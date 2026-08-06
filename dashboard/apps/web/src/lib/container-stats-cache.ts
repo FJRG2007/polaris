@@ -14,10 +14,10 @@
  * because a pass that is slower than the poll interval would otherwise stack up
  * passes against the same engine.
  *
- * Nothing here is an authorization decision. A caller has already resolved the
- * connection through the owner-scoped driver before it reads a sample, and the
- * cache is keyed by connection id - which is exactly what that resolution
- * proved the caller may reach.
+ * Nothing here is an authorization decision. The cache is keyed by connection
+ * id, and a caller has established that it may reach that connection - through
+ * `authorizeConnection`, which settles ownership whether or not the route goes
+ * on to open a driver - before it ever asks for a sample.
  */
 
 import type { ContainerStats } from "@polaris/docker";
@@ -106,16 +106,28 @@ export function rememberSample(connectionId: string, aliases: readonly string[],
     }
 }
 
-/** When the freshest of a set of samples was taken, or null when none of them
- *  ever has been. An instant rather than an age: a reader may be holding this
- *  answer from a previous visit, and only an instant stays true when it does. */
-export function newestSampleAt(samples: ReadonlyMap<string, StatsSample>, refs: readonly string[]): number | null {
-    let newest: number | null = null;
+/**
+ * How old a set of samples is, as one instant: when the oldest of them was
+ * taken, and null as soon as one of them is missing.
+ *
+ * The oldest rather than the freshest, because this answers "is any of this out
+ * of date" for the whole set. Keying off the freshest lets one warm container -
+ * a container page polling its own sample, say - stand in for every other one on
+ * the host, so the refresh never runs and numbers nobody has re-read pass for
+ * live. A ref with no sample at all is older than any instant, so it is null:
+ * a container that has just started has nothing to be fresh about.
+ *
+ * An instant rather than an age: a reader may be holding this answer from a
+ * previous visit, and only an instant stays true when it does.
+ */
+export function oldestSampleAt(samples: ReadonlyMap<string, StatsSample>, refs: readonly string[]): number | null {
+    let oldest: number | null = null;
     for (const ref of refs) {
         const at = samples.get(ref)?.at;
-        if (at !== undefined && (newest === null || at > newest)) newest = at;
+        if (at === undefined) return null;
+        if (oldest === null || at < oldest) oldest = at;
     }
-    return newest;
+    return oldest;
 }
 
 /**

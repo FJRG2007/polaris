@@ -16,11 +16,11 @@ import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
 import { ProgressBar, StatusDot } from "./pickers";
 import type { PersonRef } from "@/lib/tasks/facts";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormView } from "@/lib/tasks/form-service";
-import { ChevronDown, ChevronUp, Hash, Pencil, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AutomationsPanel, FormsPanel } from "./automations-panel";
 import type { AutomationView } from "@/lib/tasks/automation-service";
+import { ChevronDown, ChevronUp, Hash, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button, Card, CardBody, ConfirmDeleteDialog, Input, Select, cn } from "@polaris/ui";
 import type { CustomFieldView, ListSummary, SpaceMemberView, StatusView, TagView } from "@/lib/tasks/space-service";
 
@@ -216,7 +216,11 @@ function StatusesTab({
     const ordered = useMemo(() => {
         if (!moved) return statuses;
         const at = new Map(moved.map((id, index) => [id, index]));
-        return [...statuses].sort((left, right) => (at.get(left.id) ?? 0) - (at.get(right.id) ?? 0));
+        // A status the move does not name - one added since, or from another
+        // window - keeps its place at the end rather than jumping to the front.
+        return [...statuses].sort(
+            (left, right) => (at.get(left.id) ?? statuses.length) - (at.get(right.id) ?? statuses.length)
+        );
     }, [statuses, moved]);
 
     /**

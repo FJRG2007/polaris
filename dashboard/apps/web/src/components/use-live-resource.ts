@@ -56,15 +56,21 @@ export function useLiveResource<T>({
     cacheKey,
     intervalMs,
     enabled = true,
+    paused = false,
     select
 }: {
     url: string;
     cacheKey: string;
     intervalMs: number;
-    /** False stops the poll before it starts, for a subject nothing on screen is
-     *  asking about. `data` stays as it was, so a caller that gates on it reads
-     *  the answer as unknown rather than as a value. */
+    /** False asks for nothing at all, for a subject nothing on screen is asking
+     *  about. `data` stays as it was, so a caller that gates on it reads the
+     *  answer as unknown rather than as a value. */
     enabled?: boolean;
+    /** True stops the poll while leaving the resource loaded: a subject that is
+     *  on screen is still read once, and read again when it changes, because a
+     *  screen that has been told to stop refreshing still has to show what it is
+     *  looking at. */
+    paused?: boolean;
     /** Pull the payload out of the response body. */
     select: (body: unknown) => T;
 }): LiveResource<T> {
@@ -123,9 +129,16 @@ export function useLiveResource<T>({
         return () => controller.abort();
     }, [url, cacheKey]);
 
+    // The read a subject needs to be on screen at all: once, and again whenever
+    // the subject changes. Kept apart from the poll so pausing stops the refresh
+    // without leaving a newly selected subject with nothing to show.
     useEffect(() => {
         if (!enabled) return;
-        const abort = refresh();
+        return refresh();
+    }, [refresh, enabled]);
+
+    useEffect(() => {
+        if (!enabled || paused) return;
         let timer: ReturnType<typeof setInterval> | null = null;
         const start = (): void => {
             if (timer === null) timer = setInterval(refresh, intervalMs);
@@ -148,11 +161,10 @@ export function useLiveResource<T>({
         if (document.visibilityState === "visible") start();
         document.addEventListener("visibilitychange", onVisibility);
         return () => {
-            abort();
             stop();
             document.removeEventListener("visibilitychange", onVisibility);
         };
-    }, [refresh, intervalMs, enabled]);
+    }, [refresh, intervalMs, enabled, paused]);
 
     return {
         data,

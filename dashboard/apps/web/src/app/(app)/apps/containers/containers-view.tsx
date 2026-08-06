@@ -82,7 +82,10 @@ export function ContainersView({
         url: connectionId ? `/api/containers?c=${encodeURIComponent(connectionId)}` : "",
         cacheKey: `containers.${connectionId ?? "none"}`,
         intervalMs: REFRESH_MS,
-        enabled: live && connectionId !== null,
+        enabled: connectionId !== null,
+        // Pausing stops the refresh, not the load: picking a different host while
+        // paused still has to put that host on screen.
+        paused: !live,
         select: (body) => body as HostSnapshot
     });
 
@@ -144,10 +147,10 @@ export function ContainersView({
     // waiting for it. Say when what is shown was taken rather than let a reading
     // that has aged pass for this instant's.
     const usageAge = snapshot?.statsAt ? Date.now() - snapshot.statsAt : null;
-    const statusLabel = loading
-        ? "Loading"
-        : !live
-          ? "Paused"
+    const statusLabel = !live
+        ? "Paused"
+        : loading
+          ? "Loading"
           : usageAge === null
             ? "Live - first usage reading on its way"
             : usageAge > STALE_AFTER_MS

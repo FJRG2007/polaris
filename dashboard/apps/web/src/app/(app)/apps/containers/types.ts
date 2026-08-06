@@ -45,9 +45,10 @@ export interface HostSnapshot {
     overview: OverviewData;
     containers: ContainerRow[];
     canAttach: boolean;
-    /** When the usage figures were sampled. Null when none has been taken yet -
-     *  the listing is on screen and the first sample is on its way. An instant
-     *  rather than an age, so it stays true in a snapshot held between visits. */
+    /** When the oldest of the usage figures was sampled. Null while any running
+     *  container is still unsampled - the listing is on screen, the totals do
+     *  not add up yet and the reading is on its way. An instant rather than an
+     *  age, so it stays true in a snapshot held between visits. */
     statsAt: number | null;
 }
 
