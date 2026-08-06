@@ -12,6 +12,11 @@
  * Cost matters: this runs on every authenticated request. The common path is one
  * query for the user plus their settings and this session's state, and a write
  * only when the activity stamp has gone stale.
+ *
+ * The same verdict is also applied out of band, once, when the rules themselves
+ * change (revokeSessionsRefusedByRules) - a session sitting at an address it has
+ * been at all along is not re-judged per request, so something has to re-judge
+ * it the moment the rules underneath it move.
  */
 
 import { prisma } from "@polaris/db";
@@ -50,6 +55,45 @@ interface GuardInput {
 /** End a session for good: the row is what the cookie is validated against. */
 async function revokeSession(sessionId: string): Promise<void> {
     await prisma.session.deleteMany({ where: { id: sessionId } });
+}
+
+/**
+ * End the sessions that a change to an account's network rules now refuses, and
+ * leave every other one running. Narrowing where an account may connect from is
+ * not a reason to sign it out of the places the new rules still allow: ending
+ * them all logged people out of the very machine they had just been restricted
+ * to, which is the one session the change was never meant to touch.
+ *
+ * Each session is judged on the address it was last seen at, so what survives is
+ * what the new rules would let in anyway. Addresses repeat across one person's
+ * sessions - a laptop and a phone behind one router - so a verdict is computed
+ * once per distinct address, which keeps the geolocation lookups to one each.
+ *
+ * A session Polaris has never guarded has no recorded address and is left alone:
+ * guardSession evaluates it in full the first time it serves a request.
+ */
+export async function revokeSessionsRefusedByRules(userId: string): Promise<number> {
+    const states = await prisma.sessionState.findMany({
+        where: { userId, session: { expiresAt: { gt: new Date() } } },
+        select: { sessionId: true, ip: true }
+    });
+    if (states.length === 0) return 0;
+
+    const ownRules = await resolveSignInRules(userId);
+    const verdicts = new Map<string | null, boolean>();
+    const refused: string[] = [];
+    for (const state of states) {
+        let allowed = verdicts.get(state.ip);
+        if (allowed === undefined) {
+            allowed = (await evaluateAccountAccess(userId, state.ip ?? undefined, ownRules)).allowed;
+            verdicts.set(state.ip, allowed);
+        }
+        if (!allowed) refused.push(state.sessionId);
+    }
+    if (refused.length === 0) return 0;
+
+    const { count } = await prisma.session.deleteMany({ where: { userId, id: { in: refused } } });
+    return count;
 }
 
 /**

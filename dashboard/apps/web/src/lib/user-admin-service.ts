@@ -15,6 +15,7 @@
 
 import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
+import { revokeSessionsRefusedByRules } from "@/lib/session-guard";
 import { parseStringList, type AccessRulesInput } from "@polaris/core";
 import { markPrincipalsMoved, updateEnforcedRules, type AccessGroupView } from "@polaris/auth";
 
@@ -216,8 +217,13 @@ export async function setUserLimits(
 ): Promise<{ error?: string }> {
     await updateEnforcedRules(userId, actorId, rules);
     // A limit that only applies to the next sign-in is not a limit: the sessions
-    // already open were opened from wherever they were opened.
-    await dropSessions(userId);
+    // already open were opened from wherever they were opened. But only the ones
+    // the new rules actually turn away end here - restricting an account to the
+    // office is not a reason to sign it out of the office.
+    const ended = await revokeSessionsRefusedByRules(userId);
+    // A service behind a Polaris login is guarded offline from a signed token, so
+    // the new limits have to reach those guards whether or not a session ended.
+    await markPrincipalsMoved([userId]);
     await recordAudit({
         actorId,
         action: "user.limits",
@@ -227,7 +233,8 @@ export async function setUserLimits(
             cidrs: rules.allowedCidrs.length,
             countries: rules.allowedCountries.length,
             continents: rules.allowedContinents.length,
-            groups: rules.groupIds.length
+            groups: rules.groupIds.length,
+            sessionsEnded: ended
         }
     });
     return {};
