@@ -29,7 +29,16 @@ import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { containerAction, removeContainerAction } from "../actions";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
-import { Badge, Button, Card, CardBody, Skeleton, TimeSeriesChart, cn, type TimePoint } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    Skeleton,
+    TimeSeriesChart,
+    cn,
+    type TimePoint
+} from "@polaris/ui";
 import type {
     ContainerDetailData,
     ContainerUsage,
@@ -186,7 +195,9 @@ export function ContainerView({
         const at = usage?.at ?? null;
         if (!stats || at === null || Date.now() - at > CHARTABLE_AGE_MS) return;
         setSamples((previous) =>
-            previous.at(-1)?.at === at ? previous : [...previous, { at, usage: stats }].slice(-MAX_SAMPLES)
+            previous.at(-1)?.at === at
+                ? previous
+                : [...previous, { at, usage: stats }].slice(-MAX_SAMPLES)
         );
     }, [usage]);
 
@@ -245,7 +256,10 @@ export function ContainerView({
                         <ArrowLeft className="size-3" /> Containers
                     </Link>
                     <div className="flex flex-wrap items-center gap-2">
-                        <h1 className="truncate text-xl font-semibold" title={detail?.name || containerRef}>
+                        <h1
+                            className="truncate text-xl font-semibold"
+                            title={detail?.name || containerRef}
+                        >
                             {detail?.name || containerRef}
                         </h1>
                         {detail ? (
@@ -254,7 +268,10 @@ export function ContainerView({
                             <Skeleton className="h-5 w-16 rounded-full" />
                         )}
                     </div>
-                    <p className="truncate text-xs text-muted-foreground" title={detail?.image ?? undefined}>
+                    <p
+                        className="truncate text-xs text-muted-foreground"
+                        title={detail?.image ?? undefined}
+                    >
                         {detail?.image ?? ""}
                     </p>
                 </div>
@@ -353,7 +370,11 @@ export function ContainerView({
                     icon={<Network className="size-4" />}
                     label="Network"
                     value={latest ? `${formatBytes(latest.netRx)} in` : running ? null : "-"}
-                    hint={latest ? `${formatBytes(latest.netTx)} out, since it started` : "since it started"}
+                    hint={
+                        latest
+                            ? `${formatBytes(latest.netTx)} out, since it started`
+                            : "since it started"
+                    }
                     age={latestAge}
                 />
                 <Stat
@@ -361,7 +382,9 @@ export function ContainerView({
                     label="Disk I/O"
                     value={latest ? `${formatBytes(latest.blockRead)} read` : running ? null : "-"}
                     hint={
-                        latest ? `${formatBytes(latest.blockWrite)} written, since it started` : "since it started"
+                        latest
+                            ? `${formatBytes(latest.blockWrite)} written, since it started`
+                            : "since it started"
                     }
                     age={latestAge}
                 />
@@ -375,7 +398,10 @@ export function ContainerView({
             </div>
 
             <Card>
-                <div className="flex gap-1 overflow-x-auto border-b border-border px-2 py-2" role="tablist">
+                <div
+                    className="flex gap-1 overflow-x-auto border-b border-border px-2 py-2"
+                    role="tablist"
+                >
                     {TABS.map((entry) => (
                         <button
                             key={entry.id}
@@ -420,8 +446,8 @@ function Usage({ samples }: { samples: Sample[] }) {
         return (
             <Card>
                 <CardBody className="text-xs text-muted-foreground">
-                    Watching usage. The chart fills in from here - the first points arrive within a few
-                    seconds.
+                    Watching usage. The chart fills in from here - the first points arrive within a
+                    few seconds.
                 </CardBody>
             </Card>
         );
@@ -429,7 +455,10 @@ function Usage({ samples }: { samples: Sample[] }) {
 
     const from = samples[0]?.at ?? Date.now();
     const to = samples.at(-1)?.at ?? from;
-    const cpu: TimePoint[] = samples.map((sample) => ({ t: sample.at, v: sample.usage.cpuPercent }));
+    const cpu: TimePoint[] = samples.map((sample) => ({
+        t: sample.at,
+        v: sample.usage.cpuPercent
+    }));
     const memory: TimePoint[] = samples.map((sample) => ({
         t: sample.at,
         v: sample.usage.memUsage,
@@ -516,7 +545,9 @@ function RunsOn({
                             <Skeleton className="h-4 w-32" />
                         )}
                     </Field>
-                    <Field label="Networks">{networks === null ? "" : networks.join(", ") || "-"}</Field>
+                    <Field label="Networks">
+                        {networks === null ? "" : networks.join(", ") || "-"}
+                    </Field>
                 </dl>
             </CardBody>
         </Card>
@@ -526,7 +557,13 @@ function RunsOn({
 /** What the container occupies, and what it has mounted. The two sizes arrive
  *  after the mounts do - the daemon walks the filesystem for them - so they
  *  carry their own skeleton rather than holding back the card. */
-function Storage({ detail, sizes }: { detail: ContainerDetailData | null; sizes: ContainerSizes | null }) {
+function Storage({
+    detail,
+    sizes
+}: {
+    detail: ContainerDetailData | null;
+    sizes: ContainerSizes | null;
+}) {
     return (
         <Card>
             <CardBody className="space-y-3">
@@ -564,7 +601,8 @@ function Storage({ detail, sizes }: { detail: ContainerDetailData | null; sizes:
                                 ? "None"
                                 : detail.mounts.map((mount) => (
                                       <div key={mount.destination} className="break-all text-xs">
-                                          {mount.source} -&gt; {mount.destination} ({mount.rw ? "rw" : "ro"})
+                                          {mount.source} -&gt; {mount.destination} (
+                                          {mount.rw ? "rw" : "ro"})
                                       </div>
                                   ))}
                         </Field>
@@ -598,9 +636,13 @@ function DetailsTab({ detail }: { detail: ContainerDetailData | null }) {
                 <code className="break-all text-xs">{detail.command || "-"}</code>
             </Field>
             <Field label="Created">{format.dateTime(detail.createdAt)}</Field>
-            <Field label="Started">{detail.startedAt ? format.dateTime(detail.startedAt) : "-"}</Field>
+            <Field label="Started">
+                {detail.startedAt ? format.dateTime(detail.startedAt) : "-"}
+            </Field>
             <Field label="Restarts">{detail.restartCount}</Field>
-            {detail.composeProject ? <Field label="Compose project">{detail.composeProject}</Field> : null}
+            {detail.composeProject ? (
+                <Field label="Compose project">{detail.composeProject}</Field>
+            ) : null}
             <Field label="Ports">
                 {detail.ports.length === 0
                     ? "None published"
@@ -616,7 +658,9 @@ function DetailsTab({ detail }: { detail: ContainerDetailData | null }) {
                     "None"
                 ) : (
                     <>
-                        <span className="text-xs text-muted-foreground">Names only; values are never read.</span>
+                        <span className="text-xs text-muted-foreground">
+                            Names only; values are never read.
+                        </span>
                         <div className="mt-1 flex flex-wrap gap-1">
                             {detail.env.map((name) => (
                                 <Badge key={name} variant="neutral">
@@ -640,7 +684,9 @@ function LogsTab({ query }: { query: string }) {
     const load = useCallback(
         async (lines: number) => {
             setLoading(true);
-            const result = await fetchJson<{ logs: string }>(`/api/containers/logs?${query}&tail=${lines}`);
+            const result = await fetchJson<{ logs: string }>(
+                `/api/containers/logs?${query}&tail=${lines}`
+            );
             setLoading(false);
             if (!result.ok) setError(result.error);
             else {
@@ -660,7 +706,11 @@ function LogsTab({ query }: { query: string }) {
             <div className="flex items-center justify-between gap-2">
                 <span className="text-xs text-muted-foreground">Last {tail} lines</span>
                 <div className="flex items-center gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => setTail(tail >= 2000 ? 200 : tail * 5)}>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setTail(tail >= 2000 ? 200 : tail * 5)}
+                    >
                         {tail >= 2000 ? "Show fewer" : "Show more"}
                     </Button>
                     <Button
@@ -742,7 +792,9 @@ function FilesTab({ query }: { query: string }) {
                     ))}
                 </div>
             ) : entries.length === 0 && !error ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">This directory is empty.</p>
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                    This directory is empty.
+                </p>
             ) : (
                 <ul className="min-h-0 flex-1 overflow-y-auto rounded-md border border-border">
                     {entries.map((entry) => {
@@ -767,7 +819,9 @@ function FilesTab({ query }: { query: string }) {
                                 ) : (
                                     <>
                                         <FileText className="size-4 shrink-0 text-muted-foreground" />
-                                        <span className="flex-1 truncate" title={entry.name}>{entry.name}</span>
+                                        <span className="flex-1 truncate" title={entry.name}>
+                                            {entry.name}
+                                        </span>
                                         <a
                                             href={`/api/containers/file?${query}&p=${encodeURIComponent(full)}`}
                                             aria-label={`Download ${entry.name}`}
@@ -811,8 +865,8 @@ function ConsoleTab({
     if (!canAttach) {
         return (
             <Notice tone="muted">
-                This host does not offer an interactive session. Its engine is reached through the host daemon,
-                which brokers one bounded call at a time.
+                This host does not offer an interactive session. Its engine is reached through the
+                host daemon, which brokers one bounded call at a time.
             </Notice>
         );
     }
@@ -857,9 +911,13 @@ function Stat({
                 {value === null ? (
                     <Skeleton className="h-6 w-20" />
                 ) : (
-                    <div className="truncate text-lg font-semibold" title={value}>{value}</div>
+                    <div className="truncate text-lg font-semibold" title={value}>
+                        {value}
+                    </div>
                 )}
-                <div className="truncate text-xs text-muted-foreground" title={caption}>{caption}</div>
+                <div className="truncate text-xs text-muted-foreground" title={caption}>
+                    {caption}
+                </div>
             </CardBody>
         </Card>
     );
@@ -891,7 +949,9 @@ function Notice({ tone, children }: { tone: "danger" | "muted"; children: ReactN
 
 /** Fetch JSON and normalize both a transport failure and an `{ error }` body
  *  into one shape, so every caller handles failure the same way. */
-async function fetchJson<T>(url: string): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+async function fetchJson<T>(
+    url: string
+): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
     try {
         const response = await fetch(url);
         const payload = (await response.json()) as T & { error?: string };

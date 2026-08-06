@@ -22,7 +22,11 @@ import { refreshCapabilities } from "@polaris/hostd-client";
 import { userHasManage, type SessionUser } from "@/lib/session";
 import { isLocalMachine, localDockerId } from "@/lib/local-machine";
 import type { DockerConnectionSummary, LocalHostDiagnostic } from "./types";
-import { HOST_DOCKER_PREFIX, listDockerConnections, LOCAL_DOCKER_CONNECTION_ID } from "@/lib/docker-service";
+import {
+    HOST_DOCKER_PREFIX,
+    listDockerConnections,
+    LOCAL_DOCKER_CONNECTION_ID
+} from "@/lib/docker-service";
 
 export interface ContainerHosts {
     connections: DockerConnectionSummary[];
@@ -77,7 +81,9 @@ export async function containerHosts(user: SessionUser): Promise<ContainerHosts>
     // the local host is on the menu, that server is it, under its own name. It
     // still appears on its own when the local host is not offered, which is what
     // keeps an operator who may not manage the system able to reach it.
-    const sameMachine = localAvailable ? (hosts.find((host) => isLocalMachine(host, localId)) ?? null) : null;
+    const sameMachine = localAvailable
+        ? (hosts.find((host) => isLocalMachine(host, localId)) ?? null)
+        : null;
 
     const localHost: DockerConnectionSummary[] = localAvailable
         ? [
@@ -112,6 +118,8 @@ export function selectConnection(
     hosts: ContainerHosts,
     requested: string | undefined
 ): DockerConnectionSummary | null {
-    const selectable = hosts.connections.filter((connection) => !connection.local || hosts.canManage);
+    const selectable = hosts.connections.filter(
+        (connection) => !connection.local || hosts.canManage
+    );
     return selectable.find((connection) => connection.id === requested) ?? selectable[0] ?? null;
 }

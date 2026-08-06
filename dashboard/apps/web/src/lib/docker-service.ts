@@ -134,6 +134,34 @@ export async function hostDockerDriver(hostId: string, ownerId: string): Promise
     );
 }
 
+/**
+ * Whether a Containers connection resolves to something this user owns.
+ *
+ * Opening a driver proves this on its own - every resolver above is owner-scoped
+ * - so a caller that reaches the engine needs nothing else. A caller that
+ * answers from a cache instead never resolves anything, and ownership has to be
+ * established here or not at all. The local host is not owned by anyone: it is
+ * host-wide, and its caller gates it on system.manage.
+ */
+export async function ownsDockerConnection(
+    connectionId: string,
+    ownerId: string
+): Promise<boolean> {
+    if (connectionId === LOCAL_DOCKER_CONNECTION_ID) return true;
+    if (connectionId.startsWith(HOST_DOCKER_PREFIX)) {
+        const host = await prisma.host.findFirst({
+            where: { id: connectionId.slice(HOST_DOCKER_PREFIX.length), ownerId },
+            select: { id: true }
+        });
+        return host !== null;
+    }
+    const connection = await prisma.dockerConnection.findFirst({
+        where: { id: connectionId, ownerId },
+        select: { id: true }
+    });
+    return connection !== null;
+}
+
 function hostSshTransportOptions(conn: Awaited<ReturnType<typeof getHostConnection>>) {
     return {
         host: conn.address,

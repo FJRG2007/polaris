@@ -107,7 +107,12 @@ export function ModelPicker({
     }, [open]);
 
     const fuse = useMemo(
-        () => new Fuse(models, { keys: ["name", "slug", "provider"], threshold: 0.35, ignoreLocation: true }),
+        () =>
+            new Fuse(models, {
+                keys: ["name", "slug", "provider"],
+                threshold: 0.35,
+                ignoreLocation: true
+            }),
         [models]
     );
 
@@ -117,7 +122,10 @@ export function ModelPicker({
         return fuse.search(trimmed).map((hit) => hit.item);
     }, [fuse, models, query]);
 
-    const chosen = useMemo(() => models.find((model) => model.slug === value) ?? null, [models, value]);
+    const chosen = useMemo(
+        () => models.find((model) => model.slug === value) ?? null,
+        [models, value]
+    );
 
     const pick = useCallback(
         (slug: string | null) => {
@@ -143,7 +151,7 @@ export function ModelPicker({
                 className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             >
                 <span className="min-w-0 truncate text-left">
-                    {chosen ? chosen.name : (value ?? (inheritLabel ?? placeholder))}
+                    {chosen ? chosen.name : (value ?? inheritLabel ?? placeholder)}
                 </span>
                 {chosen ? (
                     <span className="text-muted-foreground shrink-0 text-xs">
@@ -166,12 +174,18 @@ export function ModelPicker({
                             placeholder={placeholder}
                             className="h-7 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                         />
-                        {loading ? <Loader2 className="text-muted-foreground size-4 shrink-0 animate-spin" /> : null}
+                        {loading ? (
+                            <Loader2 className="text-muted-foreground size-4 shrink-0 animate-spin" />
+                        ) : null}
                     </div>
 
                     <div className="max-h-72 overflow-y-auto p-1">
                         {inheritLabel !== null ? (
-                            <Row label={inheritLabel} selected={value === null} onSelect={() => pick(null)} />
+                            <Row
+                                label={inheritLabel}
+                                selected={value === null}
+                                onSelect={() => pick(null)}
+                            />
                         ) : null}
 
                         {offerTyped ? (
@@ -233,8 +247,14 @@ function Row({
         >
             <Check className={`size-4 shrink-0 ${selected ? "opacity-100" : "opacity-0"}`} />
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm" title={label}>{label}</span>
-                {detail ? <span className="text-muted-foreground block truncate text-xs" title={detail}>{detail}</span> : null}
+                <span className="block truncate text-sm" title={label}>
+                    {label}
+                </span>
+                {detail ? (
+                    <span className="text-muted-foreground block truncate text-xs" title={detail}>
+                        {detail}
+                    </span>
+                ) : null}
             </span>
         </Button>
     );

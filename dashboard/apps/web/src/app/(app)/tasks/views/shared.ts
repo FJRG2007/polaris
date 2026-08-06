@@ -84,7 +84,11 @@ export type SelectMode = "toggle" | "range";
  * Here rather than in each view so the five of them cannot drift into three
  * different answers to one gesture.
  */
-export function clickMode(event: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }): SelectMode | null {
+export function clickMode(event: {
+    metaKey: boolean;
+    ctrlKey: boolean;
+    shiftKey: boolean;
+}): SelectMode | null {
     if (event.shiftKey) return "range";
     return event.metaKey || event.ctrlKey ? "toggle" : null;
 }
@@ -99,7 +103,10 @@ export function clickMode(event: { metaKey: boolean; ctrlKey: boolean; shiftKey:
  * fit is counted so the screen can say it, because a selection that quietly
  * stopped short is one somebody acts on believing it covered everything.
  */
-export function holdSelection(next: ReadonlySet<string>): { taken: ReadonlySet<string>; dropped: number } {
+export function holdSelection(next: ReadonlySet<string>): {
+    taken: ReadonlySet<string>;
+    dropped: number;
+} {
     if (next.size <= TASK_SELECTION_MAX) return { taken: next, dropped: 0 };
     return {
         taken: new Set([...next].slice(0, TASK_SELECTION_MAX)),
@@ -120,7 +127,11 @@ export type BulkVerb = "Changed" | "Deleted";
  * twelve went, and nothing on the screen would ever have said which eight are
  * still there.
  */
-export function shortfallMessage(count: number | undefined, asked: number, verb: BulkVerb): string | null {
+export function shortfallMessage(
+    count: number | undefined,
+    asked: number,
+    verb: BulkVerb
+): string | null {
     if (count === undefined || count >= asked) return null;
     const rest = asked - count;
     return `${verb} ${count} of ${asked}: ${rest === 1 ? "one task is" : `${rest} tasks are`} not yours to change.`;
@@ -182,7 +193,11 @@ export interface ViewProps {
      *  Only supplied when the reader may change the space's statuses and the
      *  screen belongs to one space, which is what decides whether the affordance
      *  exists at all. */
-    readonly onCreateStatus?: (name: string, type: TaskStatusType, color: string) => Promise<string | null>;
+    readonly onCreateStatus?: (
+        name: string,
+        type: TaskStatusType,
+        color: string
+    ) => Promise<string | null>;
     /** Reshape a column: what it is called, what it means for the work sitting in
      *  it, and the colour it is read by. Supplied under the same rule as
      *  `onCreateStatus`, and reports whether the change landed. */

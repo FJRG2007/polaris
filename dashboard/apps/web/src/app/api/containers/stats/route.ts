@@ -16,7 +16,12 @@
 
 import { containerStats } from "@/lib/container-service";
 import { authorizeConnection, containerQuerySchema, parseQuery } from "../query";
-import { cachedSample, refreshSamples, rememberSample, STATS_TTL_MS } from "@/lib/container-stats-cache";
+import {
+    cachedSample,
+    refreshSamples,
+    rememberSample,
+    STATS_TTL_MS
+} from "@/lib/container-stats-cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,7 +49,12 @@ export async function GET(request: Request): Promise<Response> {
         return Response.json({ stats, at: stats ? Date.now() : null });
     } catch (caught) {
         return Response.json(
-            { error: caught instanceof Error ? caught.message : "Could not read this container's usage" },
+            {
+                error:
+                    caught instanceof Error
+                        ? caught.message
+                        : "Could not read this container's usage"
+            },
             { status: 502 }
         );
     }

@@ -21,7 +21,12 @@ import { ReactRenderer } from "@tiptap/react";
 import type { Editor, Range } from "@tiptap/core";
 import type { SuggestionProps } from "@tiptap/suggestion";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
-import { POPUP_CLASS, POPUP_ITEM_CLASS, POPUP_LAYER_CLASS, type SuggestionHandle } from "./suggestion";
+import {
+    POPUP_CLASS,
+    POPUP_ITEM_CLASS,
+    POPUP_LAYER_CLASS,
+    type SuggestionHandle
+} from "./suggestion";
 import {
     Code2,
     Heading1,
@@ -54,19 +59,22 @@ const BLOCKS: readonly BlockCommand[] = [
         label: "Heading",
         keywords: "title h1",
         icon: Heading1,
-        run: (editor, range) => editor.chain().focus().deleteRange(range).setNode("heading", { level: 1 }).run()
+        run: (editor, range) =>
+            editor.chain().focus().deleteRange(range).setNode("heading", { level: 1 }).run()
     },
     {
         label: "Subheading",
         keywords: "h2 section",
         icon: Heading2,
-        run: (editor, range) => editor.chain().focus().deleteRange(range).setNode("heading", { level: 2 }).run()
+        run: (editor, range) =>
+            editor.chain().focus().deleteRange(range).setNode("heading", { level: 2 }).run()
     },
     {
         label: "Small heading",
         keywords: "h3",
         icon: Heading3,
-        run: (editor, range) => editor.chain().focus().deleteRange(range).setNode("heading", { level: 3 }).run()
+        run: (editor, range) =>
+            editor.chain().focus().deleteRange(range).setNode("heading", { level: 3 }).run()
     },
     {
         label: "Bullet list",
@@ -144,10 +152,15 @@ const Menu = forwardRef<SuggestionHandle, SuggestionProps<BlockCommand>>(functio
                             props.command(item);
                         }}
                         onMouseEnter={() => setActive(index)}
-                        className={cn(POPUP_ITEM_CLASS, index === active ? "bg-muted" : "hover:bg-muted/60")}
+                        className={cn(
+                            POPUP_ITEM_CLASS,
+                            index === active ? "bg-muted" : "hover:bg-muted/60"
+                        )}
                     >
                         <item.icon className="size-4 shrink-0 text-muted-foreground" />
-                        <span className="truncate" title={item.label}>{item.label}</span>
+                        <span className="truncate" title={item.label}>
+                            {item.label}
+                        </span>
                     </button>
                 </li>
             ))}
@@ -169,18 +182,23 @@ export const BlockMenu = Extension.create({
                 pluginKey: blockMenuKey,
                 // Only at the start of an empty-ish block: a slash inside a
                 // sentence is a slash, and inside code it is a path.
-                allow: ({ editor }) => !editor.isActive("codeBlock") && !editor.isActive("markdownBlock"),
+                allow: ({ editor }) =>
+                    !editor.isActive("codeBlock") && !editor.isActive("markdownBlock"),
                 items: ({ query }) => {
                     const term = query.trim().toLowerCase();
                     if (!term) return [...BLOCKS];
                     return BLOCKS.filter(
                         (block) =>
-                            block.label.toLowerCase().includes(term) || block.keywords.includes(term)
+                            block.label.toLowerCase().includes(term) ||
+                            block.keywords.includes(term)
                     );
                 },
                 command: ({ editor, range, props }) => props.run(editor, range),
                 render: () => {
-                    let renderer: ReactRenderer<SuggestionHandle, SuggestionProps<BlockCommand>> | null = null;
+                    let renderer: ReactRenderer<
+                        SuggestionHandle,
+                        SuggestionProps<BlockCommand>
+                    > | null = null;
                     let unmount: (() => void) | null = null;
 
                     return {

@@ -36,7 +36,14 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { Button, ConfirmDeleteDialog, Select, cn } from "@polaris/ui";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
 import { CalendarDays, GanttChart, LayoutList, Plus, Rows3, Search, Table2, X } from "lucide-react";
-import type { BulkVerb, SelectMode, TaskBulkEdit, TaskEdit, TaskListRef, ViewProps } from "./views/shared";
+import type {
+    BulkVerb,
+    SelectMode,
+    TaskBulkEdit,
+    TaskEdit,
+    TaskListRef,
+    ViewProps
+} from "./views/shared";
 
 const VIEW_ICONS: Record<core.TaskViewType, typeof LayoutList> = {
     list: LayoutList,
@@ -86,12 +93,18 @@ export function ListScreen({
     // the one they open on; a shared view is the list's, and is what everybody
     // else gets. That is also where anything this screen saves for them goes -
     // reshaping what the rest of the team sees is not a thing a drag should do.
-    const ownView = savedViews.find((view) => view.ownerId === context.currentUserId && !view.shared);
+    const ownView = savedViews.find(
+        (view) => view.ownerId === context.currentUserId && !view.shared
+    );
     const initial = ownView ?? savedViews[0];
     const [viewType, setViewType] = useState<core.TaskViewType>(initial?.type ?? "board");
     const [groupBy, setGroupBy] = useState<core.TaskGroupField>(initial?.groupBy ?? "status");
-    const [sort, setSort] = useState<core.TaskSort>(initial?.sort ?? { field: "priority", direction: "asc" });
-    const [filter, setFilter] = useState<core.TaskFilter>(initialFilter ?? initial?.filter ?? core.EMPTY_FILTER);
+    const [sort, setSort] = useState<core.TaskSort>(
+        initial?.sort ?? { field: "priority", direction: "asc" }
+    );
+    const [filter, setFilter] = useState<core.TaskFilter>(
+        initialFilter ?? initial?.filter ?? core.EMPTY_FILTER
+    );
     const [showClosed, setShowClosed] = useState(initial?.showClosed ?? false);
     const [search, setSearch] = useState("");
     const [openTaskId, setOpenTaskId] = useState<string | null>(initialTaskId);
@@ -106,7 +119,10 @@ export function ListScreen({
     // Optimistic overlay: what a drag or a tick changed before the server said so.
     const [pending, setPending] = useState<Record<string, Partial<TaskRow>>>({});
 
-    const rows = useMemo(() => tasks.map((task) => ({ ...task, ...pending[task.id] })), [tasks, pending]);
+    const rows = useMemo(
+        () => tasks.map((task) => ({ ...task, ...pending[task.id] })),
+        [tasks, pending]
+    );
 
     const refresh = () =>
         startRefresh(() => {
@@ -162,7 +178,10 @@ export function ListScreen({
     }, [rows, index, filter, showClosed, search, sort, statusOrder, format.weekStartsOn]);
 
     const visible = useMemo(
-        () => visibleFacts.map((facts) => rowById.get(facts.id)).filter((task): task is TaskRow => task !== undefined),
+        () =>
+            visibleFacts
+                .map((facts) => rowById.get(facts.id))
+                .filter((task): task is TaskRow => task !== undefined),
         [visibleFacts, rowById]
     );
 
@@ -174,7 +193,10 @@ export function ListScreen({
                     groupBy,
                     {
                         statuses: context.statuses,
-                        people: context.people.map((person) => ({ id: person.id, name: person.name })),
+                        people: context.people.map((person) => ({
+                            id: person.id,
+                            name: person.name
+                        })),
                         tags: context.tags,
                         lists
                     },
@@ -187,7 +209,16 @@ export function ListScreen({
                         .map((facts) => rowById.get(facts.id))
                         .filter((task): task is TaskRow => task !== undefined)
                 })),
-        [visibleFacts, rowById, groupBy, context.statuses, context.people, context.tags, lists, format.weekStartsOn]
+        [
+            visibleFacts,
+            rowById,
+            groupBy,
+            context.statuses,
+            context.people,
+            context.tags,
+            lists,
+            format.weekStartsOn
+        ]
     );
 
     /**
@@ -204,7 +235,10 @@ export function ListScreen({
             [task.id]: { ...current[task.id], ...taskOverlay(change, context) }
         }));
 
-        const result = await runAction(() => actions.updateTaskAction({ taskId: task.id, ...change }), setError);
+        const result = await runAction(
+            () => actions.updateTaskAction({ taskId: task.id, ...change }),
+            setError
+        );
         if (result?.error) setError(result.error);
         refresh();
     };
@@ -261,7 +295,10 @@ export function ListScreen({
      * it was in, the dragged task takes its new one, and the view says it is now
      * in manual order. Nothing jumps, and the next drag is an ordinary one.
      */
-    const adoptOrder = async (task: TaskRow, position: { beforeId: string | null; afterId: string | null }) => {
+    const adoptOrder = async (
+        task: TaskRow,
+        position: { beforeId: string | null; afterId: string | null }
+    ) => {
         // Order runs per list. A screen spanning several - Everything, a sprint -
         // is looking at that many separate sequences, so only the dragged task's
         // own list is written down and every other list keeps the order somebody
@@ -269,7 +306,9 @@ export function ListScreen({
         const inList = rows.filter((row) => row.listId === task.listId);
         // The whole list, not just what passes the filter: re-spacing only the
         // visible rows would interleave them with the ones a filter is hiding.
-        const arranged = core.sortTasks(inList.map(toFacts), sort, statusOrder).map((facts) => facts.id);
+        const arranged = core
+            .sortTasks(inList.map(toFacts), sort, statusOrder)
+            .map((facts) => facts.id);
         const taskIds = core.arrangeAround(arranged, task.id, position);
 
         const result = await runAction(() => actions.arrangeTasksAction({ taskIds }), setError);
@@ -305,14 +344,24 @@ export function ListScreen({
         // The column of tasks with no status is keyed by an empty string. Sent
         // as-is it fails validation and the drop silently does nothing, so it
         // becomes an explicit null: "put this back to having no status".
-        const statusId = groupBy === "status" ? (groupKey || null) : undefined;
+        const statusId = groupBy === "status" ? groupKey || null : undefined;
         const target = context.statuses.find((status) => status.id === statusId);
         setPending((current) => ({
             ...current,
             [taskId]: target
-                ? { statusId: target.id, statusName: target.name, statusColor: target.color, statusType: target.type }
+                ? {
+                      statusId: target.id,
+                      statusName: target.name,
+                      statusColor: target.color,
+                      statusType: target.type
+                  }
                 : statusId === null
-                  ? { statusId: null, statusName: "No status", statusColor: "#64748b", statusType: "open" }
+                  ? {
+                        statusId: null,
+                        statusName: "No status",
+                        statusColor: "#64748b",
+                        statusType: "open"
+                    }
                   : {}
         }));
         const result = await runAction(
@@ -338,7 +387,12 @@ export function ListScreen({
             // A card dropped on itself promised nothing, and a card from another
             // list is not a place either: the two are ordered against their own
             // lists, so there is no gap between them to be put in.
-            if (dragged && landedOn && landedOn.id !== dragged.id && landedOn.listId === dragged.listId) {
+            if (
+                dragged &&
+                landedOn &&
+                landedOn.id !== dragged.id &&
+                landedOn.listId === dragged.listId
+            ) {
                 await adoptOrder(dragged, position);
             }
         }
@@ -422,7 +476,10 @@ export function ListScreen({
 
     // The selection as rows, narrowed to what is on screen: an id a filter has
     // since hidden is not something a bulk verb should quietly write to.
-    const selected = useMemo(() => visible.filter((task) => selection.has(task.id)), [visible, selection]);
+    const selected = useMemo(
+        () => visible.filter((task) => selection.has(task.id)),
+        [visible, selection]
+    );
 
     /** Say so when a write reached fewer tasks than the selection it was handed. */
     const reportShortfall = (count: number | undefined, asked: number, verb: BulkVerb) => {
@@ -456,7 +513,10 @@ export function ListScreen({
             });
         }
 
-        const result = await runAction(() => actions.bulkUpdateAction({ taskIds, ...change }), setError);
+        const result = await runAction(
+            () => actions.bulkUpdateAction({ taskIds, ...change }),
+            setError
+        );
         if (result?.error) setError(result.error);
         else reportShortfall(result?.count, taskIds.length, "Changed");
         if (leaves) clearSelection();
@@ -554,7 +614,12 @@ export function ListScreen({
         onUpdateStatus: canManageColumns
             ? async (statusId, name, type, color) => {
                   const saved = await runAction(
-                      () => actions.updateStatusAction(context.spaceId, statusId, { name, type, color }),
+                      () =>
+                          actions.updateStatusAction(context.spaceId, statusId, {
+                              name,
+                              type,
+                              color
+                          }),
                       setError
                   );
                   if (saved?.error) setError(saved.error);
@@ -591,11 +656,17 @@ export function ListScreen({
             <header className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0">
                     <h1 className="truncate text-xl font-semibold">{title}</h1>
-                    {subtitle && <p className="truncate text-sm text-muted-foreground">{subtitle}</p>}
+                    {subtitle && (
+                        <p className="truncate text-sm text-muted-foreground">{subtitle}</p>
+                    )}
                 </div>
                 <span className="flex-1" />
                 {context.canEdit && createTarget && (
-                    <Button size="sm" title="New task (N)" onClick={() => setCreating({ name: "", dueDate: null })}>
+                    <Button
+                        size="sm"
+                        title="New task (N)"
+                        onClick={() => setCreating({ name: "", dueDate: null })}
+                    >
                         <Plus className="size-4" /> New task
                     </Button>
                 )}
@@ -620,7 +691,9 @@ export function ListScreen({
                                 )}
                             >
                                 <Icon className="size-3.5" />
-                                <span className="hidden sm:inline">{core.TASK_VIEW_LABELS[type]}</span>
+                                <span className="hidden sm:inline">
+                                    {core.TASK_VIEW_LABELS[type]}
+                                </span>
                             </button>
                         );
                     })}
@@ -641,7 +714,9 @@ export function ListScreen({
 
                 <Select
                     value={sort.field}
-                    onValueChange={(field) => setSort({ ...sort, field: field as core.TaskSortField })}
+                    onValueChange={(field) =>
+                        setSort({ ...sort, field: field as core.TaskSortField })
+                    }
                     options={core.TASK_SORT_FIELDS.map((field) => ({
                         value: field,
                         label: `Sort: ${core.TASK_SORT_LABELS[field]}`
@@ -651,14 +726,20 @@ export function ListScreen({
                 />
                 <button
                     type="button"
-                    onClick={() => setSort({ ...sort, direction: sort.direction === "asc" ? "desc" : "asc" })}
+                    onClick={() =>
+                        setSort({ ...sort, direction: sort.direction === "asc" ? "desc" : "asc" })
+                    }
                     className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                     {sort.direction === "asc" ? "Ascending" : "Descending"}
                 </button>
 
                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <input type="checkbox" checked={showClosed} onChange={(event) => setShowClosed(event.target.checked)} />
+                    <input
+                        type="checkbox"
+                        checked={showClosed}
+                        onChange={(event) => setShowClosed(event.target.checked)}
+                    />
                     Show closed
                 </label>
 
@@ -691,7 +772,10 @@ export function ListScreen({
             </div>
 
             {error && (
-                <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <p
+                    role="alert"
+                    className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                >
                     {error}
                 </p>
             )}
@@ -711,7 +795,11 @@ export function ListScreen({
                         selected={[]}
                         onChange={(ids) => void applyToTasks(selected, { addAssigneeIds: ids })}
                     />
-                    <Button size="sm" variant="ghost" onClick={() => void applyToTasks(selected, { archived: true })}>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => void applyToTasks(selected, { archived: true })}
+                    >
                         Archive
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => setDeleting(selected)}>
@@ -743,8 +831,8 @@ export function ListScreen({
             )}
 
             <p className="text-[11px] text-muted-foreground">
-                Ctrl-click (or Cmd-click) selects a task without opening it, shift-click takes everything between, Esc
-                clears the selection, and N starts a new task.
+                Ctrl-click (or Cmd-click) selects a task without opening it, shift-click takes
+                everything between, Esc clears the selection, and N starts a new task.
             </p>
 
             {createTarget && (
@@ -785,7 +873,9 @@ export function ListScreen({
                 onOpenChange={(open) => (open ? undefined : setDeleting([]))}
                 // One task is named; a selection is counted, since a dialog
                 // listing forty names says less than the number does.
-                name={deleting.length === 1 ? (deleting[0]?.name ?? "") : `${deleting.length} tasks`}
+                name={
+                    deleting.length === 1 ? (deleting[0]?.name ?? "") : `${deleting.length} tasks`
+                }
                 kind={deleting.length === 1 ? "task" : "tasks"}
                 // One row of many is asked plainly, the way every other single
                 // delete is. A selection is not one row: it takes every subtask,
@@ -793,11 +883,16 @@ export function ListScreen({
                 // a screen where the click before it was a shift-click.
                 requireTyping={deleting.length > 1}
                 description="Comments, checklists and tracked time go with them. Archiving keeps all of that and takes them off the board."
-                confirmLabel={deleting.length === 1 ? "Delete task" : `Delete ${deleting.length} tasks`}
+                confirmLabel={
+                    deleting.length === 1 ? "Delete task" : `Delete ${deleting.length} tasks`
+                }
                 onConfirm={async () => {
                     const taskIds = deleting.map((task) => task.id);
                     if (taskIds.length === 0) return;
-                    const result = await runAction(() => actions.deleteTasksAction({ taskIds }), setError);
+                    const result = await runAction(
+                        () => actions.deleteTasksAction({ taskIds }),
+                        setError
+                    );
                     if (result?.error) setError(result.error);
                     else reportShortfall(result?.count, taskIds.length, "Deleted");
                     setDeleting([]);

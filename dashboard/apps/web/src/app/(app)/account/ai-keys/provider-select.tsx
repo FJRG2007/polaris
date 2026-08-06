@@ -51,7 +51,9 @@ export function ProviderSelect({
         const needle = query.trim().toLowerCase();
         if (!needle) return options;
         return options.filter((option) =>
-            [option.name, option.slug, ...option.aliases].some((term) => term.toLowerCase().includes(needle))
+            [option.name, option.slug, ...option.aliases].some((term) =>
+                term.toLowerCase().includes(needle)
+            )
         );
     }, [options, query]);
 
@@ -68,7 +70,10 @@ export function ProviderSelect({
                 className="border-input bg-surface flex h-9 w-full items-center gap-2 rounded-md border px-3 py-2 text-sm shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             >
                 {chosen ? <IntegrationLogo slug={chosen.slug} className="size-4 shrink-0" /> : null}
-                <span className="min-w-0 flex-1 truncate text-left" title={chosen?.name ?? undefined}>
+                <span
+                    className="min-w-0 flex-1 truncate text-left"
+                    title={chosen?.name ?? undefined}
+                >
                     {chosen?.name ?? "Pick a provider"}
                 </span>
             </button>
@@ -107,7 +112,9 @@ export function ProviderSelect({
                                     className={`size-4 shrink-0 ${option.slug === value ? "opacity-100" : "opacity-0"}`}
                                 />
                                 <IntegrationLogo slug={option.slug} className="size-4 shrink-0" />
-                                <span className="min-w-0 flex-1 truncate" title={option.name}>{option.name}</span>
+                                <span className="min-w-0 flex-1 truncate" title={option.name}>
+                                    {option.name}
+                                </span>
                             </Button>
                         ))}
                         {results.length === 0 ? (

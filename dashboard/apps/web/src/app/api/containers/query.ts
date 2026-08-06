@@ -5,12 +5,14 @@
  * they are parsed once here rather than re-derived per route, and the answer to
  * "may this user touch this engine at all" is decided in one place. The local
  * engine is host-wide, so it is gated on system.manage; every other connection
- * is resolved owner-scoped further down and needs no extra gate.
+ * is owned, and ownership is settled here rather than left to whatever the route
+ * happens to do next - a route that answers from a cache resolves no driver and
+ * would otherwise be gated by nothing at all.
  */
 
 import { z } from "zod";
 import { requireUser, userHasManage } from "@/lib/session";
-import { LOCAL_DOCKER_CONNECTION_ID } from "@/lib/docker-service";
+import { LOCAL_DOCKER_CONNECTION_ID, ownsDockerConnection } from "@/lib/docker-service";
 
 /** A Docker id or name, plus the prefixed forms a Containers connection id
  *  takes (`local`, `host:<id>`, or a stored row's cuid). */
@@ -50,7 +52,8 @@ export function parseQuery<T extends z.ZodTypeAny>(
     schema: T
 ): { ok: true; data: z.infer<T> } | { ok: false; error: string } {
     const parsed = schema.safeParse(Object.fromEntries(new URL(url).searchParams));
-    if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid request" };
+    if (!parsed.success)
+        return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid request" };
     return { ok: true, data: parsed.data };
 }
 
@@ -60,13 +63,18 @@ export interface AuthorizedCaller {
 
 /**
  * The signed-in user, when they may reach this connection at all. Null for the
- * local engine when the caller cannot manage the system; a stored or Host
- * connection resolves owner-scoped later, which is what stops one operator
- * reaching another's engine. These routes only read - acting on a container goes
- * through the server actions, which re-check system.manage themselves.
+ * local engine when the caller cannot manage the system, and null for a stored
+ * or Host connection somebody else owns - which is what stops one operator
+ * reaching another's engine, whether the route goes on to open a driver or reads
+ * a sample that engine already gave up. These routes only read - acting on a
+ * container goes through the server actions, which re-check system.manage
+ * themselves.
  */
 export async function authorizeConnection(connection: string): Promise<AuthorizedCaller | null> {
     const user = await requireUser();
-    if (connection === LOCAL_DOCKER_CONNECTION_ID && !(await userHasManage(user, "system.manage"))) return null;
+    if (connection === LOCAL_DOCKER_CONNECTION_ID) {
+        return (await userHasManage(user, "system.manage")) ? { userId: user.id } : null;
+    }
+    if (!(await ownsDockerConnection(connection, user.id))) return null;
     return { userId: user.id };
 }

@@ -24,7 +24,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import { clickMode, type BoardMove, type SelectMode, type ViewProps } from "./shared";
 import { commandsFor, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
-import { GripVertical, MessageSquare, MoreHorizontal, Paperclip, Pencil, Plus, Repeat, Trash2 } from "lucide-react";
+import {
+    GripVertical,
+    MessageSquare,
+    MoreHorizontal,
+    Paperclip,
+    Pencil,
+    Plus,
+    Repeat,
+    Trash2
+} from "lucide-react";
 import {
     AssigneePicker,
     AvatarStack,
@@ -48,7 +57,11 @@ import {
 } from "@polaris/ui";
 
 /** Where a card was dropped, as neighbours rather than an index. */
-function neighbours(tasks: readonly TaskRow[], targetId: string | null, dragged: string): BoardMove["position"] {
+function neighbours(
+    tasks: readonly TaskRow[],
+    targetId: string | null,
+    dragged: string
+): BoardMove["position"] {
     const without = tasks.filter((task) => task.id !== dragged);
     if (!targetId) {
         const last = without.at(-1);
@@ -196,7 +209,15 @@ function ColumnEditor({
  * card, so it waits for the pointer, and never appears at all to somebody who
  * cannot edit the task.
  */
-function CornerControl({ set, canEdit, children }: { set: boolean; canEdit: boolean; children: React.ReactNode }) {
+function CornerControl({
+    set,
+    canEdit,
+    children
+}: {
+    set: boolean;
+    canEdit: boolean;
+    children: React.ReactNode;
+}) {
     if (set) return <>{children}</>;
     if (!canEdit) return null;
     // An open menu takes the pointer off the card, so hover alone would hide the
@@ -238,154 +259,182 @@ export function TaskCard({
     const [over, setOver] = useState(false);
     const { task, context, canEdit, onOpen } = commands;
     // The bottom line only earns its space when there is something on it.
-    const hasMeta = task.dueDate !== null || task.subtaskCount > 0 || task.commentCount > 0 || task.points !== null;
+    const hasMeta =
+        task.dueDate !== null ||
+        task.subtaskCount > 0 ||
+        task.commentCount > 0 ||
+        task.points !== null;
 
     return (
         <TaskMenu commands={commands}>
-        <li
-            draggable
-            onDragStart={(event) => {
-                event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData("text/plain", task.id);
-                onDragStart();
-            }}
-            onDragOver={(event) => {
-                if (!accepting) return;
-                event.preventDefault();
-                setOver(true);
-            }}
-            onDragLeave={() => setOver(false)}
-            onDrop={(event) => {
-                if (!accepting) return;
-                event.preventDefault();
-                event.stopPropagation();
-                setOver(false);
-                onDropBefore();
-            }}
-            className={cn(
-                "relative",
-                over &&
-                    positioned &&
-                    "before:absolute before:-top-1 before:h-0.5 before:w-full before:rounded before:bg-primary"
-            )}
-        >
-            <div
-                role="button"
-                tabIndex={0}
-                onMouseDown={(event) => (event.shiftKey ? event.preventDefault() : undefined)}
-                onClick={(event) => {
-                    const mode = clickMode(event);
-                    if (mode) onSelect(mode);
-                    else onOpen();
+            <li
+                draggable
+                onDragStart={(event) => {
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", task.id);
+                    onDragStart();
                 }}
-                onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        onOpen();
-                    }
+                onDragOver={(event) => {
+                    if (!accepting) return;
+                    event.preventDefault();
+                    setOver(true);
+                }}
+                onDragLeave={() => setOver(false)}
+                onDrop={(event) => {
+                    if (!accepting) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setOver(false);
+                    onDropBefore();
                 }}
                 className={cn(
-                    "group flex cursor-pointer flex-col gap-2 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/50",
-                    selected && "border-primary ring-1 ring-primary"
+                    "relative",
+                    over &&
+                        positioned &&
+                        "before:absolute before:-top-1 before:h-0.5 before:w-full before:rounded before:bg-primary"
                 )}
             >
-                <div className="flex items-center gap-2">
-                    <span
-                        // The card opens on click, so the controls on it have to
-                        // stop the click from reaching the card underneath.
-                        onClick={(event) => event.stopPropagation()}
-                        onKeyDown={(event) => event.stopPropagation()}
-                        role="presentation"
-                    >
-                        <TaskStatusMarker commands={commands} />
-                    </span>
-                    <span className="font-mono text-[10px] text-muted-foreground">{task.reference}</span>
-                    <span className="flex-1" />
-                    <BlockedMarker task={task} format={format.date} />
-                    {task.recurring && <Repeat className="size-3.5 shrink-0 text-muted-foreground" aria-label="Repeats" />}
-                    {/* Who it is on and how urgent it is, in the corner rather
+                <div
+                    role="button"
+                    tabIndex={0}
+                    onMouseDown={(event) => (event.shiftKey ? event.preventDefault() : undefined)}
+                    onClick={(event) => {
+                        const mode = clickMode(event);
+                        if (mode) onSelect(mode);
+                        else onOpen();
+                    }}
+                    onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            onOpen();
+                        }
+                    }}
+                    className={cn(
+                        "group flex cursor-pointer flex-col gap-2 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/50",
+                        selected && "border-primary ring-1 ring-primary"
+                    )}
+                >
+                    <div className="flex items-center gap-2">
+                        <span
+                            // The card opens on click, so the controls on it have to
+                            // stop the click from reaching the card underneath.
+                            onClick={(event) => event.stopPropagation()}
+                            onKeyDown={(event) => event.stopPropagation()}
+                            role="presentation"
+                        >
+                            <TaskStatusMarker commands={commands} />
+                        </span>
+                        <span className="font-mono text-[10px] text-muted-foreground">
+                            {task.reference}
+                        </span>
+                        <span className="flex-1" />
+                        <BlockedMarker task={task} format={format.date} />
+                        {task.recurring && (
+                            <Repeat
+                                className="size-3.5 shrink-0 text-muted-foreground"
+                                aria-label="Repeats"
+                            />
+                        )}
+                        {/* Who it is on and how urgent it is, in the corner rather
                         than adrift under the name - and each one is the control
                         that changes it, so there is no second flag on hover
                         doing what the flag already shown could do. */}
-                    <span
-                        onClick={(event) => event.stopPropagation()}
-                        onKeyDown={(event) => event.stopPropagation()}
-                        role="presentation"
-                        className="flex items-center gap-1"
+                        <span
+                            onClick={(event) => event.stopPropagation()}
+                            onKeyDown={(event) => event.stopPropagation()}
+                            role="presentation"
+                            className="flex items-center gap-1"
+                        >
+                            <CornerControl set={task.assignees.length > 0} canEdit={canEdit}>
+                                <AssigneePicker
+                                    people={context.people}
+                                    selected={task.assignees.map((person) => person.id)}
+                                    disabled={!canEdit}
+                                    onChange={(assigneeIds) => commands.onEdit({ assigneeIds })}
+                                    trigger={
+                                        task.assignees.length > 0 ? (
+                                            <button
+                                                type="button"
+                                                aria-label="Assignees"
+                                                className="flex items-center rounded-full transition-opacity hover:opacity-75"
+                                            >
+                                                <AvatarStack people={task.assignees} size={18} />
+                                            </button>
+                                        ) : undefined
+                                    }
+                                />
+                            </CornerControl>
+                            <CornerControl set={task.priority !== "none"} canEdit={canEdit}>
+                                <PriorityPicker
+                                    value={task.priority}
+                                    disabled={!canEdit}
+                                    onChange={(priority) => commands.onEdit({ priority })}
+                                />
+                            </CornerControl>
+                        </span>
+                    </div>
+
+                    <p
+                        className={cn(
+                            "text-sm leading-snug",
+                            core.isFinishedStatus(task.statusType) && "text-muted-foreground"
+                        )}
                     >
-                        <CornerControl set={task.assignees.length > 0} canEdit={canEdit}>
-                            <AssigneePicker
-                                people={context.people}
-                                selected={task.assignees.map((person) => person.id)}
-                                disabled={!canEdit}
-                                onChange={(assigneeIds) => commands.onEdit({ assigneeIds })}
-                                trigger={
-                                    task.assignees.length > 0 ? (
-                                        <button
-                                            type="button"
-                                            aria-label="Assignees"
-                                            className="flex items-center rounded-full transition-opacity hover:opacity-75"
-                                        >
-                                            <AvatarStack people={task.assignees} size={18} />
-                                        </button>
-                                    ) : undefined
-                                }
+                        {task.name}
+                    </p>
+
+                    {showLocation && (
+                        <span onClick={(event) => event.stopPropagation()} role="presentation">
+                            <TaskLocation task={task} />
+                        </span>
+                    )}
+
+                    {task.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                            {task.tags.map((tag) => (
+                                <TagChip key={tag.id} tag={tag} />
+                            ))}
+                        </div>
+                    )}
+
+                    {hasMeta && (
+                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                            <DueBadge
+                                dueDate={task.dueDate}
+                                statusType={task.statusType}
+                                timed={task.timed}
+                                format={format.date}
                             />
-                        </CornerControl>
-                        <CornerControl set={task.priority !== "none"} canEdit={canEdit}>
-                            <PriorityPicker
-                                value={task.priority}
-                                disabled={!canEdit}
-                                onChange={(priority) => commands.onEdit({ priority })}
-                            />
-                        </CornerControl>
-                    </span>
+                            {task.subtaskCount > 0 && (
+                                <span
+                                    className="inline-flex items-center gap-0.5"
+                                    title={`${task.subtaskCount} subtasks`}
+                                >
+                                    <Paperclip className="size-3" />
+                                    {task.subtaskCount}
+                                </span>
+                            )}
+                            {task.commentCount > 0 && (
+                                <span
+                                    className="inline-flex items-center gap-0.5"
+                                    title={`${task.commentCount} comments`}
+                                >
+                                    <MessageSquare className="size-3" />
+                                    {task.commentCount}
+                                </span>
+                            )}
+                            {task.points !== null && <span title="Points">{task.points} pts</span>}
+                        </div>
+                    )}
                 </div>
-
-                <p className={cn("text-sm leading-snug", core.isFinishedStatus(task.statusType) && "text-muted-foreground")}>
-                    {task.name}
-                </p>
-
-                {showLocation && (
-                    <span onClick={(event) => event.stopPropagation()} role="presentation">
-                        <TaskLocation task={task} />
-                    </span>
-                )}
-
-                {task.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                        {task.tags.map((tag) => (
-                            <TagChip key={tag.id} tag={tag} />
-                        ))}
-                    </div>
-                )}
-
-                {hasMeta && (
-                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                        <DueBadge dueDate={task.dueDate} statusType={task.statusType} timed={task.timed} format={format.date} />
-                        {task.subtaskCount > 0 && (
-                            <span className="inline-flex items-center gap-0.5" title={`${task.subtaskCount} subtasks`}>
-                                <Paperclip className="size-3" />
-                                {task.subtaskCount}
-                            </span>
-                        )}
-                        {task.commentCount > 0 && (
-                            <span className="inline-flex items-center gap-0.5" title={`${task.commentCount} comments`}>
-                                <MessageSquare className="size-3" />
-                                {task.commentCount}
-                            </span>
-                        )}
-                        {task.points !== null && <span title="Points">{task.points} pts</span>}
-                    </div>
-                )}
-            </div>
-        </li>
+            </li>
         </TaskMenu>
     );
 }
 
 export function BoardView(props: ViewProps) {
-    const { context, groups, selection, onSelect, onMove, onQuickCreate, canEdit, orderable } = props;
+    const { context, groups, selection, onSelect, onMove, onQuickCreate, canEdit, orderable } =
+        props;
     const [dragging, setDragging] = useState<string | null>(null);
     const [addingTo, setAddingTo] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
@@ -424,13 +473,17 @@ export function BoardView(props: ViewProps) {
         // Anything the new order does not name - the "no status" pile - keeps
         // its place at the end.
         return [...groups].sort(
-            (left, right) => (at.get(left.key) ?? groups.length) - (at.get(right.key) ?? groups.length)
+            (left, right) =>
+                (at.get(left.key) ?? groups.length) - (at.get(right.key) ?? groups.length)
         );
     }, [groups, pendingOrder]);
 
     // A board is read down each column and then on to the next, which is the
     // order a shift-click spans.
-    const rendered = useMemo(() => shown.flatMap((group) => group.tasks.map((task) => task.id)), [shown]);
+    const rendered = useMemo(
+        () => shown.flatMap((group) => group.tasks.map((task) => task.id)),
+        [shown]
+    );
 
     const drop = (groupKey: string, tasks: readonly TaskRow[], targetId: string | null) => {
         if (!dragging) return;
@@ -466,250 +519,277 @@ export function BoardView(props: ViewProps) {
 
     return (
         <>
-        <div className="flex gap-3 overflow-x-auto pb-4">
-            {shown.map((group) => {
-                // The pile of work with no status is not a column of the space:
-                // there is nothing there to rename, remove or move.
-                const isColumn = byStatus && group.key !== "";
-                const manageable = isColumn && (props.onUpdateStatus !== undefined || props.onDeleteStatus !== undefined);
-                const movable = isColumn && canOrderColumns && columns.length > 1;
-                const status = isColumn ? context.statuses.find((entry) => entry.id === group.key) : undefined;
+            <div className="flex gap-3 overflow-x-auto pb-4">
+                {shown.map((group) => {
+                    // The pile of work with no status is not a column of the space:
+                    // there is nothing there to rename, remove or move.
+                    const isColumn = byStatus && group.key !== "";
+                    const manageable =
+                        isColumn &&
+                        (props.onUpdateStatus !== undefined || props.onDeleteStatus !== undefined);
+                    const movable = isColumn && canOrderColumns && columns.length > 1;
+                    const status = isColumn
+                        ? context.statuses.find((entry) => entry.id === group.key)
+                        : undefined;
 
-                return (
-                <section
-                    key={group.key}
-                    className={cn(
-                        "group/column flex w-72 shrink-0 flex-col rounded-lg bg-muted/40 transition-shadow",
-                        draggingColumn === group.key && "opacity-60",
-                        columnOver === group.key && "ring-2 ring-primary"
-                    )}
-                    onDragOver={(event) => {
-                        event.preventDefault();
-                        if (draggingColumn && draggingColumn !== group.key && isColumn) setColumnOver(group.key);
-                    }}
-                    onDragLeave={(event) => {
-                        // Moving between the column's own children leaves it as
-                        // far as the browser is concerned, so the pointer is only
-                        // gone when what it entered is outside.
-                        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
-                        setColumnOver((current) => (current === group.key ? null : current));
-                    }}
-                    onDrop={(event) => {
-                        event.preventDefault();
-                        if (draggingColumn) void dropColumn(group.key);
-                        else drop(group.key, group.tasks, null);
-                    }}
-                >
-                    {editing === group.key ? (
-                        <ColumnEditor
-                            initial={{
-                                name: group.label,
-                                type: status?.type ?? "open",
-                                color: group.color ?? "#64748b"
-                            }}
-                            submitLabel="Save"
-                            onCancel={() => setEditing(null)}
-                            onSubmit={async (next) => {
-                                const saved = await Promise.all(
-                                    columnIds(group.key).map((id) =>
-                                        props.onUpdateStatus?.(id, next.name, next.type, next.color)
-                                    )
-                                );
-                                if (saved.every(Boolean)) setEditing(null);
-                            }}
-                        />
-                    ) : (
-                        <header
-                            draggable={movable}
-                            onDragStart={(event) => {
-                                if (!movable) return;
-                                event.dataTransfer.effectAllowed = "move";
-                                event.dataTransfer.setData("text/plain", group.key);
-                                setDraggingColumn(group.key);
-                            }}
-                            onDragEnd={() => {
-                                setDraggingColumn(null);
-                                setColumnOver(null);
-                            }}
+                    return (
+                        <section
+                            key={group.key}
                             className={cn(
-                                "flex items-center gap-2 px-3 py-2",
-                                movable && "cursor-grab active:cursor-grabbing"
+                                "group/column flex w-72 shrink-0 flex-col rounded-lg bg-muted/40 transition-shadow",
+                                draggingColumn === group.key && "opacity-60",
+                                columnOver === group.key && "ring-2 ring-primary"
                             )}
+                            onDragOver={(event) => {
+                                event.preventDefault();
+                                if (draggingColumn && draggingColumn !== group.key && isColumn)
+                                    setColumnOver(group.key);
+                            }}
+                            onDragLeave={(event) => {
+                                // Moving between the column's own children leaves it as
+                                // far as the browser is concerned, so the pointer is only
+                                // gone when what it entered is outside.
+                                if (
+                                    event.currentTarget.contains(event.relatedTarget as Node | null)
+                                )
+                                    return;
+                                setColumnOver((current) =>
+                                    current === group.key ? null : current
+                                );
+                            }}
+                            onDrop={(event) => {
+                                event.preventDefault();
+                                if (draggingColumn) void dropColumn(group.key);
+                                else drop(group.key, group.tasks, null);
+                            }}
                         >
-                            {movable && (
-                                // Fades in rather than appearing, so a row of
-                                // headers does not shuffle sideways on hover.
-                                <GripVertical
-                                    aria-hidden
-                                    className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/column:opacity-100"
-                                />
-                            )}
-                            {group.color && <StatusDot color={group.color} />}
-                            <h3 className="truncate text-sm font-medium" title={group.label}>{group.label}</h3>
-                            <span className="rounded bg-background px-1.5 text-[11px] text-muted-foreground">
-                                {group.tasks.length}
-                            </span>
-                            <span className="flex-1" />
-                            {canEdit && (
-                                <button
-                                    type="button"
-                                    aria-label={`Add a task to ${group.label}`}
-                                    title="Add a task"
-                                    onClick={() => {
-                                        setAddingTo(group.key);
-                                        setDraft("");
+                            {editing === group.key ? (
+                                <ColumnEditor
+                                    initial={{
+                                        name: group.label,
+                                        type: status?.type ?? "open",
+                                        color: group.color ?? "#64748b"
                                     }}
-                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                                    submitLabel="Save"
+                                    onCancel={() => setEditing(null)}
+                                    onSubmit={async (next) => {
+                                        const saved = await Promise.all(
+                                            columnIds(group.key).map((id) =>
+                                                props.onUpdateStatus?.(
+                                                    id,
+                                                    next.name,
+                                                    next.type,
+                                                    next.color
+                                                )
+                                            )
+                                        );
+                                        if (saved.every(Boolean)) setEditing(null);
+                                    }}
+                                />
+                            ) : (
+                                <header
+                                    draggable={movable}
+                                    onDragStart={(event) => {
+                                        if (!movable) return;
+                                        event.dataTransfer.effectAllowed = "move";
+                                        event.dataTransfer.setData("text/plain", group.key);
+                                        setDraggingColumn(group.key);
+                                    }}
+                                    onDragEnd={() => {
+                                        setDraggingColumn(null);
+                                        setColumnOver(null);
+                                    }}
+                                    className={cn(
+                                        "flex items-center gap-2 px-3 py-2",
+                                        movable && "cursor-grab active:cursor-grabbing"
+                                    )}
                                 >
-                                    <Plus className="size-3.5" />
-                                </button>
-                            )}
-                            {manageable && (
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
+                                    {movable && (
+                                        // Fades in rather than appearing, so a row of
+                                        // headers does not shuffle sideways on hover.
+                                        <GripVertical
+                                            aria-hidden
+                                            className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/column:opacity-100"
+                                        />
+                                    )}
+                                    {group.color && <StatusDot color={group.color} />}
+                                    <h3
+                                        className="truncate text-sm font-medium"
+                                        title={group.label}
+                                    >
+                                        {group.label}
+                                    </h3>
+                                    <span className="rounded bg-background px-1.5 text-[11px] text-muted-foreground">
+                                        {group.tasks.length}
+                                    </span>
+                                    <span className="flex-1" />
+                                    {canEdit && (
                                         <button
                                             type="button"
-                                            aria-label={`Column options for ${group.label}`}
-                                            title="Column options"
+                                            aria-label={`Add a task to ${group.label}`}
+                                            title="Add a task"
+                                            onClick={() => {
+                                                setAddingTo(group.key);
+                                                setDraft("");
+                                            }}
                                             className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                                         >
-                                            <MoreHorizontal className="size-3.5" />
+                                            <Plus className="size-3.5" />
                                         </button>
-                                    </DropdownMenuTrigger>
-                                    {/* The rename field this menu opens would be
+                                    )}
+                                    {manageable && (
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <button
+                                                    type="button"
+                                                    aria-label={`Column options for ${group.label}`}
+                                                    title="Column options"
+                                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                                                >
+                                                    <MoreHorizontal className="size-3.5" />
+                                                </button>
+                                            </DropdownMenuTrigger>
+                                            {/* The rename field this menu opens would be
                                         blurred the moment the menu handed focus
                                         back to its trigger. */}
-                                    <DropdownMenuContent
-                                        align="end"
-                                        className="w-44"
-                                        onCloseAutoFocus={keepFocusOnClose}
-                                    >
-                                        {props.onUpdateStatus && (
-                                            <DropdownMenuItem className="gap-2" onSelect={() => setEditing(group.key)}>
-                                                <Pencil className="size-3.5" />
-                                                Edit column
-                                            </DropdownMenuItem>
-                                        )}
-                                        {props.onDeleteStatus && (
-                                            <DropdownMenuItem
-                                                className="gap-2 text-danger focus:bg-danger/10"
-                                                // A board needs somewhere for the
-                                                // work to go, so the last column
-                                                // stays.
-                                                disabled={columns.length <= 1}
-                                                onSelect={() => askToRemove(group)}
+                                            <DropdownMenuContent
+                                                align="end"
+                                                className="w-44"
+                                                onCloseAutoFocus={keepFocusOnClose}
                                             >
-                                                <Trash2 className="size-3.5" />
-                                                Delete column
-                                            </DropdownMenuItem>
-                                        )}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                                                {props.onUpdateStatus && (
+                                                    <DropdownMenuItem
+                                                        className="gap-2"
+                                                        onSelect={() => setEditing(group.key)}
+                                                    >
+                                                        <Pencil className="size-3.5" />
+                                                        Edit column
+                                                    </DropdownMenuItem>
+                                                )}
+                                                {props.onDeleteStatus && (
+                                                    <DropdownMenuItem
+                                                        className="gap-2 text-danger focus:bg-danger/10"
+                                                        // A board needs somewhere for the
+                                                        // work to go, so the last column
+                                                        // stays.
+                                                        disabled={columns.length <= 1}
+                                                        onSelect={() => askToRemove(group)}
+                                                    >
+                                                        <Trash2 className="size-3.5" />
+                                                        Delete column
+                                                    </DropdownMenuItem>
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    )}
+                                </header>
                             )}
-                        </header>
-                    )}
 
-                    <ul className="flex min-h-24 flex-col gap-2 px-2 pb-2">
-                        {addingTo === group.key && (
-                            <li>
-                                <input
-                                    autoFocus
-                                    value={draft}
-                                    placeholder="Task name, then enter"
-                                    onChange={(event) => setDraft(event.target.value)}
-                                    onBlur={() => setAddingTo(null)}
-                                    onKeyDown={(event) => {
-                                        if (event.key === "Escape") setAddingTo(null);
-                                        if (event.key === "Enter" && draft.trim()) {
-                                            onQuickCreate(group.key, draft.trim());
-                                            setDraft("");
-                                        }
-                                    }}
-                                    className="w-full rounded-lg border border-primary bg-card px-3 py-2 text-sm outline-none"
-                                />
-                            </li>
-                        )}
-                        {group.tasks.map((task) => (
-                            <TaskCard
-                                key={task.id}
-                                commands={commandsFor(props, task)}
-                                accepting={draggingColumn === null}
-                                selected={selection.has(task.id)}
-                                showLocation={props.showLocation}
-                                positioned={orderable}
-                                onSelect={(mode) => onSelect(task.id, mode, rendered)}
-                                onDragStart={() => setDragging(task.id)}
-                                onDropBefore={() => drop(group.key, group.tasks, task.id)}
+                            <ul className="flex min-h-24 flex-col gap-2 px-2 pb-2">
+                                {addingTo === group.key && (
+                                    <li>
+                                        <input
+                                            autoFocus
+                                            value={draft}
+                                            placeholder="Task name, then enter"
+                                            onChange={(event) => setDraft(event.target.value)}
+                                            onBlur={() => setAddingTo(null)}
+                                            onKeyDown={(event) => {
+                                                if (event.key === "Escape") setAddingTo(null);
+                                                if (event.key === "Enter" && draft.trim()) {
+                                                    onQuickCreate(group.key, draft.trim());
+                                                    setDraft("");
+                                                }
+                                            }}
+                                            className="w-full rounded-lg border border-primary bg-card px-3 py-2 text-sm outline-none"
+                                        />
+                                    </li>
+                                )}
+                                {group.tasks.map((task) => (
+                                    <TaskCard
+                                        key={task.id}
+                                        commands={commandsFor(props, task)}
+                                        accepting={draggingColumn === null}
+                                        selected={selection.has(task.id)}
+                                        showLocation={props.showLocation}
+                                        positioned={orderable}
+                                        onSelect={(mode) => onSelect(task.id, mode, rendered)}
+                                        onDragStart={() => setDragging(task.id)}
+                                        onDropBefore={() => drop(group.key, group.tasks, task.id)}
+                                    />
+                                ))}
+                                {group.tasks.length === 0 && addingTo !== group.key && (
+                                    <li className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+                                        Drop work here
+                                    </li>
+                                )}
+                            </ul>
+                        </section>
+                    );
+                })}
+
+                {canAddColumn &&
+                    (creating ? (
+                        <section className="flex w-72 shrink-0 flex-col rounded-lg border border-dashed border-primary/50 bg-muted/20">
+                            <ColumnEditor
+                                initial={{ name: "", type: "open", color: "#64748b" }}
+                                submitLabel="Add"
+                                onCancel={() => setCreating(false)}
+                                onSubmit={async (next) => {
+                                    const id = await props.onCreateStatus?.(
+                                        next.name,
+                                        next.type,
+                                        next.color
+                                    );
+                                    if (id) setCreating(false);
+                                }}
                             />
-                        ))}
-                        {group.tasks.length === 0 && addingTo !== group.key && (
-                            <li className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-                                Drop work here
-                            </li>
-                        )}
-                    </ul>
-                </section>
-                );
-            })}
+                        </section>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setCreating(true)}
+                            className="flex h-10 w-56 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+                        >
+                            <Plus className="size-3.5" /> New column
+                        </button>
+                    ))}
+            </div>
 
-            {canAddColumn &&
-                (creating ? (
-                    <section className="flex w-72 shrink-0 flex-col rounded-lg border border-dashed border-primary/50 bg-muted/20">
-                        <ColumnEditor
-                            initial={{ name: "", type: "open", color: "#64748b" }}
-                            submitLabel="Add"
-                            onCancel={() => setCreating(false)}
-                            onSubmit={async (next) => {
-                                const id = await props.onCreateStatus?.(next.name, next.type, next.color);
-                                if (id) setCreating(false);
-                            }}
-                        />
-                    </section>
-                ) : (
-                    <button
-                        type="button"
-                        onClick={() => setCreating(true)}
-                        className="flex h-10 w-56 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
-                    >
-                        <Plus className="size-3.5" /> New column
-                    </button>
-                ))}
-        </div>
-
-        <ConfirmDeleteDialog
-            open={removing !== null}
-            onOpenChange={(open) => (open ? undefined : setRemoving(null))}
-            name={removing?.label ?? ""}
-            kind="column"
-            description="Tasks on it move to the column you pick, so nothing falls off the board."
-            confirmLabel="Delete column"
-            confirmDisabled={!replacement}
-            onConfirm={async () => {
-                if (!removing || !replacement) return;
-                // One at a time: a space keeps its last status, and two deletes
-                // racing each other would both read the count before either
-                // landed. The replacement is another column, so it is never one
-                // of these.
-                let done = true;
-                for (const id of columnIds(removing.key)) {
-                    done = (await props.onDeleteStatus?.(id, replacement)) === true && done;
-                }
-                if (done) setRemoving(null);
-            }}
-        >
-            <label className="flex flex-col gap-1 text-sm">
-                Move its tasks to
-                <Select
-                    value={replacement}
-                    onValueChange={setReplacement}
-                    options={columns
-                        .filter((column) => column.id !== removing?.key)
-                        .map((column) => ({ value: column.id, label: column.name }))}
-                    aria-label="Replacement column"
-                    className="h-8 text-xs"
-                />
-            </label>
-        </ConfirmDeleteDialog>
+            <ConfirmDeleteDialog
+                open={removing !== null}
+                onOpenChange={(open) => (open ? undefined : setRemoving(null))}
+                name={removing?.label ?? ""}
+                kind="column"
+                description="Tasks on it move to the column you pick, so nothing falls off the board."
+                confirmLabel="Delete column"
+                confirmDisabled={!replacement}
+                onConfirm={async () => {
+                    if (!removing || !replacement) return;
+                    // One at a time: a space keeps its last status, and two deletes
+                    // racing each other would both read the count before either
+                    // landed. The replacement is another column, so it is never one
+                    // of these.
+                    let done = true;
+                    for (const id of columnIds(removing.key)) {
+                        done = (await props.onDeleteStatus?.(id, replacement)) === true && done;
+                    }
+                    if (done) setRemoving(null);
+                }}
+            >
+                <label className="flex flex-col gap-1 text-sm">
+                    Move its tasks to
+                    <Select
+                        value={replacement}
+                        onValueChange={setReplacement}
+                        options={columns
+                            .filter((column) => column.id !== removing?.key)
+                            .map((column) => ({ value: column.id, label: column.name }))}
+                        aria-label="Replacement column"
+                        className="h-8 text-xs"
+                    />
+                </label>
+            </ConfirmDeleteDialog>
         </>
     );
 }

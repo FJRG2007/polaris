@@ -134,7 +134,9 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
                     {editor.isActive("link") ? (
                         <Control
                             label="Remove the link"
-                            onClick={() => editor.chain().focus().extendMarkRange("link").unsetLink().run()}
+                            onClick={() =>
+                                editor.chain().focus().extendMarkRange("link").unsetLink().run()
+                            }
                         >
                             <Link2Off className="size-4" />
                         </Control>

@@ -16,13 +16,19 @@ import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
 import { ProgressBar, StatusDot } from "./pickers";
 import type { PersonRef } from "@/lib/tasks/facts";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormView } from "@/lib/tasks/form-service";
-import { ChevronDown, ChevronUp, Hash, Pencil, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AutomationsPanel, FormsPanel } from "./automations-panel";
 import type { AutomationView } from "@/lib/tasks/automation-service";
+import { ChevronDown, ChevronUp, Hash, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button, Card, CardBody, ConfirmDeleteDialog, Input, Select, cn } from "@polaris/ui";
-import type { CustomFieldView, ListSummary, SpaceMemberView, StatusView, TagView } from "@/lib/tasks/space-service";
+import type {
+    CustomFieldView,
+    ListSummary,
+    SpaceMemberView,
+    StatusView,
+    TagView
+} from "@/lib/tasks/space-service";
 
 const TABS = ["Overview", "Statuses", "Fields", "Tags", "People", "Automations", "Forms"] as const;
 type Tab = (typeof TABS)[number];
@@ -60,7 +66,9 @@ export interface SpaceScreenProps {
  */
 function visibilityLine(props: Pick<SpaceScreenProps, "visibility" | "orgName">): string {
     if (!props.orgName) {
-        return props.visibility === "internal" ? "Anyone on this Polaris can see it" : "Private to its members";
+        return props.visibility === "internal"
+            ? "Anyone on this Polaris can see it"
+            : "Private to its members";
     }
     return props.visibility === "internal"
         ? `Anyone in ${props.orgName} can see it`
@@ -92,7 +100,9 @@ export function SpaceScreen(props: SpaceScreenProps) {
                 </span>
                 <span className="text-muted-foreground text-xs">{visibilityLine(props)}</span>
             </header>
-            {props.description && <p className="max-w-2xl text-sm text-muted-foreground">{props.description}</p>}
+            {props.description && (
+                <p className="max-w-2xl text-sm text-muted-foreground">{props.description}</p>
+            )}
 
             <nav className="flex flex-wrap gap-1 border-b border-border">
                 {TABS.map((entry) => (
@@ -114,7 +124,10 @@ export function SpaceScreen(props: SpaceScreenProps) {
             </nav>
 
             {error && (
-                <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <p
+                    role="alert"
+                    className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                >
                     {error}
                 </p>
             )}
@@ -129,10 +142,20 @@ export function SpaceScreen(props: SpaceScreenProps) {
                 />
             )}
             {tab === "Fields" && (
-                <FieldsTab spaceId={props.spaceId} fields={props.fields} canManage={props.canManage} onError={setError} />
+                <FieldsTab
+                    spaceId={props.spaceId}
+                    fields={props.fields}
+                    canManage={props.canManage}
+                    onError={setError}
+                />
             )}
             {tab === "Tags" && (
-                <TagsTab spaceId={props.spaceId} tags={props.tags} canManage={props.canManage} onError={setError} />
+                <TagsTab
+                    spaceId={props.spaceId}
+                    tags={props.tags}
+                    canManage={props.canManage}
+                    onError={setError}
+                />
             )}
             {tab === "People" && (
                 <PeopleTab
@@ -142,9 +165,16 @@ export function SpaceScreen(props: SpaceScreenProps) {
                     onError={setError}
                 />
             )}
-            {tab === "Automations" && <AutomationsPanel automations={props.automations} context={ruleContext} />}
+            {tab === "Automations" && (
+                <AutomationsPanel automations={props.automations} context={ruleContext} />
+            )}
             {tab === "Forms" && (
-                <FormsPanel forms={props.forms} spaceId={props.spaceId} lists={listRefs} baseUrl={props.baseUrl} />
+                <FormsPanel
+                    forms={props.forms}
+                    spaceId={props.spaceId}
+                    lists={listRefs}
+                    baseUrl={props.baseUrl}
+                />
             )}
         </div>
     );
@@ -162,12 +192,16 @@ function OverviewTab({ lists }: { lists: readonly ListSummary[] }) {
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {lists.map((list) => {
                 const done = list.totalCount - list.openCount;
-                const percent = list.totalCount === 0 ? 0 : Math.round((done / list.totalCount) * 100);
+                const percent =
+                    list.totalCount === 0 ? 0 : Math.round((done / list.totalCount) * 100);
                 return (
                     <li key={list.id}>
                         <Card>
                             <CardBody className="flex flex-col gap-2 p-4">
-                                <Link href={`/tasks/l/${list.id}`} className="flex items-center gap-2 hover:underline">
+                                <Link
+                                    href={`/tasks/l/${list.id}`}
+                                    className="flex items-center gap-2 hover:underline"
+                                >
                                     <Hash className="size-4 text-muted-foreground" />
                                     <span className="truncate font-medium">{list.name}</span>
                                 </Link>
@@ -204,7 +238,11 @@ function StatusesTab({
     // saved. Held here rather than on the row so leaving it open on one status
     // and opening another cannot end with two half-edited rows.
     const [editing, setEditing] = useState<StatusView | null>(null);
-    const [draft, setDraft] = useState<{ name: string; type: core.TaskStatusType; color: string } | null>(null);
+    const [draft, setDraft] = useState<{
+        name: string;
+        type: core.TaskStatusType;
+        color: string;
+    } | null>(null);
     const [saving, setSaving] = useState(false);
     // Where a move has put things until the server says the same. The reload
     // that follows brings the new order with it, and that is when this has done
@@ -216,7 +254,12 @@ function StatusesTab({
     const ordered = useMemo(() => {
         if (!moved) return statuses;
         const at = new Map(moved.map((id, index) => [id, index]));
-        return [...statuses].sort((left, right) => (at.get(left.id) ?? 0) - (at.get(right.id) ?? 0));
+        // A status the move does not name - one added since, or from another
+        // window - keeps its place at the end rather than jumping to the front.
+        return [...statuses].sort(
+            (left, right) =>
+                (at.get(left.id) ?? statuses.length) - (at.get(right.id) ?? statuses.length)
+        );
     }, [statuses, moved]);
 
     /**
@@ -259,9 +302,9 @@ function StatusesTab({
     return (
         <section className="flex flex-col gap-3">
             <p className="text-xs text-muted-foreground">
-                Every list in this space shares these. The kind decides what Polaris counts as finished, whatever the
-                status is called, and the order here is the order of the columns on a board. Move one with the arrows,
-                or drag its column on a board.
+                Every list in this space shares these. The kind decides what Polaris counts as
+                finished, whatever the status is called, and the order here is the order of the
+                columns on a board. Move one with the arrows, or drag its column on a board.
             </p>
 
             <ul className="divide-y divide-border rounded-lg border border-border">
@@ -272,14 +315,18 @@ function StatusesTab({
                                 type="color"
                                 value={draft.color}
                                 aria-label="Status colour"
-                                onChange={(event) => setDraft({ ...draft, color: event.target.value })}
+                                onChange={(event) =>
+                                    setDraft({ ...draft, color: event.target.value })
+                                }
                                 className="h-8 w-12 shrink-0 rounded border border-border bg-background"
                             />
                             <Input
                                 autoFocus
                                 value={draft.name}
                                 aria-label="Status name"
-                                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                                onChange={(event) =>
+                                    setDraft({ ...draft, name: event.target.value })
+                                }
                                 onKeyDown={(event) => {
                                     if (event.key === "Escape") setEditing(null);
                                     if (event.key === "Enter") void save();
@@ -288,7 +335,9 @@ function StatusesTab({
                             />
                             <Select
                                 value={draft.type}
-                                onValueChange={(value) => setDraft({ ...draft, type: value as core.TaskStatusType })}
+                                onValueChange={(value) =>
+                                    setDraft({ ...draft, type: value as core.TaskStatusType })
+                                }
                                 options={core.TASK_STATUS_TYPES.map((entry) => ({
                                     value: entry,
                                     label: core.TASK_STATUS_TYPE_LABELS[entry]
@@ -296,7 +345,11 @@ function StatusesTab({
                                 aria-label="Status kind"
                                 className="h-8 w-40 text-xs"
                             />
-                            <Button size="sm" disabled={!draft.name.trim() || saving} onClick={() => void save()}>
+                            <Button
+                                size="sm"
+                                disabled={!draft.name.trim() || saving}
+                                onClick={() => void save()}
+                            >
                                 {saving ? "Saving..." : "Save"}
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
@@ -306,7 +359,9 @@ function StatusesTab({
                     ) : (
                         <li key={status.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
                             <StatusDot color={status.color} />
-                            <span className="min-w-32 flex-1 truncate text-sm" title={status.name}>{status.name}</span>
+                            <span className="min-w-32 flex-1 truncate text-sm" title={status.name}>
+                                {status.name}
+                            </span>
                             <span className="text-xs text-muted-foreground">
                                 {core.TASK_STATUS_TYPE_LABELS[status.type]}
                             </span>
@@ -338,7 +393,11 @@ function StatusesTab({
                                         title="Edit status"
                                         onClick={() => {
                                             setEditing(status);
-                                            setDraft({ name: status.name, type: status.type, color: status.color });
+                                            setDraft({
+                                                name: status.name,
+                                                type: status.type,
+                                                color: status.color
+                                            });
                                         }}
                                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                     >
@@ -350,7 +409,10 @@ function StatusesTab({
                                         title="Remove status"
                                         onClick={() => {
                                             setRemoving(status);
-                                            setReplacement(statuses.find((entry) => entry.id !== status.id)?.id ?? "");
+                                            setReplacement(
+                                                statuses.find((entry) => entry.id !== status.id)
+                                                    ?.id ?? ""
+                                            );
                                         }}
                                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
                                     >
@@ -394,7 +456,12 @@ function StatusesTab({
                         disabled={!name.trim()}
                         onClick={async () => {
                             const result = await runAction(
-                                () => actions.createStatusAction(spaceId, { name: name.trim(), type, color }),
+                                () =>
+                                    actions.createStatusAction(spaceId, {
+                                        name: name.trim(),
+                                        type,
+                                        color
+                                    }),
                                 onError
                             );
                             if (result?.error) onError(result.error);
@@ -460,15 +527,20 @@ function FieldsTab({
     return (
         <section className="flex flex-col gap-3">
             <p className="text-xs text-muted-foreground">
-                Extra columns on every task in this space. They show in the table view and on the task panel.
+                Extra columns on every task in this space. They show in the table view and on the
+                task panel.
             </p>
 
             <ul className="divide-y divide-border rounded-lg border border-border">
-                {fields.length === 0 && <li className="px-3 py-4 text-xs text-muted-foreground">No fields yet.</li>}
+                {fields.length === 0 && (
+                    <li className="px-3 py-4 text-xs text-muted-foreground">No fields yet.</li>
+                )}
                 {fields.map((field) => (
                     <li key={field.id} className="flex items-center gap-3 px-3 py-2">
                         <span className="flex-1 truncate text-sm">{field.name}</span>
-                        <span className="text-xs text-muted-foreground">{core.CUSTOM_FIELD_LABELS[field.type]}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {core.CUSTOM_FIELD_LABELS[field.type]}
+                        </span>
                         {canManage && (
                             <button
                                 type="button"
@@ -636,8 +708,8 @@ function PeopleTab({
     return (
         <section className="flex flex-col gap-3">
             <p className="text-xs text-muted-foreground">
-                Everyone here reaches the whole space. To give somebody one client or one project instead, right-click
-                that folder in the sidebar and choose who can reach it.
+                Everyone here reaches the whole space. To give somebody one client or one project
+                instead, right-click that folder in the sidebar and choose who can reach it.
             </p>
             <ul className="divide-y divide-border rounded-lg border border-border">
                 {members.map((member) => (
@@ -677,7 +749,11 @@ function PeopleTab({
                                     title="Remove from space"
                                     onClick={async () => {
                                         const result = await runAction(
-                                            () => actions.removeSpaceMemberAction(spaceId, member.userId),
+                                            () =>
+                                                actions.removeSpaceMemberAction(
+                                                    spaceId,
+                                                    member.userId
+                                                ),
                                             onError
                                         );
                                         if (result?.error) onError(result.error);
@@ -688,7 +764,9 @@ function PeopleTab({
                                 </button>
                             </>
                         ) : (
-                            <span className="text-xs text-muted-foreground">{core.SPACE_ROLE_LABELS[member.role]}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {core.SPACE_ROLE_LABELS[member.role]}
+                            </span>
                         )}
                     </li>
                 ))}
@@ -718,7 +796,8 @@ function PeopleTab({
                         disabled={!identifier.trim()}
                         onClick={async () => {
                             const result = await runAction(
-                                () => actions.addSpaceMemberAction(spaceId, identifier.trim(), role),
+                                () =>
+                                    actions.addSpaceMemberAction(spaceId, identifier.trim(), role),
                                 onError
                             );
                             if (result?.error) onError(result.error);
@@ -727,7 +806,9 @@ function PeopleTab({
                     >
                         <Plus className="size-3.5" /> Add
                     </Button>
-                    <p className="w-full text-xs text-muted-foreground">{core.SPACE_ROLE_HINTS[role]}</p>
+                    <p className="w-full text-xs text-muted-foreground">
+                        {core.SPACE_ROLE_HINTS[role]}
+                    </p>
                 </div>
             )}
 
@@ -753,7 +834,9 @@ function SpaceTeams({
     canManage: boolean;
     onError: (message: string) => void;
 }) {
-    const [granted, setGranted] = useState<{ teamId: string; teamName: string; role: core.SpaceRole }[]>([]);
+    const [granted, setGranted] = useState<
+        { teamId: string; teamName: string; role: core.SpaceRole }[]
+    >([]);
     const [available, setAvailable] = useState<{ id: string; name: string }[]>([]);
     const [loaded, setLoaded] = useState(false);
     const [pick, setPick] = useState("");
@@ -775,15 +858,17 @@ function SpaceTeams({
     // empty section would only raise a question the screen cannot answer.
     if (!loaded || (available.length === 0 && granted.length === 0)) return null;
 
-    const ungranted = available.filter((team) => !granted.some((grant) => grant.teamId === team.id));
+    const ungranted = available.filter(
+        (team) => !granted.some((grant) => grant.teamId === team.id)
+    );
 
     return (
         <section className="flex flex-col gap-3 border-t border-border pt-4">
             <div>
                 <h2 className="text-sm font-medium">Teams</h2>
                 <p className="text-xs text-muted-foreground">
-                    A team from the organization that owns this space. Everybody on it reaches the space at the role
-                    given here, and joining the team later is enough.
+                    A team from the organization that owns this space. Everybody on it reaches the
+                    space at the role given here, and joining the team later is enough.
                 </p>
             </div>
 
@@ -794,8 +879,13 @@ function SpaceTeams({
             ) : (
                 <ul className="divide-y divide-border rounded-lg border border-border">
                     {granted.map((grant) => (
-                        <li key={grant.teamId} className="flex flex-wrap items-center gap-3 px-3 py-2">
-                            <p className="min-w-0 flex-1 truncate text-sm" title={grant.teamName}>{grant.teamName}</p>
+                        <li
+                            key={grant.teamId}
+                            className="flex flex-wrap items-center gap-3 px-3 py-2"
+                        >
+                            <p className="min-w-0 flex-1 truncate text-sm" title={grant.teamName}>
+                                {grant.teamName}
+                            </p>
                             {canManage ? (
                                 <>
                                     <Select
@@ -826,7 +916,11 @@ function SpaceTeams({
                                         title="Remove from space"
                                         onClick={async () => {
                                             const result = await runAction(
-                                                () => actions.revokeSpaceTeamAction(spaceId, grant.teamId),
+                                                () =>
+                                                    actions.revokeSpaceTeamAction(
+                                                        spaceId,
+                                                        grant.teamId
+                                                    ),
                                                 onError
                                             );
                                             if (result?.error) onError(result.error);
