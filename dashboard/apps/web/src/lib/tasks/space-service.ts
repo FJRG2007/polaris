@@ -864,11 +864,28 @@ export async function createStatus(
     return status.id;
 }
 
+/**
+ * Every write below is keyed by the space as well as the row.
+ *
+ * The caller authorizes against a space it names, not against the row it is
+ * about to change - so a write keyed on the row alone will happily edit a status,
+ * tag or field belonging to a space the caller has no part in, as long as they
+ * administer some space. Scoping the write is what closes that, and matching
+ * nothing is refused rather than passed off as a successful no-op: a request
+ * that names another space's row is not a request that already got what it
+ * wanted.
+ */
+function notInSpace(what: string): Error {
+    return new Error(`That ${what} is not in this space`);
+}
+
 export async function updateStatus(
+    spaceId: string,
     statusId: string,
     input: { name: string; type: core.TaskStatusType; color: string }
 ): Promise<void> {
-    await prisma.taskStatus.update({ where: { id: statusId }, data: input });
+    const { count } = await prisma.taskStatus.updateMany({ where: { id: statusId, spaceId }, data: input });
+    if (count === 0) throw notInSpace("status");
 }
 
 /**
@@ -878,11 +895,19 @@ export async function updateStatus(
  */
 export async function deleteStatus(spaceId: string, statusId: string, replacementId: string): Promise<void> {
     if (statusId === replacementId) throw new Error("Pick a different status to move the tasks to");
-    const remaining = await prisma.taskStatus.count({ where: { spaceId } });
+    // Both ends are checked, not just the one being removed: a replacement from
+    // another space would move this space's work onto a column nobody here can
+    // see, and would do it under an authorization that never mentioned it.
+    const [status, replacement, remaining] = await Promise.all([
+        prisma.taskStatus.findFirst({ where: { id: statusId, spaceId }, select: { id: true } }),
+        prisma.taskStatus.findFirst({ where: { id: replacementId, spaceId }, select: { id: true } }),
+        prisma.taskStatus.count({ where: { spaceId } })
+    ]);
+    if (!status || !replacement) throw notInSpace("status");
     if (remaining <= 1) throw new Error("A space needs at least one status");
     await prisma.$transaction([
-        prisma.task.updateMany({ where: { statusId }, data: { statusId: replacementId } }),
-        prisma.taskStatus.delete({ where: { id: statusId } })
+        prisma.task.updateMany({ where: { statusId, spaceId }, data: { statusId: replacementId } }),
+        prisma.taskStatus.deleteMany({ where: { id: statusId, spaceId } })
     ]);
 }
 
@@ -924,12 +949,14 @@ export async function createTag(spaceId: string, name: string, color: string): P
     return tag.id;
 }
 
-export async function updateTag(tagId: string, name: string, color: string): Promise<void> {
-    await prisma.taskTag.update({ where: { id: tagId }, data: { name, color } });
+export async function updateTag(spaceId: string, tagId: string, name: string, color: string): Promise<void> {
+    const { count } = await prisma.taskTag.updateMany({ where: { id: tagId, spaceId }, data: { name, color } });
+    if (count === 0) throw notInSpace("tag");
 }
 
-export async function deleteTag(tagId: string): Promise<void> {
-    await prisma.taskTag.delete({ where: { id: tagId } });
+export async function deleteTag(spaceId: string, tagId: string): Promise<void> {
+    const { count } = await prisma.taskTag.deleteMany({ where: { id: tagId, spaceId } });
+    if (count === 0) throw notInSpace("tag");
 }
 
 // ---------------------------------------------------------------------------
@@ -990,9 +1017,13 @@ export async function createCustomField(input: core.CustomFieldInput): Promise<v
     });
 }
 
-export async function updateCustomField(fieldId: string, input: Omit<core.CustomFieldInput, "spaceId">): Promise<void> {
-    await prisma.taskCustomField.update({
-        where: { id: fieldId },
+export async function updateCustomField(
+    spaceId: string,
+    fieldId: string,
+    input: Omit<core.CustomFieldInput, "spaceId">
+): Promise<void> {
+    const { count } = await prisma.taskCustomField.updateMany({
+        where: { id: fieldId, spaceId },
         data: {
             name: input.name,
             type: input.type,
@@ -1001,8 +1032,10 @@ export async function updateCustomField(fieldId: string, input: Omit<core.Custom
             showOnCard: input.showOnCard
         }
     });
+    if (count === 0) throw notInSpace("field");
 }
 
-export async function deleteCustomField(fieldId: string): Promise<void> {
-    await prisma.taskCustomField.delete({ where: { id: fieldId } });
+export async function deleteCustomField(spaceId: string, fieldId: string): Promise<void> {
+    const { count } = await prisma.taskCustomField.deleteMany({ where: { id: fieldId, spaceId } });
+    if (count === 0) throw notInSpace("field");
 }

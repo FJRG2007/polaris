@@ -613,7 +613,7 @@ export async function updateStatusAction(
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the status and try again" };
     try {
         await access.requireSpace(caller, spaceId, "admin");
-        await spaces.updateStatus(statusId, parsed.data);
+        await spaces.updateStatus(spaceId, statusId, parsed.data);
         refresh(caller, spaceId);
         return {};
     } catch (caught) {
@@ -674,7 +674,7 @@ export async function updateTagAction(
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the tag and try again" };
     try {
         await access.requireSpace(caller, spaceId, "member");
-        await spaces.updateTag(tagId, parsed.data.name, parsed.data.color);
+        await spaces.updateTag(spaceId, tagId, parsed.data.name, parsed.data.color);
         refresh(caller, spaceId);
         return {};
     } catch (caught) {
@@ -686,7 +686,7 @@ export async function deleteTagAction(spaceId: string, tagId: string): Promise<{
     const caller = await actor();
     try {
         await access.requireSpace(caller, spaceId, "admin");
-        await spaces.deleteTag(tagId);
+        await spaces.deleteTag(spaceId, tagId);
         refresh(caller, spaceId);
         return {};
     } catch (caught) {
@@ -718,7 +718,7 @@ export async function updateCustomFieldAction(
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the field and try again" };
     try {
         await access.requireSpace(caller, spaceId, "admin");
-        await spaces.updateCustomField(fieldId, parsed.data);
+        await spaces.updateCustomField(spaceId, fieldId, parsed.data);
         refresh(caller, spaceId);
         return {};
     } catch (caught) {
@@ -730,7 +730,7 @@ export async function deleteCustomFieldAction(spaceId: string, fieldId: string):
     const caller = await actor();
     try {
         await access.requireSpace(caller, spaceId, "admin");
-        await spaces.deleteCustomField(fieldId);
+        await spaces.deleteCustomField(spaceId, fieldId);
         refresh(caller, spaceId);
         return {};
     } catch (caught) {
