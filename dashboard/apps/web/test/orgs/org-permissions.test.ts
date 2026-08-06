@@ -11,20 +11,25 @@
  *    a place they belong, and never to everything;
  *  - seeing the organization comes with every role, because one that could not
  *    would be somebody who belongs here and is turned away at every door;
- *  - and grants that cannot be read grant nothing, so a corrupted column is not
- *    an escalation.
+ *  - grants that cannot be read grant nothing, so a corrupted column is not an
+ *    escalation;
+ *  - and the successor an owner named can see the organization and change none
+ *    of it, which is the one way somebody with no roster row gets an answer at
+ *    all.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const orgFindUnique = vi.fn();
 const roleFindUnique = vi.fn();
+const successorFindUnique = vi.fn();
 
 vi.mock("@polaris/db", () => ({
     prisma: {
         organization: { findUnique: orgFindUnique, findMany: vi.fn() },
         orgRole: { findUnique: roleFindUnique, findMany: vi.fn(), createMany: vi.fn() },
-        organizationMember: { findMany: vi.fn() }
+        organizationMember: { findMany: vi.fn() },
+        accountSuccessor: { findUnique: successorFindUnique }
     }
 }));
 
@@ -41,7 +46,9 @@ describe("resolveOrgAccess", () => {
     beforeEach(() => {
         orgFindUnique.mockReset();
         roleFindUnique.mockReset();
+        successorFindUnique.mockReset();
         roleFindUnique.mockResolvedValue(null);
+        successorFindUnique.mockResolvedValue(null);
     });
 
     it("answers nothing for an organization that does not exist", async () => {
@@ -52,6 +59,20 @@ describe("resolveOrgAccess", () => {
     it("answers nothing for an account with no part in it", async () => {
         membership(null);
         expect(await resolveOrgAccess(ACTOR, "org-1")).toBeNull();
+    });
+
+    it("answers for the owner's successor, and grants them nothing at all", async () => {
+        membership(null);
+        successorFindUnique.mockResolvedValue({ successorId: ACTOR.id });
+        const access = await resolveOrgAccess(ACTOR, "org-1");
+
+        expect(access?.roleName).toBe("Successor");
+        expect(access?.isOwner).toBe(false);
+        // Not even org.read - which is what keeps them off every screen anybody
+        // on the roster can open, the roster itself included.
+        expect(orgCan(access, "org.read")).toBe(false);
+        expect(orgCan(access, "settings.manage")).toBe(false);
+        expect(orgCan(access, "people.manage")).toBe(false);
     });
 
     it("gives the owner everything without reading a role row", async () => {

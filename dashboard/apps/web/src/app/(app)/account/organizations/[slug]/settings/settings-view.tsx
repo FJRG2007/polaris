@@ -1,13 +1,18 @@
 "use client";
 
 /**
- * Four cards, in the order the risk goes up: the photo, the profile, the handle,
- * and then the two things only an owner may do.
+ * Cards in the order the risk goes up: the photo, the profile, the handle, and
+ * then the two things only an owner may do.
  *
  * Moving the handle is kept apart from a rename on purpose. A rename changes what
  * the organization is called; moving the handle breaks every link anybody saved,
  * so it is its own deliberate act with its own confirmation naming what stops
  * working.
+ *
+ * Not everybody who opens this sees all of it. The successor the owner named may
+ * end the organization and change nothing about it, so for them the page is the
+ * last card alone - showing them fields whose Save button would be refused is
+ * worse than not showing them at all.
  */
 
 import { useState } from "react";
@@ -17,23 +22,42 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import type { OrgDetail } from "@/lib/orgs/org-service";
 import { useConfirm } from "@/components/confirm-dialog";
+import { StepUpFields } from "@/components/step-up-fields";
 import { OrgPhotoCard } from "@/app/(app)/account/avatar-card";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select, Textarea } from "@polaris/ui";
 import {
     changeOrgSlugAction,
     deleteOrgAction,
     transferOrgAction,
     updateOrgAction
 } from "@/app/(app)/account/organizations/actions";
+import {
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    ConfirmDeleteDialog,
+    Input,
+    Select,
+    Textarea
+} from "@polaris/ui";
 
 export function SettingsView({
     org,
     isOwner,
+    canManage,
+    canDelete,
     candidates,
     impact
 }: {
     org: OrgDetail;
     isOwner: boolean;
+    /** Holds `settings.manage`: the name, the photo and the handle. */
+    canManage: boolean;
+    /** The owner, the successor they named, or an instance administrator. Wider
+     *  than `isOwner` on purpose: an organization whose owner has died is
+     *  otherwise permanent. */
+    canDelete: boolean;
     candidates: { userId: string; name: string }[];
     impact: { spaces: number; tasks: number };
 }) {
@@ -60,16 +84,16 @@ export function SettingsView({
                 </p>
             )}
 
-            <OrgPhotoCard orgId={org.id} name={org.name} hasPhoto={org.hasPhoto} />
-            <ProfileCard org={org} onRun={run} />
-            <HandleCard org={org} confirm={confirm} onError={setError} />
-
-            {isOwner && (
+            {canManage && (
                 <>
-                    <TransferCard org={org} candidates={candidates} confirm={confirm} onRun={run} />
-                    <DangerCard org={org} impact={impact} confirm={confirm} onRun={run} />
+                    <OrgPhotoCard orgId={org.id} name={org.name} hasPhoto={org.hasPhoto} />
+                    <ProfileCard org={org} onRun={run} />
+                    <HandleCard org={org} confirm={confirm} onError={setError} />
                 </>
             )}
+
+            {isOwner && <TransferCard org={org} candidates={candidates} confirm={confirm} onRun={run} />}
+            {canDelete && <DangerCard org={org} impact={impact} />}
             {confirmElement}
         </div>
     );
@@ -238,18 +262,23 @@ function TransferCard({
     );
 }
 
-function DangerCard({
-    org,
-    impact,
-    confirm,
-    onRun
-}: {
-    org: OrgDetail;
-    impact: { spaces: number; tasks: number };
-    confirm: Confirm;
-    onRun: Runner;
-}) {
+/**
+ * Ending the organization.
+ *
+ * Three tolls, and each one is there for a different mistake: the name has to be
+ * typed, so a misclick cannot finish it; a second factor has to be answered, so
+ * an open session somebody else is sitting at cannot either; and what is about
+ * to be destroyed is counted out in the question rather than described as "this
+ * organization", because the number of spaces and tasks is the part people are
+ * wrong about.
+ */
+function DangerCard({ org, impact }: { org: OrgDetail; impact: { spaces: number; tasks: number } }) {
     const router = useRouter();
+    const [open, setOpen] = useState(false);
+    const [proof, setProof] = useState<core.StepUpProofInput | null>(null);
+    const [pending, setPending] = useState(false);
+    const [error, setError] = useState("");
+
     const spaces = `${impact.spaces} space${impact.spaces === 1 ? "" : "s"}`;
     const tasks = `${impact.tasks} task${impact.tasks === 1 ? "" : "s"}`;
 
@@ -265,20 +294,40 @@ function DangerCard({
                 <Button
                     size="sm"
                     variant="danger"
-                    onClick={async () => {
-                        const ok = await confirm({
-                            title: `Delete ${org.name}?`,
-                            description: `${spaces} and ${tasks} are deleted with it. This cannot be undone.`,
-                            confirmLabel: "Delete",
-                            danger: true
-                        });
-                        if (!ok) return;
-                        if (await onRun(() => deleteOrgAction(org.id))) router.push("/account/organizations");
+                    onClick={() => {
+                        setError("");
+                        setOpen(true);
                     }}
                 >
                     <Trash2 className="size-4 shrink-0" /> Delete organization
                 </Button>
             </CardBody>
+
+            <ConfirmDeleteDialog
+                open={open}
+                onOpenChange={setOpen}
+                name={org.name}
+                kind="organization"
+                confirmLabel="Delete organization"
+                error={error}
+                pending={pending}
+                confirmDisabled={proof === null}
+                description={`${spaces} and ${tasks} are deleted with it, along with its teams, roles and domains. This cannot be undone.`}
+                onConfirm={async () => {
+                    if (!proof) return;
+                    setPending(true);
+                    setError("");
+                    const result = await runAction(() => deleteOrgAction(org.id, proof), setError);
+                    setPending(false);
+                    if (!result || result.error) {
+                        if (result?.error) setError(result.error);
+                        return;
+                    }
+                    router.push("/account/organizations");
+                }}
+            >
+                <StepUpFields open={open} purpose={`org-delete:${org.id}`} onChange={setProof} />
+            </ConfirmDeleteDialog>
         </Card>
     );
 }

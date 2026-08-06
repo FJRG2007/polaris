@@ -10,7 +10,7 @@
  */
 
 import { requireUser } from "@/lib/session";
-import { orgIdForSlug, resolveOrgAccess, getOrg } from "@/lib/orgs/org-service";
+import { canDeleteOrg, orgIdForSlug, resolveOrgAccess, getOrg } from "@/lib/orgs/org-service";
 
 export const dynamic = "force-dynamic";
 
@@ -27,5 +27,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
     const org = await getOrg(orgId);
     if (!org) return new Response(null, { status: 404 });
 
-    return Response.json({ name: org.name, permissions: access.permissions });
+    const canDelete = await canDeleteOrg({ id: user.id, isAdmin: user.isAdmin }, orgId);
+    return Response.json({ name: org.name, permissions: access.permissions, canDelete });
 }

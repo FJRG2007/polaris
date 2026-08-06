@@ -71,7 +71,10 @@ export async function projectAccess(projectId: string, userId: string): Promise<
     // this instance", which is what a household wants and what was always true.
     if (project.orgId) {
         const access = await resolveOrgAccess({ id: userId, isAdmin: false }, project.orgId);
-        if (!access) return null;
+        // `org.read` rather than merely having an answer: not everybody the
+        // organization answers for is on its roster. The successor its owner
+        // named holds nothing, and `internal` has to keep meaning the roster.
+        if (!orgCan(access, "org.read")) return null;
         if (orgCan(access, "deploy.manage")) {
             return { projectId: project.id, ownerId: project.ownerId, role: "admin", isOwner: false };
         }

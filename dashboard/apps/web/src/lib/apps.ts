@@ -168,6 +168,10 @@ export interface AppSection {
      *  the organization permission this screen needs. Sections with none are open
      *  to anybody who can see the subject at all. */
     permission?: OrgPermission;
+    /** Shown as well to somebody who may end the organization without running it -
+     *  the successor its owner named. Deleting is deliberately not a permission,
+     *  so it cannot be expressed as one above. */
+    orgDeleter?: boolean;
 }
 
 /**
@@ -570,6 +574,7 @@ export function orgSubapp(slug: string): AppSubapp {
                 href: `${base}/settings`,
                 icon: SlidersHorizontal,
                 permission: "settings.manage",
+                orgDeleter: true,
                 keywords: ["name", "photo", "handle", "transfer", "delete", "hand over"]
             }
         ]

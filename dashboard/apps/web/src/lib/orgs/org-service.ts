@@ -16,6 +16,7 @@ import * as core from "@polaris/core";
 import { organizationPolicy } from "./policy";
 import { ensureSystemRoles } from "./role-service";
 import { OrgAccessError, OrgError } from "./errors";
+import { isSuccessorOf } from "@/lib/successor-service";
 
 export { OrgAccessError, OrgError } from "./errors";
 
@@ -67,7 +68,18 @@ export async function resolveOrgAccess(actor: OrgActor, orgId: string): Promise<
         };
     }
     const slug = org.members[0]?.role;
-    if (!slug) return null;
+    if (!slug) {
+        // The successor the owner named is answered rather than turned away, so
+        // the one act they may perform has a screen to be performed on - and is
+        // answered with nothing at all, `org.read` included. That absence is
+        // load-bearing: every screen anybody on the roster can open is gated on
+        // `org.read`, so a successor gets the frame and the settings screen and
+        // not the roster. Naming somebody to close your organizations when you
+        // die is not handing them the list of who works in them today.
+        return (await isSuccessorOf(actor.id, org.ownerId))
+            ? { orgId, role: "successor", roleName: "Successor", isOwner: false, permissions: [] }
+            : null;
+    }
     const role = await roleFor(orgId, slug);
     return { orgId, role: slug, roleName: role.name, isOwner: false, permissions: role.permissions };
 }
@@ -133,12 +145,42 @@ export async function requireOrgPermission(
     return access;
 }
 
-/** Handing the organization on and deleting it. Never a permission, so no role
- *  anybody writes can end up able to give the organization away. An instance
- *  administrator counts, and nobody else does. */
+/** Handing the organization on. Never a permission, so no role anybody writes
+ *  can end up able to give the organization away. An instance administrator
+ *  counts, and nobody else does. */
 export async function requireOrgOwner(actor: OrgActor, orgId: string): Promise<void> {
     const access = await resolveOrgAccess(actor, orgId);
     if (!access?.isOwner) throw new OrgAccessError("Only the organization's owner can do that");
+}
+
+/**
+ * Whether this actor may end the organization, and nothing weaker.
+ *
+ * Three names, and deliberately not the same three as everything else here. The
+ * owner, because it is theirs. An instance administrator, because somebody has
+ * to be able to clear up after an account that is gone. And the successor the
+ * owner named on their own account - which is the whole point of naming one: an
+ * organization whose only owner has died is otherwise permanent, and asking an
+ * administrator to guess at the family's intentions is worse than letting the
+ * person the owner actually chose decide.
+ *
+ * A permission cannot reach this and never will. Everything else about an
+ * organization is recoverable by whoever comes next; this is the one act that
+ * takes the spaces and the work with it.
+ */
+export async function canDeleteOrg(actor: OrgActor, orgId: string): Promise<boolean> {
+    const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { ownerId: true } });
+    if (!org) return false;
+    if (actor.isAdmin || org.ownerId === actor.id) return true;
+    return isSuccessorOf(actor.id, org.ownerId);
+}
+
+export async function requireOrgDeletion(actor: OrgActor, orgId: string): Promise<void> {
+    if (!(await canDeleteOrg(actor, orgId))) {
+        throw new OrgAccessError(
+            "Only the owner, the successor they named, or an administrator can delete an organization"
+        );
+    }
 }
 
 /**
@@ -258,10 +300,23 @@ export interface OrgSummary {
     readonly spaceCount: number;
 }
 
-/** The organizations this account is part of, owned ones first. */
+/**
+ * The organizations this account is part of, owned ones first.
+ *
+ * Organizations whose owner named this account their successor are in the list
+ * too, marked as such. They are not somewhere this person works - they cannot
+ * change anything in one - but leaving them out would mean the one act a
+ * successor exists to perform has nowhere to be reached from.
+ */
 export async function listMyOrgs(userId: string): Promise<OrgSummary[]> {
     const orgs = await prisma.organization.findMany({
-        where: { OR: [{ ownerId: userId }, { members: { some: { userId } } }] },
+        where: {
+            OR: [
+                { ownerId: userId },
+                { members: { some: { userId } } },
+                { owner: { successor: { successorId: userId } } }
+            ]
+        },
         orderBy: { name: "asc" },
         select: {
             id: true,
@@ -279,7 +334,10 @@ export async function listMyOrgs(userId: string): Promise<OrgSummary[]> {
     return orgs
         .map((org) => {
             const owner = org.ownerId === userId;
-            const slug = owner ? "owner" : (org.members[0]?.role ?? core.DEFAULT_ORG_ROLE);
+            // Not on the roster and not the owner leaves one way to be here: the
+            // owner named this account their successor.
+            const member = org.members[0]?.role;
+            const slug = owner ? "owner" : (member ?? "successor");
             return {
                 id: org.id,
                 slug: org.slug,
@@ -287,7 +345,7 @@ export async function listMyOrgs(userId: string): Promise<OrgSummary[]> {
                 description: org.description,
                 image: org.image,
                 role: slug,
-                roleName: owner ? "Owner" : roleDisplayName(org.roles, slug),
+                roleName: owner ? "Owner" : member ? roleDisplayName(org.roles, member) : "Successor",
                 // The owner is not a member row, so the roster is always one
                 // longer than the table says.
                 memberCount: org._count.members + 1,

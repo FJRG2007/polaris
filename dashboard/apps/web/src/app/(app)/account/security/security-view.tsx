@@ -23,6 +23,7 @@ import type { PasskeyView } from "@/lib/passkey-directory";
 import { Button, Card, CardBody, Select } from "@polaris/ui";
 import { RemovePinDialog, SetPinDialog } from "./pin-dialogs";
 import { TwoFactorMethodsCard } from "./two-factor-methods-card";
+import { SuccessorCard, type SuccessorPerson } from "./successor-card";
 import type { TwoFactorMethodStatus } from "@/lib/two-factor-delivery";
 import { Feedback, SettingCard, type SettingLock } from "./setting-card";
 import { setNewDeviceGraceAction, updateSessionLimitsAction } from "./actions";
@@ -72,7 +73,8 @@ export function SecurityView({
     twoFactorPreferred,
     trustedDevices,
     connections,
-    otherSessions
+    otherSessions,
+    successor
 }: {
     /** Set while this browser is too new on the account to change any of this.
      *  Every control below reads it; the server refuses them regardless. */
@@ -100,6 +102,8 @@ export function SecurityView({
     connections: ConnectedSignIn[];
     /** Open sessions other than this one, which is what a sign-in is approved from. */
     otherSessions: number;
+    /** The account named to close this one's organizations if its owner dies. */
+    successor: SuccessorPerson | null;
 }) {
     const router = useRouter();
     const [dialog, setDialog] = useState<string | null>(null);
@@ -343,6 +347,7 @@ export function SecurityView({
             </div>
 
             <PasskeysCard passkeys={passkeys} lock={lock} />
+            <SuccessorCard successor={successor} lock={lock} />
 
             <ChangePasswordDialog open={dialog === "password"} onOpenChange={(open) => !open && close()} />
             <RecoverPasswordDialog

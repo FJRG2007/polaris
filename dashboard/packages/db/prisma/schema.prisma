@@ -126,6 +126,32 @@ model User {
     orgMemberships      OrganizationMember[]
     teamMemberships     TeamMember[]
     ownedDomains        OwnerDomain[]
+    successor           AccountSuccessor?    @relation("AccountSuccessorHolder")
+    successorTo         AccountSuccessor[]   @relation("AccountSuccessorHeir")
+}
+
+// The account somebody named to take over their own if they die.
+//
+// One row per account, and only ever written by the account itself: naming a
+// successor is a statement about your own estate, so nobody - not an
+// administrator, not the successor - can put themselves in this column. The
+// acknowledgement the owner read when they named one is kept as `acknowledgedAt`
+// rather than as a boolean, because what matters later is that consent was given
+// and when, not that a checkbox was true at some unrecorded moment.
+//
+// It is not a will and it is not a role. What it grants inside Polaris is
+// deliberately narrow and lives in the services that read it, so widening it is
+// a change somebody has to make on purpose.
+model AccountSuccessor {
+    userId         String   @id @db.Uuid
+    successorId    String   @db.Uuid
+    acknowledgedAt DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+
+    user      User @relation("AccountSuccessorHolder", fields: [userId], references: [id], onDelete: Cascade)
+    successor User @relation("AccountSuccessorHeir", fields: [successorId], references: [id], onDelete: Cascade)
+
+    @@index([successorId])
 }
 
 // Addresses a user owns besides the one they sign in with. The primary stays on

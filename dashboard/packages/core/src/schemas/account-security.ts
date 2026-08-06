@@ -210,6 +210,26 @@ export const recoverPasswordSchema = z
     });
 
 // ---------------------------------------------------------------------------
+// Successor
+// ---------------------------------------------------------------------------
+
+/**
+ * How one person names another they are not already looking at in a list: a
+ * username, an email address, or the name on the account.
+ *
+ * Left as free text rather than an id because the person naming a successor
+ * knows their colleague as a name, not as a uuid, and because a picker that
+ * listed every account on the instance would be a directory anybody could read.
+ */
+export const personIdentifierField = z
+    .string()
+    .trim()
+    .min(1, "Enter a username, full name, or email address")
+    .max(200);
+
+export const accountSuccessorSchema = z.object({ identifier: personIdentifierField });
+
+// ---------------------------------------------------------------------------
 // Recovering an account from outside it
 // ---------------------------------------------------------------------------
 

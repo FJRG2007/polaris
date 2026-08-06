@@ -43,9 +43,17 @@ export function AppSidebar() {
     // Hidden sections still nest under a root, so the whole list decides what is
     // an exact match even though only some of it is drawn.
     const sections = subapp ? subapp.sections : (APP_SECTIONS[app.id] ?? []);
-    const items = sections.filter(
-        (section) => !section.hidden && (!section.permission || hasOrgPermission(org?.permissions ?? [], section.permission))
-    );
+    const items = sections.filter((section) => {
+        if (section.hidden) return false;
+        // Outside an organization - and inside one before the answer arrives -
+        // the baseline rail is the entries that ask for nothing.
+        if (!org) return !section.permission;
+        // Inside one, an entry that names no permission still asks for `org.read`,
+        // which every role carries and the owner's successor does not: they are
+        // here for the one screen that lets them close it, and nothing else.
+        if (section.orgDeleter === true && org.canDelete) return true;
+        return hasOrgPermission(org.permissions, section.permission ?? "org.read");
+    });
     if (items.length === 0) return null;
 
     // The ungrouped screens keep the list's own heading; each named group follows

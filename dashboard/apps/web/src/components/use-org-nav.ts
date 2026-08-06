@@ -21,6 +21,10 @@ import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 export interface OrgNav {
     readonly name: string;
     readonly permissions: readonly string[];
+    /** Whether this reader may end the organization. Separate from the
+     *  permissions because deleting is not one - it belongs to the owner, the
+     *  successor they named, and an instance administrator. */
+    readonly canDelete: boolean;
 }
 
 /** A roster changes rarely and a role less often than that, so an answer stands
@@ -48,7 +52,8 @@ export function useOrgNav(slug: string | null): OrgNav | null {
                 const body = (await response.json()) as Partial<OrgNav>;
                 const value: OrgNav = {
                     name: typeof body.name === "string" ? body.name : slug,
-                    permissions: Array.isArray(body.permissions) ? body.permissions.filter((p) => typeof p === "string") : []
+                    permissions: Array.isArray(body.permissions) ? body.permissions.filter((p) => typeof p === "string") : [],
+                    canDelete: body.canDelete === true
                 };
                 setNav(value);
                 writeSnapshot(key(slug), value);

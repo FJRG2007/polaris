@@ -17,6 +17,7 @@
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
+import { proveStepUp } from "@/lib/step-up";
 import * as orgs from "@/lib/orgs/org-service";
 import * as roles from "@/lib/orgs/role-service";
 import { recordAudit } from "@/lib/audit-service";
@@ -128,10 +129,27 @@ export async function transferOrgAction(orgId: string, toUserId: string): Promis
     }
 }
 
-export async function deleteOrgAction(orgId: string): Promise<{ error?: string }> {
+/**
+ * End an organization.
+ *
+ * Two gates rather than one. The first says who may: the owner, the successor
+ * they named, or an instance administrator, and no role in between. The second
+ * asks that person to prove they are still themselves - this takes every space
+ * and every task in the organization with it, and an open session left on a
+ * borrowed laptop is not evidence that its owner wanted that.
+ *
+ * The proof is checked before the authorization is even looked at, so a wrong
+ * code and a refused account are told apart only by somebody who already passed
+ * the other gate.
+ */
+export async function deleteOrgAction(orgId: string, proof: unknown): Promise<{ error?: string }> {
     const caller = await actor();
+    const parsed = core.stepUpProofSchema.safeParse(proof);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Confirm it is you first" };
     try {
-        await orgs.requireOrgOwner(caller, orgId);
+        await orgs.requireOrgDeletion(caller, orgId);
+        const proven = await proveStepUp(caller.id, `org-delete:${orgId}`, parsed.data);
+        if (proven.error) return proven;
         await orgs.deleteOrg(orgId);
         // The organization is gone, so nothing will ever read this through its
         // own screen. It stays for the instance's history, which is the one place

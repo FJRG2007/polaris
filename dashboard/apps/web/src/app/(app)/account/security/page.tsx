@@ -16,6 +16,7 @@ import { auth } from "@/lib/auth";
 import { requireUser } from "@/lib/session";
 import { SecurityView } from "./security-view";
 import { listPasskeys } from "./passkey-actions";
+import { getSuccessor } from "@/lib/successor-service";
 import { currentDeviceStanding } from "@/lib/device-grace";
 import { listUserSessions } from "@/lib/session-directory";
 import type { ConnectedSignIn } from "./connected-sign-in-card";
@@ -74,7 +75,8 @@ export default async function SecurityPage() {
         trustedDevices,
         backupCodes,
         standing,
-        connections
+        connections,
+        successor
     ] = await Promise.all([
         getUserSecurity(user.id),
         listSecurityQuestions(user.id),
@@ -90,7 +92,8 @@ export default async function SecurityPage() {
         currentDeviceStanding(user),
         // The outside accounts this person has connected, and whether each may
         // sign them in - which is theirs to decide and the operator's to allow.
-        connectedSignIns(user.id)
+        connectedSignIns(user.id),
+        getSuccessor(user.id)
     ]);
     const lock = standing.settled ? undefined : { reason: newDeviceWaitMessage(standing) };
 
@@ -119,6 +122,9 @@ export default async function SecurityPage() {
                 twoFactorPreferred={settings.twoFactorPreferred}
                 connections={connections}
                 otherSessions={sessions.filter((session) => !session.current).length}
+                successor={
+                    successor ? { userId: successor.userId, name: successor.name, email: successor.email } : null
+                }
             />
         </div>
     );

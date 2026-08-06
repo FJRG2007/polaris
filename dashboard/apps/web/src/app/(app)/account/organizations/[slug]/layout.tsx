@@ -16,7 +16,7 @@ import Link from "next/link";
 import { Badge } from "@polaris/ui";
 import type { ReactNode } from "react";
 import { OrgAvatar } from "@/components/avatar";
-import { requireOrgPage } from "@/lib/orgs/page-access";
+import { requireOrgFrame } from "@/lib/orgs/page-access";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +28,7 @@ export default async function OrganizationLayout({
     params: Promise<{ slug: string }>;
 }) {
     const { slug } = await params;
-    const { org, access } = await requireOrgPage(slug);
+    const { org, access } = await requireOrgFrame(slug);
 
     return (
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">

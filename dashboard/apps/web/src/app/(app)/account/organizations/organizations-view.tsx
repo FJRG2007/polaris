@@ -116,7 +116,10 @@ export function OrganizationsView({
                     {orgs.map((org) => (
                         <li key={org.id}>
                             <Link
-                                href={`/account/organizations/${org.slug}`}
+                                // A successor is not on the roster, so the
+                                // overview is not theirs to open; their row goes
+                                // straight to the one screen that is.
+                                href={`/account/organizations/${org.slug}${org.role === "successor" ? "/settings" : ""}`}
                                 className="border-border hover:bg-muted flex items-center gap-3 rounded-lg border px-3 py-3 transition-colors"
                             >
                                 <OrgAvatar org={org} size={36} />

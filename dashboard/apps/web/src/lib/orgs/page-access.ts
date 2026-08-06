@@ -40,11 +40,35 @@ const resolve = cache(async (slug: string): Promise<OrgPageContext | null> => {
     return org ? { user, org, access } : null;
 });
 
-/** The organization this screen is about, or a 404. Pass the permission the
- *  screen needs; leave it out for the ones anybody on the roster may open. */
+/**
+ * The organization this screen is about, or a 404. Pass the permission the
+ * screen needs; leave it out for the ones anybody on the roster may open.
+ *
+ * "Anybody on the roster" is `org.read` rather than "has an answer at all",
+ * because not everybody with an answer is on the roster: the successor an owner
+ * named resolves to a membership holding nothing, precisely so that leaving the
+ * permission off here still keeps them out. Every real role carries `org.read`
+ * whether its editor granted it or not, so this changes nothing for a member.
+ */
 export async function requireOrgPage(slug: string, permission?: core.OrgPermission): Promise<OrgPageContext> {
     const context = await resolve(slug);
     if (!context) notFound();
-    if (permission && !core.hasOrgPermission(context.access.permissions, permission)) notFound();
+    if (!core.hasOrgPermission(context.access.permissions, permission ?? "org.read")) notFound();
+    return context;
+}
+
+/**
+ * The organization for the frame around those screens, and for the one screen
+ * that decides its own answer.
+ *
+ * No permission check at all: the layout is chrome, and the settings screen is
+ * opened by two different people for two different halves of it, so it works out
+ * for itself which half applies rather than being let in on one permission. Not
+ * a way around the gate - a layout hands nothing to the pages under it, and each
+ * page still calls `requireOrgPage` for itself.
+ */
+export async function requireOrgFrame(slug: string): Promise<OrgPageContext> {
+    const context = await resolve(slug);
+    if (!context) notFound();
     return context;
 }
