@@ -301,10 +301,9 @@ services:
   # Co-located WAF sentinel. Traefik forwardAuths to it for the deploy denylist and
   # require-login controls; it holds no rule state (rules arrive per request in a
   # header Traefik stamps on) and verifies login tokens offline, so it keeps
-  # enforcing if the Polaris control plane is down. On the proxy network (aliased to
-  # the name the generated forwardAuth address uses) so deployed apps' routers reach
-  # it by name; never published to the host. Idle when no app has a denylist/
-  # require-login rule.
+  # enforcing if the Polaris control plane is down. Aliased to the name the generated
+  # forwardAuth address uses, on both networks that address it (see below); never
+  # published to the host. Idle when no app has a denylist/require-login rule.
   #
   # Build-only, exactly like the mdns sidecar: with no `image`, `docker compose pull`
   # skips it instead of trying - and failing - to fetch an unpublished image, which
@@ -332,6 +331,22 @@ services:
     volumes:
       - polaris-edge-intel:/edge-intel:ro
     networks:
+      # Both networks, under the same alias, because two different callers address it
+      # by that one name. Traefik reaches it from the proxy network, where the routers
+      # it generates point their forwardAuth and their vacant-page service. The control
+      # plane reaches it from the default network, where it asks - before writing those
+      # routers - whether this container is new enough to serve the pages they name.
+      #
+      # Without the second entry that question can never be answered: the web container
+      # is not on the proxy network (deliberately - deployed apps live there, and the
+      # control plane has no business being addressable from them), so the probe failed
+      # to connect and was read as "too old". Every install therefore wrote no vacant
+      # routers and no error page, and served the edge's bare 404 and Bad Gateway
+      # instead. The guard only listens, so joining the control plane's own network
+      # exposes nothing further to anything deployed.
+      default:
+        aliases:
+          - polaris-edge-guard
       polaris-proxy:
         aliases:
           - polaris-edge-guard
