@@ -14,11 +14,11 @@ import Link from "next/link";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
-import { Hash, Plus, Trash2 } from "lucide-react";
 import { ProgressBar, StatusDot } from "./pickers";
 import type { PersonRef } from "@/lib/tasks/facts";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormView } from "@/lib/tasks/form-service";
+import { ChevronDown, ChevronUp, Hash, Pencil, Plus, Trash2 } from "lucide-react";
 import { AutomationsPanel, FormsPanel } from "./automations-panel";
 import type { AutomationView } from "@/lib/tasks/automation-service";
 import { Button, Card, CardBody, ConfirmDeleteDialog, Input, Select, cn } from "@polaris/ui";
@@ -200,38 +200,167 @@ function StatusesTab({
     const [color, setColor] = useState("#64748b");
     const [removing, setRemoving] = useState<StatusView | null>(null);
     const [replacement, setReplacement] = useState("");
+    // The status being reshaped, and the draft standing in for it until it is
+    // saved. Held here rather than on the row so leaving it open on one status
+    // and opening another cannot end with two half-edited rows.
+    const [editing, setEditing] = useState<StatusView | null>(null);
+    const [draft, setDraft] = useState<{ name: string; type: core.TaskStatusType; color: string } | null>(null);
+    const [saving, setSaving] = useState(false);
+    // Where a move has put things until the server says the same. The reload
+    // that follows brings the new order with it, and that is when this has done
+    // its job - whether or not the write landed.
+    const [moved, setMoved] = useState<string[] | null>(null);
+
+    useEffect(() => setMoved(null), [statuses]);
+
+    const ordered = useMemo(() => {
+        if (!moved) return statuses;
+        const at = new Map(moved.map((id, index) => [id, index]));
+        return [...statuses].sort((left, right) => (at.get(left.id) ?? 0) - (at.get(right.id) ?? 0));
+    }, [statuses, moved]);
+
+    /**
+     * Move one status past its neighbour.
+     *
+     * The same write the board's drag makes, reachable from a keyboard and from
+     * a touch screen - which a drag on a column header is not.
+     */
+    const move = async (index: number, delta: number) => {
+        const target = index + delta;
+        if (target < 0 || target >= ordered.length) return;
+        const next = [...ordered];
+        [next[index], next[target]] = [next[target]!, next[index]!];
+        const ids = next.map((status) => status.id);
+        setMoved(ids);
+        const result = await runAction(() => actions.reorderStatusesAction(spaceId, ids), onError);
+        if (result?.error) {
+            setMoved(null);
+            onError(result.error);
+        }
+    };
+
+    const save = async () => {
+        if (!editing || !draft?.name.trim() || saving) return;
+        setSaving(true);
+        const result = await runAction(
+            () =>
+                actions.updateStatusAction(spaceId, editing.id, {
+                    name: draft.name.trim(),
+                    type: draft.type,
+                    color: draft.color
+                }),
+            onError
+        );
+        setSaving(false);
+        if (result?.error) onError(result.error);
+        else if (result) setEditing(null);
+    };
 
     return (
         <section className="flex flex-col gap-3">
             <p className="text-xs text-muted-foreground">
                 Every list in this space shares these. The kind decides what Polaris counts as finished, whatever the
-                status is called.
+                status is called, and the order here is the order of the columns on a board. Move one with the arrows,
+                or drag its column on a board.
             </p>
 
             <ul className="divide-y divide-border rounded-lg border border-border">
-                {statuses.map((status) => (
-                    <li key={status.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
-                        <StatusDot color={status.color} />
-                        <span className="min-w-32 flex-1 truncate text-sm">{status.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                            {core.TASK_STATUS_TYPE_LABELS[status.type]}
-                        </span>
-                        {canManage && (
-                            <button
-                                type="button"
-                                aria-label={`Remove ${status.name}`}
-                                title="Remove status"
-                                onClick={() => {
-                                    setRemoving(status);
-                                    setReplacement(statuses.find((entry) => entry.id !== status.id)?.id ?? "");
+                {ordered.map((status, index) =>
+                    editing?.id === status.id && draft ? (
+                        <li key={status.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
+                            <input
+                                type="color"
+                                value={draft.color}
+                                aria-label="Status colour"
+                                onChange={(event) => setDraft({ ...draft, color: event.target.value })}
+                                className="h-8 w-12 shrink-0 rounded border border-border bg-background"
+                            />
+                            <Input
+                                autoFocus
+                                value={draft.name}
+                                aria-label="Status name"
+                                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                                onKeyDown={(event) => {
+                                    if (event.key === "Escape") setEditing(null);
+                                    if (event.key === "Enter") void save();
                                 }}
-                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
-                            >
-                                <Trash2 className="size-3.5" />
-                            </button>
-                        )}
-                    </li>
-                ))}
+                                className="h-8 min-w-32 flex-1 text-sm"
+                            />
+                            <Select
+                                value={draft.type}
+                                onValueChange={(value) => setDraft({ ...draft, type: value as core.TaskStatusType })}
+                                options={core.TASK_STATUS_TYPES.map((entry) => ({
+                                    value: entry,
+                                    label: core.TASK_STATUS_TYPE_LABELS[entry]
+                                }))}
+                                aria-label="Status kind"
+                                className="h-8 w-40 text-xs"
+                            />
+                            <Button size="sm" disabled={!draft.name.trim() || saving} onClick={() => void save()}>
+                                {saving ? "Saving..." : "Save"}
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
+                                Cancel
+                            </Button>
+                        </li>
+                    ) : (
+                        <li key={status.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
+                            <StatusDot color={status.color} />
+                            <span className="min-w-32 flex-1 truncate text-sm" title={status.name}>{status.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {core.TASK_STATUS_TYPE_LABELS[status.type]}
+                            </span>
+                            {canManage && (
+                                <>
+                                    <button
+                                        type="button"
+                                        disabled={index === 0}
+                                        aria-label={`Move ${status.name} up`}
+                                        title="Move up"
+                                        onClick={() => void move(index, -1)}
+                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                                    >
+                                        <ChevronUp className="size-3.5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={index === ordered.length - 1}
+                                        aria-label={`Move ${status.name} down`}
+                                        title="Move down"
+                                        onClick={() => void move(index, 1)}
+                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                                    >
+                                        <ChevronDown className="size-3.5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-label={`Edit ${status.name}`}
+                                        title="Edit status"
+                                        onClick={() => {
+                                            setEditing(status);
+                                            setDraft({ name: status.name, type: status.type, color: status.color });
+                                        }}
+                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                    >
+                                        <Pencil className="size-3.5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-label={`Remove ${status.name}`}
+                                        title="Remove status"
+                                        onClick={() => {
+                                            setRemoving(status);
+                                            setReplacement(statuses.find((entry) => entry.id !== status.id)?.id ?? "");
+                                        }}
+                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                                    >
+                                        <Trash2 className="size-3.5" />
+                                    </button>
+                                </>
+                            )}
+                        </li>
+                    )
+                )}
             </ul>
 
             {canManage && (

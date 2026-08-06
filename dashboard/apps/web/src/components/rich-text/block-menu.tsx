@@ -21,7 +21,7 @@ import { ReactRenderer } from "@tiptap/react";
 import type { Editor, Range } from "@tiptap/core";
 import type { SuggestionProps } from "@tiptap/suggestion";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
-import { POPUP_CLASS, POPUP_ITEM_CLASS, type SuggestionHandle } from "./suggestion";
+import { POPUP_CLASS, POPUP_ITEM_CLASS, POPUP_LAYER_CLASS, type SuggestionHandle } from "./suggestion";
 import {
     Code2,
     Heading1,
@@ -185,7 +185,11 @@ export const BlockMenu = Extension.create({
 
                     return {
                         onStart: (props) => {
-                            renderer = new ReactRenderer(Menu, { props, editor: props.editor });
+                            renderer = new ReactRenderer(Menu, {
+                                props,
+                                editor: props.editor,
+                                className: POPUP_LAYER_CLASS
+                            });
                             unmount = props.mount(renderer.element as HTMLElement);
                         },
                         onUpdate: (props) => renderer?.updateProps(props),
