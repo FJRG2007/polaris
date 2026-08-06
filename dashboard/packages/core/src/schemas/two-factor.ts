@@ -111,6 +111,44 @@ export const otpCodeField = z
     .trim()
     .regex(/^\d{6}$/, "Enter the 6-digit code");
 
+// ---------------------------------------------------------------------------
+// Proving it is still you, mid-session
+// ---------------------------------------------------------------------------
+
+/**
+ * The ways an already signed-in account can be asked to prove itself again
+ * before something irreversible happens.
+ *
+ * The three second factors, plus the password for an account that armed none of
+ * them. The password is last for a reason: it is what the open session already
+ * rests on, so it proves the least. It is offered anyway because the alternative
+ * is an account with no second factor being unable to delete anything it owns,
+ * and a gate nobody can pass is a gate people route around.
+ */
+export const STEP_UP_PROOFS = ["totp", "email", "whatsapp", "password"] as const;
+
+export type StepUpProof = (typeof STEP_UP_PROOFS)[number];
+
+/** What the person actually typed, tagged with which proof it answers. Every
+ *  variant carries its own body, so a password can never arrive where a code is
+ *  expected and be checked as one. */
+export const stepUpProofSchema = z.discriminatedUnion("proof", [
+    z.object({ proof: z.literal("totp"), code: otpCodeField }),
+    z.object({ proof: z.literal("email"), code: otpCodeField }),
+    z.object({ proof: z.literal("whatsapp"), code: otpCodeField }),
+    z.object({ proof: z.literal("password"), password: z.string().min(1, "Enter your password") })
+]);
+
+export type StepUpProofInput = z.infer<typeof stepUpProofSchema>;
+
+/** How a proof asks for itself, wherever the confirmation is drawn. */
+export const STEP_UP_PROOF_LABELS: Record<StepUpProof, string> = {
+    totp: "Authenticator code",
+    email: "Emailed code",
+    whatsapp: "WhatsApp code",
+    password: "Your password"
+};
+
 /**
  * Show enough of an address to recognize it without printing it in full on a
  * screen anyone standing behind an unproved sign-in can read.

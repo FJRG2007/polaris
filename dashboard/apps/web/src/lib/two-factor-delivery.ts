@@ -182,6 +182,35 @@ export async function challengeOptions(userId: string): Promise<ChallengeOptions
     return { methods, preferred };
 }
 
+/** One message, in both forms, whichever channel ends up carrying it. */
+export interface CodeMessage {
+    subject: string;
+    text: string;
+    html: string;
+}
+
+/**
+ * Put a message in front of an account by one of its delivery methods.
+ *
+ * The address is resolved here rather than passed in, so nothing outside this
+ * module ever holds an unmasked address, and a method whose channel has since
+ * gone says so instead of failing somewhere quieter. Used by the sign-in
+ * challenge below and by the mid-session confirmations, which need the same
+ * three questions answered - is the method on, can it deliver, where to - and
+ * must not answer them a second, slightly different way.
+ */
+export async function deliverCode(
+    userId: string,
+    method: TwoFactorDeliveryMethod,
+    message: CodeMessage
+): Promise<{ error?: string }> {
+    const { destination, blocker } = await resolveDestination(userId, method);
+    if (!destination) return { error: blocker ?? "That method stopped being usable." };
+    return method === "email"
+        ? sendAuthEmail({ to: destination.address, subject: message.subject, text: message.text, html: message.html })
+        : sendByWhatsApp(destination, message.text);
+}
+
 function messageBody(code: string): { text: string; html: string } {
     const text = [
         `Your Polaris sign-in code is ${code}.`,
@@ -235,10 +264,11 @@ export async function sendTwoFactorCode(input: {
     // uses the real address instead of the masked one shown on screen.
     if (!destination) return { error: "That method stopped being usable." };
 
+    const { text, html } = messageBody(code);
     const result =
         chosen === "email"
-            ? await sendCodeByEmail(destination.address, code)
-            : await sendCodeByWhatsApp(destination, code);
+            ? await sendAuthEmail({ to: destination.address, subject: "Your Polaris sign-in code", text, html })
+            : await sendByWhatsApp(destination, text);
 
     // Which channel carried the code is only known here - the request that checks
     // it carries nothing about where it came from - so a code that actually went
@@ -253,19 +283,13 @@ export async function sendTwoFactorCode(input: {
     return result;
 }
 
-async function sendCodeByEmail(address: string, code: string): Promise<{ error?: string }> {
-    const { text, html } = messageBody(code);
-    return sendAuthEmail({ to: address, subject: "Your Polaris sign-in code", text, html });
-}
-
 /**
- * Hand the code straight to the bridge rather than through the inbox, so it is
- * never written into the conversation history: a code that outlives the minute
- * it was good for is a code sitting in a database for no reason.
+ * Hand the message straight to the bridge rather than through the inbox, so it
+ * is never written into the conversation history: a code that outlives the
+ * minute it was good for is a code sitting in a database for no reason.
  */
-async function sendCodeByWhatsApp(destination: Destination, code: string): Promise<{ error?: string }> {
+async function sendByWhatsApp(destination: Destination, text: string): Promise<{ error?: string }> {
     if (!destination.channelId) return { error: "No WhatsApp channel to send through." };
-    const { text } = messageBody(code);
     try {
         await bridgeSend(destination.channelId, {
             peerId: normalizePeerId("whatsapp", destination.address),

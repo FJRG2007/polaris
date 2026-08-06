@@ -52,6 +52,10 @@ export interface ConfirmDeleteDialogProps {
     confirmLabel?: string;
     /** Blocks confirmation entirely and explains why (e.g. a volume a service needs). */
     blockedReason?: string | null;
+    /** Holds the button while something in `children` is still unanswered - a
+     *  second-factor code, a required choice. Silent on purpose: the control that
+     *  is not finished is on screen and says so itself. */
+    confirmDisabled?: boolean;
     error?: string | null;
     pending?: boolean;
     onConfirm: () => void;
@@ -67,6 +71,7 @@ export function ConfirmDeleteDialog({
     children,
     confirmLabel,
     blockedReason,
+    confirmDisabled = false,
     error,
     pending = false,
     onConfirm
@@ -82,7 +87,7 @@ export function ConfirmDeleteDialog({
 
     const matches = !requireTyping || typed.trim().toLowerCase() === name.trim().toLowerCase();
     const blocked = Boolean(blockedReason);
-    const ready = matches && !blocked && !pending;
+    const ready = matches && !blocked && !pending && !confirmDisabled;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>

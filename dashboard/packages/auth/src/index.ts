@@ -117,6 +117,7 @@ export {
     verifyPhoneCode,
     type UserPhoneView
 } from "./phone.js";
+export { issueStepUpCode, verifyStepUpCode, discardStepUpCode } from "./step-up.js";
 export {
     listAccessGroups,
     createAccessGroup,
