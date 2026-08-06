@@ -29,19 +29,47 @@ export interface DockerHttpRequest {
     readonly body?: string;
 }
 
-/** Send one request over an already-connected stream and read the full reply. */
+/**
+ * Send one request over an already-connected stream and read the full reply.
+ *
+ * The stream is closed once the exchange is over, and that is not tidiness. Over
+ * SSH this stream is an exec channel, and the far side is a forced command that
+ * copies bytes both ways: it has sent us everything, but it is still waiting on
+ * an EOF from us, so the channel stays open. A server allows a bounded number of
+ * them at once (sshd's MaxSessions, ten by default), and every Docker call opens
+ * one - so a page that lists containers, refreshes every five seconds and reads
+ * a detail or a log on the way past runs out within a minute, and every call
+ * after that fails with "Channel open failure: open failed" on a host that is
+ * perfectly healthy. Closing here is what gives the channel back.
+ */
 export function httpOverStream(stream: Duplex, request: DockerHttpRequest): Promise<DockerHttpResponse> {
     return new Promise((resolve, reject) => {
         const chunks: Buffer[] = [];
-        stream.on("data", (chunk: Buffer) => chunks.push(chunk));
-        stream.on("error", reject);
-        stream.on("end", () => {
-            try {
-                resolve(parseResponse(Buffer.concat(chunks)));
-            } catch (error) {
-                reject(error instanceof Error ? error : new Error(String(error)));
-            }
-        });
+
+        const onData = (chunk: Buffer): void => {
+            chunks.push(chunk);
+        };
+        const onError = (error: Error): void => finish(() => reject(error));
+        const onEnd = (): void =>
+            finish(() => {
+                try {
+                    resolve(parseResponse(Buffer.concat(chunks)));
+                } catch (error) {
+                    reject(error instanceof Error ? error : new Error(String(error)));
+                }
+            });
+
+        function finish(settle: () => void): void {
+            stream.off("data", onData);
+            stream.off("error", onError);
+            stream.off("end", onEnd);
+            stream.destroy();
+            settle();
+        }
+
+        stream.on("data", onData);
+        stream.on("error", onError);
+        stream.on("end", onEnd);
 
         stream.write(requestHead(request, ["Connection: close"]));
     });

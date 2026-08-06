@@ -179,3 +179,44 @@ describe("docker driver", () => {
         expect(driver.canAttach).toBe(false);
     });
 });
+
+/**
+ * Over SSH each of these streams is an exec channel, and a server allows a
+ * bounded number of them at once. Reading the reply and walking away left the
+ * far side waiting on an EOF that never came, so the channels accumulated until
+ * the host started refusing new ones - on a host with nothing wrong with it.
+ */
+describe("the stream a request was made on", () => {
+    function recordingDriver(response: Buffer): { driver: DockerDriver; streams: CannedStream[] } {
+        const streams: CannedStream[] = [];
+        const conn: DockerTransportConn = {
+            stream: async () => {
+                const stream = new CannedStream(response);
+                streams.push(stream);
+                return stream;
+            },
+            close: async () => undefined
+        };
+        return { driver: new DockerDriver(streamRpc(conn)), streams };
+    }
+
+    it("is closed once the reply has been read", async () => {
+        const { driver, streams } = recordingDriver(httpResponse("200 OK", []));
+        await driver.listContainers();
+        expect(streams).toHaveLength(1);
+        expect(streams[0]?.destroyed).toBe(true);
+    });
+
+    it("is closed for every call, so repeated reads do not accumulate", async () => {
+        const { driver, streams } = recordingDriver(httpResponse("200 OK", []));
+        for (let call = 0; call < 12; call += 1) await driver.listContainers();
+        expect(streams).toHaveLength(12);
+        expect(streams.every((stream) => stream.destroyed)).toBe(true);
+    });
+
+    it("is closed when the engine answers with an error", async () => {
+        const { driver, streams } = recordingDriver(httpResponse("500 Server Error", { message: "boom" }));
+        await expect(driver.listContainers()).rejects.toThrow(/500/);
+        expect(streams[0]?.destroyed).toBe(true);
+    });
+});

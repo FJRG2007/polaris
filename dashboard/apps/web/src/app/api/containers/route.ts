@@ -27,17 +27,14 @@ export async function GET(request: Request): Promise<Response> {
         const payload = await withDockerDriver(parsed.data.c, caller.userId, async (driver) => {
             const info = await driver.info();
             const list = await driver.listContainers();
-            // One stats sample per running container, in parallel - a stopped one
-            // has nothing to sample, and a single slow container must not hold up
-            // the rest of the table.
-            const samples = await Promise.all(
-                list.map(async (container) =>
-                    container.state === "running"
-                        ? { id: container.id, stats: await driver.stats(container.id).catch(() => null) }
-                        : { id: container.id, stats: null }
-                )
+            // One stats sample per running container - a stopped one has nothing
+            // to sample. Through the driver's batch rather than all at once: over
+            // SSH each sample is its own channel and a server allows a bounded
+            // number of them, so a host with a dozen running containers was
+            // asking for more than it was allowed and losing the overflow.
+            const byId = await driver.statsMany(
+                list.filter((container) => container.state === "running").map((container) => container.id)
             );
-            const byId = new Map(samples.map((sample) => [sample.id, sample.stats]));
             const containers: ContainerRow[] = list.map((container) => {
                 const stats = byId.get(container.id) ?? null;
                 return {
