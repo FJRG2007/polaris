@@ -196,6 +196,13 @@ export async function publishDomainCertificates(): Promise<void> {
         await unlink(join(dyn, name)).catch(() => undefined);
     }
 
-    const tls = entries.length > 0 ? ["tls:", "  certificates:", ...entries, ""].join("\n") : "tls: {}\n";
-    await writeFile(join(dyn, TLS_FILE), tls, "utf8");
+    // No certificates means no file. Writing an empty `tls: {}` instead is what the
+    // edge refuses outright - "tls cannot be a standalone element" - and it refuses it
+    // by failing the whole reload, so every OTHER file in this directory stops being
+    // applied too. An instance with no uploaded certificate (the usual one) would then
+    // sit on whatever config was loaded at boot, and any router written afterwards
+    // would exist on disk and never serve. The clean-up above already removed a stale
+    // copy, since this file carries the same prefix as the certificates themselves.
+    if (entries.length === 0) return;
+    await writeFile(join(dyn, TLS_FILE), ["tls:", "  certificates:", ...entries, ""].join("\n"), "utf8");
 }
