@@ -48,7 +48,7 @@ export function DangerSection({
             <SettingsCard
                 tone="danger"
                 title="Delete this project"
-                description="Every environment, service, volume record, variable and deploy log in it goes. There is no undo and no export afterwards."
+                description="Every environment, service, volume record, variable and deploy log in it goes, and whatever it is running is stopped and removed from its server. There is no undo and no export afterwards."
             >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-xs text-muted-foreground">

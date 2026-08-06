@@ -61,11 +61,41 @@ export function ProjectsGrid({
     canManage: boolean;
     localReady: boolean;
 }) {
+    const router = useRouter();
     const [layout, setLayout] = useState<"grid" | "list">("grid");
     const [search, setSearch] = useState("");
-    const fuse = useMemo(() => new Fuse(projects, { keys: ["name"], threshold: 0.4 }), [projects]);
-    const filtered = search.trim() ? fuse.search(search.trim()).map((result) => result.item) : projects;
-    const count = projects.length;
+    // Projects whose delete is in flight. Deleting one now takes its services off
+    // their servers as well as its rows out of the database, which is seconds of
+    // work - the card goes when the reader asks for it to go, and comes back with
+    // an explanation if the server refuses.
+    const [removing, setRemoving] = useState<string[]>([]);
+    const [failure, setFailure] = useState<{ name: string; message: string } | null>(null);
+    const [, startTransition] = useTransition();
+
+    // The delete lives here rather than on the card, because the card is the
+    // thing being removed: it unmounts the moment the delete is optimistic, and a
+    // failure reported from inside it would have nowhere left to appear.
+    function deleteProject(project: ProjectCardData): void {
+        setFailure(null);
+        setRemoving((ids) => [...ids, project.id]);
+        startTransition(async () => {
+            const result = await deleteProjectAction(project.id);
+            if (result?.error) {
+                setRemoving((ids) => ids.filter((id) => id !== project.id));
+                setFailure({ name: project.name, message: result.error });
+                return;
+            }
+            router.refresh();
+        });
+    }
+
+    const visible = useMemo(
+        () => projects.filter((project) => !removing.includes(project.id)),
+        [projects, removing]
+    );
+    const fuse = useMemo(() => new Fuse(visible, { keys: ["name"], threshold: 0.4 }), [visible]);
+    const filtered = search.trim() ? fuse.search(search.trim()).map((result) => result.item) : visible;
+    const count = visible.length;
 
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -78,6 +108,17 @@ export function ProjectsGrid({
                     </div>
                 )}
             </div>
+
+            {failure && (
+                <div className="flex items-start justify-between gap-3 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
+                    <p>
+                        {failure.name} was not deleted. {failure.message}
+                    </p>
+                    <Button size="sm" variant="ghost" onClick={() => setFailure(null)}>
+                        Dismiss
+                    </Button>
+                </div>
+            )}
 
             {!localReady && canManage && (
                 <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-muted-foreground">
@@ -141,7 +182,12 @@ export function ProjectsGrid({
             ) : layout === "grid" ? (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {filtered.map((project) => (
-                        <ProjectMenu key={project.id} project={project} canManage={canManage}>
+                        <ProjectMenu
+                            key={project.id}
+                            project={project}
+                            canManage={canManage}
+                            onDelete={deleteProject}
+                        >
                             <ProjectCard project={project} />
                         </ProjectMenu>
                     ))}
@@ -149,7 +195,12 @@ export function ProjectsGrid({
             ) : (
                 <div className="flex flex-col gap-2">
                     {filtered.map((project) => (
-                        <ProjectMenu key={project.id} project={project} canManage={canManage}>
+                        <ProjectMenu
+                            key={project.id}
+                            project={project}
+                            canManage={canManage}
+                            onDelete={deleteProject}
+                        >
                             <ProjectRow project={project} />
                         </ProjectMenu>
                     ))}
@@ -171,30 +222,24 @@ export function ProjectsGrid({
 function ProjectMenu({
     project,
     canManage,
+    onDelete,
     children
 }: {
     project: ProjectCardData;
     canManage: boolean;
+    /** Handed up to the grid, which owns the removal: this card is gone the
+     *  moment the delete is confirmed, and cannot report how it went. */
+    onDelete: (project: ProjectCardData) => void;
     children: ReactNode;
 }) {
     const router = useRouter();
     const [confirming, setConfirming] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
 
     const href = `/apps/deploy/${project.id}`;
 
     function remove() {
-        setError(null);
-        startTransition(async () => {
-            const result = await deleteProjectAction(project.id);
-            if (result?.error) {
-                setError(result.error);
-                return;
-            }
-            setConfirming(false);
-            router.refresh();
-        });
+        setConfirming(false);
+        onDelete(project);
     }
 
     return (
@@ -233,11 +278,9 @@ function ProjectMenu({
                 kind="project"
                 description={
                     project.total > 0
-                        ? `Every environment in this project goes with it, along with its ${project.total} ${project.total === 1 ? "service" : "services"} and their deploy history.`
+                        ? `Every environment in this project goes with it, along with its ${project.total} ${project.total === 1 ? "service" : "services"} and their deploy history. Whatever they are running is stopped and removed from its server.`
                         : "The project and its environments are removed."
                 }
-                error={error}
-                pending={pending}
                 onConfirm={remove}
             />
         </>

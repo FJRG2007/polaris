@@ -303,6 +303,61 @@ export async function getVolumeOwner(
     return row ? { ownerId: row.target.ownerId, applicationId: row.applicationId } : null;
 }
 
+/**
+ * Take everything an environment runs off its servers, before the row that
+ * describes it goes.
+ *
+ * Deleting the record only ever deleted the record: the containers stayed up on
+ * the host, still serving, still listed under Containers, with nothing left in
+ * Polaris able to stop them. Cascading a row is not the same as stopping a
+ * process, and this is the difference.
+ *
+ * Databases go first, children before instances: a logical database is dropped
+ * by reaching into its parent's container, so the parent has to still be
+ * running when its turn comes. Each service is torn down on its own and a
+ * failure is logged rather than thrown - a server that is unreachable must not
+ * leave the project undeletable, and an operator who is told nothing about a
+ * container that outlived its project is exactly where this started.
+ */
+async function tearDownEnvironment(environmentId: string, ownerId: string): Promise<void> {
+    const [databases, applications] = await Promise.all([
+        prisma.managedDatabase.findMany({
+            where: { environmentId },
+            // Non-null parents first: a child is dropped inside its instance.
+            orderBy: { parentId: "desc" },
+            select: { id: true }
+        }),
+        prisma.application.findMany({ where: { environmentId }, select: { id: true } })
+    ]);
+    // Cycle: database-service reaches this module for the deploy queue, so the
+    // teardown it owns is resolved at call time rather than at load.
+    const { deleteDatabase } = await import("./database-service");
+    for (const database of databases) {
+        await deleteDatabase(database.id, ownerId).catch((error: unknown) => {
+            console.error(`deploy: could not remove database ${database.id}:`, error);
+        });
+    }
+    for (const application of applications) {
+        await deleteApplication(application.id, ownerId).catch((error: unknown) => {
+            console.error(`deploy: could not remove service ${application.id}:`, error);
+        });
+    }
+}
+
+/** Take down everything a project runs, without removing the project itself.
+ *  Exported for the cascades that reach a project sideways - deleting the
+ *  organization it sits in takes the row with it either way, and the containers
+ *  have to come down on that path too. */
+export async function tearDownProject(projectId: string, ownerId: string): Promise<void> {
+    const environments = await prisma.environment.findMany({
+        where: { projectId },
+        select: { id: true }
+    });
+    for (const environment of environments) {
+        await tearDownEnvironment(environment.id, ownerId);
+    }
+}
+
 /** Delete a non-default environment (and everything in it) the owner owns. */
 export async function deleteEnvironment(environmentId: string, ownerId: string) {
     const environment = await prisma.environment.findFirst({
@@ -310,6 +365,7 @@ export async function deleteEnvironment(environmentId: string, ownerId: string) 
     });
     if (!environment) throw new Error("Environment not found");
     if (environment.isDefault) throw new Error("The default environment cannot be deleted");
+    await tearDownEnvironment(environmentId, ownerId);
     await prisma.environment.delete({ where: { id: environmentId } });
 }
 
@@ -336,12 +392,15 @@ export async function createProject(ownerId: string, name: string, orgId: string
     });
 }
 
-/** Delete a project the caller owns. Being an admin on somebody else's project is
- *  enough to change everything in it and deliberately not enough to remove it, so
- *  a non-owner is told plainly rather than getting a silent no-op. */
+/** Delete a project the caller owns, and take down everything it was running.
+ *  Being an admin on somebody else's project is enough to change everything in it
+ *  and deliberately not enough to remove it, so a non-owner is told plainly
+ *  rather than getting a silent no-op. */
 export async function deleteProject(projectId: string, ownerId: string) {
-    const removed = await prisma.project.deleteMany({ where: { id: projectId, ownerId } });
-    if (removed.count === 0) throw new Error("Only the project's owner can delete it");
+    const project = await prisma.project.findFirst({ where: { id: projectId, ownerId }, select: { id: true } });
+    if (!project) throw new Error("Only the project's owner can delete it");
+    await tearDownProject(projectId, ownerId);
+    await prisma.project.delete({ where: { id: projectId } });
 }
 
 export interface CreateApplicationInput {

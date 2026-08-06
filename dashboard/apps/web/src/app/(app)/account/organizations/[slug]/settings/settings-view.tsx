@@ -59,7 +59,7 @@ export function SettingsView({
      *  otherwise permanent. */
     canDelete: boolean;
     candidates: { userId: string; name: string }[];
-    impact: { spaces: number; tasks: number };
+    impact: { spaces: number; tasks: number; projects: number };
 }) {
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
@@ -272,7 +272,7 @@ function TransferCard({
  * organization", because the number of spaces and tasks is the part people are
  * wrong about.
  */
-function DangerCard({ org, impact }: { org: OrgDetail; impact: { spaces: number; tasks: number } }) {
+function DangerCard({ org, impact }: { org: OrgDetail; impact: { spaces: number; tasks: number; projects: number } }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [proof, setProof] = useState<core.StepUpProofInput | null>(null);
@@ -281,6 +281,7 @@ function DangerCard({ org, impact }: { org: OrgDetail; impact: { spaces: number;
 
     const spaces = `${impact.spaces} space${impact.spaces === 1 ? "" : "s"}`;
     const tasks = `${impact.tasks} task${impact.tasks === 1 ? "" : "s"}`;
+    const projects = `${impact.projects} deploy project${impact.projects === 1 ? "" : "s"}`;
 
     return (
         <Card>
@@ -290,6 +291,7 @@ function DangerCard({ org, impact }: { org: OrgDetail; impact: { spaces: number;
             <CardBody className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-muted-foreground text-xs">
                     Deleting takes {spaces} and {tasks} with it, along with its teams, roles and domains.
+                    {impact.projects > 0 && ` Its ${projects} go too, and the services they run are stopped.`}
                 </p>
                 <Button
                     size="sm"

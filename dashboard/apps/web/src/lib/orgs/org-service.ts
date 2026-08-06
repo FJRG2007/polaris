@@ -749,17 +749,33 @@ export async function transferOrg(orgId: string, toUserId: string): Promise<void
  *  fall to, and quietly handing it to whoever pressed delete is worse than
  *  saying what will go. */
 export async function deleteOrg(orgId: string): Promise<void> {
+    // The row cascade takes the organization's deploy projects with it, and a
+    // cascade cannot stop a container: without this the services it was running
+    // stay up on their servers with nothing left in Polaris pointing at them.
+    // Reached at call time because deploy-service reads organizations from here.
+    const projects = await prisma.project.findMany({ where: { orgId }, select: { id: true, ownerId: true } });
+    if (projects.length > 0) {
+        const { tearDownProject } = await import("@/lib/deploy-service");
+        for (const project of projects) {
+            await tearDownProject(project.id, project.ownerId);
+        }
+    }
     await prisma.organization.delete({ where: { id: orgId } });
 }
 
 /** What deleting an organization would take with it, so the confirmation can
  *  name it rather than asking "are you sure" about an unknown quantity. */
-export async function orgDeletionImpact(orgId: string): Promise<{ spaces: number; tasks: number }> {
-    const [spaces, tasks] = await Promise.all([
+export async function orgDeletionImpact(
+    orgId: string
+): Promise<{ spaces: number; tasks: number; projects: number }> {
+    const [spaces, tasks, projects] = await Promise.all([
         prisma.taskSpace.count({ where: { orgId } }),
-        prisma.task.count({ where: { space: { orgId } } })
+        prisma.task.count({ where: { space: { orgId } } }),
+        // Named because this is the part that is not just a row: the services
+        // these projects run are stopped and removed from their servers.
+        prisma.project.count({ where: { orgId } })
     ]);
-    return { spaces, tasks };
+    return { spaces, tasks, projects };
 }
 
 /**
