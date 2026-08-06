@@ -82,6 +82,12 @@ Containers app (Docker):
 - [x] Containers app: host overview (CPU/mem/counts), container table with live stats, start/stop/restart; DockerConnection model
 - [x] Local host with NO flags: auto-registered, reached through hostd's allowlisted `POST /v1/docker` proxy (ping/info/list/stats/start/stop/restart only) - the web container never mounts the socket. Gated on `system.manage` + full edition
 - [x] Global Hosts appear as Docker-over-SSH targets (derived from the Servers app), alongside the local host and legacy socket/TCP connections
+- [x] Usage sampling runs behind the request instead of in front of it: the
+      server keeps the last stats sample per host (keyed by id and by name,
+      single-flight per host), the listing and the container page answer from
+      it straight away with its age, and a fresh pass starts once that has aged
+      out. Gated on the same ownership check a driver open would prove, since a
+      cache read resolves no driver to prove it for free
 - [ ] Live end-to-end run against a real Docker host (built + unit-tested; hostd proxy + local host + host-over-SSH not yet exercised on this Docker-off dev machine)
 - [ ] TLS-cert/pasted-key credential paths for one-off TCP hosts (encryption wired; UI present)
 - [ ] Container logs, images, compose stacks
@@ -124,6 +130,12 @@ Tasks (work management):
       time estimates, points, milestones, watchers, archive, duplicate
 - [x] Five views over one load: List (grouped, nested), Board (drag and drop),
       Table (custom-field columns), Calendar, Gantt
+- [x] Board columns are a space's statuses, edited from the board: renamed and
+      removed from a header menu (a delete asks which column the work moves to
+      first), reordered by dragging a header or, off the board, with move
+      controls beside edit and remove in the space's statuses tab. A status
+      name shared by two statuses is one column, and renaming, deleting or
+      reordering it acts on all of them together, the way the drag already did
 - [x] Saved views: filters, grouping, sorting, shared or private
 - [x] Filter engine shared by views and automations (relative dates, custom
       fields, any/all matching), pure and unit-tested in `@polaris/core`
