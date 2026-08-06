@@ -16,9 +16,9 @@ import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
 import { ProgressBar, StatusDot } from "./pickers";
 import type { PersonRef } from "@/lib/tasks/facts";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormView } from "@/lib/tasks/form-service";
-import { Hash, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Hash, Pencil, Plus, Trash2 } from "lucide-react";
 import { AutomationsPanel, FormsPanel } from "./automations-panel";
 import type { AutomationView } from "@/lib/tasks/automation-service";
 import { Button, Card, CardBody, ConfirmDeleteDialog, Input, Select, cn } from "@polaris/ui";
@@ -206,6 +206,38 @@ function StatusesTab({
     const [editing, setEditing] = useState<StatusView | null>(null);
     const [draft, setDraft] = useState<{ name: string; type: core.TaskStatusType; color: string } | null>(null);
     const [saving, setSaving] = useState(false);
+    // Where a move has put things until the server says the same. The reload
+    // that follows brings the new order with it, and that is when this has done
+    // its job - whether or not the write landed.
+    const [moved, setMoved] = useState<string[] | null>(null);
+
+    useEffect(() => setMoved(null), [statuses]);
+
+    const ordered = useMemo(() => {
+        if (!moved) return statuses;
+        const at = new Map(moved.map((id, index) => [id, index]));
+        return [...statuses].sort((left, right) => (at.get(left.id) ?? 0) - (at.get(right.id) ?? 0));
+    }, [statuses, moved]);
+
+    /**
+     * Move one status past its neighbour.
+     *
+     * The same write the board's drag makes, reachable from a keyboard and from
+     * a touch screen - which a drag on a column header is not.
+     */
+    const move = async (index: number, delta: number) => {
+        const target = index + delta;
+        if (target < 0 || target >= ordered.length) return;
+        const next = [...ordered];
+        [next[index], next[target]] = [next[target]!, next[index]!];
+        const ids = next.map((status) => status.id);
+        setMoved(ids);
+        const result = await runAction(() => actions.reorderStatusesAction(spaceId, ids), onError);
+        if (result?.error) {
+            setMoved(null);
+            onError(result.error);
+        }
+    };
 
     const save = async () => {
         if (!editing || !draft?.name.trim() || saving) return;
@@ -228,12 +260,12 @@ function StatusesTab({
         <section className="flex flex-col gap-3">
             <p className="text-xs text-muted-foreground">
                 Every list in this space shares these. The kind decides what Polaris counts as finished, whatever the
-                status is called, and the order here is the order of the columns on a board - where they can be dragged
-                into another one.
+                status is called, and the order here is the order of the columns on a board. Move one with the arrows,
+                or drag its column on a board.
             </p>
 
             <ul className="divide-y divide-border rounded-lg border border-border">
-                {statuses.map((status) =>
+                {ordered.map((status, index) =>
                     editing?.id === status.id && draft ? (
                         <li key={status.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
                             <input
@@ -280,6 +312,26 @@ function StatusesTab({
                             </span>
                             {canManage && (
                                 <>
+                                    <button
+                                        type="button"
+                                        disabled={index === 0}
+                                        aria-label={`Move ${status.name} up`}
+                                        title="Move up"
+                                        onClick={() => void move(index, -1)}
+                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                                    >
+                                        <ChevronUp className="size-3.5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={index === ordered.length - 1}
+                                        aria-label={`Move ${status.name} down`}
+                                        title="Move down"
+                                        onClick={() => void move(index, 1)}
+                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                                    >
+                                        <ChevronDown className="size-3.5" />
+                                    </button>
                                     <button
                                         type="button"
                                         aria-label={`Edit ${status.name}`}

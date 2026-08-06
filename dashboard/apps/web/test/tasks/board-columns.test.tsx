@@ -13,8 +13,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
 import type { ViewProps } from "@/app/(app)/tasks/views/shared";
 import { DisplayFormatProvider } from "@/components/display-format";
-import { DISPLAY_DEFAULTS, type TaskGroupField } from "@polaris/core";
-import { BoardView, reorderColumns } from "@/app/(app)/tasks/views/board";
+import { DISPLAY_DEFAULTS, statusColumns, type TaskGroupField } from "@polaris/core";
+import { BoardView, columnStatusIds, reorderColumns } from "@/app/(app)/tasks/views/board";
 
 const CONTEXT: SpaceContext = {
     spaceId: "s1",
@@ -121,5 +121,29 @@ describe("the board's column affordances", () => {
         expect(markup).not.toContain("Column options");
         expect(markup).not.toContain("New column");
         expect(markup).not.toContain('draggable="true"');
+    });
+});
+
+describe("a column standing for more than one status", () => {
+    // Nothing stops a space holding two statuses with the same name, and the
+    // board merges them into one column. Half-changing that column is what
+    // makes it split in two, or come back with some of its work missing.
+    const merged = statusColumns([
+        { id: "st1", name: "Open", type: "open", color: "#64748b", order: 1 },
+        { id: "st3", name: "Open", type: "open", color: "#64748b", order: 3 },
+        { id: "st2", name: "Done", type: "done", color: "#22c55e", order: 2 }
+    ]);
+
+    it("names every status it stands for", () => {
+        expect(columnStatusIds(merged, "st1")).toEqual(["st1", "st3"]);
+    });
+
+    it("leaves a column of one alone", () => {
+        expect(columnStatusIds(merged, "st2")).toEqual(["st2"]);
+    });
+
+    it("falls back to the key for a pile that is no column at all", () => {
+        // The "no status" group, which the space does not define.
+        expect(columnStatusIds(merged, "")).toEqual([""]);
     });
 });

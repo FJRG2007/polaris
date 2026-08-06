@@ -117,5 +117,26 @@ describe("the space's own statuses tab", () => {
         expect(markup).toContain("Open");
         expect(markup).not.toContain('aria-label="Edit Open"');
         expect(markup).not.toContain('aria-label="Remove Open"');
+        expect(markup).not.toContain('aria-label="Move Open down"');
+    });
+
+    it("lets the order be changed without a pointer", () => {
+        // The board only reorders by dragging a column header, which is no use
+        // from a keyboard or a touch screen; this tab is the other way in.
+        const markup = spaceSettings(true);
+        expect(markup).toContain('aria-label="Move Open down"');
+        expect(markup).toContain('aria-label="Move Done up"');
+    });
+
+    it("disables the moves that would fall off either end, and only those", () => {
+        const markup = spaceSettings(true);
+        // Open is first and Done is last, so those two have nowhere to go. The
+        // attribute is matched ahead of the label because the class list also
+        // carries the word (`disabled:opacity-30`), which would match anything.
+        expect(markup).toMatch(/disabled=""[^>]*aria-label="Move Open up"/);
+        expect(markup).toMatch(/disabled=""[^>]*aria-label="Move Done down"/);
+        // The two that lead somewhere stay live.
+        expect(markup).not.toMatch(/disabled=""[^>]*aria-label="Move Open down"/);
+        expect(markup).not.toMatch(/disabled=""[^>]*aria-label="Move Done up"/);
     });
 });

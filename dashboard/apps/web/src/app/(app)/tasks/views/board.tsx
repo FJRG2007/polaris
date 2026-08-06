@@ -76,6 +76,19 @@ export function reorderColumns(ids: readonly string[], dragged: string, target: 
     return [...without.slice(0, at), dragged, ...without.slice(at)];
 }
 
+/**
+ * Every status a column stands for.
+ *
+ * A column is a name, and nothing stops a space holding two statuses that share
+ * one - the board reads them as a single column. So anything done to a column is
+ * done to all of them: renaming half of a merged column would split it in two on
+ * the next load, and deleting half would leave the column there with some of its
+ * work missing.
+ */
+export function columnStatusIds(columns: readonly core.StatusColumn[], key: string): string[] {
+    return columns.find((column) => column.id === key)?.ids ?? [key];
+}
+
 /** What a column is: a name, what it means for the work sitting in it, and the
  *  colour it is read by. */
 interface ColumnDraft {
@@ -429,6 +442,8 @@ export function BoardView(props: ViewProps) {
         setDragging(null);
     };
 
+    const columnIds = (key: string) => columnStatusIds(columns, key);
+
     const dropColumn = async (targetKey: string) => {
         const dragged = draggingColumn;
         setDraggingColumn(null);
@@ -440,11 +455,7 @@ export function BoardView(props: ViewProps) {
             targetKey
         );
         setPendingOrder(order);
-        // A column is a name, and nothing stops a space holding two statuses
-        // that share one - the board reads them as a single column, so they are
-        // written down together rather than one of them being left behind.
-        const ids = order.flatMap((key) => columns.find((column) => column.id === key)?.ids ?? [key]);
-        await props.onReorderStatuses(ids);
+        await props.onReorderStatuses(order.flatMap(columnIds));
     };
 
     /** Start removing a column, on the one it would hand its work to. */
@@ -499,13 +510,12 @@ export function BoardView(props: ViewProps) {
                             submitLabel="Save"
                             onCancel={() => setEditing(null)}
                             onSubmit={async (next) => {
-                                const saved = await props.onUpdateStatus?.(
-                                    group.key,
-                                    next.name,
-                                    next.type,
-                                    next.color
+                                const saved = await Promise.all(
+                                    columnIds(group.key).map((id) =>
+                                        props.onUpdateStatus?.(id, next.name, next.type, next.color)
+                                    )
                                 );
-                                if (saved) setEditing(null);
+                                if (saved.every(Boolean)) setEditing(null);
                             }}
                         />
                     ) : (
@@ -676,7 +686,14 @@ export function BoardView(props: ViewProps) {
             confirmDisabled={!replacement}
             onConfirm={async () => {
                 if (!removing || !replacement) return;
-                const done = await props.onDeleteStatus?.(removing.key, replacement);
+                // One at a time: a space keeps its last status, and two deletes
+                // racing each other would both read the count before either
+                // landed. The replacement is another column, so it is never one
+                // of these.
+                let done = true;
+                for (const id of columnIds(removing.key)) {
+                    done = (await props.onDeleteStatus?.(id, replacement)) === true && done;
+                }
                 if (done) setRemoving(null);
             }}
         >
