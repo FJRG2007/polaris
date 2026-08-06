@@ -31,7 +31,18 @@ export interface SuggestionHandle {
 }
 
 /** The popup shell, shared with the block menu so the two match. */
-export const POPUP_CLASS = "max-h-64 w-72 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-lg";
+export const POPUP_CLASS = "max-h-64 w-72 overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-lg";
+
+/**
+ * What the plugin's own element is given once it is mounted.
+ *
+ * That element goes on the body, positioned but with no layer of its own, and
+ * the descriptions these popups serve are usually written inside a dialog - a
+ * layer at 50 that would otherwise draw straight over them. The pointer events
+ * come back for the same reason: a modal dialog switches them off for
+ * everything outside itself, and the list is outside it.
+ */
+export const POPUP_LAYER_CLASS = "z-[60] pointer-events-auto";
 
 /** One row of either popup. */
 export const POPUP_ITEM_CLASS = "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm";
@@ -73,7 +84,7 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
 
     if (props.searching && items.length === 0) {
         return (
-            <div className="w-72 rounded-lg border border-border bg-popover p-2 shadow-lg">
+            <div className="w-72 rounded-lg border border-border bg-card p-2 shadow-lg">
                 <Skeleton className="h-6 w-full" />
             </div>
         );
@@ -81,7 +92,7 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
 
     if (items.length === 0) {
         return (
-            <div className="w-72 rounded-lg border border-border bg-popover px-3 py-2 text-xs text-muted-foreground shadow-lg">
+            <div className="w-72 rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground shadow-lg">
                 Nothing matches that.
             </div>
         );
@@ -199,7 +210,11 @@ function mentionSuggestion(
 
             return {
                 onStart: (props) => {
-                    renderer = new ReactRenderer(List, { props: { ...props, searching }, editor: props.editor });
+                    renderer = new ReactRenderer(List, {
+                        props: { ...props, searching },
+                        editor: props.editor,
+                        className: POPUP_LAYER_CLASS
+                    });
                     unmount = props.mount(renderer.element as HTMLElement);
                 },
                 onUpdate: (props) => renderer?.updateProps({ ...props, searching }),
