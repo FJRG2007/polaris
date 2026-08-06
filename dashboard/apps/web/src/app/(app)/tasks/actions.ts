@@ -1072,6 +1072,8 @@ export async function promoteChecklistItemAction(taskId: string, itemId: string)
                 parentId: taskId,
                 statusId: null,
                 priority: "none",
+                blockedUntil: null,
+                blockedNote: "",
                 assigneeIds: [],
                 tagIds: [],
                 startDate: null,

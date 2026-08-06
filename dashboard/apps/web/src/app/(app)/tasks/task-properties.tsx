@@ -59,6 +59,7 @@ export function PropertyRows({
     context,
     running,
     waitingOn,
+    timer = true,
     patch,
     onChanged,
     onError,
@@ -68,6 +69,9 @@ export function PropertyRows({
     context: SpaceContext;
     /** This account has a timer going on this task. */
     running: boolean;
+    /** Off while a task is still being drafted: there is nothing to track time
+     *  against until it exists. */
+    timer?: boolean;
     /** Unfinished tasks this one waits on. Counted rather than listed, since the
      *  list of them is a few rows down under Dependencies. */
     waitingOn: number;
@@ -214,15 +218,17 @@ export function PropertyRows({
                 />
             </Property>
 
-            <Property icon={<Timer className="size-3.5" />} label="Track time">
-                <TimerControl
-                    taskId={task.id}
-                    trackedSeconds={task.trackedSeconds}
-                    running={running}
-                    onChanged={onChanged}
-                    onError={onError}
-                />
-            </Property>
+            {timer && (
+                <Property icon={<Timer className="size-3.5" />} label="Track time">
+                    <TimerControl
+                        taskId={task.id}
+                        trackedSeconds={task.trackedSeconds}
+                        running={running}
+                        onChanged={onChanged}
+                        onError={onError}
+                    />
+                </Property>
+            )}
 
             <Property icon={<Tag className="size-3.5" />} label="Tags">
                 <span className="flex flex-wrap items-center gap-1">

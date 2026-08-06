@@ -1,89 +1,89 @@
 "use client";
 
 /**
- * Creating a task, properly.
+ * Creating a task, in the panel it will be read in.
  *
  * The quick-add on a board column stays where it is - typing a name into a
  * column is the fastest way to capture something and should not cost a dialog.
- * This is the other half: the task you already know the shape of, where filling
- * in the list, the owner and the date now beats opening the card afterwards to
- * do it in four separate writes.
+ * This is the other half, and it deliberately looks like the task rather than
+ * like a form: the same title, the same property rows, the same description
+ * surface, in the same places. Somebody filling this in is already looking at
+ * the thing they are making, so there is nothing to re-learn when it opens for
+ * real a second later.
  *
- * Everything is optional except the name and the list, and the form validates
- * against the same schema the server does, so a refusal shows on the field
- * rather than as a sentence at the bottom after a round trip.
+ * The draft is a task row held locally, patched by exactly the changes the panel
+ * sends to the server - which is what lets the property rows be the same
+ * component here as there, rather than a second set that drifts.
+ *
+ * Only the name and the list are required. Everything a task can hold that needs
+ * the task to exist first - its thread, its files, its time - is not offered
+ * here and is one click away the moment it is created.
  */
 
 import * as actions from "./actions";
 import * as core from "@polaris/core";
-import { useEffect, useState } from "react";
+import { tagColorFor } from "./pickers";
+import { taskOverlay } from "./optimistic";
 import { runAction } from "@/lib/run-action";
-import type { PersonRef } from "@/lib/tasks/facts";
+import { PropertyRows } from "./task-properties";
+import { useEffect, useMemo, useState } from "react";
 import type { StatusView, TagView } from "@/lib/tasks/space-service";
+import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
+import type { PersonRef, SpaceContext, TaskRow } from "@/lib/tasks/facts";
 import {
     Button,
     Dialog,
     DialogContent,
-    DialogDescription,
-    DialogHeader,
     DialogTitle,
-    Input,
-    Select,
-    Textarea
+    Select
 } from "@polaris/ui";
-import {
-    AssigneePicker,
-    AvatarStack,
-    DateField,
-    DurationField,
-    PriorityPicker,
-    StatusPicker,
-    TagChip,
-    TagPicker,
-    tagColorFor
-} from "./pickers";
 
-interface Fields {
-    name: string;
-    description: string;
-    listId: string;
-    statusId: string | null;
-    priority: core.TaskPriority;
-    assigneeIds: string[];
-    tagIds: string[];
-    startDate: string | null;
-    dueDate: string | null;
-    timed: boolean;
-    timeEstimate: number | null;
-    points: number | null;
-}
-
-function blank(listId: string, statusId: string | null, known: { name: string; dueDate: string | null }): Fields {
+/** The draft, in the shape every task screen already draws. */
+function blank(
+    listId: string,
+    status: StatusView | null,
+    known: { name: string; dueDate: string | null }
+): TaskRow {
     return {
+        id: "draft",
+        reference: "",
         name: known.name,
         description: "",
+        spaceId: "",
+        spaceName: "",
         listId,
-        statusId,
+        listName: "",
+        folderName: null,
+        parentId: null,
+        statusId: status?.id ?? null,
+        statusName: status?.name ?? "",
+        statusColor: status?.color ?? "",
+        statusType: status?.type ?? "open",
         priority: "none",
-        assigneeIds: [],
-        tagIds: [],
+        assignees: [],
+        tags: [],
+        createdById: null,
         startDate: null,
         dueDate: known.dueDate,
         timed: false,
         timeEstimate: null,
-        points: null
+        points: null,
+        milestone: false,
+        archived: false,
+        order: 0,
+        sprintId: null,
+        completedAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        subtaskCount: 0,
+        commentCount: 0,
+        trackedSeconds: 0,
+        blocked: false,
+        blockedUntil: null,
+        blockedNote: "",
+        recurring: false,
+        customValues: {}
     };
-}
-
-/** A labelled row. The label column is fixed so the controls line up down the
- *  panel instead of stepping in and out with the length of each word. */
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <div className="flex items-start gap-3">
-            <span className="w-24 shrink-0 pt-1.5 text-xs text-muted-foreground">{label}</span>
-            <div className="min-w-0 flex-1">{children}</div>
-        </div>
-    );
 }
 
 export function TaskCreateDialog({
@@ -119,8 +119,9 @@ export function TaskCreateDialog({
     onClose: () => void;
     onCreated: (taskId: string) => void;
 }) {
-    const firstStatus = defaultStatusId === undefined ? (statuses[0]?.id ?? null) : defaultStatusId;
-    const [fields, setFields] = useState<Fields>(() =>
+    const firstStatusId = defaultStatusId === undefined ? (statuses[0]?.id ?? null) : defaultStatusId;
+    const firstStatus = statuses.find((status) => status.id === firstStatusId) ?? null;
+    const [draft, setDraft] = useState<TaskRow>(() =>
         blank(defaultListId, firstStatus, { name: defaultName, dueDate: defaultDueDate })
     );
     const [saving, setSaving] = useState(false);
@@ -129,17 +130,36 @@ export function TaskCreateDialog({
     // A dialog that reopens holding the last task's details is a dialog that
     // creates the same task twice.
     useEffect(() => {
-        if (open) {
-            setFields(blank(defaultListId, firstStatus, { name: defaultName, dueDate: defaultDueDate }));
-            setError("");
-        }
-    }, [open, defaultListId, firstStatus, defaultName, defaultDueDate]);
+        if (!open) return;
+        setDraft(blank(defaultListId, firstStatus, { name: defaultName, dueDate: defaultDueDate }));
+        setError("");
+        // The status object is rebuilt on every render; its id is what changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, defaultListId, firstStatusId, defaultName, defaultDueDate]);
 
-    const set = <Key extends keyof Fields>(key: Key, value: Fields[Key]) =>
-        setFields((current) => ({ ...current, [key]: value }));
+    /** What the property rows are drawn against. The space's own fields and the
+     *  sibling tasks are left out: neither can be set before the task exists. */
+    const context: SpaceContext = useMemo(
+        () => ({
+            spaceId,
+            statuses,
+            tags,
+            fields: [],
+            people,
+            canEdit: true,
+            canModerate: false,
+            currentUserId: "",
+            siblings: []
+        }),
+        [spaceId, statuses, tags, people]
+    );
 
-    const nameIssue = fields.name.trim() ? core.taskName.safeParse(fields.name).error?.issues[0]?.message : null;
-    const canSubmit = fields.name.trim().length > 0 && !nameIssue && !saving;
+    /** The same input the panel sends the server, applied to the draft instead. */
+    const patch = (input: Record<string, unknown>) =>
+        setDraft((current) => ({ ...current, ...taskOverlay(input, context) }));
+
+    const nameIssue = draft.name.trim() ? core.taskName.safeParse(draft.name).error?.issues[0]?.message : null;
+    const canSubmit = draft.name.trim().length > 0 && !nameIssue && Boolean(draft.listId) && !saving;
 
     const submit = async () => {
         if (!canSubmit) return;
@@ -148,9 +168,20 @@ export function TaskCreateDialog({
         const result = await runAction(
             () =>
                 actions.createTaskAction({
-                    ...fields,
-                    name: fields.name.trim(),
-                    description: fields.description.trim()
+                    name: draft.name.trim(),
+                    description: draft.description,
+                    listId: draft.listId,
+                    statusId: draft.statusId,
+                    priority: draft.priority,
+                    assigneeIds: draft.assignees.map((person) => person.id),
+                    tagIds: draft.tags.map((tag) => tag.id),
+                    startDate: draft.startDate,
+                    dueDate: draft.dueDate,
+                    timed: draft.timed,
+                    timeEstimate: draft.timeEstimate,
+                    points: draft.points,
+                    blockedUntil: draft.blockedUntil,
+                    blockedNote: draft.blockedNote
                 }),
             setError
         );
@@ -165,164 +196,74 @@ export function TaskCreateDialog({
 
     return (
         <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
-            <DialogContent className="flex max-h-[90vh] w-[min(46rem,95vw)] max-w-[min(46rem,95vw)] flex-col gap-0 overflow-hidden p-0">
-                <DialogHeader className="mb-0 border-b border-border py-3 pl-5 pr-14">
-                    <DialogTitle>New task</DialogTitle>
-                    <DialogDescription>
-                        Only a name is required. Anything left blank can be filled in on the task itself.
-                    </DialogDescription>
-                </DialogHeader>
+            {/* Both widths are set: DialogContent's own max-w-lg would otherwise
+                cap this at a third of what the rows were laid out for. */}
+            <DialogContent className="flex max-h-[92vh] w-[min(56rem,96vw)] max-w-[min(56rem,96vw)] flex-col gap-0 overflow-hidden p-0">
+                <header className="flex flex-wrap items-center gap-2 border-b border-border py-3 pl-5 pr-14">
+                    <DialogTitle className="text-sm font-medium">New task</DialogTitle>
+                    <span className="text-xs text-muted-foreground">in</span>
+                    <Select
+                        value={draft.listId}
+                        onValueChange={(listId) => setDraft((current) => ({ ...current, listId }))}
+                        options={lists.map((list) => ({ value: list.id, label: list.name }))}
+                        aria-label="List"
+                        className="h-7 w-48 text-xs"
+                    />
+                </header>
 
-                <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
+                <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-5">
                     <div className="flex flex-col gap-1">
-                        <Input
+                        <input
                             autoFocus
-                            value={fields.name}
+                            value={draft.name}
                             aria-label="Task name"
                             placeholder="What needs doing?"
-                            onChange={(event) => set("name", event.target.value)}
+                            onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
                             onKeyDown={(event) => {
-                                // Enter submits from the name box, which is where
-                                // most of these are finished.
+                                // Enter finishes from the name box, which is where
+                                // most of these are done.
                                 if (event.key === "Enter") {
                                     event.preventDefault();
                                     void submit();
                                 }
                             }}
-                            className="h-10 text-base"
+                            className="w-full bg-transparent text-xl font-semibold outline-none placeholder:text-muted-foreground"
                         />
                         {nameIssue && <p className="text-xs text-danger">{nameIssue}</p>}
                     </div>
 
-                    <Textarea
-                        rows={3}
-                        value={fields.description}
-                        aria-label="Description"
-                        placeholder="What does done look like?"
-                        onChange={(event) => set("description", event.target.value)}
+                    <PropertyRows
+                        task={draft}
+                        context={context}
+                        running={false}
+                        waitingOn={0}
+                        // Nothing has been tracked against a task that does not
+                        // exist, and offering to start a timer on one is a button
+                        // that cannot do what it says.
+                        timer={false}
+                        patch={patch}
+                        onChanged={() => undefined}
+                        onError={setError}
+                        // A tag belongs to one space, so a screen that spans them
+                        // all offers finding rather than creating.
+                        onCreateTag={async (name) => {
+                            if (!spaceId) return null;
+                            const created = await runAction(
+                                () => actions.createTagAction(spaceId, name, tagColorFor(name)),
+                                setError
+                            );
+                            return created?.id ?? null;
+                        }}
                     />
 
-                    <div className="grid gap-3 sm:grid-cols-2">
-                        <Field label="List">
-                            <Select
-                                value={fields.listId}
-                                onValueChange={(value) => set("listId", value)}
-                                options={lists.map((list) => ({ value: list.id, label: list.name }))}
-                                aria-label="List"
-                                className="h-9 w-full"
-                            />
-                        </Field>
-                        <Field label="Status">
-                            <StatusPicker
-                                statuses={statuses}
-                                value={fields.statusId}
-                                onChange={(statusId) => set("statusId", statusId)}
-                            />
-                        </Field>
-                        <Field label="Assignees">
-                            <div className="flex items-center gap-2">
-                                <AvatarStack
-                                    people={people.filter((person) => fields.assigneeIds.includes(person.id))}
-                                />
-                                <AssigneePicker
-                                    people={people}
-                                    selected={fields.assigneeIds}
-                                    onChange={(ids) => set("assigneeIds", ids)}
-                                />
-                            </div>
-                        </Field>
-                        <Field label="Priority">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs">{core.TASK_PRIORITY_LABELS[fields.priority]}</span>
-                                <PriorityPicker value={fields.priority} onChange={(priority) => set("priority", priority)} />
-                            </div>
-                        </Field>
-                        <Field label="Start">
-                            <DateField
-                                label="Start date"
-                                value={fields.startDate}
-                                timed={fields.timed}
-                                onChange={(startDate) => set("startDate", startDate)}
-                            />
-                        </Field>
-                        <Field label="Due">
-                            <div className="flex flex-col gap-1.5">
-                                <DateField
-                                    label="Due date"
-                                    value={fields.dueDate}
-                                    timed={fields.timed}
-                                    onChange={(dueDate) => set("dueDate", dueDate)}
-                                />
-                                <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                                    <input
-                                        type="checkbox"
-                                        checked={fields.timed}
-                                        onChange={(event) => set("timed", event.target.checked)}
-                                    />
-                                    Include a time of day
-                                </label>
-                            </div>
-                        </Field>
-                        <Field label="Estimate">
-                            <DurationField
-                                minutes={fields.timeEstimate}
-                                onChange={(minutes) => set("timeEstimate", minutes)}
-                            />
-                        </Field>
-                        <Field label="Points">
-                            <input
-                                type="number"
-                                min={0}
-                                max={1000}
-                                value={fields.points ?? ""}
-                                aria-label="Story points"
-                                onChange={(event) =>
-                                    set("points", event.target.value === "" ? null : Number(event.target.value))
-                                }
-                                className="w-24 rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
-                            />
-                        </Field>
-                    </div>
-
-                    <Field label="Tags">
-                        <div className="flex flex-wrap items-center gap-1">
-                            {tags
-                                .filter((tag) => fields.tagIds.includes(tag.id))
-                                .map((tag) => (
-                                    <TagChip
-                                        key={tag.id}
-                                        tag={tag}
-                                        onRemove={() =>
-                                            set(
-                                                "tagIds",
-                                                fields.tagIds.filter((id) => id !== tag.id)
-                                            )
-                                        }
-                                    />
-                                ))}
-                            <TagPicker
-                                tags={tags}
-                                selected={fields.tagIds}
-                                onChange={(tagIds) => set("tagIds", tagIds)}
-                                // A tag that does not exist yet is created here
-                                // rather than sending somebody to the settings
-                                // and back with the form half filled in. A tag
-                                // belongs to a space, so a screen that spans them
-                                // all offers finding rather than creating.
-                                onCreate={
-                                    spaceId
-                                        ? async (name) => {
-                                              const created = await runAction(
-                                                  () => actions.createTagAction(spaceId, name, tagColorFor(name)),
-                                                  setError
-                                              );
-                                              return created?.id ?? null;
-                                          }
-                                        : undefined
-                                }
-                            />
-                        </div>
-                    </Field>
+                    <section className="flex flex-col gap-1 border-t border-border pt-4">
+                        <h3 className="text-sm font-medium">Description</h3>
+                        <RichTextEditor
+                            value={draft.description}
+                            placeholder="What does done look like? Type / for a block, @ for somebody, # for a task."
+                            onChange={(description) => setDraft((current) => ({ ...current, description }))}
+                        />
+                    </section>
 
                     {error && (
                         <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">

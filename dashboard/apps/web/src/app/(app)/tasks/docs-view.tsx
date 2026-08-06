@@ -3,19 +3,20 @@
 /**
  * Docs: a tree of Markdown pages next to the work.
  *
- * The editor is a plain textarea over Markdown rather than a block editor. That
- * is a deliberate trade: what somebody writes here can be read, diffed and taken
- * out of Polaris unchanged, and the alternative buys formatting nobody asked for
- * at the cost of owning their content.
+ * The surface is the shared rich-text editor, and what it saves is still
+ * Markdown - which was always the point. Somebody's knowledge base can be read,
+ * diffed and taken out of Polaris unchanged; what changed is that they no longer
+ * have to type the syntax to get the formatting.
  */
 
 import { useState } from "react";
 import * as actions from "./actions";
+import { cn, Button } from "@polaris/ui";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
-import { cn, Button, Textarea } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import type { DocNode, DocView } from "@/lib/tasks/doc-service";
+import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { ChevronRight, FileText, Plus, Search, Trash2 } from "lucide-react";
 
 function TreeBranch({
@@ -221,17 +222,19 @@ export function DocsView({
                             </p>
                         )}
 
-                        <Textarea
+                        <RichTextEditor
+                            // Pointed at another page, the surface has to be
+                            // rebuilt: it holds its own document and would keep
+                            // showing the last one.
+                            key={doc.id}
                             value={body}
-                            rows={24}
                             disabled={!canEdit}
-                            aria-label="Page content"
-                            placeholder="Write in Markdown. Headings with #, lists with -, links with [text](url)."
-                            onChange={(event) => setBody(event.target.value)}
-                            // A page editor earns a taller ceiling than a form
-                            // field, but still a ceiling: an editor that grows
-                            // past the viewport takes its own save button with it.
-                            className="min-h-[24rem] w-full max-h-[70vh] flex-1 resize-y rounded-md border border-border bg-background px-3 py-2 font-mono text-sm leading-relaxed outline-none focus:border-primary"
+                            placeholder="Type / for a block, @ for somebody, # for a task. Markdown works as you write it."
+                            onChange={setBody}
+                            // A page earns a taller ceiling than a form field,
+                            // but still a ceiling: a surface that grows past the
+                            // viewport takes its own save button with it.
+                            className="min-h-[24rem] max-h-[70vh] flex-1 overflow-y-auto"
                         />
                     </>
                 )}

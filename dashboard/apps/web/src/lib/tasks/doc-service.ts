@@ -8,6 +8,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { notifyMentions } from "@/lib/rich-text/mention-notify";
 
 export interface DocNode {
     readonly id: string;
@@ -148,6 +149,9 @@ export async function createDoc(actorId: string, input: core.DocInput): Promise<
 }
 
 export async function updateDoc(actorId: string, docId: string, input: core.DocInput): Promise<void> {
+    // Read first: the mention notice below needs what the page said before, and
+    // after the write that text is gone.
+    const before = await prisma.taskDoc.findUnique({ where: { id: docId }, select: { body: true } });
     await prisma.taskDoc.update({
         where: { id: docId },
         data: {
@@ -158,6 +162,14 @@ export async function updateDoc(actorId: string, docId: string, input: core.DocI
             parentId: input.parentId,
             updatedById: actorId
         }
+    });
+    await notifyMentions({
+        body: input.body,
+        previousBody: before?.body ?? "",
+        actorId,
+        title: input.title,
+        href: `/tasks/docs?doc=${docId}`,
+        spaceId: input.spaceId
     });
 }
 

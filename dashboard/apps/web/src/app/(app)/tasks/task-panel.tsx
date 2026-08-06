@@ -32,6 +32,7 @@ import { AttachmentSection, CommitSection } from "./task-files";
 import { FieldsSection, PropertyRows } from "./task-properties";
 import { ActivityStream, TimeSection } from "./task-conversation";
 import { useCallback, useEffect, useState, useTransition } from "react";
+import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { ChecklistSection, DependencySection, SubtaskSection } from "./task-subwork";
 import { Bell, BellOff, Loader2, MoreHorizontal, Repeat, Share2 } from "lucide-react";
 import {
@@ -45,7 +46,6 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-    Textarea,
     keepFocusOnClose
 } from "@polaris/ui";
 
@@ -298,16 +298,18 @@ export function TaskPanel({
 
                                 <section className="flex flex-col gap-1 border-t border-border pt-4">
                                     <h3 className="text-sm font-medium">Description</h3>
-                                    <Textarea
+                                    <RichTextEditor
                                         key={task.id}
-                                        defaultValue={task.description}
-                                        rows={4}
+                                        value={task.description}
                                         disabled={!context.canEdit}
-                                        placeholder="What needs doing, and what does done look like?"
-                                        onBlur={(event) => {
-                                            if (event.target.value !== task.description) {
-                                                void patch({ description: event.target.value });
-                                            }
+                                        placeholder="What needs doing, and what does done look like? Type / for a block, @ for somebody, # for a task."
+                                        // Saved when the caret leaves, the way
+                                        // every other free-text field here is -
+                                        // and `flushEdits` blurs it on the way
+                                        // out so closing the panel does not drop
+                                        // what was just written.
+                                        onBlur={(description) => {
+                                            if (description !== task.description) void patch({ description });
                                         }}
                                     />
                                 </section>

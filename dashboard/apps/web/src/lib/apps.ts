@@ -36,6 +36,7 @@ import {
     MessagesSquare,
     MonitorSmartphone,
     Network,
+    NotebookPen,
     Radio,
     Rocket,
     ScanLine,
@@ -242,6 +243,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         { label: "Profile", href: "/account", icon: UserCog, keywords: ["name", "email", "avatar"] },
         { label: "Preferences", href: "/account/preferences", icon: SlidersHorizontal, keywords: ["units", "language", "timezone", "week start", "calendar"] },
         { label: "Notifications", href: "/account/notifications", icon: Bell, keywords: ["alerts", "email"] },
+        {
+            label: "Notes",
+            href: "/account/notes",
+            icon: NotebookPen,
+            keywords: ["notepad", "scratch", "jot", "personal", "private", "markdown", "writing"]
+        },
         {
             label: "Connected accounts",
             href: "/account/connections",

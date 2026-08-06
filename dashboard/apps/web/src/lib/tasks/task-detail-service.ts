@@ -12,6 +12,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { notify } from "@/lib/notifications/dispatch";
 import { runAutomations } from "./automation-service";
+import { notifyMentions } from "@/lib/rich-text/mention-notify";
 
 // ---------------------------------------------------------------------------
 // Comments
@@ -48,7 +49,10 @@ export async function addComment(actorId: string, input: core.CommentInput): Pro
         .create({ data: { taskId: input.taskId, userId: actorId } })
         .catch(() => undefined);
 
-    const task = await prisma.task.findUnique({ where: { id: input.taskId }, select: { name: true } });
+    const task = await prisma.task.findUnique({
+        where: { id: input.taskId },
+        select: { name: true, spaceId: true }
+    });
     const recipients = new Set(await audience(input.taskId, actorId));
     // The person a comment was handed to hears about it whether or not they
     // were already following the task.
@@ -63,6 +67,16 @@ export async function addComment(actorId: string, input: core.CommentInput): Pro
             href: `/tasks/t/${input.taskId}`
         });
     }
+    // Being named in a comment reaches somebody who follows none of this. The
+    // people above have already heard about it, so they are not told twice.
+    await notifyMentions({
+        body: input.body,
+        actorId,
+        title: task?.name ?? "A task",
+        href: `/tasks/t/${input.taskId}`,
+        spaceId: task?.spaceId ?? null,
+        except: [...recipients]
+    });
     await runAutomations({ trigger: "task.commentAdded", taskId: input.taskId, actorId });
     return comment.id;
 }

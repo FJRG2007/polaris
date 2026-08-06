@@ -19,6 +19,7 @@ import { nextTaskNumber } from "./numbering";
 import { prisma, type Prisma } from "@polaris/db";
 import { notify } from "@/lib/notifications/dispatch";
 import type { PersonRef, TagRef, TaskRow } from "./facts";
+import { notifyMentions } from "@/lib/rich-text/mention-notify";
 import { listCommits, type CommitLink } from "./commit-service";
 import { listAttachments, type AttachmentView } from "./attachment-service";
 import { hasAutomationsFor, runAutomations, runAutomationsFor } from "./automation-service";
@@ -566,6 +567,8 @@ export async function createTask(
                 points: input.points,
                 sprintId: input.sprintId,
                 milestone: input.milestone,
+                blockedUntil: input.blockedUntil ? new Date(input.blockedUntil) : null,
+                blockedNote: input.blockedNote,
                 recurrence: input.recurrence ? JSON.stringify(input.recurrence) : null,
                 order,
                 createdById: actorId,
@@ -579,6 +582,14 @@ export async function createTask(
 
     await logActivity(created.id, actorId, "created");
     await announceAssignment(created.id, input.name, input.assigneeIds, actorId);
+    await notifyMentions({
+        body: input.description,
+        actorId,
+        title: input.name,
+        href: `/tasks/t/${created.id}`,
+        spaceId,
+        except: input.assigneeIds
+    });
     await runAutomations({ trigger: "task.created", taskId: created.id, actorId });
     return created;
 }
@@ -623,6 +634,7 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
             spaceId: true,
             listId: true,
             name: true,
+            description: true,
             statusId: true,
             priority: true,
             dueDate: true,
@@ -670,6 +682,17 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
     }
 
     await prisma.task.update({ where: { id: input.taskId }, data });
+
+    if (input.description !== undefined && input.description !== before.description) {
+        await notifyMentions({
+            body: input.description,
+            previousBody: before.description,
+            actorId,
+            title: input.name ?? before.name,
+            href: `/tasks/t/${input.taskId}`,
+            spaceId: before.spaceId
+        });
+    }
 
     if (input.assigneeIds !== undefined) {
         await setAssignees(actorId, input.taskId, input.assigneeIds, before.assignees.map((entry) => entry.userId));
@@ -1267,6 +1290,8 @@ export async function duplicateTask(actorId: string, taskId: string): Promise<st
             points: true,
             milestone: true,
             parentId: true,
+            blockedUntil: true,
+            blockedNote: true,
             assignees: { select: { userId: true } },
             tags: { select: { tagId: true } },
             checklists: { select: { name: true, order: true, items: { select: { name: true, order: true } } } },
@@ -1291,6 +1316,10 @@ export async function duplicateTask(actorId: string, taskId: string): Promise<st
         points: source.points,
         sprintId: null,
         milestone: source.milestone,
+        // A copy of work that is held up is also held up: dropping the block
+        // would put the duplicate on the board as ready to start.
+        blockedUntil: source.blockedUntil?.toISOString() ?? null,
+        blockedNote: source.blockedNote,
         recurrence: null
     });
 
@@ -1321,6 +1350,8 @@ export async function duplicateTask(actorId: string, taskId: string): Promise<st
             points: null,
             sprintId: null,
             milestone: false,
+            blockedUntil: null,
+            blockedNote: "",
             recurrence: null
         });
     }

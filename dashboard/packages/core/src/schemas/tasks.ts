@@ -962,6 +962,10 @@ export const taskCreateSchema = z.object({
     points: z.number().int().min(0).max(1000).nullable().default(null),
     sprintId: uuid.nullable().default(null),
     milestone: z.boolean().default(false),
+    /** Work can be known to be held up before it is written down: the panel that
+     *  creates a task offers the same block the panel that reads one does. */
+    blockedUntil: isoDate.default(null),
+    blockedNote: taskBlockNote.default(""),
     recurrence: recurrenceSchema.nullable().default(null)
 });
 

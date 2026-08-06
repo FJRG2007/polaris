@@ -9,6 +9,12 @@ vi.mock("next/navigation", () => ({
     usePathname: () => "/tasks/everything"
 }));
 vi.mock("@/app/(app)/tasks/actions", () => ({}));
+// The description editor asks these for its @ and # pickers, which nothing here
+// opens; the module reaches the database and the session on import.
+vi.mock("@/app/(app)/mention-actions", () => ({
+    searchMentionsAction: async () => ({ results: [] }),
+    resolveReferencesAction: async () => ({ labels: {} })
+}));
 
 const { ListScreen } = await import("@/app/(app)/tasks/list-view");
 

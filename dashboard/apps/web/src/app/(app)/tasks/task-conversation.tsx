@@ -14,13 +14,15 @@
  * other column.
  */
 
-import { Avatar } from "@/components/avatar";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
+import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
-import { cn, Input, Button, Textarea } from "@polaris/ui";
+import { cn, Input, Button } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
+import { RichText } from "@/components/rich-text/rich-text";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { CheckCircle2, Play, SendHorizontal, Square, Trash2 } from "lucide-react";
 import type { ActivityView, CommentView, TimeEntryView } from "@/lib/tasks/task-service";
 import { describeActivity, mergeConversation, type ConversationFilter } from "./conversation";
@@ -45,30 +47,31 @@ function Composer({
     onCancel?: () => void;
 }) {
     const [body, setBody] = useState("");
+    /** Bumped after each send, to give the editor a fresh one to draw. */
+    const [sent, setSent] = useState(0);
 
-    const submit = async () => {
-        const trimmed = body.trim();
+    const submit = async (text = body) => {
+        const trimmed = text.trim();
         if (!trimmed) return;
         await onSubmit(trimmed);
         setBody("");
+        setSent((count) => count + 1);
     };
 
     return (
         <div className="flex flex-col gap-2">
-            <Textarea
+            <RichTextEditor
+                // Remounted after a send, which is what clears the surface: the
+                // editor holds its own document and does not empty itself
+                // because the string behind it did.
+                key={sent}
                 value={body}
-                rows={compact ? 2 : 3}
+                bordered
                 placeholder={placeholder}
-                onChange={(event) => setBody(event.target.value)}
-                onKeyDown={(event) => {
-                    // Enter sends, shift+enter breaks the line: the shape people
-                    // already have in their fingers from every chat client.
-                    if (event.key === "Enter" && !event.shiftKey && body.trim()) {
-                        event.preventDefault();
-                        void submit();
-                    }
-                }}
-                className="w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-primary"
+                onChange={setBody}
+                // Enter sends, shift+enter breaks the line: the shape people
+                // already have in their fingers from every chat client.
+                onSubmit={(next) => void submit(next)}
             />
             <div className="flex items-center gap-2">
                 <Button size="sm" disabled={busy || !body.trim()} onClick={() => void submit()}>
@@ -150,7 +153,7 @@ export function ActivityStream({
                         </span>
                     )}
                 </div>
-                <p className="whitespace-pre-wrap break-words text-sm text-foreground/90">{comment.body}</p>
+                <RichText value={comment.body} className="break-words text-foreground/90" />
                 <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
                     {!nested && (
                         <button type="button" onClick={() => setReplyTo(comment.id)} className="hover:text-foreground">

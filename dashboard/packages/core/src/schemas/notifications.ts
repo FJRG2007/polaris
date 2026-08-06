@@ -129,6 +129,16 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "tasks.mentioned",
+        group: "tasks",
+        label: "Mentioned by name",
+        description: "Somebody wrote your name into a task, a comment or a page.",
+        level: "info",
+        // Being named is a direct address rather than activity on something you
+        // follow, so it reaches you off the app the way a shared task does.
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "tasks.due",
         group: "tasks",
         label: "Task reminder",

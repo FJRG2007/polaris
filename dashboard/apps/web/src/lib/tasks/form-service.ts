@@ -225,6 +225,8 @@ export async function submitForm(
         parentId: null,
         statusId: form.defaultStatusId,
         priority,
+        blockedUntil: null,
+        blockedNote: "",
         assigneeIds: [],
         tagIds: [],
         startDate: null,
