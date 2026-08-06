@@ -17,7 +17,7 @@
  */
 
 import { HostdClient } from "@polaris/hostd-client";
-import type { ContainerDetail, DockerDriver } from "@polaris/docker";
+import type { ContainerDetail, ContainerStats, DockerDriver } from "@polaris/docker";
 import {
     getDockerDriver,
     hostDockerDriver,
@@ -64,13 +64,26 @@ export async function withDockerDriver<T>(
     }
 }
 
-/** A container's details, for the panel that opens beside the table. */
+/** A container's details. `size` also asks what it occupies on disk, which the
+ *  daemon answers by walking the filesystem - for a page, not for a refresh. */
 export async function inspectContainer(
     connectionId: string,
     userId: string,
-    containerId: string
+    containerId: string,
+    options: { size?: boolean } = {}
 ): Promise<ContainerDetail> {
-    return withDockerDriver(connectionId, userId, (driver) => driver.inspect(containerId));
+    return withDockerDriver(connectionId, userId, (driver) => driver.inspect(containerId, options));
+}
+
+/** One live sample for one container: CPU, memory, and the bytes it has moved
+ *  over the network and to disk. Null for a container that is not running, which
+ *  has nothing to sample rather than nothing to report. */
+export async function containerStats(
+    connectionId: string,
+    userId: string,
+    containerId: string
+): Promise<ContainerStats | null> {
+    return withDockerDriver(connectionId, userId, (driver) => driver.stats(containerId).catch(() => null));
 }
 
 /** The last `tail` lines a container printed. */

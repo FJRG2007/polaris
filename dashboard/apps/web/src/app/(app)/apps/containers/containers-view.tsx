@@ -14,7 +14,6 @@
 import Link from "next/link";
 import { formatBytes } from "@polaris/core";
 import { useRouter } from "next/navigation";
-import { ContainerPanel } from "./container-panel";
 import { useConfirm } from "@/components/confirm-dialog";
 import { DockerConnectionDialog } from "./docker-connection-dialog";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
@@ -38,8 +37,8 @@ import {
 
 const REFRESH_MS = 5000;
 
-/** Which tab of the container panel an action opens. */
-type PanelTab = "details" | "logs" | "files" | "console";
+/** Which tab of a container's page a row's action opens. */
+type ContainerTab = "details" | "logs" | "files" | "console";
 
 export function ContainersView({
     connections,
@@ -61,7 +60,10 @@ export function ContainersView({
     const [snapshot, setSnapshot] = useState<HostSnapshot | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(connectionId !== null);
-    const [panel, setPanel] = useState<{ container: ContainerRow; tab: PanelTab } | null>(null);
+    // Containers whose removal is in flight. They are already off the table - the
+    // engine takes a moment to stop one, and a row that sits there until the next
+    // refresh reads as a button that did nothing. A refusal puts the row back.
+    const [removing, setRemoving] = useState<string[]>([]);
     // A refresh must never overwrite fresher data with a reply that raced it.
     const requestRef = useRef(0);
 
@@ -79,6 +81,12 @@ export function ContainersView({
                 } else {
                     setError(null);
                     setSnapshot(payload);
+                    // A container the engine no longer lists is gone for real, so
+                    // it no longer needs hiding; one still listed is still on its
+                    // way out and stays hidden.
+                    setRemoving((ids) =>
+                        ids.filter((id) => payload.containers.some((row) => row.id === id))
+                    );
                 }
             } catch {
                 if (request === requestRef.current) {
@@ -134,13 +142,16 @@ export function ContainersView({
             danger: true
         });
         if (!confirmed) return;
+        setRemoving((ids) => [...ids, container.id]);
         startTransition(async () => {
             const result = await removeContainerAction(connectionId!, container.id, {
                 force: running,
                 volumes: false
             });
-            if (result.error) setError(result.error);
-            setPanel((open) => (open?.container.id === container.id ? null : open));
+            if (result.error) {
+                setRemoving((ids) => ids.filter((id) => id !== container.id));
+                setError(result.error);
+            }
             refresh();
         });
     }
@@ -153,7 +164,15 @@ export function ContainersView({
         });
     }
 
-    const containers = snapshot?.containers ?? [];
+    const containers = (snapshot?.containers ?? []).filter((container) => !removing.includes(container.id));
+
+    /** A container's own page, on the host it was listed from. Named rather than
+     *  identified: it is what Docker calls it, what every call here accepts in
+     *  place of an id, and what makes the address worth sending to somebody. */
+    function containerHref(container: ContainerRow, tab: ContainerTab): string {
+        const base = `/apps/containers/${encodeURIComponent(container.name)}?c=${encodeURIComponent(connectionId!)}`;
+        return tab === "details" ? base : `${base}&tab=${tab}`;
+    }
 
     return (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[16rem_1fr]">
@@ -285,13 +304,12 @@ export function ContainersView({
                                         containers.map((container) => (
                                             <tr key={container.id} className="border-t border-border hover:bg-card-hover">
                                                 <td className="px-3 py-2">
-                                                    <button
-                                                        type="button"
+                                                    <Link
+                                                        href={containerHref(container, "details")}
                                                         className="block max-w-full truncate text-left font-medium hover:underline"
-                                                        onClick={() => setPanel({ container, tab: "details" })}
                                                     >
                                                         {container.name}
-                                                    </button>
+                                                    </Link>
                                                     <span className="block truncate text-xs text-muted-foreground">
                                                         {container.image}
                                                     </span>
@@ -309,25 +327,24 @@ export function ContainersView({
                                                 </td>
                                                 <td className="px-3 py-2">
                                                     <div className="flex justify-end gap-1">
-                                                        <IconButton
-                                                            label="Logs"
-                                                            onClick={() => setPanel({ container, tab: "logs" })}
-                                                        >
+                                                        <IconLink label="Logs" href={containerHref(container, "logs")}>
                                                             <ScrollText className="size-4" />
-                                                        </IconButton>
-                                                        <IconButton
-                                                            label="Files"
-                                                            onClick={() => setPanel({ container, tab: "files" })}
-                                                        >
+                                                        </IconLink>
+                                                        <IconLink label="Files" href={containerHref(container, "files")}>
                                                             <FileText className="size-4" />
-                                                        </IconButton>
-                                                        <IconButton
-                                                            label="Console"
-                                                            onClick={() => setPanel({ container, tab: "console" })}
-                                                            disabled={container.state !== "running"}
-                                                        >
-                                                            <TerminalSquare className="size-4" />
-                                                        </IconButton>
+                                                        </IconLink>
+                                                        {container.state === "running" ? (
+                                                            <IconLink
+                                                                label="Console"
+                                                                href={containerHref(container, "console")}
+                                                            >
+                                                                <TerminalSquare className="size-4" />
+                                                            </IconLink>
+                                                        ) : (
+                                                            <IconButton label="Console" onClick={() => undefined} disabled>
+                                                                <TerminalSquare className="size-4" />
+                                                            </IconButton>
+                                                        )}
                                                         {canManage ? (
                                                             <>
                                                                 {container.state === "running" ? (
@@ -376,15 +393,6 @@ export function ContainersView({
                     </>
                 )}
             </section>
-            {panel && connectionId ? (
-                <ContainerPanel
-                    connectionId={connectionId}
-                    container={panel.container}
-                    initialTab={panel.tab}
-                    canAttach={snapshot?.canAttach ?? false}
-                    onClose={() => setPanel(null)}
-                />
-            ) : null}
             {confirmDialog}
         </div>
     );
@@ -450,6 +458,16 @@ function IconButton({
     return (
         <Button size="icon" variant="ghost" onClick={onClick} disabled={disabled} aria-label={label} title={label}>
             {children}
+        </Button>
+    );
+}
+
+/** The same control, for the ones that open a page. A link rather than a click
+ *  handler so it can be middle-clicked, opened in a tab, or copied. */
+function IconLink({ label, href, children }: { label: string; href: string; children: ReactNode }) {
+    return (
+        <Button size="icon" variant="ghost" asChild aria-label={label} title={label}>
+            <Link href={href}>{children}</Link>
         </Button>
     );
 }

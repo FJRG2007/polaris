@@ -21,9 +21,20 @@ const containerId = z
     .max(128)
     .regex(/^[A-Za-z0-9][A-Za-z0-9_.-]*$/, "Invalid container id");
 
+/** A yes/no flag in a query string. Spelled out rather than coerced, because
+ *  every non-empty string coerces to true - "0" and "false" included. */
+const flag = z
+    .enum(["0", "1", "true", "false"])
+    .default("0")
+    .transform((value) => value === "1" || value === "true");
+
 export const listQuerySchema = z.object({ c: connectionId });
 
 export const containerQuerySchema = z.object({ c: connectionId, id: containerId });
+
+/** `size` asks the daemon what the container occupies on disk, which it answers
+ *  by walking the filesystem - off unless a caller says it is worth the wait. */
+export const inspectQuerySchema = containerQuerySchema.extend({ size: flag });
 
 export const logsQuerySchema = containerQuerySchema.extend({
     tail: z.coerce.number().int().min(1).max(5000).default(200)

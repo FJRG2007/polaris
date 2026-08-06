@@ -44,6 +44,47 @@ export interface HostSnapshot {
     canAttach: boolean;
 }
 
+/** What /api/containers/host answers with: the engine, named, and nothing about
+ *  its containers. The counts and totals are the same shape the listing uses;
+ *  the two aggregate fields are zero here because nothing was sampled. */
+export interface HostInfo {
+    overview: OverviewData;
+    canAttach: boolean;
+}
+
+/** One live sample for one container, as /api/containers/stats answers. The
+ *  byte counters are cumulative since the container started, not rates. */
+export interface ContainerUsage {
+    cpuPercent: number;
+    memUsage: number;
+    memLimit: number;
+    memPercent: number;
+    netRx: number;
+    netTx: number;
+    blockRead: number;
+    blockWrite: number;
+}
+
+/** Everything one container's page shows about how it was set up. `sizeRw` and
+ *  `sizeRootFs` are present only when the inspect asked for them. */
+export interface ContainerDetailData {
+    id: string;
+    name: string;
+    image: string;
+    state: string;
+    createdAt: string;
+    startedAt: string | null;
+    restartCount: number;
+    command: string;
+    ports: Array<{ container: string; host: string | null }>;
+    mounts: Array<{ source: string; destination: string; rw: boolean }>;
+    networks: string[];
+    env: string[];
+    composeProject: string | null;
+    sizeRw: number | null;
+    sizeRootFs: number | null;
+}
+
 export interface OverviewData {
     name: string;
     serverVersion: string;
