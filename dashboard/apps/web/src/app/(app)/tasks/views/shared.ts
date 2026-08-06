@@ -183,4 +183,19 @@ export interface ViewProps {
      *  screen belongs to one space, which is what decides whether the affordance
      *  exists at all. */
     readonly onCreateStatus?: (name: string, type: TaskStatusType, color: string) => Promise<string | null>;
+    /** Reshape a column: what it is called, what it means for the work sitting in
+     *  it, and the colour it is read by. Supplied under the same rule as
+     *  `onCreateStatus`, and reports whether the change landed. */
+    readonly onUpdateStatus?: (
+        statusId: string,
+        name: string,
+        type: TaskStatusType,
+        color: string
+    ) => Promise<boolean>;
+    /** Remove a column, moving the work on it onto the status given: a board that
+     *  quietly drops tasks is worse than one that refuses the delete. */
+    readonly onDeleteStatus?: (statusId: string, replacementId: string) => Promise<boolean>;
+    /** Write down the order the columns were dragged into. It belongs to the
+     *  space, so it is the order everybody on it opens the board in. */
+    readonly onReorderStatuses?: (orderedIds: string[]) => Promise<boolean>;
 }

@@ -14,11 +14,11 @@ import Link from "next/link";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
-import { Hash, Plus, Trash2 } from "lucide-react";
 import { ProgressBar, StatusDot } from "./pickers";
 import type { PersonRef } from "@/lib/tasks/facts";
 import { useCallback, useEffect, useState } from "react";
 import type { FormView } from "@/lib/tasks/form-service";
+import { Hash, Pencil, Plus, Trash2 } from "lucide-react";
 import { AutomationsPanel, FormsPanel } from "./automations-panel";
 import type { AutomationView } from "@/lib/tasks/automation-service";
 import { Button, Card, CardBody, ConfirmDeleteDialog, Input, Select, cn } from "@polaris/ui";
@@ -200,38 +200,115 @@ function StatusesTab({
     const [color, setColor] = useState("#64748b");
     const [removing, setRemoving] = useState<StatusView | null>(null);
     const [replacement, setReplacement] = useState("");
+    // The status being reshaped, and the draft standing in for it until it is
+    // saved. Held here rather than on the row so leaving it open on one status
+    // and opening another cannot end with two half-edited rows.
+    const [editing, setEditing] = useState<StatusView | null>(null);
+    const [draft, setDraft] = useState<{ name: string; type: core.TaskStatusType; color: string } | null>(null);
+    const [saving, setSaving] = useState(false);
+
+    const save = async () => {
+        if (!editing || !draft?.name.trim() || saving) return;
+        setSaving(true);
+        const result = await runAction(
+            () =>
+                actions.updateStatusAction(spaceId, editing.id, {
+                    name: draft.name.trim(),
+                    type: draft.type,
+                    color: draft.color
+                }),
+            onError
+        );
+        setSaving(false);
+        if (result?.error) onError(result.error);
+        else if (result) setEditing(null);
+    };
 
     return (
         <section className="flex flex-col gap-3">
             <p className="text-xs text-muted-foreground">
                 Every list in this space shares these. The kind decides what Polaris counts as finished, whatever the
-                status is called.
+                status is called, and the order here is the order of the columns on a board - where they can be dragged
+                into another one.
             </p>
 
             <ul className="divide-y divide-border rounded-lg border border-border">
-                {statuses.map((status) => (
-                    <li key={status.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
-                        <StatusDot color={status.color} />
-                        <span className="min-w-32 flex-1 truncate text-sm">{status.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                            {core.TASK_STATUS_TYPE_LABELS[status.type]}
-                        </span>
-                        {canManage && (
-                            <button
-                                type="button"
-                                aria-label={`Remove ${status.name}`}
-                                title="Remove status"
-                                onClick={() => {
-                                    setRemoving(status);
-                                    setReplacement(statuses.find((entry) => entry.id !== status.id)?.id ?? "");
+                {statuses.map((status) =>
+                    editing?.id === status.id && draft ? (
+                        <li key={status.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
+                            <input
+                                type="color"
+                                value={draft.color}
+                                aria-label="Status colour"
+                                onChange={(event) => setDraft({ ...draft, color: event.target.value })}
+                                className="h-8 w-12 shrink-0 rounded border border-border bg-background"
+                            />
+                            <Input
+                                autoFocus
+                                value={draft.name}
+                                aria-label="Status name"
+                                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                                onKeyDown={(event) => {
+                                    if (event.key === "Escape") setEditing(null);
+                                    if (event.key === "Enter") void save();
                                 }}
-                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
-                            >
-                                <Trash2 className="size-3.5" />
-                            </button>
-                        )}
-                    </li>
-                ))}
+                                className="h-8 min-w-32 flex-1 text-sm"
+                            />
+                            <Select
+                                value={draft.type}
+                                onValueChange={(value) => setDraft({ ...draft, type: value as core.TaskStatusType })}
+                                options={core.TASK_STATUS_TYPES.map((entry) => ({
+                                    value: entry,
+                                    label: core.TASK_STATUS_TYPE_LABELS[entry]
+                                }))}
+                                aria-label="Status kind"
+                                className="h-8 w-40 text-xs"
+                            />
+                            <Button size="sm" disabled={!draft.name.trim() || saving} onClick={() => void save()}>
+                                {saving ? "Saving..." : "Save"}
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
+                                Cancel
+                            </Button>
+                        </li>
+                    ) : (
+                        <li key={status.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
+                            <StatusDot color={status.color} />
+                            <span className="min-w-32 flex-1 truncate text-sm" title={status.name}>{status.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {core.TASK_STATUS_TYPE_LABELS[status.type]}
+                            </span>
+                            {canManage && (
+                                <>
+                                    <button
+                                        type="button"
+                                        aria-label={`Edit ${status.name}`}
+                                        title="Edit status"
+                                        onClick={() => {
+                                            setEditing(status);
+                                            setDraft({ name: status.name, type: status.type, color: status.color });
+                                        }}
+                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                    >
+                                        <Pencil className="size-3.5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-label={`Remove ${status.name}`}
+                                        title="Remove status"
+                                        onClick={() => {
+                                            setRemoving(status);
+                                            setReplacement(statuses.find((entry) => entry.id !== status.id)?.id ?? "");
+                                        }}
+                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                                    >
+                                        <Trash2 className="size-3.5" />
+                                    </button>
+                                </>
+                            )}
+                        </li>
+                    )
+                )}
             </ul>
 
             {canManage && (

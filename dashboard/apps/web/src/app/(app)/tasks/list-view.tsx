@@ -493,6 +493,17 @@ export function ListScreen({
         return () => window.removeEventListener("keydown", onKeyDown);
     });
 
+    /**
+     * Whether this screen may change the columns at all.
+     *
+     * A status belongs to a space, so a screen that spans them all has nowhere
+     * to put one and no single set to reorder - the same reason a tag cannot be
+     * created there. The rest is offered only to whoever may change a space's
+     * statuses; the actions enforce that too, this is what keeps the affordance
+     * from appearing for somebody who would only be refused.
+     */
+    const canManageColumns = context.canModerate && context.spaceId !== "";
+
     const viewProps: ViewProps = {
         rows: visible,
         groups,
@@ -529,23 +540,50 @@ export function ListScreen({
               }
             : undefined,
         groupBy,
-        // A new status belongs to a space, so a screen that spans them all has
-        // nowhere to put one - the same reason a tag cannot be created there.
-        // The rest is offered only to whoever may change a space's statuses; the
-        // action enforces that too, this is what keeps the affordance from
-        // appearing for somebody who would only be refused.
-        onCreateStatus:
-            context.canModerate && context.spaceId
-                ? async (name, type, color) => {
-                      const created = await runAction(
-                          () => actions.createStatusAction(context.spaceId, { name, type, color }),
-                          setError
-                      );
-                      if (created?.error) setError(created.error);
-                      refresh();
-                      return created?.id ?? null;
-                  }
-                : undefined
+        onCreateStatus: canManageColumns
+            ? async (name, type, color) => {
+                  const created = await runAction(
+                      () => actions.createStatusAction(context.spaceId, { name, type, color }),
+                      setError
+                  );
+                  if (created?.error) setError(created.error);
+                  refresh();
+                  return created?.id ?? null;
+              }
+            : undefined,
+        onUpdateStatus: canManageColumns
+            ? async (statusId, name, type, color) => {
+                  const saved = await runAction(
+                      () => actions.updateStatusAction(context.spaceId, statusId, { name, type, color }),
+                      setError
+                  );
+                  if (saved?.error) setError(saved.error);
+                  refresh();
+                  return saved !== null && !saved.error;
+              }
+            : undefined,
+        onDeleteStatus: canManageColumns
+            ? async (statusId, replacementId) => {
+                  const removed = await runAction(
+                      () => actions.deleteStatusAction(context.spaceId, statusId, replacementId),
+                      setError
+                  );
+                  if (removed?.error) setError(removed.error);
+                  refresh();
+                  return removed !== null && !removed.error;
+              }
+            : undefined,
+        onReorderStatuses: canManageColumns
+            ? async (orderedIds) => {
+                  const moved = await runAction(
+                      () => actions.reorderStatusesAction(context.spaceId, orderedIds),
+                      setError
+                  );
+                  if (moved?.error) setError(moved.error);
+                  refresh();
+                  return moved !== null && !moved.error;
+              }
+            : undefined
     };
 
     return (
