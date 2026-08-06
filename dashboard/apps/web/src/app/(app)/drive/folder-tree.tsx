@@ -55,6 +55,10 @@ export function FolderTree({
     const [error, setError] = useState<string | null>(null);
     // Folders already requested, so an expand/collapse cycle does not refetch.
     const requested = useRef<Set<string>>(new Set());
+    // Branches still on their way. A dialog that closes, or a connection the picker
+    // moves off, leaves nobody waiting for them - and a device that is not
+    // answering would hold the request for its whole timeout.
+    const pending = useRef<AbortController[]>([]);
 
     /** The directories of a listing, as the tree shows them. */
     const branchOf = useCallback(
@@ -76,11 +80,16 @@ export function FolderTree({
                 return;
             }
             setLoading((prev) => new Set(prev).add(path));
+            const controller = new AbortController();
+            pending.current.push(controller);
             try {
                 const query = new URLSearchParams({ c: connectionId });
                 if (path) query.set("p", path);
-                const response = await fetch(`/api/drive/list?${query.toString()}`);
+                const response = await fetch(`/api/drive/list?${query.toString()}`, {
+                    signal: controller.signal
+                });
                 const body = await response.json();
+                if (controller.signal.aborted) return;
                 if (!response.ok || body.error) {
                     // A locked or unreadable branch is not a dialog-level failure:
                     // it simply has no children to offer.
@@ -92,9 +101,11 @@ export function FolderTree({
                 writeListing(connectionId, path, entries);
                 setChildren((prev) => ({ ...prev, [path]: branchOf(entries) }));
             } catch {
+                if (controller.signal.aborted) return;
                 setChildren((prev) => ({ ...prev, [path]: [] }));
                 if (path === "") setError("Could not list this connection");
             } finally {
+                pending.current = pending.current.filter((entry) => entry !== controller);
                 setLoading((prev) => {
                     const next = new Set(prev);
                     next.delete(path);
@@ -115,6 +126,10 @@ export function FolderTree({
         setExpanded(new Set(value ? [...ancestors, value] : ancestors));
         for (const folder of ancestors) void load(folder);
         if (value) void load(value);
+        return () => {
+            for (const controller of pending.current) controller.abort();
+            pending.current = [];
+        };
         // Only re-seed when the connection changes; `value` then moves with clicks.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [connectionId, load]);

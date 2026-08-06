@@ -37,8 +37,9 @@ const RECENT_PREFIX = "drive.recent:";
 /** Every prefix a Drive read caches under, and so everything a write invalidates. */
 const DRIVE_KEY_PREFIXES = [KEY_PREFIX, ACTIVITY_PREFIX, RECENT_PREFIX];
 
-/** Folders whose prefetch is in flight, so a cursor crossing a row twice asks once. */
-const inFlight = new Set<string>();
+/** Prefetches in flight, so a cursor crossing a row twice asks once - and so a
+ *  request nobody is waiting for any more can be called off. */
+const inFlight = new Map<string, AbortController>();
 
 function key(connectionId: string, path: string): string {
     return `${KEY_PREFIX}${connectionId}:${path}`;
@@ -82,10 +83,11 @@ export function prefetchListing(connectionId: string, path: string): void {
     if (!connectionId || readListing(connectionId, path)) return;
     const id = key(connectionId, path);
     if (inFlight.has(id)) return;
-    inFlight.add(id);
+    const controller = new AbortController();
+    inFlight.set(id, controller);
     const query = new URLSearchParams({ c: connectionId });
     if (path) query.set("p", path);
-    void fetch(`/api/drive/list?${query.toString()}`)
+    void fetch(`/api/drive/list?${query.toString()}`, { signal: controller.signal })
         .then(async (response) => {
             const body = (await response.json()) as { entries?: DriveEntry[] };
             if (response.ok && Array.isArray(body.entries))
@@ -95,4 +97,22 @@ export function prefetchListing(connectionId: string, path: string): void {
             // Nothing to report: this listing was never asked for out loud.
         })
         .finally(() => inFlight.delete(id));
+}
+
+/**
+ * Call off the prefetches for every source other than the one now on screen.
+ *
+ * A guess made while the cursor crossed a row is worth nothing once the user is
+ * somewhere else, and a guess about a device that is not answering is worth less
+ * than nothing: it holds one of the handful of connections the browser will open
+ * to Polaris for the whole of that device's timeout, which is long enough to
+ * delay the listing that was actually asked for.
+ */
+export function abortPrefetchesOutside(connectionId: string): void {
+    const keep = `${KEY_PREFIX}${connectionId}:`;
+    for (const [id, controller] of inFlight) {
+        if (id.startsWith(keep)) continue;
+        controller.abort();
+        inFlight.delete(id);
+    }
 }

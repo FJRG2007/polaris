@@ -1,12 +1,16 @@
 /**
- * What Drive shows for a server that is not answering.
+ * What Drive shows for a source whose machine is not answering.
  *
- * A registered server is browsed over SFTP, so when the machine is off the
- * listing can only end in a connect timeout and a failure that names nothing.
- * The explorer is told the server is down before it asks, and this pins what it
- * does with that: the rail marks the source, the pane says why, and the file
- * browser - with its upload, new folder and delete controls - is not rendered
- * at all rather than rendered over an empty list.
+ * A source is browsed over SFTP or SMB, so when the device is off the listing can
+ * only end in a connect timeout and a failure that names nothing. The explorer is
+ * told the device is down before it asks, and this pins what it does with that:
+ * the rail marks the source and stops opening it - a row that still navigated
+ * would spend that timeout and leave the browser waiting on a machine that is not
+ * there - the pane says why, and the file browser, with its upload, new folder and
+ * delete controls, is not rendered at all rather than rendered over an empty list.
+ *
+ * A registered server and a saved NAS are both covered: reachability is a
+ * property of having a machine, not of which app the source was borrowed from.
  *
  * Rendered to static markup; the file view and the dialogs are stubbed because
  * none of them takes part in the decision.
@@ -59,16 +63,27 @@ const SERVER: ConnectionSummary = {
     needsRekey: false
 };
 
-function render(status: SourceStatus[]): string {
+const NAS: ConnectionSummary = {
+    id: "44444444-4444-4444-8444-444444444444",
+    name: "unas-pro",
+    kind: "unifi-unas",
+    requiresHostd: false,
+    config: { kind: "unifi-unas", host: "10.0.0.9" },
+    shared: false,
+    canManageAccess: false,
+    needsRekey: false
+};
+
+function render(source: ConnectionSummary, status: SourceStatus[]): string {
     statuses = status;
     return renderToStaticMarkup(
-        <DriveExplorer connections={[SERVER]} connectionId={SERVER.id} path="" />
+        <DriveExplorer connections={[source]} connectionId={source.id} path="" />
     );
 }
 
-describe("a Drive source whose server is down", () => {
+describe("a Drive source whose machine is down", () => {
     it("says so instead of showing the file browser", () => {
-        const markup = render([
+        const markup = render(SERVER, [
             { id: SERVER.id, state: "down", detail: "No answer within 3 seconds" }
         ]);
 
@@ -78,21 +93,36 @@ describe("a Drive source whose server is down", () => {
         expect(markup).not.toContain("files-view");
     });
 
-    it("marks it in the connection rail", () => {
-        const markup = render([{ id: SERVER.id, state: "down", detail: null }]);
+    it("marks it in the connection rail and stops it being opened", () => {
+        const markup = render(SERVER, [{ id: SERVER.id, state: "down", detail: null }]);
 
         expect(markup).toContain("no answer");
+        expect(markup).toContain('aria-disabled="true"');
+        // No link to browse it: clicking would only buy the connect timeout.
+        expect(markup).not.toContain("/drive?c=");
+    });
+
+    it("treats a NAS the same as a server", () => {
+        const markup = render(NAS, [
+            { id: NAS.id, state: "down", detail: "No route to that address" }
+        ]);
+
+        expect(markup).toContain("unas-pro is not answering");
+        expect(markup).toContain("No route to that address");
+        expect(markup).not.toContain("/drive?c=");
+        expect(markup).not.toContain("files-view");
     });
 
     it("browses normally once it answers", () => {
-        const markup = render([{ id: SERVER.id, state: "up", detail: null }]);
+        const markup = render(SERVER, [{ id: SERVER.id, state: "up", detail: null }]);
 
         expect(markup).toContain("files-view");
+        expect(markup).toContain("/drive?c=");
         expect(markup).not.toContain("is not answering");
     });
 
     it("browses while the probe has not answered yet", () => {
-        const markup = render([]);
+        const markup = render(SERVER, []);
 
         expect(markup).toContain("files-view");
     });

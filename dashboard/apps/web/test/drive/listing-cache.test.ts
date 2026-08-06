@@ -1,6 +1,7 @@
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+    abortPrefetchesOutside,
     activityKey,
     dropDriveSnapshots,
     prefetchListing,
@@ -106,6 +107,22 @@ describe("Drive listing cache", () => {
         // Already cached: nothing more to fetch.
         prefetchListing("host:a", "docs");
         expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls off the prefetches of the sources left behind", () => {
+        // Never settles: this is what a prefetch of a device that is off looks
+        // like, and the point is that it does not keep the connection anyway.
+        const signals: AbortSignal[] = [];
+        vi.stubGlobal("fetch", (_url: string, init?: { signal?: AbortSignal }) => {
+            if (init?.signal) signals.push(init.signal);
+            return new Promise(() => {});
+        });
+
+        prefetchListing("host:x", "");
+        prefetchListing("host:y", "");
+        abortPrefetchesOutside("host:y");
+
+        expect(signals.map((signal) => signal.aborted)).toEqual([true, false]);
     });
 
     it("caches nothing when a prefetch is refused", async () => {

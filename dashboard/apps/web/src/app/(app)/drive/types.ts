@@ -21,14 +21,29 @@ export function isServerSource(connectionId: string): boolean {
     return connectionId.startsWith("host:");
 }
 
-/** Reachability of one server source, as answered by /api/drive/server-status.
- *  Only servers are probed - a saved connection has no machine to be down. */
+/** Reachability of one source, as answered by /api/drive/source-status. Sources
+ *  with no machine to reach (a bucket, a local path, a container on this box) are
+ *  absent from that answer rather than reported up. */
 export interface SourceStatus {
     /** The Drive source id, prefix included. */
     id: string;
     state: "up" | "down";
     /** Why it is not answering, in the words the connection used. */
     detail: string | null;
+}
+
+/**
+ * Whether a source looks like it points at a machine, and so whether polling
+ * reachability can say anything at all. A hint for turning the poll off on an
+ * instance that only browses buckets and local paths - the server decides what is
+ * actually probed and remains the only authority on whether a source is down.
+ */
+export function mayBeUnreachable(connection: ConnectionSummary): boolean {
+    return (
+        isServerSource(connection.id) ||
+        typeof connection.config?.host === "string" ||
+        typeof connection.config?.baseUrl === "string"
+    );
 }
 
 export interface ConnectionSummary {

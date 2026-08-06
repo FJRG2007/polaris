@@ -9,9 +9,14 @@
  * SMB, reusing its stored account; if no share is set yet it prompts to pick one,
  * and (being a UniFi device) it also offers a shortcut to its own console.
  *
- * Sources that are registered servers are polled for reachability, because a
- * machine that is off answers a browse with a connect timeout and then a generic
- * failure: when one is down the rail says so and its files are not requested.
+ * Sources are polled for reachability, because a machine that is off answers a
+ * browse with a connect timeout and then a generic failure: one that is down is
+ * marked in the rail, cannot be opened, and is never asked for its files.
+ *
+ * Only one listing request is ever in flight. Moving to another source calls off
+ * the request the previous one had not answered - along with any prefetch left
+ * over from the cursor passing its row - so a device that is not answering holds
+ * up nothing but itself.
  */
 
 import Link from "next/link";
@@ -26,10 +31,16 @@ import { RequestDialog, type RequestTarget } from "./request-dialog";
 import { ConnectionDialog, EditConnectionDialog } from "./connection-dialog";
 import { AccessDialog, UnlockPanel, type AccessTarget } from "./access-dialog";
 import { useCallback, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
-import { dropDriveSnapshots, prefetchListing, readListing, writeListing } from "./listing-cache";
+import {
+    abortPrefetchesOutside,
+    dropDriveSnapshots,
+    prefetchListing,
+    readListing,
+    writeListing
+} from "./listing-cache";
 import {
     isSavedConnection,
-    isServerSource,
+    mayBeUnreachable,
     type ConnectionSummary,
     type DriveEntry,
     type SourceStatus
@@ -63,10 +74,10 @@ import {
     cn
 } from "@polaris/ui";
 
-/** How often the servers behind the SFTP sources are re-checked. One short-lived
- *  socket per server, and a machine going down is worth noticing while the
+/** How often the machines behind the sources are re-checked. One short-lived
+ *  socket per source, and a device going down is worth noticing while the
  *  browser is open on its files. */
-const SERVER_POLL_MS = 30_000;
+const SOURCE_POLL_MS = 30_000;
 
 /** Parent path of a relative path ("a/b/c" -> "a/b", "a" -> ""). */
 function parentOf(path: string): string {
@@ -121,6 +132,9 @@ export function DriveExplorer({
 }) {
     const router = useRouter();
     const fileInput = useRef<HTMLInputElement>(null);
+    /** The listing request in flight. There is only ever one: a new location, or a
+     *  refresh after a write, calls off the one before it instead of racing it. */
+    const listing = useRef<AbortController | null>(null);
     const [pending, startTransition] = useTransition();
     const [uploading, setUploading] = useState(false);
 
@@ -178,14 +192,19 @@ export function DriveExplorer({
     const selectedConnection =
         connections.find((connection) => connection.id === connectionId) ?? null;
 
-    // Whether the servers in the rail are answering. Polled only when one is
-    // actually listed: an instance browsing a NAS and nothing else has no server
-    // to ask about, and the poll would be a request that can never say anything.
-    const { data: reachability, refresh: recheckServers } = useLiveResource<SourceStatus[]>({
-        url: "/api/drive/server-status",
-        cacheKey: "drive.server-status",
-        intervalMs: SERVER_POLL_MS,
-        enabled: connections.some((connection) => isServerSource(connection.id)),
+    // Whether the sources in the rail are answering. Polled only when one of them
+    // points at a machine: an instance browsing a bucket and a local folder has
+    // nothing that can be off, and the poll would be a request that can never say
+    // anything.
+    const {
+        data: reachability,
+        refreshing: rechecking,
+        refresh: recheckSources
+    } = useLiveResource<SourceStatus[]>({
+        url: "/api/drive/source-status",
+        cacheKey: "drive.source-status",
+        intervalMs: SOURCE_POLL_MS,
+        enabled: connections.some(mayBeUnreachable),
         select: (body) => (body as { sources: SourceStatus[] }).sources
     });
 
@@ -200,26 +219,35 @@ export function DriveExplorer({
         [reachability]
     );
     const unreachable = downReason(connectionId);
+    const anyDown = connections.some((connection) => downReason(connection.id) !== null);
 
     const load = useCallback(
         // `showSkeleton` blanks the list to a skeleton while fetching - right for a
         // navigation (new location), wrong for a background refresh after a mutation
         // (rename/move/delete), where the optimistic list is already correct and a
         // skeleton flash just looks like a needless reload. Refreshes pass it false.
-        async (signal?: AbortSignal, showSkeleton = false) => {
+        async (showSkeleton = false) => {
+            // Whatever the last location was still waiting for, nobody is waiting
+            // for it now. Calling it off is what keeps a source that never answered
+            // from holding the skeleton over the source that did.
+            listing.current?.abort();
+            const controller = new AbortController();
+            listing.current = controller;
+            const { signal } = controller;
             setError(null);
             if (!connectionId) {
                 setEntries([]);
+                setLoading(false);
                 return;
             }
             // A folder visited moments ago (or prefetched on the way to it) paints
             // now and is corrected by the answer below, so a navigation costs a
             // remote listing but does not wait for one.
             const cached = showSkeleton ? readListing(connectionId, path) : null;
-            if (cached) {
-                setEntries(cached);
-                showSkeleton = false;
-            }
+            if (cached) setEntries(cached);
+            // Assigned, not raised: this location decides whether a skeleton is on
+            // screen, including when the one before it left one there.
+            if (showSkeleton) setLoading(!cached);
             // A server that is not answering would take the connect timeout to
             // fail and come back as a generic error. The panel already says what
             // is wrong, so the request is not made at all.
@@ -230,13 +258,12 @@ export function DriveExplorer({
             }
             setNeedsSmbShare(false);
             setLocked(null);
-            if (showSkeleton) setLoading(true);
             try {
                 const query = new URLSearchParams({ c: connectionId });
                 if (path) query.set("p", path);
                 const res = await fetch(`/api/drive/list?${query.toString()}`, { signal });
                 const body = await res.json();
-                if (signal?.aborted) return;
+                if (signal.aborted) return;
                 if (body.needsSmbShare) {
                     setEntries([]);
                     setNeedsSmbShare(true);
@@ -255,20 +282,22 @@ export function DriveExplorer({
                     writeListing(connectionId, path, next);
                 }
             } catch {
-                if (!signal?.aborted) setError("Unable to list this location");
+                if (!signal.aborted) setError("Unable to list this location");
             } finally {
-                if (!signal?.aborted && showSkeleton) setLoading(false);
+                if (!signal.aborted) setLoading(false);
             }
         },
         [connectionId, path, unreachable]
     );
 
     useEffect(() => {
-        const controller = new AbortController();
         // A location change shows the skeleton; background refreshes (mutations) do not.
-        void load(controller.signal, true);
-        return () => controller.abort();
-    }, [load]);
+        void load(true);
+        // Guesses made about other sources while the cursor crossed their rows are
+        // not worth a connection now that this one is being read.
+        if (connectionId) abortPrefetchesOutside(connectionId);
+        return () => listing.current?.abort();
+    }, [load, connectionId]);
 
     function href(id: string, target: string) {
         const query = new URLSearchParams({ c: id });
@@ -435,7 +464,21 @@ export function DriveExplorer({
             <aside className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                     <h2 className="text-sm font-medium text-muted-foreground">Connections</h2>
-                    <ConnectionDialog />
+                    <div className="flex items-center gap-1">
+                        {anyDown ? (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={recheckSources}
+                                disabled={rechecking}
+                                title="Check again"
+                                aria-label="Check the sources that are not answering"
+                            >
+                                <RefreshCw className={cn("size-4", rechecking && "animate-spin")} />
+                            </Button>
+                        ) : null}
+                        <ConnectionDialog />
+                    </div>
                 </div>
                 <nav className="flex flex-col gap-1">
                     {connections.length === 0 ? (
@@ -443,47 +486,34 @@ export function DriveExplorer({
                     ) : (
                         connections.map((connection) => (
                             <div key={connection.id} className="group flex items-center gap-1">
-                                <Link
-                                    href={href(connection.id, "")}
-                                    // The root of a source somebody is reaching for,
-                                    // fetched while they are still reaching. A source
-                                    // that is not answering is not asked.
-                                    onPointerEnter={() =>
-                                        !downReason(connection.id) &&
-                                        prefetchListing(connection.id, "")
-                                    }
-                                    onFocus={() =>
-                                        !downReason(connection.id) &&
-                                        prefetchListing(connection.id, "")
-                                    }
-                                    className={cn(
-                                        "flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted",
-                                        connection.id === connectionId && "bg-muted font-medium"
-                                    )}
-                                >
-                                    <HardDrive className="size-4 text-muted-foreground" />
-                                    <span className="flex-1 truncate">{connection.name}</span>
-                                    {connection.needsRekey ? (
-                                        <Badge variant="warning" className="gap-1">
-                                            <AlertTriangle className="size-3" />
-                                            key changed
-                                        </Badge>
-                                    ) : null}
-                                    {downReason(connection.id) ? (
-                                        <Badge
-                                            variant="danger"
-                                            title={downReason(connection.id) ?? undefined}
-                                        >
-                                            no answer
-                                        </Badge>
-                                    ) : null}
-                                    {connection.shared ? (
-                                        <Badge variant="neutral">shared</Badge>
-                                    ) : null}
-                                    {connection.requiresHostd ? (
-                                        <Badge variant="neutral">host</Badge>
-                                    ) : null}
-                                </Link>
+                                {downReason(connection.id) ? (
+                                    // Off, so there is nothing to open: browsing it
+                                    // would only spend its connect timeout to say so.
+                                    <span
+                                        aria-disabled="true"
+                                        title={`Not answering: ${downReason(connection.id)}`}
+                                        className="flex flex-1 cursor-not-allowed items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground"
+                                    >
+                                        <ConnectionLabel
+                                            connection={connection}
+                                            down={downReason(connection.id)}
+                                        />
+                                    </span>
+                                ) : (
+                                    <Link
+                                        href={href(connection.id, "")}
+                                        // The root of a source somebody is reaching
+                                        // for, fetched while they are still reaching.
+                                        onPointerEnter={() => prefetchListing(connection.id, "")}
+                                        onFocus={() => prefetchListing(connection.id, "")}
+                                        className={cn(
+                                            "flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted",
+                                            connection.id === connectionId && "bg-muted font-medium"
+                                        )}
+                                    >
+                                        <ConnectionLabel connection={connection} down={null} />
+                                    </Link>
+                                )}
                                 {connection.canManageAccess && connection.needsRekey ? (
                                     <button
                                         type="button"
@@ -530,7 +560,7 @@ export function DriveExplorer({
                     <UnreachableServer
                         name={selectedConnection?.name ?? "This server"}
                         detail={unreachable}
-                        onRecheck={recheckServers}
+                        onRecheck={recheckSources}
                     />
                 ) : selectedConnection?.needsRekey ? (
                     <div className="rounded-md border border-warning/40 bg-warning/10 p-6">
@@ -895,6 +925,38 @@ export function DriveExplorer({
                 }}
             />
         </div>
+    );
+}
+
+/**
+ * Icon, name and state of one source in the rail - the same whether the row opens
+ * it or, when the device is not answering, only names it.
+ */
+function ConnectionLabel({
+    connection,
+    down
+}: {
+    connection: ConnectionSummary;
+    down: string | null;
+}) {
+    return (
+        <>
+            <HardDrive className="size-4 text-muted-foreground" />
+            <span className="flex-1 truncate" title={connection.name}>{connection.name}</span>
+            {connection.needsRekey ? (
+                <Badge variant="warning" className="gap-1">
+                    <AlertTriangle className="size-3" />
+                    key changed
+                </Badge>
+            ) : null}
+            {down ? (
+                <Badge variant="danger" title={down}>
+                    no answer
+                </Badge>
+            ) : null}
+            {connection.shared ? <Badge variant="neutral">shared</Badge> : null}
+            {connection.requiresHostd ? <Badge variant="neutral">host</Badge> : null}
+        </>
     );
 }
 
