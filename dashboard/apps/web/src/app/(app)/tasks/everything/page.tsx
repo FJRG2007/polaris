@@ -130,6 +130,11 @@ export default async function EverythingPage({
         <div className="flex w-full flex-col gap-6 md:flex-row">
             <SpaceTree spaces={tree} canCreate />
             <ListScreen
+                // The filter is this screen's opening state, not a prop it
+                // watches, and moving from one person to another is a soft
+                // navigation - without a key React would keep the first
+                // person's filter under the second person's heading.
+                key={assigneeId ?? "everything"}
                 listId={null}
                 defaultListId={null}
                 title="Everything"

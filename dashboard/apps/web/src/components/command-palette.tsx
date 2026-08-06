@@ -65,7 +65,22 @@ const MAX_RECENT_SUGGESTIONS = 3;
 // Kept outside the component so opening the palette a second time paints from
 // what the first open already loaded.
 let indexCache: { at: number; resources: SearchResource[] } | null = null;
+
+/** Answers held per scope. Bounded because it outlives the panel: a session
+ *  spent searching would otherwise keep every distinct query it ever ran, and
+ *  a sign-out without a reload would leave one account's names in the next
+ *  account's memory. */
 const lookupCache = new Map<string, { at: number; hits: SearchHit[] }>();
+const MAX_LOOKUP_CACHE = 40;
+
+function rememberLookup(key: string, hits: SearchHit[]): void {
+    // Insertion order, so the first key is the one held longest.
+    if (lookupCache.size >= MAX_LOOKUP_CACHE) {
+        const oldest = lookupCache.keys().next().value;
+        if (oldest !== undefined) lookupCache.delete(oldest);
+    }
+    lookupCache.set(key, { at: Date.now(), hits });
+}
 
 /** One line of the panel. Everything the arrow keys move through is one of these. */
 type Row =
@@ -79,6 +94,11 @@ interface Group {
     /** Each row with its position in the flat list, which is what the arrow keys
      *  move through - so the headings never disturb the ranking. */
     rows: Array<{ row: Row; position: number }>;
+}
+
+/** The row's id in the document, for `aria-activedescendant` to point at. */
+function rowElementId(row: Row): string {
+    return `polaris-search-${row.id.replace(/[^a-z0-9-]+/gi, "-")}`;
 }
 
 function groupRows(rows: readonly Row[]): Group[] {
@@ -186,9 +206,14 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
      * A scoped search that found something is worth remembering as a search, but
      * only when it was not the way to something better: a result that was opened
      * is remembered instead, and remembering both would say the same thing twice.
+     *
+     * What counts as "found something" is the rows the panel drew, not the rows
+     * that came back from the server - otherwise "/services orphion" would be
+     * forgotten and "/tasks orphion" remembered, which is a distinction only the
+     * implementation can see.
      */
     function onOpenChange(next: boolean): void {
-        if (!next && scope && trimmed.length > 1 && !openedRef.current && hits.length > 0) {
+        if (!next && scope && trimmed.length > 1 && !openedRef.current && answers > 0) {
             remember({ kind: "query", scope: scope.id, term: trimmed, label: trimmed, href: null });
         }
         setOpen(next);
@@ -242,7 +267,7 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
                         const body: { hits?: SearchHit[]; error?: string } = await response.json();
                         if (!response.ok) throw new Error(body.error ?? "That search could not be run");
                         const found = body.hits ?? [];
-                        lookupCache.set(key, { at: Date.now(), hits: found });
+                        rememberLookup(key, found);
                         setHits(found);
                         setFailure(null);
                     })
@@ -265,6 +290,11 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
         return () => {
             clearTimeout(timer);
             controller.abort();
+            // An aborted request never reaches its `finally`, so without this a
+            // command dropped mid-debounce - backspaced out of, or closed -
+            // leaves the spinner turning over a panel that is waiting for
+            // nothing.
+            setSearching(false);
         };
     }, [open, scope, trimmed]);
 
@@ -354,6 +384,8 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
     }, [recentRows, suggestions, scope, hits, trimmed, query, fuse, pool, navigation]);
 
     const groups = useMemo(() => groupRows(rows), [rows]);
+    /** Rows that are an answer rather than a memory or a command. */
+    const answers = useMemo(() => rows.filter((row) => row.kind === "hit" || row.kind === "entry").length, [rows]);
 
     // A shorter result list must not leave the highlight past its end.
     useEffect(() => {
@@ -484,6 +516,14 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
                             autoCorrect="off"
                             spellCheck={false}
                             aria-label={scope ? scope.placeholder : "Search Polaris"}
+                            // The arrow keys move a highlight through the list
+                            // while the caret stays here, so the field has to be
+                            // the thing that says which row is current: without
+                            // it a screen reader hears nothing move.
+                            role="combobox"
+                            aria-expanded
+                            aria-autocomplete="list"
+                            aria-activedescendant={rows[active] ? rowElementId(rows[active]!) : undefined}
                             aria-controls="polaris-search-results"
                             className="h-12 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                         />
@@ -546,6 +586,7 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
                                             return (
                                                 <CommandRow
                                                     key={row.id}
+                                                    id={rowElementId(row)}
                                                     scope={row.scope}
                                                     selected={selected}
                                                     onSelect={select}
@@ -557,6 +598,7 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
                                             return (
                                                 <HitRow
                                                     key={row.id}
+                                                    id={rowElementId(row)}
                                                     hit={row.hit}
                                                     selected={selected}
                                                     onSelect={select}
@@ -568,6 +610,7 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
                                             return (
                                                 <RecentRow
                                                     key={row.id}
+                                                    id={rowElementId(row)}
                                                     entry={row.entry}
                                                     scopeLabel={
                                                         row.entry.scope ? searchScope(row.entry.scope).label : null
@@ -582,6 +625,7 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
                                         return (
                                             <EntryRow
                                                 key={row.id}
+                                                id={rowElementId(row)}
                                                 entry={row.entry}
                                                 selected={selected}
                                                 onSelect={select}

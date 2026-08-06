@@ -21,22 +21,28 @@ import type { CommandEntry } from "@/lib/search/entries";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import type { SearchScopeDefinition } from "@/lib/search/scopes";
 
+/** What every row is given, whatever it draws inside. */
+export interface RowProps {
+    /** Pointed at by the field's `aria-activedescendant` when this row is the
+     *  one the arrow keys are on. */
+    id: string;
+    selected: boolean;
+    onSelect: () => void;
+    onHover: () => void;
+}
+
 /** Shared shell: the same height, padding and highlight for every kind of row. */
 function Row({
+    id,
     selected,
     onSelect,
     onHover,
     children,
     label
-}: {
-    selected: boolean;
-    onSelect: () => void;
-    onHover: () => void;
-    children: React.ReactNode;
-    label: string;
-}) {
+}: RowProps & { children: React.ReactNode; label: string }) {
     return (
         <div
+            id={id}
             role="option"
             aria-selected={selected}
             aria-label={label}
@@ -54,20 +60,10 @@ function Row({
 }
 
 /** A destination the app registry already knew about. */
-export function EntryRow({
-    entry,
-    selected,
-    onSelect,
-    onHover
-}: {
-    entry: CommandEntry;
-    selected: boolean;
-    onSelect: () => void;
-    onHover: () => void;
-}) {
+export function EntryRow({ entry, ...row }: RowProps & { entry: CommandEntry }) {
     const Icon: LucideIcon = entry.icon;
     return (
-        <Row selected={selected} onSelect={onSelect} onHover={onHover} label={entry.label}>
+        <Row {...row} label={entry.label}>
             <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm" title={entry.label}>{entry.label}</span>
@@ -80,20 +76,10 @@ export function EntryRow({
 }
 
 /** A command, offered while its word is being typed. */
-export function CommandRow({
-    scope,
-    selected,
-    onSelect,
-    onHover
-}: {
-    scope: SearchScopeDefinition;
-    selected: boolean;
-    onSelect: () => void;
-    onHover: () => void;
-}) {
+export function CommandRow({ scope, ...row }: RowProps & { scope: SearchScopeDefinition }) {
     const Icon = scope.icon;
     return (
-        <Row selected={selected} onSelect={onSelect} onHover={onHover} label={`Search ${scope.label}`}>
+        <Row {...row} label={`Search ${scope.label}`}>
             <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm" title={scope.placeholder}>{scope.placeholder}</span>
@@ -111,19 +97,9 @@ export function CommandRow({
  * The badge, the status dot and the avatar are the whole point: these rows are
  * live data with a state of their own, not entries in a list of screens.
  */
-export function HitRow({
-    hit,
-    selected,
-    onSelect,
-    onHover
-}: {
-    hit: SearchHit;
-    selected: boolean;
-    onSelect: () => void;
-    onHover: () => void;
-}) {
+export function HitRow({ hit, ...row }: RowProps & { hit: SearchHit }) {
     return (
-        <Row selected={selected} onSelect={onSelect} onHover={onHover} label={hit.label}>
+        <Row {...row} label={hit.label}>
             {hit.scope === "users" ? (
                 <Avatar person={{ id: hit.id, name: hit.label, image: hit.image ?? null }} size={22} />
             ) : hit.status ? (
@@ -160,21 +136,16 @@ export function HitRow({
 export function RecentRow({
     entry,
     scopeLabel,
-    selected,
-    onSelect,
-    onHover,
-    onForget
-}: {
+    onForget,
+    ...row
+}: RowProps & {
     entry: RecentSearch;
     /** The command it was made under, already resolved to its name. */
     scopeLabel: string | null;
-    selected: boolean;
-    onSelect: () => void;
-    onHover: () => void;
     onForget: () => void;
 }) {
     return (
-        <Row selected={selected} onSelect={onSelect} onHover={onHover} label={entry.label}>
+        <Row {...row} label={entry.label}>
             {entry.kind === "result" ? (
                 <CornerDownLeft className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             ) : (

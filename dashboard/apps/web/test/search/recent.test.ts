@@ -110,6 +110,16 @@ describe("reading back what was stored", () => {
                     label: "Elsewhere",
                     href: "//evil.example/steal",
                     usedAt: "2026-08-06T12:00:00Z"
+                },
+                {
+                    kind: "result",
+                    scope: null,
+                    term: "",
+                    label: "Backslash",
+                    // The URL parser reads this as an authority too, so it is
+                    // the same escape wearing a different slash.
+                    href: "/\\evil.example/steal",
+                    usedAt: "2026-08-06T13:00:00Z"
                 }
             ])
         );

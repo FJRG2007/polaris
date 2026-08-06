@@ -56,11 +56,19 @@ export type SearchLookupInput = z.infer<typeof searchLookupSchema>;
  * browser's own storage or from a row written long ago - neither of which is
  * evidence of anything. Anchoring it to a single leading slash keeps a stored
  * `javascript:` or `//evil.example` from ever becoming a destination.
+ *
+ * Backslashes are refused outright rather than only in second position. The URL
+ * parser reads `/\evil.example` exactly as it reads `//evil.example`, and
+ * nothing this links to has a backslash in it, so the narrow guard would only
+ * invite the next spelling of the same trick.
  */
 export const internalPath = z
     .string()
     .max(512)
-    .refine((value) => value.startsWith("/") && !value.startsWith("//"), "That is not a path inside Polaris");
+    .refine(
+        (value) => value.startsWith("/") && !value.startsWith("//") && !value.includes("\\"),
+        "That is not a path inside Polaris"
+    );
 
 export const recentSearchSchema = z.object({
     /** `result` is something that was opened, `query` the words that were run. */
