@@ -30,7 +30,7 @@ const REFRESH_MS = 5000;
 const SHOWN = 8;
 
 export function ServerWorkload({ connectionId }: { connectionId: string }) {
-    const { data, loading, error } = useLiveResource<HostSnapshot>({
+    const { data, loading, error, stale } = useLiveResource<HostSnapshot>({
         url: `/api/containers?c=${encodeURIComponent(connectionId)}`,
         // The key the Containers table writes, so opening a server after visiting
         // that host paints from what it already fetched.
@@ -54,7 +54,12 @@ export function ServerWorkload({ connectionId }: { connectionId: string }) {
                         </span>
                     ) : null}
                 </h2>
-                {age !== null && age > STALE_AFTER_MS ? (
+                {/* A refresh that failed over figures still on screen. A panel that
+                    quietly keeps showing a healthy machine that has since stopped
+                    answering is worse than one that says so. */}
+                {stale ? (
+                    <span className="text-xs text-warning">{stale}</span>
+                ) : age !== null && age > STALE_AFTER_MS ? (
                     <span className="text-xs text-muted-foreground">sampled {formatAge(age)} ago</span>
                 ) : null}
             </div>
