@@ -90,14 +90,26 @@ function brandFromHints(brands: string | null | undefined): { name: string; vers
  * first and the broadest last. Safari states its own version as `Version/`,
  * because the number after `Safari/` is the engine build and not what anybody
  * calls their browser.
+ *
+ * A browser writes a different token on each mobile platform, and every one of
+ * those trails `Safari/` in the string: iOS forbids any engine but WebKit, so
+ * Edge, Chrome and Firefox there are Safari wearing a name, and each says which
+ * name in a token of its own. Miss the token and the row is not merely unnamed,
+ * it is named as a competitor - and no hint can correct it, because WebKit sends
+ * no `sec-ch-ua` at all. So each of them is listed with its desktop entry, and
+ * `Safari/` stays last as the claim nothing narrower matched.
  */
 const BROWSERS: readonly { readonly test: RegExp; readonly name: string; readonly version: RegExp }[] = [
     { test: /\bEdg\//, name: "Edge", version: /\bEdg\/(\d{1,4})/ },
+    { test: /\bEdgA\//, name: "Edge", version: /\bEdgA\/(\d{1,4})/ },
+    { test: /\bEdgiOS\//, name: "Edge", version: /\bEdgiOS\/(\d{1,4})/ },
     { test: /\bOPR\//, name: "Opera", version: /\bOPR\/(\d{1,4})/ },
     { test: /\bVivaldi\//, name: "Vivaldi", version: /\bVivaldi\/(\d{1,4})/ },
     { test: /\bSamsungBrowser\//, name: "Samsung Internet", version: /\bSamsungBrowser\/(\d{1,4})/ },
     { test: /\bFirefox\//, name: "Firefox", version: /\bFirefox\/(\d{1,4})/ },
+    { test: /\bFxiOS\//, name: "Firefox", version: /\bFxiOS\/(\d{1,4})/ },
     { test: /\bChrome\//, name: "Chrome", version: /\bChrome\/(\d{1,4})/ },
+    { test: /\bCriOS\//, name: "Chrome", version: /\bCriOS\/(\d{1,4})/ },
     { test: /\bSafari\//, name: "Safari", version: /\bVersion\/(\d{1,4})/ }
 ];
 

@@ -100,6 +100,30 @@ describe("describeClient", () => {
         expect(describeClient(CHROME_WINDOWS, '"toString";v="1"').browser).toBe("toString");
     });
 
+    // On iOS every browser is WebKit by decree, so each trails `Safari/` and says
+    // which browser it really is in a token of its own. Missing that token does
+    // not leave the row unnamed - it names it as a competitor, and draws that
+    // competitor's mark on a security screen. The hints cannot catch it either:
+    // WebKit sends no `sec-ch-ua`, so these arrive with the user-agent alone.
+    it("names the browsers that rebadge themselves on iOS and Android", () => {
+        const webkit = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)";
+        const cases = [
+            [`${webkit} Version/17.5 EdgiOS/131.2903.92 Mobile/15E148 Safari/605.1.15`, "Edge", "131"],
+            [`${webkit} CriOS/131.0.6778.73 Mobile/15E148 Safari/604.1`, "Chrome", "131"],
+            [`${webkit} FxiOS/133.0 Mobile/15E148 Safari/605.1.15`, "Firefox", "133"],
+            [`${CHROME_ANDROID} EdgA/131.0.2903.87`, "Edge", "131"]
+        ] as const;
+        for (const [userAgent, browser, browserVersion] of cases) {
+            expect(describeClient(userAgent)).toMatchObject({ browser, browserVersion });
+        }
+    });
+
+    it("still reads Safari as Safari once the rebadged tokens are checked", () => {
+        // The narrower tokens are tested first, so the broad `Safari/` row has to
+        // keep answering for the browser that is actually Safari.
+        expect(describeClient(SAFARI_IPAD).browser).toBe("Safari");
+    });
+
     it("falls back to the user-agent when the hints name nothing real", () => {
         expect(describeClient(FIREFOX_LINUX, '"Not_A Brand";v="24"').browser).toBe("Firefox");
     });
