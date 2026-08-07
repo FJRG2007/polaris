@@ -15,10 +15,16 @@ import { serviceName } from "@polaris/deploy";
 import { prisma, type Prisma } from "@polaris/db";
 import type { DockerDriver } from "@polaris/docker";
 import { currentReleaseRef } from "./deploy/releases";
+import { rememberSample } from "./container-stats-cache";
 import { getPorts, type TargetRow } from "./deploy/runtime";
-import { hostDockerDriver, localDockerDriver } from "./docker-service";
 import { recordHostDockerId, recordLocalDockerId } from "./local-machine";
 import { getDriverForConnection, getUnasMetrics } from "./storage-service";
+import {
+    hostDockerDriver,
+    HOST_DOCKER_PREFIX,
+    localDockerDriver,
+    LOCAL_DOCKER_CONNECTION_ID
+} from "./docker-service";
 import {
     COLLECT_TICK_MS,
     LOCAL_HOST_SUBJECT,
@@ -136,7 +142,8 @@ async function collectHosts(ts: Date): Promise<SampleRow[]> {
 }
 
 /** One server's load this tick, plus which daemon answered. Null when the
- *  machine is unreachable or has no daemon. */
+ *  machine is unreachable or has no daemon. Each container it reads on the way is
+ *  left in the Containers cache, so that screen has a reading to open on. */
 async function sampleHost(
     subjectId: string,
     ownerId: string | null,
@@ -152,11 +159,21 @@ async function sampleHost(
         // CPU sample, so a machine with a dozen containers would otherwise spend
         // most of a tick waiting rather than measuring.
         const samples = await driver.statsMany(running.map((container) => container.id));
+        // This pass has just read every container on the machine, one at a time,
+        // to add them up. Handing each one to the Containers cache on the way past
+        // costs nothing and is the difference between opening that screen on the
+        // last minute's figures and opening it on blanks - so the readings there
+        // come from this collector rather than from a second pass over the same
+        // daemon asking it the same question.
+        const connectionId =
+            ownerId === null ? LOCAL_DOCKER_CONNECTION_ID : `${HOST_DOCKER_PREFIX}${subjectId}`;
         let cpu = 0;
         let memory = 0;
-        for (const stats of samples.values()) {
+        for (const container of running) {
+            const stats = samples.get(container.id);
             // A container that stopped between the list and the read.
             if (!stats) continue;
+            rememberSample(connectionId, [container.id, container.name], stats);
             cpu += stats.cpuPercent;
             memory += stats.memUsage;
         }

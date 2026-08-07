@@ -16,8 +16,14 @@
 import { prisma } from "@polaris/db";
 import type { DockerDriver } from "@polaris/docker";
 import { isLocalMachine, localDockerId } from "./local-machine";
-import { hostDockerDriver, localDockerDriver } from "./docker-service";
-import { LOCAL_HOST_SUBJECT, type MetricSubjectType } from "./metrics-shared";
+import { hostRouteId, LOCAL_HOST_SUBJECT, type MetricSubjectType } from "./metrics-shared";
+import { cachedSamples, newestSampleAt, refreshSamples, STATS_TTL_MS } from "./container-stats-cache";
+import {
+    hostDockerDriver,
+    HOST_DOCKER_PREFIX,
+    localDockerDriver,
+    LOCAL_DOCKER_CONNECTION_ID
+} from "./docker-service";
 
 /** How much history a card's sparkline shows. Long enough to have a shape, short
  *  enough that a card is not a chart. */
@@ -177,7 +183,9 @@ async function buildServers(ownerId: string, alarms: Map<string, number>): Promi
                 : "The machine Polaris runs on",
             ...readingsFor(series.get(LOCAL_HOST_SUBJECT), now),
             alarms: local ? (alarms.get(local.id) ?? 0) : 0,
-            href: `/watch/server/${LOCAL_HOST_SUBJECT}`
+            // Addressed as the machine, not as the reserved subject its samples
+            // are filed under.
+            href: `/watch/server/${hostRouteId(LOCAL_HOST_SUBJECT)}`
         },
         ...remote.map((host) => ({
             id: host.id,
@@ -242,27 +250,38 @@ export async function getWatchOverview(ownerId: string): Promise<WatchOverview> 
 }
 
 /**
- * Every container running on any reachable server, with its live reading.
+ * Every container running on any reachable server, with its last reading.
  *
- * These are read from the daemons rather than from the sample table, because a
- * container is not a stable subject - a redeploy replaces it, and a series keyed
- * by container id would be a graveyard of stubs. What is worth charting over time
- * is the service, which has its own card; a container gets the truth about right
- * now instead, and no sparkline pretending otherwise.
+ * A container has no stored series, because it is not a stable subject - a
+ * redeploy replaces it, and a table keyed by container id would be a graveyard of
+ * stubs. What is worth charting over time is the service, which has its own card.
  *
- * That truth is not free: it is a listing plus a stats read per container on every
- * machine, and the daemon holds each stats read open for about a second. So this
- * is never called while rendering a page - it is served over `/api/watch/containers`
- * and arrives after the screen does.
+ * So the figures come from the sampler the Containers app and the metrics
+ * collector already share: the collector reads every container on every machine
+ * once a minute to add its server up, and leaves each reading behind it. Watch
+ * reads those rather than asking the daemons the same question a third time - the
+ * request costs a listing per machine instead of a listing plus a second per
+ * container, and a fresh pass is started behind the answer when what it served has
+ * aged out.
+ *
+ * Still never called while rendering a page: a listing per machine can still cross
+ * a network, so it is served over `/api/watch/containers` and arrives after the
+ * screen does.
  */
 export async function getWatchContainers(ownerId: string): Promise<WatchCard[]> {
     const { local, remote } = await watchHosts(ownerId);
-    const sources: { id: string; label: string; open: () => Promise<DockerDriver> }[] = [
+    const sources: ContainerSource[] = [
         // A server that is the local machine is reached through the daemon, not
         // over SSH to itself, so its containers are listed once.
-        { id: LOCAL_HOST_SUBJECT, label: local?.name ?? "Local", open: async () => localDockerDriver() },
+        {
+            id: LOCAL_HOST_SUBJECT,
+            connectionId: LOCAL_DOCKER_CONNECTION_ID,
+            label: local?.name ?? "Local",
+            open: async () => localDockerDriver()
+        },
         ...remote.map((host) => ({
             id: host.id,
+            connectionId: `${HOST_DOCKER_PREFIX}${host.id}`,
             label: host.name,
             open: () => hostDockerDriver(host.id, ownerId)
         }))
@@ -270,23 +289,32 @@ export async function getWatchContainers(ownerId: string): Promise<WatchCard[]> 
 
     // Machines in parallel: one unreachable server should cost its own timeout,
     // not everybody else's turn.
-    const perSource = await Promise.all(sources.map((source) => containersOn(source)));
+    const perSource = await Promise.all(sources.map((source) => containersOn(source, ownerId)));
     return perSource.flat();
 }
 
-async function containersOn(source: {
+/** One machine to list, and the id its samples are held under. The two differ:
+ *  Watch keys a server by its metric subject, the sampler by the Containers
+ *  connection that reaches it. */
+interface ContainerSource {
     id: string;
+    connectionId: string;
     label: string;
     open: () => Promise<DockerDriver>;
-}): Promise<WatchCard[]> {
+}
+
+async function containersOn(source: ContainerSource, ownerId: string): Promise<WatchCard[]> {
     let driver: DockerDriver | null = null;
     try {
         driver = await source.open();
         const containers = await driver.listContainers(true);
         const running = containers.filter((container) => container.state === "running");
-        const stats = await driver.statsMany(running.map((container) => container.id));
-        return containers.map((container) => {
-            const sample = stats.get(container.id) ?? null;
+        const samples = cachedSamples(source.connectionId);
+        const cards = containers.map((container) => {
+            // A stopped container has nothing to sample. Its last reading is not
+            // shown either: the card already says it is not running, and a number
+            // beside that reads as though it still were.
+            const sample = container.state === "running" ? (samples.get(container.id) ?? null) : null;
             return {
                 id: `${source.id}:${container.id}`,
                 kind: "container" as const,
@@ -294,14 +322,30 @@ async function containersOn(source: {
                 detail: `${source.label} - ${container.image}`,
                 state: container.state === "running" ? ("up" as const) : ("idle" as const),
                 stateLabel: container.status || container.state,
-                cpuPercent: sample == null ? null : Math.round(sample.cpuPercent * 10) / 10,
-                memUsedBytes: sample?.memUsage ?? null,
-                memTotalBytes: sample?.memLimit ?? null,
+                cpuPercent: sample == null ? null : Math.round(sample.stats.cpuPercent * 10) / 10,
+                memUsedBytes: sample?.stats.memUsage ?? null,
+                memTotalBytes: sample?.stats.memLimit ?? null,
                 spark: [],
                 alarms: 0,
-                href: `/apps/containers?connection=${encodeURIComponent(source.id === LOCAL_HOST_SUBJECT ? "local" : `host:${source.id}`)}`
+                href: `/apps/containers?c=${encodeURIComponent(source.connectionId)}`
             };
         });
+
+        // Behind the answer, never in front of it, and single-flight per machine -
+        // so two people on Watch do not sample the same engine twice.
+        const newest = newestSampleAt(
+            samples,
+            running.map((container) => container.id)
+        );
+        if (newest === null || Date.now() - newest > STATS_TTL_MS) {
+            refreshSamples(
+                source.connectionId,
+                ownerId,
+                running.map((container) => ({ id: container.id, name: container.name })),
+                { prune: true }
+            );
+        }
+        return cards;
     } catch {
         // Daemon absent or host unreachable - that server contributes nothing.
         return [];

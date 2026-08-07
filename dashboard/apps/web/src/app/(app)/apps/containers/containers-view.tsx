@@ -17,13 +17,14 @@
 import Link from "next/link";
 import { formatBytes } from "@polaris/core";
 import { useRouter } from "next/navigation";
+import { carryForwardUsage } from "./usage";
 import { formatAge, STALE_AFTER_MS } from "./freshness";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useLiveResource } from "@/components/use-live-resource";
 import { DockerConnectionDialog } from "./docker-connection-dialog";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
-import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
 import { containerAction, deleteDockerConnectionAction, removeContainerAction } from "./actions";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import type {
     ContainerRow,
     DockerConnectionSummary,
@@ -79,7 +80,7 @@ export function ContainersView({
     // Seeded from the last answer this tab held for the host, polled while the
     // tab is in front, and folded in so only the numbers that moved re-render.
     const {
-        data: snapshot,
+        data: answer,
         loading,
         error,
         stale,
@@ -94,6 +95,20 @@ export function ContainersView({
         paused: !live,
         select: (body) => body as HostSnapshot
     });
+
+    // What the table is actually showing, which is not always what the last answer
+    // carried: a host the server has no sample for answers with the containers and
+    // no figures, and blanking numbers that were on screen a second ago is worse
+    // than showing them with their age. Held per host, so switching hosts does not
+    // fill one machine's table with another's readings.
+    const shown = useRef<{ connectionId: string | null; snapshot: HostSnapshot } | null>(null);
+    const snapshot = useMemo(() => {
+        if (!answer) return null;
+        const previous = shown.current?.connectionId === connectionId ? shown.current.snapshot : null;
+        const merged = carryForwardUsage(previous, answer);
+        shown.current = { connectionId, snapshot: merged };
+        return merged;
+    }, [answer, connectionId]);
 
     // A container the engine no longer lists is gone for real, so it no longer
     // needs hiding; one still listed is still on its way out and stays hidden.
