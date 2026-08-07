@@ -34,6 +34,8 @@ document is the source of truth; keep it current as phases land.
   (multi-agent support) is done. The AI-assistant auto-reply loop (OpenClaw/
   Hermes runtime + an LLM) is the remaining external piece - the substrate is
   ready (assistantId field + the bridge send/receive API any assistant reuses).
+- Phase 5 - CODE DONE: one-click install and the Minecraft game-server app (see
+  "Game servers" below). Not yet exercised against a live server.
 
 To verify each channel live: Telegram bot token; WhatsApp Cloud (Meta app +
 phone-number id + MESSAGING_WA_VERIFY_TOKEN/APP_SECRET + webhook); WhatsApp Web
@@ -239,6 +241,44 @@ those are named blockers, not silent skips.
 - **Phase 4 - AI assistant apps.** OpenClaw/Hermes as marketplace apps that
   consume the bridge API; per-conversation assignment to an AI or a human, with
   handoff.
+- **Phase 5 - One-click install + game servers.** Install from the card with the
+  manifest's defaults; the Minecraft app with a native panel. Blocker to verify
+  end to end: a host with Docker running the image.
+
+## Game servers (Minecraft)
+
+An installed app is expected to feel native, the way a Home Assistant add-on
+does: Polaris components, Polaris navigation, no embedded foreign UI. The
+Minecraft app is the reference for that, and the shape any later game server
+follows.
+
+- **Install is one click.** The card installs on this server with the manifest's
+  defaults and opens the app. `Configure` is the same install with the server,
+  storage and settings exposed. The EULA is accepted by installing, which the
+  card says before the click rather than in a dialog after it.
+- **Control is RCON, over the container.** Every read and command runs
+  `rcon-cli` inside the running container through `RuntimePorts.runIn` - the seam
+  that already provisions databases - so it works on the local host (daemon) and
+  on a registered server (SSH) with nothing published on the network. The
+  password is minted per install (`generated` in the manifest) rather than left
+  to the image's random one, which a `docker exec` could not then use.
+- **The roster is read from the server's files.** `ops.json`, `whitelist.json`,
+  `banned-players.json` and `server.properties` are a schema; console text is
+  prose that changes between versions. Moderation still goes over RCON, so it
+  applies to the running game.
+- **Settings are the container's environment.** The image writes
+  server.properties from it at boot, so applying a setting is a redeploy - the
+  form says so, and says how many players it will disconnect.
+- **Mods and plugins are `MODRINTH_PROJECTS`.** The image installs what the list
+  names and removes what is taken off it, so the Mods screen edits that value
+  instead of pushing files into a running container. Search is proxied through
+  the web (`/api/apps/installed/[id]/minecraft/modrinth`) so the browser never
+  calls Modrinth directly.
+
+Panels the referenced projects have that this does not: world management,
+scheduled tasks/restarts, per-world game rules, a file manager of its own (Deploy
+already browses the container on local targets) and backups (the Backups app is
+the place for that, not a second implementation here).
 
 ## Reference repos (local, gitignored under `references/repos/`)
 

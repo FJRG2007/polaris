@@ -7,8 +7,8 @@
 
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/session";
-import { getInstalledApp } from "@/lib/apps/install-service";
 import { InstalledAppDashboard } from "./installed-app-dashboard";
+import { getInstalledApp, getInstalledAppSettings } from "@/lib/apps/install-service";
 
 export const dynamic = "force-dynamic";
 
@@ -17,5 +17,8 @@ export default async function InstalledAppPage({ params }: { params: Promise<{ i
     const { id } = await params;
     const app = await getInstalledApp(user.id, id);
     if (!app) notFound();
-    return <InstalledAppDashboard app={app} />;
+    // What the app was deployed with, so its panel can paint its settings without
+    // waiting on a request of its own.
+    const settings = await getInstalledAppSettings(user.id, id);
+    return <InstalledAppDashboard app={app} settings={settings} />;
 }

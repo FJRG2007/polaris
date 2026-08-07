@@ -8,10 +8,20 @@
  * logs; apps without one show the log directly.
  */
 
-import { useCallback, useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { useRuntimeLog } from "./use-runtime-log";
+import { MinecraftPanel } from "./minecraft-panel";
+import { LogViewer } from "@/components/log-viewer";
+import { MessagingBridgePanel } from "./messaging-bridge-panel";
+import type { InstalledAppDetail, InstalledAppSetting } from "@/lib/apps/install-service";
 import { ArrowLeft, ChevronDown, ChevronRight, Loader2, Play, RefreshCw, Square, Trash2 } from "lucide-react";
+import {
+    redeployInstalledAppAction,
+    setInstalledAppRunningAction,
+    uninstallInstalledAppAction
+} from "./actions";
 import {
     Badge,
     Button,
@@ -25,14 +35,6 @@ import {
     PageHeader,
     cn
 } from "@polaris/ui";
-import { LogViewer } from "@/components/log-viewer";
-import type { InstalledAppDetail } from "@/lib/apps/install-service";
-import { MessagingBridgePanel } from "./messaging-bridge-panel";
-import {
-    redeployInstalledAppAction,
-    setInstalledAppRunningAction,
-    uninstallInstalledAppAction
-} from "./actions";
 
 const STATUS_LABEL: Record<string, string> = {
     installing: "Installing",
@@ -41,40 +43,49 @@ const STATUS_LABEL: Record<string, string> = {
     failed: "Failed"
 };
 
-export function InstalledAppDashboard({ app }: { app: InstalledAppDetail }) {
+/**
+ * The adapted dashboard an app brings with it, by catalog id. An app without one
+ * falls back to the shell's own lifecycle controls and runtime log, which is what
+ * the shell renders around this either way. New apps are added here and nowhere
+ * else in the shell.
+ */
+function adaptedPanelFor(app: InstalledAppDetail, settings: InstalledAppSetting[], running: boolean) {
+    switch (app.catalogId) {
+        case "messaging-bridge":
+            return <MessagingBridgePanel />;
+        case "minecraft":
+            return (
+                <MinecraftPanel
+                    installedAppId={app.id}
+                    applicationId={app.applicationId}
+                    settings={settings}
+                    running={running}
+                />
+            );
+        default:
+            return null;
+    }
+}
+
+export function InstalledAppDashboard({
+    app,
+    settings
+}: {
+    app: InstalledAppDetail;
+    /** What the app was deployed with, for a panel that edits its settings. */
+    settings: InstalledAppSetting[];
+}) {
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [confirmingUninstall, setConfirmingUninstall] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [log, setLog] = useState("");
 
     const running = app.applicationStatus === "running";
     const applicationId = app.applicationId;
     // Apps with an adapted panel lead with it and fold the raw log away by default.
-    const adaptedPanel = app.catalogId === "messaging-bridge" ? <MessagingBridgePanel /> : null;
+    const adaptedPanel = adaptedPanelFor(app, settings, running);
     const [showLogs, setShowLogs] = useState(adaptedPanel === null);
-
-    const loadLog = useCallback(async () => {
-        if (!applicationId) return;
-        try {
-            const response = await fetch(`/api/deploy/apps/${applicationId}/logs?tail=500`, { cache: "no-store" });
-            if (!response.ok) return;
-            const data = (await response.json()) as { log?: string };
-            setLog(data.log ?? "");
-        } catch {
-            // Transient; the next poll retries.
-        }
-    }, [applicationId]);
-
-    // Poll the runtime log while the app is running and the log is visible, like the
-    // Deploy logs tab. Skipped when the log is collapsed so a healthy app is not
-    // polled for output nobody is looking at.
-    useEffect(() => {
-        if (!applicationId || !running || !showLogs) return;
-        void loadLog();
-        const timer = setInterval(loadLog, 4000);
-        return () => clearInterval(timer);
-    }, [applicationId, running, showLogs, loadLog]);
+    const { log, refresh: loadLog } = useRuntimeLog(applicationId, running && showLogs);
 
     function run(action: () => Promise<{ error?: string }>) {
         setError(null);

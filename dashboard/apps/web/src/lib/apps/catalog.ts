@@ -34,6 +34,12 @@ export type AppInstallMethod = "compose-template" | "builtin" | "integration";
  *  panels; `iframe` embeds the app's own UI. */
 export type AppDashboardKind = "builtin" | "generic" | "iframe";
 
+/** One choice of a settings field rendered as a select. */
+export interface TemplateEnvOption {
+    value: string;
+    label: string;
+}
+
 /** A single environment variable the install wizard collects or defaults. */
 export interface TemplateEnvVar {
     key: string;
@@ -43,6 +49,15 @@ export interface TemplateEnvVar {
     default?: string;
     secret?: boolean;
     required?: boolean;
+    /** When set, the value must be one of these and the form renders a select. */
+    options?: TemplateEnvOption[];
+    /** Minted at install time as a random secret (an app's own admin password),
+     *  never shown and never asked for. Implies `secret`. */
+    generated?: boolean;
+    /** Editable from the installed app's settings after the install. */
+    tunable?: boolean;
+    /** Groups tunables under a heading in the settings form. */
+    group?: string;
 }
 
 /** A volume the app needs. The install wizard offers the same choice as Deploy:
@@ -93,6 +108,9 @@ export interface AppManifest {
     dashboard: AppDashboardKind;
     /** Required when installMethod is "compose-template". */
     template?: AppComposeTemplate;
+    /** A licence the operator has to accept before the app may run (Minecraft's
+     *  EULA). Shown on the install button; installing is the acceptance. */
+    consent?: { label: string; url: string };
     /** Only one instance per Polaris (e.g. the messaging hub); the wizard then
      *  installs or opens the existing one instead of allowing duplicates. */
     singleton?: boolean;
@@ -136,11 +154,153 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         installMethod: "compose-template",
         capabilities: ["game-server"],
         dashboard: "builtin",
+        consent: { label: "Minecraft EULA", url: "https://www.minecraft.net/eula" },
         template: {
             image: "itzg/minecraft-server:latest",
             env: [
-                { key: "EULA", label: "Accept the Minecraft EULA", default: "TRUE", required: true },
-                { key: "MEMORY", label: "Memory", help: "JVM heap, e.g. 2G.", default: "2G" }
+                // Accepted by installing (the card says so); the image refuses to boot
+                // without it, so it is not a field anyone can usefully get wrong.
+                { key: "EULA", label: "Minecraft EULA", default: "TRUE", required: true },
+                // RCON is how the console, the player list and every moderation action
+                // reach the server. The image enables it and randomizes the password
+                // when unset - which a `docker exec rcon-cli` could then not use, so
+                // the install mints one and passes it as the container's own.
+                { key: "RCON_PASSWORD", label: "RCON password", generated: true },
+                {
+                    key: "TYPE",
+                    label: "Server software",
+                    help: "Paper runs plugins and is faster than vanilla. Fabric, Forge and NeoForge run mods.",
+                    default: "PAPER",
+                    options: [
+                        { value: "PAPER", label: "Paper" },
+                        { value: "PURPUR", label: "Purpur" },
+                        { value: "SPIGOT", label: "Spigot" },
+                        { value: "FABRIC", label: "Fabric" },
+                        { value: "FORGE", label: "Forge" },
+                        { value: "NEOFORGE", label: "NeoForge" },
+                        { value: "VANILLA", label: "Vanilla" }
+                    ],
+                    tunable: true,
+                    group: "Server"
+                },
+                {
+                    key: "VERSION",
+                    label: "Minecraft version",
+                    help: "LATEST tracks the newest release. Pin one (1.21.4) to keep clients and mods matched.",
+                    default: "LATEST",
+                    tunable: true,
+                    group: "Server"
+                },
+                {
+                    key: "MEMORY",
+                    label: "Memory",
+                    help: "JVM heap, e.g. 2G. Leave the machine at least a gigabyte for itself.",
+                    default: "2G",
+                    tunable: true,
+                    group: "Server"
+                },
+                {
+                    key: "MOTD",
+                    label: "Message of the day",
+                    help: "The line under the server name in the multiplayer list.",
+                    default: "A Minecraft server on Polaris",
+                    tunable: true,
+                    group: "World"
+                },
+                {
+                    key: "DIFFICULTY",
+                    label: "Difficulty",
+                    default: "easy",
+                    options: [
+                        { value: "peaceful", label: "Peaceful" },
+                        { value: "easy", label: "Easy" },
+                        { value: "normal", label: "Normal" },
+                        { value: "hard", label: "Hard" }
+                    ],
+                    tunable: true,
+                    group: "World"
+                },
+                {
+                    key: "MODE",
+                    label: "Game mode",
+                    default: "survival",
+                    options: [
+                        { value: "survival", label: "Survival" },
+                        { value: "creative", label: "Creative" },
+                        { value: "adventure", label: "Adventure" },
+                        { value: "spectator", label: "Spectator" }
+                    ],
+                    tunable: true,
+                    group: "World"
+                },
+                {
+                    key: "PVP",
+                    label: "Player versus player",
+                    default: "true",
+                    options: [
+                        { value: "true", label: "Allowed" },
+                        { value: "false", label: "Blocked" }
+                    ],
+                    tunable: true,
+                    group: "World"
+                },
+                {
+                    key: "SEED",
+                    label: "World seed",
+                    help: "Blank generates a random world. Only applies before the world is created.",
+                    tunable: true,
+                    group: "World"
+                },
+                {
+                    // The image installs what this lists when it boots, and removes
+                    // what is taken off it - so the Mods screen edits this one value
+                    // rather than pushing files into a running container.
+                    key: "MODRINTH_PROJECTS",
+                    label: "Mods and plugins",
+                    help: "Modrinth projects to install, comma separated. Managed from the Mods tab.",
+                    tunable: true,
+                    group: "Mods"
+                },
+                {
+                    key: "MODRINTH_DOWNLOAD_DEPENDENCIES",
+                    label: "Dependencies",
+                    help: "Whether a mod's own dependencies are installed with it.",
+                    default: "required",
+                    options: [
+                        { value: "required", label: "Required only" },
+                        { value: "optional", label: "Required and optional" },
+                        { value: "none", label: "None" }
+                    ],
+                    tunable: true,
+                    group: "Mods"
+                },
+                {
+                    key: "MAX_PLAYERS",
+                    label: "Player slots",
+                    default: "20",
+                    tunable: true,
+                    group: "Players"
+                },
+                {
+                    key: "VIEW_DISTANCE",
+                    label: "View distance",
+                    help: "Chunks sent to each player. Lower it if the server struggles.",
+                    default: "10",
+                    tunable: true,
+                    group: "Players"
+                },
+                {
+                    key: "ONLINE_MODE",
+                    label: "Mojang authentication",
+                    help: "Off lets cracked clients in, and anyone can claim any username.",
+                    default: "true",
+                    options: [
+                        { value: "true", label: "Required" },
+                        { value: "false", label: "Not required" }
+                    ],
+                    tunable: true,
+                    group: "Players"
+                }
             ],
             volumes: [{ name: "data", mountPath: "/data", label: "World data" }],
             ports: [{ container: 25565, protocol: "tcp", label: "Server port" }]
@@ -194,6 +354,30 @@ export function appHasCapability(app: AppManifest, capability: AppCapability): b
  *  Pure and client-safe, so the marketplace UI and the install service agree. */
 export function isInstallable(app: AppManifest): boolean {
     return !app.comingSoon && app.installMethod === "compose-template" && Boolean(app.template?.image);
+}
+
+/** The env vars an operator fills in: everything the manifest declares except the
+ *  ones the install mints itself and the ones installing already answers. */
+export function promptedEnvVars(app: AppManifest): readonly TemplateEnvVar[] {
+    return (app.template?.env ?? []).filter((field) => !field.generated && !isConsentField(app, field));
+}
+
+/** The env vars an installed app exposes as settings, in manifest order. */
+export function tunableEnvVars(app: AppManifest): readonly TemplateEnvVar[] {
+    return (app.template?.env ?? []).filter((field) => field.tunable);
+}
+
+/** Whether a value is one the manifest allows for this field. A field with
+ *  options accepts only those; everything else is bounded free text. */
+export function isAllowedEnvValue(field: TemplateEnvVar, value: string): boolean {
+    if (field.required && value.trim().length === 0) return false;
+    if (field.options) return field.options.some((option) => option.value === value);
+    return value.length <= 4096;
+}
+
+/** The consent checkbox stands in for this field, so the form never asks for it. */
+function isConsentField(app: AppManifest, field: TemplateEnvVar): boolean {
+    return Boolean(app.consent) && field.key === "EULA";
 }
 
 const CATEGORY_ORDER: readonly AppCategory[] = ["Messaging", "AI", "Game servers", "Tools"];

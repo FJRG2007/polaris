@@ -6,19 +6,20 @@
  * built, deployed and managed by the same engine as any deployed app.
  */
 
+import { prisma } from "@polaris/db";
 import { randomBytes } from "node:crypto";
 import { loadEnv } from "@polaris/config";
-import { prisma } from "@polaris/db";
-import { encryptSecret } from "@polaris/storage";
-import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
+import { slugify } from "@polaris/deploy";
 import { listHosts } from "@/lib/host-service";
-import { createApplication, createProject, deleteApplication, deployApplication } from "@/lib/deploy-service";
-import { createVolume } from "@/lib/deploy-volume-service";
-import { setEnvVars } from "@/lib/env-var-service";
+import { encryptSecret } from "@polaris/storage";
 import { appBaseUrl } from "@/lib/domain-service";
-import { invalidateBridgeCache } from "@/lib/messaging/bridge-endpoint";
-import { appHasCapability, findApp, isInstallable } from "@/lib/apps/catalog";
+import { createVolume } from "@/lib/deploy-volume-service";
+import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import type { AppInstallInput } from "@/lib/apps/install-schema";
+import { invalidateBridgeCache } from "@/lib/messaging/bridge-endpoint";
+import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
+import { createApplication, createProject, deleteApplication, deployApplication } from "@/lib/deploy-service";
+import { appHasCapability, findApp, isAllowedEnvValue, isInstallable, tunableEnvVars } from "@/lib/apps/catalog";
 
 /** All marketplace installs live under one project per owner, so the Deploy
  *  canvas stays uncluttered and the apps share a default environment. */
@@ -32,6 +33,22 @@ export interface InstalledAppView {
     applicationId: string | null;
     targetId: string | null;
     createdAt: string;
+}
+
+/** A name no service in this environment is using yet, numbering repeats the way
+ *  a file manager does ("Minecraft server 2"). */
+async function availableInstanceName(environmentId: string, wanted: string): Promise<string> {
+    // Compared as slugs, because that is what the database holds unique - two
+    // names that read differently can still be the same service.
+    const taken = new Set(
+        (await prisma.application.findMany({ where: { environmentId }, select: { slug: true } })).map((row) => row.slug)
+    );
+    if (!taken.has(slugify(wanted))) return wanted;
+    for (let suffix = 2; suffix < 100; suffix += 1) {
+        const candidate = `${wanted} ${suffix}`;
+        if (!taken.has(slugify(candidate))) return candidate;
+    }
+    throw new Error("Too many installs of this app - rename one first");
 }
 
 /** The owner's Marketplace environment id, creating the project on first use. */
@@ -88,10 +105,14 @@ export async function installApp(
 
     const environmentId = await ensureMarketplaceEnvironment(ownerId);
     const primaryPort = template.ports?.[0]?.container;
+    // One-click installs all arrive under the app's own name, and a service's slug
+    // is unique within its environment - so the second one is numbered rather than
+    // rejected with a database error nobody outside Polaris can read.
+    const name = await availableInstanceName(environmentId, input.name);
     const application = await createApplication(ownerId, {
         environmentId,
         targetId: target.id,
-        name: input.name,
+        name,
         sourceType: "image",
         sourceConfig: {
             imageRef: image,
@@ -109,7 +130,16 @@ export async function installApp(
     }
     for (const entry of input.env) {
         const declared = template.env?.find((item) => item.key === entry.key);
-        envByKey.set(entry.key, { value: entry.value, isSecret: Boolean(declared?.secret) });
+        // A value the form should never have sent (an unknown key, or one outside a
+        // field's declared options) is dropped rather than trusted: the manifest is
+        // the contract, and the client is not the one that enforces it.
+        if (!declared || declared.generated || !isAllowedEnvValue(declared, entry.value)) continue;
+        envByKey.set(entry.key, { value: entry.value, isSecret: Boolean(declared.secret) });
+    }
+    // Generated vars are the app's own credentials (Minecraft's RCON password): minted
+    // here so nobody is asked for them and no app ships a default one.
+    for (const declared of template.env ?? []) {
+        if (declared.generated) envByKey.set(declared.key, { value: randomBytes(24).toString("hex"), isSecret: true });
     }
     // Hub wiring: the bridge reads these at startup (see services/messaging-bridge).
     // WEB_INGEST_URL defaults to the public app URL; a locally-installed hub has it
@@ -150,7 +180,7 @@ export async function installApp(
         data: {
             catalogId: app.id,
             ownerId,
-            name: input.name,
+            name,
             targetId: target.id,
             applicationId: application.id,
             status: "installing",
@@ -232,6 +262,43 @@ export async function getInstalledApp(ownerId: string, id: string): Promise<Inst
         applicationStatus: application?.desiredState ?? null,
         serverName: target?.name ?? null
     };
+}
+
+/** One settings field of an installed app: what the manifest declares, filled in
+ *  with what this install is actually running on. */
+export interface InstalledAppSetting {
+    key: string;
+    label: string;
+    help?: string;
+    group?: string;
+    value: string;
+    options?: Array<{ value: string; label: string }>;
+}
+
+/**
+ * The settings an installed app exposes, in manifest order. The value is the one
+ * the container was deployed with, falling back to the manifest default for a
+ * variable that was never set - which is what the app is running on either way,
+ * since the image applies the same default.
+ */
+export async function getInstalledAppSettings(ownerId: string, id: string): Promise<InstalledAppSetting[]> {
+    const row = await prisma.installedApp.findFirst({ where: { id, ownerId } });
+    if (!row) return [];
+    const manifest = findApp(row.catalogId);
+    if (!manifest) return [];
+    const fields = tunableEnvVars(manifest);
+    if (fields.length === 0 || !row.applicationId) return [];
+    const stored = new Map(
+        (await listEnvVars("application", row.applicationId, ownerId)).map((item) => [item.key, item.value])
+    );
+    return fields.map((field) => ({
+        key: field.key,
+        label: field.label,
+        ...(field.help ? { help: field.help } : {}),
+        ...(field.group ? { group: field.group } : {}),
+        value: stored.get(field.key) ?? field.default ?? "",
+        ...(field.options ? { options: [...field.options] } : {})
+    }));
 }
 
 /** Remove an installed app: tear down its Deploy application (best effort, it may

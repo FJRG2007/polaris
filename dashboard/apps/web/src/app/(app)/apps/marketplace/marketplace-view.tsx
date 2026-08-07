@@ -8,10 +8,28 @@
  * calls the deploy.manage-gated install action.
  */
 
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { appInstallInputSchema } from "@/lib/apps/install-schema";
+import { defaultInstallInput } from "@/lib/apps/install-defaults";
+import type { InstalledAppView } from "@/lib/apps/install-service";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import {
+    appsByCategory,
+    findApp,
+    isInstallable,
+    promptedEnvVars,
+    type AppCapability,
+    type AppManifest
+} from "@/lib/apps/catalog";
+import {
+    installAppAction,
+    listInstallTargetsAction,
+    listStorageConnectionsAction,
+    type InstallTarget,
+    type StorageConnectionOption
+} from "./actions";
 import {
     Badge,
     Button,
@@ -27,16 +45,6 @@ import {
     Select,
     cn
 } from "@polaris/ui";
-import { appsByCategory, findApp, isInstallable, type AppCapability, type AppManifest } from "@/lib/apps/catalog";
-import { appInstallInputSchema } from "@/lib/apps/install-schema";
-import {
-    installAppAction,
-    listInstallTargetsAction,
-    listStorageConnectionsAction,
-    type InstallTarget,
-    type StorageConnectionOption
-} from "./actions";
-import type { InstalledAppView } from "@/lib/apps/install-service";
 
 const CAPABILITY_LABEL: Record<AppCapability, string> = {
     "messaging-hub": "Messaging",
@@ -54,8 +62,35 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export function MarketplaceView({ installed }: { installed: InstalledAppView[] }) {
+    const router = useRouter();
     const [wizardApp, setWizardApp] = useState<AppManifest | null>(null);
+    const [installingId, setInstallingId] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
     const groups = appsByCategory();
+
+    /**
+     * One click installs the app the way its manifest describes it: on this
+     * server, with its own defaults, and it opens on the app afterwards. Anyone
+     * who wants a different server or NAS-backed storage has Configure, which is
+     * the same install with the choices exposed.
+     */
+    function install(app: AppManifest): void {
+        setError(null);
+        setInstallingId(app.id);
+        void installAppAction(defaultInstallInput(app))
+            .then((result) => {
+                if (result.error || !result.installedAppId) {
+                    setError(result.error ?? "Could not install the app");
+                    setInstallingId(null);
+                    return;
+                }
+                router.push(`/apps/installed/${result.installedAppId}`);
+            })
+            .catch(() => {
+                setError("Could not install the app");
+                setInstallingId(null);
+            });
+    }
 
     const installedByCatalog = useMemo(() => {
         const map = new Map<string, number>();
@@ -63,12 +98,19 @@ export function MarketplaceView({ installed }: { installed: InstalledAppView[] }
         return map;
     }, [installed]);
 
+    // An app that only runs once per Polaris opens instead of offering a second
+    // install that the server would refuse.
+    const singletonInstall = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const item of installed) if (!map.has(item.catalogId)) map.set(item.catalogId, item.id);
+        return map;
+    }, [installed]);
+
     return (
         <div className="flex flex-col gap-6">
-            <PageHeader
-                title="Marketplace"
-                description="Install and run apps on your servers in a few clicks."
-            />
+            <PageHeader title="Marketplace" description="Install and run apps on your servers in one click." />
+
+            {error && <p className="text-sm text-danger">{error}</p>}
 
             {installed.length > 0 && <InstalledSection installed={installed} />}
 
@@ -81,7 +123,15 @@ export function MarketplaceView({ installed }: { installed: InstalledAppView[] }
                                 key={app.id}
                                 app={app}
                                 installedCount={installedByCatalog.get(app.id) ?? 0}
-                                onInstall={() => setWizardApp(app)}
+                                openHref={
+                                    app.singleton && singletonInstall.has(app.id)
+                                        ? `/apps/installed/${singletonInstall.get(app.id)}`
+                                        : null
+                                }
+                                installing={installingId === app.id}
+                                disabled={installingId !== null}
+                                onInstall={() => install(app)}
+                                onConfigure={() => setWizardApp(app)}
                             />
                         ))}
                     </div>
@@ -135,11 +185,22 @@ function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
 function AppCard({
     app,
     installedCount,
-    onInstall
+    openHref,
+    installing,
+    disabled,
+    onInstall,
+    onConfigure
 }: {
     app: AppManifest;
     installedCount: number;
+    /** Where its one instance lives, for an app that only runs once. */
+    openHref: string | null;
+    installing: boolean;
+    /** Another install is running; one at a time keeps the target's deploy queue
+     *  and this page's feedback honest. */
+    disabled: boolean;
     onInstall: () => void;
+    onConfigure: () => void;
 }) {
     const Icon = app.icon;
     const installable = isInstallable(app);
@@ -161,16 +222,48 @@ function AppCard({
                         <Badge key={capability}>{CAPABILITY_LABEL[capability]}</Badge>
                     ))}
                 </div>
-                <div className="mt-auto flex items-center justify-between pt-1">
+                {app.consent && (
+                    <p className="text-xs text-muted-foreground">
+                        Installing accepts the{" "}
+                        <a
+                            href={app.consent.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline underline-offset-2 hover:text-foreground"
+                        >
+                            {app.consent.label}
+                        </a>
+                        .
+                    </p>
+                )}
+                <div className="mt-auto flex items-center justify-between gap-2 pt-1">
                     {installedCount > 0 ? (
                         <span className="text-xs text-muted-foreground">{installedCount} installed</span>
                     ) : (
                         <span />
                     )}
-                    {installable ? (
-                        <Button size="sm" onClick={onInstall}>
-                            Install
-                        </Button>
+                    {openHref ? (
+                        <Link href={openHref}>
+                            <Button size="sm" variant="secondary">
+                                Open
+                            </Button>
+                        </Link>
+                    ) : installable ? (
+                        <div className="flex items-center gap-1">
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={onConfigure}
+                                disabled={disabled}
+                                title="Choose the server, storage and settings first"
+                            >
+                                Configure
+                            </Button>
+                            <Button size="sm" onClick={onInstall} disabled={disabled}>
+                                {installing && <Loader2 className="size-4 animate-spin" />}
+                                {installing ? "Installing" : "Install"}
+                            </Button>
+                        </div>
                     ) : (
                         <Badge className="text-muted-foreground">Coming soon</Badge>
                     )}
@@ -185,7 +278,9 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
     const [pending, startTransition] = useTransition();
     const template = app.template;
     const volumes = template?.volumes ?? [];
-    const envFields = template?.env ?? [];
+    // Only what an operator answers: the generated credentials and the licence the
+    // install itself accepts are not fields.
+    const envFields = promptedEnvVars(app);
 
     const [name, setName] = useState(app.name);
     const [serverId, setServerId] = useState("");
@@ -237,12 +332,13 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
         }
         startTransition(async () => {
             const result = await installAppAction(parsed.data);
-            if (result.error) {
-                setError(result.error);
+            if (result.error || !result.installedAppId) {
+                setError(result.error ?? "Could not install the app");
                 return;
             }
-            router.refresh();
-            onClose();
+            // Land on the app that was just installed, the way installing from the
+            // card does - it is deploying, and its page is where that is visible.
+            router.push(`/apps/installed/${result.installedAppId}`);
         });
     }
 
@@ -327,13 +423,23 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
                             {envFields.map((field) => (
                                 <label key={field.key} className="flex flex-col gap-1 text-sm">
                                     <span>{field.label}</span>
-                                    <Input
-                                        type={field.secret ? "password" : "text"}
-                                        value={env[field.key] ?? ""}
-                                        onChange={(event) =>
-                                            setEnv((current) => ({ ...current, [field.key]: event.target.value }))
-                                        }
-                                    />
+                                    {field.options ? (
+                                        <Select
+                                            value={env[field.key] ?? field.default ?? ""}
+                                            onValueChange={(value) =>
+                                                setEnv((current) => ({ ...current, [field.key]: value }))
+                                            }
+                                            options={field.options}
+                                        />
+                                    ) : (
+                                        <Input
+                                            type={field.secret ? "password" : "text"}
+                                            value={env[field.key] ?? ""}
+                                            onChange={(event) =>
+                                                setEnv((current) => ({ ...current, [field.key]: event.target.value }))
+                                            }
+                                        />
+                                    )}
                                     {field.help && <span className="text-xs text-muted-foreground">{field.help}</span>}
                                 </label>
                             ))}
@@ -341,6 +447,21 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
                     )}
 
                     {error && <p className="text-sm text-danger">{error}</p>}
+
+                    {app.consent && (
+                        <p className="text-xs text-muted-foreground">
+                            Installing accepts the{" "}
+                            <a
+                                href={app.consent.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline underline-offset-2 hover:text-foreground"
+                            >
+                                {app.consent.label}
+                            </a>
+                            .
+                        </p>
+                    )}
 
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
