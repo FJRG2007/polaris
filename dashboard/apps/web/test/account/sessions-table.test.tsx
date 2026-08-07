@@ -113,6 +113,32 @@ describe("the session table", () => {
         expect(render([session({ browser: "Chrome" })])).toContain("#4285F4");
     });
 
+    // The system column was reading as a generic monitor for every Windows row,
+    // which is most of them - the mark that says "this one is my PC" was the one
+    // client logo missing.
+    it("draws the system's own mark, Windows included", () => {
+        expect(render([session({ os: "Windows" })])).toContain("#0078D4");
+        expect(render([session({ os: "macOS" })])).toContain("M12.152 6.896");
+    });
+
+    it("draws Edge's own mark rather than the neutral globe", () => {
+        expect(render([session({ browser: "Edge" })])).toContain("#0c59a4");
+    });
+
+    // Edge is painted with gradients, and a gradient is reached through an id.
+    // The table draws the browser's mark twice per row - once leading the row,
+    // once in the App column - so a fixed id would repeat several times over,
+    // which is markup a browser is entitled to resolve either way.
+    it("gives every Edge mark its own gradient ids", () => {
+        const markup = render([
+            session({ id: "session-1", browser: "Edge" }),
+            session({ id: "session-2", browser: "Edge" })
+        ]);
+        const ids = markup.match(/id="edge-base-[^"]+"/g) ?? [];
+        expect(ids.length).toBeGreaterThan(1);
+        expect(new Set(ids).size).toBe(ids.length);
+    });
+
     it("keeps two sessions on the same machine apart by the address each was opened on", () => {
         const markup = render([
             session({ id: "session-1", host: "polaris.local" }),
