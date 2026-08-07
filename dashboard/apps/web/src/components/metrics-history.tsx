@@ -7,10 +7,12 @@
  * window; this component only picks the range, fetches, and draws.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { Button, TimeSeriesChart, cn, type GaugeTone, type TimePoint } from "@polaris/ui";
+import { formatBytes } from "@polaris/core";
 import { useDisplayFormat } from "@/components/display-format";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
+import { Button, TimeSeriesChart, cn, type GaugeTone, type TimePoint } from "@polaris/ui";
 import { LIVE_INTERVAL_MS, RANGE_ORDER, RANGE_PRESETS, type RangePreset } from "@/lib/metrics-shared";
 
 /** One series returned by the history endpoint. Percentages are derived here. */
@@ -50,6 +52,21 @@ function queryFor(window: Window): string {
     return `from=${window.from}&to=${window.to}`;
 }
 
+/** How long a kept window is still worth painting while the fresh one is fetched.
+ *
+ *  A custom window is pinned to two absolute instants, so what was drawn in it is
+ *  what would be drawn in it now - it only expires because a day-old copy of
+ *  anything is no longer worth the storage. A preset window slides with the
+ *  clock: kept long enough, its points fall off the left of the axis they would be
+ *  drawn against, and a chart of data that is all off-screen reads as a chart with
+ *  no data. A quarter of the span is the point at which what is kept still fills
+ *  most of it. */
+const KEPT_MAX_AGE_MS = 24 * 3_600_000;
+
+function keptWindowLimit(window: Window): number {
+    return window.kind === "custom" ? KEPT_MAX_AGE_MS : Math.min(KEPT_MAX_AGE_MS, RANGE_PRESETS[window.preset] / 4);
+}
+
 /** "YYYY-MM-DDTHH:mm" in local time, for a datetime-local input default. */
 function toLocalInput(ms: number): string {
     const date = new Date(ms);
@@ -81,6 +98,10 @@ export function MetricsHistory<T extends { t: number } = Point>({
         return { from: fetchedAt - RANGE_PRESETS[window.preset], to: fetchedAt };
     }, [window, fetchedAt]);
 
+    // One key per subject and window, so switching range or opening a different
+    // subject reads back that combination rather than the last one drawn.
+    const keptKey = `metrics.${endpoint}.${queryFor(window)}`;
+
     /** One fetch. `quiet` refreshes in place: a periodic tick must not blank the
      *  charts into a loading state every time it runs. */
     const load = useCallback(
@@ -92,8 +113,10 @@ export function MetricsHistory<T extends { t: number } = Point>({
             void fetch(`${endpoint}${separator}${queryFor(window)}`, { cache: "no-store", signal: controller.signal })
                 .then((res) => (res.ok ? res.json() : null))
                 .then((body) => {
-                    setPoints(body?.points ?? []);
+                    const fetched = (body?.points ?? []) as T[];
+                    setPoints(fetched);
                     setFetchedAt(at);
+                    writeSnapshot(keptKey, fetched);
                 })
                 .catch(() => undefined)
                 .finally(() => {
@@ -101,10 +124,34 @@ export function MetricsHistory<T extends { t: number } = Point>({
                 });
             return () => controller.abort();
         },
-        [endpoint, window]
+        [endpoint, window, keptKey]
     );
 
-    useEffect(() => load(), [load]);
+    /**
+     * Draw the window as it was last seen, then fetch it again.
+     *
+     * A history chart is a database read behind a network round trip, and until it
+     * lands there is nothing to draw - which is why every one of these used to
+     * open as an empty frame with a spinner in the corner. The last answer for
+     * this exact subject and range is kept in the tab, so a revisit, a range the
+     * operator has already been on, or a second panel showing the same subject
+     * paints the shape immediately and the fetch behind it only moves the line.
+     *
+     * The axis is set back to when the kept points were taken, not to now: drawing
+     * an hour-old window against this instant's axis would shift every point off
+     * its own timestamp, and the fetch that follows puts both right together.
+     */
+    useEffect(() => {
+        const kept = readSnapshot<T[]>(keptKey, keptWindowLimit(window));
+        if (kept) {
+            setPoints(kept.value);
+            setFetchedAt(kept.at);
+            setLoading(false);
+        } else {
+            setPoints(null);
+        }
+        return load(kept !== null);
+    }, [keptKey, window, load]);
 
     /**
      * Keep the window current without a reload. A live window is re-fetched on a
@@ -272,3 +319,30 @@ export function ratioPercent(used: number | null, total: number | null): number 
     if (used == null || total == null || total <= 0) return null;
     return (used / total) * 100;
 }
+
+/**
+ * CPU and memory, as every screen that charts consumption shows them.
+ *
+ * Memory is charted in bytes rather than as a share, with the share on hover:
+ * against a host's total, a container using a few hundred megabytes is a flat zero
+ * line, which reads as "nothing running" instead of "not much". A server and a
+ * service are measured differently but presented identically on purpose - the
+ * question is the same one, and two shapes for it would only invite comparing a
+ * percentage against a byte count.
+ */
+export const CONSUMPTION_METRICS: MetricSpec[] = [
+    { key: "cpu", label: "CPU", value: (point) => point.cpuPercent, format: percent, tone: "primary", max: 100 },
+    {
+        key: "mem",
+        label: "Memory",
+        value: (point) => point.memUsedBytes,
+        describe: (point) => {
+            const share = ratioPercent(point.memUsedBytes, point.memTotalBytes);
+            return share === null || point.memTotalBytes === null
+                ? null
+                : `${percent(share)} of ${formatBytes(point.memTotalBytes)}`;
+        },
+        format: formatBytes,
+        tone: "success"
+    }
+];

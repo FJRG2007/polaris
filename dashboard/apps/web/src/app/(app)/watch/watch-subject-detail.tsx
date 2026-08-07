@@ -16,35 +16,7 @@ import type { AlarmView } from "@/lib/watch-service";
 import { ArrowLeft, Bell, ExternalLink } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
 import { ProjectWebhooks } from "@/components/project-webhooks";
-import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/components/metrics-history";
-
-function formatBytes(bytes: number): string {
-    const units = ["B", "KB", "MB", "GB", "TB"];
-    let value = bytes;
-    let unit = 0;
-    while (value >= 1024 && unit < units.length - 1) {
-        value /= 1024;
-        unit += 1;
-    }
-    return `${unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
-}
-
-const CONSUMPTION: MetricSpec[] = [
-    { key: "cpu", label: "CPU", value: (point) => point.cpuPercent, format: percent, tone: "primary", max: 100 },
-    {
-        key: "mem",
-        label: "Memory",
-        value: (point) => point.memUsedBytes,
-        describe: (point) => {
-            const share = ratioPercent(point.memUsedBytes, point.memTotalBytes);
-            return share === null || point.memTotalBytes === null
-                ? null
-                : `${percent(share)} of ${formatBytes(point.memTotalBytes)}`;
-        },
-        format: formatBytes,
-        tone: "success"
-    }
-];
+import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
 
 const STATE_LABEL: Record<string, string> = { ok: "OK", alarm: "Alarm", insufficient: "No data" };
 
@@ -122,7 +94,7 @@ export function WatchSubjectDetail({
 
             {tab === "metrics" && (
                 <div className="flex flex-col gap-2">
-                    <MetricsHistory endpoint={endpoint} metrics={CONSUMPTION} />
+                    <MetricsHistory endpoint={endpoint} metrics={CONSUMPTION_METRICS} />
                     <p className="text-xs text-muted-foreground">
                         {kind === "server"
                             ? "Measured from the containers running on this server, against what the machine has."
