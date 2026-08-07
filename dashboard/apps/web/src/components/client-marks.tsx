@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * The browser and operating-system marks a session list draws beside its rows.
  *
