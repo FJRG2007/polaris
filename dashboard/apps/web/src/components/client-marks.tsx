@@ -7,14 +7,24 @@
  * kept here rather than in `brand-icons.tsx` because that file is imported by
  * screens that have no business paying for a compass rose they never draw.
  *
- * Most come from Simple Icons, which no longer carries Microsoft's; Windows and
- * Edge are taken from the SVG Logos set instead, which is why those two are
- * drawn on the 256 grid their source uses rather than the 24 of the rest. A
- * viewBox is intrinsic, so they size the same on screen.
+ * Most come from Simple Icons, which no longer carries Microsoft's: Microsoft
+ * asked for its brands to be pulled, so that set may not redistribute them.
+ * Taking Windows and Edge from SVG Logos instead does not answer that, and is
+ * not offered as one - a CC0 licence waives the collection author's copyright,
+ * never Microsoft's trademark. The two are drawn on the narrower ground a
+ * trademark leaves open: the vendor's own mark, unaltered and uncoloured by us,
+ * at label size and beside that platform's name, saying which platform a session
+ * ran on and claiming nothing else. If Microsoft ever asks otherwise, the answer
+ * is the neutral glyph below rather than an approximation. Those two keep the
+ * 256 grid their source uses rather than the 24 of the rest; a viewBox is
+ * intrinsic, so they size the same on screen.
  *
- * Samsung Internet is the one client with no mark and will not get one: Samsung
- * publishes a wordmark rather than an icon, and a wordmark at 16px is a smudge.
- * That row gets the neutral glyph and its name in text, which is honest - an
+ * Several clients keep the neutral glyph on purpose. Samsung publishes a
+ * wordmark rather than an icon, and a wordmark at 16px is a smudge; ChromeOS has
+ * no official standalone mark in any registry checked; and a user-agent that
+ * names neither its browser nor its system leaves `describeClient` with
+ * "Browser", "Unknown browser" or "Unknown OS", which nothing can be drawn for.
+ * Those rows get the glyph and their name in text, which is honest - an
  * approximated logo would be a claim about a trademark nobody made.
  */
 
@@ -82,12 +92,13 @@ export function VivaldiMark(props: SVGProps<SVGSVGElement>) {
  * Edge's official mark. It is the one client logo built out of gradients rather
  * than flat fills, so its `<defs>` carry ids - and a table draws this mark once
  * per row, which would put the same id in the document several times over. The
- * ids are therefore namespaced per instance; the colons React puts in an id are
- * dropped because a `url(#...)` reference is read as a fragment, and one that
- * looks like a scheme separator is asking for trouble in a debugger.
+ * ids are therefore namespaced per instance, with `useId` reduced to characters
+ * a fragment can carry: what React wraps a generated id in is its own business
+ * and has already been colons, guillemets and underscores across releases, none
+ * of which belong in the `url(#...)` these gradients are reached through.
  */
 export function EdgeMark(props: SVGProps<SVGSVGElement>) {
-    const id = useId().replace(/:/g, "");
+    const id = useId().replace(/[^a-zA-Z0-9_-]/g, "");
     const base = `edge-base-${id}`;
     const wave = `edge-wave-${id}`;
     const sky = `edge-sky-${id}`;

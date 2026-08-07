@@ -139,6 +139,15 @@ describe("the session table", () => {
         expect(new Set(ids).size).toBe(ids.length);
     });
 
+    // Those ids are reached through `url(#...)`, which is read as a fragment.
+    // React has wrapped a generated id in colons, in guillemets and in
+    // underscores across releases, so the mark keeps none of them.
+    it("keeps Edge's gradient ids to characters a fragment reference can carry", () => {
+        const ids = render([session({ browser: "Edge" })]).match(/id="edge-[^"]+"/g) ?? [];
+        expect(ids.length).toBeGreaterThan(0);
+        for (const id of ids) expect(id).toMatch(/^id="edge-[a-zA-Z0-9_-]+"$/);
+    });
+
     it("keeps two sessions on the same machine apart by the address each was opened on", () => {
         const markup = render([
             session({ id: "session-1", host: "polaris.local" }),
