@@ -77,6 +77,29 @@ describe("describeClient", () => {
         expect(describeClient(CHROME_WINDOWS, brands).browser).toBe("Chrome");
     });
 
+    // Both of the brands that carry their vendor: the user-agent path reads them
+    // as Chrome and Edge, so the hints path has to agree. A browser named one way
+    // with hints and another without is one machine appearing as two, and anything
+    // keyed on the name - the brand mark beside a session row, a filter - misses
+    // whichever half it was not written for.
+    it("names a vendor-prefixed brand the way its own user-agent does", () => {
+        const edge = '"Not_A Brand";v="24", "Chromium";v="131", "Microsoft Edge";v="131"';
+        expect(describeClient(CHROME_WINDOWS, edge)).toMatchObject({
+            browser: "Edge",
+            browserVersion: "131",
+            label: "Edge on Windows"
+        });
+        const edgeUserAgent = `${CHROME_WINDOWS} Edg/131.0.0.0`;
+        expect(describeClient(edgeUserAgent).browser).toBe(describeClient(edgeUserAgent, edge).browser);
+    });
+
+    // The lookup is keyed by header text, so it is asked about whatever a caller
+    // sends. A plain object would answer this off Object.prototype.
+    it("does not answer a brand named after something on the prototype", () => {
+        expect(describeClient(CHROME_WINDOWS, '"constructor";v="1"').browser).toBe("constructor");
+        expect(describeClient(CHROME_WINDOWS, '"toString";v="1"').browser).toBe("toString");
+    });
+
     it("falls back to the user-agent when the hints name nothing real", () => {
         expect(describeClient(FIREFOX_LINUX, '"Not_A Brand";v="24"').browser).toBe("Firefox");
     });

@@ -41,6 +41,26 @@ const UNNAMED_BRAND = /^chromium$|not.?a.?brand/i;
 const MAX_BRANDS = 256;
 
 /**
+ * The brands that announce themselves with the vendor attached, against the name
+ * everyone else uses for them.
+ *
+ * The user-agent path already yields the short name for both of these - `Edg/`
+ * reads as Edge, `Chrome/` as Chrome - so without this the same browser is named
+ * one way when it sent hints and another when it did not. That is the split this
+ * module exists to close: one laptop has to read the same way in every list, and
+ * anything keyed on the name (a brand mark, a filter) silently misses the half
+ * that came in through the other path.
+ *
+ * A Map rather than an object literal because the key here is header text: a
+ * plain object would answer a lookup for `constructor` or `toString` with
+ * something off the prototype, and hand back a browser name nobody sent.
+ */
+const VENDOR_PREFIXED = new Map([
+    ["Google Chrome", "Chrome"],
+    ["Microsoft Edge", "Edge"]
+]);
+
+/**
  * The browser named by a `sec-ch-ua` value, or null when it names none.
  *
  * The header is a comma-separated list of `"Brand";v="version"`, so the version
@@ -57,8 +77,7 @@ function brandFromHints(brands: string | null | undefined): { name: string; vers
         // Taken from the header at large it would be whichever brand came first,
         // which on a Chromium is the padding entry's made-up number.
         const version = entry.match(/v="(\d{1,4})/)?.[1] ?? null;
-        // Chrome is the only one that brands itself with the vendor attached.
-        return { name: name === "Google Chrome" ? "Chrome" : name, version };
+        return { name: VENDOR_PREFIXED.get(name) ?? name, version };
     }
     return null;
 }
