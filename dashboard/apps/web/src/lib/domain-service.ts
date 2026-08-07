@@ -12,6 +12,7 @@
 
 import { loadEnv } from "@polaris/config";
 import { getSetting, setSetting } from "./setting-store";
+import { getHostLanIp, isLanAddress } from "./host-address";
 import { getPolarisPublicUrl } from "./polaris-tunnel-service";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { polarisZoneHost, zoneReachable } from "./domain-zones";
@@ -25,7 +26,10 @@ const KEYS = {
     duckSub: "domain.duckdns.subdomain",
     duckToken: "domain.duckdns.token",
     deployBase: "domain.deploy.base",
-    publicIp: "domain.publicIp"
+    publicIp: "domain.publicIp",
+    // Set only when the address came from a person rather than from detection, so
+    // live detection can correct a stale detected one without overwriting a choice.
+    publicIpManual: "domain.publicIp.manual"
 } as const;
 
 /** Non-secret domain config for the admin panel. */
@@ -149,14 +153,29 @@ export async function deployBase(): Promise<string> {
 }
 
 /**
- * The public IP used to build free subdomains. Resolution order: the admin/
- * onboarding-set value, then the `POLARIS_PUBLIC_IP` env var (a deterministic,
- * zero-click default for self-hosters - e.g. the LAN IP the box answers on), so
- * free subdomains work out of the box without depending on request-time header
- * detection (which Docker's NAT can mask).
+ * The public IP used to build free subdomains and to reach this server directly.
+ *
+ * Resolution order: an address the operator set themselves, then the one the mDNS
+ * responder detects on the host right now, then the value detected once at install,
+ * then the `POLARIS_PUBLIC_IP` env var - so free subdomains and the direct IP links
+ * work out of the box without depending on request-time header detection (which
+ * Docker's NAT can mask).
+ *
+ * Live detection sits above the stored value because the stored one is written once
+ * and never revisited: it came from a request header, on whichever interface that
+ * request arrived on, and a DHCP lease that moves or a wireless NIC that answered
+ * that day leaves it naming an address the box no longer has. It only overrides a
+ * stored address that is itself a LAN one - an operator who deliberately recorded
+ * this server's WAN address keeps it, since the responder only ever reports a
+ * private one and would otherwise quietly replace it.
  */
 export async function getPublicIp(): Promise<string | null> {
-    const stored = await getSetting(KEYS.publicIp);
+    const [stored, manual] = await Promise.all([getSetting(KEYS.publicIp), getSetting(KEYS.publicIpManual)]);
+    if (stored && manual === "1") return stored;
+    if (!stored || isLanAddress(stored)) {
+        const detected = await getHostLanIp();
+        if (detected) return detected;
+    }
     if (stored) return stored;
     const env = (process.env.POLARIS_PUBLIC_IP ?? "").trim().replace(/:\d+$/, "");
     return isRoutableIpv4(env) ? env : null;
@@ -175,7 +194,9 @@ function isRoutableIpv4(value: string): boolean {
  * Auto-fill the free-subdomain public IP from a detected server address the first
  * time (Caddy sets `X-Server-Ip` to the connection's local host, e.g. 192.168.1.138,
  * even when reached by hostname), so free subdomains work with zero setup - the way
- * Dokploy/Coolify do. A manually configured IP is never overwritten.
+ * Dokploy/Coolify do. An address already recorded is never overwritten; a detected
+ * one written here does not outrank what the responder sees on the host today, so a
+ * value that goes stale is corrected by `getPublicIp` rather than left to rot.
  */
 export async function ensurePublicIp(candidate: string | null | undefined): Promise<void> {
     if (!candidate) return;
@@ -293,7 +314,14 @@ export async function setDomainConfig(input: {
     if (input.sharingDomain !== undefined) await setSetting(KEYS.sharing, input.sharingDomain.trim() || null);
     if (input.duckdnsSubdomain !== undefined) await setSetting(KEYS.duckSub, input.duckdnsSubdomain.trim() || null);
     if (input.deployBase !== undefined) await setSetting(KEYS.deployBase, input.deployBase.trim() || null);
-    if (input.publicIp !== undefined) await setSetting(KEYS.publicIp, input.publicIp.trim() || null);
+    if (input.publicIp !== undefined) {
+        const value = input.publicIp.trim() || null;
+        await setSetting(KEYS.publicIp, value);
+        // Typed in, so it outranks detection from here on. Cleared with the value, so
+        // emptying the field hands the address back to detection rather than leaving
+        // an empty manual override behind.
+        await setSetting(KEYS.publicIpManual, value ? "1" : null);
+    }
     // A saved domain is only a domain once the edge serves it, so republish the route
     // here rather than at each call site - the wizard, the admin panel and the DNS
     // check's dashboard move all land on this function.

@@ -10,6 +10,8 @@ import { join } from "node:path";
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { createWriteStream } from "node:fs";
+import { localDialHost } from "./deploy/dial";
+import { appBaseUrl } from "./domain-service";
 import { commitUrl } from "./deploy/commit-url";
 import { decryptSecret } from "@polaris/storage";
 import { mkdir, readFile } from "node:fs/promises";
@@ -19,7 +21,6 @@ import type { DomainOwner } from "./owner-domains";
 import { wipeVolume } from "./deploy-volume-service";
 import { resolveAutoDomain } from "./network-service";
 import { resolveMountTarget } from "./storage-service";
-import { appBaseUrl, getPublicIp } from "./domain-service";
 import { resolveWaf, resolveWafBatch } from "./waf-service";
 import { LocalRouter, type AppRoute } from "./deploy/router";
 import { memberOrgIds, orgIdsWhere } from "./orgs/org-service";
@@ -761,8 +762,12 @@ export async function addApplicationDomain(
  * reflects a domain being added, removed, enabled, or disabled the instant this
  * runs (Traefik watches the file). HTTPS is automatic: Let's Encrypt for a custom
  * domain, the edge's default cert for a free/LAN subdomain, plain HTTP for a
- * domain fronted by a tunnel. Best-effort - no public IP just leaves routing
- * unchanged.
+ * domain fronted by a tunnel. Best-effort - no address for the host just leaves
+ * routing unchanged.
+ *
+ * That address is the host as the edge container reaches it, not the LAN address
+ * the box holds (see `localDialHost`): a route written against a lease is a route
+ * that 502s every time the lease moves or the interface carrying it drops.
  *
  * A remote-server app is served by that server's OWN edge (so the control plane is
  * never in its request path); pushing config to a remote edge over SSH is the
@@ -810,7 +815,7 @@ export async function syncAppRoutes(): Promise<void> {
             })
         ).map((deployment) => deployment.id)
     );
-    const localIp = await getPublicIp();
+    const localIp = await localDialHost();
     const localDomains = domains.filter((domain) => domain.application.target.kind === "local");
     // Served by the remote server's own edge (per-server edge, phase 2).
     const remotePending = domains

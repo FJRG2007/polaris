@@ -53,6 +53,13 @@ services:
     environment:
       # Trust the local-network names for auth; kept in sync with the mdns service.
       POLARIS_LOCAL_HOSTNAME: ${POLARIS_MDNS_HOSTNAME:-polaris}
+      # The address the edge dials a deployed app's published port on. The host as
+      # seen from inside the Docker network, not the LAN address it happens to hold:
+      # a lease that changes, or a wireless link that drops, must not turn every
+      # deployed domain into a 502. Traefik and the edge guard resolve this name
+      # through the same `host-gateway` entry they are given below - they are
+      # configured from this file, so the name and the resolver ship together.
+      POLARIS_APP_DIAL_HOST: ${POLARIS_APP_DIAL_HOST:-host.docker.internal}
     # Traefik routes the dashboard by these labels (discovered on the default
     # network). The dashboard answers only on its own names - the local names, an
     # optional public domain, and any address of the machine itself - so an unknown
@@ -297,6 +304,14 @@ services:
     networks:
       - default
       - polaris-proxy
+    # An app's route dials it on its published host port, so the edge has to be able
+    # to reach the host from inside the network. By this name rather than by the box's
+    # LAN address: that one is detected once and stored, and when the lease moves or
+    # the interface it was read from goes down, every deployed domain answers 502 with
+    # a healthy container behind it. POLARIS_APP_DIAL_HOST (on `web`) is the name
+    # written into those routes.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   # Co-located WAF sentinel. Traefik forwardAuths to it for the deploy denylist and
   # require-login controls; it holds no rule state (rules arrive per request in a
@@ -350,6 +365,10 @@ services:
       polaris-proxy:
         aliases:
           - polaris-edge-guard
+    # A route whose response the guard rewrites dials the app through this container,
+    # so it needs the same way to reach the host that Traefik does.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 networks:
   # Shared network deployed apps and the edge join for name-based routing. hostd

@@ -2,13 +2,14 @@
  * Outbound tunnels (Cloudflare Tunnel, ngrok) so a self-hosted box behind NAT can
  * expose its apps publicly with no port-forwarding. The tunnel runs as one
  * container per server: it connects out to the provider and forwards inbound
- * traffic to the local Caddy (the host's published :80), which then routes each
- * hostname to its app. Credentials live in Integrations (the `cloudflare`/`ngrok`
+ * traffic to the local edge, which then routes each hostname to its app - by the
+ * edge's name on the shared network, since the connector is on it and the box's own
+ * address is not a fixed thing. Credentials live in Integrations (the `cloudflare`/`ngrok`
  * integration secrets); the public hostnames themselves are configured with the
  * provider (e.g. the Cloudflare dashboard maps a hostname to http://<box-ip>:80).
  */
 
-import { getPublicIp } from "./domain-service";
+import { edgeAddress } from "./deploy/dial";
 import { HostdPorts } from "./deploy/ports-hostd";
 import type { ComposeSpec } from "@polaris/deploy";
 import { getIntegrationSecret, getIntegrationState } from "./integration-service";
@@ -56,8 +57,21 @@ async function tunnelRunning(): Promise<boolean> {
     }
 }
 
+/**
+ * What the connector is run with. Its own function because the reconcile below reads
+ * the same command back off the running container: an origin that has since changed
+ * is invisible in "is it running", and that is exactly the state to repair.
+ */
+function tunnelCommand(provider: (typeof PROVIDERS)[number]): string[] {
+    // Cloudflare's token carries its ingress (configured in the CF dashboard to
+    // point at http://<box-ip>:80). ngrok forwards to the edge by its name on this
+    // network - the container is on it, and the box's LAN address is a value that
+    // moves, which would leave the tunnel forwarding into nothing.
+    return provider === "cloudflare" ? ["tunnel", "--no-autoupdate", "run"] : ["http", edgeAddress()];
+}
+
 /** The compose spec for the tunnel container of the chosen provider. */
-function tunnelSpec(provider: (typeof PROVIDERS)[number], token: string, boxIp: string | null): ComposeSpec {
+function tunnelSpec(provider: (typeof PROVIDERS)[number], token: string): ComposeSpec {
     const isCloudflare = provider === "cloudflare";
     const env: Record<string, string> = isCloudflare ? { TUNNEL_TOKEN: token } : { NGROK_AUTHTOKEN: token };
     const service = {
@@ -70,9 +84,7 @@ function tunnelSpec(provider: (typeof PROVIDERS)[number], token: string, boxIp: 
         ports: [],
         volumes: [],
         labels: {},
-        // Cloudflare's token carries its ingress (configured in the CF dashboard to
-        // point at http://<box-ip>:80). ngrok forwards to the box's Caddy directly.
-        command: isCloudflare ? ["tunnel", "--no-autoupdate", "run"] : ["http", `${boxIp ?? "host.docker.internal"}:80`],
+        command: tunnelCommand(provider),
         networks: [PROXY_NETWORK],
         restart: "unless-stopped"
     };
@@ -91,7 +103,40 @@ export async function applyTunnel(): Promise<void> {
             await ports.composeDown(PROJECT).catch(() => undefined);
             return;
         }
-        await ports.composeUp(tunnelSpec(active.provider, active.token, await getPublicIp()));
+        await ports.composeUp(tunnelSpec(active.provider, active.token));
+    } finally {
+        await ports.dispose();
+    }
+}
+
+/**
+ * Bring a connector that is already up back in line with the origin it should be
+ * forwarding to, on boot.
+ *
+ * A connector is raised once and then simply keeps running, so an origin corrected
+ * afterwards never reaches it: the container stays up, the tunnel stays registered,
+ * and every request through it reaches an address that no longer answers. Recreated
+ * only when the command it is running differs - a connector already on the right
+ * origin is left alone, since restarting one costs its public URL.
+ *
+ * Best-effort: a tunnel is a convenience, and failing to reconcile it must not take
+ * the boot with it.
+ */
+export async function reconcileTunnel(): Promise<void> {
+    const active = await activeTunnel();
+    if (!active) return;
+    const expected = tunnelCommand(active.provider);
+    const ports = new HostdPorts();
+    try {
+        const info = (await ports.inspect(SERVICE).catch(() => null)) as {
+            State?: { Running?: boolean };
+            Config?: { Cmd?: string[] };
+        } | null;
+        const serving = Boolean(info?.State?.Running) && (info?.Config?.Cmd ?? []).join(" ") === expected.join(" ");
+        if (serving) return;
+        await ports.composeUp(tunnelSpec(active.provider, active.token));
+    } catch (error) {
+        console.error("polaris: tunnel reconcile failed:", error instanceof Error ? error.message : error);
     } finally {
         await ports.dispose();
     }

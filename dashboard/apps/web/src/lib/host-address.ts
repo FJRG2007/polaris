@@ -22,7 +22,7 @@ const IPV4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1
  * own, can both reach the file - and either would be turned into a gateway link
  * and a DHCP-reservation instruction for a network that does not exist.
  */
-function isLanAddress(value: string): boolean {
+export function isLanAddress(value: string): boolean {
     const [a = 0, b = 0] = value.split(".").map(Number);
     if (a === 10) return true;
     if (a === 172 && b >= 16 && b <= 31) return true;

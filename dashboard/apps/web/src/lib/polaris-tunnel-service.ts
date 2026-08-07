@@ -13,6 +13,7 @@
 
 import { prisma } from "@polaris/db";
 import { newestUrl } from "./deploy/tunnel-url";
+import { dashboardOrigin } from "./domain-edge";
 import { HostdPorts } from "./deploy/ports-hostd";
 import type { ComposeSpec } from "@polaris/deploy";
 
@@ -22,9 +23,12 @@ const IMAGE = "cloudflare/cloudflared:latest";
 const URL_KEY = "polaris.ptunnel.url";
 const URL_PATTERN = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/i;
 
-/** Origin the tunnel forwards to: the dashboard web container on its compose network.
- *  Overridable for a non-default compose project name. */
-const ORIGIN = process.env.POLARIS_TUNNEL_ORIGIN ?? "http://polaris-web-1:3000";
+/** Origin the tunnel forwards to: the dashboard web container on its compose network,
+ *  by the same service name the edge dials it on. It used to name the container itself
+ *  (`polaris-web-1`), which every self-update replaces with a differently numbered one -
+ *  so the connector stayed up, kept its public URL, and forwarded every request into a
+ *  name that no longer resolved. Overridable for a non-default compose project name. */
+const ORIGIN = process.env.POLARIS_TUNNEL_ORIGIN ?? dashboardOrigin();
 const NETWORK = process.env.POLARIS_TUNNEL_NETWORK ?? "polaris_default";
 
 export interface PolarisTunnelStatus {
@@ -85,10 +89,19 @@ function delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function isRunning(ports: HostdPorts): Promise<boolean> {
+/**
+ * Whether the connector is up AND forwarding where it should.
+ *
+ * The origin matters as much as the process: a connector raised against an older
+ * origin keeps running, keeps its public URL, and answers every request with a
+ * gateway error - and because it is "running", nothing ever replaces it. Reading it
+ * back off the container is what lets an origin that has since been corrected reach
+ * a tunnel that was raised before it, the way the deploy quick tunnels self-heal.
+ */
+async function isServing(ports: HostdPorts): Promise<boolean> {
     try {
-        const info = (await ports.inspect(SERVICE)) as { State?: { Running?: boolean } };
-        return Boolean(info?.State?.Running);
+        const info = (await ports.inspect(SERVICE)) as { State?: { Running?: boolean }; Config?: { Cmd?: string[] } };
+        return Boolean(info?.State?.Running) && (info?.Config?.Cmd ?? []).includes(ORIGIN);
     } catch {
         return false;
     }
@@ -96,14 +109,14 @@ async function isRunning(ports: HostdPorts): Promise<boolean> {
 
 /**
  * Ensure the Polaris tunnel is up and return its public URL. Idempotent: if the
- * sidecar is already running with a known URL, returns it without restarting;
- * otherwise brings it up and polls the logs until the trycloudflare URL appears.
- * Returns null only if cloudflared never produced a URL.
+ * sidecar is already serving the current origin with a known URL, returns it without
+ * restarting; otherwise brings it up and polls the logs until the trycloudflare URL
+ * appears. Returns null only if cloudflared never produced a URL.
  */
 export async function ensurePolarisTunnel(): Promise<string | null> {
     const ports = new HostdPorts();
     try {
-        if (await isRunning(ports)) {
+        if (await isServing(ports)) {
             const url = (await readUrlFromLogs(ports)) ?? (await getStoredUrl());
             if (url) {
                 await setStoredUrl(url);
@@ -134,7 +147,7 @@ export async function getPolarisPublicUrl(): Promise<string | null> {
 export async function getPolarisTunnelStatus(): Promise<PolarisTunnelStatus> {
     const ports = new HostdPorts();
     try {
-        const running = await isRunning(ports);
+        const running = await isServing(ports);
         if (!running) return { running: false, url: null };
         const url = (await readUrlFromLogs(ports)) ?? (await getStoredUrl());
         return { running: true, url };

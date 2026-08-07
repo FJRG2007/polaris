@@ -26,8 +26,11 @@ function dynamicDir(): string {
     return process.env.POLARIS_TRAEFIK_DYNAMIC_DIR ?? "/dynamic";
 }
 
-/** The origin the edge dials for the dashboard, by service DNS on the compose network. */
-function dashboardOrigin(): string {
+/** The origin the edge dials for the dashboard, by service DNS on the compose network.
+ *  By the SERVICE name, never the container's: the container is replaced (and renamed)
+ *  by every self-update, and a name that named one particular container resolves to
+ *  nothing the first time it is. */
+export function dashboardOrigin(): string {
     return process.env.POLARIS_WEB_ORIGIN ?? "http://web:3000";
 }
 
