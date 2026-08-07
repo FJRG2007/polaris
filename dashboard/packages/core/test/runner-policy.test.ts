@@ -197,7 +197,14 @@ describe.skipIf(!hasShell)("the job guard, run", () => {
         });
         expect(code).toBe(0);
     });
-});
+    // Every case here spawns a shell, and a pull request one spawns two `node`
+    // processes inside it to read the payload. That is the point of this block - the
+    // guard is shell, so it is asserted by running it - but it puts each case at the
+    // mercy of how long this machine takes to start a process, which on Windows is
+    // most of a second before the script has done anything. The default per-test
+    // budget is 5s, so these were passing at two seconds and timing out at eight on
+    // the same code. The work being timed is process startup, not the guard.
+}, 30_000);
 
 describe("what a repository is allowed", () => {
     it("refuses to serve a public repository until somebody says so", () => {
