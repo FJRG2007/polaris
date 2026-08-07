@@ -67,6 +67,12 @@ export async function register(): Promise<void> {
     const { reconcileQuickTunnels } = await import("./lib/deploy/quick-tunnel-service");
     void reconcileQuickTunnels().catch((error) => console.error("polaris: quick-tunnel reconcile failed:", error));
 
+    // And the server's own tunnel, for the same reason: a connector raised against an
+    // origin that has since changed keeps running and forwards into nothing. Only one
+    // whose origin no longer matches is recreated, so a healthy tunnel keeps its URL.
+    const { reconcileTunnel } = await import("./lib/tunnel-service");
+    void reconcileTunnel();
+
     // Re-establish NAS volume mounts a host reboot dropped, restarting any app whose
     // mount had to be re-created - so a NAS-backed volume survives reboots like a real
     // docker volume. Best-effort; a routine restart keeps live mounts and is a no-op.

@@ -11,10 +11,10 @@
  * hostname needs the account-based tunnel configured under Integrations instead.
  */
 
+import { edgeOrigin } from "./dial";
 import { prisma } from "@polaris/db";
 import { HostdPorts } from "./ports-hostd";
 import { shortHash } from "@polaris/deploy";
-import { getPublicIp } from "../domain-service";
 import { syncAppRoutes } from "../deploy-service";
 import type { ComposeSpec } from "@polaris/deploy";
 import { newestUrl, tunnelReachable } from "./tunnel-url";
@@ -150,12 +150,10 @@ function delay(ms: number): Promise<void> {
  */
 export async function startQuickTunnel(appId: string, ownerId: string): Promise<QuickTunnelStatus> {
     await requireLocalApp(appId, ownerId);
-    const ip = await getPublicIp();
-    if (!ip) throw new Error("Set this server's IP under Deploy settings first");
     const { project, service } = names(appId);
     // Forward to Traefik (the edge), not the app's port, so tunnel requests are logged
     // at the edge like any other. Traefik routes them to this app by the tunnel host.
-    const origin = `http://${ip}:80`;
+    const origin = edgeOrigin();
 
     const ports = new HostdPorts();
     try {
@@ -245,17 +243,17 @@ export async function getQuickTunnelStatus(appId: string, ownerId: string): Prom
 
 /**
  * Migrate/self-heal quick tunnels on boot: an older tunnel forwards straight to the
- * app's port (bypassing the edge, so its traffic never reaches the access log). For
- * each live tunnel whose sidecar does not already target the edge, recreate it through
- * Traefik. A tunnel already on the edge is left untouched, so a routine restart neither
- * churns its URL nor interrupts it. Best-effort and self-guarding.
+ * app's port (bypassing the edge, so its traffic never reaches the access log), or to
+ * the edge at the LAN address the box held when the tunnel was created - which stops
+ * resolving the day that address moves. For each live tunnel whose sidecar does not
+ * already target the edge by name, recreate it. One already on it is left untouched, so
+ * a routine restart neither churns its URL nor interrupts it. Best-effort and
+ * self-guarding.
  */
 export async function reconcileQuickTunnels(): Promise<void> {
     const appIds = await quickTunnelAppIds();
     if (appIds.length === 0) return;
-    const ip = await getPublicIp();
-    if (!ip) return;
-    const expectedOrigin = `http://${ip}:80`;
+    const expectedOrigin = edgeOrigin();
     for (const appId of appIds) {
         let ownerId: string | undefined;
         try {
