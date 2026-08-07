@@ -41,6 +41,26 @@ const UNNAMED_BRAND = /^chromium$|not.?a.?brand/i;
 const MAX_BRANDS = 256;
 
 /**
+ * The brands that announce themselves with the vendor attached, against the name
+ * everyone else uses for them.
+ *
+ * The user-agent path already yields the short name for both of these - `Edg/`
+ * reads as Edge, `Chrome/` as Chrome - so without this the same browser is named
+ * one way when it sent hints and another when it did not. That is the split this
+ * module exists to close: one laptop has to read the same way in every list, and
+ * anything keyed on the name (a brand mark, a filter) silently misses the half
+ * that came in through the other path.
+ *
+ * A Map rather than an object literal because the key here is header text: a
+ * plain object would answer a lookup for `constructor` or `toString` with
+ * something off the prototype, and hand back a browser name nobody sent.
+ */
+const VENDOR_PREFIXED = new Map([
+    ["Google Chrome", "Chrome"],
+    ["Microsoft Edge", "Edge"]
+]);
+
+/**
  * The browser named by a `sec-ch-ua` value, or null when it names none.
  *
  * The header is a comma-separated list of `"Brand";v="version"`, so the version
@@ -57,8 +77,7 @@ function brandFromHints(brands: string | null | undefined): { name: string; vers
         // Taken from the header at large it would be whichever brand came first,
         // which on a Chromium is the padding entry's made-up number.
         const version = entry.match(/v="(\d{1,4})/)?.[1] ?? null;
-        // Chrome is the only one that brands itself with the vendor attached.
-        return { name: name === "Google Chrome" ? "Chrome" : name, version };
+        return { name: VENDOR_PREFIXED.get(name) ?? name, version };
     }
     return null;
 }
@@ -71,13 +90,31 @@ function brandFromHints(brands: string | null | undefined): { name: string; vers
  * first and the broadest last. Safari states its own version as `Version/`,
  * because the number after `Safari/` is the engine build and not what anybody
  * calls their browser.
+ *
+ * A browser writes a different token on each mobile platform, and every one of
+ * those trails `Safari/` in the string: iOS forbids any engine but WebKit, so
+ * Edge, Opera, Chrome and Firefox there are Safari wearing a name, and each says
+ * which name in a token of its own. Miss the token and the row is not merely
+ * unnamed, it is named as a competitor - and no hint can correct it, because
+ * WebKit sends no `sec-ch-ua` at all. So every token a browser answers to is
+ * grouped with its desktop entry and ahead of any broader claim, and `Safari/`
+ * stays last as the claim nothing narrower matched. Keeping a browser's own
+ * tokens together and above `Chrome/` and `Firefox/` is what makes the order
+ * hold on its own: a mobile string that later starts carrying the broad token
+ * too would otherwise be read as whichever browser it merely embeds.
  */
 const BROWSERS: readonly { readonly test: RegExp; readonly name: string; readonly version: RegExp }[] = [
     { test: /\bEdg\//, name: "Edge", version: /\bEdg\/(\d{1,4})/ },
+    { test: /\bEdgA\//, name: "Edge", version: /\bEdgA\/(\d{1,4})/ },
+    { test: /\bEdgiOS\//, name: "Edge", version: /\bEdgiOS\/(\d{1,4})/ },
     { test: /\bOPR\//, name: "Opera", version: /\bOPR\/(\d{1,4})/ },
+    { test: /\bOPT\//, name: "Opera", version: /\bOPT\/(\d{1,4})/ },
+    { test: /\bOPiOS\//, name: "Opera", version: /\bOPiOS\/(\d{1,4})/ },
     { test: /\bVivaldi\//, name: "Vivaldi", version: /\bVivaldi\/(\d{1,4})/ },
     { test: /\bSamsungBrowser\//, name: "Samsung Internet", version: /\bSamsungBrowser\/(\d{1,4})/ },
+    { test: /\bFxiOS\//, name: "Firefox", version: /\bFxiOS\/(\d{1,4})/ },
     { test: /\bFirefox\//, name: "Firefox", version: /\bFirefox\/(\d{1,4})/ },
+    { test: /\bCriOS\//, name: "Chrome", version: /\bCriOS\/(\d{1,4})/ },
     { test: /\bChrome\//, name: "Chrome", version: /\bChrome\/(\d{1,4})/ },
     { test: /\bSafari\//, name: "Safari", version: /\bVersion\/(\d{1,4})/ }
 ];
