@@ -15,10 +15,16 @@
  * what makes an optimistic row flicker. And it never re-renders a tab nobody is
  * looking at: a background tab banks the signal and spends it when it comes back,
  * so ten open tabs are not ten re-renders per change.
+ *
+ * Nor are they ten connections: one tab holds the stream for the whole device and
+ * passes each signal to the rest (see `shared-stream`). What a tab does with a
+ * signal is still its own decision - every screen has to re-render itself.
  */
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { subscribeSharedStream } from "@/lib/shared-stream";
+import { useSessionScope } from "@/components/session-scope";
 
 /** The channel. Scoped server-side to the spaces the session can reach. */
 const STREAM_PATH = "/api/tasks/stream";
@@ -29,6 +35,7 @@ const MIN_INTERVAL_MS = 750;
 
 export function TasksLiveRefresh() {
     const router = useRouter();
+    const scope = useSessionScope();
     // Held in refs so the effect runs once. Re-subscribing on every render would
     // drop and reopen the stream continuously.
     const lastRefresh = useRef(0);
@@ -58,8 +65,7 @@ export function TasksLiveRefresh() {
             }, wait);
         }
 
-        const source = new EventSource(STREAM_PATH);
-        source.onmessage = () => schedule();
+        const unsubscribe = subscribeSharedStream(STREAM_PATH, scope, () => schedule());
 
         function onVisible(): void {
             // Coming back to a tab is also the moment to spend anything that
@@ -74,9 +80,9 @@ export function TasksLiveRefresh() {
             document.removeEventListener("visibilitychange", onVisible);
             if (timer.current) clearTimeout(timer.current);
             timer.current = null;
-            source.close();
+            unsubscribe();
         };
-    }, [router]);
+    }, [router, scope]);
 
     return null;
 }

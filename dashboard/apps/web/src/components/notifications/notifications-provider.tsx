@@ -7,11 +7,26 @@
  * for a correct first paint and then follows a server-sent event stream, so new
  * alerts arrive without a reload. Mutations apply locally first and roll back if
  * the server refuses them.
+ *
+ * The stream is shared with the other tabs of this device rather than opened
+ * again in each of them, and so is every write made here. Two windows on the
+ * same account therefore cost one connection, chime once between them, and show
+ * an alert read in one as read in the other straight away.
  */
 
+import { useSessionScope } from "@/components/session-scope";
 import type { NotificationView } from "@/lib/notification-service";
+import { openPeerChannel, subscribeSharedStream, type PeerChannel } from "@/lib/shared-stream";
 import { hasNewArrival, notificationSoundEnabled, playNotificationSound } from "@/lib/notification-sound";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+    applyFeedMutation,
+    FEED_CHANNEL,
+    feedMessageSchema,
+    PEER_WRITE_MS,
+    type FeedMessage,
+    type FeedMutation
+} from "@/lib/notifications/feed-sync";
 import {
     clearNotificationsAction,
     deleteNotificationAction,
@@ -28,6 +43,8 @@ export interface NotificationFeed {
     clearAll: () => void;
 }
 
+const STREAM_PATH = "/api/notifications/stream";
+
 const FeedContext = createContext<NotificationFeed | null>(null);
 
 /** The shared feed. Only valid under NotificationsProvider. */
@@ -38,45 +55,74 @@ export function useNotificationFeed(): NotificationFeed {
 }
 
 export function NotificationsProvider({ initial, children }: { initial: NotificationView[]; children: ReactNode }) {
+    const scope = useSessionScope();
     const [items, setItems] = useState(initial);
     // A snapshot the server took before an in-flight mutation landed would undo
-    // the optimistic update, so stream frames are ignored while one is running.
+    // the optimistic update, so stream frames are ignored while one is running -
+    // whether it is running here or in another tab of this device.
     const inFlight = useRef(0);
+    const peerWriteUntil = useRef(0);
+    const peers = useRef<PeerChannel<FeedMessage> | null>(null);
     // What this tab has already shown. Seeded from the first paint so the alerts
     // that were waiting when the page opened do not all chime at once.
     const seen = useRef(new Set(initial.map((row) => row.id)));
 
     useEffect(() => {
-        const source = new EventSource("/api/notifications/stream");
-        source.onmessage = (event) => {
-            if (inFlight.current > 0) return;
-            try {
-                const payload = JSON.parse(event.data) as { items?: NotificationView[] };
-                if (Array.isArray(payload.items)) {
-                    if (hasNewArrival(seen.current, payload.items) && notificationSoundEnabled()) {
-                        playNotificationSound();
-                    }
-                    setItems(payload.items);
-                }
-            } catch {
-                // A malformed frame is not worth recovering from; the next tick resends the state.
+        const channel = openPeerChannel<FeedMessage>(FEED_CHANNEL, scope, (message) => {
+            const parsed = feedMessageSchema.safeParse(message);
+            if (!parsed.success) return;
+            if (parsed.data.kind === "end") {
+                peerWriteUntil.current = 0;
+                return;
             }
+            const { mutation } = parsed.data;
+            peerWriteUntil.current = Date.now() + PEER_WRITE_MS;
+            setItems((rows) => applyFeedMutation(rows, mutation));
+        });
+        peers.current = channel;
+        return () => {
+            peers.current = null;
+            channel.close();
         };
-        return () => source.close();
-    }, []);
+    }, [scope]);
 
-    /** Apply a change locally, run it on the server, and restore on failure. */
-    const apply = useCallback((project: (rows: NotificationView[]) => NotificationView[], run: () => Promise<void>) => {
+    useEffect(
+        () =>
+            subscribeSharedStream(STREAM_PATH, scope, ({ data, owner }) => {
+                if (inFlight.current > 0 || Date.now() < peerWriteUntil.current) return;
+                try {
+                    const payload = JSON.parse(data) as { items?: NotificationView[] };
+                    if (!Array.isArray(payload.items)) return;
+                    // Every tab records what it has seen, so the one that ends up
+                    // holding the connection later does not chime for a backlog it
+                    // was already showing. Only the tab that took the frame off the
+                    // wire is allowed to make the sound, which is what keeps a
+                    // device with four windows open from chiming four times.
+                    const arrived = hasNewArrival(seen.current, payload.items);
+                    if (arrived && owner && notificationSoundEnabled()) playNotificationSound();
+                    setItems(payload.items);
+                } catch {
+                    // A malformed frame is not worth recovering from; the next tick resends the state.
+                }
+            }),
+        [scope]
+    );
+
+    /** Apply a change here and in the other tabs, run it on the server, and
+     *  restore this tab on failure. */
+    const apply = useCallback((mutation: FeedMutation, run: () => Promise<void>) => {
         let snapshot: NotificationView[] = [];
         setItems((rows) => {
             snapshot = rows;
-            return project(rows);
+            return applyFeedMutation(rows, mutation);
         });
         inFlight.current += 1;
+        peers.current?.post({ kind: "begin", mutation });
         void run()
             .catch(() => setItems(snapshot))
             .finally(() => {
                 inFlight.current -= 1;
+                peers.current?.post({ kind: "end" });
             });
     }, []);
 
@@ -87,27 +133,18 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
             unread,
             markRead: (id) => {
                 if (!items.some((row) => row.id === id && !row.read)) return;
-                apply(
-                    (rows) => rows.map((row) => (row.id === id ? { ...row, read: true } : row)),
-                    () => markNotificationReadAction(id)
-                );
+                apply({ kind: "read", id }, () => markNotificationReadAction(id));
             },
             markAllRead: () => {
                 if (unread === 0) return;
-                apply(
-                    (rows) => rows.map((row) => ({ ...row, read: true })),
-                    () => markAllNotificationsReadAction()
-                );
+                apply({ kind: "readAll" }, () => markAllNotificationsReadAction());
             },
             remove: (id) => {
-                apply(
-                    (rows) => rows.filter((row) => row.id !== id),
-                    () => deleteNotificationAction(id)
-                );
+                apply({ kind: "remove", id }, () => deleteNotificationAction(id));
             },
             clearAll: () => {
                 if (items.length === 0) return;
-                apply(() => [], () => clearNotificationsAction());
+                apply({ kind: "clear" }, () => clearNotificationsAction());
             }
         };
     }, [items, apply]);

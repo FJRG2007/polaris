@@ -14,6 +14,7 @@ import { ScopeSwitcher } from "@/components/scope-switcher";
 import { CommandPalette } from "@/components/command-palette";
 import { listNotifications } from "@/lib/notification-service";
 import { UpdateIndicator } from "@/components/update-indicator";
+import { SessionScopeProvider } from "@/components/session-scope";
 import { NotificationBell } from "@/components/notification-bell";
 import { resolveScope, scopeChoices } from "@/lib/workspace-scope";
 import { RouteSkeletonCapture } from "@/components/route-skeleton";
@@ -49,46 +50,48 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <CapabilityProvider capabilities={capabilities}>
             <AppUrlProvider baseUrl={baseUrl}>
                 <DisplayFormatProvider preferences={display}>
-                    <NotificationsProvider initial={notifications}>
-                        <NotificationFavicon />
-                        <AppShell
-                            switcher={
-                                <>
-                                    <AppNav appIds={apps} />
-                                    <ScopeSwitcher
-                                        personalName={user.name}
-                                        organizations={organizations}
-                                        current={scope.org}
+                    <SessionScopeProvider userId={user.id}>
+                        <NotificationsProvider initial={notifications}>
+                            <NotificationFavicon />
+                            <AppShell
+                                switcher={
+                                    <>
+                                        <AppNav appIds={apps} />
+                                        <ScopeSwitcher
+                                            personalName={user.name}
+                                            organizations={organizations}
+                                            current={scope.org}
+                                        />
+                                    </>
+                                }
+                                navButton={<AppNavDrawer />}
+                                search={<CommandPalette isAdmin={user.isAdmin} appIds={apps} />}
+                                sidebar={<AppSidebar />}
+                                account={
+                                    <>
+                                        {user.isAdmin ? <UpdateIndicator /> : null}
+                                        <NotificationBell />
+                                        {/* The edition reads as a sentence, so it waits for a bar
+                                            wide enough to carry it next to the controls. */}
+                                        <span className="hidden lg:inline-flex">
+                                            <EditionBadge />
+                                        </span>
+                                        <AccountMenu id={user.id} name={user.name} email={user.email} />
+                                    </>
+                                }
+                            >
+                                <DeniedNotice />
+                                <RouteSkeletonCapture>{children}</RouteSkeletonCapture>
+                                {user.viewingAs ? (
+                                    <ViewAsBanner
+                                        mode={user.viewingAs.mode}
+                                        label={user.viewingAs.label}
+                                        actorName={user.viewingAs.actorName}
                                     />
-                                </>
-                            }
-                            navButton={<AppNavDrawer />}
-                            search={<CommandPalette isAdmin={user.isAdmin} appIds={apps} />}
-                            sidebar={<AppSidebar />}
-                            account={
-                                <>
-                                    {user.isAdmin ? <UpdateIndicator /> : null}
-                                    <NotificationBell />
-                                    {/* The edition reads as a sentence, so it waits for a bar
-                                        wide enough to carry it next to the controls. */}
-                                    <span className="hidden lg:inline-flex">
-                                        <EditionBadge />
-                                    </span>
-                                    <AccountMenu id={user.id} name={user.name} email={user.email} />
-                                </>
-                            }
-                        >
-                            <DeniedNotice />
-                            <RouteSkeletonCapture>{children}</RouteSkeletonCapture>
-                            {user.viewingAs ? (
-                                <ViewAsBanner
-                                    mode={user.viewingAs.mode}
-                                    label={user.viewingAs.label}
-                                    actorName={user.viewingAs.actorName}
-                                />
-                            ) : null}
-                        </AppShell>
-                    </NotificationsProvider>
+                                ) : null}
+                            </AppShell>
+                        </NotificationsProvider>
+                    </SessionScopeProvider>
                 </DisplayFormatProvider>
             </AppUrlProvider>
         </CapabilityProvider>
