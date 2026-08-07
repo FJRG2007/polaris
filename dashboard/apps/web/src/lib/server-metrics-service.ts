@@ -27,9 +27,31 @@ const CACHE_TTL_MS = 30_000;
  *  that has not answered `uname` in this long is not going to. */
 const PROBE_TIMEOUT_MS = 10_000;
 
+/**
+ * How old a cached reading may be and still be worth putting on screen while a
+ * fresh one is fetched. Far longer than the TTL above, which decides when to probe
+ * again: a reading from twenty minutes ago, labelled as such, is worth more on
+ * arriving at a page than an empty panel that fills in two seconds later.
+ */
+const PAINT_MAX_AGE_MS = 3_600_000;
+
 /** In-process cache. A dashboard open on the servers list polls, and every poll
  *  is an SSH session on somebody's machine. */
 const cache = new Map<string, { at: number; metrics: ServerMetrics }>();
+
+/**
+ * The last reading of this machine, if one was taken recently enough to show, and
+ * without probing it. What a server's page renders before its own request leaves,
+ * so the panel arrives with figures rather than with skeletons - including on a
+ * first visit, where the browser is holding nothing to paint from.
+ *
+ * Not owner-scoped, because it takes no connection and reads nothing: the caller
+ * has to have resolved the server as theirs to have its id at all.
+ */
+export function peekServerMetrics(hostId: string): { at: number; metrics: ServerMetrics } | null {
+    const hit = cache.get(hostId);
+    return hit && Date.now() - hit.at < PAINT_MAX_AGE_MS ? hit : null;
+}
 
 /**
  * Probe a server, or hand back what it said a moment ago.

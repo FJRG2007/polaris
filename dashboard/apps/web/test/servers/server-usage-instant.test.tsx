@@ -105,4 +105,35 @@ describe("A server's usage panel", () => {
         expect(markup).not.toContain("polaris-web-110");
         expect(markup).toContain("animate-pulse");
     });
+
+    // A first visit, a new tab, a browser that has never been here: the tab holds
+    // nothing, so without this the panel opens on skeletons however recently the
+    // server itself read the machine.
+    it("paints what the server already read when the tab is holding nothing", () => {
+        const markup = renderToStaticMarkup(
+            <ServerUsage
+                hostId="host-a"
+                initial={{ at: Date.now() - 5 * 60_000, value: metrics }}
+            />
+        );
+
+        expect(markup).toContain("0.62 load of 16");
+        expect(markup).toContain("polaris-web-110");
+        expect(markup).toContain("read 5m ago");
+        expect(markup).not.toContain("animate-pulse");
+    });
+
+    it("prefers what the tab holds over the server's copy, being the newer of the two", () => {
+        writeSnapshot("servers.usage.host-a", {
+            ...metrics,
+            consumers: [{ kind: "process", name: "postgres", cpuPercent: 1.2, memoryBytes: 174_000_000 }]
+        });
+
+        const markup = renderToStaticMarkup(
+            <ServerUsage hostId="host-a" initial={{ at: Date.now() - 5 * 60_000, value: metrics }} />
+        );
+
+        expect(markup).toContain("postgres");
+        expect(markup).not.toContain("polaris-web-110");
+    });
 });

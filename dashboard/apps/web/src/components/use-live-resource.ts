@@ -19,7 +19,7 @@
 
 import { mergeUnchanged } from "@/lib/structural-merge";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
+import { readSnapshot, writeSnapshot, type Snapshot } from "@/lib/snapshot-cache";
 
 /** How stale a cached snapshot may be and still be worth painting. Past this it
  *  is more likely to mislead than to help, so the skeleton is shown instead. */
@@ -66,6 +66,7 @@ export function useLiveRead<T>({
     load,
     cacheKey,
     intervalMs,
+    initial,
     enabled = true,
     paused = false
 }: {
@@ -73,11 +74,17 @@ export function useLiveRead<T>({
     cacheKey: string;
     /** Omit for a read that is taken once per subject rather than polled. */
     intervalMs?: number;
+    /**
+     * A reading the server already had, for the first paint of a browser that is
+     * holding nothing - a first visit, a new tab, a hard reload. The kept snapshot
+     * wins when there is one, being the newer of the two.
+     */
+    initial?: Snapshot<T>;
     enabled?: boolean;
     paused?: boolean;
 }): LiveResource<T> {
     // One read of the kept snapshot, seeding both the reading and its age.
-    const [seeded] = useState(() => read<T>(cacheKey));
+    const [seeded] = useState(() => read<T>(cacheKey) ?? initial ?? null);
     const [data, setData] = useState<T | null>(seeded?.value ?? null);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
@@ -86,9 +93,15 @@ export function useLiveRead<T>({
     // time the data does, which would restart the interval on every tick.
     const latest = useRef<T | null>(data);
 
-    // A key change means a different subject entirely, so the previous device's
-    // readings must not be folded into the new one's.
+    // Which subject the seed above belongs to. A key change means a different
+    // subject entirely, so the previous device's readings must not be folded into
+    // the new one's - but the mount's own key is already seeded, and re-reading it
+    // here would wipe a server-supplied `initial` that no snapshot backs.
+    const seededFor = useRef(cacheKey);
+
     useEffect(() => {
+        if (seededFor.current === cacheKey) return;
+        seededFor.current = cacheKey;
         const kept = read<T>(cacheKey);
         latest.current = kept?.value ?? null;
         setData(kept?.value ?? null);

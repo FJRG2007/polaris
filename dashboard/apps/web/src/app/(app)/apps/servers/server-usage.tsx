@@ -32,7 +32,15 @@ const REFRESH_MS = 30_000;
  *  being between polls, which is worth saying on a monitoring panel. */
 const STALE_AFTER_MS = 2 * REFRESH_MS;
 
-export function ServerUsage({ hostId }: { hostId: string }) {
+export function ServerUsage({
+    hostId,
+    initial
+}: {
+    hostId: string;
+    /** What the server had already read of this machine, so the panel arrives with
+     *  figures on a first visit too - the tab is holding nothing to paint then. */
+    initial?: { at: number; value: ServerMetrics };
+}) {
     // A machine that cannot be read has to throw rather than resolve empty: the
     // difference between "unreachable" and "nothing running" is the whole point
     // of the panel, and it decides whether the last reading stays on screen.
@@ -52,7 +60,8 @@ export function ServerUsage({ hostId }: { hostId: string }) {
         // Per host, so switching servers paints that machine's last reading
         // rather than the previous one's numbers under this one's name.
         cacheKey: `servers.usage.${hostId}`,
-        intervalMs: REFRESH_MS
+        intervalMs: REFRESH_MS,
+        initial
     });
 
     if (error) {

@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/session";
 import { getLocalHostId } from "@/lib/local-server";
 import { notFound, redirect } from "next/navigation";
 import { LOCAL_SERVER_ID, serverIdSchema } from "@polaris/core";
+import { peekServerMetrics } from "@/lib/server-metrics-service";
 import { hostRouteId, LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
 import { HOST_DOCKER_PREFIX, LOCAL_DOCKER_CONNECTION_ID } from "@/lib/docker-service";
 
@@ -16,6 +17,11 @@ export const dynamic = "force-dynamic";
  * that is a database read and it puts the page on screen at once. Everything that
  * needs the machine (whether it answers, what is eating it, its load over time) is
  * fetched by the view afterwards, so a server that is off or slow still opens.
+ *
+ * The exception is the reading the process already has of this machine, which is
+ * handed to the view rather than left for it to ask for: it costs nothing, and it
+ * is the difference between a panel of figures and a panel of skeletons on a first
+ * visit, where the browser is holding nothing of its own to paint from.
  *
  * The machine Polaris runs on is addressed as `local` and never by the reserved id
  * its samples are filed under; both the container engine and the metric series for
@@ -40,9 +46,15 @@ export default async function ServerPage({ params }: { params: Promise<{ serverI
         notFound();
     }
 
+    // Read, never probed: a page must not wait on an SSH session to a machine that
+    // may be off. Null when nothing has read this server recently, and then the
+    // view fills the panel in as its own request lands.
+    const cached = server.hostId ? peekServerMetrics(server.hostId) : null;
+
     return (
         <ServerDetail
             server={server}
+            initialUsage={cached ? { at: cached.at, value: cached.metrics } : undefined}
             connectionId={
                 server.kind === "local" ? LOCAL_DOCKER_CONNECTION_ID : `${HOST_DOCKER_PREFIX}${server.id}`
             }

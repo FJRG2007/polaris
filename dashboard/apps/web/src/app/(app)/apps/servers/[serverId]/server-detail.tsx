@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { ServerUsage } from "../server-usage";
 import { ServerWorkload } from "./server-workload";
 import { ENVIRONMENT_META } from "../environment-meta";
+import type { ServerMetrics } from "@/lib/server-probe";
 import { RemoveServerDialog } from "../remove-server-dialog";
 import { useLiveResource } from "@/components/use-live-resource";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
@@ -42,7 +43,8 @@ const TABS = [
 export function ServerDetail({
     server,
     connectionId,
-    metricsId
+    metricsId,
+    initialUsage
 }: {
     server: ServerRow;
     /** How the Containers app reaches this machine's engine, so its containers can
@@ -52,6 +54,8 @@ export function ServerDetail({
      *  directly rather than over SSH to itself, so it is `local` even when it also
      *  has a server row. */
     metricsId: string;
+    /** The reading the server already had of this machine, for the first paint. */
+    initialUsage?: { at: number; value: ServerMetrics };
 }) {
     const router = useRouter();
     const [tab, setTab] = useState<"overview" | "connection">("overview");
@@ -148,7 +152,9 @@ export function ServerDetail({
                     {/* The whole machine, including everything that is not a
                         container. It needs a login on the box, so it is offered
                         only where there is one. */}
-                    {server.hostId ? <ServerUsage key={server.hostId} hostId={server.hostId} /> : null}
+                    {server.hostId ? (
+                        <ServerUsage key={server.hostId} hostId={server.hostId} initial={initialUsage} />
+                    ) : null}
 
                     <ServerWorkload connectionId={connectionId} />
 
