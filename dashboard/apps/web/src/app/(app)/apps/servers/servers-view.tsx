@@ -22,7 +22,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { QuickEnroll } from "./quick-enroll";
 import { ServerGroups } from "./server-groups";
-import { ServerDialog } from "./server-dialog";
 import { ENVIRONMENT_META } from "./environment-meta";
 import { TerminalPanel } from "../deploy/terminal-panel";
 import { RemoveServerDialog } from "./remove-server-dialog";
@@ -52,7 +51,6 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
     const [outcome, setOutcome] = useState<RemoveServerResult | null>(null);
     const [target, setTarget] = useState<EnvironmentTarget | null>(null);
     const [shell, setShell] = useState<ServerRow | null>(null);
-    const [details, setDetails] = useState<ServerRow | null>(null);
     const [enrollLocal, setEnrollLocal] = useState(false);
 
     const { data: live } = useLiveResource<ServerStatusPayload>({
@@ -129,16 +127,15 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                             return (
                                 <tr key={server.id} className="border-t border-border hover:bg-card-hover">
                                     <td className="px-3 py-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setDetails(server)}
+                                        <Link
+                                            href={`/apps/servers/${server.id}`}
                                             aria-label={`Open ${server.name}`}
                                             className="flex items-center gap-2 font-medium hover:underline"
                                         >
                                             <Server className="size-4 text-muted-foreground" />
                                             {server.name}
                                             {server.kind === "local" ? <Badge variant="primary">This machine</Badge> : null}
-                                        </button>
+                                        </Link>
                                         <span className="block text-xs text-muted-foreground">
                                             {server.kind === "host" ? (
                                                 server.detail
@@ -233,14 +230,14 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                                                     <SquareTerminal className="size-3.5" /> Enable shell and files
                                                 </Button>
                                             ) : null}
-                                            <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                aria-label={`Rename ${server.name} and see how to connect to it`}
-                                                title="Name and connection details"
-                                                onClick={() => setDetails(server)}
-                                            >
-                                                <Settings2 className="size-4" />
+                                            <Button size="icon" variant="ghost" asChild>
+                                                <Link
+                                                    href={`/apps/servers/${server.id}`}
+                                                    aria-label={`Open ${server.name}`}
+                                                    title="Usage, load and connection details"
+                                                >
+                                                    <Settings2 className="size-4" />
+                                                </Link>
                                             </Button>
                                             {/* The local machine is never removed - it is the box
                                                 Polaris runs on - but the login it was reached by can
@@ -300,16 +297,6 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                     <QuickEnroll kind="local" onDone={() => setEnrollLocal(false)} />
                 </DialogContent>
             </Dialog>
-            <ServerDialog
-                server={details}
-                status={details ? statusOf(details.id) : null}
-                machineName={live?.machineName ?? null}
-                onRenamed={() => {
-                    setDetails(null);
-                    router.refresh();
-                }}
-                onClose={() => setDetails(null)}
-            />
 
             {/* Below the table, because a group is something you reach for once the
                 machines exist - and it is the firewall that consumes it, not this

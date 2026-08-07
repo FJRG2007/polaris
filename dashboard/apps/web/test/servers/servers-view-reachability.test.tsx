@@ -32,7 +32,6 @@ vi.mock("@/components/use-live-resource", () => ({
 vi.mock("../../src/app/(app)/apps/deploy/terminal-panel", () => ({ TerminalPanel: () => null }));
 vi.mock("../../src/app/(app)/apps/servers/host-dialog", () => ({ HostDialog: () => null }));
 vi.mock("../../src/app/(app)/apps/servers/quick-enroll", () => ({ QuickEnroll: () => null }));
-vi.mock("../../src/app/(app)/apps/servers/server-dialog", () => ({ ServerDialog: () => null }));
 vi.mock("../../src/app/(app)/apps/servers/server-groups", () => ({ ServerGroups: () => null }));
 vi.mock("../../src/app/(app)/apps/servers/remove-server-dialog", () => ({ RemoveServerDialog: () => null }));
 vi.mock("../../src/app/(app)/apps/servers/environment-dialog", () => ({ EnvironmentDialog: () => null }));

@@ -1,90 +1,25 @@
 "use client";
 
 /**
- * One server, opened: what to call it, whether it is answering, and how to reach
- * it from outside Polaris.
+ * The pieces a single server's page is built from: what to call it, whether it is
+ * answering, and how to reach it from outside Polaris.
  *
- * The commands are the point of the second half. Polaris connects over its own
- * pinned SSH session, and an operator who wants a terminal or a file manager of
- * their own has to type the same details in by hand; they are all here, ready to
- * copy, with the one thing that is NOT shared spelled out - the key Polaris signs
- * in with stays in Polaris, so these connect as whoever runs them.
+ * The commands are the point of the last one. Polaris connects over its own pinned
+ * SSH session, and an operator who wants a terminal or a file manager of their own
+ * has to type the same details in by hand; they are all here, ready to copy, with
+ * the one thing that is NOT shared spelled out - the key Polaris signs in with
+ * stays in Polaris, so these connect as whoever runs them.
  */
 
 import { useState } from "react";
-import { ServerUsage } from "./server-usage";
+import { Button, Input } from "@polaris/ui";
 import { renameServerAction } from "./actions";
 import { CopyButton } from "@/components/copy-button";
 import type { ServerRow, ServerStatus } from "./types";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
-
-export function ServerDialog({
-    server,
-    status,
-    machineName,
-    onRenamed,
-    onClose
-}: {
-    server: ServerRow | null;
-    status: ServerStatus | null;
-    /** What the local machine calls itself, once the status poll has answered. */
-    machineName: string | null;
-    onRenamed: () => void;
-    onClose: () => void;
-}) {
-    return (
-        <Dialog open={server !== null} onOpenChange={(next) => !next && onClose()}>
-            <DialogContent className="max-w-lg">
-                {server ? (
-                    <Body server={server} status={status} machineName={machineName} onRenamed={onRenamed} />
-                ) : null}
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function Body({
-    server,
-    status,
-    machineName,
-    onRenamed
-}: {
-    server: ServerRow;
-    status: ServerStatus | null;
-    machineName: string | null;
-    onRenamed: () => void;
-}) {
-    const local = server.kind === "local";
-
-    return (
-        <>
-            <DialogHeader>
-                <DialogTitle>{server.name}</DialogTitle>
-                <DialogDescription>
-                    {local
-                        ? `The machine Polaris runs on${machineName ? `, ${machineName}` : ""}.`
-                        : `Polaris signs in as ${server.detail} over SSH.`}
-                </DialogDescription>
-            </DialogHeader>
-
-            <div className="flex flex-col gap-4">
-                {/* Keyed by server so switching rows resets the field to that
-                    server's name instead of carrying the previous one over. */}
-                <RenameForm key={server.id} server={server} onRenamed={onRenamed} />
-                <Reachability server={server} status={status} />
-                {/* Only a registered server has a login to read itself through.
-                    Keyed by host so switching rows reads the new machine instead
-                    of leaving the previous one's numbers on screen. */}
-                {server.hostId ? <ServerUsage key={server.hostId} hostId={server.hostId} /> : null}
-                {local ? <LocalNote /> : <Connect server={server} />}
-            </div>
-        </>
-    );
-}
 
 /** Name the server. Save stays disabled until the value actually differs, so a
- *  dialog opened and closed cannot write the name it already had. */
-function RenameForm({ server, onRenamed }: { server: ServerRow; onRenamed: () => void }) {
+ *  field touched and put back cannot write the name it already had. */
+export function RenameForm({ server, onRenamed }: { server: ServerRow; onRenamed: () => void }) {
     const [name, setName] = useState(server.name);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -128,7 +63,7 @@ function RenameForm({ server, onRenamed }: { server: ServerRow; onRenamed: () =>
 
 /** Whether it answered, and how long it took. The local box is never probed - it
  *  is the machine serving this page. */
-function Reachability({ server, status }: { server: ServerRow; status: ServerStatus | null }) {
+export function Reachability({ server, status }: { server: ServerRow; status: ServerStatus | null }) {
     if (server.kind === "local") {
         return <p className="text-sm text-muted-foreground">Running Polaris, so it is up by definition.</p>;
     }
@@ -147,17 +82,17 @@ function Reachability({ server, status }: { server: ServerRow; status: ServerSta
 /** The Polaris box has no SSH login of its own to hand out - nothing enrolled it,
  *  so there is no account and no key. Say what to do instead of leaving an empty
  *  section where the commands are for every other server. */
-function LocalNote() {
+export function LocalNote() {
     return (
         <p className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-            Polaris has no login of its own on this machine, so there is nothing to copy here. Sign in the
-            way you already do, or add it with Add server to get a shell and its files in Polaris too.
+            Polaris has no login of its own on this machine, so there is nothing to copy here. Sign in the way you
+            already do, or add it with Add server to get a shell and its files in Polaris too.
         </p>
     );
 }
 
 /** Everything an operator needs to reach the machine with their own tools. */
-function Connect({ server }: { server: ServerRow }) {
+export function Connect({ server }: { server: ServerRow }) {
     const port = server.port ?? 22;
     const account = `${server.detail}@${server.address}`;
     const ssh = port === 22 ? `ssh ${account}` : `ssh -p ${port} ${account}`;
