@@ -1,5 +1,6 @@
 import { prisma } from "@polaris/db";
 import { listHosts } from "@/lib/host-service";
+import { LOCAL_SERVER_ID } from "@polaris/core";
 import { listAlarms } from "@/lib/watch-service";
 import { requirePermission } from "@/lib/session";
 import { notFound, redirect } from "next/navigation";
@@ -26,13 +27,19 @@ export default async function WatchSubjectPage({
     const user = await requirePermission("deploy.read");
     if (kind !== "server" && kind !== "service") notFound();
 
-    const alarms = (await listAlarms(user.id)).filter((alarm) => alarm.targetId === id);
+    const owned = await listAlarms(user.id);
+    const watching = (targetId: string) => owned.filter((alarm) => alarm.targetId === targetId);
 
     if (kind === "server") {
         const [hosts, localId] = await Promise.all([listHosts(user.id), localDockerId()]);
         const localHost = hosts.find((entry) => isLocalMachine(entry, localId)) ?? null;
 
-        if (id === LOCAL_HOST_SUBJECT) {
+        // The reserved subject id is how the samples are filed, not how the
+        // machine is addressed. Links that were made before that was true still
+        // have to arrive somewhere.
+        if (id === LOCAL_HOST_SUBJECT) redirect(`/watch/server/${LOCAL_SERVER_ID}`);
+
+        if (id === LOCAL_SERVER_ID) {
             return (
                 <WatchSubjectDetail
                     kind="server"
@@ -43,7 +50,10 @@ export default async function WatchSubjectPage({
                             ? `${localHost.username}@${localHost.address} - the machine Polaris runs on`
                             : "The machine Polaris runs on"
                     }
-                    alarms={alarms}
+                    // An alarm on this machine was set on the server row it was
+                    // enrolled as, which is what it is called everywhere alarms
+                    // are made - the local subject holds samples, not targets.
+                    alarms={watching(localHost?.id ?? LOCAL_SERVER_ID)}
                 />
             );
         }
@@ -52,14 +62,14 @@ export default async function WatchSubjectPage({
         // A server that is the machine Polaris runs on is measured directly rather
         // than over SSH to itself, so its history lives under the local subject.
         // Its own id would open a page with nothing on it.
-        if (isLocalMachine(host, localId)) redirect(`/watch/server/${LOCAL_HOST_SUBJECT}`);
+        if (isLocalMachine(host, localId)) redirect(`/watch/server/${LOCAL_SERVER_ID}`);
         return (
             <WatchSubjectDetail
                 kind="server"
                 id={id}
                 name={host.name}
                 detail={`${host.username}@${host.address}`}
-                alarms={alarms}
+                alarms={watching(host.id)}
             />
         );
     }
@@ -82,7 +92,7 @@ export default async function WatchSubjectPage({
             detail={`${app.environment.project.name} / ${app.environment.name}`}
             projectId={app.environment.projectId}
             serviceHref={`/apps/deploy/${app.environment.projectId}?service=${app.id}`}
-            alarms={alarms}
+            alarms={watching(app.id)}
         />
     );
 }

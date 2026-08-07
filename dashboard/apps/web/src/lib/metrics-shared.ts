@@ -4,15 +4,39 @@
  * so both the server services and client components can read it.
  */
 
+import { LOCAL_SERVER_ID } from "@polaris/core";
+
 export type MetricSubjectType = "app" | "storage" | "volume" | "host";
 
 /**
  * Subject id for the machine Polaris itself runs on. It has no Host row until it
  * is enrolled, but it is the one server every install has - so it gets a fixed,
- * reserved id rather than being absent from its own monitoring. A uuid, because
- * the column is one.
+ * reserved id rather than being absent from its own monitoring.
+ *
+ * A uuid because the column is one (`subjectId` is `@db.Uuid`), and reserved
+ * rather than allocated: nothing hands it out, nothing follows it, and there will
+ * never be a second. It is not an address, which is why it is never one - see
+ * `hostSubject` for what a URL carries instead.
  */
 export const LOCAL_HOST_SUBJECT = "00000000-0000-4000-8000-000000000001";
+
+/**
+ * The metric subject behind a server id from a URL or a query.
+ *
+ * The local machine is `local` everywhere a person or a route can see it - the
+ * Servers app, the runners, the Containers host picker - and the reserved uuid
+ * only inside the metric tables. Mapping here rather than at each caller is what
+ * keeps a reserved id from turning into a public one the moment somebody copies
+ * a link.
+ */
+export function hostSubject(serverId: string): string {
+    return serverId === LOCAL_SERVER_ID ? LOCAL_HOST_SUBJECT : serverId;
+}
+
+/** The other direction: how a server is addressed, given its metric subject. */
+export function hostRouteId(subjectId: string): string {
+    return subjectId === LOCAL_HOST_SUBJECT ? LOCAL_SERVER_ID : subjectId;
+}
 
 /** One point of a series returned to the client. Bytes are plain numbers (a
  *  device's memory/disk stays well under 2^53), percentages are derived from the

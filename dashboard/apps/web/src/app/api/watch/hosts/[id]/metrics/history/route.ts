@@ -1,12 +1,14 @@
 import { requirePermission } from "@/lib/session";
-import { resolveRange } from "@/lib/metrics-shared";
 import { getMetricSeries } from "@/lib/metrics-history-service";
+import { hostSubject, resolveRange } from "@/lib/metrics-shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** A server's load history over a preset (?range=1h|6h|1d|7d|30d) or a custom
- *  window (?from=&to= in epoch ms). Ownership is checked by the series reader. */
+ *  window (?from=&to= in epoch ms). `local` is the machine Polaris runs on, whose
+ *  samples are filed under a reserved subject id. Ownership is checked by the
+ *  series reader. */
 export async function GET(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
@@ -19,7 +21,13 @@ export async function GET(
         url.searchParams.get("from"),
         url.searchParams.get("to")
     );
-    const points = await getMetricSeries({ subjectType: "host", subjectId: id, ownerId: user.id, from, to });
+    const points = await getMetricSeries({
+        subjectType: "host",
+        subjectId: hostSubject(id),
+        ownerId: user.id,
+        from,
+        to
+    });
     if (points === null) return Response.json({ error: "Not found" }, { status: 404 });
     return Response.json({ points });
 }
