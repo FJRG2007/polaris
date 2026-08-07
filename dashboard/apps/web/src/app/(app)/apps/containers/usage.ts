@@ -48,13 +48,29 @@ export function carryForwardUsage(previous: HostSnapshot | null, next: HostSnaps
         return { ...row, ...last };
     });
     if (!filled) return next;
+    return { ...next, containers, statsAt: sampledAt(containers, next.statsAt) };
+}
 
-    // The header's age comes from the newest reading on the host, so it has to be
-    // recomputed over what is actually on screen - otherwise a table full of
-    // carried-forward figures reports no reading at all.
-    const newest = containers.reduce<number | null>(
-        (latest, row) => (row.statsAt !== null && (latest === null || row.statsAt > latest) ? row.statsAt : latest),
-        next.statsAt
-    );
-    return { ...next, containers, statsAt: newest };
+/**
+ * The instant the header reports, recomputed over what is actually on screen -
+ * otherwise a table full of carried-forward figures still says no reading has
+ * been taken.
+ *
+ * The oldest of them, and null as soon as one running container has none, which
+ * is how the server words it too. The freshest would let one warm container speak
+ * for the whole host, and the figure a screen shows its age from is the one that
+ * has to be the least flattering.
+ */
+function sampledAt(containers: ContainerRow[], fallback: number | null): number | null {
+    let oldest: number | null = null;
+    let running = 0;
+    for (const row of containers) {
+        if (row.state !== "running") continue;
+        running += 1;
+        if (row.statsAt === null) return null;
+        if (oldest === null || row.statsAt < oldest) oldest = row.statsAt;
+    }
+    // Nothing to sample is a complete picture rather than a missing one, and the
+    // server already said so.
+    return running === 0 ? fallback : oldest;
 }

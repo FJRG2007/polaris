@@ -17,7 +17,7 @@ import { prisma } from "@polaris/db";
 import type { DockerDriver } from "@polaris/docker";
 import { isLocalMachine, localDockerId } from "./local-machine";
 import { hostRouteId, LOCAL_HOST_SUBJECT, type MetricSubjectType } from "./metrics-shared";
-import { cachedSamples, newestSampleAt, refreshSamples, STATS_TTL_MS } from "./container-stats-cache";
+import { cachedSamples, oldestSampleAt, refreshSamples, STATS_TTL_MS } from "./container-stats-cache";
 import {
     hostDockerDriver,
     HOST_DOCKER_PREFIX,
@@ -332,12 +332,15 @@ async function containersOn(source: ContainerSource, ownerId: string): Promise<W
         });
 
         // Behind the answer, never in front of it, and single-flight per machine -
-        // so two people on Watch do not sample the same engine twice.
-        const newest = newestSampleAt(
+        // so two people on Watch do not sample the same engine twice. Judged on the
+        // oldest of the machine's samples: one warm container standing in for the
+        // rest is how a pass stops running while numbers nobody re-read go on
+        // passing for live.
+        const sampled = oldestSampleAt(
             samples,
             running.map((container) => container.id)
         );
-        if (newest === null || Date.now() - newest > STATS_TTL_MS) {
+        if (sampled === null || Date.now() - sampled > STATS_TTL_MS) {
             refreshSamples(
                 source.connectionId,
                 ownerId,

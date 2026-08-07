@@ -100,6 +100,28 @@ describe("a listing that comes back without usage", () => {
         expect(merged.statsAt).toBe(SAMPLED_AT + 5_000);
     });
 
+    it("dates the host by its oldest reading, not its freshest", () => {
+        const previous = snapshot([row({ id: "c1" }), row({ id: "c2", name: "api" })], SAMPLED_AT);
+        const fresh = row({ id: "c2", name: "api", cpuPercent: 5, statsAt: SAMPLED_AT + 30_000 });
+
+        const merged = carryForwardUsage(previous, snapshot([blank({ id: "c1" }), fresh], SAMPLED_AT + 30_000));
+
+        // c2 was re-read half a minute later, c1 is still on the reading it had.
+        // Reporting the host as sampled 30s ago would let one warm container speak
+        // for a table where nothing else moved.
+        expect(merged.statsAt).toBe(SAMPLED_AT);
+    });
+
+    it("dates the host as unsampled while one running container has no reading", () => {
+        const previous = snapshot([row({ id: "c1" })], SAMPLED_AT);
+        const never = blank({ id: "c2", name: "api" });
+
+        const merged = carryForwardUsage(previous, snapshot([blank({ id: "c1" }), never], null));
+
+        expect(merged.containers[0]?.cpuPercent).toBe(12.5);
+        expect(merged.statsAt).toBeNull();
+    });
+
     it("does not carry one container's figures onto another", () => {
         const previous = snapshot([row({ id: "c1" })], SAMPLED_AT);
 
