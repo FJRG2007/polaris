@@ -93,23 +93,29 @@ function brandFromHints(brands: string | null | undefined): { name: string; vers
  *
  * A browser writes a different token on each mobile platform, and every one of
  * those trails `Safari/` in the string: iOS forbids any engine but WebKit, so
- * Edge, Chrome and Firefox there are Safari wearing a name, and each says which
- * name in a token of its own. Miss the token and the row is not merely unnamed,
- * it is named as a competitor - and no hint can correct it, because WebKit sends
- * no `sec-ch-ua` at all. So each of them is listed with its desktop entry, and
- * `Safari/` stays last as the claim nothing narrower matched.
+ * Edge, Opera, Chrome and Firefox there are Safari wearing a name, and each says
+ * which name in a token of its own. Miss the token and the row is not merely
+ * unnamed, it is named as a competitor - and no hint can correct it, because
+ * WebKit sends no `sec-ch-ua` at all. So every token a browser answers to is
+ * grouped with its desktop entry and ahead of any broader claim, and `Safari/`
+ * stays last as the claim nothing narrower matched. Keeping a browser's own
+ * tokens together and above `Chrome/` and `Firefox/` is what makes the order
+ * hold on its own: a mobile string that later starts carrying the broad token
+ * too would otherwise be read as whichever browser it merely embeds.
  */
 const BROWSERS: readonly { readonly test: RegExp; readonly name: string; readonly version: RegExp }[] = [
     { test: /\bEdg\//, name: "Edge", version: /\bEdg\/(\d{1,4})/ },
     { test: /\bEdgA\//, name: "Edge", version: /\bEdgA\/(\d{1,4})/ },
     { test: /\bEdgiOS\//, name: "Edge", version: /\bEdgiOS\/(\d{1,4})/ },
     { test: /\bOPR\//, name: "Opera", version: /\bOPR\/(\d{1,4})/ },
+    { test: /\bOPT\//, name: "Opera", version: /\bOPT\/(\d{1,4})/ },
+    { test: /\bOPiOS\//, name: "Opera", version: /\bOPiOS\/(\d{1,4})/ },
     { test: /\bVivaldi\//, name: "Vivaldi", version: /\bVivaldi\/(\d{1,4})/ },
     { test: /\bSamsungBrowser\//, name: "Samsung Internet", version: /\bSamsungBrowser\/(\d{1,4})/ },
-    { test: /\bFirefox\//, name: "Firefox", version: /\bFirefox\/(\d{1,4})/ },
     { test: /\bFxiOS\//, name: "Firefox", version: /\bFxiOS\/(\d{1,4})/ },
-    { test: /\bChrome\//, name: "Chrome", version: /\bChrome\/(\d{1,4})/ },
+    { test: /\bFirefox\//, name: "Firefox", version: /\bFirefox\/(\d{1,4})/ },
     { test: /\bCriOS\//, name: "Chrome", version: /\bCriOS\/(\d{1,4})/ },
+    { test: /\bChrome\//, name: "Chrome", version: /\bChrome\/(\d{1,4})/ },
     { test: /\bSafari\//, name: "Safari", version: /\bVersion\/(\d{1,4})/ }
 ];
 

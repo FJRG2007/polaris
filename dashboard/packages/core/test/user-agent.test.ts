@@ -19,6 +19,9 @@ const SAFARI_IPAD =
 const CHROME_ANDROID =
     "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36";
 const FIREFOX_LINUX = "Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0";
+/** What every iOS browser is underneath, whichever name it goes by on top. */
+const WEBKIT_IPHONE =
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)";
 
 describe("describeClient", () => {
     it("reads the browser and system out of a user-agent", () => {
@@ -106,16 +109,44 @@ describe("describeClient", () => {
     // competitor's mark on a security screen. The hints cannot catch it either:
     // WebKit sends no `sec-ch-ua`, so these arrive with the user-agent alone.
     it("names the browsers that rebadge themselves on iOS and Android", () => {
-        const webkit = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)";
+        const webkit = WEBKIT_IPHONE;
         const cases = [
             [`${webkit} Version/17.5 EdgiOS/131.2903.92 Mobile/15E148 Safari/605.1.15`, "Edge", "131"],
             [`${webkit} CriOS/131.0.6778.73 Mobile/15E148 Safari/604.1`, "Chrome", "131"],
             [`${webkit} FxiOS/133.0 Mobile/15E148 Safari/605.1.15`, "Firefox", "133"],
-            [`${CHROME_ANDROID} EdgA/131.0.2903.87`, "Edge", "131"]
+            // Opera on iOS writes neither `OPR/` nor anything Chromium: current
+            // builds say `OPT/` and the older ones `OPiOS/`, both trailing Safari.
+            [`${webkit} OPT/5.1.0 Mobile/15E148 Safari/605.1.15`, "Opera", "5"],
+            [`${webkit} OPiOS/14.0.0.104835 Mobile/14E5239e Safari/9537.53`, "Opera", "14"],
+            [`${CHROME_ANDROID} EdgA/131.0.2903.87`, "Edge", "131"],
+            [`${CHROME_ANDROID} OPR/76.2.4027.73374`, "Opera", "76"]
         ] as const;
         for (const [userAgent, browser, browserVersion] of cases) {
             expect(describeClient(userAgent)).toMatchObject({ browser, browserVersion });
         }
+    });
+
+    // The list is first-match, so a browser's own token has to sit above any
+    // broader one the same string carries. Edge and Opera on Android are the
+    // cases that exist today - their tokens sit beside `Chrome/` - and there the
+    // name itself gives the order away. Chrome and Firefox on iOS carry only
+    // their narrow token today, so the broad one is written in here alongside it
+    // and the versions deliberately disagree: both tokens name the same browser,
+    // and the number is the only thing that says which entry answered.
+    it("reads a mobile browser off its own token even when a broader one follows", () => {
+        const webkit = WEBKIT_IPHONE;
+        const chromeIos = `${webkit} CriOS/131.0.6778.73 Chrome/99.0.0.0 Safari/604.1`;
+        const firefoxIos = `${webkit} FxiOS/133.0 Firefox/99.0 Safari/605.1.15`;
+        expect(describeClient(`${CHROME_ANDROID} EdgA/131.0.2903.87`).browser).toBe("Edge");
+        expect(describeClient(`${CHROME_ANDROID} OPR/76.2.4027.73374`).browser).toBe("Opera");
+        expect(describeClient(chromeIos)).toMatchObject({
+            browser: "Chrome",
+            browserVersion: "131"
+        });
+        expect(describeClient(firefoxIos)).toMatchObject({
+            browser: "Firefox",
+            browserVersion: "133"
+        });
     });
 
     it("still reads Safari as Safari once the rebadged tokens are checked", () => {
