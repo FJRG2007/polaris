@@ -27,6 +27,7 @@ import { useEffect, useState, useTransition } from "react";
 import { VolumeForm, type EditVolume } from "./volume-form";
 import type { VolumeDetail } from "@/lib/deploy-volume-service";
 import { MetricsHistory, type MetricSpec } from "@/components/metrics-history";
+import { dropSnapshots, readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { stageVolumeDeleteAction, volumeDetailAction, volumeUsageAction, wipeVolumeAction } from "./project-actions";
 import {
     Button,
@@ -81,15 +82,24 @@ const VOLUME_METRICS: MetricSpec[] = [
     }
 ];
 
-/** A measurement in flight, done, or not started. `bytes` is only meaningful
- *  once it is "done", where null means "could not be measured". */
-type Usage = { state: "measuring" } | { state: "done"; bytes: number | null };
+/** A measurement in flight or done. `bytes` is the figure to put on screen - the
+ *  last one taken while a fresh measurement is in flight - and null means there is
+ *  none yet or it could not be measured. */
+type Usage = { state: "measuring" | "done"; bytes: number | null };
 
-/** Measurements already taken this session, so reopening a volume shows its size
- *  at once instead of walking the tree again. Short-lived on purpose: a figure
- *  from a minute ago is worth showing, one from an hour ago is not. */
+/** Under this, the last measurement stands and the tree is not walked again:
+ *  reopening a volume should not cost a `du` on somebody's disk. */
 const USAGE_TTL_MS = 60_000;
-const usageCache = new Map<string, { bytes: number | null; at: number }>();
+
+/** Past this, the last measurement is not even worth painting while a fresh one
+ *  runs - a figure from a minute ago says something about the volume, one from
+ *  this morning says something about a volume that has since been written to. */
+const USAGE_PAINT_MAX_AGE_MS = 3_600_000;
+
+/** Kept in the tab rather than in a module Map, so a reload paints the size too. */
+function usageKey(volumeId: string): string {
+    return `deploy.volume-usage.${volumeId}`;
+}
 
 export function VolumeDetailDialog({
     volumeId,
@@ -108,7 +118,7 @@ export function VolumeDetailDialog({
     const [tab, setTab] = useState<Tab>(openOn);
     const [full, setFull] = useState(false);
     const [data, setData] = useState<{ volume: VolumeDetail; canManage: boolean } | null>(null);
-    const [usage, setUsage] = useState<Usage>({ state: "measuring" });
+    const [usage, setUsage] = useState<Usage>({ state: "measuring", bytes: null });
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -130,15 +140,16 @@ export function VolumeDetailDialog({
         });
 
         // Measured alongside, not after: the panel is already on screen and
-        // usable while this is still walking the volume.
-        const cached = usageCache.get(volumeId);
-        if (cached && Date.now() - cached.at < USAGE_TTL_MS) {
-            setUsage({ state: "done", bytes: cached.bytes });
+        // usable while this is still walking the volume - and it shows the last
+        // size it knows while that happens, rather than the word "Measuring".
+        const kept = readSnapshot<number | null>(usageKey(volumeId), USAGE_PAINT_MAX_AGE_MS);
+        if (kept && Date.now() - kept.at < USAGE_TTL_MS) {
+            setUsage({ state: "done", bytes: kept.value });
         } else {
-            setUsage({ state: "measuring" });
+            setUsage({ state: "measuring", bytes: kept?.value ?? null });
             void volumeUsageAction(volumeId).then((result) => {
                 const bytes = result.usedBytes ?? null;
-                usageCache.set(volumeId, { bytes, at: Date.now() });
+                writeSnapshot(usageKey(volumeId), bytes);
                 if (active) setUsage({ state: "done", bytes });
             });
         }
@@ -154,16 +165,17 @@ export function VolumeDetailDialog({
         onChanged();
         router.refresh();
         if (!volumeId) return;
-        // What the volume holds has changed under it, so the cached figure is the
-        // one thing that must not be reused.
-        usageCache.delete(volumeId);
-        setUsage({ state: "measuring" });
+        // What the volume holds has changed under it, so the kept figure is the
+        // one thing that must not be reused - not even to paint while the fresh
+        // measurement runs.
+        dropSnapshots(usageKey(volumeId));
+        setUsage({ state: "measuring", bytes: null });
         void volumeDetailAction(volumeId).then((result) => {
             if (result.volume) setData({ volume: result.volume, canManage: result.canManage ?? false });
         });
         void volumeUsageAction(volumeId).then((result) => {
             const bytes = result.usedBytes ?? null;
-            usageCache.set(volumeId, { bytes, at: Date.now() });
+            writeSnapshot(usageKey(volumeId), bytes);
             setUsage({ state: "done", bytes });
         });
     }
@@ -304,14 +316,22 @@ function Notice({ title, body }: { title: string; body: string }) {
 
 function MetricsTab({ volume, usage }: { volume: VolumeDetail; usage: Usage }) {
     const measuring = usage.state === "measuring";
-    const usedBytes = usage.state === "done" ? usage.bytes : null;
+    const usedBytes = usage.bytes;
     return (
         <div className="flex flex-col gap-4">
             <div className="grid gap-3 sm:grid-cols-3">
                 <Stat
                     label="In use"
-                    value={measuring ? "Measuring" : usedBytes == null ? "Not measurable" : formatBytes(usedBytes)}
-                    pending={measuring}
+                    // The last size stands while a fresh measurement runs: a number
+                    // being re-read is worth more than the word "Measuring".
+                    value={
+                        usedBytes != null
+                            ? formatBytes(usedBytes)
+                            : measuring
+                              ? "Measuring"
+                              : "Not measurable"
+                    }
+                    pending={measuring && usedBytes == null}
                     hint={
                         measuring
                             ? "Reading the volume from inside the service"

@@ -11,6 +11,10 @@
  *
  * Polling pauses while the tab is hidden and catches up on return, so a
  * dashboard left open overnight is not still asking every few seconds.
+ *
+ * `useLiveRead` is the same behaviour over any promise - a server action, a
+ * measurement, anything that is not a GET - so a panel of tracked figures gets
+ * the instant paint whether the numbers arrive over an endpoint or an action.
  */
 
 import { mergeUnchanged } from "@/lib/structural-merge";
@@ -40,74 +44,64 @@ export interface LiveResource<T> {
     stale: string | null;
     /** True while a request is in flight over data already on screen. */
     refreshing: boolean;
-    /** When the shown data was fetched, or null when it came from the cache. */
+    /**
+     * When the shown reading was taken: the moment it arrived, or the moment the
+     * kept one was written when it is still the cached one. Never null while data
+     * is on screen, so a panel can always say how old what it shows is - a figure
+     * from ten minutes ago passing for this instant's is the failure mode the
+     * cache would otherwise introduce.
+     */
     updatedAt: number | null;
     refresh: () => void;
 }
 
 /**
- * Fetch `url` now and every `intervalMs`, seeded from the cached snapshot.
+ * The cached, polled read itself, over any promise.
  *
- * `cacheKey` identifies the snapshot; pass something stable per subject (the
- * connection id), not per render.
+ * `load` is called with an abort signal and must resolve the value or throw; pass
+ * it through `useCallback`, because a new identity is what tells this a different
+ * subject is being read and re-runs the fetch.
  */
-export function useLiveResource<T>({
-    url,
+export function useLiveRead<T>({
+    load,
     cacheKey,
     intervalMs,
     enabled = true,
-    paused = false,
-    select
+    paused = false
 }: {
-    url: string;
+    load: (signal: AbortSignal) => Promise<T>;
     cacheKey: string;
-    intervalMs: number;
-    /** False asks for nothing at all, for a subject nothing on screen is asking
-     *  about. `data` stays as it was, so a caller that gates on it reads the
-     *  answer as unknown rather than as a value. */
+    /** Omit for a read that is taken once per subject rather than polled. */
+    intervalMs?: number;
     enabled?: boolean;
-    /** True stops the poll while leaving the resource loaded: a subject that is
-     *  on screen is still read once, and read again when it changes, because a
-     *  screen that has been told to stop refreshing still has to show what it is
-     *  looking at. */
     paused?: boolean;
-    /** Pull the payload out of the response body. */
-    select: (body: unknown) => T;
 }): LiveResource<T> {
-    const [data, setData] = useState<T | null>(() => read<T>(cacheKey)?.value ?? null);
+    // One read of the kept snapshot, seeding both the reading and its age.
+    const [seeded] = useState(() => read<T>(cacheKey));
+    const [data, setData] = useState<T | null>(seeded?.value ?? null);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
-    const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+    const [updatedAt, setUpdatedAt] = useState<number | null>(seeded?.at ?? null);
     // Held in a ref so the fetch callback does not have to change identity every
     // time the data does, which would restart the interval on every tick.
     const latest = useRef<T | null>(data);
-    const selectRef = useRef(select);
-    selectRef.current = select;
 
     // A key change means a different subject entirely, so the previous device's
     // readings must not be folded into the new one's.
     useEffect(() => {
-        const seed = read<T>(cacheKey)?.value ?? null;
-        latest.current = seed;
-        setData(seed);
-        setUpdatedAt(null);
+        const kept = read<T>(cacheKey);
+        latest.current = kept?.value ?? null;
+        setData(kept?.value ?? null);
+        setUpdatedAt(kept?.at ?? null);
         setError(null);
     }, [cacheKey]);
 
     const refresh = useCallback(() => {
         const controller = new AbortController();
         setRefreshing(true);
-        void fetch(url, { cache: "no-store", signal: controller.signal })
-            .then(async (res) => {
-                const body: unknown = await res.json();
-                if (!res.ok) {
-                    const message =
-                        typeof body === "object" && body !== null && "error" in body
-                            ? String((body as { error: unknown }).error)
-                            : "Unable to reach the device";
-                    throw new Error(message);
-                }
-                const value = selectRef.current(body);
+        void load(controller.signal)
+            .then((value) => {
+                if (controller.signal.aborted) return;
                 // Only what differs becomes a new reference, so an unchanged
                 // panel does not re-render and nothing flickers.
                 const merged =
@@ -128,7 +122,7 @@ export function useLiveResource<T>({
                 if (!controller.signal.aborted) setRefreshing(false);
             });
         return () => controller.abort();
-    }, [url, cacheKey]);
+    }, [load, cacheKey]);
 
     // The read a subject needs to be on screen at all: once, and again whenever
     // the subject changes. Kept apart from the poll so pausing stops the refresh
@@ -139,7 +133,7 @@ export function useLiveResource<T>({
     }, [refresh, enabled]);
 
     useEffect(() => {
-        if (!enabled || paused) return;
+        if (!enabled || paused || !intervalMs) return;
         let timer: ReturnType<typeof setInterval> | null = null;
         const start = (): void => {
             if (timer === null) timer = setInterval(refresh, intervalMs);
@@ -176,4 +170,55 @@ export function useLiveResource<T>({
         updatedAt,
         refresh
     };
+}
+
+/**
+ * Fetch `url` now and every `intervalMs`, seeded from the cached snapshot.
+ *
+ * `cacheKey` identifies the snapshot; pass something stable per subject (the
+ * connection id), not per render.
+ */
+export function useLiveResource<T>({
+    url,
+    cacheKey,
+    intervalMs,
+    enabled = true,
+    paused = false,
+    select
+}: {
+    url: string;
+    cacheKey: string;
+    intervalMs: number;
+    /** False asks for nothing at all, for a subject nothing on screen is asking
+     *  about. `data` stays as it was, so a caller that gates on it reads the
+     *  answer as unknown rather than as a value. */
+    enabled?: boolean;
+    /** True stops the poll while leaving the resource loaded: a subject that is
+     *  on screen is still read once, and read again when it changes, because a
+     *  screen that has been told to stop refreshing still has to show what it is
+     *  looking at. */
+    paused?: boolean;
+    /** Pull the payload out of the response body. */
+    select: (body: unknown) => T;
+}): LiveResource<T> {
+    const selectRef = useRef(select);
+    selectRef.current = select;
+
+    const load = useCallback(
+        async (signal: AbortSignal): Promise<T> => {
+            const res = await fetch(url, { cache: "no-store", signal });
+            const body: unknown = await res.json();
+            if (!res.ok) {
+                const message =
+                    typeof body === "object" && body !== null && "error" in body
+                        ? String((body as { error: unknown }).error)
+                        : "Unable to reach the device";
+                throw new Error(message);
+            }
+            return selectRef.current(body);
+        },
+        [url]
+    );
+
+    return useLiveRead<T>({ load, cacheKey, intervalMs, enabled, paused });
 }

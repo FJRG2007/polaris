@@ -1,9 +1,11 @@
 /**
- * How old a reading is, in words, for the two Containers screens that show one.
+ * How old a reading is, in words, for every screen that shows one.
  *
- * Usage is sampled behind the request rather than in front of it, so what is on
- * screen is the last sample rather than this instant's. That is only honest if
- * the screen says so when the number has aged, which is what this is for.
+ * Usage is sampled behind the request rather than in front of it, and a revisit
+ * paints the last sample before the fresh one lands, so what is on screen is
+ * rarely this instant's. That is only honest if the screen says so once the
+ * number has aged, which is what this is for. Lives with the Containers screens
+ * because that is where it started; the servers and deploy panels read it too.
  */
 
 /** A gap in words: "3s", "2m", "1h". Sub-second gaps read as "0s" rather than

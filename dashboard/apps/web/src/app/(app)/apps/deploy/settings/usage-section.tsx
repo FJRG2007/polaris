@@ -7,12 +7,18 @@
  * container - opening a summary screen should not fan out a Docker call per
  * service - so they carry the time they were sampled at instead of pretending to
  * be instantaneous.
+ *
+ * The screen paints from the last answer it held and then keeps itself current on
+ * the collector's own cadence, so opening it shows numbers rather than a spinner
+ * and leaving it open shows this minute's rather than the ones it opened with.
  */
 
+import { useCallback } from "react";
 import { Button } from "@polaris/ui";
-import { useEffect, useState } from "react";
 import { SettingsCard } from "../project-settings";
+import { COLLECT_TICK_MS } from "@/lib/metrics-shared";
 import { projectUsageAction } from "../project-actions";
+import { useLiveRead } from "@/components/use-live-resource";
 import { useDisplayFormat } from "@/components/display-format";
 import type { ProjectUsage } from "@/lib/deploy-project-service";
 import { Database, Layers, Loader2, RefreshCw } from "lucide-react";
@@ -31,25 +37,27 @@ function formatBytes(bytes: number | null): string {
 
 export function UsageSection({ projectId }: { projectId: string }) {
     const display = useDisplayFormat();
-    const [usage, setUsage] = useState<ProjectUsage | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
 
-    function load() {
-        setLoading(true);
-        void projectUsageAction(projectId)
-            .then((result) => {
-                if (result.error || !result.usage) {
-                    setError(result.error ?? "Could not load the usage");
-                    return;
-                }
-                setError(null);
-                setUsage(result.usage);
-            })
-            .finally(() => setLoading(false));
-    }
+    const load = useCallback(async (): Promise<ProjectUsage> => {
+        const result = await projectUsageAction(projectId);
+        if (result.error || !result.usage) throw new Error(result.error ?? "Could not load the usage");
+        return result.usage;
+    }, [projectId]);
 
-    useEffect(load, [projectId]);
+    const {
+        data: usage,
+        loading,
+        error,
+        stale,
+        refreshing,
+        refresh
+    } = useLiveRead<ProjectUsage>({
+        load,
+        cacheKey: `deploy.usage.${projectId}`,
+        // Nothing new exists between collector ticks, so asking faster would only
+        // redraw identical figures.
+        intervalMs: COLLECT_TICK_MS
+    });
 
     return (
         <div className="flex flex-col gap-4">
@@ -57,7 +65,7 @@ export function UsageSection({ projectId }: { projectId: string }) {
                 title="Totals"
                 description="Summed across every service that reported a sample in the last half hour."
             >
-                {loading && !usage ? (
+                {loading ? (
                     <div className="flex justify-center py-6 text-muted-foreground">
                         <Loader2 className="size-5 animate-spin" />
                     </div>
@@ -83,14 +91,18 @@ export function UsageSection({ projectId }: { projectId: string }) {
                                     ? `Sampled ${display.dateTime(usage.sampledAt)}`
                                     : "No samples yet. The collector writes one every few minutes."}
                             </p>
-                            <Button variant="ghost" size="sm" onClick={load} disabled={loading}>
-                                {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                            <Button variant="ghost" size="sm" onClick={refresh} disabled={refreshing}>
+                                {refreshing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
                                 Refresh
                             </Button>
                         </div>
                     </>
                 )}
+                {/* A read that failed with nothing to show is the failure; one that
+                    failed over figures already on screen only means they stopped
+                    moving, which is a warning rather than an error. */}
                 {error && <p className="text-sm text-danger">{error}</p>}
+                {stale && <p className="text-sm text-warning">Showing the last figures. {stale}</p>}
             </SettingsCard>
 
             <SettingsCard title="By service" description="A service with no figures is not reporting - usually because it is not running.">

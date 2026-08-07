@@ -8,11 +8,11 @@
  */
 
 import type { ReactNode } from "react";
-import { Clock, HardDrive, RefreshCw, TriangleAlert } from "lucide-react";
 import { formatBytes } from "@polaris/core";
-import { Badge, Card, CardBody, CardHeader, CardTitle, RadialGauge, type GaugeTone } from "@polaris/ui";
-import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
 import { useDisplayFormat } from "@/components/display-format";
+import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
+import { Clock, HardDrive, RefreshCw, TriangleAlert } from "lucide-react";
+import { Badge, Card, CardBody, CardHeader, CardTitle, RadialGauge, type GaugeTone } from "@polaris/ui";
 
 /** Pick a gauge color from a 0..1 ratio: calm, then warning, then danger. */
 function ratioTone(ratio: number, warn = 0.75, bad = 0.9): GaugeTone {
@@ -40,7 +40,7 @@ export function UnasMetrics({
     metrics: UnasMetricsData;
     /** A reading is in flight over the one on screen. */
     refreshing?: boolean;
-    /** When this reading arrived, or null while it is still the cached one. */
+    /** When this reading was taken, whether it just arrived or is the kept one. */
     updatedAt?: number | null;
     /** Why these readings stopped updating, when the device stopped answering. */
     stale?: string | null;

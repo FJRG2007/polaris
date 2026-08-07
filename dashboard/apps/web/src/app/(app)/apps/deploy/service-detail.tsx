@@ -19,6 +19,7 @@ import { stageServiceDeleteAction } from "./project-actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { isTunnelHostname, type DisplayFormat } from "@polaris/core";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
+import { SERVICE_METRICS_MS, useServiceMetrics } from "./service-metrics";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
 import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/components/metrics-history";
@@ -1444,29 +1445,14 @@ function formatBytes(bytes: number): string {
 }
 
 function MetricsTab({ applicationId }: { applicationId: string }) {
-    const [data, setData] = useState<{
-        state?: string;
-        cpuPercent?: number | null;
-        memPercent?: number | null;
-        memUsedBytes?: number | null;
-        memTotalBytes?: number | null;
-    } | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        let active = true;
-        void fetch(`/api/deploy/apps/${applicationId}/metrics`, { cache: "no-store" })
-            .then((res) => (res.ok ? res.json() : null))
-            .then((body) => active && setData(body))
-            .catch(() => undefined)
-            .finally(() => active && setLoading(false));
-        return () => {
-            active = false;
-        };
-    }, [applicationId]);
+    // Seeded from the last reading this tab held for the service and refreshed
+    // while it is open: a live figure that only exists after a round trip is one
+    // the screen should show, not wait for.
+    const { data, loading, stale } = useServiceMetrics(applicationId, SERVICE_METRICS_MS);
 
     return (
         <div className="flex flex-col gap-4 py-1">
+            {stale ? <p className="text-xs text-warning">Showing the last reading. {stale}</p> : null}
             {loading ? (
                 <Loading />
             ) : data?.state ? (

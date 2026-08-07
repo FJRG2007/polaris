@@ -17,6 +17,7 @@ import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageDatabaseDeleteAction } from "./project-actions";
 import { DockerMark, GitHubMark } from "@/components/brand-icons";
 import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
+import { SERVICE_LIST_METRICS_MS, useServiceMetrics } from "./service-metrics";
 import {
     useCallback,
     useEffect,
@@ -1577,26 +1578,15 @@ export function DeploymentLogs({ deploymentId, onDone }: { deploymentId: string;
     );
 }
 
+/** A service's state and what it is consuming, on its card. Painted from the last
+ *  reading the tab held for it, then kept current - a badge that appears a second
+ *  after the card it belongs to is a card that moves under the pointer. */
 function MetricsBadge({ applicationId }: { applicationId: string }) {
-    const [text, setText] = useState<string | null>(null);
+    const { data } = useServiceMetrics(applicationId, SERVICE_LIST_METRICS_MS);
 
-    useEffect(() => {
-        let active = true;
-        void fetch(`/api/deploy/apps/${applicationId}/metrics`, { cache: "no-store" })
-            .then((res) => (res.ok ? res.json() : null))
-            .then((data: { state?: string; cpuPercent?: number | null; memPercent?: number | null } | null) => {
-                if (!active || !data?.state) return;
-                const parts = [data.state];
-                if (typeof data.cpuPercent === "number") parts.push(`${data.cpuPercent.toFixed(0)}% cpu`);
-                if (typeof data.memPercent === "number") parts.push(`${data.memPercent.toFixed(0)}% mem`);
-                setText(parts.join(" · "));
-            })
-            .catch(() => undefined);
-        return () => {
-            active = false;
-        };
-    }, [applicationId]);
-
-    if (!text) return null;
-    return <Badge>{text}</Badge>;
+    if (!data?.state) return null;
+    const parts = [data.state];
+    if (typeof data.cpuPercent === "number") parts.push(`${data.cpuPercent.toFixed(0)}% cpu`);
+    if (typeof data.memPercent === "number") parts.push(`${data.memPercent.toFixed(0)}% mem`);
+    return <Badge>{parts.join(" · ")}</Badge>;
 }
