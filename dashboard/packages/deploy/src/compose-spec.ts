@@ -12,6 +12,9 @@ import type { AppDeployPlan, DbDeployPlan } from "./runtime/driver.js";
 export interface ComposeSpecPort {
     readonly host: number;
     readonly container: number;
+    /** Transport to publish. Defaults to TCP; a Bedrock game server is the case
+     *  that is UDP, and publishing it as TCP means nothing can reach it. */
+    readonly protocol?: "tcp" | "udp";
 }
 
 export interface ComposeSpecVolume {
@@ -88,7 +91,15 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
                 // Publish a host port so the app is reachable over the host's IP
                 // (LAN/intranet) with no reverse proxy - bound on all interfaces,
                 // so it is only internet-facing if the operator forwards the port.
-                ports: plan.expose ? [{ host: plan.expose.host, container: plan.expose.container }] : [],
+                ports: plan.expose
+                    ? [
+                          {
+                              host: plan.expose.host,
+                              container: plan.expose.container,
+                              ...(plan.expose.protocol ? { protocol: plan.expose.protocol } : {})
+                          }
+                      ]
+                    : [],
                 volumes: plan.volumes.map((volume) => ({
                     source: volume.source,
                     target: volume.mountPath,
@@ -185,7 +196,10 @@ export function renderComposeYaml(spec: ComposeSpec, volumeRoot: string, mountRo
         }
         if (service.ports.length > 0) {
             lines.push("    ports:");
-            for (const port of service.ports) lines.push(`      - ${yamlQuote(`${port.host}:${port.container}`)}`);
+            for (const port of service.ports) {
+                const suffix = port.protocol === "udp" ? "/udp" : "";
+                lines.push(`      - ${yamlQuote(`${port.host}:${port.container}${suffix}`)}`);
+            }
         }
         if (service.volumes.length > 0) {
             lines.push("    volumes:");

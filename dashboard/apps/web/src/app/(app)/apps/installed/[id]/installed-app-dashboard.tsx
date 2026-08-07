@@ -53,7 +53,10 @@ function adaptedPanelFor(app: InstalledAppDetail, settings: InstalledAppSetting[
     switch (app.catalogId) {
         case "messaging-bridge":
             return <MessagingBridgePanel />;
+        // Both editions are driven by the same panel; what differs is underneath,
+        // and the panel offers what the edition it is looking at actually has.
         case "minecraft":
+        case "minecraft-bedrock":
             return (
                 <MinecraftPanel
                     installedAppId={app.id}
@@ -86,6 +89,11 @@ export function InstalledAppDashboard({
     const adaptedPanel = adaptedPanelFor(app, settings, running);
     const [showLogs, setShowLogs] = useState(adaptedPanel === null);
     const { log, refresh: loadLog } = useRuntimeLog(applicationId, running && showLogs);
+    // Back goes where this app is listed, which for a game server is the Game
+    // servers page rather than the marketplace it was installed from.
+    const isGame = app.catalogId.startsWith("minecraft");
+    const backHref = isGame ? "/apps/games" : "/apps/marketplace";
+    const backLabel = isGame ? "Game servers" : "Marketplace";
 
     function run(action: () => Promise<{ error?: string }>) {
         setError(null);
@@ -102,10 +110,10 @@ export function InstalledAppDashboard({
     return (
         <div className="flex flex-col gap-4">
             <Link
-                href="/apps/marketplace"
+                href={backHref}
                 className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
-                <ArrowLeft className="size-4" /> Marketplace
+                <ArrowLeft className="size-4" /> {backLabel}
             </Link>
 
             <PageHeader
@@ -206,7 +214,7 @@ export function InstalledAppDashboard({
                                         setConfirmingUninstall(false);
                                         return;
                                     }
-                                    router.push("/apps/marketplace");
+                                    router.push(backHref);
                                 })
                             }
                             disabled={pending}

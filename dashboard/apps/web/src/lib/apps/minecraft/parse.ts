@@ -47,6 +47,30 @@ export function parsePlayerList(output: string): PlayerList | null {
     return { online, max, players: parseNameList(match[3] ?? "") };
 }
 
+/**
+ * The most recent `list` answer in a console log. Bedrock has no RCON, so its
+ * answer is not returned to the caller at all - it is printed to the server's own
+ * console, where the newest one is the true one and the ones above it are
+ * history.
+ */
+export function parsePlayerListFromLog(log: string): PlayerList | null {
+    const lines = stripFormatting(log).split(/\r?\n/);
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+        const line = lines[index] ?? "";
+        const counted = parsePlayerList(line);
+        if (!counted) continue;
+        // Bedrock prints the count and the names on separate lines. Only reach for
+        // the line below when the count says there are names and this line carried
+        // none - otherwise the next log line would be read as a player.
+        if (counted.online > 0 && counted.players.length === 0) {
+            const names = parseNameList(lines[index + 1] ?? "");
+            return { ...counted, players: names };
+        }
+        return counted;
+    }
+    return null;
+}
+
 /** The trailing "Alice, Bob" of a list answer. Essentials-style suffixes and
  *  blank entries are dropped; a name Minecraft accepts has no spaces. */
 function parseNameList(tail: string): string[] {
@@ -86,6 +110,15 @@ const bansFileSchema = z
  *  was in flight would be worse than one that is briefly short a name. */
 export function parseNameFile(content: string): string[] {
     return rosterFileSchema.parse(safeJson(content)).map((entry) => entry.name);
+}
+
+/** The addresses in `banned-ips.json`. */
+export function parseBannedIps(content: string): string[] {
+    return z
+        .array(z.object({ ip: z.string().trim().min(1).max(64) }).passthrough())
+        .catch([])
+        .parse(safeJson(content))
+        .map((entry) => entry.ip);
 }
 
 /** Entries out of `banned-players.json`, with why and by whom. */

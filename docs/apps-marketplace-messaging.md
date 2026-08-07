@@ -252,6 +252,38 @@ does: Polaris components, Polaris navigation, no embedded foreign UI. The
 Minecraft app is the reference for that, and the shape any later game server
 follows.
 
+**Game servers is a pillar page, not one app.** `/apps/games` lists every server
+this owner runs, of either edition, with what each one is doing right now and a
+New server dialog that picks the edition up front. A server is still a
+marketplace install underneath - the page is a shorter way into the same install
+path, so a server made either way is the same object.
+
+- **Both editions.** `minecraft` is Java (PC), `minecraft-bedrock` is Bedrock
+  (phones, consoles, the Windows app). They are managed through one panel and
+  differ underneath: Bedrock has no RCON, so its commands go through the image's
+  `send-command` and its player list is read back out of the console log; it has
+  an allow list rather than a whitelist, records operators by xuid, and has no
+  ban command at all - so the screens offer only what the edition actually has.
+- **Reachable on the port players type.** A game server is not reached through
+  the proxy, so the manifest declares the host port its clients assume (25565
+  TCP, 19132 UDP) and the install pins it, taking the next free one for a second
+  server. Publishing a Bedrock server as TCP would answer nothing, hence the
+  protocol on the port spec.
+- **Closed by default.** Authentication required, whitelist enforced, command
+  blocks off, secure profiles required, spawn protected - and an anticheat
+  (grimac), block history to roll a raid back with (coreprotect) and the
+  permission plugin both are administered through (luckperms) installed on the
+  first boot. Each carries `?` so a Minecraft release they have no build for yet
+  warns instead of stopping the server.
+- **Its own permissions.** `games.read`, `games.moderate` and `games.manage`, so
+  a moderator can kick and whitelist without being able to deploy anything.
+  `deploy.manage` carries all three, which is what keeps roles written before
+  they existed working.
+- **The firewall reaches it.** Polaris' firewall is an HTTP guard and a game
+  server is not HTTP, so its blocked addresses are handed to the server's own ban
+  list from the Players screen. Ranges stay behind: Minecraft bans one address at
+  a time, and the screen says how many were left.
+
 - **Install is one click.** The card installs on this server with the manifest's
   defaults and opens the app. `Configure` is the same install with the server,
   storage and settings exposed. The EULA is accepted by installing, which the

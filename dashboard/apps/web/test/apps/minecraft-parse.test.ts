@@ -12,9 +12,11 @@
 
 import { describe, expect, it } from "vitest";
 import {
+    parseBannedIps,
     parseBansFile,
     parseNameFile,
     parsePlayerList,
+    parsePlayerListFromLog,
     parseProperties,
     parseServerVersion,
     parseWhitelistAnswer,
@@ -57,6 +59,42 @@ describe("parsePlayerList", () => {
     it("refuses anything that is not a player list", () => {
         expect(parsePlayerList("")).toBeNull();
         expect(parsePlayerList("Unknown command")).toBeNull();
+    });
+});
+
+describe("parsePlayerListFromLog", () => {
+    // Bedrock has no RCON: the command is written to the console and the answer is
+    // only ever printed to the log, under whatever has happened since.
+    it("takes the newest answer, not the first", () => {
+        const log = [
+            "[2026-08-07 22:24:35 INFO] There are 0/10 players online:",
+            "[2026-08-07 22:30:01 INFO] Player connected: Alice",
+            "[2026-08-07 22:31:00 INFO] There are 1/10 players online:",
+            "Alice"
+        ].join("\n");
+        expect(parsePlayerListFromLog(log)).toEqual({ online: 1, max: 10, players: ["Alice"] });
+    });
+
+    // The names are on the line below the count, and that line is a log line like
+    // any other - so an empty server must not read the next entry as a player.
+    it("does not read the following log line as a player when nobody is on", () => {
+        const log = ["[INFO] There are 0/10 players online:", "[INFO] Server started."].join("\n");
+        expect(parsePlayerListFromLog(log)).toEqual({ online: 0, max: 10, players: [] });
+    });
+
+    it("has no answer in a log that never contained one", () => {
+        expect(parsePlayerListFromLog("[INFO] Server started.")).toBeNull();
+    });
+});
+
+describe("parseBannedIps", () => {
+    it("reads the addresses the server refuses", () => {
+        const file = "[{\"ip\":\"203.0.113.7\",\"source\":\"Server\",\"reason\":\"Blocked\"}]";
+        expect(parseBannedIps(file)).toEqual(["203.0.113.7"]);
+    });
+
+    it("reads a server that has banned nobody", () => {
+        expect(parseBannedIps("")).toEqual([]);
     });
 });
 

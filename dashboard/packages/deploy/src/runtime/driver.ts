@@ -78,7 +78,7 @@ export interface AppDeployPlan {
     /** Host port to publish so the app is reachable directly over the host's IP
      *  (LAN/intranet), independent of any reverse proxy. `container` is the port
      *  the app listens on inside the container. */
-    readonly expose?: { readonly host: number; readonly container: number };
+    readonly expose?: { readonly host: number; readonly container: number; readonly protocol?: "tcp" | "udp" };
     /** True when `expose.container` is a fallback guess (the user did not pin a
      *  port), so the runtime may refine it from the image's own exposed port. */
     readonly autoContainerPort?: boolean;

@@ -22,6 +22,7 @@ import {
     FileText,
     FolderGit2,
     FolderOpen,
+    Gamepad2,
     Globe,
     HardDrive,
     History,
@@ -193,6 +194,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
     apps: [
         { label: "Deploy", href: "/apps/deploy", icon: Rocket, keywords: ["projects", "services", "docker"] },
         { label: "Marketplace", href: "/apps/marketplace", icon: Store, keywords: ["install", "catalog"] },
+        {
+            label: "Game servers",
+            href: "/apps/games",
+            icon: Gamepad2,
+            keywords: ["minecraft", "java", "bedrock", "players", "console", "rcon", "mods", "plugins"]
+        },
         { label: "Servers", href: "/apps/servers", icon: Server, keywords: ["hosts", "machines", "ssh"] },
         { label: "Runners", href: "/apps/runners", icon: Workflow, keywords: ["github actions", "ci"] },
         {

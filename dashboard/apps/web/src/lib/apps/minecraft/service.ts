@@ -17,19 +17,47 @@
 import { prisma } from "@polaris/db";
 import { getHostLanIp } from "@/lib/host-address";
 import type { RuntimePorts } from "@polaris/deploy";
-import { hostPortForApp } from "@/lib/deploy-service";
 import { currentReleaseRef } from "@/lib/deploy/releases";
+import { resolveWaf } from "@/lib/waf-service";
 import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
-import { parseBansFile, parseNameFile, parsePlayerList, parseProperties, type BanEntry, type PlayerList } from "./parse";
+import { readAppContainerMetricsOrNull } from "@/lib/app-container-metrics";
+import { hostPortForApp, readAppRuntimeLog } from "@/lib/deploy-service";
+import {
+    parseBannedIps,
+    parseBansFile,
+    parseNameFile,
+    parsePlayerList,
+    parsePlayerListFromLog,
+    parseProperties,
+    type BanEntry,
+    type PlayerList
+} from "./parse";
 
 /** Where the server's data lives inside the container (the image's own /data). */
 const DATA_DIR = "/data";
+
+/**
+ * Which Minecraft this is. The two editions are managed the same way from the
+ * outside and differently underneath: Java answers commands over RCON, while
+ * Bedrock has no RCON at all - its commands go to the server's console and its
+ * answers come back only in the log.
+ */
+export type MinecraftEdition = "java" | "bedrock";
+
+export function editionOf(catalogId: string): MinecraftEdition {
+    return catalogId === "minecraft-bedrock" ? "bedrock" : "java";
+}
+
+/** How long to give the Bedrock console to print an answer we then read back. */
+const CONSOLE_ANSWER_MS = 700;
 
 /** Long enough for a ban reason, short enough that no single field can carry a
  *  script into the console. */
 const MAX_COMMAND_LENGTH = 512;
 
 export interface MinecraftStatus {
+    /** Which Minecraft this is; the screens offer what the edition supports. */
+    readonly edition: MinecraftEdition;
     /** The container is up. */
     readonly running: boolean;
     /** The server answered RCON - it is up AND past its startup. */
@@ -39,6 +67,21 @@ export interface MinecraftStatus {
     readonly address: string | null;
     /** Why it is not answering, when it is not. */
     readonly message: string | null;
+    /** What the container is using, from the same sampling the rest of Polaris
+     *  does. Null on a remote target, where the daemon proxy does not reach. */
+    readonly cpuPercent: number | null;
+    readonly memUsedBytes: number | null;
+    readonly memTotalBytes: number | null;
+}
+
+/** Addresses the Polaris firewall blocks for this server, and whether the server
+ *  itself has been told about them. Minecraft bans one address at a time, so a
+ *  range the firewall holds cannot be handed to it. */
+export interface MinecraftFirewall {
+    readonly blocked: readonly string[];
+    readonly applied: readonly string[];
+    /** Firewall entries that are ranges, which the game cannot ban. */
+    readonly ranges: readonly string[];
 }
 
 export interface MinecraftRoster {
@@ -58,6 +101,9 @@ interface MinecraftInstall {
     readonly portSubject: string;
     readonly target: TargetRow & { hostId: string | null };
     readonly running: boolean;
+    readonly edition: MinecraftEdition;
+    /** The host port the deploy published this server on, when it pinned one. */
+    readonly hostPort: number | null;
 }
 
 /** Resolve an installed app to the container its server runs in, asserting the
@@ -74,13 +120,22 @@ async function resolveInstall(ownerId: string, installedAppId: string): Promise<
     });
     if (!app) throw new Error("This server's deployment is gone");
     const release = await currentReleaseRef(app);
+    let hostPort: number | null = null;
+    try {
+        const config = JSON.parse(app.sourceConfig) as { hostPort?: unknown };
+        if (typeof config.hostPort === "number") hostPort = config.hostPort;
+    } catch {
+        // An unreadable config pins no port; the derived one still applies.
+    }
     return {
         installedAppId: install.id,
         applicationId: app.id,
         container: release.name,
         portSubject: release.portSubject,
         target: app.target,
-        running: app.desiredState === "running"
+        running: app.desiredState === "running",
+        edition: editionOf(install.catalogId),
+        hostPort
     };
 }
 
@@ -120,7 +175,7 @@ export async function runServerCommand(
     if (argv.length === 0 || argv.length > 24) throw new Error("That command is not valid");
     for (const argument of argv) assertSafeArgument(argument);
     const install = await resolveInstall(ownerId, installedAppId);
-    return execRcon(install, ownerId, argv);
+    return execCommand(install, ownerId, argv);
 }
 
 /** A console line the operator typed. Split on whitespace, because that is what
@@ -131,10 +186,17 @@ export async function runConsoleLine(ownerId: string, installedAppId: string, li
     return runServerCommand(ownerId, installedAppId, trimmed.split(/\s+/));
 }
 
-async function execRcon(install: MinecraftInstall, ownerId: string, argv: readonly string[]): Promise<string> {
-    const result = await withPorts(install, ownerId, (ports) =>
-        ports.runIn(install.container, ["rcon-cli", ...argv])
-    );
+/**
+ * Run a command on the server and hand back whatever came back.
+ *
+ * Java answers over RCON, so the answer is the return value. Bedrock has no RCON:
+ * the command is written to the server's console and the answer is only printed
+ * to its log, so there is nothing to return - which is why anything that needs an
+ * answer (the player list) reads the log on Bedrock instead of this.
+ */
+async function execCommand(install: MinecraftInstall, ownerId: string, argv: readonly string[]): Promise<string> {
+    const command = install.edition === "bedrock" ? ["send-command", ...argv] : ["rcon-cli", ...argv];
+    const result = await withPorts(install, ownerId, (ports) => ports.runIn(install.container, command));
     if (result.code !== 0) {
         // rcon-cli fails the same way for a server that is still generating its
         // world and for one that has crashed; say what an operator can act on.
@@ -159,31 +221,122 @@ async function readServerFile(install: MinecraftInstall, ownerId: string, name: 
 /** Who is on, where to reach the server, and whether it is answering at all. */
 export async function getServerStatus(ownerId: string, installedAppId: string): Promise<MinecraftStatus> {
     const install = await resolveInstall(ownerId, installedAppId);
-    const address = await serverAddress(install, ownerId);
+    const [address, usage] = await Promise.all([
+        serverAddress(install, ownerId),
+        readAppContainerMetricsOrNull(install.applicationId, ownerId)
+    ]);
     const empty: PlayerList = { online: 0, max: 0, players: [] };
+    const resources = {
+        edition: install.edition,
+        cpuPercent: usage?.cpuPercent ?? null,
+        memUsedBytes: usage?.memUsedBytes ?? null,
+        memTotalBytes: usage?.memTotalBytes ?? null
+    };
     if (!install.running) {
-        return { running: false, answering: false, players: empty, address, message: "The server is stopped" };
+        return {
+            running: false,
+            answering: false,
+            players: empty,
+            address,
+            message: "The server is stopped",
+            ...resources
+        };
     }
     try {
-        const players = parsePlayerList(await execRcon(install, ownerId, ["list"]));
+        const players = await readPlayerList(install, ownerId);
         if (!players) {
-            return { running: true, answering: false, players: empty, address, message: "The server is starting" };
+            return {
+                running: true,
+                answering: false,
+                players: empty,
+                address,
+                message: "The server is starting",
+                ...resources
+            };
         }
-        return { running: true, answering: true, players, address, message: null };
+        return { running: true, answering: true, players, address, message: null, ...resources };
     } catch (caught) {
         return {
             running: true,
             answering: false,
             players: empty,
             address,
-            message: caught instanceof Error ? caught.message : "The server is not answering"
+            message: caught instanceof Error ? caught.message : "The server is not answering",
+            ...resources
         };
     }
+}
+
+/**
+ * What the Polaris firewall blocks, against what this server has actually been
+ * told to refuse. The firewall is an HTTP guard and a game server is not HTTP, so
+ * the two are joined here rather than by the edge: the addresses it holds are
+ * handed to the server's own ban list, which is the only thing a game client is
+ * refused by.
+ */
+export async function getServerFirewall(ownerId: string, installedAppId: string): Promise<MinecraftFirewall> {
+    const install = await resolveInstall(ownerId, installedAppId);
+    const [waf, banned] = await Promise.all([
+        resolveWaf(install.applicationId),
+        readServerFile(install, ownerId, "banned-ips.json")
+    ]);
+    const applied = new Set(parseBannedIps(banned));
+    const blocked = waf.deny.filter((entry) => !entry.includes("/"));
+    return {
+        blocked,
+        applied: blocked.filter((entry) => applied.has(entry)),
+        ranges: waf.deny.filter((entry) => entry.includes("/"))
+    };
+}
+
+/**
+ * Ban every address the firewall blocks that the server does not already refuse,
+ * and report how many that was. Bedrock has no ban command at all, so there it
+ * changes nothing and says so.
+ */
+export async function applyFirewallBans(ownerId: string, installedAppId: string): Promise<number> {
+    const install = await resolveInstall(ownerId, installedAppId);
+    if (install.edition === "bedrock") throw new Error("Bedrock servers cannot ban an address");
+    const firewall = await getServerFirewall(ownerId, installedAppId);
+    const pending = firewall.blocked.filter((entry) => !firewall.applied.includes(entry));
+    let banned = 0;
+    for (const address of pending) {
+        await execCommand(install, ownerId, ["ban-ip", address, "Blocked by the Polaris firewall"]);
+        banned += 1;
+    }
+    return banned;
+}
+
+/**
+ * Who is online. Java asks and is answered; Bedrock is asked and answers into its
+ * own console, so there the command is sent and the log is read back a moment
+ * later for the newest answer it printed.
+ */
+async function readPlayerList(install: MinecraftInstall, ownerId: string): Promise<PlayerList | null> {
+    if (install.edition !== "bedrock") return parsePlayerList(await execCommand(install, ownerId, ["list"]));
+    await execCommand(install, ownerId, ["list"]);
+    await new Promise((resolve) => setTimeout(resolve, CONSOLE_ANSWER_MS));
+    return parsePlayerListFromLog(await readAppRuntimeLog(install.applicationId, ownerId, 80));
 }
 
 /** Operators, whitelisted players and bans, as the server has them on disk. */
 export async function getServerRoster(ownerId: string, installedAppId: string): Promise<MinecraftRoster> {
     const install = await resolveInstall(ownerId, installedAppId);
+    // Bedrock keeps an allow list instead of a whitelist, has no ban list at all,
+    // and records operators by xuid rather than by name - so it reports the one
+    // roster it actually has, and the screen offers only what can be acted on.
+    if (install.edition === "bedrock") {
+        const [allowList, properties] = await Promise.all([
+            readServerFile(install, ownerId, "allowlist.json"),
+            readServerFile(install, ownerId, "server.properties")
+        ]);
+        return {
+            ops: [],
+            whitelist: parseNameFile(allowList),
+            bans: [],
+            whitelistEnforced: parseProperties(properties)["allow-list"] === "true"
+        };
+    }
     const [ops, whitelist, bans, properties] = await Promise.all([
         readServerFile(install, ownerId, "ops.json"),
         readServerFile(install, ownerId, "whitelist.json"),
@@ -208,7 +361,13 @@ async function serverAddress(install: MinecraftInstall, ownerId: string): Promis
         install.target.kind === "local" || !install.target.hostId
             ? await getHostLanIp()
             : await hostIp(install.target.hostId, ownerId);
-    return ip ? `${ip}:${hostPortForApp(install.portSubject)}` : null;
+    if (!ip) return null;
+    // A game server publishes on the port its clients assume, pinned at install.
+    // The derived port is the fallback for one installed before that existed.
+    const port = install.hostPort ?? hostPortForApp(install.portSubject);
+    // 25565 and 19132 are what a client tries when no port is typed, so an address
+    // that is already on it is shorter and less to get wrong.
+    return port === 25565 || port === 19132 ? ip : `${ip}:${port}`;
 }
 
 /** A registered server's address, as it was enrolled. */

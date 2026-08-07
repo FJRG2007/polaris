@@ -17,7 +17,7 @@ const querySchema = z.object({
  *  browser never calls a third party directly, and gated on the same permission
  *  as the rest of the app - the results end up in an install. */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
-    await requirePermission("deploy.manage");
+    await requirePermission("games.manage");
     await params;
     const url = new URL(request.url);
     const parsed = querySchema.safeParse({

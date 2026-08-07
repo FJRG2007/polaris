@@ -2,9 +2,10 @@
 
 /**
  * What the Minecraft panel can do to a server. Reads live on the app's own API
- * route (they are polled); everything here changes something, so it needs
- * deploy.manage, validates its input against the same schemas the form uses, and
- * is recorded - banning a player is an administrative act, not a UI event.
+ * route (they are polled); everything here changes something, so it is gated on
+ * the game-server permissions - moderating players and running the console are
+ * different grants - validates its input against the same schemas the form uses,
+ * and is recorded: banning a player is an administrative act, not a UI event.
  */
 
 import { z } from "zod";
@@ -15,7 +16,7 @@ import { setEnvVars } from "@/lib/env-var-service";
 import { deployApplication } from "@/lib/deploy-service";
 import { getInstalledApp } from "@/lib/apps/install-service";
 import { findApp, isAllowedEnvValue, tunableEnvVars } from "@/lib/apps/catalog";
-import { runConsoleLine, runServerCommand } from "@/lib/apps/minecraft/service";
+import { applyFirewallBans, runConsoleLine, runServerCommand } from "@/lib/apps/minecraft/service";
 
 /** A Minecraft (Java Edition) account name. */
 const playerNameSchema = z
@@ -65,7 +66,7 @@ function moderationArgv(input: MinecraftModeration): string[] {
 }
 
 export async function moderatePlayerAction(input: MinecraftModeration): Promise<{ output?: string; error?: string }> {
-    const user = await requirePermission("deploy.manage");
+    const user = await requirePermission("games.moderate");
     const parsed = moderationSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
@@ -89,7 +90,7 @@ export async function setWhitelistEnforcedAction(
     installedAppId: string,
     enforced: boolean
 ): Promise<{ output?: string; error?: string }> {
-    const user = await requirePermission("deploy.manage");
+    const user = await requirePermission("games.moderate");
     try {
         const output = await runServerCommand(user.id, installedAppId, ["whitelist", enforced ? "on" : "off"]);
         return { output: output.trim() };
@@ -98,9 +99,29 @@ export async function setWhitelistEnforcedAction(
     }
 }
 
+/** Hand the firewall's blocked addresses to the server's own ban list. */
+export async function applyFirewallBansAction(installedAppId: string): Promise<{ banned?: number; error?: string }> {
+    const user = await requirePermission("games.moderate");
+    try {
+        const banned = await applyFirewallBans(user.id, installedAppId);
+        if (banned > 0) {
+            await recordAudit({
+                actorId: user.id,
+                action: "minecraft.firewall-apply",
+                targetType: "installedApp",
+                targetId: installedAppId,
+                metadata: { banned }
+            });
+        }
+        return { banned };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not apply the firewall" };
+    }
+}
+
 /** Flush the world to disk, for before a backup or a restart. */
 export async function saveWorldAction(installedAppId: string): Promise<{ output?: string; error?: string }> {
-    const user = await requirePermission("deploy.manage");
+    const user = await requirePermission("games.moderate");
     try {
         const output = await runServerCommand(user.id, installedAppId, ["save-all"]);
         return { output: output.trim() };
@@ -114,7 +135,9 @@ export async function sendConsoleCommandAction(
     installedAppId: string,
     line: string
 ): Promise<{ output?: string; error?: string }> {
-    const user = await requirePermission("deploy.manage");
+    // The console runs any command the server takes, op included, so it is the
+    // full grant rather than the moderator one.
+    const user = await requirePermission("games.manage");
     const parsed = consoleSchema.safeParse({ installedAppId, line });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That command is not valid" };
     try {
@@ -136,7 +159,7 @@ export async function updateServerSettingsAction(
     installedAppId: string,
     values: Array<{ key: string; value: string }>
 ): Promise<{ error?: string }> {
-    const user = await requirePermission("deploy.manage");
+    const user = await requirePermission("games.manage");
     const parsed = settingsSchema.safeParse({ installedAppId, values });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the settings and try again" };
     try {

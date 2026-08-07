@@ -77,6 +77,11 @@ export interface TemplatePort {
     /** http | tcp | udp - udp matters for game servers. */
     protocol: "http" | "tcp" | "udp";
     label?: string;
+    /** The host port to publish on, when the app is reached by typing an address
+     *  rather than through the proxy: a game server has to answer on the port its
+     *  players' clients assume. Taken as a starting point - a second server on the
+     *  same machine gets the next free one. */
+    host?: number;
 }
 
 /** The compose-template install descriptor. Either a published `image` or a
@@ -144,12 +149,12 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
     },
     {
         id: "minecraft",
-        name: "Minecraft server",
+        name: "Minecraft (Java)",
         category: "Game servers",
         icon: Gamepad2,
-        summary: "A Java Minecraft server with a live console and player list.",
+        summary: "A Java server for PC players, closed and protected by default.",
         description:
-            "Runs a Minecraft: Java Edition server (itzg/minecraft-server) on the server you choose, with world data on a server-local volume or a NAS. Manage it from an adapted dashboard: console, players, start/stop.",
+            "Runs a Minecraft: Java Edition server on the machine you choose, with the world on a server-local volume or a NAS. It comes closed: Mojang authentication required, whitelist enforced, command blocks off, and an anticheat and a block-history plugin already installed. Manage it from the Game servers panel: console, players, mods and settings.",
         docsUrl: "https://docker-minecraft-server.readthedocs.io/",
         installMethod: "compose-template",
         capabilities: ["game-server"],
@@ -255,9 +260,17 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // The image installs what this lists when it boots, and removes
                     // what is taken off it - so the Mods screen edits this one value
                     // rather than pushing files into a running container.
+                    //
+                    // The default set is the protection a server exposed to the
+                    // internet needs on day one and that nobody installs before the
+                    // first griefing: an anticheat, block history to roll a raid back
+                    // with, and the permission plugin both are administered through.
+                    // Each carries "?" so a Minecraft release they have no build for
+                    // yet warns instead of stopping the server from booting.
                     key: "MODRINTH_PROJECTS",
                     label: "Mods and plugins",
                     help: "Modrinth projects to install, comma separated. Managed from the Mods tab.",
+                    default: "grimac?,coreprotect?,luckperms?",
                     tunable: true,
                     group: "Mods"
                 },
@@ -300,10 +313,183 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     ],
                     tunable: true,
                     group: "Players"
+                },
+                {
+                    // A new server is reachable the moment it boots, and an open one
+                    // is found by scanners within the hour. It starts closed: add
+                    // yourself from the Players screen, or turn this off.
+                    key: "ENABLE_WHITELIST",
+                    label: "Whitelist",
+                    help: "On means only players you add can join. Add yourself from Players.",
+                    default: "true",
+                    options: [
+                        { value: "true", label: "Enforced" },
+                        { value: "false", label: "Anyone may join" }
+                    ],
+                    tunable: true,
+                    group: "Players"
+                },
+                {
+                    // Applies a whitelist change to whoever is already connected
+                    // rather than only to the next person who joins.
+                    key: "ENFORCE_WHITELIST",
+                    label: "Apply the whitelist immediately",
+                    default: "true",
+                    options: [
+                        { value: "true", label: "Yes" },
+                        { value: "false", label: "On next join" }
+                    ],
+                    tunable: true,
+                    group: "Players"
+                },
+                {
+                    // A command block is an in-game way to run server commands, and
+                    // the usual route from "a griefer got in" to "the server is gone".
+                    key: "ENABLE_COMMAND_BLOCK",
+                    label: "Command blocks",
+                    help: "Off keeps players from running server commands from inside the world.",
+                    default: "false",
+                    options: [
+                        { value: "false", label: "Blocked" },
+                        { value: "true", label: "Allowed" }
+                    ],
+                    tunable: true,
+                    group: "Security"
+                },
+                {
+                    key: "ENFORCE_SECURE_PROFILE",
+                    label: "Signed chat profiles",
+                    help: "On rejects clients that cannot prove who they are.",
+                    default: "true",
+                    options: [
+                        { value: "true", label: "Required" },
+                        { value: "false", label: "Not required" }
+                    ],
+                    tunable: true,
+                    group: "Security"
+                },
+                {
+                    key: "SPAWN_PROTECTION",
+                    label: "Spawn protection",
+                    help: "Blocks in this radius of spawn can only be changed by operators. 0 disables it.",
+                    default: "16",
+                    tunable: true,
+                    group: "Security"
                 }
             ],
             volumes: [{ name: "data", mountPath: "/data", label: "World data" }],
-            ports: [{ container: 25565, protocol: "tcp", label: "Server port" }]
+            ports: [{ container: 25565, protocol: "tcp", host: 25565, label: "Server port" }]
+        }
+    },
+    {
+        id: "minecraft-bedrock",
+        name: "Minecraft (Bedrock)",
+        category: "Game servers",
+        icon: Gamepad2,
+        summary: "A Bedrock server for phones, consoles and Windows.",
+        description:
+            "Runs a Minecraft: Bedrock Edition server, the one phones, consoles, tablets and the Windows app connect to. Managed from the same panel as a Java server: console, players, settings. Bedrock has no RCON, so commands are sent to the server's console and the player list is read from it.",
+        docsUrl: "https://github.com/itzg/docker-minecraft-bedrock-server",
+        installMethod: "compose-template",
+        capabilities: ["game-server"],
+        dashboard: "builtin",
+        consent: { label: "Minecraft EULA", url: "https://www.minecraft.net/eula" },
+        template: {
+            image: "itzg/minecraft-bedrock-server:latest",
+            env: [
+                { key: "EULA", label: "Minecraft EULA", default: "TRUE", required: true },
+                {
+                    key: "VERSION",
+                    label: "Bedrock version",
+                    help: "LATEST tracks the newest release.",
+                    default: "LATEST",
+                    tunable: true,
+                    group: "Server"
+                },
+                {
+                    key: "SERVER_NAME",
+                    label: "Server name",
+                    help: "Shown in the friends and servers list.",
+                    default: "A Minecraft server on Polaris",
+                    tunable: true,
+                    group: "World"
+                },
+                {
+                    key: "DIFFICULTY",
+                    label: "Difficulty",
+                    default: "easy",
+                    options: [
+                        { value: "peaceful", label: "Peaceful" },
+                        { value: "easy", label: "Easy" },
+                        { value: "normal", label: "Normal" },
+                        { value: "hard", label: "Hard" }
+                    ],
+                    tunable: true,
+                    group: "World"
+                },
+                {
+                    key: "GAMEMODE",
+                    label: "Game mode",
+                    default: "survival",
+                    options: [
+                        { value: "survival", label: "Survival" },
+                        { value: "creative", label: "Creative" },
+                        { value: "adventure", label: "Adventure" }
+                    ],
+                    tunable: true,
+                    group: "World"
+                },
+                {
+                    key: "LEVEL_SEED",
+                    label: "World seed",
+                    help: "Blank generates a random world. Only applies before the world is created.",
+                    tunable: true,
+                    group: "World"
+                },
+                {
+                    key: "MAX_PLAYERS",
+                    label: "Player slots",
+                    default: "10",
+                    tunable: true,
+                    group: "Players"
+                },
+                {
+                    key: "VIEW_DISTANCE",
+                    label: "View distance",
+                    default: "10",
+                    tunable: true,
+                    group: "Players"
+                },
+                {
+                    // Bedrock's whitelist. On by default for the same reason Java's
+                    // is: a server nobody was let into cannot be griefed.
+                    key: "ALLOW_LIST",
+                    label: "Allow list",
+                    help: "On means only players on the allow list can join.",
+                    default: "true",
+                    options: [
+                        { value: "true", label: "Enforced" },
+                        { value: "false", label: "Anyone may join" }
+                    ],
+                    tunable: true,
+                    group: "Players"
+                },
+                {
+                    key: "ONLINE_MODE",
+                    label: "Xbox Live authentication",
+                    help: "Off lets unauthenticated clients in, and anyone can claim any name.",
+                    default: "true",
+                    options: [
+                        { value: "true", label: "Required" },
+                        { value: "false", label: "Not required" }
+                    ],
+                    tunable: true,
+                    group: "Players"
+                }
+            ],
+            volumes: [{ name: "data", mountPath: "/data", label: "World data" }],
+            // Bedrock speaks UDP; published as TCP it answers nothing at all.
+            ports: [{ container: 19132, protocol: "udp", host: 19132, label: "Server port" }]
         }
     },
     {

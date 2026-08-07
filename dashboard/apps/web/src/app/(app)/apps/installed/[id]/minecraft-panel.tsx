@@ -23,7 +23,7 @@ import { MinecraftSettings } from "./minecraft-settings";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
-import type { MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
+import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
 
 const TABS = [
     { id: "overview", label: "Overview" },
@@ -44,6 +44,7 @@ const POLL_MS = 5000;
 interface ServerReading {
     status: MinecraftStatus | null;
     roster: MinecraftRoster | null;
+    firewall: MinecraftFirewall | null;
 }
 
 export function MinecraftPanel({
@@ -59,7 +60,7 @@ export function MinecraftPanel({
 }) {
     const router = useRouter();
     const [tab, setTab] = useState<TabId>("overview");
-    const [reading, setReading] = useState<ServerReading>({ status: null, roster: null });
+    const [reading, setReading] = useState<ServerReading>({ status: null, roster: null, firewall: null });
     const [error, setError] = useState<string | null>(null);
 
     // The roster costs three reads inside the container, so it is only gathered
@@ -72,13 +73,22 @@ export function MinecraftPanel({
                 `/api/apps/installed/${installedAppId}/minecraft${wantsRoster ? "?roster=1" : ""}`,
                 { cache: "no-store" }
             );
-            const data = (await response.json()) as { status?: MinecraftStatus; roster?: MinecraftRoster; error?: string };
+            const data = (await response.json()) as {
+                status?: MinecraftStatus;
+                roster?: MinecraftRoster;
+                firewall?: MinecraftFirewall;
+                error?: string;
+            };
             if (!response.ok || !data.status) {
                 setError(data.error ?? "Could not read the server");
                 return;
             }
             setError(null);
-            setReading((current) => ({ status: data.status ?? null, roster: data.roster ?? (wantsRoster ? current.roster : null) }));
+            setReading((current) => ({
+                status: data.status ?? null,
+                roster: data.roster ?? (wantsRoster ? current.roster : null),
+                firewall: data.firewall ?? (wantsRoster ? current.firewall : null)
+            }));
         } catch {
             // Transient; the next poll retries.
         }
@@ -132,6 +142,7 @@ export function MinecraftPanel({
                     installedAppId={installedAppId}
                     status={status}
                     roster={reading.roster}
+                    firewall={reading.firewall}
                     onChanged={() => void load()}
                 />
             )}
@@ -233,6 +244,18 @@ function StatusBadge({ status, running }: { status: MinecraftStatus | null; runn
     );
 }
 
+/** Bytes as an operator reads them, which is the nearest whole unit. */
+function formatBytes(bytes: number): string {
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let value = bytes;
+    let unit = 0;
+    while (value >= 1024 && unit < units.length - 1) {
+        value /= 1024;
+        unit += 1;
+    }
+    return `${value < 10 && unit > 0 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
+}
+
 function OverviewTab({
     status,
     settings,
@@ -272,6 +295,34 @@ function OverviewTab({
                                 </button>
                             ))}
                         </div>
+                    )}
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardBody className="flex flex-col gap-2">
+                    <p className="text-sm font-medium">Machine</p>
+                    {status === null ? (
+                        <Skeleton className="h-10 w-full" />
+                    ) : status.cpuPercent === null && status.memUsedBytes === null ? (
+                        <p className="text-sm text-muted-foreground">
+                            Usage is measured on servers Polaris runs itself.
+                        </p>
+                    ) : (
+                        <dl className="flex flex-col gap-1 text-sm">
+                            <div className="flex items-baseline justify-between gap-3">
+                                <dt className="text-muted-foreground">Processor</dt>
+                                <dd>{status.cpuPercent === null ? "-" : `${status.cpuPercent.toFixed(1)}%`}</dd>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                                <dt className="text-muted-foreground">Memory</dt>
+                                <dd>
+                                    {status.memUsedBytes === null
+                                        ? "-"
+                                        : `${formatBytes(status.memUsedBytes)}${status.memTotalBytes ? ` of ${formatBytes(status.memTotalBytes)}` : ""}`}
+                                </dd>
+                            </div>
+                        </dl>
                     )}
                 </CardBody>
             </Card>

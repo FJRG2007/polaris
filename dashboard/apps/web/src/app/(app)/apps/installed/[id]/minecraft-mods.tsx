@@ -113,11 +113,17 @@ export function MinecraftMods({
         return (
             <Card>
                 <CardBody className="flex flex-col gap-2 py-8 text-center">
-                    <p className="text-sm">This server runs {serverType || "vanilla"}, which cannot load mods.</p>
-                    <p className="text-sm text-muted-foreground">
-                        Change the server software under Settings to Paper for plugins, or Fabric, Forge or NeoForge for
-                        mods.
+                    <p className="text-sm">
+                        {serverType
+                            ? `This server runs ${serverType.toLowerCase()}, which cannot load mods.`
+                            : "Bedrock servers do not load mods or plugins."}
                     </p>
+                    {serverType && (
+                        <p className="text-sm text-muted-foreground">
+                            Change the server software under Settings to Paper for plugins, or Fabric, Forge or NeoForge
+                            for mods.
+                        </p>
+                    )}
                 </CardBody>
             </Card>
         );

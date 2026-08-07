@@ -1472,6 +1472,11 @@ async function buildAppPlan(
     // consistent across redeploys without a schema column.
     const storedPort = typeof source.port === "number" ? source.port : undefined;
     const containerPort = storedPort ?? app.domains[0]?.targetPort ?? (app.sourceType === "image" ? 80 : 3000);
+    // A game server is reached by typing an address into a game, not by a proxy, so
+    // it publishes on the port that game expects (25565, 19132) instead of the
+    // derived one nobody would guess. Pinned at install; absent for everything else.
+    const storedHostPort = typeof source.hostPort === "number" ? source.hostPort : undefined;
+    const hostProtocol = source.hostProtocol === "udp" ? "udp" : undefined;
 
     // Everything a builder produces from source reads PORT to decide where to
     // listen - it is the convention every framework and every buildpack follows -
@@ -1508,7 +1513,11 @@ async function buildAppPlan(
         // A kept release publishes on a port of its own, derived from the deployment
         // rather than the app, so it does not fight the release it stands beside for
         // the service's port.
-        expose: { host: hostPortForApp(kept ? release.id : app.id), container: containerPort },
+        expose: {
+            host: storedHostPort ?? hostPortForApp(kept ? release.id : app.id),
+            container: containerPort,
+            ...(hostProtocol ? { protocol: hostProtocol } : {})
+        },
         // When the user has not pinned a container port, the value above is a guess
         // (a domain's target port or a source default); let the runtime refine it from
         // the image's own exposed port so IP:port reaches a live socket, not a dead one.

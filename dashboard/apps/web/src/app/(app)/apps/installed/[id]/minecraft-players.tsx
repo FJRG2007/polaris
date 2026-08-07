@@ -10,19 +10,26 @@
 import { useState, useTransition } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Badge, Button, Card, CardBody, Input, Switch } from "@polaris/ui";
-import type { MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
-import { Ban, Crown, DoorOpen, ShieldMinus, ShieldPlus, UserMinus, UserPlus } from "lucide-react";
-import { moderatePlayerAction, setWhitelistEnforcedAction, type MinecraftModeration } from "./minecraft-actions";
+import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
+import { Ban, Crown, DoorOpen, ShieldBan, ShieldMinus, ShieldPlus, UserMinus, UserPlus } from "lucide-react";
+import {
+    applyFirewallBansAction,
+    moderatePlayerAction,
+    setWhitelistEnforcedAction,
+    type MinecraftModeration
+} from "./minecraft-actions";
 
 export function MinecraftPlayers({
     installedAppId,
     status,
     roster,
+    firewall,
     onChanged
 }: {
     installedAppId: string;
     status: MinecraftStatus | null;
     roster: MinecraftRoster | null;
+    firewall: MinecraftFirewall | null;
     onChanged: () => void;
 }) {
     const [pending, startTransition] = useTransition();
@@ -61,6 +68,7 @@ export function MinecraftPlayers({
         );
     }
 
+    const bedrock = status?.edition === "bedrock";
     const online = status?.players.players ?? [];
     const ops = roster?.ops ?? [];
     const whitelist = roster?.whitelist ?? [];
@@ -113,6 +121,7 @@ export function MinecraftPlayers({
                 ))}
             </Section>
 
+            {!bedrock && (
             <Section
                 title="Operators"
                 count={ops.length}
@@ -137,9 +146,11 @@ export function MinecraftPlayers({
                     </Row>
                 ))}
             </Section>
+            )}
 
             <WhitelistSection
                 installedAppId={installedAppId}
+                title={bedrock ? "Allow list" : "Whitelist"}
                 whitelist={whitelist}
                 enforced={roster?.whitelistEnforced ?? false}
                 loading={roster === null}
@@ -150,6 +161,9 @@ export function MinecraftPlayers({
                 onChanged={onChanged}
             />
 
+            <FirewallSection installedAppId={installedAppId} firewall={firewall} onError={setError} onChanged={onChanged} />
+
+            {!bedrock && (
             <Section title="Banned" count={bans.length} empty="Nobody is banned." loading={roster === null}>
                 {bans.map((ban) => (
                     <Row key={ban.name} name={ban.name} note={ban.reason ?? undefined}>
@@ -162,9 +176,81 @@ export function MinecraftPlayers({
                     </Row>
                 ))}
             </Section>
+            )}
 
             {confirmElement}
         </div>
+    );
+}
+
+/**
+ * What the Polaris firewall blocks, and whether this server has been told.
+ *
+ * The firewall guards HTTP; a game server is not HTTP, so nothing joins the two
+ * on its own. Handing its addresses to the server's own ban list is what makes
+ * one blocklist mean one thing across the instance - and it is a button rather
+ * than something automatic, because banning an address from a game is visible to
+ * whoever is playing from it.
+ */
+function FirewallSection({
+    installedAppId,
+    firewall,
+    onError,
+    onChanged
+}: {
+    installedAppId: string;
+    firewall: MinecraftFirewall | null;
+    onError: (message: string | null) => void;
+    onChanged: () => void;
+}) {
+    const [pending, startTransition] = useTransition();
+    const [applied, setApplied] = useState<string | null>(null);
+    const outstanding = firewall ? firewall.blocked.filter((entry) => !firewall.applied.includes(entry)) : [];
+
+    function apply(): void {
+        onError(null);
+        startTransition(async () => {
+            const result = await applyFirewallBansAction(installedAppId);
+            if (result.error) {
+                onError(result.error);
+                return;
+            }
+            setApplied(
+                result.banned === 0
+                    ? "Every blocked address was already banned here"
+                    : `Banned ${result.banned} ${result.banned === 1 ? "address" : "addresses"}`
+            );
+            onChanged();
+        });
+    }
+
+    if (!firewall || (firewall.blocked.length === 0 && firewall.ranges.length === 0)) return null;
+
+    return (
+        <Card>
+            <CardBody className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium">
+                        Firewall <span className="text-muted-foreground">{firewall.blocked.length || ""}</span>
+                    </p>
+                    <Button size="sm" variant="secondary" onClick={apply} disabled={pending || outstanding.length === 0}>
+                        <ShieldBan className="size-4" />
+                        {outstanding.length === 0 ? "All applied" : `Ban ${outstanding.length} here`}
+                    </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                    Addresses the Polaris firewall blocks. A game server refuses them only once they are on its own ban
+                    list.
+                </p>
+                {firewall.ranges.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                        {firewall.ranges.length} {firewall.ranges.length === 1 ? "range is" : "ranges are"} blocked in the
+                        firewall. Minecraft bans single addresses only, so those are not applied here.
+                    </p>
+                )}
+                {applied && <p className="text-xs text-muted-foreground">{applied}</p>}
+            </CardBody>
+        </Card>
     );
 }
 
@@ -173,6 +259,7 @@ export function MinecraftPlayers({
  *  private and not be. */
 function WhitelistSection({
     installedAppId,
+    title,
     whitelist,
     enforced,
     loading,
@@ -183,6 +270,7 @@ function WhitelistSection({
     onChanged
 }: {
     installedAppId: string;
+    title: string;
     whitelist: readonly string[];
     enforced: boolean;
     loading: boolean;
@@ -208,9 +296,9 @@ function WhitelistSection({
 
     return (
         <Section
-            title="Whitelist"
+            title={title}
             count={whitelist.length}
-            empty="The whitelist is empty. Turn it on and only the players here can join."
+            empty="Nobody is on the list yet. While it is enforced, only the players here can join."
             loading={loading}
             action={
                 <div className="flex items-center gap-2">

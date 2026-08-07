@@ -17,9 +17,7 @@ const USER_AGENT = "polaris-dashboard (https://github.com/FJRG2007/polaris)";
 const SEARCH_URL = "https://api.modrinth.com/v2/search";
 const TIMEOUT_MS = 8000;
 
-/** Server software, as the loader category Modrinth files projects under. Both
- *  mods and plugins are `project_type: mod` there; what distinguishes them is
- *  the loader category. */
+/** Server software, as the loader category Modrinth files projects under. */
 const LOADER_BY_TYPE: Record<string, string> = {
     PAPER: "paper",
     PURPUR: "paper",
@@ -28,6 +26,11 @@ const LOADER_BY_TYPE: Record<string, string> = {
     FORGE: "forge",
     NEOFORGE: "neoforge"
 };
+
+/** Modrinth indexes a server-side addon as a plugin or as a mod depending on the
+ *  loader it targets, and searching for the wrong one of the two answers with
+ *  nothing at all rather than with an error. */
+const PLUGIN_LOADERS = new Set(["paper", "spigot", "purpur", "bukkit", "folia"]);
 
 /** Whether this server software can load anything from Modrinth at all. */
 export function loaderForType(type: string): string | null {
@@ -62,7 +65,8 @@ const searchResponseSchema = z.object({
  * the index is a browser with no results, not a broken page.
  */
 export async function searchModrinth(query: string, loader: string, limit = 20): Promise<ModrinthProject[]> {
-    const facets = JSON.stringify([["project_type:mod"], [`categories:${loader}`]]);
+    const projectType = PLUGIN_LOADERS.has(loader) ? "plugin" : "mod";
+    const facets = JSON.stringify([[`project_type:${projectType}`], [`categories:${loader}`]]);
     const url = `${SEARCH_URL}?query=${encodeURIComponent(query)}&facets=${encodeURIComponent(facets)}&limit=${limit}&index=downloads`;
     try {
         const response = await fetch(url, {

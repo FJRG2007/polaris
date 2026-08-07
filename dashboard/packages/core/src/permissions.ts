@@ -18,6 +18,9 @@ export const PERMISSIONS = [
     "requests.manage",
     "deploy.read",
     "deploy.manage",
+    "games.read",
+    "games.moderate",
+    "games.manage",
     "agents.read",
     "agents.manage",
     "tasks.read",
@@ -57,6 +60,9 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "requests.create",
         "deploy.read",
         "deploy.manage",
+        "games.read",
+        "games.moderate",
+        "games.manage",
         "agents.read",
         "agents.manage",
         "tasks.read",
@@ -64,7 +70,7 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "inbox.read",
         "inbox.manage"
     ],
-    viewer: ["drive.read", "deploy.read", "agents.read", "tasks.read", "inbox.read"],
+    viewer: ["drive.read", "deploy.read", "games.read", "agents.read", "tasks.read", "inbox.read"],
     guest: []
 };
 
@@ -93,6 +99,9 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     "requests.manage": { area: "Sharing", label: "Manage everyone's drop points" },
     "deploy.read": { area: "Apps", label: "See deployments, servers and containers" },
     "deploy.manage": { area: "Apps", label: "Deploy, restart and configure apps" },
+    "games.read": { area: "Game servers", label: "See game servers and who is playing" },
+    "games.moderate": { area: "Game servers", label: "Op, kick, ban and whitelist players" },
+    "games.manage": { area: "Game servers", label: "Create servers, run console commands and change settings" },
     "agents.read": { area: "Apps", label: "See coding-agent repositories and runs" },
     "agents.manage": { area: "Apps", label: "Enable repositories and start agent runs" },
     "tasks.read": { area: "Tasks", label: "See spaces, lists and tasks" },
@@ -119,7 +128,13 @@ export const IMPLIED_PERMISSIONS: Readonly<Partial<Record<Permission, readonly P
     "drive.delete": ["drive.read"],
     "shares.manage": ["shares.create"],
     "requests.manage": ["requests.create"],
-    "deploy.manage": ["deploy.read"],
+    // Whoever may deploy anything on this machine may already run a game server
+    // on it, so the game-server grants ride along - which also means an operator
+    // who set their roles up before these existed does not have to redo them.
+    "deploy.manage": ["deploy.read", "games.read", "games.moderate", "games.manage"],
+    "deploy.read": ["games.read"],
+    "games.moderate": ["games.read"],
+    "games.manage": ["games.read", "games.moderate"],
     "agents.manage": ["agents.read"],
     "tasks.manage": ["tasks.read"],
     "inbox.manage": ["inbox.read"]
