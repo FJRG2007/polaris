@@ -20,7 +20,7 @@ import Image from "next/image";
 import * as mc from "@/lib/apps/minecraft/motd";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
-import { AlignCenter, Check, ImageUp, Loader2, RotateCw } from "lucide-react";
+import { AlignCenter, Check, Code2, ImageUp, Loader2, RotateCw } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { renameGameServerAction, setServerIconAction, updateServerSettingsAction } from "./minecraft-actions";
 
@@ -130,30 +130,57 @@ function MotdCard({
 }) {
     const saved = useMemo(() => mc.decodeMotd(motd), [motd]);
     const [text, setText] = useState(saved);
+    // Whether the field holds the text or the codes. Formatted is the default
+    // because the codes are an implementation detail of the file; raw is there
+    // because somebody who knows them is faster typing them, and because a MOTD
+    // pasted from a generator on the web arrives as codes.
+    const [raw, setRaw] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const [confirm, confirmElement] = useConfirm();
     const area = useRef<HTMLTextAreaElement>(null);
+    const map = useMemo(() => mc.motdMap(text), [text]);
     const preview = useMemo(() => mc.motdSpans(text), [text]);
     const changed = mc.encodeMotd(text) !== motd;
+    const shown = raw ? text : map.plain;
 
-    /** Put a code where the cursor is, and keep the cursor after it - a toolbar
-     *  that sends the caret back to the start is one nobody uses twice. */
-    const insert = useCallback((code: string) => {
-        const field = area.current;
-        const token = `&${code}`;
-        if (!field) {
-            setText((current) => current + token);
-            return;
-        }
-        const start = field.selectionStart;
-        const end = field.selectionEnd;
-        setText((current) => `${current.slice(0, start)}${token}${current.slice(end)}`);
-        requestAnimationFrame(() => {
-            field.focus();
-            field.setSelectionRange(start + token.length, start + token.length);
-        });
-    }, []);
+    /**
+     * Apply a code to whatever is selected.
+     *
+     * The selection is wrapped, not replaced, and the formatting after it is put
+     * back - so colouring a word colours that word. With nothing selected the
+     * code lands at the caret and applies from there on, which is what the game
+     * does with it.
+     */
+    const apply = useCallback(
+        (code: string) => {
+            const field = area.current;
+            const from = field?.selectionStart ?? shown.length;
+            const to = field?.selectionEnd ?? from;
+            // The field's offsets are the stored string's in raw mode and the
+            // visible text's in formatted mode; the edit is always in the latter.
+            const start = raw ? mc.plainIndexAt(map, from) : from;
+            const end = raw ? mc.plainIndexAt(map, to) : to;
+            const next = mc.applyMotdCode(text, start, end, code);
+            setText(next.text);
+            requestAnimationFrame(() => {
+                if (!field) return;
+                field.focus();
+                const after = mc.motdMap(next.text);
+                const caret = raw
+                    ? [after.offsets[next.start] ?? next.text.length, after.offsets[next.end] ?? next.text.length]
+                    : [next.start, next.end];
+                field.setSelectionRange(caret[0] as number, caret[1] as number);
+            });
+        },
+        [map, raw, shown.length, text]
+    );
+
+    /** What the person typed, folded back into the string the server stores. */
+    const edit = useCallback(
+        (value: string) => setText((current) => (raw ? value : mc.replaceMotdPlain(current, value))),
+        [raw]
+    );
 
     async function save(): Promise<void> {
         setError(null);
@@ -182,9 +209,9 @@ function MotdCard({
                 <div>
                     <p className="text-sm font-medium">Description</p>
                     <p className="text-xs text-muted-foreground">
-                        The two lines under the server in a player&apos;s multiplayer list. Pick a colour or a style and
-                        it applies from the cursor on; a colour clears the style before it, which is Minecraft&apos;s
-                        rule and the reason for the preview.
+                        The two lines under the server in a player&apos;s multiplayer list. Select some text and pick a
+                        colour or a style for it; with nothing selected it applies from the cursor on. A colour
+                        clears the style before it, which is Minecraft&apos;s rule and the reason for the preview.
                     </p>
                 </div>
 
@@ -193,7 +220,7 @@ function MotdCard({
                         <button
                             key={code}
                             type="button"
-                            onClick={() => insert(code)}
+                            onClick={() => apply(code)}
                             aria-label={colour.name}
                             title={colour.name}
                             className="size-6 rounded border border-border transition-transform hover:scale-110"
@@ -206,7 +233,7 @@ function MotdCard({
                             key={code}
                             size="sm"
                             variant="ghost"
-                            onClick={() => insert(code)}
+                            onClick={() => apply(code)}
                             title={label}
                             aria-label={label}
                             className="h-6 px-2 text-xs"
@@ -217,7 +244,7 @@ function MotdCard({
                     <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => insert(mc.RESET)}
+                        onClick={() => apply(mc.RESET)}
                         title="Reset the formatting from here on"
                         aria-label="Reset the formatting from here on"
                         className="h-6 px-2 text-xs"
@@ -228,10 +255,10 @@ function MotdCard({
 
                 <textarea
                     ref={area}
-                    value={text}
-                    onChange={(event) => setText(event.target.value)}
+                    value={shown}
+                    onChange={(event) => edit(event.target.value)}
                     rows={mc.MOTD_MAX_LINES}
-                    aria-label="Server description"
+                    aria-label={raw ? "Server description, with its formatting codes" : "Server description"}
                     spellCheck={false}
                     className="w-full resize-none rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm outline-none focus:border-primary"
                 />
@@ -240,6 +267,15 @@ function MotdCard({
                     <span className="text-xs text-muted-foreground">
                         {mc.MOTD_MAX_LINES} lines. Anything after them is not shown.
                     </span>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 text-xs"
+                        onClick={() => setRaw((current) => !current)}
+                        title={raw ? "Edit the text and let the buttons write the codes" : "Edit the codes yourself"}
+                    >
+                        <Code2 className="size-3.5" /> {raw ? "Formatted" : "Codes"}
+                    </Button>
                     {/* A button and not a switch: it pads the text that is there
                         now, so there is no state to be in afterwards. Running it
                         twice leaves the same result. */}

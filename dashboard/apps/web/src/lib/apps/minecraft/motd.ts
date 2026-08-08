@@ -284,3 +284,154 @@ export function stripMotd(text: string): string {
         .map((spans) => spans.map((span) => span.text).join(""))
         .join("\n");
 }
+
+/** The codes in force at a point: a colour, and the styles stacked on it. */
+export interface MotdCodes {
+    /** The colour code, or null while nothing has set one. */
+    readonly color: string | null;
+    readonly styles: readonly string[];
+}
+
+const NO_CODES: MotdCodes = { color: null, styles: [] };
+
+/**
+ * Where every visible character sits in the stored string, and what formatting is
+ * in force there.
+ *
+ * The editor works in the text a person sees and the server stores the text with
+ * the codes in it, and the two do not line up: `&aHello` is six characters to a
+ * reader and eight to the file. Anything that turns a selection into an edit -
+ * colouring a word, typing in the middle of one - has to cross that gap, and this
+ * is the only place that crossing is worked out.
+ */
+export interface MotdMap {
+    /** The text with the codes taken out, which is what the editor shows. */
+    readonly plain: string;
+    /** Where visible character `i` begins in the raw string. One longer than
+     *  `plain`, so the end of the text has an offset too. */
+    readonly offsets: readonly number[];
+    /** What is in force immediately before visible character `i`. Same length as
+     *  `offsets`, for the same reason. */
+    readonly codes: readonly MotdCodes[];
+}
+
+export function motdMap(raw: string): MotdMap {
+    const offsets: number[] = [];
+    const codes: MotdCodes[] = [];
+    let plain = "";
+    let current: MotdCodes = NO_CODES;
+
+    for (let index = 0; index < raw.length; index += 1) {
+        const character = raw[index] as string;
+        const marker = character === AMPERSAND || character === SECTION;
+        const code = marker ? (raw[index + 1] ?? "").toLowerCase() : "";
+        if (marker && isFormatCode(code)) {
+            index += 1;
+            if (code === RESET) current = NO_CODES;
+            // A colour clears the styles with it, which is the game's rule and
+            // the one that has to survive into what gets written back.
+            else if (code in MOTD_COLORS) current = { color: code, styles: [] };
+            else current = { color: current.color, styles: [...new Set([...current.styles, code])] };
+            continue;
+        }
+        offsets.push(index);
+        codes.push(current);
+        plain += character;
+    }
+    offsets.push(raw.length);
+    codes.push(current);
+    return { plain, offsets, codes };
+}
+
+/** The visible character a raw offset falls on, for a caret that was placed in
+ *  the stored string rather than in the text. A caret inside a code belongs to the
+ *  character the code introduces. */
+export function plainIndexAt(map: MotdMap, rawIndex: number): number {
+    const found = map.offsets.findIndex((offset) => offset >= rawIndex);
+    return found === -1 ? map.plain.length : found;
+}
+
+/** The codes that put the formatting back to `codes`, from whatever is in force.
+ *  Empty when the text is already plain and nothing has to be said. */
+function restoreCodes(codes: MotdCodes): string {
+    if (!codes.color && codes.styles.length === 0) return `${AMPERSAND}${RESET}`;
+    // A colour resets the styles, so it goes first and the styles are re-stated
+    // after it - the same order the game reads them in.
+    const colour = codes.color ? `${AMPERSAND}${codes.color}` : `${AMPERSAND}${RESET}`;
+    return colour + codes.styles.map((style) => `${AMPERSAND}${style}`).join("");
+}
+
+/**
+ * Apply one code to a stretch of the visible text.
+ *
+ * The selection is wrapped, never replaced. Replacing it is what the toolbar used
+ * to do, and it turned "make this word green" into "delete this word and leave
+ * &a" - the whole reason somebody stops trusting the buttons and edits the codes
+ * by hand.
+ *
+ * After the stretch the formatting is put back to what it was there, so colouring
+ * a word in the middle of a coloured line does not repaint the rest of it.
+ *
+ * With nothing selected there is nothing to wrap, so the code is inserted at the
+ * caret and applies from there on, which is what the game does with it.
+ */
+export function applyMotdCode(
+    raw: string,
+    /** Offsets into the visible text, as a text field reports them. */
+    start: number,
+    end: number,
+    code: string
+): { readonly text: string; readonly start: number; readonly end: number } {
+    const map = motdMap(raw);
+    const from = Math.max(0, Math.min(start, map.plain.length));
+    const to = Math.max(from, Math.min(end, map.plain.length));
+    const token = `${AMPERSAND}${code}`;
+    const rawFrom = map.offsets[from] ?? raw.length;
+    if (from === to) {
+        return { text: raw.slice(0, rawFrom) + token + raw.slice(rawFrom), start: from, end: from };
+    }
+    const rawTo = map.offsets[to] ?? raw.length;
+    const after = code === RESET ? "" : restoreCodes(map.codes[to] ?? NO_CODES);
+    return {
+        text: raw.slice(0, rawFrom) + token + raw.slice(rawFrom, rawTo) + after + raw.slice(rawTo),
+        start: from,
+        end: to
+    };
+}
+
+/**
+ * Put edited visible text back into the stored string, keeping its formatting.
+ *
+ * The editor hands a person the text without the codes, so every keystroke has to
+ * be folded back into a string they never see. One contiguous change is assumed,
+ * which is what typing, pasting and deleting a selection all are - so the common
+ * head and tail are found and only what lies between them is replaced.
+ *
+ * The codes at the seam are deliberately kept: typing at the end of a coloured
+ * word extends the colour, which is what somebody watching the preview expects,
+ * rather than dropping the new characters into whatever came before it.
+ */
+export function replaceMotdPlain(raw: string, nextPlain: string): string {
+    const map = motdMap(raw);
+    const previous = map.plain;
+    if (previous === nextPlain) return raw;
+
+    let head = 0;
+    while (head < previous.length && head < nextPlain.length && previous[head] === nextPlain[head]) head += 1;
+    let tail = 0;
+    while (
+        tail < previous.length - head &&
+        tail < nextPlain.length - head &&
+        previous[previous.length - 1 - tail] === nextPlain[nextPlain.length - 1 - tail]
+    ) {
+        tail += 1;
+    }
+
+    const removedTo = previous.length - tail;
+    // The head's own offset is where the replacement starts. Its end is the
+    // offset of the first character kept, so any codes sitting between the two
+    // are dropped along with the text they were introducing.
+    const rawFrom = map.offsets[head] ?? raw.length;
+    const rawTo = map.offsets[removedTo] ?? raw.length;
+    return raw.slice(0, rawFrom) + nextPlain.slice(head, nextPlain.length - tail) + raw.slice(rawTo);
+}
