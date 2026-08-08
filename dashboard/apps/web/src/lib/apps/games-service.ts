@@ -15,15 +15,15 @@ import { listHosts } from "@/lib/host-service";
 import { getHostLanIp } from "@/lib/host-address";
 import { hostPortForApp } from "@/lib/deploy-service";
 import { getLocalEnvironment } from "@/lib/network-service";
-import { sweepTimeouts } from "@/lib/apps/minecraft/timeout-service";
 import { readInstallConfig } from "@/lib/apps/install-config";
 import { appHasCapability, findApp } from "@/lib/apps/catalog";
 import { getServerMetrics } from "@/lib/server-metrics-service";
 import { gameServerAddress } from "@/lib/apps/minecraft/address";
 import type { PortBlocks, PortPolicy } from "@/lib/apps/port-block";
+import { sweepTimeouts } from "@/lib/apps/minecraft/timeout-service";
 import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
 import { enforcePlayerAddresses } from "@/lib/apps/minecraft/player-access";
-import { gamePorts, probeReach, reachConfirmed } from "@/lib/apps/minecraft/reach";
+import { gamePorts, probeListening, probeReach, reachConfirmed } from "@/lib/apps/minecraft/reach";
 import { gameReachAdvice, type GamePort, type GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { applyFirewallBans, editionOf, getServerPlayers, type MinecraftEdition } from "@/lib/apps/minecraft/service";
 
@@ -458,6 +458,16 @@ export async function readGamePorts(probe = false): Promise<GamePortsReading> {
                   proven.has(server.installedAppId) ? { ...server, confirmed: true } : server
               );
     const pending = rows.filter((server) => !server.confirmed);
+    // Whether any of the unproven servers is even up. Without it the card told the
+    // operator to forward a port whenever a server happened to be starting, which
+    // is exactly when it has nothing to say about the router at all.
+    const listening =
+        pending.length === 0
+            ? null
+            : await probeListening(
+                  pending.flatMap((server) => server.ports),
+                  lanIp
+              ).catch(() => null);
     return {
         servers: rows,
         advice: gameReachAdvice(
@@ -466,7 +476,8 @@ export async function readGamePorts(probe = false): Promise<GamePortsReading> {
             pending.length === 0,
             lanIp,
             policy,
-            blocks
+            blocks,
+            listening
         ),
         lanIp,
         policy,

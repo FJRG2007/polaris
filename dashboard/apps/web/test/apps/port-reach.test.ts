@@ -37,7 +37,7 @@ vi.mock("@polaris/core", async (importActual) => ({
     isPublicIpv4: (value: string) => value === "127.0.0.1"
 }));
 
-const { noteReachedFrom, probeGamePort, probeReach } = await import("@/lib/apps/minecraft/reach");
+const { noteReachedFrom, probeGamePort, probeListening, probeReach } = await import("@/lib/apps/minecraft/reach");
 
 /** A port with something listening on it, and the same port once nothing is. */
 async function listener(): Promise<{ port: number; server: Server }> {
@@ -125,5 +125,24 @@ describe("recording what arrived", () => {
     it("takes one from a public address", async () => {
         expect(await noteReachedFrom("player", "203.0.113.9")).toBe(true);
         expect(patched[0]?.id).toBe("player");
+    });
+});
+
+describe("whether the server is even listening", () => {
+    it("says yes while something answers here, and no once nothing does", async () => {
+        const { port, server } = await listener();
+
+        expect(await probeListening([{ port, protocol: "tcp" }], "127.0.0.1")).toBe(true);
+        await close(server);
+        // This is the state that used to be read as "your router is not forwarding
+        // it": a server still generating its world answers nothing, from inside or
+        // out, and the advice has to say so instead of naming the router.
+        expect(await probeListening([{ port, protocol: "tcp" }], "127.0.0.1")).toBe(false);
+    });
+
+    it("answers nothing at all for a server that publishes only UDP", async () => {
+        // Silence and a block sound the same on UDP, so there is no state to report.
+        expect(await probeListening([{ port: 19132, protocol: "udp" }], "127.0.0.1")).toBeNull();
+        expect(await probeListening([], "127.0.0.1")).toBeNull();
     });
 });

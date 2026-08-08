@@ -82,9 +82,9 @@ const PROBE_TIMEOUT_MS = 4000;
  * their own WAN address back inward. UDP is not probed at all, because an
  * unanswered UDP packet and a blocked one are the same silence.
  */
-export function probeGamePort(host: string, port: number): Promise<boolean> {
+export function probeGamePort(host: string, port: number, timeoutMs = PROBE_TIMEOUT_MS): Promise<boolean> {
     return new Promise((resolve) => {
-        const socket = connect({ host, port, timeout: PROBE_TIMEOUT_MS });
+        const socket = connect({ host, port, timeout: timeoutMs });
         const settle = (reached: boolean): void => {
             socket.destroy();
             resolve(reached);
@@ -93,6 +93,32 @@ export function probeGamePort(host: string, port: number): Promise<boolean> {
         socket.once("timeout", () => settle(false));
         socket.once("error", () => settle(false));
     });
+}
+
+/** A local connect crosses no router, so it either answers at once or there is
+ *  nothing there. Short enough that a page can wait for it. */
+const LOCAL_PROBE_TIMEOUT_MS = 700;
+
+/**
+ * Whether anything is listening on these ports here, on this network.
+ *
+ * The question the reach advice was missing. A server that is still generating
+ * its world answers nothing, from inside or out, and reading that silence as "the
+ * router is not forwarding it" is what told an operator to open a port they had
+ * already opened - and then ticked it by itself once the server finished booting.
+ *
+ * Null when there is no address to try, so the advice can say nothing about it
+ * rather than infer. UDP is not probed for the reason it is never probed: silence
+ * and a block are the same thing.
+ */
+export async function probeListening(ports: readonly GamePort[], lanIp: string | null): Promise<boolean | null> {
+    const tcp = ports.filter((entry) => entry.protocol === "tcp");
+    if (tcp.length === 0) return null;
+    const host = lanIp ?? "127.0.0.1";
+    for (const port of tcp) {
+        if (await probeGamePort(host, port.port, LOCAL_PROBE_TIMEOUT_MS)) return true;
+    }
+    return false;
 }
 
 /** How long a probe's answer stands before the port is worth knocking on again.
@@ -178,5 +204,9 @@ export async function reachAdviceFor(installedAppId: string, probe = false): Pro
     if (!confirmed && probe) {
         confirmed = (await probeReach([{ installedAppId, ports }])).length > 0;
     }
-    return gameReachAdvice(environment, ports, confirmed, lanIp, policy, blocks);
+    // Only asked when it would change what is said. A server already proven from
+    // outside is reachable whatever it is doing right now, and a local connect on
+    // every render would be a page waiting on a socket for nothing.
+    const listening = confirmed ? null : await probeListening(ports, lanIp).catch(() => null);
+    return gameReachAdvice(environment, ports, confirmed, lanIp, policy, blocks, listening);
 }

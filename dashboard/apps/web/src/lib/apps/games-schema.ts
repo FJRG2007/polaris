@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { isSeed } from "@/lib/apps/minecraft/world";
+import { isBiome, isLevelType, isSeed } from "@/lib/apps/minecraft/world";
 import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
 
 export const createGameServerSchema = z
@@ -27,6 +27,10 @@ export const createGameServerSchema = z
         /** The world to generate. Any text: a number is used as itself, anything
          *  else is hashed. Blank is a random world. */
         seed: z.string().trim().max(64).optional(),
+        /** The shape of the world. Java only; Bedrock names its own differently. */
+        levelType: z.string().trim().max(64).refine(isLevelType, "That is not a world type").optional(),
+        /** Which biome the whole overworld is, when the type is the one-biome one. */
+        biome: z.string().trim().max(64).refine(isBiome, "That is not a biome").optional(),
         /** "local" or a connected server's id. */
         serverId: z.string().trim().min(1),
         /** Slots. What the server refuses past, not what it plans for. */

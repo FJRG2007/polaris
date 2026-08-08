@@ -13,7 +13,6 @@
  */
 
 import { installApp } from "@/lib/apps/install-service";
-import { seedEnvKey } from "@/lib/apps/minecraft/world";
 import { joinAccess } from "@/lib/apps/minecraft/access";
 import { availableHostPort } from "@/lib/apps/port-registry";
 import { promptedEnvVars, findApp } from "@/lib/apps/catalog";
@@ -21,6 +20,8 @@ import { setGameHostname } from "@/lib/apps/minecraft/address";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import type { CreateGameServerInput } from "@/lib/apps/games-schema";
 import { grantPlayerAccess } from "@/lib/apps/minecraft/player-access";
+import { newestCommonVersion, wantsLatest } from "@/lib/apps/minecraft/blueprint-version";
+import { DEFAULT_BIOME, DEFAULT_LEVEL_TYPE, levelTypeEnv, seedEnvKey } from "@/lib/apps/minecraft/world";
 import {
     CROSSPLAY_PROJECTS,
     findBlueprint,
@@ -60,12 +61,26 @@ export async function createGameServer(
 
     // What the operator chose, then what the blueprint insists on: a blueprint
     // that needs Paper is not a suggestion, it is what its plugins load into.
-    env.set("VERSION", input.version || "LATEST");
+    // A blueprint is a promise about the game this server plays, and its plugins
+    // keep it. Left on LATEST, one whose plugin has no build for the newest
+    // release installs nothing, warns into a log nobody reads, and hands back an
+    // ordinary survival server - so the version the blueprint can actually run on
+    // is pinned before anything is created. Only when the operator asked for
+    // whatever is newest: a version they typed is their decision.
+    const pinned = wantsLatest(input.version) ? await blueprintVersion(blueprint) : null;
+    env.set("VERSION", pinned ?? input.version ?? "LATEST");
     env.set("MAX_PLAYERS", String(input.maxPlayers));
     // The seed only ever applies to a world that does not exist yet, which is
     // exactly what this is creating. Left unset it is a random world, and the
     // manager can start another one from a seed later without losing this map.
     if (input.seed) env.set(seedEnvKey(input.edition), input.seed);
+    // The shape of the world, which like the seed only ever applies to one that
+    // does not exist yet.
+    for (const [key, value] of Object.entries(
+        levelTypeEnv(input.edition, input.levelType ?? DEFAULT_LEVEL_TYPE, input.biome ?? DEFAULT_BIOME)
+    )) {
+        env.set(key, value);
+    }
     // Only the Java image runs a JVM to give a heap to.
     if (input.edition === "java") {
         env.set("MEMORY", formatMemory(memoryMb));
@@ -115,6 +130,18 @@ export async function createGameServer(
 
     const hostname = await attachHostname(ownerId, install.installedAppId, input);
     return { installedAppId: install.installedAppId, hostname };
+}
+
+/**
+ * The newest Minecraft release a blueprint's own plugins all support.
+ *
+ * Only the blueprint's projects decide it. The protection every server gets is
+ * deliberately not counted: those carry "?" too, and letting an anticheat that
+ * has not been rebuilt yet hold every new server back a release would be a worse
+ * failure than the one this exists to fix.
+ */
+export async function blueprintVersion(blueprint: GameBlueprint): Promise<string | null> {
+    return blueprint.projects.length === 0 ? null : newestCommonVersion(blueprint.projects);
 }
 
 /** The blueprint's plugins on top of the protection every server gets, plus the

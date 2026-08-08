@@ -183,3 +183,51 @@ describe("what carries onto a new map", () => {
         expect(world.seedEnvKey("bedrock")).toBe("LEVEL_SEED");
     });
 });
+
+describe("the seed the world was actually made from", () => {
+    it("reads the number the server answers with", () => {
+        expect(world.parseSeedReply("Seed: [-4172144997902289642]")).toBe("-4172144997902289642");
+        expect(world.parseSeedReply("Seed: [123]")).toBe("123");
+    });
+
+    it("is null when the server said something else", () => {
+        expect(world.parseSeedReply("Unknown or incomplete command")).toBeNull();
+        expect(world.parseSeedReply("")).toBeNull();
+    });
+});
+
+describe("the shape of the world", () => {
+    it("sets the type, and the biome only for the shape that has one", () => {
+        expect(world.levelTypeEnv("java", "minecraft:large_biomes", world.DEFAULT_BIOME)).toEqual({
+            LEVEL_TYPE: "minecraft:large_biomes",
+            GENERATOR_SETTINGS: ""
+        });
+        expect(world.levelTypeEnv("java", "minecraft:single_biome_surface", "minecraft:desert")).toEqual({
+            LEVEL_TYPE: "minecraft:single_biome_surface",
+            GENERATOR_SETTINGS: '{"biome":"minecraft:desert"}'
+        });
+    });
+
+    it("clears the settings rather than leaving the last world's behind", () => {
+        // Written blank on purpose: a shape left over from the previous world would
+        // quietly generate that one again under the new world's name.
+        expect(world.levelTypeEnv("java", "minecraft:normal", "minecraft:desert").GENERATOR_SETTINGS).toBe("");
+    });
+
+    it("sets nothing on Bedrock, which names its own shapes differently", () => {
+        expect(world.levelTypeEnv("bedrock", "minecraft:flat", world.DEFAULT_BIOME)).toEqual({});
+    });
+
+    it("refuses a type or a biome it does not know", () => {
+        expect(world.isLevelType("minecraft:flat")).toBe(true);
+        expect(world.isLevelType("minecraft:invented")).toBe(false);
+        expect(world.isBiome("minecraft:desert")).toBe(true);
+        expect(world.isBiome("minecraft:invented")).toBe(false);
+        expect(world.levelTypeEnv("java", "minecraft:invented", world.DEFAULT_BIOME)).toEqual({});
+    });
+
+    it("only the one-biome shape asks for a biome", () => {
+        expect(world.usesBiome("minecraft:single_biome_surface")).toBe(true);
+        expect(world.usesBiome("minecraft:normal")).toBe(false);
+    });
+});

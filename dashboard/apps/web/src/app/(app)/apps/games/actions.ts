@@ -11,8 +11,8 @@ import { revalidatePath } from "next/cache";
 import { clientIp } from "@/lib/request-context";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
-import { createGameServer } from "@/lib/apps/games-create";
 import { gameHostname } from "@/lib/apps/minecraft/address";
+import { blueprintVersion, createGameServer } from "@/lib/apps/games-create";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import { getInstalledApp, installApp, uninstallApp } from "@/lib/apps/install-service";
 import { createGameServerSchema, type CreateGameServerInput } from "@/lib/apps/games-schema";
@@ -49,6 +49,22 @@ export async function suggestedMemoryAction(concurrentPlayers: number, blueprint
     await requirePermission("games.read");
     const blueprint = GAME_BLUEPRINTS.find((entry) => entry.id === blueprintId);
     return formatMemory(recommendedMemoryMb(concurrentPlayers, blueprint?.weight ?? "normal"));
+}
+
+/**
+ * The Minecraft release a blueprint's plugins can run on, for the dialog to say
+ * before anything is created.
+ *
+ * Worth showing rather than doing quietly: a blueprint pinning an older release
+ * is a real consequence - the clients that join have to match it - and finding
+ * out afterwards, from the version field on a server that is already built, is
+ * how somebody ends up deleting it and trying again.
+ */
+export async function blueprintVersionAction(blueprintId: string): Promise<{ version: string | null }> {
+    await requirePermission("games.read");
+    const blueprint = GAME_BLUEPRINTS.find((entry) => entry.id === blueprintId);
+    if (!blueprint) return { version: null };
+    return { version: await blueprintVersion(blueprint).catch(() => null) };
 }
 
 /** Create a server. Returns its installed-app id so the page can open it. */

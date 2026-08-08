@@ -24,11 +24,11 @@ import { setGameHostname } from "@/lib/apps/minecraft/address";
 import { patchInstallConfig } from "@/lib/apps/install-config";
 import { writeContainerFile } from "@/lib/container-files-service";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/minecraft/timeout";
-import { isBackupName, isLevelName } from "@/lib/apps/minecraft/world";
 import { setGameSchedule } from "@/lib/apps/minecraft/schedule-service";
 import { findApp, isAllowedEnvValue, tunableEnvVars } from "@/lib/apps/catalog";
 import { liftTimeout, timeoutPlayer } from "@/lib/apps/minecraft/timeout-service";
 import { parseInventory, type InventoryItem } from "@/lib/apps/minecraft/inventory";
+import { isBackupName, isBiome, isLevelName, isLevelType } from "@/lib/apps/minecraft/world";
 import { parseDimension, parsePosition, type PlayerPosition } from "@/lib/apps/minecraft/position";
 import { applyFirewallBans, runConsoleLine, runServerCommand } from "@/lib/apps/minecraft/service";
 import { MAX_IDLE_MINUTES, MIN_IDLE_MINUTES, type GameSchedule } from "@/lib/apps/minecraft/schedule";
@@ -734,6 +734,10 @@ const newWorldSchema = z.object({
     installedAppId: z.string().uuid(),
     /** Blank generates a random world. */
     seed: z.string().trim().max(64).optional(),
+    /** The shape of the world. Java only; Bedrock names its own differently. */
+    levelType: z.string().trim().max(64).refine(isLevelType, "That is not a world type").optional(),
+    /** Which biome the whole overworld is, when the type is the one-biome one. */
+    biome: z.string().trim().max(64).refine(isBiome, "That is not a biome").optional(),
     /** Java only: carry every player's bag, stats and advancements across. */
     keepPlayers: z.boolean().default(false)
 });
@@ -813,6 +817,8 @@ export async function newWorldAction(input: NewWorldInput): Promise<{ level?: st
             parsed.data.installedAppId,
             {
                 ...(parsed.data.seed ? { seed: parsed.data.seed } : {}),
+                ...(parsed.data.levelType ? { levelType: parsed.data.levelType } : {}),
+                ...(parsed.data.biome ? { biome: parsed.data.biome } : {}),
                 keepPlayers: parsed.data.keepPlayers
             },
             user.id

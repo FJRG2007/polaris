@@ -66,7 +66,10 @@ export function gameReachAdvice(
     confirmed: boolean,
     lanIp: string | null = null,
     policy: PortPolicy = "per-port",
-    blocks: PortBlocks = DEFAULT_PORT_BLOCKS
+    blocks: PortBlocks = DEFAULT_PORT_BLOCKS,
+    /** Whether anything is listening on the port here, on this network. Null when
+     *  it was not checked. */
+    listening: boolean | null = null
 ): GameReachAdvice {
     if (ports.length === 0) {
         return {
@@ -89,6 +92,22 @@ export function gameReachAdvice(
             forward: false
         };
     }
+    // Nothing is listening here, so nothing outside could have answered either -
+    // and there is no evidence about the router one way or the other. Telling the
+    // operator to forward a port at this point is a demand built on a missing
+    // answer, which is exactly how somebody ends up opening a port that was open
+    // all along and watching it tick itself minutes later, once the server had
+    // finished starting.
+    if (listening === false) {
+        return {
+            ok: false,
+            actionable: false,
+            title: "Not answering yet, so its port cannot be checked",
+            detail: `Nothing is listening on ${named} here, so whether it reaches this machine from outside cannot be told apart from the server being down. Start it - or wait for it to finish generating its world - and this checks itself.`,
+            steps: [],
+            forward: false
+        };
+    }
     if (environment === "home-cgnat") {
         return {
             ok: false,
@@ -107,12 +126,16 @@ export function gameReachAdvice(
         return {
             ok: false,
             actionable: true,
-            title: `${named} has to be forwarded on your router`,
-            detail: `The domain setup opens 80 and 443 for websites. ${named} is this server's own port, and nothing has opened it - until something does, players outside this network get a timeout.`,
+            // Not "has to be forwarded". From in here a forward that exists and one
+            // that does not look identical - most routers will not loop their own
+            // public address back inward - so the only honest claim is that nothing
+            // has proved it yet.
+            title: `${named} is not confirmed from outside yet`,
+            detail: `The domain setup opens 80 and 443 for websites; ${named} is this server's own port and rides on none of that. Polaris cannot prove a forward from inside the network, so if you have already opened it, this clears itself the first time somebody joins from outside.`,
             steps: [
                 ranged
-                    ? `Forward ${describeBlocksFor(ports, blocks)} to ${lanIp ?? "this server"} on your router. Polaris keeps every game server inside that range, so this is the last time it has to be opened.`
-                    : `Forward ${named} to ${lanIp ?? "this server"} on your router.`,
+                    ? `If it is not open yet, forward ${describeBlocksFor(ports, blocks)} to ${lanIp ?? "this server"} on your router. Polaris keeps every game server inside that range, so this is the last time it has to be opened.`
+                    : `If it is not open yet, forward ${named} to ${lanIp ?? "this server"} on your router.`,
                 "Polaris marks this done by itself the moment the port answers from outside, or the first time somebody joins on it."
             ],
             forward: true
@@ -122,10 +145,10 @@ export function gameReachAdvice(
         return {
             ok: false,
             actionable: true,
-            title: `${named} has to be allowed in your firewall`,
-            detail: `This server holds its own public address, so nothing has to be forwarded - but the provider's firewall or security group has to let ${named} in.`,
+            title: `${named} is not confirmed from outside yet`,
+            detail: `This server holds its own public address, so nothing has to be forwarded - but the provider's firewall or security group has to let ${named} in, and from in here an allowed port and a blocked one look the same until something arrives.`,
             steps: [
-                `Allow inbound ${named} in your provider's firewall or security group.`,
+                `If it is not allowed yet, allow inbound ${named} in your provider's firewall or security group.`,
                 "Polaris marks this done by itself the moment the port answers from outside, or the first time somebody joins on it."
             ],
             forward: false

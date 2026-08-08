@@ -11,13 +11,13 @@
  */
 
 import { useRouter } from "next/navigation";
-import { isSeed } from "@/lib/apps/minecraft/world";
+import * as world from "@/lib/apps/minecraft/world";
 import { createGameServerSchema } from "@/lib/apps/games-schema";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
 import { Gamepad2, Loader2, MemoryStick, ShieldCheck, Users } from "lucide-react";
-import { createGameServerAction, gameSetupAction, type GameSetup } from "./actions";
 import { blueprintsFor, formatMemory, recommendedMemoryMb } from "@/lib/apps/minecraft/blueprints";
+import { blueprintVersionAction, createGameServerAction, gameSetupAction, type GameSetup } from "./actions";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select, Skeleton, cn } from "@polaris/ui";
 
 const SOFTWARE = [
@@ -42,6 +42,11 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
     const [software, setSoftware] = useState("PAPER");
     const [version, setVersion] = useState("LATEST");
     const [seed, setSeed] = useState("");
+    const [levelType, setLevelType] = useState(world.DEFAULT_LEVEL_TYPE);
+    const [biome, setBiome] = useState(world.DEFAULT_BIOME);
+    /** The release the chosen blueprint's plugins can run on. Null until it is
+     *  known, and for a blueprint that installs nothing and pins nothing. */
+    const [pinned, setPinned] = useState<string | null>(null);
     const [serverId, setServerId] = useState("local");
     const [maxPlayers, setMaxPlayers] = useState(20);
     const [concurrentPlayers, setConcurrentPlayers] = useState(8);
@@ -57,6 +62,20 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
 
     const blueprints = useMemo(() => blueprintsFor(edition), [edition]);
     const blueprint = blueprints.find((entry) => entry.id === blueprintId);
+    const isLatest = version.trim().length === 0 || version.trim().toUpperCase() === "LATEST";
+
+    // Asked as the blueprint is chosen rather than at submit, so the release it
+    // pins is on screen while the decision is still being made.
+    useEffect(() => {
+        let active = true;
+        setPinned(null);
+        void blueprintVersionAction(blueprintId)
+            .then((answer) => active && setPinned(answer.version))
+            .catch(() => undefined);
+        return () => {
+            active = false;
+        };
+    }, [blueprintId]);
     const memory = formatMemory(recommendedMemoryMb(concurrentPlayers, blueprint?.weight ?? "normal"));
     const machine = setup?.machines.find((entry) => entry.id === serverId) ?? null;
 
@@ -88,7 +107,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
     const addressError =
         ownerAddress.trim().length === 0 || isAddressRule(ownerAddress) ? null : "That is not an address or a range";
     const seedError =
-        seed.trim().length === 0 || isSeed(seed.trim()) ? null : "A seed is up to 64 characters of ordinary text";
+        seed.trim().length === 0 || world.isSeed(seed.trim()) ? null : "A seed is up to 64 characters of ordinary text";
     const ready =
         name.trim().length > 0 &&
         isPlayerName(edition, ownerPlayer) &&
@@ -113,6 +132,8 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
             software: edition === "java" ? software : undefined,
             version: version.trim() || "LATEST",
             seed: seed.trim() || undefined,
+            levelType: edition === "java" ? levelType : undefined,
+            biome: edition === "java" && world.usesBiome(levelType) ? biome : undefined,
             serverId,
             maxPlayers,
             concurrentPlayers,
@@ -212,22 +233,58 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                         <label className="flex flex-col gap-1 text-sm">
                             <span className="font-medium">Version</span>
                             <Input value={version} onChange={(event) => setVersion(event.target.value)} />
-                            <span className="text-xs text-muted-foreground">LATEST, or pin one like 1.21.4.</span>
+                            <span className="text-xs text-muted-foreground">
+                                {pinned && isLatest
+                                    ? `${blueprint?.name} runs on ${pinned}, so the server is created on it.`
+                                    : "LATEST, or pin one like 1.21.4."}
+                            </span>
                         </label>
                     </div>
 
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">World seed</span>
-                        <Input
-                            value={seed}
-                            onChange={(event) => setSeed(event.target.value)}
-                            placeholder="Leave blank for a random world"
-                        />
-                        <span className={cn("text-xs", seedError ? "text-danger" : "text-muted-foreground")}>
-                            {seedError ??
-                                "A number or any words. The same seed generates the same map - you can start another one from a different seed later."}
-                        </span>
-                    </label>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label className="flex flex-col gap-1 text-sm">
+                            <span className="font-medium">World seed</span>
+                            <Input
+                                value={seed}
+                                onChange={(event) => setSeed(event.target.value)}
+                                placeholder="Leave blank for a random world"
+                            />
+                            <span className={cn("text-xs", seedError ? "text-danger" : "text-muted-foreground")}>
+                                {seedError ??
+                                    "A number or any words. The same seed always generates the same map."}
+                            </span>
+                        </label>
+                        {edition === "java" && (
+                            <label className="flex flex-col gap-1 text-sm">
+                                <span className="font-medium">World type</span>
+                                <Select
+                                    value={levelType}
+                                    onValueChange={setLevelType}
+                                    options={world.LEVEL_TYPES.map((entry) => ({
+                                        value: entry.value,
+                                        label: entry.label
+                                    }))}
+                                />
+                                <span className="text-xs text-muted-foreground">
+                                    {world.LEVEL_TYPES.find((entry) => entry.value === levelType)?.detail}
+                                </span>
+                            </label>
+                        )}
+                    </div>
+
+                    {edition === "java" && world.usesBiome(levelType) && (
+                        <label className="flex flex-col gap-1 text-sm">
+                            <span className="font-medium">Biome</span>
+                            <Select
+                                value={biome}
+                                onValueChange={setBiome}
+                                options={world.BIOMES.map((entry) => ({ value: entry.value, label: entry.label }))}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                                The whole overworld is this one biome. The Nether and the End are unchanged.
+                            </span>
+                        </label>
+                    )}
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <label className="flex flex-col gap-1 text-sm">

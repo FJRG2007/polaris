@@ -157,6 +157,91 @@ export function isDimensionOf(name: string, level: string): boolean {
     return DIMENSION_SUFFIXES.some((suffix) => name === `${level}${suffix}`);
 }
 
+/** The variables that decide what a generated world looks like, beside its seed. */
+const LEVEL_TYPE_KEY = "LEVEL_TYPE";
+const GENERATOR_SETTINGS_KEY = "GENERATOR_SETTINGS";
+
+/** The shape of the world, as `level-type` names it. */
+export interface LevelTypeOption {
+    readonly value: string;
+    readonly label: string;
+    readonly detail: string;
+}
+
+/**
+ * The world shapes Minecraft generates.
+ *
+ * Java's own `level-type` values, and only those - Bedrock's set is a different
+ * one, so this is not offered there rather than offered wrongly.
+ */
+export const LEVEL_TYPES: readonly LevelTypeOption[] = [
+    { value: "minecraft:normal", label: "Normal", detail: "The ordinary world, with every biome in it." },
+    { value: "minecraft:large_biomes", label: "Large biomes", detail: "The same world, with each biome several times wider." },
+    { value: "minecraft:amplified", label: "Amplified", detail: "Enormous terrain. Hard on the machine, and worth seeing." },
+    { value: "minecraft:single_biome_surface", label: "One biome", detail: "The whole overworld is the biome you pick." },
+    { value: "minecraft:flat", label: "Flat", detail: "A featureless plane, for building on." }
+];
+
+export const DEFAULT_LEVEL_TYPE = "minecraft:normal";
+
+/** Whether this shape is generated around a biome the operator chooses. */
+export function usesBiome(levelType: string): boolean {
+    return levelType === "minecraft:single_biome_surface";
+}
+
+/** Overworld biomes worth offering as a whole world: the ones that read as a
+ *  different place to be, rather than every id the game has. */
+export const BIOMES: readonly { readonly value: string; readonly label: string }[] = [
+    { value: "minecraft:plains", label: "Plains" },
+    { value: "minecraft:forest", label: "Forest" },
+    { value: "minecraft:birch_forest", label: "Birch forest" },
+    { value: "minecraft:dark_forest", label: "Dark forest" },
+    { value: "minecraft:cherry_grove", label: "Cherry grove" },
+    { value: "minecraft:desert", label: "Desert" },
+    { value: "minecraft:badlands", label: "Badlands" },
+    { value: "minecraft:savanna", label: "Savanna" },
+    { value: "minecraft:jungle", label: "Jungle" },
+    { value: "minecraft:swamp", label: "Swamp" },
+    { value: "minecraft:mangrove_swamp", label: "Mangrove swamp" },
+    { value: "minecraft:taiga", label: "Taiga" },
+    { value: "minecraft:snowy_taiga", label: "Snowy taiga" },
+    { value: "minecraft:ice_spikes", label: "Ice spikes" },
+    { value: "minecraft:mushroom_fields", label: "Mushroom fields" },
+    { value: "minecraft:ocean", label: "Ocean" }
+];
+
+export const DEFAULT_BIOME = "minecraft:plains";
+
+export function isLevelType(value: string): boolean {
+    return LEVEL_TYPES.some((entry) => entry.value === value);
+}
+
+export function isBiome(value: string): boolean {
+    return BIOMES.some((entry) => entry.value === value);
+}
+
+/**
+ * What a chosen shape sets, as the image's environment.
+ *
+ * Both variables are always written, blank included: these are set on a server
+ * that already exists as well as on a new one, and leaving the old value behind
+ * would generate the previous shape's world under the new shape's name.
+ */
+export function levelTypeEnv(
+    edition: MinecraftEdition,
+    levelType: string,
+    biome: string
+): Record<string, string> {
+    // Bedrock names its world shapes differently and this offers Java's, so there
+    // is nothing here to set for it.
+    if (edition === "bedrock" || !isLevelType(levelType)) return {};
+    return {
+        [LEVEL_TYPE_KEY]: levelType,
+        [GENERATOR_SETTINGS_KEY]:
+            usesBiome(levelType) && isBiome(biome) ? JSON.stringify({ biome }) : ""
+    };
+}
+
 /** The file every generated level has and nothing else in the data directory
  *  does. What makes a folder a world is that the game wrote this into it. */
 export const LEVEL_MARKER = "level.dat";
@@ -264,6 +349,20 @@ export function parseBackupList(output: string): StatLine[] {
         rows.push({ name, sizeBytes: Number.parseInt(match[1] as string, 10) });
     }
     return rows.sort((a, b) => (a.name < b.name ? 1 : -1));
+}
+
+/**
+ * The seed in a `seed` reply, which the server answers as `Seed: [123]`.
+ *
+ * Worth asking for rather than only showing what was configured. A world created
+ * without one was generated from a seed all the same - the server picked it - and
+ * an operator looking at a field that says "Random" has no way to tell a world
+ * that really was random from one where the setting never took. The number itself
+ * settles it, and it is also the only way to make that world again.
+ */
+export function parseSeedReply(output: string): string | null {
+    const match = /Seed:\s*\[(-?\d{1,20})\]/i.exec(output);
+    return match ? (match[1] as string) : null;
 }
 
 /** Lines of a `ls -1A` listing, without the blanks. */

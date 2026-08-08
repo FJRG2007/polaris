@@ -57,6 +57,10 @@ export interface WorldView {
     readonly level: string;
     /** The seed the next new world would be generated from. Blank means random. */
     readonly seed: string;
+    /** The seed the map being played was actually generated from, as the server
+     *  reports it. Null when it could not be asked - a stopped server, or Bedrock,
+     *  which answers into its own console rather than to the caller. */
+    readonly worldSeed: string | null;
     /** Whether a player's things can be carried onto a new map on this edition. */
     readonly carriesPlayers: boolean;
     readonly worlds: readonly WorldEntry[];
@@ -117,20 +121,41 @@ export async function readWorldView(ownerId: string, installedAppId: string): Pr
                     ...base,
                     worlds: [],
                     backups: [],
+                    worldSeed: null,
                     message: "The server has to be running to read or change its worlds. Start it first."
                 };
             }
-            const [worlds, backups] = await Promise.all([listWorlds(server, level), listBackups(server)]);
-            return { ...base, worlds, backups, message: null };
+            const [worlds, backups, worldSeed] = await Promise.all([
+                listWorlds(server, level),
+                listBackups(server),
+                readWorldSeed(server)
+            ]);
+            return { ...base, worlds, backups, worldSeed, message: null };
         } catch (caught) {
             return {
                 ...base,
                 worlds: [],
                 backups: [],
+                worldSeed: null,
                 message: caught instanceof Error ? caught.message : "Could not read the server's files"
             };
         }
     });
+}
+
+/**
+ * The seed the map being played was actually generated from.
+ *
+ * Asked of the game rather than read from the setting, because the setting only
+ * says what the next world would use: a world created without a seed still has
+ * one, and "Random" on a screen is not an answer to "which world is this".
+ *
+ * Java answers over RCON. Bedrock has no RCON and answers into its own console,
+ * so there this is null and the screen says what was configured instead.
+ */
+async function readWorldSeed(server: ServerContainer): Promise<string | null> {
+    if (server.edition === "bedrock") return null;
+    return server.say(["seed"]).then(world.parseSeedReply, () => null);
 }
 
 /** The maps on disk, found by the marker the game writes into each of them. A
@@ -346,11 +371,15 @@ export async function restoreWorldBackup(
 export async function newWorld(
     ownerId: string,
     installedAppId: string,
-    input: { seed?: string; keepPlayers: boolean },
+    input: { seed?: string; levelType?: string; biome?: string; keepPlayers: boolean },
     actorId: string
 ): Promise<{ level: string; carried: boolean }> {
     const seed = input.seed?.trim() ?? "";
     if (seed.length > 0 && !world.isSeed(seed)) throw new Error("That seed will not do");
+    const levelType = input.levelType ?? world.DEFAULT_LEVEL_TYPE;
+    const biome = input.biome ?? world.DEFAULT_BIOME;
+    if (!world.isLevelType(levelType)) throw new Error("That is not a world type");
+    if (world.usesBiome(levelType) && !world.isBiome(biome)) throw new Error("That is not a biome");
 
     const planned = await withServerContainer(ownerId, installedAppId, async (server) => {
         const { level: current } = await readWorldSettings(ownerId, server.applicationId, server.edition);
@@ -380,7 +409,14 @@ export async function newWorld(
             { key: world.levelEnvKey(server.edition), value: target, isSecret: false },
             // Cleared rather than left behind when no seed was given: the stored one
             // would otherwise generate the same map again and read as a bug.
-            { key: world.seedEnvKey(server.edition), value: seed, isSecret: false }
+            { key: world.seedEnvKey(server.edition), value: seed, isSecret: false },
+            // Written every time, blank included, for the same reason: a shape left
+            // over from the last world would quietly generate the previous one.
+            ...Object.entries(world.levelTypeEnv(server.edition, levelType, biome)).map(([key, value]) => ({
+                key,
+                value,
+                isSecret: false
+            }))
         ]);
         return { target, keep };
     });

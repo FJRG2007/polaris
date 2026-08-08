@@ -17,6 +17,7 @@
 
 import Link from "next/link";
 import { formatBytes } from "@polaris/core";
+import * as world from "@/lib/apps/minecraft/world";
 import { CopyButton } from "@/components/copy-button";
 import { useCallback, useEffect, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
@@ -54,6 +55,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    Select,
     Skeleton,
     cn
 } from "@polaris/ui";
@@ -133,8 +135,10 @@ function WorldsCard({
     const [failed, setFailed] = useState<string | null>(null);
     const [deleting, setDeleting] = useState<string | null>(null);
 
-    const others = (view?.worlds ?? []).filter((world) => !world.current);
-    const current = (view?.worlds ?? []).find((world) => world.current) ?? null;
+    // Named `entry` rather than `world`, which is the module namespace in this
+    // file: a callback that shadowed it would silently take the wrong `world`.
+    const others = (view?.worlds ?? []).filter((entry) => !entry.current);
+    const current = (view?.worlds ?? []).find((entry) => entry.current) ?? null;
 
     async function switchTo(level: string): Promise<void> {
         setBusy(level);
@@ -179,14 +183,30 @@ function WorldsCard({
                         </div>
                         <div className="flex items-baseline justify-between gap-3">
                             <dt className="text-muted-foreground">Seed</dt>
+                            {/* What the map was actually generated from, asked of
+                                the server. The configured value only says what the
+                                next world would use, and a world created without
+                                one still has a seed - showing "Random" for it
+                                answers nothing and cannot be used to make it
+                                again. */}
                             <dd className="flex min-w-0 items-center gap-1">
-                                {view.seed ? (
+                                {(view.worldSeed ?? view.seed) ? (
                                     <>
-                                        <span className="truncate font-mono" title={view.seed}>{view.seed}</span>
-                                        <CopyButton value={view.seed} label="Copy the world seed" />
+                                        <span
+                                            className="truncate font-mono"
+                                            title={view.worldSeed ?? view.seed}
+                                        >
+                                            {view.worldSeed ?? view.seed}
+                                        </span>
+                                        <CopyButton
+                                            value={view.worldSeed ?? view.seed}
+                                            label="Copy the world seed"
+                                        />
                                     </>
                                 ) : (
-                                    <span className="text-muted-foreground">Random</span>
+                                    <span className="text-muted-foreground">
+                                        {view.edition === "bedrock" ? "Random" : "Not read yet"}
+                                    </span>
                                 )}
                             </dd>
                         </div>
@@ -204,27 +224,27 @@ function WorldsCard({
                         <p className="text-xs text-muted-foreground">
                             Maps this server has played before. Switching restarts it.
                         </p>
-                        {others.map((world) => (
+                        {others.map((entry) => (
                             <div
-                                key={world.level}
+                                key={entry.level}
                                 className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-2 text-sm"
                             >
                                 <div className="min-w-0">
-                                    <p className="truncate font-mono" title={world.level}>{world.level}</p>
+                                    <p className="truncate font-mono" title={entry.level}>{entry.level}</p>
                                     <p className="text-xs text-muted-foreground">
-                                        {world.sizeBytes != null ? formatBytes(world.sizeBytes) : "Size unknown"}
+                                        {entry.sizeBytes != null ? formatBytes(entry.sizeBytes) : "Size unknown"}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <Button
                                         size="icon"
                                         variant="ghost"
-                                        aria-label={`Play on ${world.level}`}
+                                        aria-label={`Play on ${entry.level}`}
                                         title="Play on this map"
                                         disabled={busy !== null}
-                                        onClick={() => void switchTo(world.level)}
+                                        onClick={() => void switchTo(entry.level)}
                                     >
-                                        {busy === world.level ? (
+                                        {busy === entry.level ? (
                                             <Loader2 className="size-4 animate-spin" />
                                         ) : (
                                             <Play className="size-4" />
@@ -233,10 +253,10 @@ function WorldsCard({
                                     <Button
                                         size="icon"
                                         variant="ghost"
-                                        aria-label={`Delete ${world.level}`}
+                                        aria-label={`Delete ${entry.level}`}
                                         title="Delete this map"
                                         disabled={busy !== null}
-                                        onClick={() => setDeleting(world.level)}
+                                        onClick={() => setDeleting(entry.level)}
                                     >
                                         <Trash2 className="size-4" />
                                     </Button>
@@ -282,6 +302,8 @@ function NewWorldDialog({
     onDone: () => Promise<void>;
 }) {
     const [seed, setSeed] = useState("");
+    const [levelType, setLevelType] = useState(world.DEFAULT_LEVEL_TYPE);
+    const [biome, setBiome] = useState(world.DEFAULT_BIOME);
     const [keepPlayers, setKeepPlayers] = useState(carriesPlayers);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -292,6 +314,10 @@ function NewWorldDialog({
         const result = await newWorldAction({
             installedAppId,
             ...(seed.trim() ? { seed: seed.trim() } : {}),
+            // The shapes are Java's own names, so they are only sent for Java -
+            // which is the same edition that can carry players across.
+            ...(carriesPlayers ? { levelType } : {}),
+            ...(carriesPlayers && world.usesBiome(levelType) ? { biome } : {}),
             keepPlayers: keepPlayers && carriesPlayers
         });
         setPending(false);
@@ -324,6 +350,37 @@ function NewWorldDialog({
                             A number or any words. The same seed always generates the same map.
                         </span>
                     </label>
+
+                    {carriesPlayers && (
+                        <label className="flex flex-col gap-1 text-sm">
+                            <span className="font-medium">World type</span>
+                            <Select
+                                value={levelType}
+                                onValueChange={setLevelType}
+                                options={world.LEVEL_TYPES.map((entry) => ({
+                                    value: entry.value,
+                                    label: entry.label
+                                }))}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                                {world.LEVEL_TYPES.find((entry) => entry.value === levelType)?.detail}
+                            </span>
+                        </label>
+                    )}
+
+                    {carriesPlayers && world.usesBiome(levelType) && (
+                        <label className="flex flex-col gap-1 text-sm">
+                            <span className="font-medium">Biome</span>
+                            <Select
+                                value={biome}
+                                onValueChange={setBiome}
+                                options={world.BIOMES.map((entry) => ({ value: entry.value, label: entry.label }))}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                                The whole overworld is this one biome. The Nether and the End are unchanged.
+                            </span>
+                        </label>
+                    )}
 
                     <label
                         className={cn(
