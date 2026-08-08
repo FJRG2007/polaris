@@ -29,6 +29,7 @@ import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-histor
 import { MinecraftPlayers } from "./minecraft-players";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
+import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import { GAME_TABS, gameTabHref, isGameTab } from "./tabs";
 import { MinecraftAppearance } from "./minecraft-appearance";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -270,6 +271,10 @@ export function MinecraftPanel({
                         iconSetAt={game?.iconSetAt ?? null}
                         playersOnline={status?.players.online ?? 0}
                         onSaved={reloadSettings}
+                    />
+                    <MinecraftSchedule
+                        installedAppId={installedAppId}
+                        schedule={game?.schedule ?? NO_SCHEDULE}
                     />
                     <MinecraftDomain
                         installedAppId={installedAppId}

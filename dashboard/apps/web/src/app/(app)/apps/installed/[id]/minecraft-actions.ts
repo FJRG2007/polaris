@@ -23,6 +23,8 @@ import { writeContainerFile } from "@/lib/container-files-service";
 import { findApp, isAllowedEnvValue, tunableEnvVars } from "@/lib/apps/catalog";
 import { parseInventory, type InventoryItem } from "@/lib/apps/minecraft/inventory";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/minecraft/timeout";
+import { setGameSchedule } from "@/lib/apps/minecraft/schedule-service";
+import { MAX_IDLE_MINUTES, MIN_IDLE_MINUTES, type GameSchedule } from "@/lib/apps/minecraft/schedule";
 import { liftTimeout, timeoutPlayer } from "@/lib/apps/minecraft/timeout-service";
 import { applyFirewallBans, runConsoleLine, runServerCommand } from "@/lib/apps/minecraft/service";
 import {
@@ -268,6 +270,70 @@ export async function liftTimeoutAction(installedAppId: string, player: string):
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not lift the timeout" };
+    }
+}
+
+const scheduleWindowSchema = z.object({
+    days: z.array(z.number().int().min(0).max(6)).max(7),
+    from: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "A time looks like 23:00"),
+    to: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "A time looks like 06:00"),
+    mode: z.enum(["on", "off", "sleep"])
+});
+
+const scheduleSchema = z.object({
+    installedAppId: z.string().uuid(),
+    schedule: z.object({
+        enabled: z.boolean(),
+        /** Checked against the platform's own zone list rather than a pattern: a
+         *  name that looks right and does not exist would silently be read as UTC,
+         *  and the schedule would fire at the wrong hour with nothing to show for
+         *  it. */
+        timezone: z.string().min(1).max(64).refine(isKnownTimezone, "That is not a time zone this server knows"),
+        otherwise: z.enum(["on", "off", "sleep"]),
+        idleMinutes: z.number().int().min(MIN_IDLE_MINUTES).max(MAX_IDLE_MINUTES),
+        windows: z.array(scheduleWindowSchema).max(24)
+    })
+});
+
+function isKnownTimezone(value: string): boolean {
+    try {
+        new Intl.DateTimeFormat("en-US", { timeZone: value });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/** Declared rather than inferred: the schedule's own type is readonly all the
+ *  way down, and the screen holds one of those. The schema still decides what is
+ *  accepted; this only says what may be handed in. */
+export interface GameScheduleInput {
+    readonly installedAppId: string;
+    readonly schedule: GameSchedule;
+}
+
+/** Save when a server should be up, and when it may go quiet. */
+export async function saveGameScheduleAction(input: GameScheduleInput): Promise<{ error?: string }> {
+    const user = await requirePermission("games.manage");
+    const parsed = scheduleSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        // Ownership: the schedule is written straight to the install's config, so
+        // nothing else on the way would refuse somebody else's server.
+        const install = await getInstalledApp(user.id, parsed.data.installedAppId);
+        if (!install) return { error: "Server not found" };
+        await setGameSchedule(parsed.data.installedAppId, parsed.data.schedule);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.schedule",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { enabled: parsed.data.schedule.enabled, windows: parsed.data.schedule.windows.length }
+        });
+        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save the schedule" };
     }
 }
 

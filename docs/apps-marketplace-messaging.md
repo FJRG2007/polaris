@@ -305,6 +305,19 @@ configured means the machine's own address, as before.
   added later reaches every running server without anyone pressing anything.
   Ranges stay behind: Minecraft bans one address at a time, and the screen says
   how many were left.
+- **Hours, not a switch.** A server carries a schedule: windows over the week
+  that each say be on, be off, or sleep when empty, and a default for the hours
+  no window covers - so "quiet overnight unless somebody is playing, up the rest
+  of the day" is one rule. Times are read in a named zone rather than the
+  machine's, and sleeping never starts anything: a server woken at three in the
+  morning would only find itself empty again. It is applied from
+  `POST /api/cron/game-schedules` (same secret as the other cron routes) and,
+  for an instance with no cron, from the Game servers page itself, which has
+  already asked every server who is on.
+  What is **not** here is waking on a connection attempt. Nothing listens on the
+  game port while the container is down, so noticing that somebody tried needs a
+  stand-in process holding the port and speaking enough of the protocol to
+  answer a ping - a component of its own, not a setting.
 - **Its files are Drive files.** The panel links the container's `/data` into the
   Drive explorer (`?c=container:<applicationId>`), which already browses a
   deployed container - so worlds, configs and plugin folders are read and edited

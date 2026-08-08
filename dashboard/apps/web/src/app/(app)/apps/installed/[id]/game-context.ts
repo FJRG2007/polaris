@@ -10,6 +10,7 @@ import { prisma } from "@polaris/db";
 import { reachAdviceFor } from "@/lib/apps/minecraft/reach";
 import { readInstallConfig } from "@/lib/apps/install-config";
 import { gameDomainSuffix } from "@/lib/apps/minecraft/address";
+import { readSchedule, type GameSchedule } from "@/lib/apps/minecraft/schedule";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 
 export interface GameContext {
@@ -22,6 +23,8 @@ export interface GameContext {
     /** When an icon was last uploaded, so the panel can say there is one without
      *  reaching into the container to look. */
     readonly iconSetAt: string | null;
+    /** The hours it is kept up, and the hours it may go quiet. */
+    readonly schedule: GameSchedule;
 }
 
 /**
@@ -47,6 +50,7 @@ export async function gameContextFor(app: {
         reach,
         hostname: typeof config.hostname === "string" ? config.hostname : null,
         suffix,
-        iconSetAt: typeof config.iconSetAt === "string" ? config.iconSetAt : null
+        iconSetAt: typeof config.iconSetAt === "string" ? config.iconSetAt : null,
+        schedule: readSchedule(config)
     };
 }
