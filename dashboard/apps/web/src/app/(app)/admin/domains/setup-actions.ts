@@ -23,6 +23,8 @@ import { syncDashboardRoute } from "@/lib/domain-edge";
 import { serverEnvironmentSchema } from "@polaris/core";
 import { listGamePorts } from "@/lib/apps/games-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import type { PortBlocks, PortPolicy } from "@/lib/apps/port-block";
+import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
 import { detectDnsProvider, type DnsProviderInfo } from "@/lib/dns-provider";
 import { isBaseDomain, isZoneLabel, normalizeBaseDomain } from "@polaris/deploy";
 import { getCloudflareAccountStatus } from "@/lib/integrations/cloudflare-account-service";
@@ -80,6 +82,10 @@ export interface DomainSetupState {
      * nothing else here would ever mention.
      */
     gameServers: Array<{ name: string; ports: Array<{ port: number; protocol: "tcp" | "udp" }>; confirmed: boolean }>;
+    /** How those ports are opened - a rule each, or one range per transport - and
+     *  the ranges themselves, which is what the rules are written from. */
+    portPolicy: PortPolicy;
+    portBlocks: PortBlocks;
 }
 
 /** Everything the wizard renders from, in one round trip. */
@@ -96,18 +102,21 @@ async function domainSetupState(): Promise<DomainSetupState> {
     // operator to guess that a button on the last step is what unblocks their domain.
     const saved = await getDomainZones();
     if (saved.baseDomain && !(await zoneDnsVerified())) await checkZoneDns().catch(() => undefined);
-    const [environment, network, zones, domains, cloudflare, strategy, lanIp, gameServers] = await Promise.all([
-        getLocalEnvironment(),
-        getNetworkStatus(),
-        getDomainZones(),
-        getDomainConfig(),
-        getCloudflareAccountStatus(),
-        getSetting(STRATEGY_KEY),
-        getHostLanIp(),
-        // Best effort: the domain setup must open with or without the game servers,
-        // and a deployment that has none is the common case.
-        listGamePorts().catch(() => [])
-    ]);
+    const [environment, network, zones, domains, cloudflare, strategy, lanIp, gameServers, portPolicy, portBlocks] =
+        await Promise.all([
+            getLocalEnvironment(),
+            getNetworkStatus(),
+            getDomainZones(),
+            getDomainConfig(),
+            getCloudflareAccountStatus(),
+            getSetting(STRATEGY_KEY),
+            getHostLanIp(),
+            // Best effort: the domain setup must open with or without the game servers,
+            // and a deployment that has none is the common case.
+            listGamePorts().catch(() => []),
+            getPortPolicy(),
+            getPortBlocks()
+        ]);
     return {
         environment,
         network,
@@ -122,6 +131,8 @@ async function domainSetupState(): Promise<DomainSetupState> {
         cloudflareConnected: cloudflare.dnsReady,
         cloudflareTunnelReady: cloudflare.connected,
         lanIp,
+        portPolicy,
+        portBlocks,
         gameServers: gameServers.map((server) => ({
             name: server.name,
             ports: server.ports.map((port) => ({ port: port.port, protocol: port.protocol })),

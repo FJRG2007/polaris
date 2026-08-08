@@ -341,7 +341,7 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                         selected={strategy}
                         tunnelReady={state.cloudflareTunnelReady}
                         lanIp={state.lanIp}
-                        gameRules={gameForwardRules(state.gameServers)}
+                        gameRules={gameForwardRules(state.gameServers, state.portPolicy, state.portBlocks)}
                         onSelect={setStrategy}
                     />
                 )}
@@ -570,7 +570,9 @@ function StrategyStep({
                         <p>
                             Forward ports 80 and 443 to this server
                             {gameRules.length > 0
-                                ? `, plus ${gameRules.length === 1 ? "the port" : "the ports"} your game servers answer on`
+                                ? gameRules.some((rule) => rule.endPort)
+                                    ? ", plus the range your game servers answer in"
+                                    : `, plus ${gameRules.length === 1 ? "the port" : "the ports"} your game servers answer on`
                                 : ""}
                             . Pick your brand for the exact menu names and the values to type - the rest of the setup
                             works either way, so this can be done afterwards.
@@ -935,7 +937,7 @@ function DnsStep({
                         {message && <span className="text-xs text-muted-foreground">{message}</span>}
                     </div>
                 )}
-                {duckdns && <ZoneResults report={report} gameRules={gameForwardRules(state.gameServers)} />}
+                {duckdns && <ZoneResults report={report} gameRules={gameForwardRules(state.gameServers, state.portPolicy, state.portBlocks)} />}
             </div>
         );
     }
@@ -1042,7 +1044,7 @@ function DnsStep({
                 </div>
             )}
 
-            <ZoneResults report={report} gameRules={gameForwardRules(state.gameServers)} />
+            <ZoneResults report={report} gameRules={gameForwardRules(state.gameServers, state.portPolicy, state.portBlocks)} />
         </div>
     );
 }

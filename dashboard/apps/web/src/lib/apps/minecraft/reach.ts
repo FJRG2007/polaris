@@ -22,6 +22,7 @@ import { prisma } from "@polaris/db";
 import { isLanAddress } from "@/lib/host-address";
 import type { ServerEnvironment } from "@polaris/core";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
+import { describeBlock, DEFAULT_PORT_BLOCKS, type PortBlocks, type PortPolicy } from "@/lib/apps/port-block";
 
 /** One port a game server answers on, as the router has to be told it. */
 export interface GamePort {
@@ -49,6 +50,17 @@ export function describePorts(ports: readonly GamePort[]): string {
     return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
 }
 
+/** The same sentence for the blocks these ports come from, which is what the
+ *  range policy asks the operator to open: "TCP 25565-25664 and UDP 19132-19231". */
+export function describeBlocksFor(ports: readonly GamePort[], blocks: PortBlocks): string {
+    const used = (["tcp", "udp"] as const).filter((protocol) =>
+        ports.some((entry) => entry.protocol === protocol)
+    );
+    const parts = used.map((protocol) => `${protocol.toUpperCase()} ${describeBlock(blocks[protocol])}`);
+    if (parts.length <= 1) return parts[0] ?? "its range";
+    return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
+}
+
 /**
  * What still has to happen for players outside the network to get in.
  *
@@ -61,7 +73,9 @@ export function gameReachAdvice(
     environment: ServerEnvironment,
     ports: readonly GamePort[],
     confirmed: boolean,
-    lanIp: string | null = null
+    lanIp: string | null = null,
+    policy: PortPolicy = "per-port",
+    blocks: PortBlocks = DEFAULT_PORT_BLOCKS
 ): GameReachAdvice {
     if (ports.length === 0) {
         return {
@@ -98,13 +112,16 @@ export function gameReachAdvice(
         };
     }
     if (environment === "home-nat") {
+        const ranged = policy === "range";
         return {
             ok: false,
             actionable: true,
             title: `${named} has to be forwarded on your router`,
             detail: `The domain setup opens 80 and 443 for websites. ${named} is this server's own port, and nothing has opened it - until something does, players outside this network get a timeout.`,
             steps: [
-                `Forward ${named} to ${lanIp ?? "this server"} on your router.`,
+                ranged
+                    ? `Forward ${describeBlocksFor(ports, blocks)} to ${lanIp ?? "this server"} on your router. Polaris keeps every game server inside that range, so this is the last time it has to be opened.`
+                    : `Forward ${named} to ${lanIp ?? "this server"} on your router.`,
                 "Polaris marks this done by itself the first time somebody joins from outside."
             ],
             forward: true

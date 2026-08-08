@@ -13,6 +13,7 @@ import { getLocalEnvironment } from "@/lib/network-service";
 import { readInstallConfig } from "@/lib/apps/install-config";
 import { gameDomainSuffix } from "@/lib/apps/minecraft/address";
 import { InstalledAppDashboard } from "./installed-app-dashboard";
+import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
 import { getInstalledApp, getInstalledAppSettings } from "@/lib/apps/install-service";
 import { gamePorts, gameReachAdvice, reachConfirmed, type GameReachAdvice } from "@/lib/apps/minecraft/reach";
 
@@ -39,16 +40,18 @@ async function gameContextFor(app: {
     id: string;
 }): Promise<GameContext | null> {
     if (!app.catalogId.startsWith("minecraft") || !app.applicationId) return null;
-    const [{ environment }, lanIp, ports, install, suffix] = await Promise.all([
+    const [{ environment }, lanIp, ports, install, suffix, policy, blocks] = await Promise.all([
         getLocalEnvironment().catch(() => ({ environment: "unknown" as const })),
         getHostLanIp().catch(() => null),
         gamePorts(app.applicationId),
         prisma.installedApp.findUnique({ where: { id: app.id }, select: { config: true } }),
-        gameDomainSuffix().catch(() => null)
+        gameDomainSuffix().catch(() => null),
+        getPortPolicy(),
+        getPortBlocks()
     ]);
     const config = readInstallConfig(install?.config);
     return {
-        reach: gameReachAdvice(environment, ports, reachConfirmed(install?.config), lanIp),
+        reach: gameReachAdvice(environment, ports, reachConfirmed(install?.config), lanIp, policy, blocks),
         hostname: typeof config.hostname === "string" ? config.hostname : null,
         suffix
     };

@@ -59,9 +59,15 @@ function ForwardValue({ field, rule, lanIp }: { field: RouterFormField; rule: Ro
         case "protocol":
             return <code className="text-foreground">{rule.protocol}</code>;
         case "port":
-            return <code className="text-foreground">{rule.port}</code>;
+            // A range rule fills the same single field with `start-end`, which every
+            // brand's form accepts - it is how a router is asked for a run of ports.
+            return (
+                <code className="text-foreground">
+                    {rule.endPort && rule.endPort !== rule.port ? `${rule.port}-${rule.endPort}` : rule.port}
+                </code>
+            );
         case "portRange":
-            return <code className="text-foreground">{`${rule.port} ~ ${rule.port}`}</code>;
+            return <code className="text-foreground">{`${rule.port} ~ ${rule.endPort ?? rule.port}`}</code>;
         case "anySource":
             // Left at zeroes on purpose: the field limits which WAN addresses may use
             // the rule, and Polaris has to answer the whole internet.

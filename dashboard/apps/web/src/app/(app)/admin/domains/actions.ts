@@ -12,6 +12,7 @@ import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { setOwnerDomainPolicy, type OwnerDomainPolicy } from "@/lib/owner-domains";
 import { checkedAddresses, removeAddress, type CheckedAddress } from "@/lib/address-health";
+import { getPortBlocks, getPortPolicy, setPortBlock, setPortPolicy } from "@/lib/apps/port-block-store";
 import {
     clearDuckdnsToken,
     getDomainConfig,
@@ -20,6 +21,14 @@ import {
     syncDuckDns,
     type DomainConfig
 } from "@/lib/domain-service";
+import {
+    parseBlockInput,
+    portPolicySchema,
+    type PortBlock,
+    type PortBlocks,
+    type PortPolicy,
+    type PortProtocol
+} from "@/lib/apps/port-block";
 import {
     detectPlacement,
     detectPublicIp,
@@ -139,6 +148,59 @@ export async function saveOwnerDomainPolicyAction(input: unknown): Promise<{ pol
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not save that" };
     }
+}
+
+/**
+ * How game ports are handed out and how the router is asked to open them.
+ *
+ * The blocks are part of the same save because they are the same decision: the
+ * range policy is only worth anything if the ports Polaris allocates are inside
+ * the range the operator forwarded, and the allocator reads these blocks whichever
+ * policy is set. Ranges arrive as they are typed ("25565-25664") and are parsed by
+ * the same helper the form validates with, so the field cannot accept something
+ * the write then refuses.
+ */
+const portPolicyInputSchema = z.object({
+    policy: portPolicySchema,
+    tcp: z.string().optional(),
+    udp: z.string().optional()
+});
+
+export async function savePortPolicyAction(
+    input: z.input<typeof portPolicyInputSchema>
+): Promise<{ policy?: PortPolicy; blocks?: PortBlocks; error?: string }> {
+    const user = await requireAdmin();
+    const parsed = portPolicyInputSchema.safeParse(input);
+    if (!parsed.success) return { error: "Invalid port settings" };
+    const blocks: Partial<Record<PortProtocol, PortBlock>> = {};
+    for (const protocol of ["tcp", "udp"] as const) {
+        const text = parsed.data[protocol];
+        if (text === undefined) continue;
+        const block = parseBlockInput(text);
+        if (!block) {
+            return {
+                error: `The ${protocol.toUpperCase()} range has to read like 25565-25664, stay above 1024, and leave 80 and 443 alone.`
+            };
+        }
+        blocks[protocol] = block;
+    }
+    try {
+        await setPortPolicy(parsed.data.policy);
+        for (const [protocol, block] of Object.entries(blocks)) {
+            await setPortBlock(protocol as PortProtocol, block);
+        }
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save that" };
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: "network.ports",
+        targetType: "setting",
+        targetId: "ports",
+        metadata: { policy: parsed.data.policy, ...blocks }
+    });
+    revalidatePath("/admin/domains");
+    return { policy: await getPortPolicy(), blocks: await getPortBlocks() };
 }
 
 export async function clearDuckdnsTokenAction(): Promise<{ config: DomainConfig }> {

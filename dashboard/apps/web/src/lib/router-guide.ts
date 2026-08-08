@@ -14,6 +14,8 @@
  * ISP set, which is why the label on the router is always the first answer.
  */
 
+import { inBlock, DEFAULT_PORT_BLOCKS, type PortBlocks, type PortPolicy } from "@/lib/apps/port-block";
+
 export type RouterBrand =
     | "zte"
     | "huawei"
@@ -81,6 +83,10 @@ export interface RouterForwardRule {
     readonly name: string;
     readonly protocol: string;
     readonly port: number;
+    /** The last port of a range, when the rule covers one. A rule that opens the
+     *  whole block game servers are allocated from is written once and never
+     *  revisited, which is the point of the range policy. */
+    readonly endPort?: number;
 }
 
 /**
@@ -333,18 +339,51 @@ export const FORWARD_RULES: readonly RouterForwardRule[] = [
  *
  * 80 and 443 carry every website Polaris serves and not one game client: a game
  * server answers on its own port, on its own transport, and a Bedrock rule
- * forwarded as TCP forwards nothing at all. Named after the server so an operator
- * looking at a list of rules a year from now can tell which one it belongs to, and
- * so deleting the server tells them which rule to take out.
+ * forwarded as TCP forwards nothing at all.
+ *
+ * Two ways to write them, and the difference is how often the operator goes back
+ * into the router. Under `per-port` there is a rule per published port, named
+ * after the server so a list of rules a year from now still says which server
+ * each belongs to, and deleting a server says which rule to take out. Under
+ * `range` there is one rule per transport covering the whole block Polaris
+ * allocates game ports from: it is written once and every server created
+ * afterwards is already inside it. A server whose port falls outside its block -
+ * an install from before the block existed - still gets its own rule, because a
+ * range that does not contain it opens nothing for it.
  */
 export function gameForwardRules(
-    servers: readonly { name: string; ports: readonly { port: number; protocol: "tcp" | "udp" }[] }[]
+    servers: readonly { name: string; ports: readonly { port: number; protocol: "tcp" | "udp" }[] }[],
+    policy: PortPolicy = "per-port",
+    blocks: PortBlocks = DEFAULT_PORT_BLOCKS
 ): RouterForwardRule[] {
-    const rules: RouterForwardRule[] = [];
-    for (const server of servers) {
+    const named = (server: { name: string }, port: number, protocol: string): RouterForwardRule => {
         const slug = server.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "server";
+        return { name: `game-${slug}-${port}`, protocol, port };
+    };
+    if (policy === "per-port") {
+        return servers.flatMap((server) =>
+            server.ports.map((port) => named(server, port.port, port.protocol.toUpperCase()))
+        );
+    }
+
+    const rules: RouterForwardRule[] = [];
+    // One range rule per transport actually in use: a deployment with no Bedrock
+    // and no crossplay has nothing answering on UDP, and a rule for it would be an
+    // opening nothing is behind.
+    for (const protocol of ["tcp", "udp"] as const) {
+        const block = blocks[protocol];
+        if (!servers.some((server) => server.ports.some((port) => port.protocol === protocol))) continue;
+        rules.push({
+            name: `polaris-games-${protocol}`,
+            protocol: protocol.toUpperCase(),
+            port: block.start,
+            endPort: block.end
+        });
+    }
+    for (const server of servers) {
         for (const port of server.ports) {
-            rules.push({ name: `game-${slug}-${port.port}`, protocol: port.protocol.toUpperCase(), port: port.port });
+            if (inBlock(port.port, blocks[port.protocol])) continue;
+            rules.push(named(server, port.port, port.protocol.toUpperCase()));
         }
     }
     return rules;

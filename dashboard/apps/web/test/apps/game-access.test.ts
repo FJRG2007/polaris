@@ -171,6 +171,29 @@ describe("gameReachAdvice", () => {
     it("has nothing to ask for when no port is published", () => {
         expect(gameReachAdvice("home-nat", [], false).ok).toBe(true);
     });
+
+    // Under the range policy the operator is not being asked to open this server's
+    // port; they are being asked to open the block it came out of, once.
+    it("asks for the range rather than the port when that is what covers it", () => {
+        const advice = gameReachAdvice("home-nat", ports, false, "192.168.1.142", "range");
+        const steps = advice.steps.join(" ");
+
+        expect(steps).toContain("TCP 25565-25664");
+        expect(steps).toContain("192.168.1.142");
+        expect(steps).toContain("last time");
+    });
+
+    it("names only the transports in play when it asks for the ranges", () => {
+        const both = [
+            { port: 25565, protocol: "tcp" as const },
+            { port: 19132, protocol: "udp" as const }
+        ];
+
+        expect(gameReachAdvice("home-nat", both, false, null, "range").steps[0]).toContain(
+            "TCP 25565-25664 and UDP 19132-19231"
+        );
+        expect(gameReachAdvice("home-nat", ports, false, null, "range").steps[0]).not.toContain("UDP");
+    });
 });
 
 describe("describePorts", () => {

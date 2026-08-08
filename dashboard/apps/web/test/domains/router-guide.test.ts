@@ -8,7 +8,14 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { detectRouterBrand, likelyGateway, routerGuide, ROUTER_BRANDS } from "../../src/lib/router-guide";
+import { DEFAULT_PORT_BLOCKS } from "../../src/lib/apps/port-block";
+import {
+    detectRouterBrand,
+    gameForwardRules,
+    likelyGateway,
+    routerGuide,
+    ROUTER_BRANDS
+} from "../../src/lib/router-guide";
 
 describe("recognizing the router", () => {
     it("reads the brand out of the header the firmware sends", () => {
@@ -97,6 +104,62 @@ describe("the forwarding form", () => {
     it("leaves the generic labels in place for brands that fit them", () => {
         expect(routerGuide("tplink").forwardFields).toBeNull();
         expect(routerGuide("other").forwardFields).toBeNull();
+    });
+});
+
+describe("the rules a game server needs", () => {
+    const java = { name: "Survival", ports: [{ port: 25565, protocol: "tcp" as const }] };
+    const crossplay = {
+        name: "Creative",
+        ports: [
+            { port: 25566, protocol: "tcp" as const },
+            { port: 19132, protocol: "udp" as const }
+        ]
+    };
+
+    it("writes one rule per port, named after its server, when asked port by port", () => {
+        // The name is what tells an operator a year later which rule belongs to
+        // which server, and which one to delete with it.
+        expect(gameForwardRules([java, crossplay], "per-port")).toEqual([
+            { name: "game-survival-25565", protocol: "TCP", port: 25565 },
+            { name: "game-creative-25566", protocol: "TCP", port: 25566 },
+            { name: "game-creative-19132", protocol: "UDP", port: 19132 }
+        ]);
+    });
+
+    it("collapses every server into one rule per transport under the range policy", () => {
+        // The point of the range: this is the same two rules for two servers as for
+        // twenty, and for the ones not created yet.
+        expect(gameForwardRules([java, crossplay], "range")).toEqual([
+            { name: "polaris-games-tcp", protocol: "TCP", port: 25565, endPort: 25664 },
+            { name: "polaris-games-udp", protocol: "UDP", port: 19132, endPort: 19231 }
+        ]);
+    });
+
+    it("opens no UDP range when nothing here answers on UDP", () => {
+        // An opening with nothing behind it is still an opening.
+        expect(gameForwardRules([java], "range")).toEqual([
+            { name: "polaris-games-tcp", protocol: "TCP", port: 25565, endPort: 25664 }
+        ]);
+    });
+
+    it("still names a server whose port the range does not reach", () => {
+        // An install from before the block existed: forwarding the range would leave
+        // it dark, and nothing else on the page would say why.
+        const legacy = { name: "Old world", ports: [{ port: 7777, protocol: "tcp" as const }] };
+
+        expect(gameForwardRules([java, legacy], "range", DEFAULT_PORT_BLOCKS)).toEqual([
+            { name: "polaris-games-tcp", protocol: "TCP", port: 25565, endPort: 25664 },
+            { name: "game-old-world-7777", protocol: "TCP", port: 7777 }
+        ]);
+    });
+
+    it("follows a widened block rather than the default", () => {
+        expect(gameForwardRules([java], "range", { tcp: { start: 30000, end: 30099 }, udp: DEFAULT_PORT_BLOCKS.udp })).toEqual([
+            { name: "polaris-games-tcp", protocol: "TCP", port: 30000, endPort: 30099 },
+            // 25565 is outside the widened block, so it keeps a rule of its own.
+            { name: "game-survival-25565", protocol: "TCP", port: 25565 }
+        ]);
     });
 });
 

@@ -15,10 +15,13 @@
 
 import { RouterSteps } from "./router-steps";
 import { getHostLanIp } from "@/lib/host-address";
+import { PortPolicyForm } from "./port-policy-form";
 import { Badge, Card, CardBody } from "@polaris/ui";
 import { gameForwardRules } from "@/lib/router-guide";
+import { describeBlock } from "@/lib/apps/port-block";
 import { listGamePorts } from "@/lib/apps/games-service";
 import { getLocalEnvironment } from "@/lib/network-service";
+import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
 import { describePorts, gameReachAdvice } from "@/lib/apps/minecraft/reach";
 
 export async function GamePortsCard() {
@@ -27,9 +30,11 @@ export async function GamePortsCard() {
     // explains a situation nobody is in is noise on an admin page.
     if (servers.length === 0) return null;
 
-    const [{ environment }, lanIp] = await Promise.all([
+    const [{ environment }, lanIp, policy, blocks] = await Promise.all([
         getLocalEnvironment().catch(() => ({ environment: "unknown" as const })),
-        getHostLanIp().catch(() => null)
+        getHostLanIp().catch(() => null),
+        getPortPolicy(),
+        getPortBlocks()
     ]);
 
     const pending = servers.filter((server) => !server.confirmed);
@@ -37,7 +42,15 @@ export async function GamePortsCard() {
         environment,
         pending.flatMap((server) => server.ports),
         pending.length === 0,
-        lanIp
+        lanIp,
+        policy,
+        blocks
+    );
+    // A server whose port predates the block is one the range rule does not cover,
+    // and it is worth saying which: the operator would otherwise forward the range,
+    // see this server still unreachable, and have nothing to go on.
+    const outside = servers.filter((server) =>
+        server.ports.some((port) => port.port < blocks[port.protocol].start || port.port > blocks[port.protocol].end)
     );
 
     return (
@@ -48,8 +61,20 @@ export async function GamePortsCard() {
                     <p className="text-xs text-muted-foreground">
                         Ports 80 and 443 carry every website Polaris serves and not one game client. Each server below
                         answers on its own port, on its own transport, and nothing above this opens them.
+                        {policy === "range" ? (
+                            <>
+                                {" "}
+                                Polaris keeps them inside{" "}
+                                <span className="font-mono text-foreground">TCP {describeBlock(blocks.tcp)}</span> and{" "}
+                                <span className="font-mono text-foreground">UDP {describeBlock(blocks.udp)}</span>, so
+                                forwarding those two ranges covers the servers you have and the ones you have not
+                                created yet.
+                            </>
+                        ) : null}
                     </p>
                 </div>
+
+                <PortPolicyForm policy={policy} blocks={blocks} />
 
                 <ul className="flex flex-col divide-y divide-border/60">
                     {servers.map((server) => (
@@ -84,10 +109,23 @@ export async function GamePortsCard() {
                         )}
                         {advice.forward && (
                             <div className="text-muted-foreground">
-                                <RouterSteps server={null} lanIp={lanIp} rules={gameForwardRules(pending)} />
+                                <RouterSteps
+                                    server={null}
+                                    lanIp={lanIp}
+                                    rules={gameForwardRules(pending, policy, blocks)}
+                                />
                             </div>
                         )}
                     </div>
+                )}
+
+                {policy === "range" && outside.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                        {outside.length === 1 ? "One server answers" : `${outside.length} servers answer`} outside those
+                        ranges - {outside.map((server) => server.name).join(", ")} - so {outside.length === 1 ? "it" : "they"}{" "}
+                        {outside.length === 1 ? "keeps" : "keep"} a rule of their own above. Widening a range does not move
+                        a server that is already running; recreating it does.
+                    </p>
                 )}
             </CardBody>
         </Card>
