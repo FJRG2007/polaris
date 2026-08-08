@@ -12,10 +12,15 @@
 import { prisma } from "@polaris/db";
 import { freemem, totalmem } from "node:os";
 import { listHosts } from "@/lib/host-service";
+import { getHostLanIp } from "@/lib/host-address";
+import { getLocalEnvironment } from "@/lib/network-service";
 import { appHasCapability, findApp } from "@/lib/apps/catalog";
 import { getServerMetrics } from "@/lib/server-metrics-service";
+import type { PortBlocks, PortPolicy } from "@/lib/apps/port-block";
+import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
 import { enforcePlayerAddresses } from "@/lib/apps/minecraft/player-access";
-import { gamePorts, reachConfirmed, type GamePort } from "@/lib/apps/minecraft/reach";
+import { gamePorts, probeReach, reachConfirmed } from "@/lib/apps/minecraft/reach";
+import { gameReachAdvice, type GamePort, type GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { applyFirewallBans, editionOf, getServerStatus, type MinecraftEdition } from "@/lib/apps/minecraft/service";
 
 /** A machine a server can be created on, with what it has left to give. */
@@ -262,4 +267,59 @@ export async function listGamePorts(): Promise<GamePortRow[]> {
         }))
     );
     return rows.filter((row) => row.ports.length > 0);
+}
+
+/** Every game server's ports, what is still in the way of the ones not proven,
+ *  and the settings the router instructions are written from. */
+export interface GamePortsReading {
+    readonly servers: readonly GamePortRow[];
+    readonly advice: GameReachAdvice;
+    /** This server's address on the network, for the rules to point at. */
+    readonly lanIp: string | null;
+    readonly policy: PortPolicy;
+    readonly blocks: PortBlocks;
+}
+
+/**
+ * The whole of what the Domains card shows, in one read.
+ *
+ * Shared with the endpoint that card polls, so the first paint and every refresh
+ * afterwards are built the same way - a card that says one thing on load and
+ * another a second later would be reporting the refresh, not the network.
+ *
+ * `probe` is off for a render and on for a poll: knocking on a closed port waits
+ * out a timeout, and an admin page must not be held open by it.
+ */
+export async function readGamePorts(probe = false): Promise<GamePortsReading> {
+    const [servers, { environment }, lanIp, policy, blocks] = await Promise.all([
+        listGamePorts(),
+        getLocalEnvironment().catch(() => ({ environment: "unknown" as const })),
+        getHostLanIp().catch(() => null),
+        getPortPolicy(),
+        getPortBlocks()
+    ]);
+    const proven = probe
+        ? new Set(await probeReach(servers.filter((server) => !server.confirmed)))
+        : new Set<string>();
+    const rows =
+        proven.size === 0
+            ? servers
+            : servers.map((server) =>
+                  proven.has(server.installedAppId) ? { ...server, confirmed: true } : server
+              );
+    const pending = rows.filter((server) => !server.confirmed);
+    return {
+        servers: rows,
+        advice: gameReachAdvice(
+            environment,
+            pending.flatMap((server) => server.ports),
+            pending.length === 0,
+            lanIp,
+            policy,
+            blocks
+        ),
+        lanIp,
+        policy,
+        blocks
+    };
 }

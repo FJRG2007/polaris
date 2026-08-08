@@ -22,10 +22,10 @@ import { saveWorldAction } from "./minecraft-actions";
 import { MinecraftConsole } from "./minecraft-console";
 import { MinecraftPlayers } from "./minecraft-players";
 import { MinecraftSettings } from "./minecraft-settings";
-import type { GameReachAdvice } from "@/lib/apps/minecraft/reach";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FolderOpen, Loader2, Save, ShieldAlert } from "lucide-react";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
+import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
@@ -48,6 +48,10 @@ const POLL_MS = 5000;
 
 interface ServerReading {
     status: MinecraftStatus | null;
+    /** What is still in the way of players outside this network, as of the last
+     *  poll: the operator forwards the port with this page open, so the answer has
+     *  to arrive without a reload. Null until the first poll answers. */
+    reach: GameReachAdvice | null;
     roster: MinecraftRoster | null;
     firewall: MinecraftFirewall | null;
     access: PlayerAccessView | null;
@@ -72,6 +76,7 @@ export function MinecraftPanel({
     const [tab, setTab] = useState<TabId>("overview");
     const [reading, setReading] = useState<ServerReading>({
         status: null,
+        reach: null,
         roster: null,
         firewall: null,
         access: null
@@ -90,6 +95,7 @@ export function MinecraftPanel({
             );
             const data = (await response.json()) as {
                 status?: MinecraftStatus;
+                reach?: GameReachAdvice | null;
                 roster?: MinecraftRoster;
                 firewall?: MinecraftFirewall;
                 access?: PlayerAccessView;
@@ -102,6 +108,9 @@ export function MinecraftPanel({
             setError(null);
             setReading((current) => ({
                 status: data.status ?? null,
+                // Kept when a poll could not work it out, rather than dropped back
+                // to the page's: the warning would flicker on every failed read.
+                reach: data.reach ?? current.reach,
                 roster: data.roster ?? (wantsRoster ? current.roster : null),
                 firewall: data.firewall ?? (wantsRoster ? current.firewall : null),
                 access: data.access ?? (wantsRoster ? current.access : null)
@@ -134,7 +143,7 @@ export function MinecraftPanel({
                 settings={settings}
                 installedAppId={installedAppId}
                 applicationId={applicationId}
-                reach={game?.reach ?? null}
+                reach={reading.reach ?? game?.reach ?? null}
             />
 
             {error && <p className="text-sm text-danger">{error}</p>}

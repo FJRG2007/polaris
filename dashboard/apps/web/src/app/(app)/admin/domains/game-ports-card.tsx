@@ -8,50 +8,26 @@
  * "running", and every player outside the network gets a timeout.
  *
  * So it is driven by the servers themselves rather than by the DNS check, and it
- * shows what is confirmed apart from what is not: a port is only ticked once
- * somebody has actually joined on it from a public address, which is the one piece
- * of evidence a router cannot fake.
+ * shows what is confirmed apart from what is not: a port is ticked once something
+ * has actually arrived on it from a public address, which is the one piece of
+ * evidence a router cannot fake.
+ *
+ * The card itself renders what is already known and nothing more - the knocking is
+ * the live half, and it happens under `GamePortsLive` where waiting on a router
+ * costs nobody the page.
  */
 
-import { RouterSteps } from "./router-steps";
-import { getHostLanIp } from "@/lib/host-address";
+import { Card, CardBody } from "@polaris/ui";
+import { GamePortsLive } from "./game-ports-live";
 import { PortPolicyForm } from "./port-policy-form";
-import { Badge, Card, CardBody } from "@polaris/ui";
-import { gameForwardRules } from "@/lib/router-guide";
 import { describeBlock } from "@/lib/apps/port-block";
-import { listGamePorts } from "@/lib/apps/games-service";
-import { getLocalEnvironment } from "@/lib/network-service";
-import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
-import { describePorts, gameReachAdvice } from "@/lib/apps/minecraft/reach";
+import { readGamePorts } from "@/lib/apps/games-service";
 
 export async function GamePortsCard() {
-    const servers = await listGamePorts().catch(() => []);
+    const reading = await readGamePorts().catch(() => null);
     // Nothing to say on a deployment that runs no game servers, and a card that
     // explains a situation nobody is in is noise on an admin page.
-    if (servers.length === 0) return null;
-
-    const [{ environment }, lanIp, policy, blocks] = await Promise.all([
-        getLocalEnvironment().catch(() => ({ environment: "unknown" as const })),
-        getHostLanIp().catch(() => null),
-        getPortPolicy(),
-        getPortBlocks()
-    ]);
-
-    const pending = servers.filter((server) => !server.confirmed);
-    const advice = gameReachAdvice(
-        environment,
-        pending.flatMap((server) => server.ports),
-        pending.length === 0,
-        lanIp,
-        policy,
-        blocks
-    );
-    // A server whose port predates the block is one the range rule does not cover,
-    // and it is worth saying which: the operator would otherwise forward the range,
-    // see this server still unreachable, and have nothing to go on.
-    const outside = servers.filter((server) =>
-        server.ports.some((port) => port.port < blocks[port.protocol].start || port.port > blocks[port.protocol].end)
-    );
+    if (!reading || reading.servers.length === 0) return null;
 
     return (
         <Card id="game-ports" className="scroll-mt-4">
@@ -61,72 +37,27 @@ export async function GamePortsCard() {
                     <p className="text-xs text-muted-foreground">
                         Ports 80 and 443 carry every website Polaris serves and not one game client. Each server below
                         answers on its own port, on its own transport, and nothing above this opens them.
-                        {policy === "range" ? (
+                        {reading.policy === "range" ? (
                             <>
                                 {" "}
                                 Polaris keeps them inside{" "}
-                                <span className="font-mono text-foreground">TCP {describeBlock(blocks.tcp)}</span> and{" "}
-                                <span className="font-mono text-foreground">UDP {describeBlock(blocks.udp)}</span>, so
-                                forwarding those two ranges covers the servers you have and the ones you have not
+                                <span className="font-mono text-foreground">
+                                    TCP {describeBlock(reading.blocks.tcp)}
+                                </span>{" "}
+                                and{" "}
+                                <span className="font-mono text-foreground">
+                                    UDP {describeBlock(reading.blocks.udp)}
+                                </span>
+                                , so forwarding those two ranges covers the servers you have and the ones you have not
                                 created yet.
                             </>
                         ) : null}
                     </p>
                 </div>
 
-                <PortPolicyForm policy={policy} blocks={blocks} />
+                <PortPolicyForm policy={reading.policy} blocks={reading.blocks} />
 
-                <ul className="flex flex-col divide-y divide-border/60">
-                    {servers.map((server) => (
-                        <li key={server.installedAppId} className="flex items-center gap-2 py-2">
-                            <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm" title={server.name}>
-                                    {server.name}
-                                </p>
-                                <p className="font-mono text-xs text-muted-foreground">
-                                    {describePorts(server.ports)}
-                                </p>
-                            </div>
-                            {server.confirmed ? (
-                                <Badge className="border-success/40 text-success">Reached from outside</Badge>
-                            ) : (
-                                <Badge className="border-warning/40 text-warning">Not confirmed</Badge>
-                            )}
-                        </li>
-                    ))}
-                </ul>
-
-                {pending.length > 0 && (
-                    <div className="flex flex-col gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs">
-                        <p className="font-medium text-foreground">{advice.title}</p>
-                        <p className="text-muted-foreground">{advice.detail}</p>
-                        {advice.steps.length > 0 && (
-                            <ul className="ml-4 list-disc text-muted-foreground">
-                                {advice.steps.map((step) => (
-                                    <li key={step}>{step}</li>
-                                ))}
-                            </ul>
-                        )}
-                        {advice.forward && (
-                            <div className="text-muted-foreground">
-                                <RouterSteps
-                                    server={null}
-                                    lanIp={lanIp}
-                                    rules={gameForwardRules(pending, policy, blocks)}
-                                />
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {policy === "range" && outside.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                        {outside.length === 1 ? "One server answers" : `${outside.length} servers answer`} outside those
-                        ranges - {outside.map((server) => server.name).join(", ")} - so {outside.length === 1 ? "it" : "they"}{" "}
-                        {outside.length === 1 ? "keeps" : "keep"} a rule of their own above. Widening a range does not move
-                        a server that is already running; recreating it does.
-                    </p>
-                )}
+                <GamePortsLive initial={reading} />
             </CardBody>
         </Card>
     );

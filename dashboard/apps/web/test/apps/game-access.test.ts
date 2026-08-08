@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 import { parseJoinAddresses } from "@/lib/apps/minecraft/parse";
-import { describePorts, gameReachAdvice } from "@/lib/apps/minecraft/reach";
+import { describePorts, gameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { accessRefusal, addressMatches, isAddressRule, isPlayerName, joinAccess } from "@/lib/apps/minecraft/access";
 
 describe("addressMatches", () => {

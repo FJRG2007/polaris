@@ -8,14 +8,12 @@
 import { prisma } from "@polaris/db";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/session";
-import { getHostLanIp } from "@/lib/host-address";
-import { getLocalEnvironment } from "@/lib/network-service";
+import { reachAdviceFor } from "@/lib/apps/minecraft/reach";
 import { readInstallConfig } from "@/lib/apps/install-config";
 import { gameDomainSuffix } from "@/lib/apps/minecraft/address";
 import { InstalledAppDashboard } from "./installed-app-dashboard";
-import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
+import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { getInstalledApp, getInstalledAppSettings } from "@/lib/apps/install-service";
-import { gamePorts, gameReachAdvice, reachConfirmed, type GameReachAdvice } from "@/lib/apps/minecraft/reach";
 
 export const dynamic = "force-dynamic";
 
@@ -30,9 +28,11 @@ export interface GameContext {
 }
 
 /**
- * Worked out here rather than in the panel because none of it changes while the
- * page is open - the machine's environment, its LAN address, the ports the deploy
- * pinned, the domain layout - and the panel polls every five seconds.
+ * Worked out here so the panel paints with it rather than after it - the machine's
+ * environment, the ports the deploy pinned, the domain layout. The reach is the
+ * one part that can change while the page is open, so this is only its starting
+ * point: it is read without knocking on anything, and the panel's own poll takes
+ * it from there.
  */
 async function gameContextFor(app: {
     catalogId: string;
@@ -40,18 +40,14 @@ async function gameContextFor(app: {
     id: string;
 }): Promise<GameContext | null> {
     if (!app.catalogId.startsWith("minecraft") || !app.applicationId) return null;
-    const [{ environment }, lanIp, ports, install, suffix, policy, blocks] = await Promise.all([
-        getLocalEnvironment().catch(() => ({ environment: "unknown" as const })),
-        getHostLanIp().catch(() => null),
-        gamePorts(app.applicationId),
+    const [reach, install, suffix] = await Promise.all([
+        reachAdviceFor(app.id),
         prisma.installedApp.findUnique({ where: { id: app.id }, select: { config: true } }),
-        gameDomainSuffix().catch(() => null),
-        getPortPolicy(),
-        getPortBlocks()
+        gameDomainSuffix().catch(() => null)
     ]);
     const config = readInstallConfig(install?.config);
     return {
-        reach: gameReachAdvice(environment, ports, reachConfirmed(install?.config), lanIp, policy, blocks),
+        reach,
         hostname: typeof config.hostname === "string" ? config.hostname : null,
         suffix
     };
