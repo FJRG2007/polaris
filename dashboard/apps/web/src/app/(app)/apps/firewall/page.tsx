@@ -25,14 +25,24 @@ import { FirewallInstancePanels } from "./instance-panels";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { WAF_SCOPE_TYPES, type WafScopeType } from "@polaris/core";
 import { gameServerForApplication } from "@/lib/apps/games-service";
+import { listInstalledAppScopes } from "@/lib/apps/install-service";
 import { listPlayerAccess } from "@/lib/apps/minecraft/player-access";
-import { scopeNeedsTarget, scopeOptions, type ScopeCatalog, type ScopeOption } from "./scope-kinds";
+import {
+    ruleScopeFor,
+    scopeNeedsTarget,
+    scopeOptions,
+    type ScopeCatalog,
+    type ScopeKind,
+    type ScopeOption
+} from "./scope-kinds";
 
 export const dynamic = "force-dynamic";
 
 /** What each scope covers, said once here rather than repeated in the editor. */
-function describe(kind: WafScopeType, label: string): string {
+function describe(kind: ScopeKind, label: string): string {
     switch (kind) {
+        case "marketplace":
+            return `Applies to ${label} alone. It is an installed app, and these are the rules on the service it runs.`;
         case "polaris":
             return "Guards the dashboard itself on the public domains it answers on. The local network name is served separately and stays reachable, so shutting the public internet out here is something you can undo from your own network.";
         case "global":
@@ -59,10 +69,11 @@ export default async function FirewallPage({
     const user = await requirePermission("deploy.manage");
     const canOperate = await userHasManage(user, "system.manage");
 
-    const [projects, hosts, groups] = await Promise.all([
+    const [projects, hosts, groups, marketplace] = await Promise.all([
         listProjectScopes(user.id),
         listHosts(user.id),
-        listHostGroups(user.id)
+        listHostGroups(user.id),
+        listInstalledAppScopes(user.id)
     ]);
 
     const environments: ScopeOption[] = [];
@@ -75,10 +86,16 @@ export default async function FirewallPage({
             }
         }
     }
+    // An install whose service this caller cannot see is not offered: the shortcut
+    // must not become a way round the ownership the service list already applies.
+    const visible = new Set(services.map((service) => service.id));
     const catalog: ScopeCatalog = {
         projects: projects.map((project) => ({ id: project.id, label: project.name })),
         environments,
         services,
+        marketplace: marketplace
+            .filter((app) => visible.has(app.applicationId))
+            .map((app) => ({ id: app.applicationId, label: app.label })),
         servers: hosts.map((host) => ({ id: host.id, label: host.name })),
         serverGroups: groups.map((group) => ({ id: group.id, label: group.name }))
     };
@@ -90,10 +107,14 @@ export default async function FirewallPage({
     // scope is the broader-sounding of the two. Someone opening the firewall came to
     // protect what they deployed; the dashboard is one application among those, and its
     // own scope is a special case they can pick when they want it.
-    const requested = WAF_SCOPE_TYPES.includes(scope as WafScopeType) ? (scope as WafScopeType) : null;
-    const fallback: WafScopeType = canOperate ? "global" : "project";
-    let kind = requested ?? fallback;
+    const known = (value: string | undefined): value is ScopeKind =>
+        value === "marketplace" || WAF_SCOPE_TYPES.includes(value as WafScopeType);
+    const fallback: ScopeKind = canOperate ? "global" : "project";
+    let kind: ScopeKind = known(scope) ? scope : fallback;
     if (!canOperate && (kind === "polaris" || kind === "global")) kind = "project";
+    // The marketplace shortcut is a way of naming a service, so it resolves to one:
+    // rules written here are the same rows the Service scope would show.
+    const ruleScope = ruleScopeFor(kind);
 
     const options = scopeOptions(kind, catalog);
     const scopeId = scopeNeedsTarget(kind) ? (options.find((option) => option.id === id)?.id ?? options[0]?.id ?? "") : "";
@@ -107,7 +128,7 @@ export default async function FirewallPage({
     // A service that is a game server is guarded by something else entirely: its
     // player list, not the HTTP rules below. Looked up only when one service is in
     // scope, which is the only case where it can be one.
-    const game = kind === "application" && scopeId ? await gameServerForApplication(user.id, scopeId) : null;
+    const game = ruleScope === "application" && scopeId ? await gameServerForApplication(user.id, scopeId) : null;
     const gameAccess = game ? await listPlayerAccess(user.id, game.installedAppId).catch(() => null) : null;
     // Read once: the editor offers it for the allowlist, and the anomaly panel marks
     // the reader's own address so a finding about themselves reads as one.
@@ -139,8 +160,8 @@ export default async function FirewallPage({
                 <>
                     {game && <GameFirewallPanel installedAppId={game.installedAppId} initial={gameAccess} />}
                     <WafEditor
-                        key={`${kind}:${scopeId}`}
-                        scopeType={kind}
+                        key={`${ruleScope}:${scopeId}`}
+                        scopeType={ruleScope}
                         scopeId={scopeId}
                         description={describe(kind, label)}
                         // Polaris has a login of its own; sending its visitors round the

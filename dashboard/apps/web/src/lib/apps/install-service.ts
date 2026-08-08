@@ -255,6 +255,39 @@ export async function listInstalledApps(ownerId: string): Promise<InstalledAppVi
     }));
 }
 
+/** An installed app that is backed by a deployed service, named as the app. */
+export interface InstalledAppScope {
+    /** The service the rules actually attach to. */
+    readonly applicationId: string;
+    readonly label: string;
+}
+
+/**
+ * The owner's marketplace installs, as somewhere a rule can be pointed.
+ *
+ * Somebody who installed Minecraft knows it as Minecraft, not as the service slug
+ * it happens to run under three levels down a project tree, so any screen that asks
+ * "which of your things is this about" should be able to offer the app by name.
+ * Only installs with a service: a builtin app runs no container to guard.
+ */
+export async function listInstalledAppScopes(ownerId: string): Promise<InstalledAppScope[]> {
+    const rows = await prisma.installedApp.findMany({
+        where: { ownerId, status: { not: "removed" }, applicationId: { not: null } },
+        orderBy: { name: "asc" },
+        select: { name: true, catalogId: true, applicationId: true }
+    });
+    return rows.map((row) => {
+        const manifest = findApp(row.catalogId);
+        // The catalog name disambiguates two installs of the same app, which is the
+        // case the bare instance name reads worst in.
+        const kind = manifest?.name ?? row.catalogId;
+        return {
+            applicationId: row.applicationId as string,
+            label: kind === row.name ? row.name : `${row.name} (${kind})`
+        };
+    });
+}
+
 export interface InstalledAppDetail extends InstalledAppView {
     /** Catalog display name and how its dashboard is rendered. */
     catalogName: string;

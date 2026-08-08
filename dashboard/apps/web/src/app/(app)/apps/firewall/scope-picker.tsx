@@ -16,10 +16,9 @@
  */
 
 import { Select } from "@polaris/ui";
-import type { WafScopeType } from "@polaris/core";
 import { HeaderPortal } from "@/components/header-portal";
 import { useRouter, useSearchParams } from "next/navigation";
-import { SCOPE_KINDS, scopeNeedsTarget, scopeOptions, type ScopeCatalog } from "./scope-kinds";
+import { SCOPE_KINDS, scopeNeedsTarget, scopeOptions, type ScopeCatalog, type ScopeKind } from "./scope-kinds";
 
 export function ScopePicker({
     kind,
@@ -27,7 +26,7 @@ export function ScopePicker({
     catalog,
     canOperate
 }: {
-    kind: WafScopeType;
+    kind: ScopeKind;
     id: string;
     catalog: ScopeCatalog;
     /** The two instance-wide scopes are operator controls, so a member is not offered
@@ -38,10 +37,12 @@ export function ScopePicker({
     const params = useSearchParams();
     const kinds = SCOPE_KINDS.filter(
         (entry) => canOperate || (entry.value !== "polaris" && entry.value !== "global")
-    );
+        // Nothing installed from the marketplace means no shortcut to offer, and a
+        // kind that resolves to an empty list is one that only wastes a click.
+    ).filter((entry) => entry.value !== "marketplace" || catalog.marketplace.length > 0);
     const targets = scopeOptions(kind, catalog);
 
-    function go(nextKind: WafScopeType, nextId: string) {
+    function go(nextKind: ScopeKind, nextId: string) {
         const next = new URLSearchParams(params.toString());
         next.set("scope", nextKind);
         if (nextId) next.set("id", nextId);
@@ -56,7 +57,7 @@ export function ScopePicker({
             className="h-8 min-w-0 flex-1 font-medium md:w-40 md:min-w-[10rem] md:flex-none"
             options={kinds.map((entry) => ({ value: entry.value, label: entry.label }))}
             onValueChange={(value) => {
-                const nextKind = value as WafScopeType;
+                const nextKind = value as ScopeKind;
                 // Moving to a kind that names something lands on its first entry, so the
                 // page is never showing a chooser with nothing chosen.
                 const first = scopeNeedsTarget(nextKind) ? (scopeOptions(nextKind, catalog)[0]?.id ?? "") : "";
