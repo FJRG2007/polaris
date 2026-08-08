@@ -6,31 +6,33 @@
  */
 
 import { GamesView } from "./games-view";
-import { requirePermission } from "@/lib/session";
+import { findApp } from "@/lib/apps/catalog";
 import { editionOf } from "@/lib/apps/minecraft/service";
+import { isGameServerApp } from "@/lib/apps/games-service";
 import { listInstalledApps } from "@/lib/apps/install-service";
-import { appHasCapability, findApp } from "@/lib/apps/catalog";
+import { requirePermission, userHasManage } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function GameServersPage() {
     const user = await requirePermission("games.read");
-    const installs = await listInstalledApps(user.id);
+    const [installs, canManage] = await Promise.all([
+        listInstalledApps(user.id),
+        userHasManage(user, "games.manage")
+    ]);
     // The manager is an installed app of its own; without it there is nothing to
     // manage, and the page offers to install it instead of pretending otherwise.
     const managerInstalled = installs.some((install) => install.catalogId === "minecraft-manager");
     const servers = installs
-        .filter((install) => {
-            const manifest = findApp(install.catalogId);
-            return manifest ? appHasCapability(manifest, "game-server") : false;
-        })
+        .filter((install) => isGameServerApp(install.catalogId))
         .map((install) => ({
             id: install.id,
             name: install.name,
             catalogId: install.catalogId,
             catalogName: findApp(install.catalogId)?.name ?? install.catalogId,
             edition: editionOf(install.catalogId),
+            applicationId: install.applicationId,
             status: install.status
         }));
-    return <GamesView servers={servers} managerInstalled={managerInstalled} />;
+    return <GamesView servers={servers} managerInstalled={managerInstalled} canManage={canManage} />;
 }

@@ -23,6 +23,14 @@ import { gamePorts, probeReach, reachConfirmed } from "@/lib/apps/minecraft/reac
 import { gameReachAdvice, type GamePort, type GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { applyFirewallBans, editionOf, getServerStatus, type MinecraftEdition } from "@/lib/apps/minecraft/service";
 
+/** Whether a catalog id names a game server rather than any other installed app.
+ *  The manifest's capability is the authority - a game server is not a list of
+ *  known ids, it is anything that declares itself one. */
+export function isGameServerApp(catalogId: string): boolean {
+    const manifest = findApp(catalogId);
+    return manifest ? appHasCapability(manifest, "game-server") : false;
+}
+
 /** A machine a server can be created on, with what it has left to give. */
 export interface GameMachine {
     readonly id: string;
@@ -40,6 +48,9 @@ export interface GameServerRow {
     readonly catalogId: string;
     readonly catalogName: string;
     readonly edition: MinecraftEdition;
+    /** The service backing it, for the screens that reach past the game - its
+     *  files, its logs. Null for an install whose deploy never completed. */
+    readonly applicationId: string | null;
     /** The machine it runs on. */
     readonly serverName: string | null;
     readonly running: boolean;
@@ -58,10 +69,7 @@ export async function listGameServers(ownerId: string): Promise<GameServerRow[]>
         where: { ownerId, status: { not: "removed" } },
         orderBy: { createdAt: "desc" }
     });
-    const games = installs.filter((install) => {
-        const manifest = findApp(install.catalogId);
-        return manifest ? appHasCapability(manifest, "game-server") : false;
-    });
+    const games = installs.filter((install) => isGameServerApp(install.catalogId));
     const targets = new Map(
         (
             await prisma.deployTarget.findMany({
@@ -81,6 +89,7 @@ export async function listGameServers(ownerId: string): Promise<GameServerRow[]>
                 catalogId: install.catalogId,
                 catalogName: manifest?.name ?? install.catalogId,
                 edition: editionOf(install.catalogId),
+                applicationId: install.applicationId,
                 serverName: install.targetId ? (targets.get(install.targetId) ?? null) : null,
                 running: status?.running ?? false,
                 answering: status?.answering ?? false,
@@ -141,10 +150,7 @@ async function committedMemoryByTarget(ownerId: string): Promise<Map<string, num
         where: { ownerId, status: { not: "removed" }, applicationId: { not: null } },
         select: { catalogId: true, applicationId: true, targetId: true }
     });
-    const games = installs.filter((install) => {
-        const manifest = findApp(install.catalogId);
-        return manifest ? appHasCapability(manifest, "game-server") : false;
-    });
+    const games = installs.filter((install) => isGameServerApp(install.catalogId));
     if (games.length === 0) return new Map();
 
     const targets = await prisma.deployTarget.findMany({
@@ -199,8 +205,7 @@ export async function syncFirewallBans(ownerId: string): Promise<{ servers: numb
     let banned = 0;
     let kicked = 0;
     for (const install of installs) {
-        const manifest = findApp(install.catalogId);
-        if (!manifest || !appHasCapability(manifest, "game-server")) continue;
+        if (!isGameServerApp(install.catalogId)) continue;
         // Bedrock has no ban command at all, so there is nothing to hand it.
         if (editionOf(install.catalogId) === "bedrock") continue;
         const applied = await applyFirewallBans(ownerId, install.id).catch(() => null);
@@ -241,9 +246,7 @@ export async function gameServerForApplication(
         where: { ownerId, applicationId, status: { not: "removed" } },
         select: { id: true, name: true, catalogId: true }
     });
-    if (!install) return null;
-    const manifest = findApp(install.catalogId);
-    if (!manifest || !appHasCapability(manifest, "game-server")) return null;
+    if (!install || !isGameServerApp(install.catalogId)) return null;
     return { installedAppId: install.id, name: install.name };
 }
 
@@ -254,10 +257,7 @@ export async function listGamePorts(): Promise<GamePortRow[]> {
         where: { status: { not: "removed" } },
         select: { id: true, name: true, catalogId: true, applicationId: true, config: true }
     });
-    const games = installs.filter((install) => {
-        const manifest = findApp(install.catalogId);
-        return manifest ? appHasCapability(manifest, "game-server") : false;
-    });
+    const games = installs.filter((install) => isGameServerApp(install.catalogId));
     const rows = await Promise.all(
         games.map(async (install) => ({
             installedAppId: install.id,

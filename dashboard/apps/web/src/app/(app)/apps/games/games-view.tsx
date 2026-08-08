@@ -2,20 +2,61 @@
 
 /**
  * The manager: every server this owner runs, what each is doing, and the way to
- * make another. Rows paint from what the page already knows and the live parts -
- * who is playing, whether it is answering - arrive from the page's own API, so
- * opening it never waits on a container.
+ * make another.
+ *
+ * A table rather than cards, and the same table the containers page uses, because
+ * that is what these are - a handful of long-lived processes an operator scans
+ * down looking for the one that is wrong. The rows paint from what the page
+ * already knows and the live parts - who is playing, whether it is answering,
+ * where to connect - arrive from the page's own API, so opening it never waits on
+ * a container.
+ *
+ * Every verb is on the row: the icons for the two or three anybody uses, and a
+ * right-click for the rest. Deleting is deliberately among them - a server whose
+ * create failed has a page with nothing to render, and until now the only way to
+ * be rid of one was the page that would not open.
  */
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { installManagerAction } from "./actions";
 import { CopyButton } from "@/components/copy-button";
 import { NewServerDialog } from "./new-server-dialog";
-import { Gamepad2, Loader2, Plus, Users } from "lucide-react";
+import { useConfirm } from "@/components/confirm-dialog";
 import type { GameServerRow } from "@/lib/apps/games-service";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { Badge, Button, Card, CardBody, PageHeader, Skeleton } from "@polaris/ui";
+import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
+import {
+    deleteGameServerAction,
+    installManagerAction,
+    redeployGameServerAction,
+    setGameServerRunningAction
+} from "./actions";
+import {
+    Copy,
+    ExternalLink,
+    FolderOpen,
+    Gamepad2,
+    Loader2,
+    Play,
+    Plus,
+    RefreshCw,
+    Square,
+    Trash2,
+    Users
+} from "lucide-react";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuLabel,
+    ContextMenuSeparator,
+    ContextMenuTrigger,
+    PageHeader,
+    Skeleton
+} from "@polaris/ui";
 
 const POLL_MS = 6000;
 
@@ -26,12 +67,37 @@ export interface GameServerSeed {
     catalogId: string;
     catalogName: string;
     edition: "java" | "bedrock";
+    /** The service behind it, for the screens that reach past the game. */
+    applicationId: string | null;
     status: string;
 }
 
-export function GamesView({ servers, managerInstalled }: { servers: GameServerSeed[]; managerInstalled: boolean }) {
+/** What a row is, once the live read has caught up with the seed. */
+interface ServerView extends GameServerSeed {
+    live: GameServerRow | null;
+}
+
+export function GamesView({
+    servers,
+    managerInstalled,
+    canManage
+}: {
+    servers: GameServerSeed[];
+    managerInstalled: boolean;
+    /** Whether this viewer may start, stop or delete. A reader still sees
+     *  everything the table reports. */
+    canManage: boolean;
+}) {
+    const router = useRouter();
     const [live, setLive] = useState<Map<string, GameServerRow>>(new Map());
     const [creating, setCreating] = useState(false);
+    const [pending, startTransition] = useTransition();
+    const [error, setError] = useState<string | null>(null);
+    const [confirm, confirmDialog] = useConfirm();
+    // Servers whose deletion is in flight. They leave the table at once - tearing
+    // a container down takes a moment, and a row that sits there until the next
+    // poll reads as a button that did nothing. A refusal puts the row back.
+    const [deleting, setDeleting] = useState<string[]>([]);
 
     const load = useCallback(async () => {
         if (!managerInstalled) return;
@@ -51,12 +117,55 @@ export function GamesView({ servers, managerInstalled }: { servers: GameServerSe
         return () => clearInterval(timer);
     }, [load]);
 
-    const playing = useMemo(() => [...live.values()].reduce((total, row) => total + row.online, 0), [live]);
+    const rows = useMemo<ServerView[]>(
+        () =>
+            servers
+                .filter((server) => !deleting.includes(server.id))
+                .map((server) => ({ ...server, live: live.get(server.id) ?? null })),
+        [servers, live, deleting]
+    );
+    const playing = useMemo(() => rows.reduce((total, row) => total + (row.live?.online ?? 0), 0), [rows]);
+
+    function run(action: () => Promise<{ error?: string }>): void {
+        setError(null);
+        startTransition(async () => {
+            const result = await action();
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            await load();
+            router.refresh();
+        });
+    }
+
+    async function onDelete(server: ServerView): Promise<void> {
+        const confirmed = await confirm({
+            title: `Delete ${server.name}?`,
+            description:
+                "The server is stopped and its container removed. The world and everything else on a server-local volume goes with it; data on a NAS mount is kept.",
+            confirmLabel: "Delete",
+            danger: true
+        });
+        if (!confirmed) return;
+        setError(null);
+        setDeleting((ids) => [...ids, server.id]);
+        startTransition(async () => {
+            const result = await deleteGameServerAction(server.id);
+            if (result.error) {
+                setDeleting((ids) => ids.filter((id) => id !== server.id));
+                setError(result.error);
+                return;
+            }
+            await load();
+            router.refresh();
+        });
+    }
 
     if (!managerInstalled) return <InstallManager />;
 
     return (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4">
             <PageHeader
                 title="Game servers"
                 description={
@@ -65,11 +174,15 @@ export function GamesView({ servers, managerInstalled }: { servers: GameServerSe
                         : `${servers.length} ${servers.length === 1 ? "server" : "servers"}, ${playing} playing right now.`
                 }
                 actions={
-                    <Button onClick={() => setCreating(true)}>
-                        <Plus className="size-4" /> New server
-                    </Button>
+                    canManage ? (
+                        <Button onClick={() => setCreating(true)}>
+                            <Plus className="size-4" /> New server
+                        </Button>
+                    ) : null
                 }
             />
+
+            {error && <p className="text-sm text-danger">{error}</p>}
 
             {servers.length === 0 ? (
                 <Card>
@@ -81,20 +194,44 @@ export function GamesView({ servers, managerInstalled }: { servers: GameServerSe
                             address. Java is the PC edition, Bedrock is phones and consoles, and one server can take
                             both.
                         </p>
-                        <Button onClick={() => setCreating(true)}>
-                            <Plus className="size-4" /> New server
-                        </Button>
+                        {canManage && (
+                            <Button onClick={() => setCreating(true)}>
+                                <Plus className="size-4" /> New server
+                            </Button>
+                        )}
                     </CardBody>
                 </Card>
             ) : (
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                    {servers.map((server) => (
-                        <ServerCard key={server.id} server={server} live={live.get(server.id) ?? null} />
-                    ))}
+                <div className="overflow-x-auto rounded-lg border border-border">
+                    <table className="w-full min-w-[52rem] text-sm">
+                        <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                            <tr>
+                                <th className="px-3 py-2 font-medium">Server</th>
+                                <th className="px-3 py-2 font-medium">Status</th>
+                                <th className="px-3 py-2 font-medium">Players</th>
+                                <th className="px-3 py-2 font-medium">Address</th>
+                                <th className="hidden px-3 py-2 font-medium lg:table-cell">Machine</th>
+                                <th className="px-3 py-2" />
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rows.map((server) => (
+                                <ServerRow
+                                    key={server.id}
+                                    server={server}
+                                    canManage={canManage}
+                                    pending={pending}
+                                    onRun={run}
+                                    onDelete={() => void onDelete(server)}
+                                />
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             )}
 
             {creating && <NewServerDialog onClose={() => setCreating(false)} />}
+            {confirmDialog}
         </div>
     );
 }
@@ -152,65 +289,204 @@ function InstallManager() {
     );
 }
 
-function ServerCard({ server, live }: { server: GameServerSeed; live: GameServerRow | null }) {
+/** The world's files, in the same explorer every other file in Polaris is
+ *  browsed from. Null for a server that has no container to browse. */
+function filesHref(applicationId: string | null): string | null {
+    return applicationId ? `/drive?c=container:${applicationId}&p=/data` : null;
+}
+
+function ServerRow({
+    server,
+    canManage,
+    pending,
+    onRun,
+    onDelete
+}: {
+    server: ServerView;
+    canManage: boolean;
+    pending: boolean;
+    onRun: (action: () => Promise<{ error?: string }>) => void;
+    onDelete: () => void;
+}) {
+    const live = server.live;
+    const href = `/apps/installed/${server.id}`;
+    const files = filesHref(server.applicationId);
+    const running = live?.running ?? false;
+    const address = live?.address ?? null;
+    // Until the first poll answers there is nothing to say about the container, so
+    // the lifecycle verbs wait rather than offer the wrong one.
+    const known = live !== null;
+
     return (
-        <Card className="transition-colors hover:border-border">
-            <CardBody className="flex flex-col gap-3">
-                <div className="flex items-start gap-3">
-                    <div className="grid size-10 shrink-0 place-items-center rounded-md border border-border bg-surface">
-                        <Gamepad2 className="size-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
+        <ContextMenu>
+            <ContextMenuTrigger asChild>
+                <tr className="border-t border-border hover:bg-card-hover">
+                    <td className="px-3 py-2">
                         <Link
-                            href={`/apps/installed/${server.id}`}
-                            className="truncate text-sm font-medium hover:underline"
+                            href={href}
+                            className="block max-w-full truncate font-medium hover:underline"
+                            title={server.name}
                         >
                             {server.name}
                         </Link>
-                        <p className="truncate text-xs text-muted-foreground">
-                            {[server.catalogName, live?.serverName].filter(Boolean).join(" - ")}
-                        </p>
-                    </div>
-                    <StatusBadge live={live} status={server.status} />
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                    {live === null ? (
-                        <Skeleton className="h-5 w-40" />
-                    ) : live.address ? (
-                        <div className="flex min-w-0 items-center gap-1">
-                            <code className="truncate font-mono text-xs" title={live.address}>{live.address}</code>
-                            <CopyButton value={live.address} label={`Copy the address of ${server.name}`} />
+                        {/* Not the machine: that has a column of its own. */}
+                        <span className="block truncate text-xs text-muted-foreground" title={server.catalogName}>{server.catalogName}</span>
+                    </td>
+                    <td className="px-3 py-2">
+                        <StatusBadge live={live} status={server.status} />
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                        <PlayersCell live={live} />
+                    </td>
+                    <td className="px-3 py-2">
+                        <AddressCell name={server.name} live={live} />
+                    </td>
+                    <td className="hidden px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                        {live === null ? <Skeleton className="h-4 w-24" /> : (live.serverName ?? "-")}
+                    </td>
+                    <td className="px-3 py-2">
+                        <div className="flex justify-end gap-1">
+                            <IconLink label={`Open ${server.name}`} href={href}>
+                                <ExternalLink className="size-4" />
+                            </IconLink>
+                            {files && (
+                                <IconLink label={`Browse the files of ${server.name}`} href={files}>
+                                    <FolderOpen className="size-4" />
+                                </IconLink>
+                            )}
+                            {canManage && (
+                                <>
+                                    <IconButton
+                                        label={running ? `Stop ${server.name}` : `Start ${server.name}`}
+                                        disabled={pending || !known || !server.applicationId}
+                                        onClick={() => onRun(() => setGameServerRunningAction(server.id, !running))}
+                                    >
+                                        {running ? <Square className="size-4" /> : <Play className="size-4" />}
+                                    </IconButton>
+                                    <IconButton label={`Delete ${server.name}`} disabled={pending} onClick={onDelete}>
+                                        <Trash2 className="size-4" />
+                                    </IconButton>
+                                </>
+                            )}
                         </div>
-                    ) : (
-                        <span className="text-xs text-muted-foreground">{live.message ?? "No address yet"}</span>
-                    )}
+                    </td>
+                </tr>
+            </ContextMenuTrigger>
 
-                    {live?.answering && (
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Users className="size-3" />
-                            {live.online} / {live.max}
-                        </span>
-                    )}
-                </div>
-
-                {live && live.players.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                        {live.players.map((player) => (
-                            <span key={player} className="rounded border border-border px-1.5 py-0.5 text-xs">
-                                {player}
-                            </span>
-                        ))}
-                    </div>
+            <ContextMenuContent>
+                <ContextMenuLabel>{server.name}</ContextMenuLabel>
+                <ContextMenuSeparator />
+                <ContextMenuItem asChild>
+                    <Link href={href}>
+                        <ExternalLink className="size-4" /> Open
+                    </Link>
+                </ContextMenuItem>
+                {files && (
+                    <ContextMenuItem asChild>
+                        <Link href={files}>
+                            <FolderOpen className="size-4" /> Files
+                        </Link>
+                    </ContextMenuItem>
                 )}
-            </CardBody>
-        </Card>
+                {address && (
+                    <ContextMenuItem onSelect={() => void navigator.clipboard?.writeText(address)}>
+                        <Copy className="size-4" /> Copy address
+                    </ContextMenuItem>
+                )}
+                {canManage && (
+                    <>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem
+                            disabled={pending || !known || !server.applicationId}
+                            onSelect={() => onRun(() => setGameServerRunningAction(server.id, !running))}
+                        >
+                            {running ? <Square className="size-4" /> : <Play className="size-4" />}
+                            {running ? "Stop" : "Start"}
+                        </ContextMenuItem>
+                        <ContextMenuItem
+                            disabled={pending || !server.applicationId}
+                            onSelect={() => onRun(() => redeployGameServerAction(server.id))}
+                        >
+                            <RefreshCw className="size-4" /> Redeploy
+                        </ContextMenuItem>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem variant="danger" disabled={pending} onSelect={onDelete}>
+                            <Trash2 className="size-4" /> Delete
+                        </ContextMenuItem>
+                    </>
+                )}
+            </ContextMenuContent>
+        </ContextMenu>
+    );
+}
+
+/** Who is on, and the names behind the count for a server small enough to say. */
+function PlayersCell({ live }: { live: GameServerRow | null }) {
+    if (live === null) return <Skeleton className="h-4 w-12" />;
+    if (!live.answering) return <span>-</span>;
+    return (
+        <span
+            className="flex items-center gap-1"
+            title={live.players.length > 0 ? live.players.join(", ") : "Nobody is playing right now"}
+        >
+            <Users className="size-3.5" />
+            {live.online} / {live.max}
+        </span>
+    );
+}
+
+/** Where a player connects. The name when it has one, the machine's address when
+ *  it does not, and why there is neither when there is neither. */
+function AddressCell({ name, live }: { name: string; live: GameServerRow | null }) {
+    if (live === null) return <Skeleton className="h-4 w-40" />;
+    if (!live.address) {
+        return <span className="text-xs text-muted-foreground">{live.message ?? "No address yet"}</span>;
+    }
+    return (
+        <div className="flex min-w-0 items-center gap-1">
+            <code className="truncate font-mono text-xs" title={live.address}>
+                {live.address}
+            </code>
+            <CopyButton value={live.address} label={`the address of ${name}`} />
+        </div>
     );
 }
 
 function StatusBadge({ live, status }: { live: GameServerRow | null; status: string }) {
-    if (live === null) return <Badge>{status === "failed" ? "Failed" : "Loading"}</Badge>;
+    // An install that failed stays failed however the container reads: a create
+    // that fell over leaves nothing running, and reporting that as merely
+    // "Stopped" invites somebody to press Start on a server that was never built.
+    if (status === "failed" && !live?.running) return <Badge variant="danger">Failed</Badge>;
+    if (live === null) return <Badge>Loading</Badge>;
     if (!live.running) return <Badge>Stopped</Badge>;
-    if (!live.answering) return <Badge className="border-warning/40 text-warning">Starting</Badge>;
-    return <Badge className="border-success/40 text-success">Online</Badge>;
+    if (!live.answering) return <Badge variant="warning">Starting</Badge>;
+    return <Badge variant="success">Online</Badge>;
+}
+
+function IconButton({
+    label,
+    onClick,
+    disabled,
+    children
+}: {
+    label: string;
+    onClick: () => void;
+    disabled?: boolean;
+    children: ReactNode;
+}) {
+    return (
+        <Button size="icon" variant="ghost" onClick={onClick} disabled={disabled} aria-label={label} title={label}>
+            {children}
+        </Button>
+    );
+}
+
+/** The same control, for the ones that open a page. A link rather than a click
+ *  handler so it can be middle-clicked, opened in a tab, or copied. */
+function IconLink({ label, href, children }: { label: string; href: string; children: ReactNode }) {
+    return (
+        <Button size="icon" variant="ghost" asChild aria-label={label} title={label}>
+            <Link href={href}>{children}</Link>
+        </Button>
+    );
 }
