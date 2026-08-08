@@ -22,8 +22,10 @@ import { CopyButton } from "@/components/copy-button";
 import { useCallback, useEffect, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import type { WorldView } from "@/lib/apps/minecraft/world-service";
+import { BACKUP_EVERY_OPTIONS, MAX_KEEP_LAST, type BackupEvery } from "@/lib/apps/minecraft/backup-policy";
 import {
     Archive,
+    CalendarClock,
     Download,
     HardDriveDownload,
     Loader2,
@@ -39,6 +41,7 @@ import {
     deleteWorldBackupAction,
     newWorldAction,
     restoreWorldBackupAction,
+    saveBackupPolicyAction,
     switchWorldAction
 } from "./minecraft-actions";
 import {
@@ -59,6 +62,10 @@ import {
     Skeleton,
     cn
 } from "@polaris/ui";
+
+/** Gigabytes as the budget field means them, which is what a disk is sold in and
+ *  what an operator types. */
+const GIB = 1024 ** 3;
 
 /** What every screen here needs: the view, and a way to ask for it again. */
 export function useWorldView(installedAppId: string): {
@@ -104,6 +111,7 @@ export function MinecraftWorld({ installedAppId, name }: { installedAppId: strin
             <WorldMessage view={view} />
             <WorldsCard installedAppId={installedAppId} view={view} error={error} onChanged={reload} />
             <GameServerBackups installedAppId={installedAppId} serverName={name} view={view} onChanged={reload} />
+            <BackupScheduleCard installedAppId={installedAppId} view={view} onChanged={reload} />
         </div>
     );
 }
@@ -643,5 +651,185 @@ function RestoreDialog({
                 </div>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/**
+ * How often the world is copied, and how much of it is kept.
+ *
+ * The two belong on one card because they are one decision. A schedule with no
+ * retention rule is a disk that fills, and a full disk on a game server does not
+ * fail politely - the world stops being writable, which is the thing the backups
+ * were for. So turning the schedule on is also answering "and then what".
+ *
+ * Save stays disabled until something differs from what was loaded, so a card
+ * somebody opened and read cannot be saved back over itself.
+ */
+function BackupScheduleCard({
+    installedAppId,
+    view,
+    onChanged
+}: {
+    installedAppId: string;
+    view: WorldView | null;
+    onChanged: () => Promise<void>;
+}) {
+    const saved = view?.policy ?? null;
+    const [every, setEvery] = useState<BackupEvery>("off");
+    const [keepLast, setKeepLast] = useState(0);
+    const [budgetGb, setBudgetGb] = useState("");
+    const [notify, setNotify] = useState(true);
+    const [pending, setPending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // Taken from the server once its answer arrives, and again whenever it moves
+    // underneath - a sweep can change what is stored while this is open.
+    useEffect(() => {
+        if (!saved) return;
+        setEvery(saved.every);
+        setKeepLast(saved.keepLast);
+        setBudgetGb(saved.maxBytes > 0 ? String(Math.round((saved.maxBytes / GIB) * 10) / 10) : "");
+        setNotify(saved.notifyOnFailure);
+    }, [saved]);
+
+    const maxBytes = Math.round((Number.parseFloat(budgetGb) || 0) * GIB);
+    const budgetError =
+        budgetGb.trim().length > 0 && !(Number.parseFloat(budgetGb) > 0)
+            ? "Give a size in gigabytes, or leave it blank"
+            : null;
+    // Dirty means the values differ from the ones loaded, not that a field was
+    // touched: a number typed and put back leaves Save disabled.
+    const dirty =
+        saved !== null &&
+        (every !== saved.every ||
+            keepLast !== saved.keepLast ||
+            maxBytes !== saved.maxBytes ||
+            notify !== saved.notifyOnFailure);
+
+    async function save(): Promise<void> {
+        setPending(true);
+        setError(null);
+        const result = await saveBackupPolicyAction({
+            installedAppId,
+            every,
+            keepLast,
+            maxBytes,
+            notifyOnFailure: notify
+        });
+        setPending(false);
+        if (result.error) setError(result.error);
+        else await onChanged();
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <CalendarClock className="size-4 text-primary" />
+                    Automatic backups
+                </CardTitle>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-4">
+                {view === null ? (
+                    <Skeleton className="h-24 w-full" />
+                ) : (
+                    <>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <label className="flex flex-col gap-1 text-sm">
+                                <span className="font-medium">Back up</span>
+                                <Select
+                                    value={every}
+                                    onValueChange={(value) => setEvery(value as BackupEvery)}
+                                    options={BACKUP_EVERY_OPTIONS.map((entry) => ({
+                                        value: entry.value,
+                                        label: entry.label
+                                    }))}
+                                />
+                                <span className="text-xs text-muted-foreground">
+                                    {view.nextBackupAt
+                                        ? `Next one due ${new Date(view.nextBackupAt).toLocaleString()}.`
+                                        : "Copies are taken only when you press the button."}
+                                </span>
+                            </label>
+
+                            <label className="flex flex-col gap-1 text-sm">
+                                <span className="font-medium">Keep the last</span>
+                                <Input
+                                    type="number"
+                                    min={0}
+                                    max={MAX_KEEP_LAST}
+                                    value={keepLast}
+                                    onChange={(event) => setKeepLast(Math.max(0, Number(event.target.value) || 0))}
+                                />
+                                <span className="text-xs text-muted-foreground">
+                                    {keepLast > 0
+                                        ? `Older ones go once there are more than ${keepLast}.`
+                                        : "No limit on how many are kept."}
+                                </span>
+                            </label>
+                        </div>
+
+                        <label className="flex flex-col gap-1 text-sm">
+                            <span className="font-medium">Size budget</span>
+                            <Input
+                                value={budgetGb}
+                                onChange={(event) => setBudgetGb(event.target.value)}
+                                placeholder="No limit"
+                                inputMode="decimal"
+                            />
+                            <span className={cn("text-xs", budgetError ? "text-danger" : "text-muted-foreground")}>
+                                {budgetError ??
+                                    `In gigabytes. The oldest go as the total approaches it${
+                                        view.backups.length > 0
+                                            ? ` - they take up ${formatBytes(view.backupBytes)} now`
+                                            : ""
+                                    }. The newest copy is never deleted.`}
+                            </span>
+                        </label>
+
+                        <label className="flex cursor-pointer items-start gap-2 text-sm">
+                            <Checkbox
+                                checked={notify}
+                                onChange={(event) => setNotify(event.target.checked)}
+                                className="mt-0.5"
+                            />
+                            <span className="flex flex-col gap-0.5">
+                                <span className="font-medium">Tell me if one fails</span>
+                                <span className="text-xs text-muted-foreground">
+                                    A notification when a scheduled copy could not be taken. A server that is simply
+                                    stopped is skipped quietly.
+                                </span>
+                            </span>
+                        </label>
+
+                        {/* A schedule nothing sweeps is a promise this screen would
+                            otherwise make and not keep. */}
+                        {every !== "off" && !view.scheduleRuns && (
+                            <p className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs">
+                                <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+                                <span className="text-muted-foreground">
+                                    Nothing is scheduled to run this yet. Set POLARIS_CRON_SECRET and point a scheduler
+                                    at <code className="font-mono">/api/cron/game-backups</code>, or keep taking copies
+                                    with the button above.
+                                </span>
+                            </p>
+                        )}
+
+                        {error && <p className="text-sm text-danger">{error}</p>}
+
+                        <div className="flex justify-end">
+                            <Button
+                                size="sm"
+                                onClick={() => void save()}
+                                disabled={pending || !dirty || budgetError !== null}
+                            >
+                                {pending && <Loader2 className="size-4 animate-spin" />}
+                                Save
+                            </Button>
+                        </div>
+                    </>
+                )}
+            </CardBody>
+        </Card>
     );
 }

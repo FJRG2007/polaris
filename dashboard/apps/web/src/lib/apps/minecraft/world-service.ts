@@ -20,8 +20,13 @@
 
 import * as world from "./world";
 import { prisma } from "@polaris/db";
+import { loadEnv } from "@polaris/config";
+import * as policy from "./backup-policy";
 import { deployApplication } from "@/lib/deploy-service";
+import { appHasCapability, findApp } from "@/lib/apps/catalog";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
+import { createNotification } from "@/lib/notification-service";
+import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import { withServerContainer, type MinecraftEdition, type ServerContainer } from "./service";
 
 /** How long to give a Bedrock server to finish holding its save before the
@@ -65,6 +70,15 @@ export interface WorldView {
     readonly carriesPlayers: boolean;
     readonly worlds: readonly WorldEntry[];
     readonly backups: readonly WorldBackup[];
+    /** How often copies are taken and how many are kept. */
+    readonly policy: policy.BackupPolicy;
+    /** What the archives take up together, against the budget when there is one. */
+    readonly backupBytes: number;
+    /** When the next scheduled copy is due, or null when none is scheduled. */
+    readonly nextBackupAt: string | null;
+    /** Whether anything is actually running the schedule. A schedule nothing
+     *  sweeps is a promise the screen would otherwise make and not keep. */
+    readonly scheduleRuns: boolean;
     /** Why the lists are empty, when the container could not be read. */
     readonly message: string | null;
 }
@@ -104,11 +118,16 @@ async function applicationOf(ownerId: string, installedAppId: string): Promise<s
 export async function readWorldView(ownerId: string, installedAppId: string): Promise<WorldView> {
     return withServerContainer(ownerId, installedAppId, async (server) => {
         const { level, seed } = await readWorldSettings(ownerId, server.applicationId, server.edition);
+        const rules = await getBackupPolicy(installedAppId);
         const base = {
             edition: server.edition,
             level,
             seed,
-            carriesPlayers: world.canCarryPlayers(server.edition)
+            carriesPlayers: world.canCarryPlayers(server.edition),
+            policy: rules,
+            // A schedule is only real if something sweeps it. Saying so is the
+            // difference between a promise and a setting that looks like one.
+            scheduleRuns: Boolean(loadEnv().POLARIS_CRON_SECRET)
         };
         try {
             // Asked before anything is read, because a command against a container
@@ -122,6 +141,8 @@ export async function readWorldView(ownerId: string, installedAppId: string): Pr
                     worlds: [],
                     backups: [],
                     worldSeed: null,
+                    backupBytes: 0,
+                    nextBackupAt: null,
                     message: "The server has to be running to read or change its worlds. Start it first."
                 };
             }
@@ -130,13 +151,24 @@ export async function readWorldView(ownerId: string, installedAppId: string): Pr
                 listBackups(server),
                 readWorldSeed(server)
             ]);
-            return { ...base, worlds, backups, worldSeed, message: null };
+            const newest = backups[0] ? new Date(backups[0].createdAt) : null;
+            return {
+                ...base,
+                worlds,
+                backups,
+                worldSeed,
+                backupBytes: policy.totalBackupBytes(backups),
+                nextBackupAt: policy.nextBackupAt(rules, newest)?.toISOString() ?? null,
+                message: null
+            };
         } catch (caught) {
             return {
                 ...base,
                 worlds: [],
                 backups: [],
                 worldSeed: null,
+                backupBytes: 0,
+                nextBackupAt: null,
                 message: caught instanceof Error ? caught.message : "Could not read the server's files"
             };
         }
@@ -240,34 +272,78 @@ async function listBackups(server: ServerContainer): Promise<WorldBackup[]> {
  */
 export async function createWorldBackup(ownerId: string, installedAppId: string): Promise<WorldBackup> {
     return withServerContainer(ownerId, installedAppId, async (server) => {
-        const { level } = await readWorldSettings(ownerId, server.applicationId, server.edition);
-        const listing = await server.runOk(
-            ["ls", "-1A", "--", world.levelParent(server.edition)],
-            "Could not read the server's files"
-        );
-        const present = new Set(world.parseListing(listing));
-        const dirs = world.levelDirs(server.edition, level).filter((dir) => present.has(dir.split("/").pop() as string));
-        if (dirs.length === 0) throw new Error("There is no world to back up yet - start the server and let it generate one");
-
-        await server.runOk(["mkdir", "-p", "--", world.BACKUP_DIR], "Could not create the backup folder");
-        await holdSave(server);
-        const at = new Date();
-        const name = world.backupName(at);
-        try {
-            await server.runOk(
-                ["tar", "-czf", `${world.BACKUP_DIR}/${name}`, "-C", world.DATA_DIR, ...dirs],
-                "Could not write the backup"
-            );
-        } finally {
-            await resumeSave(server);
-        }
-        const stat = await server.run(["stat", "-c", "%s", "--", `${world.BACKUP_DIR}/${name}`]);
-        return {
-            name,
-            sizeBytes: Number.parseInt(stat.output.trim(), 10) || 0,
-            createdAt: at.toISOString()
-        };
+        const taken = await writeBackup(ownerId, server);
+        // Retention is enforced where a copy is made rather than on a timer, so a
+        // manual backup cannot be the one that pushes the disk past its budget.
+        await pruneBackups(server, policy.readBackupPolicy(readInstallConfig(
+            (await prisma.installedApp.findUnique({ where: { id: installedAppId }, select: { config: true } }))?.config
+        )));
+        return taken;
     });
+}
+
+/** The archive itself, on a container that is already open. Shared by the button
+ *  and by the sweep, so a scheduled copy and one somebody asked for are the same
+ *  act rather than two that drift. */
+async function writeBackup(ownerId: string, server: ServerContainer): Promise<WorldBackup> {
+    const { level } = await readWorldSettings(ownerId, server.applicationId, server.edition);
+    const listing = await server.runOk(
+        ["ls", "-1A", "--", world.levelParent(server.edition)],
+        "Could not read the server's files"
+    );
+    const present = new Set(world.parseListing(listing));
+    const dirs = world.levelDirs(server.edition, level).filter((dir) => present.has(dir.split("/").pop() as string));
+    if (dirs.length === 0) {
+        throw new Error("There is no world to back up yet - start the server and let it generate one");
+    }
+
+    await server.runOk(["mkdir", "-p", "--", world.BACKUP_DIR], "Could not create the backup folder");
+    await holdSave(server);
+    const at = new Date();
+    const name = world.backupName(at);
+    try {
+        await server.runOk(
+            ["tar", "-czf", `${world.BACKUP_DIR}/${name}`, "-C", world.DATA_DIR, ...dirs],
+            "Could not write the backup"
+        );
+    } finally {
+        await resumeSave(server);
+    }
+    const stat = await server.run(["stat", "-c", "%s", "--", `${world.BACKUP_DIR}/${name}`]);
+    return {
+        name,
+        sizeBytes: Number.parseInt(stat.output.trim(), 10) || 0,
+        createdAt: at.toISOString()
+    };
+}
+
+/**
+ * Write the world out before the server is stopped.
+ *
+ * Minecraft saves on a graceful shutdown, and a graceful shutdown is not what
+ * every stop turns out to be: a container that does not finish shutting down in
+ * time is killed, and what is killed is the last few minutes everyone played.
+ * Flushing first costs a second and makes the difference not matter.
+ *
+ * Best effort and never throws. This runs on the path that stops a server, and a
+ * server that will not answer is exactly one that needs stopping - refusing to
+ * stop it because it could not be asked to save would be the worse failure.
+ */
+export async function flushWorldForStop(ownerId: string, installedAppId: string): Promise<boolean> {
+    try {
+        return await withServerContainer(ownerId, installedAppId, async (server) => {
+            if (!server.running) return false;
+            await server.say(server.edition === "bedrock" ? ["save", "hold"] : ["save-all", "flush"]);
+            // Bedrock was asked to hold its save, not to finish one; let it.
+            if (server.edition === "bedrock") {
+                await new Promise((resolve) => setTimeout(resolve, BEDROCK_SAVE_HOLD_MS));
+                await server.say(["save", "resume"]).catch(() => undefined);
+            }
+            return true;
+        });
+    } catch {
+        return false;
+    }
 }
 
 /** Stop the server writing the world, so what is on disk stops moving. */
@@ -423,6 +499,117 @@ export async function newWorld(
 
     await deployApplication(await applicationOf(ownerId, installedAppId), ownerId, actorId);
     return { level: planned.target, carried: planned.keep };
+}
+
+/** The policy on one server, and how it is written. */
+export async function getBackupPolicy(installedAppId: string): Promise<policy.BackupPolicy> {
+    const row = await prisma.installedApp.findUnique({ where: { id: installedAppId }, select: { config: true } });
+    return policy.readBackupPolicy(readInstallConfig(row?.config));
+}
+
+export async function setBackupPolicy(installedAppId: string, value: policy.BackupPolicy): Promise<void> {
+    await patchInstallConfig(installedAppId, { backupPolicy: value });
+}
+
+/**
+ * Delete whatever the retention rules no longer keep, and say what went.
+ *
+ * Run after every backup rather than on a timer of its own: the moment a new
+ * archive lands is the moment the count and the budget can be exceeded, and
+ * pruning then means the disk never holds more than the operator asked for even
+ * for a minute.
+ */
+async function pruneBackups(server: ServerContainer, rules: policy.BackupPolicy): Promise<string[]> {
+    const doomed = policy.backupsToPrune(await listBackups(server), rules);
+    const gone: string[] = [];
+    for (const name of doomed) {
+        const removed = await server.run(["rm", "-f", "--", `${world.BACKUP_DIR}/${name}`]);
+        if (removed.code === 0) gone.push(name);
+    }
+    return gone;
+}
+
+/** What one sweep did to one server. */
+export interface BackupSweep {
+    readonly installedAppId: string;
+    readonly name: string | null;
+    readonly pruned: readonly string[];
+    readonly error: string | null;
+}
+
+/**
+ * Take the copies that are due across an owner's servers, and prune what has
+ * fallen out of retention.
+ *
+ * Swept from the cron and again whenever the screen is read, exactly as the
+ * schedules are: an instance with no cron configured should still keep the
+ * backups it was promised while somebody is looking, and the cron is what makes
+ * that true at four in the morning too.
+ *
+ * A server that is stopped is skipped rather than failed. `docker exec` needs a
+ * container that is up, so a stopped server cannot be archived at all - and a
+ * nightly notification saying so about a server somebody deliberately turned off
+ * is noise that teaches people to ignore the ones that matter.
+ */
+export async function sweepWorldBackups(ownerId: string, now: Date = new Date()): Promise<BackupSweep[]> {
+    const installs = await prisma.installedApp.findMany({
+        where: { ownerId, status: { not: "removed" }, applicationId: { not: null } },
+        select: { id: true, name: true, catalogId: true, config: true }
+    });
+    const swept: BackupSweep[] = [];
+    for (const install of installs) {
+        const manifest = findApp(install.catalogId);
+        if (!manifest || !appHasCapability(manifest, "game-server")) continue;
+        const rules = policy.readBackupPolicy(readInstallConfig(install.config));
+        if (rules.every === "off") continue;
+        const done = await sweepOne(ownerId, install, rules, now);
+        if (done) swept.push(done);
+    }
+    return swept;
+}
+
+/** One server's turn, which never throws: a sweep walks every server the owner
+ *  has, and one that cannot be reached must not end the walk. */
+async function sweepOne(
+    ownerId: string,
+    install: { id: string; name: string },
+    rules: policy.BackupPolicy,
+    now: Date
+): Promise<BackupSweep | null> {
+    try {
+        return await withServerContainer(ownerId, install.id, async (server) => {
+            const existing = await listBackups(server);
+            const newest = existing[0] ? new Date(existing[0].createdAt) : null;
+            if (!policy.backupDue(rules, newest, now)) {
+                // Not due, but retention still applies: the operator may have just
+                // lowered the limit, and it should bite without waiting a week.
+                return { installedAppId: install.id, name: null, pruned: await pruneBackups(server, rules), error: null };
+            }
+            const taken = await writeBackup(ownerId, server);
+            return {
+                installedAppId: install.id,
+                name: taken.name,
+                pruned: await pruneBackups(server, rules),
+                error: null
+            };
+        });
+    } catch (caught) {
+        const message = caught instanceof Error ? caught.message : "The backup did not run";
+        // A server that is simply off is not a failure worth waking anybody for.
+        if (/start the server first|not been deployed/i.test(message)) return null;
+        if (rules.notifyOnFailure) {
+            await createNotification({
+                userId: ownerId,
+                type: "games.backup-failed",
+                title: `Could not back up ${install.name}`,
+                body: message,
+                href: `/apps/installed/${install.id}/world`,
+                level: "warning",
+                actionRequired: true
+            });
+        }
+        return { installedAppId: install.id, name: null, pruned: [], error: message };
+    }
 }
 
 /** Boot the server onto a map it already has. */

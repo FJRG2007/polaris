@@ -28,18 +28,11 @@ import { setGameSchedule } from "@/lib/apps/minecraft/schedule-service";
 import { findApp, isAllowedEnvValue, tunableEnvVars } from "@/lib/apps/catalog";
 import { liftTimeout, timeoutPlayer } from "@/lib/apps/minecraft/timeout-service";
 import { parseInventory, type InventoryItem } from "@/lib/apps/minecraft/inventory";
+import { MAX_BACKUP_BYTES, MAX_KEEP_LAST } from "@/lib/apps/minecraft/backup-policy";
 import { isBackupName, isBiome, isLevelName, isLevelType } from "@/lib/apps/minecraft/world";
 import { parseDimension, parsePosition, type PlayerPosition } from "@/lib/apps/minecraft/position";
 import { applyFirewallBans, runConsoleLine, runServerCommand } from "@/lib/apps/minecraft/service";
 import { MAX_IDLE_MINUTES, MIN_IDLE_MINUTES, type GameSchedule } from "@/lib/apps/minecraft/schedule";
-import {
-    createWorldBackup,
-    deleteLevel,
-    deleteWorldBackup,
-    newWorld,
-    restoreWorldBackup,
-    switchLevel
-} from "@/lib/apps/minecraft/world-service";
 import {
     grantPlayerAccess,
     listPlayerAccess,
@@ -47,6 +40,15 @@ import {
     setAddressBinding,
     type PlayerAccessView
 } from "@/lib/apps/minecraft/player-access";
+import {
+    createWorldBackup,
+    deleteLevel,
+    deleteWorldBackup,
+    newWorld,
+    restoreWorldBackup,
+    setBackupPolicy,
+    switchLevel
+} from "@/lib/apps/minecraft/world-service";
 
 /** A Minecraft (Java Edition) account name. */
 const playerNameSchema = z
@@ -759,6 +761,43 @@ export async function backUpWorldAction(installedAppId: string): Promise<{ name?
         return { name: backup.name };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not back up the world" };
+    }
+}
+
+const backupPolicySchema = z.object({
+    installedAppId: z.string().uuid(),
+    every: z.enum(["off", "hourly", "six-hourly", "daily", "weekly"]),
+    /** 0 means no count limit. */
+    keepLast: z.number().int().min(0).max(MAX_KEEP_LAST),
+    /** 0 means no size limit. */
+    maxBytes: z.number().int().min(0).max(MAX_BACKUP_BYTES),
+    notifyOnFailure: z.boolean()
+});
+
+export type BackupPolicyInput = z.infer<typeof backupPolicySchema>;
+
+/** How often this server's world is copied, and how much of it is kept. */
+export async function saveBackupPolicyAction(input: BackupPolicyInput): Promise<{ error?: string }> {
+    const user = await requirePermission("games.manage");
+    const parsed = backupPolicySchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const { installedAppId, ...rules } = parsed.data;
+    try {
+        // Ownership: the policy is written straight to the install's config, so
+        // nothing else on the way would refuse somebody else's server.
+        const install = await getInstalledApp(user.id, installedAppId);
+        if (!install) return { error: "Server not found" };
+        await setBackupPolicy(installedAppId, rules);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.backup-policy",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { every: rules.every, keepLast: rules.keepLast, maxBytes: rules.maxBytes }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save the backup schedule" };
     }
 }
 

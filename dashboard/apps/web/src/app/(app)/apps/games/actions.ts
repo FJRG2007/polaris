@@ -12,6 +12,7 @@ import { clientIp } from "@/lib/request-context";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { gameHostname } from "@/lib/apps/minecraft/address";
+import { flushWorldForStop } from "@/lib/apps/minecraft/world-service";
 import { blueprintVersion, createGameServer } from "@/lib/apps/games-create";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import { getInstalledApp, installApp, uninstallApp } from "@/lib/apps/install-service";
@@ -112,6 +113,9 @@ export async function setGameServerRunningAction(
     try {
         const install = await ownedGameServer(user.id, installedAppId);
         if (!install.applicationId) throw new Error("This server has not been deployed yet");
+        // Written out before it goes down. A stop that does not finish gracefully
+        // is killed, and what a kill costs is the last few minutes everyone played.
+        if (!running) await flushWorldForStop(user.id, installedAppId);
         await setApplicationRunning(install.applicationId, user.id, running);
         await recordAudit({
             actorId: user.id,

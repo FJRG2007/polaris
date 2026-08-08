@@ -14,6 +14,7 @@
 
 import { prisma } from "@polaris/db";
 import { getServerPlayers } from "./service";
+import { flushWorldForStop } from "./world-service";
 import { setApplicationRunning } from "@/lib/deploy-service";
 import { readSchedule, scheduleAction, type GameSchedule } from "./schedule";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
@@ -80,6 +81,9 @@ export async function sweepGameSchedules(
 
         const action = scheduleAction(schedule, at, { running, playersOnline, emptySince });
         if (!action) continue;
+        // A scheduled stop is the one nobody is watching, so it is the one where an
+        // unwritten world would be noticed last: flush before it goes down.
+        if (action !== "start") await flushWorldForStop(ownerId, install.id);
         const applied = await setApplicationRunning(install.applicationId as string, ownerId, action === "start")
             .then(() => true)
             .catch(() => false);
