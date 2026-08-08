@@ -15,6 +15,7 @@ import { listHosts } from "@/lib/host-service";
 import { getHostLanIp } from "@/lib/host-address";
 import { hostPortForApp } from "@/lib/deploy-service";
 import { getLocalEnvironment } from "@/lib/network-service";
+import { sweepTimeouts } from "@/lib/apps/minecraft/timeout-service";
 import { readInstallConfig } from "@/lib/apps/install-config";
 import { appHasCapability, findApp } from "@/lib/apps/catalog";
 import { getServerMetrics } from "@/lib/server-metrics-service";
@@ -333,6 +334,9 @@ export async function syncFirewallBans(ownerId: string): Promise<{ servers: numb
         if (applied === null) continue;
         servers += 1;
         banned += applied;
+        // A timeout is a ban with an end, and this walk is the thing that comes
+        // back to lift it. Without it a ten-minute cool-off is a permanent ban.
+        await sweepTimeouts(ownerId, install.id).catch(() => 0);
         // The same walk carries the player list, which is the half of the firewall
         // the game itself cannot hold: a name is only let in from its own address.
         const access = await enforcePlayerAddresses(ownerId, install.id).catch(() => null);

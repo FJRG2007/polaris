@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/session";
 import { reachAdviceFor } from "@/lib/apps/minecraft/reach";
+import { readPlayerTimeouts, sweepTimeouts } from "@/lib/apps/minecraft/timeout-service";
 import { enforcePlayerAddresses, listPlayerAccess } from "@/lib/apps/minecraft/player-access";
-import { getServerFirewall, getServerRoster, getServerStatus } from "@/lib/apps/minecraft/service";
+import {
+    getPlayerSessions,
+    getServerFirewall,
+    getServerRoster,
+    getServerStatus
+} from "@/lib/apps/minecraft/service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +32,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const status = await getServerStatus(user.id, id);
         // A server that is not answering has no roster to report, and asking for one
         // would only stack up failing execs behind a poll.
-        const [reach, roster, firewall, access] = await Promise.all([
+        const [reach, roster, firewall, access, sessions] = await Promise.all([
             reachAdviceFor(id, true).catch(() => null),
             wantsRoster && status.answering ? getServerRoster(user.id, id) : null,
             wantsRoster ? getServerFirewall(user.id, id).catch(() => null) : null,
@@ -40,9 +46,32 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             // whoever is already on. The cron does this on its own schedule; a
             // deployment without cron configured would otherwise have rules that
             // only ever took effect on the next join.
-            wantsRoster ? enforcePlayerAddresses(user.id, id).catch(() => null) : null
+            wantsRoster ? enforcePlayerAddresses(user.id, id).catch(() => null) : null,
+            // Who arrived and who left, which only the log records. Gathered for
+            // the screen that shows it, like the roster - and unlike the roster it
+            // survives a server that has stopped answering, because a history is
+            // most wanted about a server that has just gone quiet.
+            wantsRoster ? getPlayerSessions(user.id, id).catch(() => []) : [],
+            // Timeouts end by somebody coming back to lift them. The cron does
+            // that on its own schedule; an instance with no cron configured would
+            // otherwise hand out cool-offs that never end, so opening the screen
+            // that grants them is also when the due ones are lifted.
+            wantsRoster && status.answering ? sweepTimeouts(user.id, id).catch(() => 0) : 0
         ]);
-        return NextResponse.json({ status, reach, roster, firewall, access });
+        const timeouts = wantsRoster ? await readPlayerTimeouts(id).catch(() => []) : [];
+        // The log's timestamps are the server's, so the clock they are read
+        // against has to be too - a browser minutes out would otherwise report
+        // somebody as still arriving long after they left.
+        return NextResponse.json({
+            status,
+            reach,
+            roster,
+            firewall,
+            access,
+            sessions,
+            timeouts,
+            now: new Date().toISOString()
+        });
     } catch (caught) {
         return NextResponse.json(
             { error: caught instanceof Error ? caught.message : "Could not read the server" },

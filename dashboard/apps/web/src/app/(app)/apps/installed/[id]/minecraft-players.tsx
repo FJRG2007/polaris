@@ -11,39 +11,66 @@
  * the cuts an operator actually reaches for are a filter over that.
  *
  * Every action is one RCON command and takes effect in the running game, so the
- * table is re-read from the server afterwards rather than patched locally - the
- * server is the record, not this screen.
+ * server stays the record: the table is re-read from it afterwards. What the row
+ * shows in the meantime is the change the operator just made, held until the next
+ * read agrees and rolled back if the server refuses - a crown that only appears
+ * five seconds later reads as a button that did nothing, and gets pressed twice.
  */
 
-import { useMemo, useState, useTransition } from "react";
+import * as actions from "./minecraft-actions";
 import { useConfirm } from "@/components/confirm-dialog";
 import { GameAccessForm } from "@/components/game-access-form";
+import type { MinecraftModeration } from "./minecraft-actions";
 import { ACCESS_REACH_NOTE } from "@/lib/apps/minecraft/access";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
+import { timeoutFor, type PlayerTimeout } from "@/lib/apps/minecraft/timeout";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import { foldPlayers, type PlayerEntry } from "@/lib/apps/minecraft/players";
-import { Badge, Button, Card, CardBody, Input, Select, Switch, cn } from "@polaris/ui";
 import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
 import {
+    GiveItemDialog,
+    HistoryDialog,
+    InventoryDialog,
+    TeleportDialog,
+    TimeoutDialog,
+    type PlayerDialog
+} from "./minecraft-player-dialogs";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    Input,
+    Select,
+    Switch,
+    cn
+} from "@polaris/ui";
+import {
+    Backpack,
     Ban,
     Crown,
     DoorOpen,
+    History,
+    MapPin,
+    MoreHorizontal,
+    PackagePlus,
     Search,
     ShieldBan,
     ShieldMinus,
     ShieldPlus,
+    Skull,
+    Timer,
     UserMinus,
     UserPlus,
     Users
 } from "lucide-react";
-import {
-    applyFirewallBansAction,
-    grantPlayerAccessAction,
-    moderatePlayerAction,
-    revokePlayerAccessAction,
-    setAddressBindingAction,
-    setWhitelistEnforcedAction,
-    type MinecraftModeration
-} from "./minecraft-actions";
 
 /** The cuts an operator reaches for; anything finer is what search is for. */
 const FILTERS = [
@@ -62,6 +89,9 @@ export function MinecraftPlayers({
     roster,
     firewall,
     access,
+    sessions,
+    now,
+    timeouts,
     onChanged
 }: {
     installedAppId: string;
@@ -70,6 +100,12 @@ export function MinecraftPlayers({
     firewall: MinecraftFirewall | null;
     /** Who may connect and from where - the list the server is actually closed by. */
     access: PlayerAccessView | null;
+    /** Who arrived and who left, out of the server's log. */
+    sessions: readonly PlayerSessionEvent[];
+    /** The server's clock when it read them. */
+    now: number;
+    /** Bans with an end, and when each one lifts. */
+    timeouts: readonly PlayerTimeout[];
     onChanged: () => void;
 }) {
     const [pending, startTransition] = useTransition();
@@ -77,12 +113,59 @@ export function MinecraftPlayers({
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState<Filter>("all");
     const [confirm, confirmElement] = useConfirm();
+    // What the operator has just changed, shown until the server's own answer
+    // catches up. Keyed by the same lowercase name the lists are folded on.
+    const [applied, setApplied] = useState<Map<string, Partial<PlayerEntry>>>(new Map());
+    // The player a form is open about, and which form.
+    const [acting, setActing] = useState<{ player: PlayerEntry; dialog: PlayerDialog } | null>(null);
 
     const answering = status?.answering ?? false;
     const bedrock = status?.edition === "bedrock";
     const edition = access?.edition ?? status?.edition ?? "java";
-    const players = useMemo(() => foldPlayers(status, roster, access), [status, roster, access]);
+    const known = useMemo(
+        () => foldPlayers(status, roster, access, sessions, now),
+        [status, roster, access, sessions, now]
+    );
+    const players = useMemo(
+        () => known.map((player) => ({ ...player, ...(applied.get(player.name.toLowerCase()) ?? {}) })),
+        [known, applied]
+    );
     const registered = access?.rules.length ?? 0;
+    const onlineNames = useMemo(
+        () => players.filter((player) => player.online).map((player) => player.name),
+        [players]
+    );
+
+    // An expectation stops being one the moment the server reports the same
+    // thing. Dropping it then rather than on a timer means the row never flickers
+    // back to the old value and never keeps a stale one after a change elsewhere.
+    useEffect(() => {
+        setApplied((current) => {
+            if (current.size === 0) return current;
+            const next = new Map(current);
+            for (const player of known) {
+                const expectation = next.get(player.name.toLowerCase());
+                if (!expectation) continue;
+                const agreed = Object.entries(expectation).every(
+                    ([field, value]) => player[field as keyof PlayerEntry] === value
+                );
+                if (agreed) next.delete(player.name.toLowerCase());
+            }
+            return next.size === current.size ? current : next;
+        });
+    }, [known]);
+
+    /** Show a change now, and put it back if the server refuses it. */
+    function expect(player: string, patch: Partial<PlayerEntry>): () => void {
+        const key = player.toLowerCase();
+        setApplied((current) => new Map(current).set(key, { ...current.get(key), ...patch }));
+        return () =>
+            setApplied((current) => {
+                const next = new Map(current);
+                next.delete(key);
+                return next;
+            });
+    }
 
     const shown = useMemo(() => {
         const needle = query.trim().toLowerCase();
@@ -98,11 +181,12 @@ export function MinecraftPlayers({
         });
     }, [players, query, filter]);
 
-    function run(action: () => Promise<{ error?: string }>): void {
+    function run(action: () => Promise<{ error?: string }>, rollback?: () => void): void {
         setError(null);
         startTransition(async () => {
             const result = await action();
             if (result.error) {
+                rollback?.();
                 setError(result.error);
                 return;
             }
@@ -110,8 +194,35 @@ export function MinecraftPlayers({
         });
     }
 
+    /** What each verb will have done to the row, so it can say so at once. The
+     *  ones that only take effect in the running world - killing somebody,
+     *  handing them an item - change nothing this table shows, so they expect
+     *  nothing. */
+    function expectationOf(action: MinecraftModeration["action"]): Partial<PlayerEntry> | null {
+        switch (action) {
+            case "op":
+                return { operator: true };
+            case "deop":
+                return { operator: false };
+            case "ban":
+                return { banned: true };
+            case "pardon":
+                return { banned: false, banReason: null };
+            case "whitelist-add":
+                return { whitelisted: true };
+            case "whitelist-remove":
+                return { whitelisted: false };
+            case "kick":
+                return { online: false, presence: "offline" };
+            default:
+                return null;
+        }
+    }
+
     function moderate(input: Omit<MinecraftModeration, "installedAppId">): void {
-        run(() => moderatePlayerAction({ ...input, installedAppId }));
+        const expectation = expectationOf(input.action);
+        const rollback = expectation ? expect(input.player, expectation) : undefined;
+        run(() => actions.moderatePlayerAction({ ...input, installedAppId }), rollback);
     }
 
     async function moderateWithConfirm(
@@ -125,7 +236,7 @@ export function MinecraftPlayers({
 
     async function addPlayer(input: { username: string; address: string }): Promise<boolean> {
         setError(null);
-        const result = await grantPlayerAccessAction({ installedAppId, ...input });
+        const result = await actions.grantPlayerAccessAction({ installedAppId, ...input });
         if (result.error) {
             setError(result.error);
             return false;
@@ -173,7 +284,7 @@ export function MinecraftPlayers({
                             </span>
                             <Switch
                                 checked={access?.bindAddresses ?? true}
-                                onChange={(enabled) => run(() => setAddressBindingAction(installedAppId, enabled))}
+                                onChange={(enabled) => run(() => actions.setAddressBindingAction(installedAppId, enabled))}
                                 disabled={pending || access === null || !access.addressesAvailable}
                                 aria-label="Check each player's address when they join"
                             />
@@ -222,6 +333,7 @@ export function MinecraftPlayers({
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
                             <th className="px-3 py-2 font-medium">Player</th>
+                            <th className="px-3 py-2 font-medium">Status</th>
                             <th className="px-3 py-2 font-medium">Standing</th>
                             <th className="hidden px-3 py-2 font-medium md:table-cell">Address</th>
                             <th className="px-3 py-2" />
@@ -230,13 +342,13 @@ export function MinecraftPlayers({
                     <tbody>
                         {!answering && players.length === 0 ? (
                             <tr>
-                                <td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">
+                                <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
                                     {status?.message ?? "Connecting to the server..."}
                                 </td>
                             </tr>
                         ) : shown.length === 0 ? (
                             <tr>
-                                <td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">
+                                <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
                                     {players.length === 0
                                         ? "Nobody is registered and nobody is playing."
                                         : "Nobody matches that."}
@@ -252,7 +364,11 @@ export function MinecraftPlayers({
                                     pending={pending}
                                     onModerate={moderate}
                                     onModerateWithConfirm={moderateWithConfirm}
-                                    onRevoke={() => run(() => revokePlayerAccessAction(installedAppId, player.name))}
+                                    timeout={timeoutFor(timeouts, player.name)}
+                                    onOpen={(dialog) => setActing({ player, dialog })}
+                                    onRevoke={() =>
+                                        run(() => actions.revokePlayerAccessAction(installedAppId, player.name))
+                                    }
                                 />
                             ))
                         )}
@@ -267,6 +383,73 @@ export function MinecraftPlayers({
                 onChanged={onChanged}
             />
 
+            {acting?.dialog === "give" && (
+                <GiveItemDialog
+                    player={acting.player.name}
+                    pending={pending}
+                    onClose={() => setActing(null)}
+                    onGive={(item, count) => {
+                        setActing(null);
+                        run(() =>
+                            actions.givePlayerItemAction({
+                                installedAppId,
+                                player: acting.player.name,
+                                item,
+                                count
+                            })
+                        );
+                    }}
+                />
+            )}
+            {acting?.dialog === "teleport" && (
+                <TeleportDialog
+                    player={acting.player.name}
+                    others={onlineNames.filter((name) => name !== acting.player.name)}
+                    pending={pending}
+                    onClose={() => setActing(null)}
+                    onTeleport={(destination) => {
+                        setActing(null);
+                        run(() =>
+                            actions.teleportPlayerAction({
+                                installedAppId,
+                                player: acting.player.name,
+                                destination
+                            })
+                        );
+                    }}
+                />
+            )}
+            {acting?.dialog === "timeout" && (
+                <TimeoutDialog
+                    player={acting.player.name}
+                    pending={pending}
+                    onClose={() => setActing(null)}
+                    onTimeout={(minutes, reason) => {
+                        const player = acting.player.name;
+                        setActing(null);
+                        const rollback = expect(player, { banned: true, online: false, presence: "offline" });
+                        run(
+                            () => actions.timeoutPlayerAction({ installedAppId, player, minutes, reason }),
+                            rollback
+                        );
+                    }}
+                />
+            )}
+            {acting?.dialog === "inventory" && (
+                <InventoryDialog
+                    player={acting.player.name}
+                    onClose={() => setActing(null)}
+                    onRead={() => actions.readPlayerInventoryAction(installedAppId, acting.player.name)}
+                />
+            )}
+            {acting?.dialog === "history" && (
+                <HistoryDialog
+                    player={acting.player.name}
+                    sessions={acting.player.sessions}
+                    onClose={() => setActing(null)}
+                />
+            )}
+
             {confirmElement}
         </div>
     );
@@ -277,20 +460,25 @@ function PlayerRow({
     bedrock,
     answering,
     pending,
+    timeout,
     onModerate,
     onModerateWithConfirm,
+    onOpen,
     onRevoke
 }: {
     player: PlayerEntry;
     bedrock: boolean;
     answering: boolean;
     pending: boolean;
+    /** The timeout they are serving, when they are serving one. */
+    timeout: PlayerTimeout | null;
     onModerate: (input: Omit<MinecraftModeration, "installedAppId">) => void;
     onModerateWithConfirm: (
         input: Omit<MinecraftModeration, "installedAppId">,
         title: string,
         description: string
     ) => Promise<void>;
+    onOpen: (dialog: PlayerDialog) => void;
     onRevoke: () => void;
 }) {
     const { name } = player;
@@ -315,17 +503,25 @@ function PlayerRow({
                 )}
             </td>
             <td className="px-3 py-2">
+                <StatusCell player={player} onOpen={onOpen} />
+            </td>
+            <td className="px-3 py-2">
                 <div className="flex flex-wrap items-center gap-1">
-                    {player.online && <Badge variant="success">online</Badge>}
                     {player.address !== null && <Badge variant="primary">allowed</Badge>}
                     {player.operator && <Badge>operator</Badge>}
                     {player.whitelisted && <Badge>whitelisted</Badge>}
-                    {player.banned && (
-                        <Badge variant="danger">
-                            <Ban className="size-3" />
-                            banned
-                        </Badge>
-                    )}
+                    {player.banned &&
+                        (timeout ? (
+                            <Badge variant="danger" title={`Lifts ${new Date(timeout.until).toLocaleString()}`}>
+                                <Timer className="size-3" />
+                                timed out, {remaining(timeout.until)}
+                            </Badge>
+                        ) : (
+                            <Badge variant="danger">
+                                <Ban className="size-3" />
+                                banned
+                            </Badge>
+                        ))}
                     {/* A name the game knows and Polaris does not is the gap that
                         lets somebody in on the username alone. */}
                     {player.address === null && !player.banned && <Badge variant="warning">not registered</Badge>}
@@ -419,9 +615,148 @@ function PlayerRow({
                             onClick={onRevoke}
                         />
                     )}
+                    <MoreActions
+                        player={player}
+                        bedrock={bedrock}
+                        live={live}
+                        onOpen={onOpen}
+                        onModerateWithConfirm={onModerateWithConfirm}
+                    />
                 </div>
             </td>
         </tr>
+    );
+}
+
+/**
+ * What a player is doing, in the words somebody watching the server would use.
+ *
+ * Only what the server actually reports. Vanilla Minecraft has no idea of
+ * idleness - nothing answers it and nothing prints it - so there is no "away"
+ * here: it could only be guessed from how long somebody has been quiet, and a
+ * player mining in silence would be labelled away to the operator about to kick
+ * them.
+ */
+function StatusCell({ player, onOpen }: { player: PlayerEntry; onOpen: (dialog: PlayerDialog) => void }) {
+    const badge =
+        player.presence === "playing" ? (
+            <Badge variant="success">Playing</Badge>
+        ) : player.presence === "connecting" ? (
+            <Badge variant="warning">Connecting</Badge>
+        ) : player.presence === "never" ? (
+            <Badge>Never joined</Badge>
+        ) : (
+            <Badge>Offline</Badge>
+        );
+
+    return (
+        <div className="flex flex-col items-start gap-0.5">
+            {badge}
+            {player.sessions.length > 0 && (
+                <button
+                    type="button"
+                    onClick={() => onOpen("history")}
+                    className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                    title={`When ${player.name} joined and left`}
+                >
+                    {player.presence === "playing" ? "since " : ""}
+                    {relativeTime(player.lastSeen)}
+                </button>
+            )}
+        </div>
+    );
+}
+
+/** How much of a timeout is left, in the same shape as how long ago. */
+function remaining(iso: string): string {
+    const minutes = Math.max(0, Math.round((Date.parse(iso) - Date.now()) / 60_000));
+    if (minutes < 1) return "lifting now";
+    if (minutes < 60) return `${minutes}m left`;
+    const hours = Math.round(minutes / 60);
+    return hours < 24 ? `${hours}h left` : `${Math.round(hours / 24)}d left`;
+}
+
+/** How long ago, as somebody says it out loud. Absolute below a minute is noise;
+ *  past a week the date itself is what an operator wants. */
+function relativeTime(iso: string | null): string {
+    if (!iso) return "time not logged";
+    const at = Date.parse(iso);
+    if (Number.isNaN(at)) return "time not logged";
+    const seconds = Math.round((Date.now() - at) / 1000);
+    if (seconds < 60) return "just now";
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.round(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.round(hours / 24);
+    if (days <= 7) return `${days}d ago`;
+    return new Date(at).toLocaleDateString();
+}
+
+/** The verbs that are not one press: the ones that need a value, and the ones
+ *  rare enough that a row of icons for them would bury the three that are not. */
+function MoreActions({
+    player,
+    bedrock,
+    live,
+    onOpen,
+    onModerateWithConfirm
+}: {
+    player: PlayerEntry;
+    bedrock: boolean;
+    live: boolean;
+    onOpen: (dialog: PlayerDialog) => void;
+    onModerateWithConfirm: (
+        input: Omit<MinecraftModeration, "installedAppId">,
+        title: string,
+        description: string
+    ) => Promise<void>;
+}) {
+    // Bedrock answers none of these: it has no RCON, so the console is written to
+    // and only the log answers back - there is nothing to read an inventory from.
+    if (bedrock) return null;
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="ghost" aria-label={`More for ${player.name}`} title="More">
+                    <MoreHorizontal className="size-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuLabel>{player.name}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled={!live || !player.online} onSelect={() => onOpen("inventory")}>
+                    <Backpack className="size-4" /> Inventory
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={!live} onSelect={() => onOpen("give")}>
+                    <PackagePlus className="size-4" /> Give an item
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={!live || !player.online} onSelect={() => onOpen("teleport")}>
+                    <MapPin className="size-4" /> Teleport
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={player.sessions.length === 0} onSelect={() => onOpen("history")}>
+                    <History className="size-4" /> Joins and leaves
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                    className="text-danger"
+                    disabled={!live || !player.online}
+                    onSelect={() =>
+                        void onModerateWithConfirm(
+                            { action: "kill", player: player.name },
+                            `Kill ${player.name}?`,
+                            "They die where they stand and drop what they were carrying. Nothing stops them respawning."
+                        )
+                    }
+                >
+                    <Skull className="size-4" /> Kill
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-danger" disabled={!live || player.banned} onSelect={() => onOpen("timeout")}>
+                    <Timer className="size-4" /> Time out
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 
@@ -454,7 +789,7 @@ function WhitelistSwitch({
                 onChange={(next) => {
                     onError(null);
                     startTransition(async () => {
-                        const result = await setWhitelistEnforcedAction(installedAppId, next);
+                        const result = await actions.setWhitelistEnforcedAction(installedAppId, next);
                         if (result.error) {
                             onError(result.error);
                             return;
@@ -494,7 +829,7 @@ function FirewallSection({
     function apply(): void {
         onError(null);
         startTransition(async () => {
-            const result = await applyFirewallBansAction(installedAppId);
+            const result = await actions.applyFirewallBansAction(installedAppId);
             if (result.error) {
                 onError(result.error);
                 return;

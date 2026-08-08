@@ -21,6 +21,9 @@ import { setGameHostname } from "@/lib/apps/minecraft/address";
 import { patchInstallConfig } from "@/lib/apps/install-config";
 import { writeContainerFile } from "@/lib/container-files-service";
 import { findApp, isAllowedEnvValue, tunableEnvVars } from "@/lib/apps/catalog";
+import { parseInventory, type InventoryItem } from "@/lib/apps/minecraft/inventory";
+import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/minecraft/timeout";
+import { liftTimeout, timeoutPlayer } from "@/lib/apps/minecraft/timeout-service";
 import { applyFirewallBans, runConsoleLine, runServerCommand } from "@/lib/apps/minecraft/service";
 import {
     grantPlayerAccess,
@@ -38,7 +41,7 @@ const playerNameSchema = z
 
 const moderationSchema = z.object({
     installedAppId: z.string().uuid(),
-    action: z.enum(["op", "deop", "kick", "ban", "pardon", "whitelist-add", "whitelist-remove"]),
+    action: z.enum(["op", "deop", "kick", "ban", "pardon", "kill", "whitelist-add", "whitelist-remove"]),
     player: playerNameSchema,
     /** Shown to the player being kicked or banned. */
     reason: z.string().trim().max(200).optional()
@@ -70,6 +73,8 @@ function moderationArgv(input: MinecraftModeration): string[] {
             return ["ban", input.player, ...reason];
         case "pardon":
             return ["pardon", input.player];
+        case "kill":
+            return ["kill", input.player];
         case "whitelist-add":
             return ["whitelist", "add", input.player];
         case "whitelist-remove":
@@ -93,6 +98,176 @@ export async function moderatePlayerAction(input: MinecraftModeration): Promise<
         return { output: output.trim() };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+    }
+}
+
+/** A namespaced item id as the game writes it, with the namespace optional
+ *  because `give Alice stone` is what an operator types. */
+const itemIdSchema = z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^(?:[a-z0-9_.-]+:)?[a-z0-9_.-]{1,64}$/, "An item looks like minecraft:stone");
+
+/** Where to send somebody: another player, or three coordinates - each an
+ *  absolute number or a `~` offset, which is how the game reads them. */
+const destinationSchema = z.union([
+    playerNameSchema,
+    z
+        .string()
+        .trim()
+        .regex(
+            /^~?-?\d{1,7}(?:\.\d{1,3})?\s+~?-?\d{1,7}(?:\.\d{1,3})?\s+~?-?\d{1,7}(?:\.\d{1,3})?$/,
+            "Coordinates look like 100 64 -220"
+        )
+]);
+
+const giveSchema = z.object({
+    installedAppId: z.string().uuid(),
+    player: playerNameSchema,
+    item: itemIdSchema,
+    /** One stack at a time; more than that is several presses, which is the
+     *  honest amount of deliberation for handing out items. */
+    count: z.number().int().min(1).max(64)
+});
+
+const teleportSchema = z.object({
+    installedAppId: z.string().uuid(),
+    player: playerNameSchema,
+    destination: destinationSchema
+});
+
+const timeoutSchema = z.object({
+    installedAppId: z.string().uuid(),
+    player: playerNameSchema,
+    minutes: z.number().int().min(1).max(MAX_TIMEOUT_MINUTES),
+    reason: z.string().trim().max(200).optional()
+});
+
+export type GiveItemInput = z.infer<typeof giveSchema>;
+export type TeleportInput = z.infer<typeof teleportSchema>;
+export type TimeoutInput = z.infer<typeof timeoutSchema>;
+
+/** Put items in a player's bag. */
+export async function givePlayerItemAction(input: GiveItemInput): Promise<{ output?: string; error?: string }> {
+    const user = await requirePermission("games.moderate");
+    const parsed = giveSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const { installedAppId, player, item, count } = parsed.data;
+    try {
+        const output = await runServerCommand(user.id, installedAppId, ["give", player, item, String(count)]);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.give",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { player, item, count }
+        });
+        return { output: output.trim() };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+    }
+}
+
+/** Move a player to another player, or to a place. */
+export async function teleportPlayerAction(input: TeleportInput): Promise<{ output?: string; error?: string }> {
+    const user = await requirePermission("games.moderate");
+    const parsed = teleportSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const { installedAppId, player, destination } = parsed.data;
+    try {
+        // Split here rather than in the schema so coordinates reach the server as
+        // three arguments and a player name as one, which is what `tp` expects.
+        const output = await runServerCommand(user.id, installedAppId, [
+            "tp",
+            player,
+            ...destination.split(/\s+/)
+        ]);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.teleport",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { player, destination }
+        });
+        return { output: output.trim() };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+    }
+}
+
+/** What a player is carrying, read out of the server rather than guessed from
+ *  what anyone has handed them. */
+export async function readPlayerInventoryAction(
+    installedAppId: string,
+    player: string
+): Promise<{ items?: InventoryItem[]; error?: string }> {
+    const user = await requirePermission("games.read");
+    const parsed = z.object({ installedAppId: z.string().uuid(), player: playerNameSchema }).safeParse({
+        installedAppId,
+        player
+    });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        const output = await runServerCommand(user.id, parsed.data.installedAppId, [
+            "data",
+            "get",
+            "entity",
+            parsed.data.player,
+            "Inventory"
+        ]);
+        return { items: parseInventory(output) };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : "Could not read the inventory - the player has to be on the server"
+        };
+    }
+}
+
+/** Ban a player for a while, and let Polaris lift it. */
+export async function timeoutPlayerAction(input: TimeoutInput): Promise<{ until?: string; error?: string }> {
+    const user = await requirePermission("games.moderate");
+    const parsed = timeoutSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const { installedAppId, player, minutes, reason } = parsed.data;
+    try {
+        const entry = await timeoutPlayer(user.id, installedAppId, player, minutes, reason);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.timeout",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { player, minutes }
+        });
+        return { until: entry.until };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+    }
+}
+
+/** End one early. */
+export async function liftTimeoutAction(installedAppId: string, player: string): Promise<{ error?: string }> {
+    const user = await requirePermission("games.moderate");
+    const parsed = z.object({ installedAppId: z.string().uuid(), player: playerNameSchema }).safeParse({
+        installedAppId,
+        player
+    });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        await liftTimeout(user.id, parsed.data.installedAppId, parsed.data.player);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.timeout-lift",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { player: parsed.data.player }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not lift the timeout" };
     }
 }
 

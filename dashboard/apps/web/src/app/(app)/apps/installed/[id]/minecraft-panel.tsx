@@ -32,6 +32,8 @@ import { GAME_TABS, gameTabHref, isGameTab } from "./tabs";
 import { MinecraftAppearance } from "./minecraft-appearance";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
+import type { PlayerTimeout } from "@/lib/apps/minecraft/timeout";
+import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
@@ -58,6 +60,13 @@ interface ServerReading {
     roster: MinecraftRoster | null;
     firewall: MinecraftFirewall | null;
     access: PlayerAccessView | null;
+    /** Who arrived and who left, as far back as the log reaches. */
+    sessions: readonly PlayerSessionEvent[];
+    /** The server's clock when it read them, so the browser's own being out does
+     *  not change what a player is reported as doing. */
+    now: number;
+    /** Bans with an end, and when each one lifts. */
+    timeouts: readonly PlayerTimeout[];
 }
 
 export function MinecraftPanel({
@@ -100,7 +109,10 @@ export function MinecraftPanel({
         reach: null,
         roster: null,
         firewall: null,
-        access: null
+        access: null,
+        sessions: [],
+        now: Date.now(),
+        timeouts: []
     });
     const [error, setError] = useState<string | null>(null);
 
@@ -120,6 +132,9 @@ export function MinecraftPanel({
                 roster?: MinecraftRoster;
                 firewall?: MinecraftFirewall;
                 access?: PlayerAccessView;
+                sessions?: PlayerSessionEvent[];
+                timeouts?: PlayerTimeout[];
+                now?: string;
                 error?: string;
             };
             if (!response.ok || !data.status) {
@@ -136,7 +151,10 @@ export function MinecraftPanel({
                 firewall: data.firewall ?? (wantsRoster ? current.firewall : null),
                 // Read on every poll, not only the moderation screen's, because the
                 // overview says whether anybody can join at all.
-                access: data.access ?? current.access
+                access: data.access ?? current.access,
+                sessions: data.sessions ?? (wantsRoster ? current.sessions : []),
+                timeouts: data.timeouts ?? (wantsRoster ? current.timeouts : []),
+                now: data.now ? Date.parse(data.now) : current.now
             }));
         } catch {
             // Transient; the next poll retries.
@@ -210,6 +228,9 @@ export function MinecraftPanel({
                     roster={reading.roster}
                     firewall={reading.firewall}
                     access={reading.access}
+                    sessions={reading.sessions}
+                    now={reading.now}
+                    timeouts={reading.timeouts}
                     onChanged={() => void load()}
                 />
             )}

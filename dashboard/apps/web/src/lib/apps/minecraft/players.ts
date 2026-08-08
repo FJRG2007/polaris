@@ -14,6 +14,7 @@
 
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import type { MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
+import { playerActivity, sessionsByPlayer, type PlayerPresence, type PlayerSessionEvent } from "./sessions";
 
 /** One person, with every list this server holds them in. */
 export interface PlayerEntry {
@@ -28,6 +29,12 @@ export interface PlayerEntry {
     readonly note: string | null;
     readonly banReason: string | null;
     readonly banned: boolean;
+    /** What they are doing, from the server's answer and its log. */
+    readonly presence: PlayerPresence;
+    /** When they last arrived or left, ISO 8601, as far back as the log reaches. */
+    readonly lastSeen: string | null;
+    /** Their own arrivals and departures, oldest first. */
+    readonly sessions: readonly PlayerSessionEvent[];
 }
 
 /**
@@ -42,7 +49,14 @@ export interface PlayerEntry {
 export function foldPlayers(
     status: MinecraftStatus | null,
     roster: MinecraftRoster | null,
-    access: PlayerAccessView | null
+    access: PlayerAccessView | null,
+    /** The joins and leaves the log still holds, for what each player is doing
+     *  and when they were last here. */
+    sessions: readonly PlayerSessionEvent[] = [],
+    /** The clock the log's timestamps are compared against. The server's, passed
+     *  in with the reading, because a browser whose clock is minutes out would
+     *  otherwise decide somebody is still arriving an hour after they left. */
+    now: number = Date.now()
 ): PlayerEntry[] {
     const byKey = new Map<string, PlayerEntry>();
     const upsert = (name: string, patch: Partial<PlayerEntry>): void => {
@@ -55,7 +69,10 @@ export function foldPlayers(
             address: null,
             note: null,
             banReason: null,
-            banned: false
+            banned: false,
+            presence: "never" as PlayerPresence,
+            lastSeen: null,
+            sessions: []
         };
         byKey.set(key, { ...current, ...patch });
     };
@@ -65,6 +82,15 @@ export function foldPlayers(
     for (const player of roster?.ops ?? []) upsert(player, { operator: true });
     for (const player of roster?.whitelist ?? []) upsert(player, { whitelisted: true });
     for (const ban of roster?.bans ?? []) upsert(ban.name, { banned: true, banReason: ban.reason });
+    // Somebody who has been on this server is somebody it knows, whether or not
+    // any of its lists still mentions them.
+    for (const event of sessions) upsert(event.name, {});
+
+    const history = sessionsByPlayer(sessions);
+    for (const [key, entry] of byKey) {
+        const own = history.get(key) ?? [];
+        byKey.set(key, { ...entry, ...playerActivity(own, entry.online, now), sessions: own });
+    }
 
     // Online first - they are the ones something can be done about right now -
     // then alphabetically, so the list does not reshuffle as people come and go.

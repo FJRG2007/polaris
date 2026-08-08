@@ -22,6 +22,7 @@ import type { RuntimePorts } from "@polaris/deploy";
 import { currentReleaseRef } from "@/lib/deploy/releases";
 import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
 import { hostPortForApp, readAppRuntimeLog } from "@/lib/deploy-service";
+import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
 import { readAppContainerMetricsOrNull } from "@/lib/app-container-metrics";
 import {
     parseBannedIps,
@@ -343,6 +344,20 @@ async function readPlayerList(install: MinecraftInstall, ownerId: string): Promi
     await execCommand(install, ownerId, ["list"]);
     await new Promise((resolve) => setTimeout(resolve, CONSOLE_ANSWER_MS));
     return parsePlayerListFromLog(await readAppRuntimeLog(install.applicationId, ownerId, 80));
+}
+
+/** How far back to read for the arrivals and departures. Enough to cover an
+ *  evening on a quiet server; a busy one prints past it, and the history is then
+ *  as long as the log is - which is what it says on the screen. */
+const SESSION_LOG_TAIL = 1500;
+
+/** Every join and leave the server's log still holds, oldest first. */
+export async function getPlayerSessions(
+    ownerId: string,
+    installedAppId: string
+): Promise<readonly PlayerSessionEvent[]> {
+    const install = await resolveInstall(ownerId, installedAppId);
+    return parsePlayerSessions(await readAppRuntimeLog(install.applicationId, ownerId, SESSION_LOG_TAIL));
 }
 
 /** Operators, whitelisted players and bans, as the server has them on disk. */
