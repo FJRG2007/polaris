@@ -316,8 +316,15 @@ export async function getInstalledAppSettings(ownerId: string, id: string): Prom
     if (!manifest) return [];
     const fields = tunableEnvVars(manifest);
     if (fields.length === 0 || !row.applicationId) return [];
+    // An install whose service is gone has no settings to show, and that is all it
+    // means here. It must never be an exception: this is one panel on the page an
+    // operator opens to get rid of exactly such an install, and a throw takes the
+    // page - Uninstall included - down with it.
     const stored = new Map(
-        (await listEnvVars("application", row.applicationId, ownerId)).map((item) => [item.key, item.value])
+        (await listEnvVars("application", row.applicationId, ownerId).catch(() => [])).map((item) => [
+            item.key,
+            item.value
+        ])
     );
     return fields.map((field) => ({
         key: field.key,

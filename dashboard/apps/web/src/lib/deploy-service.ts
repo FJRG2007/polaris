@@ -1327,11 +1327,38 @@ export async function deleteApplication(applicationId: string, ownerId: string):
     await prisma.deployment.deleteMany({ where: { deployableType: "application", deployableId: applicationId } });
     await prisma.envVar.deleteMany({ where: { scopeType: "application", scopeId: applicationId } });
     await prisma.application.delete({ where: { id: applicationId } });
+    await releaseInstallsOf(applicationId);
     // The delete cascades the app's Domain rows, but the edge is not the database: its
     // routers stay until they are rewritten, and one pointing at a container that no
     // longer exists answers for the hostname as an app that is merely down. Resynced
     // here so a deleted app's name goes back to being an unclaimed one.
     await syncAppRoutes().catch(() => undefined);
+}
+
+/**
+ * Retire the marketplace installs this application was backing.
+ *
+ * A marketplace app is an InstalledApp row pointing at an ordinary Application,
+ * and deleting that service from the Deploy canvas is a legitimate way to be rid
+ * of one - it is the same container either way. What must not survive it is the
+ * install row: it keeps listing the app, its own page reads the service to render
+ * the settings and fails when it is gone, and the Uninstall button that would have
+ * cleared it is on that page. So the install is marked removed here, at the one
+ * point every caller comes through, rather than at each of them.
+ */
+async function releaseInstallsOf(applicationId: string): Promise<void> {
+    const installs = await prisma.installedApp.findMany({
+        where: { applicationId, status: { not: "removed" } },
+        select: { catalogId: true }
+    });
+    if (installs.length === 0) return;
+    await prisma.installedApp.updateMany({ where: { applicationId }, data: { status: "removed" } });
+    // Cycle: bridge-endpoint reaches this module for the hub's port, so the cache
+    // it owns is resolved at call time rather than at load.
+    if (installs.some((install) => install.catalogId === "messaging-bridge")) {
+        const { invalidateBridgeCache } = await import("./messaging/bridge-endpoint");
+        invalidateBridgeCache();
+    }
 }
 
 /**

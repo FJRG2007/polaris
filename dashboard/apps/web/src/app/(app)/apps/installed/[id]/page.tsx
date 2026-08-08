@@ -59,7 +59,12 @@ export default async function InstalledAppPage({ params }: { params: Promise<{ i
     const app = await getInstalledApp(user.id, id);
     if (!app) notFound();
     // What the app was deployed with, so its panel can paint its settings without
-    // waiting on a request of its own.
-    const [settings, game] = await Promise.all([getInstalledAppSettings(user.id, id), gameContextFor(app)]);
+    // waiting on a request of its own. Both are detail on a page whose job is to
+    // manage the install, so neither may take it down: an app that cannot be
+    // described is precisely the one somebody came here to stop or remove.
+    const [settings, game] = await Promise.all([
+        getInstalledAppSettings(user.id, id),
+        gameContextFor(app).catch(() => null)
+    ]);
     return <InstalledAppDashboard app={app} settings={settings} game={game} />;
 }
