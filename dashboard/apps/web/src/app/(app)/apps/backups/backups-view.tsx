@@ -98,7 +98,9 @@ export function BackupsView({
                                     <div className="flex min-w-0 items-center gap-2">
                                         <Database className="size-4 shrink-0 text-muted-foreground" />
                                         <div className="min-w-0">
-                                            <p className="truncate font-medium">{backup.name}</p>
+                                            <p className="truncate font-medium" title={backup.name}>
+                                                {backup.name}
+                                            </p>
                                             <p className="text-xs text-muted-foreground">
                                                 {formatBytes(BigInt(backup.sizeBytes))} -{" "}
                                                 {format.dateTime(backup.createdAt)}

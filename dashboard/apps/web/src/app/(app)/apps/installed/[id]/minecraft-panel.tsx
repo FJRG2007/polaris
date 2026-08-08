@@ -597,16 +597,23 @@ function OverviewTab({
                 <CardBody className="flex flex-col gap-2">
                     <p className="text-sm font-medium">World</p>
                     <dl className="flex flex-col gap-1 text-sm">
-                        {shown.map((setting) => (
-                            <div key={setting.key} className="flex items-baseline justify-between gap-3">
-                                <dt className="text-muted-foreground">{setting.label}</dt>
-                                <dd className="truncate text-right">
-                                    {setting.options?.find((option) => option.value === setting.value)?.label ??
-                                        setting.value ??
-                                        "-"}
-                                </dd>
-                            </div>
-                        ))}
+                        {shown.map((setting) => {
+                            // A description is the long one here, and clipping it
+                            // with nothing carrying the rest hides exactly what an
+                            // operator opened the overview to read.
+                            const value =
+                                setting.options?.find((option) => option.value === setting.value)?.label ??
+                                setting.value ??
+                                "-";
+                            return (
+                                <div key={setting.key} className="flex items-baseline justify-between gap-3">
+                                    <dt className="text-muted-foreground">{setting.label}</dt>
+                                    <dd className="truncate text-right" title={value}>
+                                        {value}
+                                    </dd>
+                                </div>
+                            );
+                        })}
                     </dl>
                 </CardBody>
             </Card>

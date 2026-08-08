@@ -443,7 +443,9 @@ export function GameServerBackups({
                 <div className="flex items-center justify-between gap-2">
                     <CardTitle className="flex min-w-0 items-center gap-2">
                         <Archive className="size-4 text-primary" />
-                        <span className="truncate">{heading ?? "Backups"}</span>
+                        <span className="truncate" title={heading ?? "Backups"}>
+                            {heading ?? "Backups"}
+                        </span>
                         {view && view.backups.length > 0 && (
                             <Badge variant="neutral">{view.backups.length}</Badge>
                         )}
@@ -477,7 +479,9 @@ export function GameServerBackups({
                                 className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-2 text-sm"
                             >
                                 <div className="min-w-0">
-                                    <p className="truncate">{format.dateTime(backup.createdAt)}</p>
+                                    <p className="truncate" title={format.dateTime(backup.createdAt)}>
+                                        {format.dateTime(backup.createdAt)}
+                                    </p>
                                     <p className="text-xs text-muted-foreground">{formatBytes(backup.sizeBytes)}</p>
                                 </div>
                                 <div className="flex items-center gap-1">
