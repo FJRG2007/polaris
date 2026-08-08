@@ -69,6 +69,10 @@ export interface GameServerFacts {
      *  live read, which costs a round trip to the server itself. */
     readonly running: boolean;
     readonly address: string | null;
+    /** How many players it was built for. Read from the setting rather than from
+     *  the running server, so the list can say "0 / 20" about one that is down -
+     *  a dash there reads as "unknown", and the number is not unknown. */
+    readonly slots: number | null;
     /** Why there is no address, when there is none. */
     readonly message: string | null;
 }
@@ -130,7 +134,7 @@ export async function listGameServerFacts(ownerId: string): Promise<GameServerFa
     // An address needs the release the server actually publishes on, and the
     // machine's own address for every server without a name of its own. Both are
     // read once for the whole list rather than per row.
-    const [isolated, hosts, lanIp] = await Promise.all([
+    const [isolated, hosts, lanIp, slots] = await Promise.all([
         prisma.deployment
             .findMany({
                 where: { id: { in: presentIds(apps.map((app) => app.currentDeploymentId)) }, isolated: true },
@@ -143,7 +147,13 @@ export async function listGameServerFacts(ownerId: string): Promise<GameServerFa
                 select: { id: true, address: true }
             })
             .then((rows) => new Map(rows.map((row) => [row.id, row.address]))),
-        local ? getHostLanIp().catch(() => null) : null
+        local ? getHostLanIp().catch(() => null) : null,
+        prisma.envVar
+            .findMany({
+                where: { scopeType: "application", scopeId: { in: apps.map((app) => app.id) }, key: "MAX_PLAYERS" },
+                select: { scopeId: true, value: true }
+            })
+            .then((rows) => new Map(rows.map((row) => [row.scopeId, Number.parseInt(row.value ?? "", 10)])))
     ]);
 
     return installs.map((install) => {
@@ -160,6 +170,7 @@ export async function listGameServerFacts(ownerId: string): Promise<GameServerFa
             applicationId: install.applicationId,
             serverName: install.targetId ? (targetName.get(install.targetId) ?? null) : null,
             running,
+            slots: app && Number.isFinite(slots.get(app.id)) ? (slots.get(app.id) as number) : null,
             address: app
                 ? gameServerAddress({
                       hostname,

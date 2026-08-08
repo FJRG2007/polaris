@@ -52,6 +52,7 @@ import {
     Button,
     Card,
     CardBody,
+    cn,
     ConfirmDeleteDialog,
     ContextMenu,
     ContextMenuContent,
@@ -468,16 +469,27 @@ function ServerRow({
  *  server that is not meant to be up has nobody on it, which is known without
  *  asking it. */
 function PlayersCell({ facts, live }: { facts: GameServerFacts | null; live: GameServerLive | null }) {
-    if (facts !== null && !facts.running) return <span>-</span>;
-    if (live === null) return <Skeleton className="h-4 w-12" />;
-    if (!live.answering) return <span>-</span>;
+    // A server nobody can be on still has a size, and it is worth saying: "0 / 20"
+    // is the same shape as every other row, where a dash reads as "not known" and
+    // makes the column impossible to scan down.
+    const answering = live?.answering ?? false;
+    if (!answering && facts === null) return <Skeleton className="h-4 w-12" />;
+    const online = answering ? live?.online ?? 0 : 0;
+    const total = (answering ? live?.max : null) || facts?.slots;
+    if (!total) return <span>-</span>;
     return (
         <span
-            className="flex items-center gap-1"
-            title={live.players.length > 0 ? live.players.join(", ") : "Nobody is playing right now"}
+            className={cn("flex items-center gap-1", !answering && "text-muted-foreground/60")}
+            title={
+                !answering
+                    ? "Nobody can be on: the server is not answering"
+                    : live && live.players.length > 0
+                      ? live.players.join(", ")
+                      : "Nobody is playing right now"
+            }
         >
             <Users className="size-3.5" />
-            {live.online} / {live.max}
+            {online} / {total}
         </span>
     );
 }

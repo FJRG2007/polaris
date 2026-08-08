@@ -249,6 +249,27 @@ export function centerMotd(text: string): string {
         .join("\n");
 }
 
+/** The padding taken back off, which is what centring added and nothing else. */
+export function uncenterMotd(text: string): string {
+    return motdLines(text)
+        .map((line) => line.replace(/^ +/, ""))
+        .join("\n");
+}
+
+/** Whether the lines are already sitting in the middle. A line with no padding at
+ *  all is not centred, which is what stops a MOTD that happens to be exactly wide
+ *  enough from reading as centred and refusing to be centred. */
+export function isCenteredMotd(text: string): boolean {
+    const lines = motdLines(text).filter((line) => line.trim().length > 0);
+    if (lines.length === 0) return false;
+    return lines.every((line) => line.startsWith(" ")) && centerMotd(text) === motdLines(text).join("\n");
+}
+
+/** Centre the lines, or put them back against the left if they already are. */
+export function toggleCenterMotd(text: string): string {
+    return isCenteredMotd(text) ? uncenterMotd(text) : centerMotd(text);
+}
+
 /**
  * The value the container's MOTD variable has to hold.
  *
@@ -343,6 +364,30 @@ export function motdMap(raw: string): MotdMap {
     return { plain, offsets, codes };
 }
 
+/**
+ * What is in force across a stretch of the text, for a toolbar that has to show
+ * which of its buttons are already pressed.
+ *
+ * Only what every character shares. A selection that is half bold is not bold -
+ * pressing the button on it should finish the job, and a button that claimed it
+ * was already done would be lying about what the next press will do. A caret
+ * reports what it sits in, which is what the next character typed will get.
+ */
+export function codesOver(map: MotdMap, start: number, end: number): MotdCodes {
+    const from = Math.max(0, Math.min(start, map.plain.length));
+    const to = Math.max(from, Math.min(end, map.plain.length));
+    const first = map.codes[from] ?? NO_CODES;
+    if (from === to) return first;
+    let color = first.color;
+    let styles = [...first.styles];
+    for (let index = from + 1; index < to; index += 1) {
+        const codes = map.codes[index] ?? NO_CODES;
+        if (codes.color !== color) color = null;
+        styles = styles.filter((style) => codes.styles.includes(style));
+    }
+    return { color, styles };
+}
+
 /** The visible character a raw offset falls on, for a caret that was placed in
  *  the stored string rather than in the text. A caret inside a code belongs to the
  *  character the code introduces. */
@@ -351,29 +396,92 @@ export function plainIndexAt(map: MotdMap, rawIndex: number): number {
     return found === -1 ? map.plain.length : found;
 }
 
-/** The codes that put the formatting back to `codes`, from whatever is in force.
- *  Empty when the text is already plain and nothing has to be said. */
-function restoreCodes(codes: MotdCodes): string {
-    if (!codes.color && codes.styles.length === 0) return `${AMPERSAND}${RESET}`;
-    // A colour resets the styles, so it goes first and the styles are re-stated
-    // after it - the same order the game reads them in.
-    const colour = codes.color ? `${AMPERSAND}${codes.color}` : `${AMPERSAND}${RESET}`;
-    return colour + codes.styles.map((style) => `${AMPERSAND}${style}`).join("");
+function sameCodes(left: MotdCodes, right: MotdCodes): boolean {
+    return (
+        left.color === right.color &&
+        left.styles.length === right.styles.length &&
+        left.styles.every((style) => right.styles.includes(style))
+    );
 }
 
 /**
- * Apply one code to a stretch of the visible text.
+ * The codes that get from one formatting to another.
  *
- * The selection is wrapped, never replaced. Replacing it is what the toolbar used
- * to do, and it turned "make this word green" into "delete this word and leave
- * &a" - the whole reason somebody stops trusting the buttons and edits the codes
- * by hand.
+ * Adding a style is the style's own code and nothing else. Everything else - a
+ * different colour, or a style being taken off - has to go through a code that
+ * clears, because there is no "stop being bold" in Minecraft: the only way back
+ * is a colour or a reset, both of which drop every style, so whatever should
+ * survive is re-stated after it.
+ */
+function transitionCodes(from: MotdCodes, to: MotdCodes): string {
+    if (sameCodes(from, to)) return "";
+    const dropped = from.styles.some((style) => !to.styles.includes(style));
+    if (from.color !== to.color || dropped) {
+        const head = to.color ? `${AMPERSAND}${to.color}` : `${AMPERSAND}${RESET}`;
+        return head + to.styles.map((style) => `${AMPERSAND}${style}`).join("");
+    }
+    return to.styles
+        .filter((style) => !from.styles.includes(style))
+        .map((style) => `${AMPERSAND}${style}`)
+        .join("");
+}
+
+/** Write the visible text back out with a formatting per character, emitting a
+ *  code only where one character differs from the one before it. */
+function encodeMotdCodes(plain: string, codes: readonly MotdCodes[]): string {
+    let out = "";
+    let active: MotdCodes = NO_CODES;
+    for (let index = 0; index < plain.length; index += 1) {
+        const wanted = codes[index] ?? NO_CODES;
+        out += transitionCodes(active, wanted);
+        active = wanted;
+        out += plain[index];
+    }
+    return out;
+}
+
+/** Whether a code is already in force. A reset is "in force" when there is
+ *  nothing to reset. */
+function codeIsOn(codes: MotdCodes, code: string): boolean {
+    if (code === RESET) return codes.color === null && codes.styles.length === 0;
+    if (code in MOTD_COLORS) return codes.color === code;
+    return codes.styles.includes(code);
+}
+
+/** One character's formatting with a code turned on or off. A colour keeps the
+ *  styles under it: colouring a bold word should leave it bold, whatever the
+ *  section-sign notation does on its own. */
+function withCode(codes: MotdCodes, code: string, on: boolean): MotdCodes {
+    if (code === RESET) return NO_CODES;
+    if (code in MOTD_COLORS) return { color: on ? code : null, styles: codes.styles };
+    return {
+        color: codes.color,
+        styles: on ? [...new Set([...codes.styles, code])].sort() : codes.styles.filter((style) => style !== code)
+    };
+}
+
+/**
+ * Turn one code on or off over a stretch of the visible text.
  *
- * After the stretch the formatting is put back to what it was there, so colouring
- * a word in the middle of a coloured line does not repaint the rest of it.
+ * It toggles, like every other editor: a selection that is already obfuscated
+ * stops being obfuscated when the button is pressed again. The first version only
+ * ever added, so pressing a style twice stacked a second code and there was no way
+ * back to plain except deleting the text - which is a formatting button nobody can
+ * trust and the reason people go and edit the codes by hand.
  *
- * With nothing selected there is nothing to wrap, so the code is inserted at the
- * caret and applies from there on, which is what the game does with it.
+ * The stretch is re-written from a formatting per character rather than wrapped in
+ * markers, because taking a style off cannot be expressed by inserting anything:
+ * there is no "stop being bold" in Minecraft, only codes that clear everything. It
+ * also means the codes come out minimal - one where something changes, none where
+ * nothing does.
+ *
+ * A colour keeps the styles under it. The notation does not, which is why the
+ * whole run has to be re-stated; what an operator means by colouring a bold word
+ * is not "and stop it being bold".
+ *
+ * With nothing selected there is nothing to re-write, so the caret takes the code
+ * that applies from there on - and toggling there means the codes that switch it
+ * back off.
  */
 export function applyMotdCode(
     raw: string,
@@ -385,18 +493,20 @@ export function applyMotdCode(
     const map = motdMap(raw);
     const from = Math.max(0, Math.min(start, map.plain.length));
     const to = Math.max(from, Math.min(end, map.plain.length));
-    const token = `${AMPERSAND}${code}`;
-    const rawFrom = map.offsets[from] ?? raw.length;
+
     if (from === to) {
+        const here = map.codes[from] ?? NO_CODES;
+        const token = transitionCodes(here, withCode(here, code, !codeIsOn(here, code)));
+        const rawFrom = map.offsets[from] ?? raw.length;
         return { text: raw.slice(0, rawFrom) + token + raw.slice(rawFrom), start: from, end: from };
     }
-    const rawTo = map.offsets[to] ?? raw.length;
-    const after = code === RESET ? "" : restoreCodes(map.codes[to] ?? NO_CODES);
-    return {
-        text: raw.slice(0, rawFrom) + token + raw.slice(rawFrom, rawTo) + after + raw.slice(rawTo),
-        start: from,
-        end: to
-    };
+
+    // Off only when every character already has it: a half-formatted selection is
+    // one somebody is trying to finish, not undo.
+    const selected = map.codes.slice(from, to);
+    const on = !selected.every((codes) => codeIsOn(codes, code));
+    const next = map.codes.map((codes, index) => (index >= from && index < to ? withCode(codes, code, on) : codes));
+    return { text: encodeMotdCodes(map.plain, next), start: from, end: to };
 }
 
 /**

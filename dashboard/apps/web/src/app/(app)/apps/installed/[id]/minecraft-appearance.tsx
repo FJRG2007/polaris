@@ -19,8 +19,8 @@
 import Image from "next/image";
 import * as mc from "@/lib/apps/minecraft/motd";
 import { useConfirm } from "@/components/confirm-dialog";
-import { Button, Card, CardBody, Input } from "@polaris/ui";
-import { AlignCenter, Check, Code2, ImageUp, Loader2, RotateCw } from "lucide-react";
+import { Button, Card, CardBody, Input, cn } from "@polaris/ui";
+import { AlignCenter, AlignLeft, Check, Code2, ImageUp, Loader2, RotateCw, Save } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { renameGameServerAction, setServerIconAction, updateServerSettingsAction } from "./minecraft-actions";
 
@@ -136,12 +136,25 @@ function MotdCard({
     // pasted from a generator on the web arrives as codes.
     const [raw, setRaw] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // Set when a save lands, cleared the moment anything is typed again, so the
+    // note under the buttons is about this text and not the last one.
+    const [stored, setStored] = useState(false);
     const [pending, startTransition] = useTransition();
     const [confirm, confirmElement] = useConfirm();
     const area = useRef<HTMLTextAreaElement>(null);
     const map = useMemo(() => mc.motdMap(text), [text]);
+    // What the caret is on, so the buttons can show whether their code is already
+    // in force - a toggle that does not say which way it is pointing is a button
+    // you press to find out.
+    const [selection, setSelection] = useState({ start: 0, end: 0 });
     const preview = useMemo(() => mc.motdSpans(text), [text]);
+    const active = useMemo(() => {
+        const from = raw ? mc.plainIndexAt(map, selection.start) : selection.start;
+        const to = raw ? mc.plainIndexAt(map, selection.end) : selection.end;
+        return mc.codesOver(map, from, to);
+    }, [map, raw, selection]);
     const changed = mc.encodeMotd(text) !== motd;
+    const centred = useMemo(() => mc.isCenteredMotd(text), [text]);
     const shown = raw ? text : map.plain;
 
     /**
@@ -161,6 +174,7 @@ function MotdCard({
             // visible text's in formatted mode; the edit is always in the latter.
             const start = raw ? mc.plainIndexAt(map, from) : from;
             const end = raw ? mc.plainIndexAt(map, to) : to;
+            setSelection({ start: from, end: to });
             const next = mc.applyMotdCode(text, start, end, code);
             setText(next.text);
             requestAnimationFrame(() => {
@@ -182,23 +196,32 @@ function MotdCard({
         [raw]
     );
 
-    async function save(): Promise<void> {
+    async function save(restart: boolean): Promise<void> {
         setError(null);
-        const warning =
-            playersOnline > 0
-                ? `${playersOnline} ${playersOnline === 1 ? "player is" : "players are"} connected and will be disconnected.`
-                : "The server restarts to pick the new description up.";
-        if (!(await confirm({ title: "Restart with the new description?", description: warning, confirmLabel: "Save and restart" }))) {
-            return;
+        setStored(false);
+        if (restart) {
+            const warning =
+                playersOnline > 0
+                    ? `${playersOnline} ${playersOnline === 1 ? "player is" : "players are"} connected and will be disconnected.`
+                    : "The server restarts to pick the new description up.";
+            const agreed = await confirm({
+                title: "Restart with the new description?",
+                description: warning,
+                confirmLabel: "Save and restart"
+            });
+            if (!agreed) return;
         }
         startTransition(async () => {
-            const result = await updateServerSettingsAction(installedAppId, [
-                { key: "MOTD", value: mc.encodeMotd(text) }
-            ]);
+            const result = await updateServerSettingsAction(
+                installedAppId,
+                [{ key: "MOTD", value: mc.encodeMotd(text) }],
+                restart
+            );
             if (result.error) {
                 setError(result.error);
                 return;
             }
+            setStored(true);
             onSaved();
         });
     }
@@ -210,8 +233,8 @@ function MotdCard({
                     <p className="text-sm font-medium">Description</p>
                     <p className="text-xs text-muted-foreground">
                         The two lines under the server in a player&apos;s multiplayer list. Select some text and pick a
-                        colour or a style for it; with nothing selected it applies from the cursor on. A colour
-                        clears the style before it, which is Minecraft&apos;s rule and the reason for the preview.
+                        colour or a style for it; press the same one again to take it off. With nothing selected it
+                        applies from the cursor on. The preview is what the server list will actually draw.
                     </p>
                 </div>
 
@@ -222,8 +245,14 @@ function MotdCard({
                             type="button"
                             onClick={() => apply(code)}
                             aria-label={colour.name}
-                            title={colour.name}
-                            className="size-6 rounded border border-border transition-transform hover:scale-110"
+                            aria-pressed={active.color === code}
+                            title={active.color === code ? `${colour.name} - press to clear` : colour.name}
+                            className={cn(
+                                "size-6 rounded border transition-transform hover:scale-110",
+                                active.color === code
+                                    ? "border-foreground ring-2 ring-foreground/40"
+                                    : "border-border"
+                            )}
                             style={{ backgroundColor: colour.hex }}
                         />
                     ))}
@@ -234,9 +263,13 @@ function MotdCard({
                             size="sm"
                             variant="ghost"
                             onClick={() => apply(code)}
-                            title={label}
+                            title={active.styles.includes(code) ? `${label} - press to remove` : label}
                             aria-label={label}
-                            className="h-6 px-2 text-xs"
+                            aria-pressed={active.styles.includes(code)}
+                            className={cn(
+                                "h-6 px-2 text-xs",
+                                active.styles.includes(code) && "bg-primary/15 text-foreground"
+                            )}
                         >
                             {label}
                         </Button>
@@ -257,6 +290,12 @@ function MotdCard({
                     ref={area}
                     value={shown}
                     onChange={(event) => edit(event.target.value)}
+                    onSelect={(event) =>
+                        setSelection({
+                            start: event.currentTarget.selectionStart,
+                            end: event.currentTarget.selectionEnd
+                        })
+                    }
                     rows={mc.MOTD_MAX_LINES}
                     aria-label={raw ? "Server description, with its formatting codes" : "Server description"}
                     spellCheck={false}
@@ -283,10 +322,16 @@ function MotdCard({
                         size="sm"
                         variant="ghost"
                         className="h-6 px-2 text-xs"
-                        onClick={() => setText((current) => mc.centerMotd(current))}
-                        title="Pad the lines so they sit in the middle of the list"
+                        onClick={() => setText((current) => mc.toggleCenterMotd(current))}
+                        title={
+                            centred
+                                ? "Put the lines back against the left"
+                                : "Pad the lines so they sit in the middle of the list"
+                        }
+                        aria-pressed={centred}
                     >
-                        <AlignCenter className="size-3.5" /> Centre the lines
+                        {centred ? <AlignLeft className="size-3.5" /> : <AlignCenter className="size-3.5" />}
+                        {centred ? "Align left" : "Centre the lines"}
                     </Button>
                 </div>
 
@@ -294,14 +339,27 @@ function MotdCard({
 
                 {error && <p className="text-xs text-danger">{error}</p>}
 
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground">
-                        {changed ? "Pending a restart." : "This is what the server is running on."}
+                        {changed
+                            ? "Not saved yet."
+                            : stored
+                              ? "Saved. The server shows it from its next restart."
+                              : "This is what the server is running on."}
                     </p>
-                    <Button onClick={() => void save()} disabled={pending || !changed}>
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <RotateCw className="size-4" />}
-                        Save and restart
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        {/* The image writes server.properties at boot, so saving
+                            alone is a real choice and not half an action: it keeps
+                            the text and leaves whoever is playing alone. */}
+                        <Button variant="secondary" onClick={() => void save(false)} disabled={pending || !changed}>
+                            {pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                            Save
+                        </Button>
+                        <Button onClick={() => void save(true)} disabled={pending || !changed}>
+                            <RotateCw className="size-4" />
+                            Save and restart
+                        </Button>
+                    </div>
                 </div>
 
                 {confirmElement}
@@ -381,8 +439,19 @@ function IconCard({
     const [preview, setPreview] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [done, setDone] = useState(false);
+    // Whether the one already on the server could be fetched. It lives inside the
+    // container, so a server that is down has an icon nobody can look at - which
+    // is worth saying rather than showing an empty square that reads as "gone".
+    const [unreadable, setUnreadable] = useState(false);
     const [pending, startTransition] = useTransition();
     const picker = useRef<HTMLInputElement>(null);
+
+    // The one the server is carrying, busted by when it was set so a new upload
+    // shows at once and an unchanged one is not fetched again.
+    const stored = iconSetAt
+        ? `/api/apps/installed/${installedAppId}/minecraft/icon?v=${encodeURIComponent(iconSetAt)}`
+        : null;
+    const shown = preview ?? (unreadable ? null : stored);
 
     function choose(file: File | undefined): void {
         if (!file) return;
@@ -399,6 +468,7 @@ function IconCard({
                         return;
                     }
                     setDone(true);
+                    setUnreadable(false);
                     onSaved();
                 });
             })
@@ -421,13 +491,14 @@ function IconCard({
                         className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-md border border-border"
                         style={{ backgroundColor: mc.MOTD_BACKGROUND }}
                     >
-                        {preview ? (
+                        {shown ? (
                             <Image
-                                src={preview}
-                                alt="The icon that will be used"
+                                src={shown}
+                                alt="The server's icon"
                                 width={ICON_SIDE}
                                 height={ICON_SIDE}
                                 unoptimized
+                                onError={() => setUnreadable(true)}
                             />
                         ) : (
                             <ImageUp className="size-5 text-muted-foreground" />
@@ -445,10 +516,12 @@ function IconCard({
                         </Button>
                         <span className="text-xs text-muted-foreground">
                             {done
-                                ? "Uploaded. Restart the server to show it."
-                                : iconSetAt
-                                  ? "An icon is already set. Choosing one replaces it."
-                                  : "No icon yet."}
+                                ? "Saved. The server shows it from its next restart."
+                                : !iconSetAt
+                                  ? "No icon yet."
+                                  : unreadable
+                                    ? "An icon is set. It cannot be shown while the server is down."
+                                    : "This is the icon it carries. Choosing one replaces it."}
                         </span>
                     </div>
                 </div>

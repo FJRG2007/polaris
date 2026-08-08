@@ -659,9 +659,20 @@ export async function sendConsoleCommandAction(
  * redeploy. Which is why this says so on the button rather than pretending the
  * change is instant.
  */
+/**
+ * Save settings, and optionally restart so they take effect now.
+ *
+ * The image writes server.properties from its environment at boot, so nothing
+ * here reaches a running server: a value saved without a restart is a value the
+ * server picks up the next time it starts, whenever that is. That is worth having
+ * on its own - somebody writing a description at four in the afternoon should not
+ * have to choose between losing it and disconnecting everybody who is playing.
+ */
 export async function updateServerSettingsAction(
     installedAppId: string,
-    values: Array<{ key: string; value: string }>
+    values: Array<{ key: string; value: string }>,
+    /** False stores the values and leaves the running server alone. */
+    restart = true
 ): Promise<{ error?: string }> {
     const user = await requirePermission("games.manage");
     const parsed = settingsSchema.safeParse({ installedAppId, values });
@@ -682,7 +693,7 @@ export async function updateServerSettingsAction(
         });
         if (vars.length === 0) throw new Error("Nothing to save");
         await setEnvVars("application", install.applicationId, user.id, vars);
-        await deployApplication(install.applicationId, user.id, user.id);
+        if (restart) await deployApplication(install.applicationId, user.id, user.id);
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
