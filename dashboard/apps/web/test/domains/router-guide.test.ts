@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_PORT_BLOCKS } from "../../src/lib/apps/port-block";
 import {
     detectRouterBrand,
+    fitRuleNames,
     gameForwardRules,
     likelyGateway,
     routerGuide,
@@ -104,6 +105,64 @@ describe("the forwarding form", () => {
     it("leaves the generic labels in place for brands that fit them", () => {
         expect(routerGuide("tplink").forwardFields).toBeNull();
         expect(routerGuide("other").forwardFields).toBeNull();
+    });
+
+    it("says a ZTE saves the rule switched off, and an unknown brand might", () => {
+        // The rule is listed, every value in it is right, and no packet moves. There
+        // is nothing on the page to work that out from, so it has to be said.
+        expect(routerGuide("zte").forwardEnable).toMatch(/switched off/i);
+        expect(routerGuide("other").forwardEnable).toMatch(/Enable or Status/i);
+    });
+});
+
+describe("names the form will accept", () => {
+    const ranged = [
+        { name: "polaris-games-tcp", protocol: "TCP", port: 25565, endPort: 25664 },
+        { name: "polaris-games-udp", protocol: "UDP", port: 19132, endPort: 19231 }
+    ];
+
+    it("shortens the range rules to ZTE's 16-character name field", () => {
+        // 17 characters, and the form refuses the entry rather than trimming it: the
+        // page would otherwise print a value that cannot be typed into the router.
+        expect(routerGuide("zte").nameLimit).toBe(16);
+        expect(fitRuleNames(ranged, routerGuide("zte").nameLimit).map((rule) => rule.name)).toEqual([
+            "plr-games-tcp",
+            "plr-games-udp"
+        ]);
+    });
+
+    it("leaves every rule alone where the brand does not cap the name", () => {
+        expect(fitRuleNames(ranged, null)).toBe(ranged);
+        // Polaris's own two rules fit anywhere, so even a capped brand gets them
+        // verbatim - a name nobody has to shorten should not be shortened.
+        expect(
+            fitRuleNames([{ name: "polaris-https", protocol: "TCP", port: 443 }], 16).map((rule) => rule.name)
+        ).toEqual(["polaris-https"]);
+    });
+
+    it("keeps the port when it has to cut a per-port rule down", () => {
+        // The tail is what says which server and which rule this is; the middle is
+        // the part that can go.
+        const [fitted] = fitRuleNames([{ name: "game-old-world-7777", protocol: "TCP", port: 7777 }], 16);
+
+        expect(fitted?.name).toBe("game-old-wo-7777");
+        expect(fitted?.name.length).toBeLessThanOrEqual(16);
+    });
+
+    it("never hands two rules the same name", () => {
+        // A form that refuses a long name refuses a repeated one too, so trimming
+        // must not turn two rules into one.
+        const names = fitRuleNames(
+            [
+                { name: "game-alpha-one-25565", protocol: "TCP", port: 25565 },
+                { name: "game-alpha-two-25566", protocol: "TCP", port: 25566 },
+                { name: "game-alpha-six-25567", protocol: "TCP", port: 25567 }
+            ],
+            12
+        ).map((rule) => rule.name);
+
+        expect(new Set(names).size).toBe(3);
+        for (const name of names) expect(name.length).toBeLessThanOrEqual(12);
     });
 });
 

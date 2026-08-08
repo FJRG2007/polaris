@@ -23,6 +23,7 @@ import { CopyButton } from "@/components/copy-button";
 import { ChevronDown, ExternalLink } from "lucide-react";
 import {
     detectRouterBrand,
+    fitRuleNames,
     likelyGateway,
     routerGuide,
     FORWARD_RULES,
@@ -104,6 +105,10 @@ export function RouterSteps({
     const guide = routerGuide(brand);
     const gateway = likelyGateway(lanIp);
     const adminUrl = guide.admin ?? (gateway ? `http://${gateway}` : null);
+    // Named for the form in front of the operator rather than for Polaris: a brand
+    // whose Name field is too short to hold `polaris-games-tcp` gets it shortened
+    // here, so what the page shows is what the router will accept.
+    const named = fitRuleNames(rules, guide.nameLimit);
 
     return (
         <div className="flex flex-col gap-3">
@@ -223,7 +228,7 @@ export function RouterSteps({
                             </ol>
                         </li>
                         <li>
-                            Create {rules.length === 1 ? "one rule" : `these ${rules.length} rules`} in{" "}
+                            Create {named.length === 1 ? "one rule" : `these ${named.length} rules`} in{" "}
                             <b className="font-medium text-foreground">{guide.forwardPath}</b>, with exactly these
                             values
                             {guide.forwardSave ? (
@@ -239,7 +244,7 @@ export function RouterSteps({
                                     <thead>
                                         <tr className="text-muted-foreground">
                                             <th className="font-normal">Field</th>
-                                            {rules.map((rule, index) => (
+                                            {named.map((rule, index) => (
                                                 <th key={rule.name} className="font-normal">
                                                     Rule {index + 1}
                                                 </th>
@@ -250,7 +255,7 @@ export function RouterSteps({
                                         {(guide.forwardFields ?? GENERIC_FORWARD_FIELDS).map((field, index) => (
                                             <tr key={`${field.label}-${index}`}>
                                                 <td>{field.label}</td>
-                                                {rules.map((rule) => (
+                                                {named.map((rule) => (
                                                     <td key={rule.name}>
                                                         <ForwardValue field={field} rule={rule} lanIp={lanIp} />
                                                     </td>
@@ -267,6 +272,13 @@ export function RouterSteps({
                                 </p>
                             )}
                         </li>
+                        {/* A rule saved but left off is the failure with nothing to see:
+                            it is listed, its values are right, and no packet moves. */}
+                        {guide.forwardEnable && (
+                            <li>
+                                Switch {named.length === 1 ? "the rule" : "each rule"} on. {guide.forwardEnable}
+                            </li>
+                        )}
                         <li>Save, then run the DNS check again - it reports the moment the ports reach Polaris.</li>
                         <li>
                             Only if the router still answers after that: it is keeping the ports for its own admin

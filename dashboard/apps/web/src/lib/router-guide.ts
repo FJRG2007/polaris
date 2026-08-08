@@ -72,6 +72,12 @@ export interface RouterBrandGuide {
     readonly forwardFields: readonly RouterFormField[] | null;
     /** The control that commits a rule, when the brand names it something particular. */
     readonly forwardSave: string | null;
+    /** How long a rule's name may be, on a brand that caps it short enough to
+     *  refuse the names Polaris writes. Null leaves them as they are. */
+    readonly nameLimit: number | null;
+    /** What still has to be done for a saved rule to be in force, on a brand that
+     *  does not turn one on for you. */
+    readonly forwardEnable: string | null;
     /** Menu path to whatever is holding 80 and 443, when the brand has a usual one. */
     readonly remotePath: string | null;
     /** What is different about this brand, in the operator's way. */
@@ -146,6 +152,11 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             { label: "LAN Host Port", value: "portRange" }
         ],
         forwardSave: "Create New Item",
+        // The Name field is capped at 16 characters and the form refuses anything
+        // longer outright, so `polaris-games-tcp` cannot be typed at all.
+        nameLimit: 16,
+        forwardEnable:
+            "The rule is created switched off. Set it to on in the list of rules once it is saved, or the ports stay closed behind a rule that looks right.",
         remotePath: "Management & Diagnosis > Remote management (some builds keep it under Internet > Security > Access control)",
         caution:
             "ZTE firmware supplied by an ISP reserves 80, 443, 21 and 7547 for its own management and refuses to forward them. If the form rejects the rule, the ports cannot be opened on this router - publish Polaris through a tunnel instead, under Advanced below."
@@ -168,6 +179,8 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         forwardPath: "Forward Rules > Port Mapping Configuration, with Type set to Custom",
         forwardFields: null,
         forwardSave: null,
+        nameLimit: null,
+        forwardEnable: null,
         remotePath: "Security > ACL Rules, which is what usually publishes the admin page on the WAN side",
         caution: null
     },
@@ -190,6 +203,8 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         forwardPath: "Advanced > NAT Forwarding > Virtual Servers > Add",
         forwardFields: null,
         forwardSave: null,
+        nameLimit: null,
+        forwardEnable: null,
         remotePath: "Advanced > System Tools > Administration > Remote Management",
         caution: null
     },
@@ -212,6 +227,8 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         forwardPath: "WAN > Virtual Server / Port Forwarding, with Enable Port Forwarding set to Yes",
         forwardFields: null,
         forwardSave: null,
+        nameLimit: null,
+        forwardEnable: null,
         remotePath: "Administration > System > Enable Web Access from WAN",
         caution: null
     },
@@ -228,6 +245,8 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         forwardPath: "Internet > Permit Access > Port Sharing > Add Device for Sharing",
         forwardFields: null,
         forwardSave: null,
+        nameLimit: null,
+        forwardEnable: null,
         remotePath: "Internet > Permit Access > FRITZ!Box Services",
         caution:
             "It shares ports per device: pick this server, then add one sharing for 80 and one for 443. Turn on the advanced view if the menu is not there."
@@ -251,6 +270,8 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         forwardPath: "ADVANCED > Advanced Setup > Port Forwarding / Port Triggering > Add Custom Service",
         forwardFields: null,
         forwardSave: null,
+        nameLimit: null,
+        forwardEnable: null,
         remotePath: "ADVANCED > Advanced Setup > Remote Management",
         caution: null
     },
@@ -267,6 +288,8 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         forwardPath: "IP > Firewall > NAT > Add, chain dstnat",
         forwardFields: null,
         forwardSave: null,
+        nameLimit: null,
+        forwardEnable: null,
         remotePath: "IP > Services, where the www and www-ssl services hold 80 and 443",
         caution:
             "The form is not a port-forward form: set chain=dstnat, protocol=tcp, dst-port=80,443, in-interface to the WAN interface, then action=dst-nat with to-addresses set to this server."
@@ -290,6 +313,11 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             "Look for Port forwarding, Virtual server, NAT/PAT or Applications & Gaming - the same form under four different names.",
         forwardFields: null,
         forwardSave: null,
+        nameLimit: null,
+        // Said for every unknown brand because it is the failure with nothing to
+        // see: the rule is listed, its values are right, and it does nothing.
+        forwardEnable:
+            "If the rule has an Enable or Status switch, turn it on - some firmware saves a new rule switched off.",
         remotePath: "Look for Remote management, Web access from WAN or Remote administration.",
         caution: null
     }
@@ -387,6 +415,52 @@ export function gameForwardRules(
         }
     }
     return rules;
+}
+
+/**
+ * The same rules, named so this brand's form will take them.
+ *
+ * ZTE caps the Name field at 16 characters and refuses the entry outright, so
+ * `polaris-games-tcp` is a value the page can print and the operator cannot type -
+ * and a form rejecting the thing they were told to enter leaves them with nothing
+ * to go on. What identifies a rule is kept: `polaris` collapses to `plr`, and a
+ * name still too long loses its middle rather than its tail, which carries the
+ * port or the transport. Names stay distinct within the set, since a form that
+ * refuses a long name refuses a repeated one too.
+ */
+export function fitRuleNames(
+    rules: readonly RouterForwardRule[],
+    limit: number | null
+): readonly RouterForwardRule[] {
+    if (limit === null || rules.every((rule) => rule.name.length <= limit)) return rules;
+    const taken = new Set<string>();
+    return rules.map((rule) => {
+        const name = distinct(shortenName(rule.name, limit), limit, taken);
+        taken.add(name);
+        return name === rule.name ? rule : { ...rule, name };
+    });
+}
+
+/** A name within `limit`, dropping the least identifying part of it first. */
+function shortenName(name: string, limit: number): string {
+    if (name.length <= limit) return name;
+    const short = name.startsWith("polaris-") ? `plr-${name.slice("polaris-".length)}` : name;
+    if (short.length <= limit) return short;
+    const cut = short.lastIndexOf("-");
+    const tail = cut > 0 ? short.slice(cut) : "";
+    if (tail.length >= limit) return short.slice(0, limit);
+    return `${short.slice(0, cut).slice(0, limit - tail.length).replace(/-+$/, "")}${tail}`;
+}
+
+/** A name no other rule in the set has taken, numbered when trimming collided. */
+function distinct(name: string, limit: number, taken: ReadonlySet<string>): string {
+    if (!taken.has(name)) return name;
+    for (let n = 2; n < 100; n += 1) {
+        const suffix = String(n);
+        const candidate = `${name.slice(0, Math.max(0, limit - suffix.length))}${suffix}`;
+        if (!taken.has(candidate)) return candidate;
+    }
+    return name;
 }
 
 /**
