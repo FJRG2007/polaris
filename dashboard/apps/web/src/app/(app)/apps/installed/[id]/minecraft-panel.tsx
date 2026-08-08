@@ -10,18 +10,25 @@
  * settings, whether it is meant to be running) and fills the live parts in as the
  * server answers, because a server that is still generating a world can take a
  * minute to say anything at all.
+ *
+ * Each screen is a real path (`.../console`), so reloading while reading the
+ * console lands back on the console rather than on the overview. Switching writes
+ * the URL through the history API rather than navigating, because the panel holds
+ * a live poll of the server: a navigation would tear it down and every screen
+ * would open on skeletons it already had the answers for.
  */
 
 import Link from "next/link";
-import type { GameContext } from "./page";
-import { useRouter } from "next/navigation";
 import { MinecraftMods } from "./minecraft-mods";
+import type { GameContext } from "./game-context";
 import { MinecraftDomain } from "./minecraft-domain";
 import { CopyButton } from "@/components/copy-button";
 import { saveWorldAction } from "./minecraft-actions";
 import { MinecraftConsole } from "./minecraft-console";
 import { MinecraftPlayers } from "./minecraft-players";
+import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
+import { GAME_TABS, gameTabHref, isGameTab } from "./tabs";
 import { MinecraftAppearance } from "./minecraft-appearance";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
@@ -31,14 +38,6 @@ import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import { FolderOpen, Loader2, Save, ShieldAlert, UserPlus } from "lucide-react";
 import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
 
-const TABS = [
-    { id: "overview", label: "Overview" },
-    { id: "console", label: "Console" },
-    { id: "players", label: "Players" },
-    { id: "mods", label: "Mods" },
-    { id: "settings", label: "Settings" }
-] as const;
-
 /** Mods are managed on their own screen, so their variables are not repeated as
  *  raw fields on Settings. */
 const MODS_GROUP = "Mods";
@@ -47,8 +46,6 @@ const MODS_GROUP = "Mods";
  *  centring - so it is not also offered as a raw text field two cards below, where
  *  the two would quietly disagree about what the server is running on. */
 const MOTD_KEY = "MOTD";
-
-type TabId = (typeof TABS)[number]["id"];
 
 const POLL_MS = 5000;
 
@@ -83,7 +80,21 @@ export function MinecraftPanel({
     game: GameContext | null;
 }) {
     const router = useRouter();
-    const [tab, setTab] = useState<TabId>("overview");
+    const pathname = usePathname();
+    // The screen the URL names. Read from the path rather than held in state, so a
+    // reload, a shared link and the browser's back button all agree with the tabs.
+    const tab = useMemo(() => {
+        const base = `/apps/installed/${installedAppId}`;
+        const slug = pathname.startsWith(base) ? pathname.slice(base.length).replace(/^\//, "") : "";
+        return isGameTab(slug) ? slug : "";
+    }, [pathname, installedAppId]);
+    const openTab = useCallback(
+        (slug: string) => {
+            if (slug === tab) return;
+            window.history.pushState(null, "", gameTabHref(installedAppId, slug));
+        },
+        [installedAppId, tab]
+    );
     const [reading, setReading] = useState<ServerReading>({
         status: null,
         reach: null,
@@ -157,30 +168,38 @@ export function MinecraftPanel({
                 applicationId={applicationId}
                 reach={reading.reach ?? game?.reach ?? null}
                 access={reading.access}
-                onOpenPlayers={() => setTab("players")}
+                onOpenPlayers={() => openTab("players")}
             />
 
             {error && <p className="text-sm text-danger">{error}</p>}
 
-            <div className="no-scrollbar flex items-center gap-1 overflow-x-auto border-b border-border/60 text-sm">
-                {TABS.map((entry) => (
-                    <button
-                        key={entry.id}
-                        type="button"
-                        onClick={() => setTab(entry.id)}
+            <nav className="no-scrollbar flex items-center gap-1 overflow-x-auto border-b border-border/60 text-sm">
+                {GAME_TABS.map((entry) => (
+                    // A real href, so a screen can be middle-clicked, opened in a
+                    // new tab and copied; the plain click is taken over to keep the
+                    // panel's poll alive across the switch.
+                    <a
+                        key={entry.slug}
+                        href={gameTabHref(installedAppId, entry.slug)}
+                        aria-current={tab === entry.slug ? "page" : undefined}
+                        onClick={(event) => {
+                            if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+                            event.preventDefault();
+                            openTab(entry.slug);
+                        }}
                         className={cn(
                             "-mb-px whitespace-nowrap border-b-2 px-3 py-2 transition-colors",
-                            tab === entry.id
+                            tab === entry.slug
                                 ? "border-primary text-foreground"
                                 : "border-transparent text-muted-foreground hover:text-foreground"
                         )}
                     >
                         {entry.label}
-                    </button>
+                    </a>
                 ))}
-            </div>
+            </nav>
 
-            {tab === "overview" && <OverviewTab status={status} settings={settings} onOpenPlayers={() => setTab("players")} />}
+            {tab === "" && <OverviewTab status={status} settings={settings} onOpenPlayers={() => openTab("players")} />}
             {tab === "console" && (
                 <MinecraftConsole installedAppId={installedAppId} applicationId={applicationId} running={running} />
             )}

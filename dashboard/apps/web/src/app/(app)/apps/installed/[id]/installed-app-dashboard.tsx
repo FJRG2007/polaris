@@ -9,33 +9,21 @@
  */
 
 import Link from "next/link";
-import type { GameContext } from "./page";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import type { GameContext } from "./game-context";
 import { useRuntimeLog } from "./use-runtime-log";
 import { MinecraftPanel } from "./minecraft-panel";
 import { LogViewer } from "@/components/log-viewer";
 import { MessagingBridgePanel } from "./messaging-bridge-panel";
 import type { InstalledAppDetail, InstalledAppSetting } from "@/lib/apps/install-service";
-import { ArrowLeft, ChevronDown, ChevronRight, Loader2, Play, RefreshCw, Square, Trash2 } from "lucide-react";
+import { Badge, Button, Card, CardBody, ConfirmDeleteDialog, PageHeader, cn } from "@polaris/ui";
+import { ArrowLeft, ChevronDown, ChevronRight, Play, RefreshCw, Square, Trash2 } from "lucide-react";
 import {
     redeployInstalledAppAction,
     setInstalledAppRunningAction,
     uninstallInstalledAppAction
 } from "./actions";
-import {
-    Badge,
-    Button,
-    Card,
-    CardBody,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    PageHeader,
-    cn
-} from "@polaris/ui";
 
 const STATUS_LABEL: Record<string, string> = {
     installing: "Installing",
@@ -111,6 +99,9 @@ export function InstalledAppDashboard({
     const [pending, startTransition] = useTransition();
     const [confirmingUninstall, setConfirmingUninstall] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // Kept apart from the page's error: a refusal to uninstall belongs in the
+    // dialog that asked, not behind it on a page the reader has stopped looking at.
+    const [uninstallError, setUninstallError] = useState<string | null>(null);
 
     const running = app.applicationStatus === "running";
     const applicationId = app.applicationId;
@@ -220,40 +211,26 @@ export function InstalledAppDashboard({
                 </CardBody>
             </Card>
 
-            <Dialog open={confirmingUninstall} onOpenChange={setConfirmingUninstall}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Uninstall {app.name}?</DialogTitle>
-                        <DialogDescription>
-                            This tears down its container and removes it from your apps. Data on server-local volumes is
-                            lost; data on a NAS mount is kept.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="flex justify-end gap-2">
-                        <Button variant="ghost" onClick={() => setConfirmingUninstall(false)} disabled={pending}>
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="danger"
-                            onClick={() =>
-                                startTransition(async () => {
-                                    const result = await uninstallInstalledAppAction(app.id);
-                                    if (result.error) {
-                                        setError(result.error);
-                                        setConfirmingUninstall(false);
-                                        return;
-                                    }
-                                    router.push(backHref);
-                                })
-                            }
-                            disabled={pending}
-                        >
-                            {pending && <Loader2 className="size-4 animate-spin" />}
-                            Uninstall
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <ConfirmDeleteDialog
+                open={confirmingUninstall}
+                onOpenChange={(open) => !pending && setConfirmingUninstall(open)}
+                name={app.name}
+                kind="app"
+                confirmLabel="Uninstall"
+                description="This tears down its container and removes it from your apps. Data on server-local volumes is lost; data on a NAS mount is kept."
+                error={uninstallError}
+                pending={pending}
+                onConfirm={() =>
+                    startTransition(async () => {
+                        const result = await uninstallInstalledAppAction(app.id);
+                        if (result.error) {
+                            setUninstallError(result.error);
+                            return;
+                        }
+                        router.push(backHref);
+                    })
+                }
+            />
         </div>
     );
 }
