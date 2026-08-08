@@ -11,6 +11,7 @@
  */
 
 import { useRouter } from "next/navigation";
+import { isSeed } from "@/lib/apps/minecraft/world";
 import { createGameServerSchema } from "@/lib/apps/games-schema";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
@@ -40,6 +41,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
     const [blueprintId, setBlueprintId] = useState("survival");
     const [software, setSoftware] = useState("PAPER");
     const [version, setVersion] = useState("LATEST");
+    const [seed, setSeed] = useState("");
     const [serverId, setServerId] = useState("local");
     const [maxPlayers, setMaxPlayers] = useState(20);
     const [concurrentPlayers, setConcurrentPlayers] = useState(8);
@@ -85,8 +87,13 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
               : "3 to 16 letters, digits or underscores";
     const addressError =
         ownerAddress.trim().length === 0 || isAddressRule(ownerAddress) ? null : "That is not an address or a range";
+    const seedError =
+        seed.trim().length === 0 || isSeed(seed.trim()) ? null : "A seed is up to 64 characters of ordinary text";
     const ready =
-        name.trim().length > 0 && isPlayerName(edition, ownerPlayer) && isAddressRule(ownerAddress);
+        name.trim().length > 0 &&
+        isPlayerName(edition, ownerPlayer) &&
+        isAddressRule(ownerAddress) &&
+        seedError === null;
 
     const label = (subdomain.trim() || name.trim() || "server")
         .toLowerCase()
@@ -105,6 +112,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
             blueprintId,
             software: edition === "java" ? software : undefined,
             version: version.trim() || "LATEST",
+            seed: seed.trim() || undefined,
             serverId,
             maxPlayers,
             concurrentPlayers,
@@ -207,6 +215,19 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                             <span className="text-xs text-muted-foreground">LATEST, or pin one like 1.21.4.</span>
                         </label>
                     </div>
+
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">World seed</span>
+                        <Input
+                            value={seed}
+                            onChange={(event) => setSeed(event.target.value)}
+                            placeholder="Leave blank for a random world"
+                        />
+                        <span className={cn("text-xs", seedError ? "text-danger" : "text-muted-foreground")}>
+                            {seedError ??
+                                "A number or any words. The same seed generates the same map - you can start another one from a different seed later."}
+                        </span>
+                    </label>
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <label className="flex flex-col gap-1 text-sm">

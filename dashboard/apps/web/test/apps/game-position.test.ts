@@ -23,6 +23,14 @@ describe("parsePosition", () => {
     it("is null when the reply was cut off before the list closed", () => {
         expect(parsePosition("Alice has the following entity data: [123.4d, 64.0d,")).toBeNull();
     });
+
+    it("reads the coordinates past anything the client printed before the reply", () => {
+        const reply = [
+            "2026/08/08 21:45:30 [WARN] connection reset, retrying",
+            "Alice has the following entity data: [1.0d, 2.0d, 3.0d]"
+        ].join("\n");
+        expect(parsePosition(reply)).toEqual({ x: 1, y: 2, z: 3 });
+    });
 });
 
 describe("parseDimension", () => {
@@ -38,6 +46,18 @@ describe("parseDimension", () => {
     it("is null when nothing namespaced came back", () => {
         expect(parseDimension("No entity was found")).toBeNull();
         expect(parseDimension("Alice has the following entity data: 12")).toBeNull();
+    });
+
+    it("does not read a clock time in a log line as a world", () => {
+        expect(parseDimension("2026/08/08 21:45:30 [WARN] connection reset")).toBeNull();
+    });
+
+    it("reads the world past a line the client printed first", () => {
+        const reply = [
+            "2026/08/08 21:45:30 [WARN] connection reset, retrying",
+            'Alice has the following entity data: "minecraft:the_end"'
+        ].join("\n");
+        expect(parseDimension(reply)).toBe("minecraft:the_end");
     });
 });
 

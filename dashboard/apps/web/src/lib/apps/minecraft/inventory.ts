@@ -9,7 +9,7 @@
  * else in an entry is stepped over rather than modelled.
  */
 
-import { readBalanced, readInt, splitTopLevel, topLevelColon, unquote } from "./snbt";
+import { dataReplyValue, readFirstAccepted, readInt, splitTopLevel, topLevelColon, unquote } from "./snbt";
 
 /** One stack, as the server reported it. */
 export interface InventoryItem {
@@ -70,16 +70,16 @@ function range(start: number, length: number): number[] {
  * and "could not be read" that the panel does not already say.
  */
 export function parseInventory(output: string): InventoryItem[] {
-    const start = output.indexOf("[");
-    if (start === -1) return [];
-    const list = readBalanced(output, start);
-    if (list === null) return [];
-    const items: InventoryItem[] = [];
-    for (const entry of splitTopLevel(list.slice(1, -1))) {
-        const item = readItem(entry);
-        if (item) items.push(item);
-    }
-    return items.sort((left, right) => left.slot - right.slot);
+    return (
+        readFirstAccepted(dataReplyValue(output), "[", (list) => {
+            const items = splitTopLevel(list.slice(1, -1)).flatMap((entry) => readItem(entry) ?? []);
+            // A list with nothing in it is not this list: an inventory reply that
+            // parses to no items is either genuinely empty - in which case an empty
+            // answer is right anyway - or it was never the inventory, and the next
+            // bracket along still might be.
+            return items.length > 0 ? items.sort((left, right) => left.slot - right.slot) : null;
+        }) ?? []
+    );
 }
 
 /** One `{Slot: 0b, id: "minecraft:stone", count: 64}` entry, if it is one. */

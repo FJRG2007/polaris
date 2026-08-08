@@ -55,6 +55,22 @@ describe("parseInventory", () => {
     it("does not invent items from a reply that was cut off", () => {
         expect(parseInventory('A has: [{Slot: 0b, id: "minecraft:stone", Count: 1b}')).toEqual([]);
     });
+
+    it("reads the bag past anything the client printed before the reply", () => {
+        // What comes back from the container is the command's output and its
+        // diagnostics together. Taking the first bracket takes "[WARN]" and reports
+        // a full inventory as an empty one.
+        const reply = [
+            "2026/08/08 21:45:30 [WARN] connection reset, retrying",
+            'Alice has the following entity data: [{Slot: 0b, id: "minecraft:stone", Count: 64b}]'
+        ].join("\n");
+        expect(parseInventory(reply)).toEqual([{ slot: 0, id: "minecraft:stone", count: 64 }]);
+    });
+
+    it("skips a bracket that holds no stack and keeps looking", () => {
+        const reply = 'Alice has the following entity data: [] [{Slot: 2b, id: "minecraft:torch", Count: 3b}]';
+        expect(parseInventory(reply)).toEqual([{ slot: 2, id: "minecraft:torch", count: 3 }]);
+    });
 });
 
 describe("slotLabel", () => {

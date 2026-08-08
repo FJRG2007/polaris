@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { isSeed } from "@/lib/apps/minecraft/world";
 import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
 
 export const createGameServerSchema = z
@@ -23,6 +24,9 @@ export const createGameServerSchema = z
         /** Java only: PAPER, FABRIC, ... The blueprint may pin it. */
         software: z.string().trim().max(32).optional(),
         version: z.string().trim().max(32).default("LATEST"),
+        /** The world to generate. Any text: a number is used as itself, anything
+         *  else is hashed. Blank is a random world. */
+        seed: z.string().trim().max(64).optional(),
         /** "local" or a connected server's id. */
         serverId: z.string().trim().min(1),
         /** Slots. What the server refuses past, not what it plans for. */
@@ -48,6 +52,13 @@ export const createGameServerSchema = z
                 code: z.ZodIssueCode.custom,
                 path: ["ownerAddress"],
                 message: "Give one address, a range like 203.0.113.0/24, or \"any\""
+            });
+        }
+        if (value.seed !== undefined && value.seed.length > 0 && !isSeed(value.seed)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["seed"],
+                message: "A seed is up to 64 characters of ordinary text"
             });
         }
         if (value.concurrentPlayers > value.maxPlayers) {

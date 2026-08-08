@@ -85,6 +85,66 @@ export function topLevelColon(field: string): number {
     return -1;
 }
 
+/**
+ * What the server wrapped its answer in: `<name> has the following entity data:`.
+ *
+ * Vanilla, Paper and Spigot all say it, for entities, blocks and storage alike.
+ */
+const DATA_PREAMBLE = /has the following [a-z ]*data:\s*/i;
+
+/**
+ * The value out of a `data get` reply, without the sentence around it.
+ *
+ * The reply does not arrive alone. What comes back from the container is the
+ * command's output and its diagnostics together, so a line the client printed
+ * first - a connection warning, a timestamped log line - sits in front of the
+ * answer. A reader that took the first bracket in all of that would take
+ * `[WARN]` and report a full bag as empty, which is worse than failing: it is a
+ * confident wrong answer about whether somebody is carrying something.
+ *
+ * Anchoring on the sentence the server itself writes is what makes the value
+ * findable no matter what was printed before it.
+ */
+export function dataReplyValue(output: string): string {
+    const match = DATA_PREAMBLE.exec(output);
+    return match ? output.slice(match.index + match[0].length) : output;
+}
+
+/**
+ * Whether the server answered the question at all.
+ *
+ * The difference between "the bag is empty" and "that was not an answer" is
+ * invisible once both have been read into no items, and they are not the same
+ * thing to say to somebody checking whether a player is carrying something. This
+ * is what lets a reader tell them apart before it reports either.
+ */
+export function isDataReply(output: string): boolean {
+    return DATA_PREAMBLE.test(output);
+}
+
+/**
+ * The first balanced span in `text` that a reader accepts.
+ *
+ * Every opening bracket is tried in turn rather than only the first, because the
+ * first one may belong to something that was never the answer - and a span that
+ * parses to nothing is indistinguishable, to the reader, from an answer that was
+ * genuinely empty. Whoever knows what a real answer looks like decides, by
+ * returning null for one that is not.
+ */
+export function readFirstAccepted<T>(
+    text: string,
+    bracket: "[" | "{",
+    read: (span: string) => T | null
+): T | null {
+    for (let index = text.indexOf(bracket); index !== -1; index = text.indexOf(bracket, index + 1)) {
+        const span = readBalanced(text, index);
+        if (span === null) continue;
+        const value = read(span);
+        if (value !== null) return value;
+    }
+    return null;
+}
+
 /** A string with its quotes and escapes taken off, or the bare token unchanged. */
 export function unquote(value: string): string {
     const trimmed = value.trim();

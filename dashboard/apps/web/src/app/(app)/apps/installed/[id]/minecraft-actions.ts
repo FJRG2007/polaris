@@ -15,6 +15,7 @@ import { clientIp } from "@/lib/request-context";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { setEnvVars } from "@/lib/env-var-service";
+import { isDataReply } from "@/lib/apps/minecraft/snbt";
 import { deployApplication } from "@/lib/deploy-service";
 import { getInstalledApp } from "@/lib/apps/install-service";
 import { ITEM_ID_PATTERN } from "@/lib/apps/minecraft/items";
@@ -23,6 +24,7 @@ import { setGameHostname } from "@/lib/apps/minecraft/address";
 import { patchInstallConfig } from "@/lib/apps/install-config";
 import { writeContainerFile } from "@/lib/container-files-service";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/minecraft/timeout";
+import { isBackupName, isLevelName } from "@/lib/apps/minecraft/world";
 import { setGameSchedule } from "@/lib/apps/minecraft/schedule-service";
 import { findApp, isAllowedEnvValue, tunableEnvVars } from "@/lib/apps/catalog";
 import { liftTimeout, timeoutPlayer } from "@/lib/apps/minecraft/timeout-service";
@@ -30,6 +32,14 @@ import { parseInventory, type InventoryItem } from "@/lib/apps/minecraft/invento
 import { parseDimension, parsePosition, type PlayerPosition } from "@/lib/apps/minecraft/position";
 import { applyFirewallBans, runConsoleLine, runServerCommand } from "@/lib/apps/minecraft/service";
 import { MAX_IDLE_MINUTES, MIN_IDLE_MINUTES, type GameSchedule } from "@/lib/apps/minecraft/schedule";
+import {
+    createWorldBackup,
+    deleteLevel,
+    deleteWorldBackup,
+    newWorld,
+    restoreWorldBackup,
+    switchLevel
+} from "@/lib/apps/minecraft/world-service";
 import {
     grantPlayerAccess,
     listPlayerAccess,
@@ -218,7 +228,21 @@ export async function readPlayerInventoryAction(
             parsed.data.player,
             "Inventory"
         ]);
-        return { items: parseInventory(stripFormatting(output)) };
+        const text = stripFormatting(output);
+        const items = parseInventory(text);
+        // An empty bag and a reply that was never an inventory both read as no
+        // items, and they are not the same thing to tell somebody checking what a
+        // player is carrying. Only the server's own sentence proves it answered,
+        // so without it the reader is shown what it actually said instead.
+        if (items.length === 0 && !isDataReply(text)) {
+            const said = text.trim().replace(/\s+/g, " ").slice(0, 160);
+            return {
+                error: said
+                    ? `The server did not answer with an inventory: ${said}`
+                    : "The server did not answer - the player has to be on the server"
+            };
+        }
+        return { items };
     } catch (caught) {
         return {
             error:
@@ -681,6 +705,170 @@ export async function saveWorldAction(installedAppId: string): Promise<{ output?
         return { output: output.trim() };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not save the world" };
+    }
+}
+
+/**
+ * The map, and the copies of it.
+ *
+ * All of these are the manage grant rather than the moderator one, backing up
+ * included: every one of them writes into the world volume, and a restore or a
+ * new world decides which map the server comes back on. Each is recorded for the
+ * same reason - replacing the map is the least reversible thing this panel can
+ * do to a server people have built on.
+ */
+
+const worldNameSchema = z.object({
+    installedAppId: z.string().uuid(),
+    /** A level as it is named on disk. Re-checked in the service against the same
+     *  rule, since this decides a path inside the container. */
+    level: z.string().trim().min(1).max(64).refine(isLevelName, "That is not a world on this server")
+});
+
+const backupNameSchema = z.object({
+    installedAppId: z.string().uuid(),
+    name: z.string().trim().min(1).max(64).refine(isBackupName, "That is not a backup of this server")
+});
+
+const newWorldSchema = z.object({
+    installedAppId: z.string().uuid(),
+    /** Blank generates a random world. */
+    seed: z.string().trim().max(64).optional(),
+    /** Java only: carry every player's bag, stats and advancements across. */
+    keepPlayers: z.boolean().default(false)
+});
+
+export type NewWorldInput = z.infer<typeof newWorldSchema>;
+
+/** Copy the world into an archive on the server. */
+export async function backUpWorldAction(installedAppId: string): Promise<{ name?: string; error?: string }> {
+    const user = await requirePermission("games.manage");
+    try {
+        const backup = await createWorldBackup(user.id, installedAppId);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.world-backup",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { name: backup.name, bytes: backup.sizeBytes }
+        });
+        return { name: backup.name };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not back up the world" };
+    }
+}
+
+/** Take an archive off the server. */
+export async function deleteWorldBackupAction(installedAppId: string, name: string): Promise<{ error?: string }> {
+    const user = await requirePermission("games.manage");
+    const parsed = backupNameSchema.safeParse({ installedAppId, name });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a backup of this server" };
+    try {
+        await deleteWorldBackup(user.id, parsed.data.installedAppId, parsed.data.name);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.world-backup-delete",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { name: parsed.data.name }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not delete the backup" };
+    }
+}
+
+/** Put an archived world back and restart onto it. The map it was on stays. */
+export async function restoreWorldBackupAction(
+    installedAppId: string,
+    name: string
+): Promise<{ level?: string; error?: string }> {
+    const user = await requirePermission("games.manage");
+    const parsed = backupNameSchema.safeParse({ installedAppId, name });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a backup of this server" };
+    try {
+        const restored = await restoreWorldBackup(user.id, parsed.data.installedAppId, parsed.data.name, user.id);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.world-restore",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { name: parsed.data.name, level: restored.level }
+        });
+        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        return { level: restored.level };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not restore that backup" };
+    }
+}
+
+/** Generate a new map, optionally carrying what every player is holding. */
+export async function newWorldAction(input: NewWorldInput): Promise<{ level?: string; carried?: boolean; error?: string }> {
+    const user = await requirePermission("games.manage");
+    const parsed = newWorldSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        const created = await newWorld(
+            user.id,
+            parsed.data.installedAppId,
+            {
+                ...(parsed.data.seed ? { seed: parsed.data.seed } : {}),
+                keepPlayers: parsed.data.keepPlayers
+            },
+            user.id
+        );
+        await recordAudit({
+            actorId: user.id,
+            action: "games.world-new",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { level: created.level, seeded: Boolean(parsed.data.seed), keptPlayers: created.carried }
+        });
+        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        return { level: created.level, carried: created.carried };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not start a new world" };
+    }
+}
+
+/** Boot the server onto a map it already has. */
+export async function switchWorldAction(installedAppId: string, level: string): Promise<{ error?: string }> {
+    const user = await requirePermission("games.manage");
+    const parsed = worldNameSchema.safeParse({ installedAppId, level });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a world on this server" };
+    try {
+        await switchLevel(user.id, parsed.data.installedAppId, parsed.data.level, user.id);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.world-switch",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { level: parsed.data.level }
+        });
+        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not switch world" };
+    }
+}
+
+/** Delete a map the server is not on. */
+export async function deleteWorldAction(installedAppId: string, level: string): Promise<{ error?: string }> {
+    const user = await requirePermission("games.manage");
+    const parsed = worldNameSchema.safeParse({ installedAppId, level });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a world on this server" };
+    try {
+        await deleteLevel(user.id, parsed.data.installedAppId, parsed.data.level);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.world-delete",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { level: parsed.data.level }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not delete that world" };
     }
 }
 

@@ -1,21 +1,40 @@
 "use client";
 
 /**
- * Backups app view. The Polaris database target is live: take a gzipped logical
- * backup, then download or delete it. NAS and other-app targets are shown as
- * upcoming so the platform's direction is visible, matching how the locked apps
- * appear in the switcher.
+ * Backups app view. Two targets are live: the Polaris database, as a gzipped
+ * logical backup taken here, and every Minecraft world, as an archive taken
+ * inside the server that runs it. NAS and other-app targets are shown as upcoming
+ * so the platform's direction is visible, matching how the locked apps appear in
+ * the switcher.
+ *
+ * The game cards are the server's own, imported rather than rebuilt: this page
+ * and the server's World screen have to agree about what is on disk, and two
+ * lists of the same archives would eventually not.
  */
 
+import Link from "next/link";
 import { useState } from "react";
 import { formatBytes } from "@polaris/core";
 import type { BackupInfo } from "@/lib/backup-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { createBackupAction, deleteBackupAction } from "./actions";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
-import { Boxes, Database, Download, HardDriveDownload, Server, Trash2 } from "lucide-react";
+import { Boxes, Database, Download, Gamepad2, HardDriveDownload, Server, Trash2 } from "lucide-react";
+import { GameServerBackups, WorldMessage, useWorldView } from "@/app/(app)/apps/installed/[id]/minecraft-world";
 
-export function BackupsView({ initialBackups }: { initialBackups: BackupInfo[] }) {
+/** A game server there is a world to back up on. */
+export interface BackupGameServer {
+    readonly id: string;
+    readonly name: string;
+}
+
+export function BackupsView({
+    initialBackups,
+    servers
+}: {
+    initialBackups: BackupInfo[];
+    servers: BackupGameServer[];
+}) {
     const format = useDisplayFormat();
     const [backups, setBackups] = useState(initialBackups);
     const [backingUp, setBackingUp] = useState(false);
@@ -109,6 +128,18 @@ export function BackupsView({ initialBackups }: { initialBackups: BackupInfo[] }
                 </CardBody>
             </Card>
 
+            {servers.length > 0 && (
+                <div className="flex flex-col gap-4">
+                    <div className="flex items-center gap-2">
+                        <Gamepad2 className="size-4 text-muted-foreground" />
+                        <h2 className="text-sm font-medium">Game worlds</h2>
+                    </div>
+                    {servers.map((server) => (
+                        <GameServerCard key={server.id} id={server.id} name={server.name} />
+                    ))}
+                </div>
+            )}
+
             <div className="grid gap-4 sm:grid-cols-2">
                 <UpcomingTarget
                     icon={Server}
@@ -121,6 +152,31 @@ export function BackupsView({ initialBackups }: { initialBackups: BackupInfo[] }
                     description="Back up data from other Polaris apps as they land."
                 />
             </div>
+        </div>
+    );
+}
+
+/**
+ * One game server's worlds, on the page that manages every backup.
+ *
+ * The card is the same one the server's own screen shows, so backing up here and
+ * backing up there are the same act rather than two that drift. It loads its own
+ * view because measuring a world walks the whole folder: doing that for four
+ * servers before the page rendered would hold the database backups - the thing
+ * most people opened this page for - behind them.
+ */
+function GameServerCard({ id, name }: { id: string; name: string }) {
+    const { view, reload } = useWorldView(id);
+    return (
+        <div className="flex flex-col gap-1">
+            <WorldMessage view={view} />
+            <GameServerBackups installedAppId={id} serverName={name} view={view} onChanged={reload} heading={name} />
+            <Link
+                href={`/apps/installed/${id}/world`}
+                className="self-end text-xs text-muted-foreground hover:text-foreground"
+            >
+                Open {name}
+            </Link>
         </div>
     );
 }

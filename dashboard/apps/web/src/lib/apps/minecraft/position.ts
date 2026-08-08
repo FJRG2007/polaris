@@ -9,7 +9,7 @@
  * whole entity: hundreds of lines through RCON to learn three numbers.
  */
 
-import { readBalanced, readFloat, splitTopLevel, unquote } from "./snbt";
+import { dataReplyValue, readFirstAccepted, readFloat, splitTopLevel, unquote } from "./snbt";
 
 /** Where somebody is, as the server has it. */
 export interface PlayerPosition {
@@ -38,26 +38,32 @@ const DIMENSIONS: Readonly<Record<string, string>> = {
  * standing, so it must never be what "we do not know" looks like.
  */
 export function parsePosition(output: string): { x: number; y: number; z: number } | null {
-    const start = output.indexOf("[");
-    if (start === -1) return null;
-    const list = readBalanced(output, start);
-    if (list === null) return null;
-    const values = splitTopLevel(list.slice(1, -1)).map((part) => readFloat(part));
-    if (values.length !== 3) return null;
-    const [x, y, z] = values;
-    if (typeof x !== "number" || typeof y !== "number" || typeof z !== "number") return null;
-    return { x, y, z };
+    // Every bracket is tried, not only the first: what comes back from the
+    // container is the reply and whatever the client printed before it, and a log
+    // line with a bracket in it would otherwise be read as the coordinates.
+    return readFirstAccepted(dataReplyValue(output), "[", (list) => {
+        const values = splitTopLevel(list.slice(1, -1)).map((part) => readFloat(part));
+        if (values.length !== 3) return null;
+        const [x, y, z] = values;
+        if (typeof x !== "number" || typeof y !== "number" || typeof z !== "number") return null;
+        return { x, y, z };
+    });
 }
+
+/** A namespaced id, whose namespace has to start with a letter - so a clock time
+ *  in a log line printed before the reply is never read as a dimension. */
+const DIMENSION_ID = /^[a-z][a-z0-9_.-]*:[a-z0-9_./-]+$/;
 
 /** The world in a `data get entity ... Dimension` reply, or null. */
 export function parseDimension(output: string): string | null {
-    const colon = output.indexOf(":");
-    if (colon === -1) return null;
     // The reply is `<name> has the following entity data: "minecraft:overworld"`,
-    // so the value is whatever follows the sentence's own colon - and the id
-    // inside it carries a second one, which is why this splits on the first only.
-    const value = unquote(output.slice(colon + 1).trim());
-    return /^[a-z0-9_.-]+:[a-z0-9_./-]+$/.test(value) ? value : null;
+    // so the value is what follows that sentence.
+    const value = unquote(dataReplyValue(output).trim());
+    if (DIMENSION_ID.test(value)) return value;
+    // A plugin that reworded the sentence still answers with the id somewhere in
+    // it, and an id is specific enough to be found on its own.
+    const found = /\b[a-z][a-z0-9_.-]*:[a-z0-9_./-]+/.exec(output);
+    return found ? found[0] : null;
 }
 
 /** A dimension in words. */

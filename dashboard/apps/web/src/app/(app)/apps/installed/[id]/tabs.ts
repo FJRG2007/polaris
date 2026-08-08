@@ -22,6 +22,7 @@ export const GAME_TABS: readonly GameTab[] = [
     { slug: "", label: "Overview" },
     { slug: "console", label: "Console" },
     { slug: "players", label: "Players" },
+    { slug: "world", label: "World" },
     { slug: "mods", label: "Mods" },
     { slug: "usage", label: "Usage" },
     { slug: "security", label: "Security" },

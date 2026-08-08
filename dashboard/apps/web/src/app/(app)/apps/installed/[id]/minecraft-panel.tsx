@@ -21,25 +21,26 @@
 import Link from "next/link";
 import { MinecraftMods } from "./minecraft-mods";
 import type { GameContext } from "./game-context";
+import { MinecraftWorld } from "./minecraft-world";
 import { MinecraftDomain } from "./minecraft-domain";
 import { CopyButton } from "@/components/copy-button";
 import { saveWorldAction } from "./minecraft-actions";
 import { MinecraftConsole } from "./minecraft-console";
-import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
-import { FirewallSection, MinecraftPlayers } from "./minecraft-players";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
-import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import { GAME_TABS, gameTabHref, isGameTab } from "./tabs";
 import { MinecraftAppearance } from "./minecraft-appearance";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import type { PlayerTimeout } from "@/lib/apps/minecraft/timeout";
+import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
+import type { InstalledAppSetting } from "@/lib/apps/install-service";
+import { FirewallSection, MinecraftPlayers } from "./minecraft-players";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import { FolderOpen, Loader2, Save, ShieldAlert, UserPlus } from "lucide-react";
+import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
 import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
 
 /** Mods are managed on their own screen, so their variables are not repeated as
@@ -261,6 +262,7 @@ export function MinecraftPanel({
                     onChanged={() => void load()}
                 />
             )}
+            {tab === "world" && <MinecraftWorld installedAppId={installedAppId} name={name} />}
             {tab === "usage" &&
                 (applicationId ? (
                     // The same history Deploy draws for any service, because a game

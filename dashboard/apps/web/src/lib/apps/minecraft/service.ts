@@ -18,8 +18,8 @@ import { prisma } from "@polaris/db";
 import { gameServerAddress } from "./address";
 import { resolveWaf } from "@/lib/waf-service";
 import { getHostLanIp } from "@/lib/host-address";
-import type { RuntimePorts } from "@polaris/deploy";
 import { currentReleaseRef } from "@/lib/deploy/releases";
+import type { ExecResult, RuntimePorts } from "@polaris/deploy";
 import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
 import { hostPortForApp, readAppRuntimeLog } from "@/lib/deploy-service";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
@@ -219,8 +219,17 @@ export async function runConsoleLine(ownerId: string, installedAppId: string, li
  * answer (the player list) reads the log on Bedrock instead of this.
  */
 async function execCommand(install: MinecraftInstall, ownerId: string, argv: readonly string[]): Promise<string> {
+    return withPorts(install, ownerId, (ports) => sendGameCommand(ports, install, argv));
+}
+
+/** The same, on ports that are already open. */
+async function sendGameCommand(
+    ports: RuntimePorts,
+    install: MinecraftInstall,
+    argv: readonly string[]
+): Promise<string> {
     const command = install.edition === "bedrock" ? ["send-command", ...argv] : ["rcon-cli", ...argv];
-    const result = await withPorts(install, ownerId, (ports) => ports.runIn(install.container, command));
+    const result = await ports.runIn(install.container, command);
     if (result.code !== 0) {
         // rcon-cli fails the same way for a server that is still generating its
         // world and for one that has crashed; say what an operator can act on.
@@ -231,6 +240,74 @@ async function execCommand(install: MinecraftInstall, ownerId: string, argv: rea
         );
     }
     return result.output;
+}
+
+/**
+ * A running server's container, held open for a piece of work that needs several
+ * commands.
+ *
+ * Everything above runs one command and closes the connection behind it, which is
+ * right for a poll and wrong for anything that has to flush the world, read a
+ * directory, unpack an archive and move folders - on a registered machine each of
+ * those would be its own SSH handshake. So the work that comes in bursts gets the
+ * ports once and keeps them for as long as it needs.
+ *
+ * `run` is the container itself (`tar`, `mv`, `du`) and `say` is the game inside
+ * it (RCON on Java, the console on Bedrock). Both refuse the same way the rest of
+ * this file does: a message an operator can act on, never a daemon's own.
+ */
+export interface ServerContainer {
+    readonly installedAppId: string;
+    readonly applicationId: string;
+    readonly edition: MinecraftEdition;
+    /** Whether Polaris means it to be up. Not the same as it answering. */
+    readonly running: boolean;
+    /** Run a command in the container and hand back how it went. */
+    run(argv: readonly string[]): Promise<ExecResult>;
+    /** Run one and refuse unless it worked, with the output as the reason. */
+    runOk(argv: readonly string[], failure: string): Promise<string>;
+    /** Send a command to the game and hand back what it said. */
+    say(argv: readonly string[]): Promise<string>;
+}
+
+export async function withServerContainer<T>(
+    ownerId: string,
+    installedAppId: string,
+    work: (server: ServerContainer) => Promise<T>
+): Promise<T> {
+    const install = await resolveInstall(ownerId, installedAppId);
+    return withPorts(install, ownerId, async (ports) => {
+        const server: ServerContainer = {
+            installedAppId: install.installedAppId,
+            applicationId: install.applicationId,
+            edition: install.edition,
+            running: install.running,
+            run: (argv) => ports.runIn(install.container, argv),
+            runOk: async (argv, failure) => {
+                const result = await ports.runIn(install.container, argv);
+                if (result.code !== 0) throw new Error(containerFailure(result.output, failure));
+                return result.output;
+            },
+            say: (argv) => sendGameCommand(ports, install, argv)
+        };
+        return work(server);
+    });
+}
+
+/**
+ * Why a command in the container failed, in a sentence.
+ *
+ * The container's own output is worth showing when there is any - "No space left
+ * on device" is the whole answer to a backup that would not write - but the
+ * daemon's refusal for a container that is not up names a hash nobody has seen,
+ * so that one is replaced.
+ */
+function containerFailure(output: string, failure: string): string {
+    const said = output.trim();
+    if (said.length === 0 || /is not running|no such container/i.test(said)) {
+        return `${failure} - start the server first`;
+    }
+    return `${failure}: ${said.slice(0, 200)}`;
 }
 
 /** Read one of the server's own files out of the container. Empty when it does

@@ -13,6 +13,7 @@
  */
 
 import { installApp } from "@/lib/apps/install-service";
+import { seedEnvKey } from "@/lib/apps/minecraft/world";
 import { joinAccess } from "@/lib/apps/minecraft/access";
 import { availableHostPort } from "@/lib/apps/port-registry";
 import { promptedEnvVars, findApp } from "@/lib/apps/catalog";
@@ -61,6 +62,10 @@ export async function createGameServer(
     // that needs Paper is not a suggestion, it is what its plugins load into.
     env.set("VERSION", input.version || "LATEST");
     env.set("MAX_PLAYERS", String(input.maxPlayers));
+    // The seed only ever applies to a world that does not exist yet, which is
+    // exactly what this is creating. Left unset it is a random world, and the
+    // manager can start another one from a seed later without losing this map.
+    if (input.seed) env.set(seedEnvKey(input.edition), input.seed);
     // Only the Java image runs a JVM to give a heap to.
     if (input.edition === "java") {
         env.set("MEMORY", formatMemory(memoryMb));
