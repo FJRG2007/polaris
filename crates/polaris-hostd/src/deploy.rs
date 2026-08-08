@@ -262,9 +262,16 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
         if !service.ports.is_empty() {
             out.push_str("    ports:\n");
             for port in &service.ports {
+                // Absent means TCP, which compose also assumes; a Bedrock game
+                // server is the case that is UDP, and published as TCP it answers
+                // nothing at all.
+                let suffix = match port.protocol.as_deref() {
+                    Some("udp") => "/udp",
+                    _ => "",
+                };
                 out.push_str(&format!(
                     "      - {}\n",
-                    yaml_quote(&format!("{}:{}", port.host, port.container))
+                    yaml_quote(&format!("{}:{}{}", port.host, port.container, suffix))
                 ));
             }
         }
@@ -952,6 +959,22 @@ mod tests {
             r#"{"project":"p","services":[{"name":"web","image":"nginx","pullPolicy":"whenever"}]}"#,
         );
         assert!(validate_spec(&bad, &config).is_err());
+    }
+
+    #[test]
+    fn publishes_a_udp_port_as_udp() {
+        // A Bedrock Minecraft server speaks UDP. Two ways this breaks and both are
+        // silent: the daemon refusing the field outright (the spec denies unknown
+        // ones), or accepting it and rendering TCP anyway - a published port that
+        // answers nothing. A TCP port keeps rendering bare, as compose assumes.
+        let config = test_config();
+        let s = spec(
+            r#"{"project":"p","services":[{"name":"mc","image":"itzg/minecraft-bedrock-server","ports":[{"host":19132,"container":19132,"protocol":"udp"},{"host":25565,"container":25565}]}]}"#,
+        );
+        assert!(validate_spec(&s, &config).is_ok());
+        let rendered = render_compose(&s, &config);
+        assert!(rendered.contains("\"19132:19132/udp\""));
+        assert!(rendered.contains("\"25565:25565\""));
     }
 
     #[test]
