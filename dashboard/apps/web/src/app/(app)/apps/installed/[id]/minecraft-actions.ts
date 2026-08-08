@@ -17,16 +17,19 @@ import { recordAudit } from "@/lib/audit-service";
 import { setEnvVars } from "@/lib/env-var-service";
 import { deployApplication } from "@/lib/deploy-service";
 import { getInstalledApp } from "@/lib/apps/install-service";
+import { ITEM_ID_PATTERN } from "@/lib/apps/minecraft/items";
+import { stripFormatting } from "@/lib/apps/minecraft/parse";
 import { setGameHostname } from "@/lib/apps/minecraft/address";
 import { patchInstallConfig } from "@/lib/apps/install-config";
 import { writeContainerFile } from "@/lib/container-files-service";
-import { findApp, isAllowedEnvValue, tunableEnvVars } from "@/lib/apps/catalog";
-import { parseInventory, type InventoryItem } from "@/lib/apps/minecraft/inventory";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/minecraft/timeout";
 import { setGameSchedule } from "@/lib/apps/minecraft/schedule-service";
-import { MAX_IDLE_MINUTES, MIN_IDLE_MINUTES, type GameSchedule } from "@/lib/apps/minecraft/schedule";
+import { findApp, isAllowedEnvValue, tunableEnvVars } from "@/lib/apps/catalog";
 import { liftTimeout, timeoutPlayer } from "@/lib/apps/minecraft/timeout-service";
+import { parseInventory, type InventoryItem } from "@/lib/apps/minecraft/inventory";
+import { parseDimension, parsePosition, type PlayerPosition } from "@/lib/apps/minecraft/position";
 import { applyFirewallBans, runConsoleLine, runServerCommand } from "@/lib/apps/minecraft/service";
+import { MAX_IDLE_MINUTES, MIN_IDLE_MINUTES, type GameSchedule } from "@/lib/apps/minecraft/schedule";
 import {
     grantPlayerAccess,
     listPlayerAccess,
@@ -104,12 +107,9 @@ export async function moderatePlayerAction(input: MinecraftModeration): Promise<
 }
 
 /** A namespaced item id as the game writes it, with the namespace optional
- *  because `give Alice stone` is what an operator types. */
-const itemIdSchema = z
-    .string()
-    .trim()
-    .toLowerCase()
-    .regex(/^(?:[a-z0-9_.-]+:)?[a-z0-9_.-]{1,64}$/, "An item looks like minecraft:stone");
+ *  because `give Alice stone` is what an operator types. The pattern is the one
+ *  the picker offers ids against, so the form cannot propose what this refuses. */
+const itemIdSchema = z.string().trim().toLowerCase().regex(ITEM_ID_PATTERN, "An item looks like minecraft:stone");
 
 /** Where to send somebody: another player, or three coordinates - each an
  *  absolute number or a `~` offset, which is how the game reads them. */
@@ -218,13 +218,63 @@ export async function readPlayerInventoryAction(
             parsed.data.player,
             "Inventory"
         ]);
-        return { items: parseInventory(output) };
+        return { items: parseInventory(stripFormatting(output)) };
     } catch (caught) {
         return {
             error:
                 caught instanceof Error
                     ? caught.message
                     : "Could not read the inventory - the player has to be on the server"
+        };
+    }
+}
+
+/**
+ * Where a player is standing, and in which world.
+ *
+ * Two reads, and the world is the optional one: a server that answers the
+ * coordinates and not the dimension has still answered the question that was
+ * asked, and refusing the whole thing over the label would be worse than showing
+ * coordinates without it.
+ */
+export async function readPlayerPositionAction(
+    installedAppId: string,
+    player: string
+): Promise<{ position?: PlayerPosition; error?: string }> {
+    const user = await requirePermission("games.read");
+    const parsed = z
+        .object({ installedAppId: z.string().uuid(), player: playerNameSchema })
+        .safeParse({ installedAppId, player });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        const output = await runServerCommand(user.id, parsed.data.installedAppId, [
+            "data",
+            "get",
+            "entity",
+            parsed.data.player,
+            "Pos"
+        ]);
+        const coordinates = parsePosition(stripFormatting(output));
+        if (coordinates === null) {
+            return { error: "The server did not report a position - the player has to be on the server" };
+        }
+        const dimension = await runServerCommand(user.id, parsed.data.installedAppId, [
+            "data",
+            "get",
+            "entity",
+            parsed.data.player,
+            "Dimension"
+        ]).then(
+            (answer) => parseDimension(stripFormatting(answer)),
+            () => null
+        );
+        return { position: { ...coordinates, dimension } };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : "Could not read the position - the player has to be on the server"
         };
     }
 }

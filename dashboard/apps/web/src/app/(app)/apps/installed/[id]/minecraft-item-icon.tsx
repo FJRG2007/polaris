@@ -1,0 +1,43 @@
+"use client";
+
+/**
+ * One item's picture, at whatever size the caller draws its slot.
+ *
+ * The set is named after the item id, so there is no lookup - but it is a set of
+ * a particular Minecraft version, and a server can hold an item newer than it or
+ * an item from a mod. Those resolve to a URL that is not there, and a broken
+ * image in a slot reads as a bug in the panel rather than as an item nobody drew
+ * yet, so a failed load falls back to a neutral block.
+ *
+ * `pixelated` because these are 16x16 textures shipped at 64x64: smoothed up to a
+ * slot they turn into the blur that every Minecraft screenshot is not.
+ */
+
+import { cn } from "@polaris/ui";
+import { useState } from "react";
+import { Package } from "lucide-react";
+import { itemIconUrl } from "@/lib/apps/minecraft/items";
+
+export function ItemIcon({ id, className }: { id: string; className?: string }) {
+    // Keyed by id rather than a bare boolean: the same icon element is reused as
+    // a picker's results change under it, and a flag left over from the previous
+    // item would blank out the next one.
+    const [failed, setFailed] = useState<string | null>(null);
+    const url = itemIconUrl(id);
+
+    if (url === null || failed === id) {
+        return <Package className={cn("text-muted-foreground/70", className)} aria-hidden />;
+    }
+
+    return (
+        <img
+            src={url}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            draggable={false}
+            onError={() => setFailed(id)}
+            className={cn("[image-rendering:pixelated] select-none object-contain", className)}
+        />
+    );
+}

@@ -5,9 +5,9 @@
     "type": "module",
     "description": "Polaris dashboard - the Next.js control-plane app.",
     "scripts": {
-        "predev": "node scripts/copy-pdfjs-assets.mjs",
+        "predev": "node scripts/copy-pdfjs-assets.mjs && node scripts/copy-mcicons-assets.mjs",
         "dev": "next dev",
-        "prebuild": "node scripts/copy-pdfjs-assets.mjs",
+        "prebuild": "node scripts/copy-pdfjs-assets.mjs && node scripts/copy-mcicons-assets.mjs",
         "build": "next build",
         "start": "next start",
         "test": "vitest run --passWithNoTests",

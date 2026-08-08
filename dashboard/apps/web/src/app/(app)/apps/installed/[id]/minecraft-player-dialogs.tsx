@@ -4,26 +4,31 @@
  * The things you do to one player that need more than a click.
  *
  * Kept out of the table because they are all the same shape - name a player, ask
- * for one more thing, send a command - and a table that also holds five forms
+ * for one more thing, send a command - and a table that also holds every form
  * stops being readable. Each one is opened from the row and answers about that
  * row only.
  *
  * Every field is checked here against the same rules the server action checks it
  * against, so a wrong item id says so before it is a failed command in the log.
+ * The two that read rather than change - what somebody is carrying, where they
+ * are standing - share their states, because a refresh that behaved differently
+ * between them would be a difference nobody could see the reason for.
  */
 
-import { useEffect, useState } from "react";
-import { Backpack, Loader2 } from "lucide-react";
+import * as actions from "./minecraft-actions";
+import { ItemPicker } from "./minecraft-item-picker";
+import { InventoryGrid } from "./minecraft-inventory";
+import { CopyButton } from "@/components/copy-button";
+import { useCallback, useEffect, useState } from "react";
+import { typedItemId } from "@/lib/apps/minecraft/items";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/minecraft/timeout";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
-import { slotLabel, type InventoryItem } from "@/lib/apps/minecraft/inventory";
+import { Backpack, Loader2, MapPin, RefreshCw, TriangleAlert } from "lucide-react";
+import { dimensionLabel, formatCoordinates, type PlayerPosition } from "@/lib/apps/minecraft/position";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
 
 /** Which of the forms is open, or none. */
-export type PlayerDialog = "give" | "teleport" | "timeout" | "inventory" | "history";
-
-/** Item ids as the game writes them; the same rule the action validates against. */
-const ITEM_ID = /^(?:[a-z0-9_.-]+:)?[a-z0-9_.-]{1,64}$/;
+export type PlayerDialog = "give" | "teleport" | "timeout" | "inventory" | "location" | "history";
 
 /** Three coordinates, absolute or `~` relative. */
 const COORDINATES = /^~?-?\d{1,7}(?:\.\d{1,3})?\s+~?-?\d{1,7}(?:\.\d{1,3})?\s+~?-?\d{1,7}(?:\.\d{1,3})?$/;
@@ -53,33 +58,39 @@ export function GiveItemDialog({
     onClose: () => void;
     onGive: (item: string, count: number) => void;
 }) {
-    const [item, setItem] = useState("minecraft:");
+    const [query, setQuery] = useState("");
+    const [picked, setPicked] = useState<string | null>(null);
     const [count, setCount] = useState("1");
     const parsedCount = Number.parseInt(count, 10);
-    const itemError = item.trim().length > 0 && !ITEM_ID.test(item.trim()) ? "An item looks like minecraft:stone" : null;
+    // A written-out id counts as a choice, so an operator who knows exactly what
+    // they want can type it and press Enter. Half a word on the way to one does
+    // not: `minecraft:swor` is a well-formed id and no item at all.
+    const item = picked ?? typedItemId(query);
     const countError =
         !Number.isInteger(parsedCount) || parsedCount < 1 || parsedCount > 64 ? "Between 1 and 64" : null;
-    const ready = ITEM_ID.test(item.trim()) && !countError && !pending;
 
     return (
         <Shell
+            size="md"
             title={`Give ${player} an item`}
             description="It goes straight into their inventory, or drops at their feet when there is no room."
             onClose={onClose}
             pending={pending}
-            ready={ready}
+            ready={item !== null && !countError && !pending}
             confirmLabel="Give"
-            onConfirm={() => onGive(item.trim(), parsedCount)}
+            onConfirm={() => item !== null && onGive(item, parsedCount)}
         >
-            <Field label="Item" error={itemError}>
-                <Input
-                    autoFocus
-                    value={item}
-                    spellCheck={false}
-                    placeholder="minecraft:diamond"
-                    onChange={(event) => setItem(event.target.value)}
-                />
-            </Field>
+            <ItemPicker
+                value={item}
+                query={query}
+                onQueryChange={(next) => {
+                    setQuery(next);
+                    // Typing again is somebody looking for something else; keeping
+                    // the old tile selected would hand out the previous item.
+                    setPicked(null);
+                }}
+                onSelect={setPicked}
+            />
             <Field label="How many" error={countError}>
                 <Input
                     type="number"
@@ -208,73 +219,212 @@ export function TimeoutDialog({
 }
 
 /**
- * What a player is carrying.
+ * What a player is carrying, in the shape the game keeps it.
  *
  * Read when the dialog opens rather than polled: an inventory changes constantly
- * and a list that reshuffled under the operator reading it would be worse than
- * one they refresh when they want to.
+ * and a grid that reshuffled under the operator reading it would be worse than
+ * one they refresh when they want to - so there is a button that does.
+ *
+ * The install is named rather than handed a reader, because the screen behind
+ * this polls: a closure passed down would be a new function on every tick and the
+ * read would fire again with it, once every five seconds, unasked.
  */
 export function InventoryDialog({
+    installedAppId,
     player,
-    onClose,
-    onRead
+    onClose
 }: {
+    installedAppId: string;
     player: string;
     onClose: () => void;
-    onRead: () => Promise<{ items?: InventoryItem[]; error?: string }>;
 }) {
-    const [items, setItems] = useState<InventoryItem[] | null>(null);
+    const read = useCallback(
+        () => actions.readPlayerInventoryAction(installedAppId, player),
+        [installedAppId, player]
+    );
+    const { data, error, loading, refresh } = useServerRead(read);
+    const items = data?.items ?? null;
+
+    return (
+        <Reading
+            title={`${player}'s inventory`}
+            description="As the server has it right now."
+            icon={<Backpack className="size-6" />}
+            loadingLabel="Reading it from the server..."
+            empty="Nothing in it."
+            loading={loading}
+            error={error}
+            onRefresh={refresh}
+            onClose={onClose}
+        >
+            {items && <InventoryGrid items={items} />}
+        </Reading>
+    );
+}
+
+/**
+ * Where a player is, and the coordinates in a form worth pasting.
+ *
+ * Read on demand rather than shown in the table: every reading is a command sent
+ * to the running server, and one per player per poll would be a moderation screen
+ * that costs the server more than the players do.
+ */
+export function LocationDialog({
+    installedAppId,
+    player,
+    onClose
+}: {
+    installedAppId: string;
+    player: string;
+    onClose: () => void;
+}) {
+    const read = useCallback(
+        () => actions.readPlayerPositionAction(installedAppId, player),
+        [installedAppId, player]
+    );
+    const { data, error, loading, refresh } = useServerRead(read);
+    const position = data?.position ?? null;
+
+    return (
+        <Reading
+            title={`Where ${player} is`}
+            description="Read from the running server, so it is where they were a moment ago."
+            icon={<MapPin className="size-6" />}
+            loadingLabel="Asking the server..."
+            empty="The server did not say."
+            loading={loading}
+            error={error}
+            onRefresh={refresh}
+            onClose={onClose}
+        >
+            {position && <Coordinates player={player} position={position} />}
+        </Reading>
+    );
+}
+
+/** The three numbers, big enough to read off the screen and copyable as the one
+ *  string that goes into a `tp` or a note. */
+function Coordinates({ player, position }: { player: string; position: PlayerPosition }) {
+    const coordinates = formatCoordinates(position);
+
+    return (
+        <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2">
+                <dl className="flex gap-4">
+                    {(["X", "Y", "Z"] as const).map((axis, index) => (
+                        <div key={axis}>
+                            <dt className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">{axis}</dt>
+                            <dd className="font-mono text-lg tabular-nums">{coordinates.split(" ")[index]}</dd>
+                        </div>
+                    ))}
+                </dl>
+                <CopyButton value={coordinates} label={`${player}'s coordinates`} className="size-8" />
+            </div>
+            <p className="text-xs text-muted-foreground">
+                {position.dimension ? dimensionLabel(position.dimension) : "World not reported"} - exactly{" "}
+                <span className="font-mono">
+                    {position.x.toFixed(2)} {position.y.toFixed(2)} {position.z.toFixed(2)}
+                </span>
+            </p>
+        </div>
+    );
+}
+
+/** One read of the running server, with the states a read has. Shared because the
+ *  inventory and the position are the same thing asked twice, and a refresh that
+ *  behaved differently between them would be a bug nobody could see. */
+function useServerRead<T extends { error?: string }>(read: () => Promise<T>): {
+    data: T | null;
+    error: string | null;
+    loading: boolean;
+    refresh: () => void;
+} {
+    const [data, setData] = useState<T | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const [attempt, setAttempt] = useState(0);
 
     useEffect(() => {
         let live = true;
         setLoading(true);
-        void onRead().then((result) => {
-            if (!live) return;
-            setLoading(false);
-            if (result.error) setError(result.error);
-            else setItems(result.items ?? []);
-        });
+        setError(null);
+        void read().then(
+            (result) => {
+                if (!live) return;
+                setLoading(false);
+                if (result.error) setError(result.error);
+                else setData(result);
+            },
+            () => {
+                if (!live) return;
+                setLoading(false);
+                setError("Could not reach the server");
+            }
+        );
         return () => {
             live = false;
         };
-    }, [onRead]);
+    }, [read, attempt]);
 
+    return { data, error, loading, refresh: () => setAttempt((count) => count + 1) };
+}
+
+/** The frame around something read out of the server: the states, the refresh and
+ *  the way out. */
+function Reading({
+    title,
+    description,
+    icon,
+    loadingLabel,
+    empty,
+    loading,
+    error,
+    children,
+    onRefresh,
+    onClose
+}: {
+    title: string;
+    description: string;
+    icon: React.ReactNode;
+    loadingLabel: string;
+    /** What to say when the read worked and there was nothing in it. */
+    empty: string;
+    loading: boolean;
+    error: string | null;
+    /** The reading itself, or nothing when there was none. */
+    children: React.ReactNode;
+    onRefresh: () => void;
+    onClose: () => void;
+}) {
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>{player}&apos;s inventory</DialogTitle>
-                    <DialogDescription>As the server has it right now.</DialogDescription>
+                    <DialogTitle>{title}</DialogTitle>
+                    <DialogDescription>{description}</DialogDescription>
                 </DialogHeader>
                 {loading ? (
                     <p className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-                        <Loader2 className="size-4 animate-spin" /> Reading it from the server...
+                        <Loader2 className="size-4 animate-spin" /> {loadingLabel}
                     </p>
                 ) : error ? (
-                    <p className="py-6 text-sm text-danger">{error}</p>
-                ) : items && items.length > 0 ? (
-                    <ul className="max-h-80 divide-y divide-border overflow-y-auto text-sm">
-                        {items.map((item) => (
-                            <li key={item.slot} className="flex items-center justify-between gap-3 py-1.5">
-                                <span className="truncate font-mono text-xs" title={item.id}>
-                                    {item.id.replace(/^minecraft:/, "")}
-                                </span>
-                                <span className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
-                                    <span>{slotLabel(item.slot)}</span>
-                                    <span className="tabular-nums">x{item.count}</span>
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
+                    <p className="flex items-start gap-2 py-6 text-sm text-danger">
+                        <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                        {error}
+                    </p>
+                ) : children ? (
+                    children
                 ) : (
                     <p className="flex flex-col items-center gap-2 py-8 text-center text-sm text-muted-foreground">
-                        <Backpack className="size-6" />
-                        Nothing in it.
+                        {icon}
+                        {empty}
                     </p>
                 )}
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                    <Button variant="secondary" onClick={onRefresh} disabled={loading}>
+                        <RefreshCw className={loading ? "size-4 animate-spin" : "size-4"} />
+                        Refresh
+                    </Button>
                     <Button variant="ghost" onClick={onClose}>
                         Close
                     </Button>
@@ -348,7 +498,8 @@ function Shell({
     confirmLabel,
     ready,
     pending,
-    danger
+    danger,
+    size = "sm"
 }: {
     title: string;
     description: string;
@@ -359,10 +510,12 @@ function Shell({
     ready: boolean;
     pending: boolean;
     danger?: boolean;
+    /** Wider for the form that holds a grid of pictures rather than two fields. */
+    size?: "sm" | "md";
 }) {
     return (
         <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
-            <DialogContent className="max-w-sm">
+            <DialogContent className={size === "md" ? "max-w-md" : "max-w-sm"}>
                 <DialogHeader>
                     <DialogTitle>{title}</DialogTitle>
                     <DialogDescription>{description}</DialogDescription>

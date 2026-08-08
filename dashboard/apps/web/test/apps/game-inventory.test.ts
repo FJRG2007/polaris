@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { parseInventory, slotLabel } from "@/lib/apps/minecraft/inventory";
+import {
+    ARMOUR_SLOTS,
+    HOTBAR_SLOTS,
+    MAIN_SLOT_ROWS,
+    OFFHAND_SLOT,
+    bySlot,
+    extraSlots,
+    parseInventory,
+    slotLabel
+} from "@/lib/apps/minecraft/inventory";
 
 describe("parseInventory", () => {
     it("reads the slot, the id and the count of every stack", () => {
@@ -56,5 +65,46 @@ describe("slotLabel", () => {
         expect(slotLabel(100)).toBe("Boots");
         expect(slotLabel(-106)).toBe("Offhand");
         expect(slotLabel(27)).toBe("Slot 27");
+    });
+});
+
+describe("the drawn layout", () => {
+    it("is the game's own: nine on the hotbar, three rows of nine above it", () => {
+        expect(HOTBAR_SLOTS).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+        expect(MAIN_SLOT_ROWS).toHaveLength(3);
+        expect(MAIN_SLOT_ROWS.flat()).toHaveLength(27);
+        expect(MAIN_SLOT_ROWS.flat()[0]).toBe(9);
+        expect(MAIN_SLOT_ROWS.flat().at(-1)).toBe(35);
+    });
+
+    it("wears armour head first, which is the order it is drawn in", () => {
+        expect(ARMOUR_SLOTS.map(slotLabel)).toEqual(["Helmet", "Chestplate", "Leggings", "Boots"]);
+        expect(slotLabel(OFFHAND_SLOT)).toBe("Offhand");
+    });
+});
+
+describe("extraSlots", () => {
+    it("is empty when every stack has a slot the grid draws", () => {
+        const items = [
+            { slot: 0, id: "minecraft:stone", count: 1 },
+            { slot: 35, id: "minecraft:apple", count: 3 },
+            { slot: -106, id: "minecraft:shield", count: 1 },
+            { slot: 103, id: "minecraft:diamond_helmet", count: 1 }
+        ];
+        expect(extraSlots(items)).toEqual([]);
+    });
+
+    it("keeps what a modded slot holds, rather than reporting a full bag as empty", () => {
+        const backpack = { slot: 200, id: "curios:ring", count: 1 };
+        expect(extraSlots([{ slot: 0, id: "minecraft:stone", count: 1 }, backpack])).toEqual([backpack]);
+    });
+});
+
+describe("bySlot", () => {
+    it("indexes the stacks the way a grid asks for them", () => {
+        const apple = { slot: 4, id: "minecraft:apple", count: 2 };
+        const index = bySlot([apple]);
+        expect(index.get(4)).toEqual(apple);
+        expect(index.get(5)).toBeUndefined();
     });
 });

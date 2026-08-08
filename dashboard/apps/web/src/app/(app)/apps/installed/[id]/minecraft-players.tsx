@@ -24,14 +24,15 @@ import type { MinecraftModeration } from "./minecraft-actions";
 import { ACCESS_REACH_NOTE } from "@/lib/apps/minecraft/access";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
-import { timeoutFor, type PlayerTimeout } from "@/lib/apps/minecraft/timeout";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import { foldPlayers, type PlayerEntry } from "@/lib/apps/minecraft/players";
+import { timeoutFor, type PlayerTimeout } from "@/lib/apps/minecraft/timeout";
 import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
 import {
     GiveItemDialog,
     HistoryDialog,
     InventoryDialog,
+    LocationDialog,
     TeleportDialog,
     TimeoutDialog,
     type PlayerDialog
@@ -58,6 +59,7 @@ import {
     Crown,
     DoorOpen,
     History,
+    LocateFixed,
     MapPin,
     MoreHorizontal,
     PackagePlus,
@@ -428,9 +430,16 @@ export function MinecraftPlayers({
             )}
             {acting?.dialog === "inventory" && (
                 <InventoryDialog
+                    installedAppId={installedAppId}
                     player={acting.player.name}
                     onClose={() => setActing(null)}
-                    onRead={() => actions.readPlayerInventoryAction(installedAppId, acting.player.name)}
+                />
+            )}
+            {acting?.dialog === "location" && (
+                <LocationDialog
+                    installedAppId={installedAppId}
+                    player={acting.player.name}
+                    onClose={() => setActing(null)}
                 />
             )}
             {acting?.dialog === "history" && (
@@ -722,6 +731,9 @@ function MoreActions({
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={!live} onSelect={() => onOpen("give")}>
                     <PackagePlus className="size-4" /> Give an item
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={!live || !player.online} onSelect={() => onOpen("location")}>
+                    <LocateFixed className="size-4" /> Where they are
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={!live || !player.online} onSelect={() => onOpen("teleport")}>
                     <MapPin className="size-4" /> Teleport
