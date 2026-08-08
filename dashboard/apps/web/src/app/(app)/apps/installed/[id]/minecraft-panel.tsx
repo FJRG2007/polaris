@@ -25,6 +25,7 @@ import { MinecraftDomain } from "./minecraft-domain";
 import { CopyButton } from "@/components/copy-button";
 import { saveWorldAction } from "./minecraft-actions";
 import { MinecraftConsole } from "./minecraft-console";
+import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
 import { MinecraftPlayers } from "./minecraft-players";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
@@ -234,6 +235,24 @@ export function MinecraftPanel({
                     onChanged={() => void load()}
                 />
             )}
+            {tab === "usage" &&
+                (applicationId ? (
+                    // The same history Deploy draws for any service, because a game
+                    // server is one: it is already sampled and already stored, and a
+                    // second copy of it under another name would be a second thing
+                    // to keep true.
+                    <MetricsHistory
+                        endpoint={`/api/deploy/apps/${applicationId}/metrics/history`}
+                        metrics={CONSUMPTION_METRICS}
+                    />
+                ) : (
+                    <Card>
+                        <CardBody className="py-10 text-center text-sm text-muted-foreground">
+                            Usage is measured once the server has deployed.
+                        </CardBody>
+                    </Card>
+                ))}
+
             {tab === "mods" && (
                 <MinecraftMods
                     installedAppId={installedAppId}

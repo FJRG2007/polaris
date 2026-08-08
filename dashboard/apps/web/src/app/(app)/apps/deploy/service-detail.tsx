@@ -22,7 +22,7 @@ import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
 import { SERVICE_METRICS_MS, useServiceMetrics } from "./service-metrics";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
-import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/components/metrics-history";
+import { CONSUMPTION_METRICS, MetricsHistory, percent, type MetricSpec } from "@/components/metrics-history";
 import {
     cn,
     Input,
@@ -1476,7 +1476,7 @@ function MetricsTab({ applicationId }: { applicationId: string }) {
             )}
             <div>
                 <h3 className="mb-1 text-sm font-medium">History</h3>
-                <MetricsHistory endpoint={`/api/deploy/apps/${applicationId}/metrics/history`} metrics={DEPLOY_METRICS} />
+                <MetricsHistory endpoint={`/api/deploy/apps/${applicationId}/metrics/history`} metrics={CONSUMPTION_METRICS} />
             </div>
             <div>
                 <h3 className="mb-1 text-sm font-medium">HTTP</h3>
@@ -1485,28 +1485,6 @@ function MetricsTab({ applicationId }: { applicationId: string }) {
         </div>
     );
 }
-
-/** Charts drawn on the Deploy Metrics tab: CPU as a percentage, memory as absolute
- *  usage (a container's memory is a tiny fraction of host RAM, so a percent reads as
- *  0 - show the real MB/GB and let the chart auto-scale, like the Containers app). */
-const DEPLOY_METRICS: MetricSpec[] = [
-    { key: "cpu", label: "CPU", value: (point) => point.cpuPercent, format: percent, tone: "primary", max: 100 },
-    {
-        key: "mem",
-        label: "Memory",
-        value: (point) => point.memUsedBytes,
-        // The absolute figure is the honest one here, but "of 16 GB" is what makes
-        // it mean anything.
-        describe: (point) => {
-            const share = ratioPercent(point.memUsedBytes, point.memTotalBytes);
-            return share === null || point.memTotalBytes === null
-                ? null
-                : `${percent(share)} of ${formatBytes(point.memTotalBytes)}`;
-        },
-        format: formatBytes,
-        tone: "success"
-    }
-];
 
 /** A bucket of the app's HTTP traffic series (mirrors HttpMetricPoint from the API). */
 interface HttpPoint {
