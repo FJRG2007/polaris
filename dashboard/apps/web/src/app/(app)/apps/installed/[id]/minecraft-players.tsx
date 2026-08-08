@@ -87,7 +87,6 @@ export function MinecraftPlayers({
     installedAppId,
     status,
     roster,
-    firewall,
     access,
     sessions,
     now,
@@ -97,7 +96,6 @@ export function MinecraftPlayers({
     installedAppId: string;
     status: MinecraftStatus | null;
     roster: MinecraftRoster | null;
-    firewall: MinecraftFirewall | null;
     /** Who may connect and from where - the list the server is actually closed by. */
     access: PlayerAccessView | null;
     /** Who arrived and who left, out of the server's log. */
@@ -375,13 +373,6 @@ export function MinecraftPlayers({
                     </tbody>
                 </table>
             </div>
-
-            <FirewallSection
-                installedAppId={installedAppId}
-                firewall={firewall}
-                onError={setError}
-                onChanged={onChanged}
-            />
 
             {acting?.dialog === "give" && (
                 <GiveItemDialog
@@ -811,7 +802,7 @@ function WhitelistSwitch({
  * than something automatic, because banning an address from a game is visible to
  * whoever is playing from it.
  */
-function FirewallSection({
+export function FirewallSection({
     installedAppId,
     firewall,
     onError,

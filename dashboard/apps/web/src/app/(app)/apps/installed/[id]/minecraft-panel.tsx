@@ -26,7 +26,7 @@ import { CopyButton } from "@/components/copy-button";
 import { saveWorldAction } from "./minecraft-actions";
 import { MinecraftConsole } from "./minecraft-console";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
-import { MinecraftPlayers } from "./minecraft-players";
+import { FirewallSection, MinecraftPlayers } from "./minecraft-players";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
@@ -50,6 +50,10 @@ const MODS_GROUP = "Mods";
  *  centring - so it is not also offered as a raw text field two cards below, where
  *  the two would quietly disagree about what the server is running on. */
 const MOTD_KEY = "MOTD";
+
+/** Who may do what, on its own screen: an operator looking for the setting that
+ *  keeps griefers out should not have to scroll past the render distance. */
+const SECURITY_GROUP = "Security";
 
 const POLL_MS = 5000;
 
@@ -125,7 +129,7 @@ export function MinecraftPanel({
 
     // The roster costs three reads inside the container, so it is only gathered
     // for the screen that shows it.
-    const wantsRoster = tab === "players";
+    const wantsRoster = tab === "players" || tab === "security";
 
     const load = useCallback(async () => {
         try {
@@ -250,7 +254,6 @@ export function MinecraftPanel({
                     installedAppId={installedAppId}
                     status={status}
                     roster={reading.roster}
-                    firewall={reading.firewall}
                     access={reading.access}
                     sessions={reading.sessions}
                     now={reading.now}
@@ -284,6 +287,27 @@ export function MinecraftPanel({
                     onSaved={reloadSettings}
                 />
             )}
+            {tab === "security" && (
+                <div className="flex flex-col gap-4">
+                    <MinecraftSettings
+                        installedAppId={installedAppId}
+                        settings={settings.filter((setting) => setting.group === SECURITY_GROUP)}
+                        playersOnline={status?.players.online ?? 0}
+                        onSaved={reloadSettings}
+                    />
+                    {/* The firewall guards HTTP and a game server is not HTTP, so
+                        its addresses only mean anything here once they are on the
+                        server's own ban list. That is a security question, and it
+                        used to sit at the bottom of the players table. */}
+                    <FirewallSection
+                        installedAppId={installedAppId}
+                        firewall={reading.firewall}
+                        onError={setError}
+                        onChanged={() => void load()}
+                    />
+                </div>
+            )}
+
             {tab === "settings" && (
                 <div className="flex flex-col gap-4">
                     <MinecraftAppearance
@@ -307,7 +331,10 @@ export function MinecraftPanel({
                     <MinecraftSettings
                         installedAppId={installedAppId}
                         settings={settings.filter(
-                            (setting) => setting.group !== MODS_GROUP && setting.key !== MOTD_KEY
+                            (setting) =>
+                                setting.group !== MODS_GROUP &&
+                                setting.group !== SECURITY_GROUP &&
+                                setting.key !== MOTD_KEY
                         )}
                         playersOnline={status?.players.online ?? 0}
                         onSaved={reloadSettings}

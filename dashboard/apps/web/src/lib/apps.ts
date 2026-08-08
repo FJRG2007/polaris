@@ -181,6 +181,17 @@ export interface AppSection {
  * search index, so a page added here becomes navigable and findable at once.
  * Apps with no entry render no rail.
  */
+/**
+ * The two headings the Apps rail is read under.
+ *
+ * Ten entries in one flat list is ten things to read every time you are looking
+ * for one, and they are not ten of a kind: four are things you run, three are the
+ * machines they run on, three are how you watch and protect them. The rail groups
+ * them so the eye lands on the third of the list it wants.
+ */
+const MACHINES_GROUP = "Machines";
+const OPERATIONS_GROUP = "Operations";
+
 export const APP_SECTIONS: Record<string, AppSection[]> = {
     drive: [
         { label: "Overview", href: "/drive/overview", icon: LayoutDashboard, keywords: ["usage", "storage"] },
@@ -200,8 +211,20 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: Gamepad2,
             keywords: ["minecraft", "java", "bedrock", "players", "console", "rcon", "mods", "plugins"]
         },
-        { label: "Servers", href: "/apps/servers", icon: Server, keywords: ["hosts", "machines", "ssh"] },
-        { label: "Runners", href: "/apps/runners", icon: Workflow, keywords: ["github actions", "ci"] },
+        {
+            label: "Servers",
+            href: "/apps/servers",
+            icon: Server,
+            group: MACHINES_GROUP,
+            keywords: ["hosts", "machines", "ssh"]
+        },
+        {
+            label: "Runners",
+            href: "/apps/runners",
+            icon: Workflow,
+            group: MACHINES_GROUP,
+            keywords: ["github actions", "ci"]
+        },
         {
             label: "Agents",
             href: "/apps/agents",
@@ -212,16 +235,30 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Firewall",
             href: "/apps/firewall",
             icon: ShieldCheck,
+            group: OPERATIONS_GROUP,
             keywords: ["waf", "ip", "allowlist", "denylist", "block", "access"]
         },
         {
             label: "Analytics",
             href: "/apps/analytics",
             icon: ChartColumn,
+            group: OPERATIONS_GROUP,
             keywords: ["visitors", "traffic", "pageviews", "referrers", "metrics", "umami"]
         },
-        { label: "Containers", href: "/apps/containers", icon: Container, keywords: ["docker"] },
-        { label: "Backups", href: "/apps/backups", icon: Database, keywords: ["restore", "snapshots"] }
+        {
+            label: "Containers",
+            href: "/apps/containers",
+            icon: Container,
+            group: MACHINES_GROUP,
+            keywords: ["docker"]
+        },
+        {
+            label: "Backups",
+            href: "/apps/backups",
+            icon: Database,
+            group: OPERATIONS_GROUP,
+            keywords: ["restore", "snapshots"]
+        }
     ],
     watch: [
         { label: "Overview", href: "/watch", icon: LayoutDashboard, keywords: ["monitoring", "health"] },
