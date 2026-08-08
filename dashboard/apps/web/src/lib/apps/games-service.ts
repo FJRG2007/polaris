@@ -13,15 +13,18 @@ import { prisma } from "@polaris/db";
 import { freemem, totalmem } from "node:os";
 import { listHosts } from "@/lib/host-service";
 import { getHostLanIp } from "@/lib/host-address";
+import { hostPortForApp } from "@/lib/deploy-service";
 import { getLocalEnvironment } from "@/lib/network-service";
+import { readInstallConfig } from "@/lib/apps/install-config";
 import { appHasCapability, findApp } from "@/lib/apps/catalog";
 import { getServerMetrics } from "@/lib/server-metrics-service";
+import { gameServerAddress } from "@/lib/apps/minecraft/address";
 import type { PortBlocks, PortPolicy } from "@/lib/apps/port-block";
 import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
 import { enforcePlayerAddresses } from "@/lib/apps/minecraft/player-access";
 import { gamePorts, probeReach, reachConfirmed } from "@/lib/apps/minecraft/reach";
 import { gameReachAdvice, type GamePort, type GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
-import { applyFirewallBans, editionOf, getServerStatus, type MinecraftEdition } from "@/lib/apps/minecraft/service";
+import { applyFirewallBans, editionOf, getServerPlayers, type MinecraftEdition } from "@/lib/apps/minecraft/service";
 
 /** Whether a catalog id names a game server rather than any other installed app.
  *  The manifest's capability is the authority - a game server is not a list of
@@ -42,7 +45,15 @@ export interface GameMachine {
     readonly committedMb: number;
 }
 
-export interface GameServerRow {
+/**
+ * What the list can say about a server from Polaris' own records: where it runs,
+ * where a player connects, and whether it is meant to be up.
+ *
+ * Nothing here asks a container anything, so the whole list is a handful of
+ * queries rather than a probe per server - which is why the page can paint the
+ * machine and the address at once and let the live read catch up.
+ */
+export interface GameServerFacts {
     readonly id: string;
     readonly name: string;
     readonly catalogId: string;
@@ -53,9 +64,18 @@ export interface GameServerRow {
     readonly applicationId: string | null;
     /** The machine it runs on. */
     readonly serverName: string | null;
+    /** Whether it is meant to be up. Whether it is actually answering is the
+     *  live read, which costs a round trip to the server itself. */
     readonly running: boolean;
-    readonly answering: boolean;
     readonly address: string | null;
+    /** Why there is no address, when there is none. */
+    readonly message: string | null;
+}
+
+/** What only the server itself can answer: who is on it right now. */
+export interface GameServerLive {
+    readonly id: string;
+    readonly answering: boolean;
     readonly online: number;
     readonly max: number;
     readonly players: readonly string[];
@@ -63,41 +83,142 @@ export interface GameServerRow {
     readonly message: string | null;
 }
 
-/** The owner's game servers, newest first. */
-export async function listGameServers(ownerId: string): Promise<GameServerRow[]> {
-    const installs = await prisma.installedApp.findMany({
-        where: { ownerId, status: { not: "removed" } },
-        orderBy: { createdAt: "desc" }
-    });
-    const games = installs.filter((install) => isGameServerApp(install.catalogId));
-    const targets = new Map(
-        (
-            await prisma.deployTarget.findMany({
-                where: { id: { in: games.map((game) => game.targetId).filter((id): id is string => id !== null) } },
-                select: { id: true, name: true }
-            })
-        ).map((target) => [target.id, target.name])
-    );
+/** The ids of a set of rows that have one, for an `in` filter. */
+function presentIds(values: readonly (string | null)[]): string[] {
+    return values.filter((value): value is string => value !== null);
+}
 
+/** The owner's game servers and everything Polaris already knows about them,
+ *  newest first. */
+export async function listGameServerFacts(ownerId: string): Promise<GameServerFacts[]> {
+    const installs = (
+        await prisma.installedApp.findMany({
+            where: { ownerId, status: { not: "removed" } },
+            orderBy: { createdAt: "desc" }
+        })
+    ).filter((install) => isGameServerApp(install.catalogId));
+    if (installs.length === 0) return [];
+
+    const [targets, apps] = await Promise.all([
+        prisma.deployTarget.findMany({
+            where: { id: { in: presentIds(installs.map((install) => install.targetId)) } },
+            select: { id: true, name: true }
+        }),
+        prisma.application.findMany({
+            where: {
+                id: { in: presentIds(installs.map((install) => install.applicationId)) },
+                environment: { project: { ownerId } }
+            },
+            select: {
+                id: true,
+                sourceConfig: true,
+                desiredState: true,
+                currentDeploymentId: true,
+                target: { select: { kind: true, hostId: true } }
+            }
+        })
+    ]);
+    const targetName = new Map(targets.map((target) => [target.id, target.name]));
+    const appOf = new Map(apps.map((app) => [app.id, app]));
+    const local = apps.some((app) => app.target.kind === "local" || !app.target.hostId);
+
+    // An address needs the release the server actually publishes on, and the
+    // machine's own address for every server without a name of its own. Both are
+    // read once for the whole list rather than per row.
+    const [isolated, hosts, lanIp] = await Promise.all([
+        prisma.deployment
+            .findMany({
+                where: { id: { in: presentIds(apps.map((app) => app.currentDeploymentId)) }, isolated: true },
+                select: { id: true }
+            })
+            .then((rows) => new Set(rows.map((row) => row.id))),
+        prisma.host
+            .findMany({
+                where: { id: { in: presentIds(apps.map((app) => app.target.hostId)) }, ownerId },
+                select: { id: true, address: true }
+            })
+            .then((rows) => new Map(rows.map((row) => [row.id, row.address]))),
+        local ? getHostLanIp().catch(() => null) : null
+    ]);
+
+    return installs.map((install) => {
+        const app = install.applicationId ? (appOf.get(install.applicationId) ?? null) : null;
+        const config = readInstallConfig(install.config);
+        const hostname = typeof config.hostname === "string" ? config.hostname : null;
+        const running = app?.desiredState === "running";
+        return {
+            id: install.id,
+            name: install.name,
+            catalogId: install.catalogId,
+            catalogName: findApp(install.catalogId)?.name ?? install.catalogId,
+            edition: editionOf(install.catalogId),
+            applicationId: install.applicationId,
+            serverName: install.targetId ? (targetName.get(install.targetId) ?? null) : null,
+            running,
+            address: app
+                ? gameServerAddress({
+                      hostname,
+                      portless: config.portless === true,
+                      ip: hostname
+                          ? null
+                          : app.target.kind === "local" || !app.target.hostId
+                            ? lanIp
+                            : (hosts.get(app.target.hostId) ?? null),
+                      port: pinnedHostPort(app.sourceConfig) ?? hostPortForApp(publishedSubject(app, isolated))
+                  })
+                : null,
+            message: app ? (running ? null : "The server is stopped") : "This server is still being set up"
+        };
+    });
+}
+
+/** The port the install pinned for this application, when it pinned one. An
+ *  unreadable config pins nothing; the derived port still applies. */
+function pinnedHostPort(sourceConfig: string): number | null {
+    try {
+        const parsed = JSON.parse(sourceConfig) as { hostPort?: unknown };
+        return typeof parsed.hostPort === "number" ? parsed.hostPort : null;
+    } catch {
+        return null;
+    }
+}
+
+/** What the published port is derived from: the release for a server deployed in
+ *  isolation, the application itself for one deployed over its predecessor. */
+function publishedSubject(
+    app: { id: string; currentDeploymentId: string | null },
+    isolated: ReadonlySet<string>
+): string {
+    return app.currentDeploymentId && isolated.has(app.currentDeploymentId) ? app.currentDeploymentId : app.id;
+}
+
+/**
+ * Who is on each of the owner's servers.
+ *
+ * One round trip into every running container, so it is deliberately apart from
+ * the facts: it is what the list waits on, and nothing else should. A server that
+ * is stopped is not asked at all, and one that refuses is a row that says so
+ * rather than a list that fails.
+ */
+export async function listGameServerLive(ownerId: string): Promise<GameServerLive[]> {
+    const servers = await listGameServerFacts(ownerId);
     return Promise.all(
-        games.map(async (install) => {
-            const manifest = findApp(install.catalogId);
-            const status = await getServerStatus(ownerId, install.id).catch(() => null);
+        servers.map(async (server) => {
+            if (!server.running || !server.applicationId) {
+                return { id: server.id, answering: false, online: 0, max: 0, players: [], message: server.message };
+            }
+            const live = await getServerPlayers(ownerId, server.id).catch((caught: unknown) => ({
+                answering: false,
+                players: { online: 0, max: 0, players: [] },
+                message: caught instanceof Error ? caught.message : "The server is not answering"
+            }));
             return {
-                id: install.id,
-                name: install.name,
-                catalogId: install.catalogId,
-                catalogName: manifest?.name ?? install.catalogId,
-                edition: editionOf(install.catalogId),
-                applicationId: install.applicationId,
-                serverName: install.targetId ? (targets.get(install.targetId) ?? null) : null,
-                running: status?.running ?? false,
-                answering: status?.answering ?? false,
-                address: status?.address ?? null,
-                online: status?.players.online ?? 0,
-                max: status?.players.max ?? 0,
-                players: status?.players.players ?? [],
-                message: status?.message ?? (status ? null : "This server is still being set up")
+                id: server.id,
+                answering: live.answering,
+                online: live.players.online,
+                max: live.players.max,
+                players: live.players.players,
+                message: live.message
             };
         })
     );

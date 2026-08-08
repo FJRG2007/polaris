@@ -93,6 +93,32 @@ export function formatGameAddress(address: GameAddress | null, fallback: string 
     return address.portless ? address.hostname : `${address.hostname}:${port}`;
 }
 
+/** The ports a client tries when the player types no port at all, Java then
+ *  Bedrock. An address already on one of them is shorter and less to get wrong. */
+const IMPLIED_PORTS = [25565, 19132];
+
+/**
+ * What a player types to connect, from what Polaris knows about the server: its
+ * name on the operator's domain when it has one, otherwise the machine's own
+ * address. Null when neither is known - better no address than one that does not
+ * resolve.
+ *
+ * Pure, and the only place the rule lives: the list builds it for every server
+ * from one batch of records, and a server's own page builds it from that
+ * server's, and the two must not be able to disagree.
+ */
+export function gameServerAddress(server: {
+    hostname: string | null;
+    portless: boolean;
+    /** The machine's address, for a server with no name of its own. */
+    ip: string | null;
+    port: number;
+}): string | null {
+    if (server.hostname) return server.portless ? server.hostname : `${server.hostname}:${server.port}`;
+    if (!server.ip) return null;
+    return IMPLIED_PORTS.includes(server.port) ? server.ip : `${server.ip}:${server.port}`;
+}
+
 /**
  * Give a server its name on the operator's domain, and record it.
  *

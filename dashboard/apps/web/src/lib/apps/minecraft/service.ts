@@ -15,13 +15,14 @@
  */
 
 import { prisma } from "@polaris/db";
+import { gameServerAddress } from "./address";
+import { resolveWaf } from "@/lib/waf-service";
 import { getHostLanIp } from "@/lib/host-address";
 import type { RuntimePorts } from "@polaris/deploy";
 import { currentReleaseRef } from "@/lib/deploy/releases";
-import { resolveWaf } from "@/lib/waf-service";
 import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
-import { readAppContainerMetricsOrNull } from "@/lib/app-container-metrics";
 import { hostPortForApp, readAppRuntimeLog } from "@/lib/deploy-service";
+import { readAppContainerMetricsOrNull } from "@/lib/app-container-metrics";
 import {
     parseBannedIps,
     parseBansFile,
@@ -233,51 +234,61 @@ async function readServerFile(install: MinecraftInstall, ownerId: string, name: 
     return result.code === 0 ? result.output : "";
 }
 
+/** Who is on and whether the server is answering at all. */
+export interface MinecraftPlayers {
+    readonly answering: boolean;
+    readonly players: PlayerList;
+    /** Why it is not answering, when it is not. */
+    readonly message: string | null;
+}
+
 /** Who is on, where to reach the server, and whether it is answering at all. */
 export async function getServerStatus(ownerId: string, installedAppId: string): Promise<MinecraftStatus> {
     const install = await resolveInstall(ownerId, installedAppId);
-    const [address, usage] = await Promise.all([
+    const [address, usage, live] = await Promise.all([
         serverAddress(install, ownerId),
-        readAppContainerMetricsOrNull(install.applicationId, ownerId)
+        readAppContainerMetricsOrNull(install.applicationId, ownerId),
+        readLivePlayers(install, ownerId)
     ]);
-    const empty: PlayerList = { online: 0, max: 0, players: [] };
-    const resources = {
+    return {
         edition: install.edition,
+        running: install.running,
+        answering: live.answering,
+        players: live.players,
+        address,
+        message: live.message,
         cpuPercent: usage?.cpuPercent ?? null,
         memUsedBytes: usage?.memUsedBytes ?? null,
         memTotalBytes: usage?.memTotalBytes ?? null
     };
-    if (!install.running) {
-        return {
-            running: false,
-            answering: false,
-            players: empty,
-            address,
-            message: "The server is stopped",
-            ...resources
-        };
-    }
+}
+
+/**
+ * Only who is on, for the callers that only want that.
+ *
+ * The list of servers and the firewall pass both ask this of every server they
+ * touch, and neither shows the container's CPU or its address - sampling a
+ * container costs about a second each, which on a page listing servers is the
+ * whole wait.
+ */
+export async function getServerPlayers(ownerId: string, installedAppId: string): Promise<MinecraftPlayers> {
+    return readLivePlayers(await resolveInstall(ownerId, installedAppId), ownerId);
+}
+
+/** Ask the running server who is on. A server that is stopped or still coming up
+ *  is a reading that says so, never a throw - the callers list servers. */
+async function readLivePlayers(install: MinecraftInstall, ownerId: string): Promise<MinecraftPlayers> {
+    const empty: PlayerList = { online: 0, max: 0, players: [] };
+    if (!install.running) return { answering: false, players: empty, message: "The server is stopped" };
     try {
         const players = await readPlayerList(install, ownerId);
-        if (!players) {
-            return {
-                running: true,
-                answering: false,
-                players: empty,
-                address,
-                message: "The server is starting",
-                ...resources
-            };
-        }
-        return { running: true, answering: true, players, address, message: null, ...resources };
+        if (!players) return { answering: false, players: empty, message: "The server is starting" };
+        return { answering: true, players, message: null };
     } catch (caught) {
         return {
-            running: true,
             answering: false,
             players: empty,
-            address,
-            message: caught instanceof Error ? caught.message : "The server is not answering",
-            ...resources
+            message: caught instanceof Error ? caught.message : "The server is not answering"
         };
     }
 }
@@ -372,23 +383,22 @@ export async function getServerRoster(ownerId: string, installedAppId: string): 
  * better an absent address than one that does not resolve.
  */
 async function serverAddress(install: MinecraftInstall, ownerId: string): Promise<string | null> {
-    // A name on the operator's domain is the address when there is one: it is what
-    // players are given, and it keeps working when the machine's own changes.
-    if (install.hostname) {
-        const port = install.hostPort ?? hostPortForApp(install.portSubject);
-        return install.portless ? install.hostname : `${install.hostname}:${port}`;
-    }
-    const ip =
-        install.target.kind === "local" || !install.target.hostId
-            ? await getHostLanIp()
-            : await hostIp(install.target.hostId, ownerId);
-    if (!ip) return null;
-    // A game server publishes on the port its clients assume, pinned at install.
-    // The derived port is the fallback for one installed before that existed.
-    const port = install.hostPort ?? hostPortForApp(install.portSubject);
-    // 25565 and 19132 are what a client tries when no port is typed, so an address
-    // that is already on it is shorter and less to get wrong.
-    return port === 25565 || port === 19132 ? ip : `${ip}:${port}`;
+    // A name on the operator's domain is the address when there is one, so the
+    // machine's own is only looked up for a server that has no name.
+    const ip = install.hostname
+        ? null
+        : install.target.kind === "local" || !install.target.hostId
+          ? await getHostLanIp()
+          : await hostIp(install.target.hostId, ownerId);
+    return gameServerAddress({
+        hostname: install.hostname,
+        portless: install.portless,
+        ip,
+        // A game server publishes on the port its clients assume, pinned at
+        // install. The derived port is the fallback for one installed before that
+        // existed.
+        port: install.hostPort ?? hostPortForApp(install.portSubject)
+    });
 }
 
 /** A registered server's address, as it was enrolled. */

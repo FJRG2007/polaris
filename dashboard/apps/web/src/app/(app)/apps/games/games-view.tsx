@@ -6,10 +6,15 @@
  *
  * A table rather than cards, and the same table the containers page uses, because
  * that is what these are - a handful of long-lived processes an operator scans
- * down looking for the one that is wrong. The rows paint from what the page
- * already knows and the live parts - who is playing, whether it is answering,
- * where to connect - arrive from the page's own API, so opening it never waits on
- * a container.
+ * down looking for the one that is wrong.
+ *
+ * The table fills in two passes, because its columns cost wildly different
+ * things. Where a server runs and where a player connects are Polaris' own
+ * records - a few queries - while who is playing is a round trip into every
+ * running container, seconds when one of them is wedged. Asking for both at once
+ * meant the whole table waited on the slowest server on the page, so they are two
+ * reads: the machine and the address land immediately, and only the player counts
+ * hold a skeleton.
  *
  * Every verb is on the row: the icons for the two or three anybody uses, and a
  * right-click for the rest. Deleting is deliberately among them - a server whose
@@ -21,8 +26,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CopyButton } from "@/components/copy-button";
 import { NewServerDialog } from "./new-server-dialog";
-import { useConfirm } from "@/components/confirm-dialog";
-import type { GameServerRow } from "@/lib/apps/games-service";
+import type { GameServerFacts, GameServerLive } from "@/lib/apps/games-service";
 import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import {
     deleteGameServerAction,
@@ -48,6 +52,7 @@ import {
     Button,
     Card,
     CardBody,
+    ConfirmDeleteDialog,
     ContextMenu,
     ContextMenuContent,
     ContextMenuItem,
@@ -72,9 +77,12 @@ export interface GameServerSeed {
     status: string;
 }
 
-/** What a row is, once the live read has caught up with the seed. */
+/** What a row is, as its two reads catch up with the seed. */
 interface ServerView extends GameServerSeed {
-    live: GameServerRow | null;
+    /** Where it runs and where a player connects. Null until the first read. */
+    facts: GameServerFacts | null;
+    /** Who is on it. Null until the servers themselves have answered. */
+    live: GameServerLive | null;
 }
 
 export function GamesView({
@@ -89,40 +97,69 @@ export function GamesView({
     canManage: boolean;
 }) {
     const router = useRouter();
-    const [live, setLive] = useState<Map<string, GameServerRow>>(new Map());
+    const [facts, setFacts] = useState<Map<string, GameServerFacts>>(new Map());
+    const [live, setLive] = useState<Map<string, GameServerLive>>(new Map());
     const [creating, setCreating] = useState(false);
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
-    const [confirm, confirmDialog] = useConfirm();
-    // Servers whose deletion is in flight. They leave the table at once - tearing
-    // a container down takes a moment, and a row that sits there until the next
-    // poll reads as a button that did nothing. A refusal puts the row back.
-    const [deleting, setDeleting] = useState<string[]>([]);
+    // The server the delete dialog is asking about, and what it refused with.
+    const [deleting, setDeleting] = useState<ServerView | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+    // Servers already deleted. They leave the table at once - tearing a container
+    // down takes a moment, and a row that sits there until the next poll reads as
+    // a button that did nothing.
+    const [removed, setRemoved] = useState<string[]>([]);
 
-    const load = useCallback(async () => {
+    const loadFacts = useCallback(async () => {
         if (!managerInstalled) return;
         try {
             const response = await fetch("/api/apps/games", { cache: "no-store" });
             if (!response.ok) return;
-            const data = (await response.json()) as { servers?: GameServerRow[] };
+            const data = (await response.json()) as { servers?: GameServerFacts[] };
+            setFacts(new Map((data.servers ?? []).map((row) => [row.id, row])));
+        } catch {
+            // Transient; the next poll retries.
+        }
+    }, [managerInstalled]);
+
+    const loadLive = useCallback(async () => {
+        if (!managerInstalled) return;
+        try {
+            const response = await fetch("/api/apps/games/live", { cache: "no-store" });
+            if (!response.ok) return;
+            const data = (await response.json()) as { servers?: GameServerLive[] };
             setLive(new Map((data.servers ?? []).map((row) => [row.id, row])));
         } catch {
             // Transient; the next poll retries.
         }
     }, [managerInstalled]);
 
+    // Both start together and land when they land: the table is not held back to
+    // the speed of the slower one.
+    const reload = useCallback(async () => {
+        await Promise.all([loadFacts(), loadLive()]);
+    }, [loadFacts, loadLive]);
+
     useEffect(() => {
-        void load();
-        const timer = setInterval(() => void load(), POLL_MS);
+        void loadFacts();
+        void loadLive();
+        const timer = setInterval(() => {
+            void loadFacts();
+            void loadLive();
+        }, POLL_MS);
         return () => clearInterval(timer);
-    }, [load]);
+    }, [loadFacts, loadLive]);
 
     const rows = useMemo<ServerView[]>(
         () =>
             servers
-                .filter((server) => !deleting.includes(server.id))
-                .map((server) => ({ ...server, live: live.get(server.id) ?? null })),
-        [servers, live, deleting]
+                .filter((server) => !removed.includes(server.id))
+                .map((server) => ({
+                    ...server,
+                    facts: facts.get(server.id) ?? null,
+                    live: live.get(server.id) ?? null
+                })),
+        [servers, facts, live, removed]
     );
     const playing = useMemo(() => rows.reduce((total, row) => total + (row.live?.online ?? 0), 0), [rows]);
 
@@ -134,30 +171,24 @@ export function GamesView({
                 setError(result.error);
                 return;
             }
-            await load();
+            await reload();
             router.refresh();
         });
     }
 
-    async function onDelete(server: ServerView): Promise<void> {
-        const confirmed = await confirm({
-            title: `Delete ${server.name}?`,
-            description:
-                "The server is stopped and its container removed. The world and everything else on a server-local volume goes with it; data on a NAS mount is kept.",
-            confirmLabel: "Delete",
-            danger: true
-        });
-        if (!confirmed) return;
-        setError(null);
-        setDeleting((ids) => [...ids, server.id]);
+    function onConfirmDelete(): void {
+        const server = deleting;
+        if (!server) return;
+        setDeleteError(null);
         startTransition(async () => {
             const result = await deleteGameServerAction(server.id);
             if (result.error) {
-                setDeleting((ids) => ids.filter((id) => id !== server.id));
-                setError(result.error);
+                setDeleteError(result.error);
                 return;
             }
-            await load();
+            setRemoved((ids) => [...ids, server.id]);
+            setDeleting(null);
+            await reload();
             router.refresh();
         });
     }
@@ -222,7 +253,10 @@ export function GamesView({
                                     canManage={canManage}
                                     pending={pending}
                                     onRun={run}
-                                    onDelete={() => void onDelete(server)}
+                                    onDelete={() => {
+                                        setDeleteError(null);
+                                        setDeleting(server);
+                                    }}
                                 />
                             ))}
                         </tbody>
@@ -231,7 +265,16 @@ export function GamesView({
             )}
 
             {creating && <NewServerDialog onClose={() => setCreating(false)} />}
-            {confirmDialog}
+            <ConfirmDeleteDialog
+                open={deleting !== null}
+                onOpenChange={(open) => !open && !pending && setDeleting(null)}
+                name={deleting?.name ?? ""}
+                kind="server"
+                description="The server is stopped and its container removed. The world and everything else on a server-local volume goes with it; data on a NAS mount is kept."
+                error={deleteError}
+                pending={pending}
+                onConfirm={onConfirmDelete}
+            />
         </div>
     );
 }
@@ -308,14 +351,15 @@ function ServerRow({
     onRun: (action: () => Promise<{ error?: string }>) => void;
     onDelete: () => void;
 }) {
-    const live = server.live;
+    const { facts, live } = server;
     const href = `/apps/installed/${server.id}`;
     const files = filesHref(server.applicationId);
-    const running = live?.running ?? false;
-    const address = live?.address ?? null;
-    // Until the first poll answers there is nothing to say about the container, so
-    // the lifecycle verbs wait rather than offer the wrong one.
-    const known = live !== null;
+    const running = facts?.running ?? false;
+    const address = facts?.address ?? null;
+    // Start and stop act on what the server is meant to be doing, which is the
+    // first read - so they are offered as soon as it lands rather than waiting on
+    // the containers to be asked who is playing.
+    const known = facts !== null;
 
     return (
         <ContextMenu>
@@ -333,16 +377,16 @@ function ServerRow({
                         <span className="block truncate text-xs text-muted-foreground" title={server.catalogName}>{server.catalogName}</span>
                     </td>
                     <td className="px-3 py-2">
-                        <StatusBadge live={live} status={server.status} />
+                        <StatusBadge facts={facts} live={live} status={server.status} />
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">
-                        <PlayersCell live={live} />
+                        <PlayersCell facts={facts} live={live} />
                     </td>
                     <td className="px-3 py-2">
-                        <AddressCell name={server.name} live={live} />
+                        <AddressCell name={server.name} facts={facts} />
                     </td>
                     <td className="hidden px-3 py-2 text-xs text-muted-foreground lg:table-cell">
-                        {live === null ? <Skeleton className="h-4 w-24" /> : (live.serverName ?? "-")}
+                        {facts === null ? <Skeleton className="h-4 w-24" /> : (facts.serverName ?? "-")}
                     </td>
                     <td className="px-3 py-2">
                         <div className="flex justify-end gap-1">
@@ -420,8 +464,11 @@ function ServerRow({
     );
 }
 
-/** Who is on, and the names behind the count for a server small enough to say. */
-function PlayersCell({ live }: { live: GameServerRow | null }) {
+/** Who is on, and the names behind the count for a server small enough to say. A
+ *  server that is not meant to be up has nobody on it, which is known without
+ *  asking it. */
+function PlayersCell({ facts, live }: { facts: GameServerFacts | null; live: GameServerLive | null }) {
+    if (facts !== null && !facts.running) return <span>-</span>;
     if (live === null) return <Skeleton className="h-4 w-12" />;
     if (!live.answering) return <span>-</span>;
     return (
@@ -437,28 +484,40 @@ function PlayersCell({ live }: { live: GameServerRow | null }) {
 
 /** Where a player connects. The name when it has one, the machine's address when
  *  it does not, and why there is neither when there is neither. */
-function AddressCell({ name, live }: { name: string; live: GameServerRow | null }) {
-    if (live === null) return <Skeleton className="h-4 w-40" />;
-    if (!live.address) {
-        return <span className="text-xs text-muted-foreground">{live.message ?? "No address yet"}</span>;
+function AddressCell({ name, facts }: { name: string; facts: GameServerFacts | null }) {
+    if (facts === null) return <Skeleton className="h-4 w-40" />;
+    if (!facts.address) {
+        return <span className="text-xs text-muted-foreground">{facts.message ?? "No address yet"}</span>;
     }
     return (
         <div className="flex min-w-0 items-center gap-1">
-            <code className="truncate font-mono text-xs" title={live.address}>
-                {live.address}
+            <code className="truncate font-mono text-xs" title={facts.address}>
+                {facts.address}
             </code>
-            <CopyButton value={live.address} label={`the address of ${name}`} />
+            <CopyButton value={facts.address} label={`the address of ${name}`} />
         </div>
     );
 }
 
-function StatusBadge({ live, status }: { live: GameServerRow | null; status: string }) {
+function StatusBadge({
+    facts,
+    live,
+    status
+}: {
+    facts: GameServerFacts | null;
+    live: GameServerLive | null;
+    status: string;
+}) {
     // An install that failed stays failed however the container reads: a create
     // that fell over leaves nothing running, and reporting that as merely
     // "Stopped" invites somebody to press Start on a server that was never built.
-    if (status === "failed" && !live?.running) return <Badge variant="danger">Failed</Badge>;
-    if (live === null) return <Badge>Loading</Badge>;
-    if (!live.running) return <Badge>Stopped</Badge>;
+    if (status === "failed" && !facts?.running) return <Badge variant="danger">Failed</Badge>;
+    if (facts === null) return <Badge>Loading</Badge>;
+    if (!facts.running) return <Badge>Stopped</Badge>;
+    // Up, but whether it is actually answering is the read that is still out -
+    // saying "Online" before the server has said so would be reporting the
+    // container, which is the thing an operator opens this page to distrust.
+    if (live === null) return <Badge variant="warning">Checking</Badge>;
     if (!live.answering) return <Badge variant="warning">Starting</Badge>;
     return <Badge variant="success">Online</Badge>;
 }

@@ -28,7 +28,7 @@ import { noteReachedFrom } from "@/lib/apps/minecraft/reach";
 import { parseJoinAddresses } from "@/lib/apps/minecraft/parse";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import { accessRefusal, isAddressRule, isPlayerName, type PlayerAccess } from "@/lib/apps/minecraft/access";
-import { editionOf, getServerStatus, runServerCommand, type MinecraftEdition } from "@/lib/apps/minecraft/service";
+import { editionOf, getServerPlayers, runServerCommand, type MinecraftEdition } from "@/lib/apps/minecraft/service";
 
 /** How much log to read back when matching joins. A join line per player is all
  *  that is wanted, and a busy server prints a lot between them. */
@@ -191,7 +191,7 @@ export async function enforcePlayerAddresses(ownerId: string, installedAppId: st
     if (install.edition !== "java" || !install.applicationId) return nothing;
 
     const [status, rules] = await Promise.all([
-        getServerStatus(ownerId, installedAppId),
+        getServerPlayers(ownerId, installedAppId),
         playerAccessRules(installedAppId)
     ]);
     if (!status.answering || status.players.players.length === 0) return nothing;
