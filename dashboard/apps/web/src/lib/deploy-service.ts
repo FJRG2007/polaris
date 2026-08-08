@@ -1210,6 +1210,13 @@ export async function restartApplication(applicationId: string, ownerId: string)
  * Disable or enable a deployment without removing it: stop or start the container
  * while keeping the deployment record and its release history intact. The current
  * deployment's status tracks it (running <-> stopped) so the UI can reflect state.
+ *
+ * What the operator asked for is recorded on the application, not only carried out
+ * on the container, because the two are read by different things at different
+ * times. Every screen reports state from `desiredState`, the boot reconcile brings
+ * back everything that says "running", and Watch alarms on anything that says
+ * "running" and is not - so a stop that only halted the container read as a button
+ * that did nothing, and came back up on its own at the next reboot.
  */
 export async function setApplicationRunning(
     applicationId: string,
@@ -1220,9 +1227,13 @@ export async function setApplicationRunning(
     // stopping just halts the container while keeping the deployment record.
     if (running) {
         await deployApplication(applicationId, ownerId, ownerId);
+        await prisma.application.update({ where: { id: applicationId }, data: { desiredState: "running" } });
         return;
     }
     const { app, container, target } = await appRuntime(applicationId, ownerId);
+    // Recorded before the container is touched: a stop that half-succeeded must
+    // not leave the app claiming it should be up, or the next reconcile undoes it.
+    await prisma.application.update({ where: { id: applicationId }, data: { desiredState: "stopped" } });
     const ports = await getPorts(target, ownerId);
     try {
         await ports.container(container, "stop");
