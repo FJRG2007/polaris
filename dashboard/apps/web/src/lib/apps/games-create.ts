@@ -12,13 +12,14 @@
  * which is strictly better than no server.
  */
 
+import { installApp } from "@/lib/apps/install-service";
 import { joinAccess } from "@/lib/apps/minecraft/access";
+import { availableHostPort } from "@/lib/apps/port-registry";
 import { promptedEnvVars, findApp } from "@/lib/apps/catalog";
 import { setGameHostname } from "@/lib/apps/minecraft/address";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import type { CreateGameServerInput } from "@/lib/apps/games-schema";
 import { grantPlayerAccess } from "@/lib/apps/minecraft/player-access";
-import { availableHostPort, installApp } from "@/lib/apps/install-service";
 import {
     CROSSPLAY_PROJECTS,
     findBlueprint,
@@ -84,7 +85,7 @@ export async function createGameServer(
     const extraPorts = input.crossplay
         ? [
               {
-                  host: await availableHostPort(ownerId, BEDROCK_PORT),
+                  host: await availableHostPort(BEDROCK_PORT, "udp"),
                   container: BEDROCK_PORT,
                   protocol: "udp" as const
               }

@@ -14,6 +14,7 @@ import { listHosts } from "@/lib/host-service";
 import { encryptSecret } from "@polaris/storage";
 import { appBaseUrl } from "@/lib/domain-service";
 import { createVolume } from "@/lib/deploy-volume-service";
+import { availableHostPort } from "@/lib/apps/port-registry";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import type { AppInstallInput } from "@/lib/apps/install-schema";
 import { invalidateBridgeCache } from "@/lib/messaging/bridge-endpoint";
@@ -49,32 +50,6 @@ async function availableInstanceName(environmentId: string, wanted: string): Pro
         if (!taken.has(slugify(candidate))) return candidate;
     }
     throw new Error("Too many installs of this app - rename one first");
-}
-
-/**
- * A host port near the one the app wants that no other app of this owner has
- * pinned. A game server answers on the port its players' clients assume, so the
- * first Minecraft server gets 25565 and the second gets 25566 rather than both
- * fighting over one - or landing on a derived port nobody would think to type.
- */
-export async function availableHostPort(ownerId: string, preferred: number): Promise<number> {
-    const rows = await prisma.application.findMany({
-        where: { environment: { project: { ownerId } } },
-        select: { sourceConfig: true }
-    });
-    const taken = new Set<number>();
-    for (const row of rows) {
-        try {
-            const config = JSON.parse(row.sourceConfig) as { hostPort?: unknown };
-            if (typeof config.hostPort === "number") taken.add(config.hostPort);
-        } catch {
-            // A config we cannot read pins nothing we need to avoid.
-        }
-    }
-    for (let port = preferred; port < preferred + 100; port += 1) {
-        if (!taken.has(port)) return port;
-    }
-    throw new Error("No free port left near the one this app needs");
 }
 
 /** The owner's Marketplace environment id, creating the project on first use. */
@@ -157,7 +132,9 @@ export async function installApp(
     const name = await availableInstanceName(environmentId, input.name);
     // An app that declares the host port it wants is one people reach by typing an
     // address (a game server): publish it there, on the transport its clients speak.
-    const hostPort = primary?.host ? await availableHostPort(ownerId, primary.host) : undefined;
+    const hostPort = primary?.host
+        ? await availableHostPort(primary.host, primary.protocol === "udp" ? "udp" : "tcp")
+        : undefined;
     const application = await createApplication(ownerId, {
         environmentId,
         targetId: target.id,
