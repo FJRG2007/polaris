@@ -85,6 +85,23 @@ export function addressMatches(rule: string, address: string): boolean {
     return ((candidate & mask) >>> 0) === ((base & mask) >>> 0);
 }
 
+/**
+ * What the player list actually stops, said in one place because two screens show
+ * it and a protection described differently in two places is one nobody trusts.
+ *
+ * Worth being blunt about, because the obvious reading of "who can connect" is a
+ * network block and it is not one. The port is open to anyone who can route to it:
+ * the server answers the status ping, so a stranger sees the name, the description,
+ * the icon and the player count, and only finds out they are not welcome when they
+ * press Join. What the list refuses is the login, which is the account getting in -
+ * not the packet arriving.
+ *
+ * Closing the port itself is the firewall's job and it is not wired to this list
+ * yet; until it is, this is the honest description of the difference.
+ */
+export const ACCESS_REACH_NOTE =
+    "The port stays open to anyone who can reach it, so a stranger can still see this server in their list and read its description. What the list refuses is the login: an unregistered name, or a registered one arriving from somewhere else, does not get in.";
+
 /** One player, and where they are allowed to connect from. */
 export interface PlayerAccess {
     readonly username: string;

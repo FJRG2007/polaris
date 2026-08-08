@@ -18,6 +18,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { GameAccessForm } from "@/components/game-access-form";
+import { ACCESS_REACH_NOTE } from "@/lib/apps/minecraft/access";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import { foldPlayers, type PlayerEntry } from "@/lib/apps/minecraft/players";
 import { Badge, Button, Card, CardBody, Input, Select, Switch, cn } from "@polaris/ui";
@@ -163,7 +164,7 @@ export function MinecraftPlayers({
                             <p className="text-sm font-medium">Add a player</p>
                             <p className="text-xs text-muted-foreground">
                                 A player is let in when the username is on this list and they arrive from the address
-                                registered to it. The rest of the firewall guards HTTP, which a game port is not.
+                                registered to it. {ACCESS_REACH_NOTE}
                             </p>
                         </div>
                         <div className="flex items-center gap-2">

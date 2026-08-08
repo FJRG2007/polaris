@@ -16,6 +16,7 @@
 import { UserMinus } from "lucide-react";
 import { useState, useTransition } from "react";
 import { GameAccessForm } from "@/components/game-access-form";
+import { ACCESS_REACH_NOTE } from "@/lib/apps/minecraft/access";
 import { Badge, Button, Card, CardBody, Switch } from "@polaris/ui";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import {
@@ -86,6 +87,7 @@ export function GameAccessEditor({
                     A player is let in when the username is on this list and they arrive from the address registered to
                     it. The rest of the firewall guards HTTP, which a game port is not.
                 </p>
+                <p className="text-xs text-muted-foreground">{ACCESS_REACH_NOTE}</p>
 
                 <GameAccessForm
                     edition={edition}
