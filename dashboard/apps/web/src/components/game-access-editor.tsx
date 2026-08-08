@@ -13,10 +13,10 @@
  * as what it costs rather than as a preference.
  */
 
+import { UserMinus } from "lucide-react";
 import { useState, useTransition } from "react";
-import { UserMinus, UserPlus } from "lucide-react";
-import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
-import { Badge, Button, Card, CardBody, Input, Switch } from "@polaris/ui";
+import { GameAccessForm } from "@/components/game-access-form";
+import { Badge, Button, Card, CardBody, Switch } from "@polaris/ui";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import {
     grantPlayerAccessAction,
@@ -38,14 +38,9 @@ export function GameAccessEditor({
 }) {
     const [pending, startTransition] = useTransition();
     const [failure, setFailure] = useState<string | null>(null);
-    const [username, setUsername] = useState("");
-    const [address, setAddress] = useState("");
 
     const edition = access?.edition ?? "java";
     const rules = access?.rules ?? [];
-    const nameInvalid = username.trim().length > 0 && !isPlayerName(edition, username);
-    const addressInvalid = address.trim().length > 0 && !isAddressRule(address);
-    const ready = isPlayerName(edition, username) && isAddressRule(address);
 
     /** Report upward when the host screen collects errors, and locally otherwise -
      *  a failure that only one of the two screens can show is a failure the other
@@ -55,7 +50,7 @@ export function GameAccessEditor({
         onError?.(message);
     }
 
-    function run(action: () => Promise<{ error?: string }>, after?: () => void): void {
+    function run(action: () => Promise<{ error?: string }>): void {
         report(null);
         startTransition(async () => {
             const result = await action();
@@ -63,7 +58,6 @@ export function GameAccessEditor({
                 report(result.error);
                 return;
             }
-            after?.();
             onChanged();
         });
     }
@@ -93,51 +87,20 @@ export function GameAccessEditor({
                     it. The rest of the firewall guards HTTP, which a game port is not.
                 </p>
 
-                <div className="flex flex-col gap-1">
-                    <div className="flex flex-wrap items-start gap-2">
-                        <Input
-                            value={username}
-                            onChange={(event) => setUsername(event.target.value)}
-                            placeholder={edition === "bedrock" ? "Gamertag" : "Username"}
-                            className="min-w-36 flex-1"
-                            aria-label="Player"
-                        />
-                        <Input
-                            value={address}
-                            onChange={(event) => setAddress(event.target.value)}
-                            placeholder="203.0.113.9, 203.0.113.0/24 or any"
-                            className="min-w-48 flex-1"
-                            aria-label="Address they connect from"
-                        />
-                        <Button
-                            size="sm"
-                            disabled={pending || !ready}
-                            onClick={() =>
-                                run(
-                                    () =>
-                                        grantPlayerAccessAction({
-                                            installedAppId,
-                                            username: username.trim(),
-                                            address: address.trim()
-                                        }),
-                                    () => {
-                                        setUsername("");
-                                        setAddress("");
-                                    }
-                                )
-                            }
-                        >
-                            <UserPlus className="size-4" /> Add
-                        </Button>
-                    </div>
-                    {(nameInvalid || addressInvalid) && (
-                        <p className="text-xs text-danger">
-                            {nameInvalid
-                                ? "That is not a username this edition accepts"
-                                : "That is not an address or a range"}
-                        </p>
-                    )}
-                </div>
+                <GameAccessForm
+                    edition={edition}
+                    disabled={pending}
+                    onAdd={async (input) => {
+                        report(null);
+                        const result = await grantPlayerAccessAction({ installedAppId, ...input });
+                        if (result.error) {
+                            report(result.error);
+                            return false;
+                        }
+                        onChanged();
+                        return true;
+                    }}
+                />
 
                 {access === null ? (
                     <p className="py-3 text-sm text-muted-foreground">Reading the list...</p>

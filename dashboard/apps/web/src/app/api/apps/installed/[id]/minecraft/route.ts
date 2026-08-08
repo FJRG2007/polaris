@@ -30,9 +30,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             reachAdviceFor(id, true).catch(() => null),
             wantsRoster && status.answering ? getServerRoster(user.id, id) : null,
             wantsRoster ? getServerFirewall(user.id, id).catch(() => null) : null,
-            // One query, and it is what the moderation screen is really about now:
-            // the game's own lists say who, and this says who from where.
-            wantsRoster ? listPlayerAccess(user.id, id).catch(() => null) : null,
+            // One indexed query, and unlike the roster it does not go near the
+            // container - so it rides on every poll rather than only the moderation
+            // screen's. The overview needs it too: a server nobody is registered on
+            // is one nobody can join, and that has to be said where the address is,
+            // not on a tab somebody has to think to open.
+            listPlayerAccess(user.id, id).catch(() => null),
             // Opening the moderation screen is also when the list gets applied to
             // whoever is already on. The cron does this on its own schedule; a
             // deployment without cron configured would otherwise have rules that

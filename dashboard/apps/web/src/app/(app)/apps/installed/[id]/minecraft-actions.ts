@@ -10,6 +10,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { clientIp } from "@/lib/request-context";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { setEnvVars } from "@/lib/env-var-service";
@@ -150,6 +151,19 @@ export async function grantPlayerAccessAction(input: PlayerAccessInput): Promise
 export async function playerAccessAction(installedAppId: string): Promise<PlayerAccessView | null> {
     const user = await requirePermission("games.read");
     return listPlayerAccess(user.id, installedAppId).catch(() => null);
+}
+
+/**
+ * The address Polaris sees this dashboard request arriving from.
+ *
+ * Offered as a fill for the address field, because the operator registering
+ * themselves is almost always sitting on the line they will play from - and the
+ * alternative is asking somebody to go and look their own IP up. It is only ever
+ * a suggestion: the field stays editable, and what is typed is what is stored.
+ */
+export async function myAddressAction(): Promise<{ address: string | null }> {
+    await requirePermission("games.read");
+    return { address: (await clientIp()) ?? null };
 }
 
 /** Take a player off the list, and off the server if they are on it. */

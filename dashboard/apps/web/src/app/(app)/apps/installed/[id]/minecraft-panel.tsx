@@ -23,11 +23,11 @@ import { MinecraftConsole } from "./minecraft-console";
 import { MinecraftPlayers } from "./minecraft-players";
 import { MinecraftSettings } from "./minecraft-settings";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FolderOpen, Loader2, Save, ShieldAlert } from "lucide-react";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
+import { FolderOpen, Loader2, Save, ShieldAlert, UserPlus } from "lucide-react";
 import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
 
 const TABS = [
@@ -113,7 +113,9 @@ export function MinecraftPanel({
                 reach: data.reach ?? current.reach,
                 roster: data.roster ?? (wantsRoster ? current.roster : null),
                 firewall: data.firewall ?? (wantsRoster ? current.firewall : null),
-                access: data.access ?? (wantsRoster ? current.access : null)
+                // Read on every poll, not only the moderation screen's, because the
+                // overview says whether anybody can join at all.
+                access: data.access ?? current.access
             }));
         } catch {
             // Transient; the next poll retries.
@@ -144,6 +146,8 @@ export function MinecraftPanel({
                 installedAppId={installedAppId}
                 applicationId={applicationId}
                 reach={reading.reach ?? game?.reach ?? null}
+                access={reading.access}
+                onOpenPlayers={() => setTab("players")}
             />
 
             {error && <p className="text-sm text-danger">{error}</p>}
@@ -216,7 +220,9 @@ function ConnectCard({
     settings,
     installedAppId,
     applicationId,
-    reach
+    reach,
+    access,
+    onOpenPlayers
 }: {
     status: MinecraftStatus | null;
     running: boolean;
@@ -224,6 +230,9 @@ function ConnectCard({
     installedAppId: string;
     applicationId: string | null;
     reach: GameReachAdvice | null;
+    /** Who may connect. Null until the first poll answers. */
+    access: PlayerAccessView | null;
+    onOpenPlayers: () => void;
 }) {
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState<string | null>(null);
@@ -283,6 +292,31 @@ function ConnectCard({
                     </Button>
                 </div>
                 {saved && <p className="w-full text-xs text-muted-foreground">{saved}</p>}
+
+                {/* An address nobody is allowed to use is not an address. Both
+                    images boot with their list enforced and empty, so this is the
+                    state a brand-new server is in, and the operator standing here
+                    with the address copied is exactly who has to be told. */}
+                {access !== null && access.rules.length === 0 && (
+                    <div className="flex w-full items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2">
+                        <UserPlus className="mt-0.5 size-4 shrink-0 text-warning" />
+                        <div className="flex flex-col items-start gap-1 text-xs">
+                            <p className="font-medium text-foreground">Nobody can join yet</p>
+                            <p className="text-muted-foreground">
+                                No player is registered, so the server refuses everyone - including you. Add your{" "}
+                                {access.edition === "bedrock" ? "gamertag" : "Minecraft username"} and the address you
+                                play from, then connect on the address above.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={onOpenPlayers}
+                                className="text-primary hover:underline"
+                            >
+                                Add yourself in Players
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* The address is only an address if packets can get to it. A game
                     port rides on nothing the domain setup opened, so this is where
