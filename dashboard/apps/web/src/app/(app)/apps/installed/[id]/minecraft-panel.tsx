@@ -292,7 +292,7 @@ function ConnectCard({
                                 </ul>
                             )}
                             {reach.forward && (
-                                <Link href="/admin/domains" className="w-fit text-primary hover:underline">
+                                <Link href="/admin/domains#game-ports" className="w-fit text-primary hover:underline">
                                     Open the router walkthrough
                                 </Link>
                             )}

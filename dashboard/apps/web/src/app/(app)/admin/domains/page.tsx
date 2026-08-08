@@ -9,6 +9,7 @@
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { DomainsView } from "./domains-view";
+import { GamePortsCard } from "./game-ports-card";
 import { getDomainZones } from "@/lib/domain-zones";
 import { ownerDomainPolicy } from "@/lib/owner-domains";
 import { checkedAddresses } from "@/lib/address-health";
@@ -43,6 +44,14 @@ export default async function DomainsPage() {
                 initialAddresses={addresses}
                 effectiveAppUrl={effectiveAppUrl}
             />
+            {/* The zone check above is finished once 80 and 443 arrive, and a game
+                server answers on neither - so what it needs is asked for here
+                rather than folded into advice that disappears when the website
+                works. Renders nothing when no game server exists. */}
+            <div className="mt-4">
+                <GamePortsCard />
+            </div>
+
             {/* Below the instance's own addresses, because it is a different
                 decision: not what Polaris answers on, but what other people are
                 allowed to point at it. */}
