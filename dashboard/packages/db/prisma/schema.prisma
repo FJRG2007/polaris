@@ -2076,6 +2076,31 @@ model InstalledApp {
     @@index([applicationId])
 }
 
+// Who may connect to a game server, and from where. A game server is not HTTP, so
+// none of the WAF tables apply to it: the game's own list holds usernames and has
+// no concept of an address, and this is the half that adds one. Enforced on the
+// join (see lib/apps/minecraft/player-access), which is the first moment a
+// player's address exists.
+model GamePlayerAccess {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    // The InstalledApp this rule belongs to. Bare uuid, per the InstalledApp
+    // precedent of not linking installs by foreign key.
+    installedAppId String   @db.Uuid
+    // Minecraft username or Bedrock gamertag, stored as the operator typed it and
+    // compared case-insensitively.
+    username       String
+    // One IPv4 address, a CIDR range, or "any" for a player whose line moves.
+    address        String
+    // Why this player is on the list, for whoever reads it in six months.
+    note           String?
+    createdById    String?  @db.Uuid
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+
+    @@unique([installedAppId, username])
+    @@index([installedAppId])
+}
+
 // ---------------------------------------------------------------------------
 // Messaging (unified inbox across WhatsApp / Telegram / Discord / Slack)
 // ---------------------------------------------------------------------------

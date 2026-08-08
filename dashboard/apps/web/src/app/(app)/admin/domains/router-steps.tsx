@@ -17,9 +17,10 @@
  * that was never on.
  */
 
-import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ExternalLink } from "lucide-react";
 import { Button, Select } from "@polaris/ui";
+import { useEffect, useRef, useState } from "react";
+import { CopyButton } from "@/components/copy-button";
+import { ChevronDown, ExternalLink } from "lucide-react";
 import {
     detectRouterBrand,
     likelyGateway,
@@ -30,7 +31,6 @@ import {
     type RouterForwardRule,
     type RouterFormField
 } from "@/lib/router-guide";
-import { CopyButton } from "@/components/copy-button";
 
 /** A value to type elsewhere: shown verbatim, copied in one click. */
 function Value({ text }: { text: string }) {
@@ -71,7 +71,18 @@ function ForwardValue({ field, rule, lanIp }: { field: RouterFormField; rule: Ro
     }
 }
 
-export function RouterSteps({ server, lanIp }: { server: string | null; lanIp: string | null }) {
+export function RouterSteps({
+    server,
+    lanIp,
+    rules = FORWARD_RULES
+}: {
+    server: string | null;
+    lanIp: string | null;
+    /** The rules to create. Defaults to the two Polaris itself needs; a deployment
+     *  running game servers adds one per published game port, because nothing else
+     *  in the setup ever asks for those. */
+    rules?: readonly RouterForwardRule[];
+}) {
     const [open, setOpen] = useState(false);
     const [brand, setBrand] = useState<RouterBrand>(() => detectRouterBrand(server));
     // A brand the operator chose outranks anything a later probe recognizes. They
@@ -206,8 +217,9 @@ export function RouterSteps({ server, lanIp }: { server: string | null; lanIp: s
                             </ol>
                         </li>
                         <li>
-                            Create two rules in <b className="font-medium text-foreground">{guide.forwardPath}</b>, with
-                            exactly these values
+                            Create {rules.length === 1 ? "one rule" : `these ${rules.length} rules`} in{" "}
+                            <b className="font-medium text-foreground">{guide.forwardPath}</b>, with exactly these
+                            values
                             {guide.forwardSave ? (
                                 <>
                                     {" "}
@@ -221,9 +233,9 @@ export function RouterSteps({ server, lanIp }: { server: string | null; lanIp: s
                                     <thead>
                                         <tr className="text-muted-foreground">
                                             <th className="font-normal">Field</th>
-                                            {FORWARD_RULES.map((rule) => (
+                                            {rules.map((rule, index) => (
                                                 <th key={rule.name} className="font-normal">
-                                                    Rule {rule.port === 80 ? "1" : "2"}
+                                                    Rule {index + 1}
                                                 </th>
                                             ))}
                                         </tr>
@@ -232,7 +244,7 @@ export function RouterSteps({ server, lanIp }: { server: string | null; lanIp: s
                                         {(guide.forwardFields ?? GENERIC_FORWARD_FIELDS).map((field, index) => (
                                             <tr key={`${field.label}-${index}`}>
                                                 <td>{field.label}</td>
-                                                {FORWARD_RULES.map((rule) => (
+                                                {rules.map((rule) => (
                                                     <td key={rule.name}>
                                                         <ForwardValue field={field} rule={rule} lanIp={lanIp} />
                                                     </td>

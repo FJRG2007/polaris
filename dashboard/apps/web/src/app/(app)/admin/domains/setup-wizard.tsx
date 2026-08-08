@@ -16,6 +16,34 @@
  */
 
 import { useEffect, useState } from "react";
+import { RouterSteps } from "./router-steps";
+import { CopyButton } from "@/components/copy-button";
+import type { ServerEnvironment } from "@polaris/core";
+import type { DnsProviderInfo } from "@/lib/dns-provider";
+import type { ZoneDnsProvisionResult, ZoneDnsReport } from "@/lib/domain-dns";
+import { connectCloudflareAccountAction } from "@/app/(app)/integrations/actions";
+import { CLOUDFLARE_DNS_TOKEN_URL } from "@/lib/integrations/cloudflare-token-link";
+import { FORWARD_RULES, gameForwardRules, type RouterForwardRule } from "@/lib/router-guide";
+import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "@/app/(app)/apps/servers/environment-meta";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Checkbox, Input, Select } from "@polaris/ui";
+import { clearSetupDraft, isUntouched, readSetupDraft, savedAnswers, writeSetupDraft } from "./setup-draft";
+import {
+    approachesFor,
+    approachOf,
+    strategiesFor,
+    STRATEGY_META,
+    type ApproachChoice,
+    type ExposureStrategy,
+    type StrategyChoice
+} from "@/lib/domain-strategies";
+import {
+    checkZoneDnsAction,
+    detectDnsProviderAction,
+    domainSetupStateAction,
+    provisionZoneDnsAction,
+    saveDomainSetupAction,
+    type DomainSetupState
+} from "./setup-actions";
 import {
     Cable,
     Check,
@@ -33,33 +61,6 @@ import {
     TriangleAlert,
     Wand2
 } from "lucide-react";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Checkbox, Input, Select } from "@polaris/ui";
-import type { ServerEnvironment } from "@polaris/core";
-import type { DnsProviderInfo } from "@/lib/dns-provider";
-import type { ZoneDnsProvisionResult, ZoneDnsReport } from "@/lib/domain-dns";
-import { CLOUDFLARE_DNS_TOKEN_URL } from "@/lib/integrations/cloudflare-token-link";
-import {
-    approachesFor,
-    approachOf,
-    strategiesFor,
-    STRATEGY_META,
-    type ApproachChoice,
-    type ExposureStrategy,
-    type StrategyChoice
-} from "@/lib/domain-strategies";
-import { CopyButton } from "@/components/copy-button";
-import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "../../apps/servers/environment-meta";
-import { connectCloudflareAccountAction } from "../../integrations/actions";
-import { RouterSteps } from "./router-steps";
-import { clearSetupDraft, isUntouched, readSetupDraft, savedAnswers, writeSetupDraft } from "./setup-draft";
-import {
-    checkZoneDnsAction,
-    detectDnsProviderAction,
-    domainSetupStateAction,
-    provisionZoneDnsAction,
-    saveDomainSetupAction,
-    type DomainSetupState
-} from "./setup-actions";
 
 /** A zone row as the wizard edits it (the saved shape, plus a key for React). */
 interface ZoneRow {
@@ -340,6 +341,7 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                         selected={strategy}
                         tunnelReady={state.cloudflareTunnelReady}
                         lanIp={state.lanIp}
+                        gameRules={gameForwardRules(state.gameServers)}
                         onSelect={setStrategy}
                     />
                 )}
@@ -483,6 +485,7 @@ function StrategyStep({
     selected,
     tunnelReady,
     lanIp,
+    gameRules,
     onSelect
 }: {
     environment: ServerEnvironment;
@@ -493,6 +496,9 @@ function StrategyStep({
     tunnelReady: boolean;
     /** What a forward would point at, for the router steps. */
     lanIp: string | null;
+    /** Extra rules the deployment's game servers need, so the operator opens every
+     *  port in one visit to the router rather than coming back for each server. */
+    gameRules: readonly RouterForwardRule[];
     onSelect: (next: ExposureStrategy) => void;
 }) {
     const approach = approachOf(selected);
@@ -562,10 +568,14 @@ function StrategyStep({
                     <div className="flex flex-col gap-2 rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
                         <p className="font-medium text-foreground">What you have to do in the router</p>
                         <p>
-                            Forward ports 80 and 443 to this server. Pick your brand for the exact menu names and the
-                            values to type - the rest of the setup works either way, so this can be done afterwards.
+                            Forward ports 80 and 443 to this server
+                            {gameRules.length > 0
+                                ? `, plus ${gameRules.length === 1 ? "the port" : "the ports"} your game servers answer on`
+                                : ""}
+                            . Pick your brand for the exact menu names and the values to type - the rest of the setup
+                            works either way, so this can be done afterwards.
                         </p>
-                        <RouterSteps server={null} lanIp={lanIp} />
+                        <RouterSteps server={null} lanIp={lanIp} rules={[...FORWARD_RULES, ...gameRules]} />
                     </div>
                 )}
             </div>
@@ -925,7 +935,7 @@ function DnsStep({
                         {message && <span className="text-xs text-muted-foreground">{message}</span>}
                     </div>
                 )}
-                {duckdns && <ZoneResults report={report} />}
+                {duckdns && <ZoneResults report={report} gameRules={gameForwardRules(state.gameServers)} />}
             </div>
         );
     }
@@ -1032,7 +1042,7 @@ function DnsStep({
                 </div>
             )}
 
-            <ZoneResults report={report} />
+            <ZoneResults report={report} gameRules={gameForwardRules(state.gameServers)} />
         </div>
     );
 }
@@ -1185,7 +1195,15 @@ function ProviderHint({ provider, cloudflareConnected }: { provider: DnsProvider
 }
 
 /** What the last check saw for each zone - the proof the records are really there. */
-function ZoneResults({ report }: { report: ZoneDnsReport | null }) {
+function ZoneResults({
+    report,
+    gameRules = []
+}: {
+    report: ZoneDnsReport | null;
+    /** Forwarding rules the game servers need, carried down so the router steps ask
+     *  for every port at once rather than sending the operator back a second time. */
+    gameRules?: readonly RouterForwardRule[];
+}) {
     return (
         <>
             {report?.zones.map((zone) => (
@@ -1205,7 +1223,9 @@ function ZoneResults({ report }: { report: ZoneDnsReport | null }) {
                     </span>
                 </p>
             ))}
-            {report?.router && !report.router.ok ? <RouterAdviceNote advice={report.router} /> : null}
+            {report?.router && !report.router.ok ? (
+                <RouterAdviceNote advice={report.router} gameRules={gameRules} />
+            ) : null}
         </>
     );
 }
@@ -1213,7 +1233,13 @@ function ZoneResults({ report }: { report: ZoneDnsReport | null }) {
 /** What is left to do outside Polaris. Shown only when there is something to do:
  *  the records being right is already reported above, and repeating "and the router
  *  is fine too" for every check would bury the case that needs acting on. */
-function RouterAdviceNote({ advice }: { advice: NonNullable<ZoneDnsReport["router"]> }) {
+function RouterAdviceNote({
+    advice,
+    gameRules = []
+}: {
+    advice: NonNullable<ZoneDnsReport["router"]>;
+    gameRules?: readonly RouterForwardRule[];
+}) {
     const danger = advice.level === "danger";
     return (
         <div
@@ -1232,7 +1258,13 @@ function RouterAdviceNote({ advice }: { advice: NonNullable<ZoneDnsReport["route
                         ))}
                     </ol>
                 )}
-                {advice.forward && <RouterSteps server={advice.server} lanIp={advice.lanIp} />}
+                {advice.forward && (
+                    <RouterSteps
+                        server={advice.server}
+                        lanIp={advice.lanIp}
+                        rules={[...FORWARD_RULES, ...gameRules]}
+                    />
+                )}
             </div>
         </div>
     );

@@ -1,9 +1,13 @@
 /**
- * Cron endpoint that hands every game server the addresses the firewall blocks.
+ * Cron endpoint that keeps every game server's firewall true: the addresses the
+ * Polaris firewall blocks, and the player list each server is closed by.
  *
  * The firewall guards HTTP and a game server is not HTTP, so nothing joins the
  * two by itself; a ban added while a server is running would otherwise only reach
- * it the next time somebody pressed the button on its page. Same contract as the
+ * it the next time somebody pressed the button on its page. The player list is the
+ * same problem from the other side - a rule that says a name may only connect from
+ * one address means nothing until somebody checks the players who are already on.
+ * Same contract as the
  * other cron routes: disabled unless POLARIS_CRON_SECRET is set, and callers
  * present it as a bearer token (or an x-cron-key header). Node runtime for Prisma.
  */
@@ -35,11 +39,13 @@ export async function POST(request: Request): Promise<Response> {
     });
     let servers = 0;
     let banned = 0;
+    let kicked = 0;
     for (const owner of owners) {
         const result = await syncFirewallBans(owner.ownerId).catch(() => null);
         if (!result) continue;
         servers += result.servers;
         banned += result.banned;
+        kicked += result.kicked;
     }
-    return Response.json({ servers, banned });
+    return Response.json({ servers, banned, kicked });
 }

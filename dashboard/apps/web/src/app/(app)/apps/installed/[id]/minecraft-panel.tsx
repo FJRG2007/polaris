@@ -13,17 +13,21 @@
  */
 
 import Link from "next/link";
+import type { GameContext } from "./page";
 import { useRouter } from "next/navigation";
-import { FolderOpen, Loader2, Save } from "lucide-react";
 import { MinecraftMods } from "./minecraft-mods";
+import { MinecraftDomain } from "./minecraft-domain";
 import { CopyButton } from "@/components/copy-button";
 import { saveWorldAction } from "./minecraft-actions";
 import { MinecraftConsole } from "./minecraft-console";
 import { MinecraftPlayers } from "./minecraft-players";
 import { MinecraftSettings } from "./minecraft-settings";
+import type { GameReachAdvice } from "@/lib/apps/minecraft/reach";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { FolderOpen, Loader2, Save, ShieldAlert } from "lucide-react";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
+import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
 
 const TABS = [
@@ -46,22 +50,32 @@ interface ServerReading {
     status: MinecraftStatus | null;
     roster: MinecraftRoster | null;
     firewall: MinecraftFirewall | null;
+    access: PlayerAccessView | null;
 }
 
 export function MinecraftPanel({
     installedAppId,
     applicationId,
     settings,
-    running
+    running,
+    game
 }: {
     installedAppId: string;
     applicationId: string | null;
     settings: InstalledAppSetting[];
     running: boolean;
+    /** The server's address, and what still has to be opened for players outside
+     *  this network. */
+    game: GameContext | null;
 }) {
     const router = useRouter();
     const [tab, setTab] = useState<TabId>("overview");
-    const [reading, setReading] = useState<ServerReading>({ status: null, roster: null, firewall: null });
+    const [reading, setReading] = useState<ServerReading>({
+        status: null,
+        roster: null,
+        firewall: null,
+        access: null
+    });
     const [error, setError] = useState<string | null>(null);
 
     // The roster costs three reads inside the container, so it is only gathered
@@ -78,6 +92,7 @@ export function MinecraftPanel({
                 status?: MinecraftStatus;
                 roster?: MinecraftRoster;
                 firewall?: MinecraftFirewall;
+                access?: PlayerAccessView;
                 error?: string;
             };
             if (!response.ok || !data.status) {
@@ -88,7 +103,8 @@ export function MinecraftPanel({
             setReading((current) => ({
                 status: data.status ?? null,
                 roster: data.roster ?? (wantsRoster ? current.roster : null),
-                firewall: data.firewall ?? (wantsRoster ? current.firewall : null)
+                firewall: data.firewall ?? (wantsRoster ? current.firewall : null),
+                access: data.access ?? (wantsRoster ? current.access : null)
             }));
         } catch {
             // Transient; the next poll retries.
@@ -118,6 +134,7 @@ export function MinecraftPanel({
                 settings={settings}
                 installedAppId={installedAppId}
                 applicationId={applicationId}
+                reach={game?.reach ?? null}
             />
 
             {error && <p className="text-sm text-danger">{error}</p>}
@@ -150,6 +167,7 @@ export function MinecraftPanel({
                     status={status}
                     roster={reading.roster}
                     firewall={reading.firewall}
+                    access={reading.access}
                     onChanged={() => void load()}
                 />
             )}
@@ -162,12 +180,20 @@ export function MinecraftPanel({
                 />
             )}
             {tab === "settings" && (
-                <MinecraftSettings
-                    installedAppId={installedAppId}
-                    settings={settings.filter((setting) => setting.group !== MODS_GROUP)}
-                    playersOnline={status?.players.online ?? 0}
-                    onSaved={reloadSettings}
-                />
+                <div className="flex flex-col gap-4">
+                    <MinecraftDomain
+                        installedAppId={installedAppId}
+                        hostname={game?.hostname ?? null}
+                        suffix={game?.suffix ?? null}
+                        address={status?.address ?? null}
+                    />
+                    <MinecraftSettings
+                        installedAppId={installedAppId}
+                        settings={settings.filter((setting) => setting.group !== MODS_GROUP)}
+                        playersOnline={status?.players.online ?? 0}
+                        onSaved={reloadSettings}
+                    />
+                </div>
             )}
         </div>
     );
@@ -180,13 +206,15 @@ function ConnectCard({
     running,
     settings,
     installedAppId,
-    applicationId
+    applicationId,
+    reach
 }: {
     status: MinecraftStatus | null;
     running: boolean;
     settings: InstalledAppSetting[];
     installedAppId: string;
     applicationId: string | null;
+    reach: GameReachAdvice | null;
 }) {
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState<string | null>(null);
@@ -246,6 +274,31 @@ function ConnectCard({
                     </Button>
                 </div>
                 {saved && <p className="w-full text-xs text-muted-foreground">{saved}</p>}
+
+                {/* The address is only an address if packets can get to it. A game
+                    port rides on nothing the domain setup opened, so this is where
+                    an operator finds out - not from a friend timing out. */}
+                {reach && !reach.ok && reach.actionable && (
+                    <div className="flex w-full items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2">
+                        <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+                        <div className="flex flex-col gap-1 text-xs">
+                            <p className="font-medium text-foreground">{reach.title}</p>
+                            <p className="text-muted-foreground">{reach.detail}</p>
+                            {reach.steps.length > 0 && (
+                                <ul className="ml-4 list-disc text-muted-foreground">
+                                    {reach.steps.map((step) => (
+                                        <li key={step}>{step}</li>
+                                    ))}
+                                </ul>
+                            )}
+                            {reach.forward && (
+                                <Link href="/admin/domains" className="w-fit text-primary hover:underline">
+                                    Open the router walkthrough
+                                </Link>
+                            )}
+                        </div>
+                    </div>
+                )}
             </CardBody>
         </Card>
     );

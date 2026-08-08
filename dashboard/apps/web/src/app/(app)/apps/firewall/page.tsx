@@ -18,11 +18,14 @@ import { notFound } from "next/navigation";
 import { ScopePicker } from "./scope-picker";
 import { listHosts } from "@/lib/host-service";
 import { clientIp } from "@/lib/request-context";
+import { GameFirewallPanel } from "./game-panel";
 import { listProjectScopes } from "@/lib/deploy-service";
 import { listHostGroups } from "@/lib/host-group-service";
 import { FirewallInstancePanels } from "./instance-panels";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { WAF_SCOPE_TYPES, type WafScopeType } from "@polaris/core";
+import { gameServerForApplication } from "@/lib/apps/games-service";
+import { listPlayerAccess } from "@/lib/apps/minecraft/player-access";
 import { scopeNeedsTarget, scopeOptions, type ScopeCatalog, type ScopeOption } from "./scope-kinds";
 
 export const dynamic = "force-dynamic";
@@ -101,6 +104,11 @@ export default async function FirewallPage({
         notFound();
     }
     const label = options.find((option) => option.id === scopeId)?.label ?? "";
+    // A service that is a game server is guarded by something else entirely: its
+    // player list, not the HTTP rules below. Looked up only when one service is in
+    // scope, which is the only case where it can be one.
+    const game = kind === "application" && scopeId ? await gameServerForApplication(user.id, scopeId) : null;
+    const gameAccess = game ? await listPlayerAccess(user.id, game.installedAppId).catch(() => null) : null;
     // Read once: the editor offers it for the allowlist, and the anomaly panel marks
     // the reader's own address so a finding about themselves reads as one.
     const callerIp = (await clientIp()) ?? null;
@@ -128,23 +136,26 @@ export default async function FirewallPage({
                     here.
                 </p>
             ) : (
-                <WafEditor
-                    key={`${kind}:${scopeId}`}
-                    scopeType={kind}
-                    scopeId={scopeId}
-                    description={describe(kind, label)}
-                    // Polaris has a login of its own; sending its visitors round the
-                    // guard's cross-domain handoff to reach it would be a loop.
-                    offerLogin={kind !== "polaris"}
-                    callerIp={callerIp}
-                    canOperate={canOperate}
-                    // Traffic, bans and jails are instance-wide however narrow the scope
-                    // above happens to be, so they are shown to whoever runs the instance
-                    // rather than to a project's members. Handed to the editor rather
-                    // than rendered beside it: they belong under the rule LIST, and a
-                    // rule opened from it is a page of its own.
-                    instancePanels={canOperate ? <FirewallInstancePanels callerIp={callerIp} /> : null}
-                />
+                <>
+                    {game && <GameFirewallPanel installedAppId={game.installedAppId} initial={gameAccess} />}
+                    <WafEditor
+                        key={`${kind}:${scopeId}`}
+                        scopeType={kind}
+                        scopeId={scopeId}
+                        description={describe(kind, label)}
+                        // Polaris has a login of its own; sending its visitors round the
+                        // guard's cross-domain handoff to reach it would be a loop.
+                        offerLogin={kind !== "polaris"}
+                        callerIp={callerIp}
+                        canOperate={canOperate}
+                        // Traffic, bans and jails are instance-wide however narrow the
+                        // scope above happens to be, so they are shown to whoever runs
+                        // the instance rather than to a project's members. Handed to the
+                        // editor rather than rendered beside it: they belong under the
+                        // rule LIST, and a rule opened from it is a page of its own.
+                        instancePanels={canOperate ? <FirewallInstancePanels callerIp={callerIp} /> : null}
+                    />
+                </>
             )}
         </div>
     );

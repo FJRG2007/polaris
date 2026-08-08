@@ -6,10 +6,16 @@
  */
 
 import { z } from "zod";
+import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
 
 export const createGameServerSchema = z
     .object({
         name: z.string().trim().min(1, "Name the server").max(48),
+        /** The player the server is created for. Required: both images enforce a
+         *  list, and a server created without a name on it is one nobody can join. */
+        ownerPlayer: z.string().trim().min(1, "Give the username that will run the server").max(16),
+        /** Where that player connects from - one address, a CIDR range, or "any". */
+        ownerAddress: z.string().trim().min(1, "Give the address that player connects from").max(43),
         /** Which client it is for. Crossplay makes a Java server Bedrock can also join. */
         edition: z.enum(["java", "bedrock"]),
         crossplay: z.boolean().default(false),
@@ -27,6 +33,23 @@ export const createGameServerSchema = z
         subdomain: z.string().trim().max(63).optional()
     })
     .superRefine((value, ctx) => {
+        if (!isPlayerName(value.edition, value.ownerPlayer)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["ownerPlayer"],
+                message:
+                    value.edition === "bedrock"
+                        ? "That is not an Xbox gamertag"
+                        : "A Minecraft username is 3 to 16 letters, digits or underscores"
+            });
+        }
+        if (!isAddressRule(value.ownerAddress)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["ownerAddress"],
+                message: "Give one address, a range like 203.0.113.0/24, or \"any\""
+            });
+        }
         if (value.concurrentPlayers > value.maxPlayers) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,

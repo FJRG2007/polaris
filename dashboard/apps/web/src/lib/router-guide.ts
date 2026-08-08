@@ -329,6 +329,28 @@ export const FORWARD_RULES: readonly RouterForwardRule[] = [
 ];
 
 /**
+ * The rules a game server needs on top of those.
+ *
+ * 80 and 443 carry every website Polaris serves and not one game client: a game
+ * server answers on its own port, on its own transport, and a Bedrock rule
+ * forwarded as TCP forwards nothing at all. Named after the server so an operator
+ * looking at a list of rules a year from now can tell which one it belongs to, and
+ * so deleting the server tells them which rule to take out.
+ */
+export function gameForwardRules(
+    servers: readonly { name: string; ports: readonly { port: number; protocol: "tcp" | "udp" }[] }[]
+): RouterForwardRule[] {
+    const rules: RouterForwardRule[] = [];
+    for (const server of servers) {
+        const slug = server.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "server";
+        for (const port of server.ports) {
+            rules.push({ name: `game-${slug}-${port.port}`, protocol: port.protocol.toUpperCase(), port: port.port });
+        }
+    }
+    return rules;
+}
+
+/**
  * The router's own address, inferred from this server's. Routers sit on .1 of the
  * subnet nearly always, and "nearly" is why this is offered as a starting point
  * rather than stated - the address that is certain is the one already in the

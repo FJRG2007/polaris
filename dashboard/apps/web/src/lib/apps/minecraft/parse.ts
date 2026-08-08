@@ -145,6 +145,29 @@ export function parseProperties(content: string): Record<string, string> {
     return properties;
 }
 
+/**
+ * The address each player last connected from, out of the server's own log.
+ *
+ * This is the only place a player's address appears: the roster files record who
+ * may join, never from where, and RCON has no command that reports it. Java prints
+ * it on the login line (`Alice[/203.0.113.9:52344] logged in`); Bedrock prints the
+ * gamertag and XUID and no address at all, which is why address rules can only be
+ * enforced on Java.
+ *
+ * The newest line wins - a player who reconnects from somewhere else is at the new
+ * address, and judging them by the first line in the log would be judging where
+ * they were an hour ago.
+ */
+export function parseJoinAddresses(log: string): Map<string, string> {
+    const found = new Map<string, string>();
+    const pattern = /([A-Za-z0-9_]{3,16})\[\/((?:\d{1,3}\.){3}\d{1,3}):\d+\]\s+logged in/g;
+    for (const match of stripFormatting(log).matchAll(pattern)) {
+        const [, name, address] = match;
+        if (name && address) found.set(name.toLowerCase(), address);
+    }
+    return found;
+}
+
 /** The version the running server announced, from its startup log. Null when the
  *  log no longer reaches back that far. */
 export function parseServerVersion(log: string): string | null {

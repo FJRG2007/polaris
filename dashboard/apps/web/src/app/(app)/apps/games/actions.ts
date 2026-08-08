@@ -8,6 +8,7 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { clientIp } from "@/lib/request-context";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { installApp } from "@/lib/apps/install-service";
@@ -25,13 +26,20 @@ export interface GameSetup {
     readonly machines: GameMachine[];
     /** The domain servers get names under, when one is configured. */
     readonly domainExample: string | null;
+    /** The address this operator is on right now, offered as the one their own
+     *  player is registered to - it is where they would connect from too. */
+    readonly yourAddress: string | null;
 }
 
 /** Everything the create dialog needs that only the server knows. */
 export async function gameSetupAction(): Promise<GameSetup> {
     const user = await requirePermission("games.manage");
-    const [machines, domainExample] = await Promise.all([listGameMachines(user.id), gameHostname("survival")]);
-    return { machines, domainExample };
+    const [machines, domainExample, yourAddress] = await Promise.all([
+        listGameMachines(user.id),
+        gameHostname("survival"),
+        clientIp()
+    ]);
+    return { machines, domainExample, yourAddress: yourAddress ?? null };
 }
 
 /** What memory a server for this many players would be given, so the dialog can

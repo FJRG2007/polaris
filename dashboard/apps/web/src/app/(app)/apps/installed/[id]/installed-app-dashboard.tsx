@@ -15,6 +15,7 @@ import { useRuntimeLog } from "./use-runtime-log";
 import { MinecraftPanel } from "./minecraft-panel";
 import { LogViewer } from "@/components/log-viewer";
 import { MessagingBridgePanel } from "./messaging-bridge-panel";
+import type { GameContext } from "./page";
 import type { InstalledAppDetail, InstalledAppSetting } from "@/lib/apps/install-service";
 import { ArrowLeft, ChevronDown, ChevronRight, Loader2, Play, RefreshCw, Square, Trash2 } from "lucide-react";
 import {
@@ -49,7 +50,12 @@ const STATUS_LABEL: Record<string, string> = {
  * the shell renders around this either way. New apps are added here and nowhere
  * else in the shell.
  */
-function adaptedPanelFor(app: InstalledAppDetail, settings: InstalledAppSetting[], running: boolean) {
+function adaptedPanelFor(
+    app: InstalledAppDetail,
+    settings: InstalledAppSetting[],
+    running: boolean,
+    game: GameContext | null
+) {
     switch (app.catalogId) {
         case "messaging-bridge":
             return <MessagingBridgePanel />;
@@ -80,6 +86,7 @@ function adaptedPanelFor(app: InstalledAppDetail, settings: InstalledAppSetting[
                     applicationId={app.applicationId}
                     settings={settings}
                     running={running}
+                    game={game}
                 />
             );
         default:
@@ -89,11 +96,15 @@ function adaptedPanelFor(app: InstalledAppDetail, settings: InstalledAppSetting[
 
 export function InstalledAppDashboard({
     app,
-    settings
+    settings,
+    game = null
 }: {
     app: InstalledAppDetail;
     /** What the app was deployed with, for a panel that edits its settings. */
     settings: InstalledAppSetting[];
+    /** For a game server: its address, and what still has to be opened for
+     *  players outside this network. Null for anything that is not one. */
+    game?: GameContext | null;
 }) {
     const router = useRouter();
     const [pending, startTransition] = useTransition();
@@ -103,7 +114,7 @@ export function InstalledAppDashboard({
     const running = app.applicationStatus === "running";
     const applicationId = app.applicationId;
     // Apps with an adapted panel lead with it and fold the raw log away by default.
-    const adaptedPanel = adaptedPanelFor(app, settings, running);
+    const adaptedPanel = adaptedPanelFor(app, settings, running, game);
     const [showLogs, setShowLogs] = useState(adaptedPanel === null);
     const { log, refresh: loadLog } = useRuntimeLog(applicationId, running && showLogs);
     // Back goes where this app is listed, which for a game server is the Game

@@ -18,6 +18,7 @@ import { getPublicIp } from "@/lib/domain-service";
 import { getDomainZones } from "@/lib/domain-zones";
 import { normalizeZoneName } from "@polaris/deploy";
 import { provisionHostnameDns } from "@/lib/domain-dns";
+import { patchInstallConfig } from "@/lib/apps/install-config";
 import { loadCloudflareToken } from "@/lib/integrations/cloudflare-account-service";
 import { resolveZoneForHostname, upsertSrvRecord } from "@/lib/integrations/cloudflare-api";
 
@@ -90,6 +91,60 @@ export async function provisionGameDns(
 export function formatGameAddress(address: GameAddress | null, fallback: string | null, port: number): string | null {
     if (!address?.hostname) return fallback;
     return address.portless ? address.hostname : `${address.hostname}:${port}`;
+}
+
+/**
+ * Give a server its name on the operator's domain, and record it.
+ *
+ * Shared by creating a server and by changing its address afterwards, because they
+ * are the same act: work out the name, refuse one already spoken for, point it at
+ * this machine and at the port, and write down what a player has to type. A server
+ * with no domain configured, or no published port to point a record at, keeps the
+ * address it already had rather than losing one.
+ *
+ * The config is merged rather than replaced - it also carries the server's access
+ * settings, and a rename must not quietly reopen it.
+ */
+export async function setGameHostname(
+    ownerId: string,
+    installedAppId: string,
+    input: { name: string; subdomain?: string; edition: "java" | "bedrock" }
+): Promise<string | null> {
+    const wanted = await gameHostname(input.name, input.subdomain);
+    if (!wanted) return null;
+    if (await hostnameTaken(ownerId, wanted, installedAppId)) {
+        throw new Error(`${wanted} is already taken by another server - pick a different subdomain`);
+    }
+    const install = await prisma.installedApp.findFirst({
+        where: { id: installedAppId, ownerId },
+        select: { applicationId: true }
+    });
+    const port = install?.applicationId ? await publishedPort(install.applicationId) : null;
+    if (!port) return null;
+    const address = await provisionGameDns(wanted, port, input.edition);
+    if (!address.hostname) return null;
+    await patchInstallConfig(installedAppId, { hostname: address.hostname, portless: address.portless });
+    return address.hostname;
+}
+
+/** The host port the install pinned for this application, which is what a SRV
+ *  record has to name. */
+async function publishedPort(applicationId: string): Promise<number | null> {
+    const app = await prisma.application.findUnique({ where: { id: applicationId }, select: { sourceConfig: true } });
+    if (!app) return null;
+    try {
+        const config = JSON.parse(app.sourceConfig) as { hostPort?: unknown };
+        return typeof config.hostPort === "number" ? config.hostPort : null;
+    } catch {
+        return null;
+    }
+}
+
+/** The suffix every game server's name ends in on this Polaris (".mc.example.com"),
+ *  so a screen can show what a chosen label will become. Null with no domain. */
+export async function gameDomainSuffix(): Promise<string | null> {
+    const example = await gameHostname("server");
+    return example ? example.slice("server".length) : null;
 }
 
 /** What Polaris could not detect: the public address a name has to point at. */

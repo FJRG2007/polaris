@@ -375,6 +375,22 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     group: "Players"
                 },
                 {
+                    // The players the server boots already whitelisted, so it is
+                    // never created with the whitelist on and nobody on it. Written
+                    // by the create flow from the operator's own username; the image
+                    // merges it into whatever whitelist.json already holds, so
+                    // players added later survive a restart. Not tunable: the list
+                    // is managed from Players and the firewall, not as raw text.
+                    key: "WHITELIST",
+                    label: "Whitelisted players"
+                },
+                {
+                    // Same, for who administers it. A server whose creator is not an
+                    // operator cannot be moderated from inside the game.
+                    key: "OPS",
+                    label: "Operators"
+                },
+                {
                     // Applies a whitelist change to whoever is already connected
                     // rather than only to the next person who joins.
                     key: "ENFORCE_WHITELIST",
@@ -519,6 +535,13 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     ],
                     tunable: true,
                     group: "Players"
+                },
+                {
+                    // Gamertags the server boots with as operators. Bedrock resolves
+                    // each to an XUID at startup, which is also the only way Polaris
+                    // can name a Bedrock player before they have ever connected.
+                    key: "OPS",
+                    label: "Operators"
                 },
                 {
                     key: "ONLINE_MODE",

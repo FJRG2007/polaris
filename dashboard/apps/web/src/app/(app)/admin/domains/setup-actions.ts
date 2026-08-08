@@ -16,12 +16,19 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { serverEnvironmentSchema } from "@polaris/core";
 import { requireAdmin } from "@/lib/session";
 import { getHostLanIp } from "@/lib/host-address";
 import { recordAudit } from "@/lib/audit-service";
-import { checkZoneDns, provisionZoneDns, type ZoneDnsProvisionResult, type ZoneDnsReport } from "@/lib/domain-dns";
+import { syncDashboardRoute } from "@/lib/domain-edge";
+import { serverEnvironmentSchema } from "@polaris/core";
+import { listGamePorts } from "@/lib/apps/games-service";
+import { getSetting, setSetting } from "@/lib/setting-store";
 import { detectDnsProvider, type DnsProviderInfo } from "@/lib/dns-provider";
+import { isBaseDomain, isZoneLabel, normalizeBaseDomain } from "@polaris/deploy";
+import { getCloudflareAccountStatus } from "@/lib/integrations/cloudflare-account-service";
+import { EXPOSURE_STRATEGIES, STRATEGY_META, type ExposureStrategy } from "@/lib/domain-strategies";
+import { getDomainConfig, setDomainConfig, syncDuckDns, type DomainConfig } from "@/lib/domain-service";
+import { checkZoneDns, provisionZoneDns, type ZoneDnsProvisionResult, type ZoneDnsReport } from "@/lib/domain-dns";
 import {
     getDomainZones,
     saveDomainZones,
@@ -30,11 +37,6 @@ import {
     zoneRecords,
     type DomainZoneConfig
 } from "@/lib/domain-zones";
-import { getCloudflareAccountStatus } from "@/lib/integrations/cloudflare-account-service";
-import { EXPOSURE_STRATEGIES, STRATEGY_META, type ExposureStrategy } from "@/lib/domain-strategies";
-import { getDomainConfig, setDomainConfig, syncDuckDns, type DomainConfig } from "@/lib/domain-service";
-import { syncDashboardRoute } from "@/lib/domain-edge";
-import { getSetting, setSetting } from "@/lib/setting-store";
 import {
     getLocalEnvironment,
     getNetworkStatus,
@@ -43,7 +45,6 @@ import {
     type LocalEnvironment,
     type NetworkStatus
 } from "@/lib/network-service";
-import { isBaseDomain, isZoneLabel, normalizeBaseDomain } from "@polaris/deploy";
 
 /** The strategy the setup last saved. Its own key because nothing else records it. */
 const STRATEGY_KEY = "domain.setup.strategy";
@@ -72,6 +73,13 @@ export interface DomainSetupState {
     lanIp: string | null;
     /** The DNS records the current layout needs. */
     records: Array<{ host: string; wildcard: string; scope: string }>;
+    /**
+     * Game servers and the ports they answer on. Part of this screen because it is
+     * the screen that asks an operator to open ports at all: 80 and 443 carry every
+     * website and no game client, so a deployment running game servers needs rules
+     * nothing else here would ever mention.
+     */
+    gameServers: Array<{ name: string; ports: Array<{ port: number; protocol: "tcp" | "udp" }>; confirmed: boolean }>;
 }
 
 /** Everything the wizard renders from, in one round trip. */
@@ -88,14 +96,17 @@ async function domainSetupState(): Promise<DomainSetupState> {
     // operator to guess that a button on the last step is what unblocks their domain.
     const saved = await getDomainZones();
     if (saved.baseDomain && !(await zoneDnsVerified())) await checkZoneDns().catch(() => undefined);
-    const [environment, network, zones, domains, cloudflare, strategy, lanIp] = await Promise.all([
+    const [environment, network, zones, domains, cloudflare, strategy, lanIp, gameServers] = await Promise.all([
         getLocalEnvironment(),
         getNetworkStatus(),
         getDomainZones(),
         getDomainConfig(),
         getCloudflareAccountStatus(),
         getSetting(STRATEGY_KEY),
-        getHostLanIp()
+        getHostLanIp(),
+        // Best effort: the domain setup must open with or without the game servers,
+        // and a deployment that has none is the common case.
+        listGamePorts().catch(() => [])
     ]);
     return {
         environment,
@@ -111,6 +122,11 @@ async function domainSetupState(): Promise<DomainSetupState> {
         cloudflareConnected: cloudflare.dnsReady,
         cloudflareTunnelReady: cloudflare.connected,
         lanIp,
+        gameServers: gameServers.map((server) => ({
+            name: server.name,
+            ports: server.ports.map((port) => ({ port: port.port, protocol: port.protocol })),
+            confirmed: server.confirmed
+        })),
         records: zoneRecords(zones).map((record) => ({
             host: record.host,
             wildcard: record.wildcard,

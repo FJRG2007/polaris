@@ -15,8 +15,16 @@ import { recordAudit } from "@/lib/audit-service";
 import { setEnvVars } from "@/lib/env-var-service";
 import { deployApplication } from "@/lib/deploy-service";
 import { getInstalledApp } from "@/lib/apps/install-service";
+import { setGameHostname } from "@/lib/apps/minecraft/address";
 import { findApp, isAllowedEnvValue, tunableEnvVars } from "@/lib/apps/catalog";
 import { applyFirewallBans, runConsoleLine, runServerCommand } from "@/lib/apps/minecraft/service";
+import {
+    grantPlayerAccess,
+    listPlayerAccess,
+    revokePlayerAccess,
+    setAddressBinding,
+    type PlayerAccessView
+} from "@/lib/apps/minecraft/player-access";
 
 /** A Minecraft (Java Edition) account name. */
 const playerNameSchema = z
@@ -96,6 +104,134 @@ export async function setWhitelistEnforcedAction(
         return { output: output.trim() };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not change the whitelist" };
+    }
+}
+
+const accessSchema = z.object({
+    installedAppId: z.string().uuid(),
+    username: z.string().trim().min(1).max(16),
+    /** One address, a range, or "any". Re-checked in the service against the same
+     *  rule the form uses. */
+    address: z.string().trim().min(1).max(43),
+    note: z.string().trim().max(120).optional()
+});
+
+export type PlayerAccessInput = z.infer<typeof accessSchema>;
+
+/**
+ * Let a player in, from an address. This is the pair the server is closed by, so
+ * it is the full manage grant rather than the moderator one: moderating decides
+ * who is thrown out today, this decides who can ever get in.
+ */
+export async function grantPlayerAccessAction(input: PlayerAccessInput): Promise<{ error?: string }> {
+    const user = await requirePermission("games.manage");
+    const parsed = accessSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        await grantPlayerAccess(user.id, parsed.data.installedAppId, user.id, {
+            username: parsed.data.username,
+            address: parsed.data.address,
+            ...(parsed.data.note ? { note: parsed.data.note } : {})
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.access-grant",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { player: parsed.data.username, address: parsed.data.address }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not add that player" };
+    }
+}
+
+/** The list as it stands, for a screen that is not polling the server itself. */
+export async function playerAccessAction(installedAppId: string): Promise<PlayerAccessView | null> {
+    const user = await requirePermission("games.read");
+    return listPlayerAccess(user.id, installedAppId).catch(() => null);
+}
+
+/** Take a player off the list, and off the server if they are on it. */
+export async function revokePlayerAccessAction(
+    installedAppId: string,
+    username: string
+): Promise<{ error?: string }> {
+    const user = await requirePermission("games.manage");
+    try {
+        await revokePlayerAccess(user.id, installedAppId, username);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.access-revoke",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { player: username }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not remove that player" };
+    }
+}
+
+/**
+ * Stop checking where a player connects from, or start again.
+ *
+ * Off is a real loosening - a leaked account is then enough to get in - so it is
+ * recorded like any other change to who can reach the server.
+ */
+export async function setAddressBindingAction(
+    installedAppId: string,
+    enabled: boolean
+): Promise<{ error?: string }> {
+    const user = await requirePermission("games.manage");
+    try {
+        await setAddressBinding(user.id, installedAppId, enabled);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.access-binding",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { enabled }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not change that" };
+    }
+}
+
+/**
+ * Move a server onto a different name.
+ *
+ * The records are written for the operator (an A record at this machine, and for
+ * Java a SRV record so the port is not part of what a player types), which is why
+ * this is the manage grant: it changes what the world can reach.
+ */
+export async function setGameHostnameAction(
+    installedAppId: string,
+    subdomain: string
+): Promise<{ hostname?: string | null; error?: string }> {
+    const user = await requirePermission("games.manage");
+    const parsed = z.string().trim().max(63).safeParse(subdomain);
+    if (!parsed.success) return { error: "That subdomain is too long" };
+    try {
+        const install = await getInstalledApp(user.id, installedAppId);
+        if (!install) throw new Error("Installed app not found");
+        const hostname = await setGameHostname(user.id, installedAppId, {
+            name: install.name,
+            ...(parsed.data ? { subdomain: parsed.data } : {}),
+            edition: install.catalogId === "minecraft-bedrock" ? "bedrock" : "java"
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.hostname",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { hostname }
+        });
+        revalidatePath(`/apps/installed/${installedAppId}`);
+        return { hostname };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not set that address" };
     }
 }
 

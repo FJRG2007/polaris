@@ -9,27 +9,27 @@
 
 import { useState, useTransition } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
+import { GameAccessEditor } from "@/components/game-access-editor";
 import { Badge, Button, Card, CardBody, Input, Switch } from "@polaris/ui";
+import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
 import { Ban, Crown, DoorOpen, ShieldBan, ShieldMinus, ShieldPlus, UserMinus, UserPlus } from "lucide-react";
-import {
-    applyFirewallBansAction,
-    moderatePlayerAction,
-    setWhitelistEnforcedAction,
-    type MinecraftModeration
-} from "./minecraft-actions";
+import { applyFirewallBansAction, moderatePlayerAction, setWhitelistEnforcedAction, type MinecraftModeration } from "./minecraft-actions";
 
 export function MinecraftPlayers({
     installedAppId,
     status,
     roster,
     firewall,
+    access,
     onChanged
 }: {
     installedAppId: string;
     status: MinecraftStatus | null;
     roster: MinecraftRoster | null;
     firewall: MinecraftFirewall | null;
+    /** Who may connect and from where - the list the server is actually closed by. */
+    access: PlayerAccessView | null;
     onChanged: () => void;
 }) {
     const [pending, startTransition] = useTransition();
@@ -120,6 +120,13 @@ export function MinecraftPlayers({
                     </Row>
                 ))}
             </Section>
+
+            <GameAccessEditor
+                installedAppId={installedAppId}
+                access={access}
+                onError={setError}
+                onChanged={onChanged}
+            />
 
             {!bedrock && (
             <Section

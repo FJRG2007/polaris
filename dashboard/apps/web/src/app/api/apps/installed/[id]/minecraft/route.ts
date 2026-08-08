@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/session";
+import { enforcePlayerAddresses, listPlayerAccess } from "@/lib/apps/minecraft/player-access";
 import { getServerFirewall, getServerRoster, getServerStatus } from "@/lib/apps/minecraft/service";
 
 export const runtime = "nodejs";
@@ -17,11 +18,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const status = await getServerStatus(user.id, id);
         // A server that is not answering has no roster to report, and asking for one
         // would only stack up failing execs behind a poll.
-        const [roster, firewall] = await Promise.all([
+        const [roster, firewall, access] = await Promise.all([
             wantsRoster && status.answering ? getServerRoster(user.id, id) : null,
-            wantsRoster ? getServerFirewall(user.id, id).catch(() => null) : null
+            wantsRoster ? getServerFirewall(user.id, id).catch(() => null) : null,
+            // One query, and it is what the moderation screen is really about now:
+            // the game's own lists say who, and this says who from where.
+            wantsRoster ? listPlayerAccess(user.id, id).catch(() => null) : null,
+            // Opening the moderation screen is also when the list gets applied to
+            // whoever is already on. The cron does this on its own schedule; a
+            // deployment without cron configured would otherwise have rules that
+            // only ever took effect on the next join.
+            wantsRoster ? enforcePlayerAddresses(user.id, id).catch(() => null) : null
         ]);
-        return NextResponse.json({ status, roster, firewall });
+        return NextResponse.json({ status, roster, firewall, access });
     } catch (caught) {
         return NextResponse.json(
             { error: caught instanceof Error ? caught.message : "Could not read the server" },

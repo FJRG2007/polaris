@@ -9,11 +9,13 @@
  * server that is still booting is a row that says so, not a page that errors.
  */
 
-import { freemem, totalmem } from "node:os";
 import { prisma } from "@polaris/db";
+import { freemem, totalmem } from "node:os";
 import { listHosts } from "@/lib/host-service";
-import { getServerMetrics } from "@/lib/server-metrics-service";
 import { appHasCapability, findApp } from "@/lib/apps/catalog";
+import { getServerMetrics } from "@/lib/server-metrics-service";
+import { enforcePlayerAddresses } from "@/lib/apps/minecraft/player-access";
+import { gamePorts, reachConfirmed, type GamePort } from "@/lib/apps/minecraft/reach";
 import { applyFirewallBans, editionOf, getServerStatus, type MinecraftEdition } from "@/lib/apps/minecraft/service";
 
 /** A machine a server can be created on, with what it has left to give. */
@@ -183,13 +185,14 @@ export function parseMemoryMb(value: string): number {
  * per server - one that is still starting is skipped, not fatal - and it reports
  * what it did so the caller can log it.
  */
-export async function syncFirewallBans(ownerId: string): Promise<{ servers: number; banned: number }> {
+export async function syncFirewallBans(ownerId: string): Promise<{ servers: number; banned: number; kicked: number }> {
     const installs = await prisma.installedApp.findMany({
         where: { ownerId, status: { not: "removed" } },
         select: { id: true, catalogId: true }
     });
     let servers = 0;
     let banned = 0;
+    let kicked = 0;
     for (const install of installs) {
         const manifest = findApp(install.catalogId);
         if (!manifest || !appHasCapability(manifest, "game-server")) continue;
@@ -199,6 +202,64 @@ export async function syncFirewallBans(ownerId: string): Promise<{ servers: numb
         if (applied === null) continue;
         servers += 1;
         banned += applied;
+        // The same walk carries the player list, which is the half of the firewall
+        // the game itself cannot hold: a name is only let in from its own address.
+        const access = await enforcePlayerAddresses(ownerId, install.id).catch(() => null);
+        kicked += access?.kicked.length ?? 0;
     }
-    return { servers, banned };
+    return { servers, banned, kicked };
+}
+
+/** One game server's published ports, named so a forwarding rule can be written
+ *  for it. Instance-wide: what has to be open is the operator's problem, not one
+ *  owner's, and the domain setup that asks for it is an admin screen. */
+export interface GamePortRow {
+    readonly installedAppId: string;
+    readonly name: string;
+    readonly ports: readonly GamePort[];
+    /** Whether a player has already arrived on it from outside the network. */
+    readonly confirmed: boolean;
+}
+
+/**
+ * The game server backing a deployed application, when it is one.
+ *
+ * The firewall picks its scope from the deploy tree, where a game server is an
+ * ordinary service - so this is how that screen finds out it is looking at
+ * something whose rules are not HTTP rules at all.
+ */
+export async function gameServerForApplication(
+    ownerId: string,
+    applicationId: string
+): Promise<{ installedAppId: string; name: string } | null> {
+    const install = await prisma.installedApp.findFirst({
+        where: { ownerId, applicationId, status: { not: "removed" } },
+        select: { id: true, name: true, catalogId: true }
+    });
+    if (!install) return null;
+    const manifest = findApp(install.catalogId);
+    if (!manifest || !appHasCapability(manifest, "game-server")) return null;
+    return { installedAppId: install.id, name: install.name };
+}
+
+/** Every game server's published ports, for the screens that ask an operator to
+ *  open them. */
+export async function listGamePorts(): Promise<GamePortRow[]> {
+    const installs = await prisma.installedApp.findMany({
+        where: { status: { not: "removed" } },
+        select: { id: true, name: true, catalogId: true, applicationId: true, config: true }
+    });
+    const games = installs.filter((install) => {
+        const manifest = findApp(install.catalogId);
+        return manifest ? appHasCapability(manifest, "game-server") : false;
+    });
+    const rows = await Promise.all(
+        games.map(async (install) => ({
+            installedAppId: install.id,
+            name: install.name,
+            ports: await gamePorts(install.applicationId),
+            confirmed: reachConfirmed(install.config)
+        }))
+    );
+    return rows.filter((row) => row.ports.length > 0);
 }

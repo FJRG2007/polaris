@@ -13,7 +13,8 @@
 import { useRouter } from "next/navigation";
 import { createGameServerSchema } from "@/lib/apps/games-schema";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Gamepad2, Loader2, MemoryStick, Users } from "lucide-react";
+import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
+import { Gamepad2, Loader2, MemoryStick, ShieldCheck, Users } from "lucide-react";
 import { createGameServerAction, gameSetupAction, type GameSetup } from "./actions";
 import { blueprintsFor, formatMemory, recommendedMemoryMb } from "@/lib/apps/minecraft/blueprints";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select, Skeleton, cn } from "@polaris/ui";
@@ -43,6 +44,14 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
     const [maxPlayers, setMaxPlayers] = useState(20);
     const [concurrentPlayers, setConcurrentPlayers] = useState(8);
     const [subdomain, setSubdomain] = useState("");
+    const [ownerPlayer, setOwnerPlayer] = useState("");
+    const [ownerAddress, setOwnerAddress] = useState("");
+
+    // Offered rather than imposed: it is where this operator is right now, which is
+    // where their own client would arrive from, and they can widen or replace it.
+    useEffect(() => {
+        if (setup?.yourAddress && ownerAddress.length === 0) setOwnerAddress(setup.yourAddress);
+    }, [setup, ownerAddress]);
 
     const blueprints = useMemo(() => blueprintsFor(edition), [edition]);
     const blueprint = blueprints.find((entry) => entry.id === blueprintId);
@@ -66,6 +75,19 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
         if (edition === "bedrock") setCrossplay(false);
     }, [edition, blueprints, blueprintId]);
 
+    // Checked as it is typed, against the same rules the action re-checks: a name
+    // the server would refuse is worth saying before a container is built for it.
+    const playerError =
+        ownerPlayer.trim().length === 0 || isPlayerName(edition, ownerPlayer)
+            ? null
+            : edition === "bedrock"
+              ? "That is not an Xbox gamertag"
+              : "3 to 16 letters, digits or underscores";
+    const addressError =
+        ownerAddress.trim().length === 0 || isAddressRule(ownerAddress) ? null : "That is not an address or a range";
+    const ready =
+        name.trim().length > 0 && isPlayerName(edition, ownerPlayer) && isAddressRule(ownerAddress);
+
     const label = (subdomain.trim() || name.trim() || "server")
         .toLowerCase()
         .replace(/[^a-z0-9-]+/g, "-")
@@ -76,6 +98,8 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
         setError(null);
         const parsed = createGameServerSchema.safeParse({
             name: name.trim(),
+            ownerPlayer: ownerPlayer.trim(),
+            ownerAddress: ownerAddress.trim(),
             edition,
             crossplay,
             blueprintId,
@@ -260,13 +284,48 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                         )}
                     </label>
 
+                    <div className="flex flex-col gap-2">
+                        <span className="text-sm font-medium">Who can connect</span>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <label className="flex flex-col gap-1 text-sm">
+                                <span className="text-muted-foreground">
+                                    {edition === "bedrock" ? "Your gamertag" : "Your Minecraft username"}
+                                </span>
+                                <Input
+                                    value={ownerPlayer}
+                                    onChange={(event) => setOwnerPlayer(event.target.value)}
+                                    placeholder={edition === "bedrock" ? "Gamertag" : "Steve"}
+                                />
+                                {playerError && <span className="text-xs text-danger">{playerError}</span>}
+                            </label>
+                            <label className="flex flex-col gap-1 text-sm">
+                                <span className="text-muted-foreground">Connecting from</span>
+                                <Input
+                                    value={ownerAddress}
+                                    onChange={(event) => setOwnerAddress(event.target.value)}
+                                    placeholder="203.0.113.9"
+                                />
+                                <span className={cn("text-xs", addressError ? "text-danger" : "text-muted-foreground")}>
+                                    {addressError ?? 'One address, a range like 203.0.113.0/24, or "any".'}
+                                </span>
+                            </label>
+                        </div>
+                        <p className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted-foreground">
+                            <ShieldCheck className="size-4 shrink-0" />
+                            <span>
+                                The server starts closed: nobody else can join until you add them, and each player is
+                                only let in from the address registered to them. Change it later under Firewall.
+                            </span>
+                        </p>
+                    </div>
+
                     {error && <p className="text-sm text-danger">{error}</p>}
 
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
                             Cancel
                         </Button>
-                        <Button onClick={submit} disabled={pending || name.trim().length === 0}>
+                        <Button onClick={submit} disabled={pending || !ready}>
                             {pending && <Loader2 className="size-4 animate-spin" />}
                             Create server
                         </Button>

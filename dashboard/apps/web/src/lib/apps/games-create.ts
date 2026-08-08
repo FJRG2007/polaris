@@ -12,12 +12,13 @@
  * which is strictly better than no server.
  */
 
-import { prisma } from "@polaris/db";
-import { availableHostPort, installApp } from "@/lib/apps/install-service";
+import { joinAccess } from "@/lib/apps/minecraft/access";
 import { promptedEnvVars, findApp } from "@/lib/apps/catalog";
+import { setGameHostname } from "@/lib/apps/minecraft/address";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import type { CreateGameServerInput } from "@/lib/apps/games-schema";
-import { gameHostname, hostnameTaken, provisionGameDns } from "@/lib/apps/minecraft/address";
+import { grantPlayerAccess } from "@/lib/apps/minecraft/player-access";
+import { availableHostPort, installApp } from "@/lib/apps/install-service";
 import {
     CROSSPLAY_PROJECTS,
     findBlueprint,
@@ -66,6 +67,13 @@ export async function createGameServer(
     }
     for (const [key, value] of Object.entries(blueprint.env ?? {})) env.set(key, value);
 
+    // Who the server lets in, decided before it boots rather than left to a list
+    // that starts enforced and empty. Last over the blueprint, because no blueprint
+    // is allowed to produce a server nobody can join.
+    for (const [key, value] of Object.entries(joinAccess(input.edition, input.ownerPlayer).env)) {
+        env.set(key, value);
+    }
+
     if (input.edition === "java") {
         env.set("MODRINTH_PROJECTS", projectList(blueprint, env.get("MODRINTH_PROJECTS"), input.crossplay));
     }
@@ -90,6 +98,15 @@ export async function createGameServer(
         extraPorts
     );
 
+    // The address half of the pair, which the game has nowhere to keep. The image
+    // was already handed the username; this is what makes the name mean one line
+    // rather than anyone holding the account.
+    await grantPlayerAccess(ownerId, install.installedAppId, actorId, {
+        username: input.ownerPlayer,
+        address: input.ownerAddress,
+        note: "Created this server"
+    });
+
     const hostname = await attachHostname(ownerId, install.installedAppId, input);
     return { installedAppId: install.installedAppId, hostname };
 }
@@ -109,45 +126,20 @@ function projectList(blueprint: GameBlueprint, current: string | undefined, cros
 }
 
 /**
- * Give the server a name on the operator's domain and record it on the install.
- * Silent when there is no domain to put it on - the server still has the address
- * it was published at.
+ * Give the server a name on the operator's domain. The same act as changing it
+ * later, so it is the same code: see `setGameHostname`. Silent when there is no
+ * domain to put it on - the server still has the address it was published at.
  */
 async function attachHostname(
     ownerId: string,
     installedAppId: string,
     input: CreateGameServerInput
 ): Promise<string | null> {
-    const wanted = await gameHostname(input.name, input.subdomain);
-    if (!wanted) return null;
-    if (await hostnameTaken(ownerId, wanted, installedAppId)) {
-        throw new Error(`${wanted} is already taken by another server - pick a different subdomain`);
-    }
-    const install = await prisma.installedApp.findFirst({
-        where: { id: installedAppId },
-        select: { applicationId: true }
+    return setGameHostname(ownerId, installedAppId, {
+        name: input.name,
+        ...(input.subdomain ? { subdomain: input.subdomain } : {}),
+        edition: input.edition
     });
-    const port = install?.applicationId ? await publishedPort(install.applicationId) : null;
-    if (!port) return null;
-    const address = await provisionGameDns(wanted, port, input.edition);
-    if (!address.hostname) return null;
-    await prisma.installedApp.update({
-        where: { id: installedAppId },
-        data: { config: JSON.stringify({ hostname: address.hostname, portless: address.portless }) }
-    });
-    return address.hostname;
-}
-
-/** The host port the install pinned for this application. */
-async function publishedPort(applicationId: string): Promise<number | null> {
-    const app = await prisma.application.findUnique({ where: { id: applicationId }, select: { sourceConfig: true } });
-    if (!app) return null;
-    try {
-        const config = JSON.parse(app.sourceConfig) as { hostPort?: unknown };
-        return typeof config.hostPort === "number" ? config.hostPort : null;
-    } catch {
-        return null;
-    }
 }
 
 /** The settings the create dialog shows before a world exists, for one edition. */
