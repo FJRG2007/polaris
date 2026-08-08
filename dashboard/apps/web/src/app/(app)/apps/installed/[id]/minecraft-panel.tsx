@@ -77,7 +77,8 @@ export function MinecraftPanel({
     name,
     settings,
     running,
-    game
+    game,
+    onStatus
 }: {
     installedAppId: string;
     applicationId: string | null;
@@ -89,6 +90,10 @@ export function MinecraftPanel({
     /** The server's address, and what still has to be opened for players outside
      *  this network. */
     game: GameContext | null;
+    /** Told what the server is actually doing, so the page has one answer rather
+     *  than a header that reports what Polaris intends and a card beneath it
+     *  reporting what the container is up to. */
+    onStatus?: (label: string | null) => void;
 }) {
     const router = useRouter();
     const pathname = usePathname();
@@ -154,8 +159,19 @@ export function MinecraftPanel({
                 // Read on every poll, not only the moderation screen's, because the
                 // overview says whether anybody can join at all.
                 access: data.access ?? current.access,
-                sessions: data.sessions ?? (wantsRoster ? current.sessions : []),
-                timeouts: data.timeouts ?? (wantsRoster ? current.timeouts : []),
+                // Checked rather than taken: these two are read by walking them,
+                // and a payload that answered with the wrong shape took the whole
+                // screen down instead of one panel.
+                sessions: Array.isArray(data.sessions)
+                    ? data.sessions
+                    : wantsRoster
+                      ? current.sessions
+                      : [],
+                timeouts: Array.isArray(data.timeouts)
+                    ? data.timeouts
+                    : wantsRoster
+                      ? current.timeouts
+                      : [],
                 now: data.now ? Date.parse(data.now) : current.now
             }));
         } catch {
@@ -168,6 +184,12 @@ export function MinecraftPanel({
         const timer = setInterval(() => void load(), POLL_MS);
         return () => clearInterval(timer);
     }, [load]);
+
+    // The shell draws the badge in the header; only this component polls, so it is
+    // the one that knows.
+    useEffect(() => {
+        onStatus?.(statusLabel(reading.status, running));
+    }, [onStatus, reading.status, running]);
 
     /** Settings come from the page, so applying them has to re-render it -
      *  otherwise the form keeps showing the old values as the current ones. */
@@ -431,13 +453,30 @@ function ConnectCard({
     );
 }
 
+/**
+ * What the server is doing, in one word.
+ *
+ * "Meant to be running" and "running" are different things, and the page used to
+ * show both without saying which was which: the header read Running off the
+ * desired state while the card under it read Starting off a container that had
+ * been dead for an hour. One function decides now, and the header is told.
+ */
+function statusLabel(status: MinecraftStatus | null, running: boolean): string | null {
+    if (status === null) return null;
+    if (!running || !status.running) return "Stopped";
+    if (status.containerRunning === false) return "Not running";
+    return status.answering ? "Online" : "Starting";
+}
+
 function StatusBadge({ status, running }: { status: MinecraftStatus | null; running: boolean }) {
-    if (status === null) return <Skeleton className="h-6 w-20" />;
-    if (!running || !status.running) return <Badge>Stopped</Badge>;
-    if (!status.answering) return <Badge className="border-warning/40 text-warning">Starting</Badge>;
+    const label = statusLabel(status, running);
+    if (label === null) return <Skeleton className="h-6 w-20" />;
+    if (label === "Not running") return <Badge variant="danger">Not running</Badge>;
+    if (label === "Starting") return <Badge className="border-warning/40 text-warning">Starting</Badge>;
+    if (label === "Stopped") return <Badge>Stopped</Badge>;
     return (
         <Badge className="border-success/40 text-success">
-            {status.players.online} / {status.players.max} online
+            {status?.players.online} / {status?.players.max} online
         </Badge>
     );
 }

@@ -22,12 +22,37 @@ export interface AppContainerMetrics {
     readonly memTotalBytes: number | null;
 }
 
+/**
+ * What one app's container is doing, without sampling it.
+ *
+ * The inspect is one call and returns at once; the stats sample beside it takes
+ * about a second, because the engine has to watch the container over an interval
+ * to have a CPU figure at all. Anything that only needs to know whether the thing
+ * is up - and that is most callers - should ask for this and not pay for that.
+ *
+ * Null when it cannot be answered: a remote target, whose daemon proxy this does
+ * not reach, or a container that is gone.
+ */
+export async function readAppContainerState(applicationId: string, ownerId: string): Promise<string | null> {
+    return inspectContainer(applicationId, ownerId)
+        .then((state) => state.status)
+        .catch(() => null);
+}
+
+async function inspectContainer(
+    applicationId: string,
+    ownerId: string
+): Promise<{ status: string; health?: string | null }> {
+    const container = await resolveLocalContainer(applicationId, ownerId);
+    const inspect = await new HostdClient().dockerRequest("GET", `/containers/${encodeURIComponent(container)}/json`);
+    return parseContainerState(inspect.status === 200 ? JSON.parse(inspect.body) : null);
+}
+
 /** Sample one app's container. Throws for an app that is not the owner's, and for
  *  a remote target - the daemon proxy only reaches the local engine. */
 export async function readAppContainerMetrics(applicationId: string, ownerId: string): Promise<AppContainerMetrics> {
     const container = await resolveLocalContainer(applicationId, ownerId);
-    const inspect = await new HostdClient().dockerRequest("GET", `/containers/${encodeURIComponent(container)}/json`);
-    const state = parseContainerState(inspect.status === 200 ? JSON.parse(inspect.body) : null);
+    const state = await inspectContainer(applicationId, ownerId);
     if (state.status !== "running") {
         return {
             state: state.status,

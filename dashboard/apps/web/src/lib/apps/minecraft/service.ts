@@ -23,7 +23,7 @@ import { currentReleaseRef } from "@/lib/deploy/releases";
 import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
 import { hostPortForApp, readAppRuntimeLog } from "@/lib/deploy-service";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
-import { readAppContainerMetricsOrNull } from "@/lib/app-container-metrics";
+import { readAppContainerMetricsOrNull, readAppContainerState } from "@/lib/app-container-metrics";
 import {
     parseBannedIps,
     parseBansFile,
@@ -60,8 +60,15 @@ const MAX_COMMAND_LENGTH = 512;
 export interface MinecraftStatus {
     /** Which Minecraft this is; the screens offer what the edition supports. */
     readonly edition: MinecraftEdition;
-    /** The container is up. */
+    /** Polaris is meant to be keeping it up. Not the same as it being up: a
+     *  container that crashed, was killed, or was stopped outside Polaris leaves
+     *  this true and `containerRunning` false, and reporting only this is what had
+     *  a dead server showing "Starting" for as long as anybody watched it. */
     readonly running: boolean;
+    /** Whether the container is actually up. Null when it cannot be seen from
+     *  here - a server on a registered machine, which the daemon proxy does not
+     *  reach. */
+    readonly containerRunning: boolean | null;
     /** The server answered RCON - it is up AND past its startup. */
     readonly answering: boolean;
     readonly players: PlayerList;
@@ -241,6 +248,9 @@ export interface MinecraftPlayers {
     readonly players: PlayerList;
     /** Why it is not answering, when it is not. */
     readonly message: string | null;
+    /** Whether the container was up when it was asked. Null when that cannot be
+     *  seen from here. */
+    readonly containerRunning: boolean | null;
 }
 
 /** Who is on, where to reach the server, and whether it is answering at all. */
@@ -254,6 +264,7 @@ export async function getServerStatus(ownerId: string, installedAppId: string): 
     return {
         edition: install.edition,
         running: install.running,
+        containerRunning: live.containerRunning ?? (usage ? usage.state === "running" : null),
         answering: live.answering,
         players: live.players,
         address,
@@ -276,20 +287,44 @@ export async function getServerPlayers(ownerId: string, installedAppId: string):
     return readLivePlayers(await resolveInstall(ownerId, installedAppId), ownerId);
 }
 
-/** Ask the running server who is on. A server that is stopped or still coming up
- *  is a reading that says so, never a throw - the callers list servers. */
+/**
+ * Ask the running server who is on. A server that is stopped or still coming up is
+ * a reading that says so, never a throw - the callers list servers.
+ *
+ * The container is looked at before it is spoken to, which costs one cheap call
+ * and saves two things. A container that is down is not asked at all, so a page
+ * listing stopped servers does not wait out a failing exec for each of them; and
+ * what the reader is told is that it is not running, rather than the daemon's own
+ * "Error response from daemon: container 1ef6df9... is not running", which names
+ * a container nobody has ever seen and says nothing about what to do.
+ */
 async function readLivePlayers(install: MinecraftInstall, ownerId: string): Promise<MinecraftPlayers> {
     const empty: PlayerList = { online: 0, max: 0, players: [] };
-    if (!install.running) return { answering: false, players: empty, message: "The server is stopped" };
+    if (!install.running) {
+        return { answering: false, players: empty, message: "The server is stopped", containerRunning: null };
+    }
+    const state = await readAppContainerState(install.applicationId, ownerId);
+    if (state !== null && state !== "running") {
+        return {
+            answering: false,
+            players: empty,
+            // Polaris is meant to be keeping it up and it is not: something took
+            // it down from outside, or it fell over.
+            message: "The container is not running. Redeploy it, or read the logs to see why it stopped.",
+            containerRunning: false
+        };
+    }
+    const containerRunning = state === null ? null : true;
     try {
         const players = await readPlayerList(install, ownerId);
-        if (!players) return { answering: false, players: empty, message: "The server is starting" };
-        return { answering: true, players, message: null };
+        if (!players) return { answering: false, players: empty, message: "The server is starting", containerRunning };
+        return { answering: true, players, message: null, containerRunning };
     } catch (caught) {
         return {
             answering: false,
             players: empty,
-            message: caught instanceof Error ? caught.message : "The server is not answering"
+            message: caught instanceof Error ? caught.message : "The server is not answering",
+            containerRunning
         };
     }
 }

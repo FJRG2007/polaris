@@ -32,7 +32,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const status = await getServerStatus(user.id, id);
         // A server that is not answering has no roster to report, and asking for one
         // would only stack up failing execs behind a poll.
-        const [reach, roster, firewall, access, sessions] = await Promise.all([
+        // Named rather than destructured by position: this list has grown twice,
+        // and a name that silently slid onto its neighbour's result is what shipped
+        // the enforcement report to the screen as if it were the session history.
+        const gathered = await Promise.all([
             reachAdviceFor(id, true).catch(() => null),
             wantsRoster && status.answering ? getServerRoster(user.id, id) : null,
             wantsRoster ? getServerFirewall(user.id, id).catch(() => null) : null,
@@ -45,7 +48,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             // Opening the moderation screen is also when the list gets applied to
             // whoever is already on. The cron does this on its own schedule; a
             // deployment without cron configured would otherwise have rules that
-            // only ever took effect on the next join.
+            // only ever took effect on the next join. Nothing reads the report.
             wantsRoster ? enforcePlayerAddresses(user.id, id).catch(() => null) : null,
             // Who arrived and who left, which only the log records. Gathered for
             // the screen that shows it, like the roster - and unlike the roster it
@@ -57,7 +60,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             // otherwise hand out cool-offs that never end, so opening the screen
             // that grants them is also when the due ones are lifted.
             wantsRoster && status.answering ? sweepTimeouts(user.id, id).catch(() => 0) : 0
-        ]);
+        ] as const);
+        const [reach, roster, firewall, access] = gathered;
+        const sessions = gathered[5];
         const timeouts = wantsRoster ? await readPlayerTimeouts(id).catch(() => []) : [];
         // The log's timestamps are the server's, so the clock they are read
         // against has to be too - a browser minutes out would otherwise report

@@ -77,6 +77,10 @@ export interface GameServerFacts {
 export interface GameServerLive {
     readonly id: string;
     readonly answering: boolean;
+    /** Whether the container is actually up, when that can be seen from here.
+     *  A server Polaris means to be running and that is not is neither stopped
+     *  nor starting, and the row has to be able to say so. */
+    readonly containerRunning: boolean | null;
     readonly online: number;
     readonly max: number;
     readonly players: readonly string[];
@@ -206,16 +210,26 @@ export async function listGameServerLive(ownerId: string): Promise<GameServerLiv
     return Promise.all(
         servers.map(async (server) => {
             if (!server.running || !server.applicationId) {
-                return { id: server.id, answering: false, online: 0, max: 0, players: [], message: server.message };
+                return {
+                    id: server.id,
+                    answering: false,
+                    containerRunning: null,
+                    online: 0,
+                    max: 0,
+                    players: [],
+                    message: server.message
+                };
             }
             const live = await getServerPlayers(ownerId, server.id).catch((caught: unknown) => ({
                 answering: false,
+                containerRunning: null,
                 players: { online: 0, max: 0, players: [] },
                 message: caught instanceof Error ? caught.message : "The server is not answering"
             }));
             return {
                 id: server.id,
                 answering: live.answering,
+                containerRunning: live.containerRunning,
                 online: live.players.online,
                 max: live.players.max,
                 players: live.players.players,

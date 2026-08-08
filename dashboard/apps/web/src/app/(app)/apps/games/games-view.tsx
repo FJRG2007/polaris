@@ -514,6 +514,8 @@ function StatusBadge({
     if (status === "failed" && !facts?.running) return <Badge variant="danger">Failed</Badge>;
     if (facts === null) return <Badge>Loading</Badge>;
     if (!facts.running) return <Badge>Stopped</Badge>;
+    // Meant to be up and is not: stopped from outside Polaris, or fallen over.
+    if (live?.containerRunning === false) return <Badge variant="danger">Not running</Badge>;
     // Up, but whether it is actually answering is the read that is still out -
     // saying "Online" before the server has said so would be reporting the
     // container, which is the thing an operator opens this page to distrust.

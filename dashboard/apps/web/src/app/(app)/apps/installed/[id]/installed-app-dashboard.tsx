@@ -42,7 +42,9 @@ function adaptedPanelFor(
     app: InstalledAppDetail,
     settings: InstalledAppSetting[],
     running: boolean,
-    game: GameContext | null
+    game: GameContext | null,
+    /** Handed to a panel that polls, so what it learns reaches the header. */
+    onStatus: (label: string | null) => void
 ) {
     switch (app.catalogId) {
         case "messaging-bridge":
@@ -76,6 +78,7 @@ function adaptedPanelFor(
                     settings={settings}
                     running={running}
                     game={game}
+                    onStatus={onStatus}
                 />
             );
         default:
@@ -102,11 +105,15 @@ export function InstalledAppDashboard({
     // Kept apart from the page's error: a refusal to uninstall belongs in the
     // dialog that asked, not behind it on a page the reader has stopped looking at.
     const [uninstallError, setUninstallError] = useState<string | null>(null);
+    // What the app's own panel has found out, when it has one that polls. The
+    // header knows only what Polaris intends, which is not the same thing and
+    // read as a contradiction when the container had gone down underneath it.
+    const [liveStatus, setLiveStatus] = useState<string | null>(null);
 
     const running = app.applicationStatus === "running";
     const applicationId = app.applicationId;
     // Apps with an adapted panel lead with it and fold the raw log away by default.
-    const adaptedPanel = adaptedPanelFor(app, settings, running, game);
+    const adaptedPanel = adaptedPanelFor(app, settings, running, game, setLiveStatus);
     const [showLogs, setShowLogs] = useState(adaptedPanel === null);
     const { log, refresh: loadLog } = useRuntimeLog(applicationId, running && showLogs);
     // Back goes where this app is listed, which for a game server is the Game
@@ -143,11 +150,15 @@ export function InstalledAppDashboard({
                     <div className="flex items-center gap-2">
                         <Badge
                             className={cn(
-                                app.applicationStatus === "failed" && "border-danger/40 text-danger",
-                                running && "border-success/40 text-success"
+                                (app.applicationStatus === "failed" || liveStatus === "Not running") &&
+                                    "border-danger/40 text-danger",
+                                running && liveStatus !== "Not running" && "border-success/40 text-success"
                             )}
                         >
-                            {app.applicationStatus ? (STATUS_LABEL[app.applicationStatus] ?? app.applicationStatus) : "-"}
+                            {liveStatus ??
+                                (app.applicationStatus
+                                    ? (STATUS_LABEL[app.applicationStatus] ?? app.applicationStatus)
+                                    : "-")}
                         </Badge>
                         <Button
                             size="sm"
