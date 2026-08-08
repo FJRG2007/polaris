@@ -9,6 +9,7 @@
  */
 
 import { z } from "zod";
+import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { clientIp } from "@/lib/request-context";
 import { requirePermission } from "@/lib/session";
@@ -17,6 +18,8 @@ import { setEnvVars } from "@/lib/env-var-service";
 import { deployApplication } from "@/lib/deploy-service";
 import { getInstalledApp } from "@/lib/apps/install-service";
 import { setGameHostname } from "@/lib/apps/minecraft/address";
+import { patchInstallConfig } from "@/lib/apps/install-config";
+import { writeContainerFile } from "@/lib/container-files-service";
 import { findApp, isAllowedEnvValue, tunableEnvVars } from "@/lib/apps/catalog";
 import { applyFirewallBans, runConsoleLine, runServerCommand } from "@/lib/apps/minecraft/service";
 import {
@@ -247,6 +250,116 @@ export async function setGameHostnameAction(
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not set that address" };
     }
+}
+
+/**
+ * Rename a server.
+ *
+ * Only what Polaris calls it. The address is deliberately left alone: it was
+ * derived from the name when the server was created, players have it written down,
+ * and silently moving a server because somebody fixed a typo would be worse than
+ * the two names disagreeing. Changing the address is its own control, next to this.
+ */
+export async function renameGameServerAction(
+    installedAppId: string,
+    name: string
+): Promise<{ name?: string; error?: string }> {
+    const user = await requirePermission("games.manage");
+    const parsed = z.string().trim().min(1, "Give the server a name").max(60).safeParse(name);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That name will not do" };
+    try {
+        const install = await getInstalledApp(user.id, installedAppId);
+        if (!install) throw new Error("Server not found");
+        await prisma.installedApp.update({ where: { id: install.id }, data: { name: parsed.data } });
+        await recordAudit({
+            actorId: user.id,
+            action: "games.rename",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { from: install.name, to: parsed.data }
+        });
+        revalidatePath(`/apps/installed/${installedAppId}`);
+        revalidatePath("/apps/games");
+        return { name: parsed.data };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not rename the server" };
+    }
+}
+
+/** Where the image looks for the picture shown beside the server in the client's
+ *  multiplayer list. */
+const ICON_PATH = "/data/server-icon.png";
+
+/** Minecraft's own rule: exactly this, in pixels, or it is ignored. */
+const ICON_SIDE = 64;
+
+/** A 64x64 PNG is a couple of kilobytes. This is loose enough never to reject a
+ *  real one and tight enough that nothing large is pushed into a container. */
+const MAX_ICON_BYTES = 512 * 1024;
+
+const iconSchema = z.object({
+    installedAppId: z.string().uuid(),
+    /** The PNG, base64 encoded, already scaled to 64x64 by the browser. */
+    png: z.string().min(1).max(Math.ceil((MAX_ICON_BYTES * 4) / 3) + 64)
+});
+
+/**
+ * The picture beside the server in the multiplayer list.
+ *
+ * The browser scales whatever was picked to 64x64 before sending it, because that
+ * is the only size Minecraft accepts and asking somebody to go and resize a file
+ * themselves is not a feature. That makes the client the convenient path and not
+ * the authority: the bytes are checked here for being a PNG of exactly that size,
+ * since anything else is silently ignored by the server and would look like Polaris
+ * had lost the upload.
+ */
+export async function setServerIconAction(input: {
+    installedAppId: string;
+    png: string;
+}): Promise<{ error?: string }> {
+    const user = await requirePermission("games.manage");
+    const parsed = iconSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That image will not do" };
+    try {
+        const bytes = Buffer.from(parsed.data.png, "base64");
+        if (bytes.length === 0) throw new Error("That image is empty");
+        if (bytes.length > MAX_ICON_BYTES) throw new Error("That image is too large");
+        const size = pngSize(bytes);
+        if (!size) throw new Error("That is not a PNG");
+        if (size.width !== ICON_SIDE || size.height !== ICON_SIDE) {
+            throw new Error(`A server icon has to be ${ICON_SIDE}x${ICON_SIDE}`);
+        }
+
+        const install = await getInstalledApp(user.id, parsed.data.installedAppId);
+        if (!install?.applicationId) throw new Error("This server has not been deployed yet");
+        await writeContainerFile(install.applicationId, user.id, ICON_PATH, bytes);
+        // What the panel shows without reaching into the container for it.
+        await patchInstallConfig(parsed.data.installedAppId, { iconSetAt: new Date().toISOString() });
+        await recordAudit({
+            actorId: user.id,
+            action: "games.icon",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId
+        });
+        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not set the icon" };
+    }
+}
+
+/**
+ * A PNG's dimensions, from its header.
+ *
+ * The signature and then IHDR, which the format requires to be the first chunk, so
+ * the width and height sit at a fixed offset. Enough to refuse the wrong size
+ * without a decoder, and the only thing that has to be known about the file.
+ */
+function pngSize(bytes: Buffer): { width: number; height: number } | null {
+    const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+    if (bytes.length < 24 || !signature.every((byte, index) => bytes[index] === byte)) return null;
+    if (bytes.toString("ascii", 12, 16) !== "IHDR") return null;
+    return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
 }
 
 /** Hand the firewall's blocked addresses to the server's own ban list. */

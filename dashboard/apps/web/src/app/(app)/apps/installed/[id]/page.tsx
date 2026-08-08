@@ -25,6 +25,9 @@ export interface GameContext {
     readonly hostname: string | null;
     /** What every game server's name ends in here, for the address picker. */
     readonly suffix: string | null;
+    /** When an icon was last uploaded, so the panel can say there is one without
+     *  reaching into the container to look. */
+    readonly iconSetAt: string | null;
 }
 
 /**
@@ -49,7 +52,8 @@ async function gameContextFor(app: {
     return {
         reach,
         hostname: typeof config.hostname === "string" ? config.hostname : null,
-        suffix
+        suffix,
+        iconSetAt: typeof config.iconSetAt === "string" ? config.iconSetAt : null
     };
 }
 

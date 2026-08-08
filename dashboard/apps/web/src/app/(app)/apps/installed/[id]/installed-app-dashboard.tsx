@@ -9,13 +9,13 @@
  */
 
 import Link from "next/link";
+import type { GameContext } from "./page";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useRuntimeLog } from "./use-runtime-log";
 import { MinecraftPanel } from "./minecraft-panel";
 import { LogViewer } from "@/components/log-viewer";
 import { MessagingBridgePanel } from "./messaging-bridge-panel";
-import type { GameContext } from "./page";
 import type { InstalledAppDetail, InstalledAppSetting } from "@/lib/apps/install-service";
 import { ArrowLeft, ChevronDown, ChevronRight, Loader2, Play, RefreshCw, Square, Trash2 } from "lucide-react";
 import {
@@ -84,6 +84,7 @@ function adaptedPanelFor(
                 <MinecraftPanel
                     installedAppId={app.id}
                     applicationId={app.applicationId}
+                    name={app.name}
                     settings={settings}
                     running={running}
                     game={game}

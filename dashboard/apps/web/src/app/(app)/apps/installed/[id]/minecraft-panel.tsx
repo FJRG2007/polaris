@@ -22,6 +22,7 @@ import { saveWorldAction } from "./minecraft-actions";
 import { MinecraftConsole } from "./minecraft-console";
 import { MinecraftPlayers } from "./minecraft-players";
 import { MinecraftSettings } from "./minecraft-settings";
+import { MinecraftAppearance } from "./minecraft-appearance";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
@@ -42,6 +43,11 @@ const TABS = [
  *  raw fields on Settings. */
 const MODS_GROUP = "Mods";
 
+/** The description has an editor of its own - a preview, a colour toolbar and the
+ *  centring - so it is not also offered as a raw text field two cards below, where
+ *  the two would quietly disagree about what the server is running on. */
+const MOTD_KEY = "MOTD";
+
 type TabId = (typeof TABS)[number]["id"];
 
 const POLL_MS = 5000;
@@ -60,12 +66,16 @@ interface ServerReading {
 export function MinecraftPanel({
     installedAppId,
     applicationId,
+    name,
     settings,
     running,
     game
 }: {
     installedAppId: string;
     applicationId: string | null;
+    /** What Polaris calls it, which the appearance panel renames and the MOTD
+     *  preview draws above the description. */
+    name: string;
     settings: InstalledAppSetting[];
     running: boolean;
     /** The server's address, and what still has to be opened for players outside
@@ -194,6 +204,14 @@ export function MinecraftPanel({
             )}
             {tab === "settings" && (
                 <div className="flex flex-col gap-4">
+                    <MinecraftAppearance
+                        installedAppId={installedAppId}
+                        name={name}
+                        motd={settings.find((setting) => setting.key === MOTD_KEY)?.value ?? ""}
+                        iconSetAt={game?.iconSetAt ?? null}
+                        playersOnline={status?.players.online ?? 0}
+                        onSaved={reloadSettings}
+                    />
                     <MinecraftDomain
                         installedAppId={installedAppId}
                         hostname={game?.hostname ?? null}
@@ -202,7 +220,9 @@ export function MinecraftPanel({
                     />
                     <MinecraftSettings
                         installedAppId={installedAppId}
-                        settings={settings.filter((setting) => setting.group !== MODS_GROUP)}
+                        settings={settings.filter(
+                            (setting) => setting.group !== MODS_GROUP && setting.key !== MOTD_KEY
+                        )}
                         playersOnline={status?.players.online ?? 0}
                         onSaved={reloadSettings}
                     />
