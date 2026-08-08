@@ -237,6 +237,38 @@ export async function upsertARecord(token: string, zoneId: string, hostname: str
 }
 
 /**
+ * Point a service record at a host and port, so a client that looks one up
+ * connects without being told the port.
+ *
+ * The components go in `data` rather than in a packed `content` string: the API
+ * documents each of them there, and a record written field by field is one the
+ * next writer can read back the same way. Never proxied - Cloudflare's proxy
+ * handles HTTP, and what looks a SRV record up is a game client.
+ */
+export async function upsertSrvRecord(
+    token: string,
+    zoneId: string,
+    name: string,
+    target: string,
+    port: number
+): Promise<string> {
+    const record = {
+        type: "SRV",
+        name,
+        ttl: 300,
+        data: { priority: 0, weight: 5, port, target }
+    };
+    const [current] = await findDnsRecords(token, zoneId, "SRV", name);
+    if (current) {
+        await cf(token, "PUT", `/zones/${zoneId}/dns_records/${current.id}`, record);
+        return current.id;
+    }
+    const created = await cf<{ id?: unknown }>(token, "POST", `/zones/${zoneId}/dns_records`, record);
+    if (typeof created?.id !== "string") throw new Error("Cloudflare did not return a DNS record id");
+    return created.id;
+}
+
+/**
  * Write the TXT record an ACME DNS-01 challenge is answered with, returning its id so
  * the caller can take it away again.
  *

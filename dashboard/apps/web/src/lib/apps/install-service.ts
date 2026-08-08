@@ -57,7 +57,7 @@ async function availableInstanceName(environmentId: string, wanted: string): Pro
  * first Minecraft server gets 25565 and the second gets 25566 rather than both
  * fighting over one - or landing on a derived port nobody would think to type.
  */
-async function availableHostPort(ownerId: string, preferred: number): Promise<number> {
+export async function availableHostPort(ownerId: string, preferred: number): Promise<number> {
     const rows = await prisma.application.findMany({
         where: { environment: { project: { ownerId } } },
         select: { sourceConfig: true }
@@ -95,11 +95,38 @@ async function ensureMarketplaceEnvironment(ownerId: string): Promise<string> {
 export async function installApp(
     ownerId: string,
     actorId: string,
-    input: AppInstallInput
-): Promise<{ installedAppId: string; applicationId: string }> {
+    input: AppInstallInput,
+    /** Further ports the caller needs published beside the manifest's own. A Java
+     *  Minecraft server that Bedrock clients join answers on a UDP port too. */
+    extraPorts?: readonly { host: number; container: number; protocol?: "tcp" | "udp" }[]
+): Promise<{ installedAppId: string; applicationId: string | null }> {
     const app = findApp(input.catalogId);
     if (!app) throw new Error("Unknown app");
     if (!isInstallable(app)) throw new Error("This app cannot be installed yet");
+
+    if (app.singleton) {
+        const existing = await prisma.installedApp.findFirst({
+            where: { ownerId, catalogId: app.id, status: { not: "removed" } }
+        });
+        if (existing) throw new Error("This app is already installed");
+    }
+
+    // A builtin app runs nothing: installing it records that this Polaris has the
+    // feature, and the dashboard is the app. The Minecraft manager is one - what it
+    // creates are the servers, and those are ordinary deployed apps.
+    if (app.installMethod === "builtin") {
+        const record = await prisma.installedApp.create({
+            data: {
+                catalogId: app.id,
+                ownerId,
+                name: input.name,
+                status: "running",
+                installedById: actorId
+            }
+        });
+        return { installedAppId: record.id, applicationId: null };
+    }
+
     // isInstallable guarantees a compose template with an image.
     const template = app.template!;
     const image = template.image!;
@@ -110,13 +137,6 @@ export async function installApp(
     const isHub = appHasCapability(app, "messaging-hub");
     const bridgeToken = isHub ? randomBytes(32).toString("hex") : null;
     const ingestKey = isHub ? randomBytes(32).toString("hex") : null;
-
-    if (app.singleton) {
-        const existing = await prisma.installedApp.findFirst({
-            where: { ownerId, catalogId: app.id, status: { not: "removed" } }
-        });
-        if (existing) throw new Error("This app is already installed");
-    }
 
     // Resolve the server the operator chose: the local host, or an SSH host
     // adopted as a deploy target on first use (same path as Deploy).
@@ -146,7 +166,8 @@ export async function installApp(
         sourceConfig: {
             imageRef: image,
             ...(primary?.container ? { port: primary.container } : {}),
-            ...(hostPort ? { hostPort, hostProtocol: primary?.protocol === "udp" ? "udp" : "tcp" } : {})
+            ...(hostPort ? { hostPort, hostProtocol: primary?.protocol === "udp" ? "udp" : "tcp" } : {}),
+            ...(extraPorts && extraPorts.length > 0 ? { extraPorts } : {})
         }
     });
 

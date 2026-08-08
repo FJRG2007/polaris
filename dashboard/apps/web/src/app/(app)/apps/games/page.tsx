@@ -16,6 +16,9 @@ export const dynamic = "force-dynamic";
 export default async function GameServersPage() {
     const user = await requirePermission("games.read");
     const installs = await listInstalledApps(user.id);
+    // The manager is an installed app of its own; without it there is nothing to
+    // manage, and the page offers to install it instead of pretending otherwise.
+    const managerInstalled = installs.some((install) => install.catalogId === "minecraft-manager");
     const servers = installs
         .filter((install) => {
             const manifest = findApp(install.catalogId);
@@ -29,5 +32,5 @@ export default async function GameServersPage() {
             edition: editionOf(install.catalogId),
             status: install.status
         }));
-    return <GamesView servers={servers} />;
+    return <GamesView servers={servers} managerInstalled={managerInstalled} />;
 }

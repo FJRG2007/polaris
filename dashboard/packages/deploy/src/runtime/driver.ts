@@ -79,6 +79,10 @@ export interface AppDeployPlan {
      *  (LAN/intranet), independent of any reverse proxy. `container` is the port
      *  the app listens on inside the container. */
     readonly expose?: { readonly host: number; readonly container: number; readonly protocol?: "tcp" | "udp" };
+    /** Further ports to publish beside the main one. A Java Minecraft server that
+     *  Bedrock clients can also join answers on a second, UDP port - one service,
+     *  two doors, so it cannot be modelled as the single exposed port. */
+    readonly extraPorts?: readonly { readonly host: number; readonly container: number; readonly protocol?: "tcp" | "udp" }[];
     /** True when `expose.container` is a fallback guess (the user did not pin a
      *  port), so the runtime may refine it from the image's own exposed port. */
     readonly autoContainerPort?: boolean;

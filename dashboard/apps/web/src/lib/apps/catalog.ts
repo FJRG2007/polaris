@@ -21,6 +21,7 @@ export type AppCapability =
     | "messaging-hub"
     | "messaging-channel"
     | "ai-assistant"
+    | "game-manager"
     | "game-server"
     | "tool";
 
@@ -121,6 +122,10 @@ export interface AppManifest {
     singleton?: boolean;
     /** Declared but not yet installable - shown locked in the marketplace. */
     comingSoon?: boolean;
+    /** Not offered in the marketplace: it is created from inside another app that
+     *  owns it (a Minecraft server is created by the Minecraft manager). Still a
+     *  real manifest - it is what the install is made from. */
+    internal?: boolean;
 }
 
 export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
@@ -148,8 +153,22 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         }
     },
     {
+        id: "minecraft-manager",
+        name: "Minecraft",
+        category: "Game servers",
+        icon: Gamepad2,
+        summary: "Create and run as many Minecraft servers as you want.",
+        description:
+            "The Minecraft server manager. Install it once, then create servers from one page: Java for PC players, Bedrock for phones and consoles, or one server both can join. Each gets an address on your domain, a console, player moderation, mods and plugins, and the memory it needs for the players you expect.",
+        installMethod: "builtin",
+        capabilities: ["game-manager"],
+        dashboard: "builtin",
+        singleton: true
+    },
+    {
         id: "minecraft",
         name: "Minecraft (Java)",
+        internal: true,
         category: "Game servers",
         icon: Gamepad2,
         summary: "A Java server for PC players, closed and protected by default.",
@@ -288,6 +307,32 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     group: "Mods"
                 },
                 {
+                    key: "RESOURCE_PACK",
+                    label: "Resource pack",
+                    help: "A direct link to the pack's zip. Players are offered it when they join.",
+                    tunable: true,
+                    group: "World"
+                },
+                {
+                    key: "RESOURCE_PACK_SHA1",
+                    label: "Resource pack checksum",
+                    help: "The pack's SHA-1. Without it clients re-download the pack every time.",
+                    tunable: true,
+                    group: "World"
+                },
+                {
+                    key: "RESOURCE_PACK_ENFORCE",
+                    label: "Require the resource pack",
+                    help: "On disconnects players who decline it.",
+                    default: "false",
+                    options: [
+                        { value: "false", label: "Optional" },
+                        { value: "true", label: "Required" }
+                    ],
+                    tunable: true,
+                    group: "World"
+                },
+                {
                     key: "MAX_PLAYERS",
                     label: "Player slots",
                     default: "20",
@@ -384,6 +429,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
     {
         id: "minecraft-bedrock",
         name: "Minecraft (Bedrock)",
+        internal: true,
         category: "Game servers",
         icon: Gamepad2,
         summary: "A Bedrock server for phones, consoles and Windows.",
@@ -527,7 +573,7 @@ export function findApp(id: string): AppManifest | undefined {
 
 /** Apps that are installable now (declared, not coming soon). */
 export function installableApps(): readonly AppManifest[] {
-    return POLARIS_APP_CATALOG.filter((app) => !app.comingSoon);
+    return POLARIS_APP_CATALOG.filter((app) => !app.comingSoon && !app.internal);
 }
 
 /** Whether an app provides a given capability. */
@@ -539,7 +585,11 @@ export function appHasCapability(app: AppManifest, capability: AppCapability): b
  *  image (build-only apps need their image published first) and not coming soon.
  *  Pure and client-safe, so the marketplace UI and the install service agree. */
 export function isInstallable(app: AppManifest): boolean {
-    return !app.comingSoon && app.installMethod === "compose-template" && Boolean(app.template?.image);
+    if (app.comingSoon) return false;
+    // A builtin app has nothing to run: installing it records that this Polaris
+    // has it, and the app itself is the dashboard.
+    if (app.installMethod === "builtin") return true;
+    return app.installMethod === "compose-template" && Boolean(app.template?.image);
 }
 
 /** The env vars an operator fills in: everything the manifest declares except the
@@ -572,6 +622,6 @@ const CATEGORY_ORDER: readonly AppCategory[] = ["Messaging", "AI", "Game servers
 export function appsByCategory(): ReadonlyArray<{ category: AppCategory; apps: AppManifest[] }> {
     return CATEGORY_ORDER.map((category) => ({
         category,
-        apps: POLARIS_APP_CATALOG.filter((app) => app.category === category)
+        apps: POLARIS_APP_CATALOG.filter((app) => app.category === category && !app.internal)
     })).filter((group) => group.apps.length > 0);
 }

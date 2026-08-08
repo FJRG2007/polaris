@@ -252,11 +252,30 @@ does: Polaris components, Polaris navigation, no embedded foreign UI. The
 Minecraft app is the reference for that, and the shape any later game server
 follows.
 
-**Game servers is a pillar page, not one app.** `/apps/games` lists every server
-this owner runs, of either edition, with what each one is doing right now and a
-New server dialog that picks the edition up front. A server is still a
-marketplace install underneath - the page is a shorter way into the same install
-path, so a server made either way is the same object.
+**The marketplace installs a manager, not a server.** `minecraft-manager` is a
+builtin app: installing it runs nothing and turns `/apps/games` into a real page.
+Servers are created there, from two internal manifests (`minecraft`,
+`minecraft-bedrock`) the marketplace never offers - which is why the catalog has
+an `internal` flag at all. Each server is still an ordinary install underneath.
+
+**What creating a server asks, and what it works out.** Who plays on it (Java,
+Bedrock, or a Java world Bedrock joins through Geyser), what it plays (a
+blueprint), and how many people will be on it at once. From that: the image, the
+heap (`recommendedMemoryMb` - sized from concurrent players, not from the slot
+count), the plugins the blueprint needs, whether a second UDP port has to be
+published for crossplay, and the address. The machine picker shows what each
+machine has free and what its game servers are already promised, so a server is
+not put where it does not fit.
+
+**Blueprints are presets, not content.** Each names real Modrinth projects the
+image installs itself, with `?` so a Minecraft release they have no build for yet
+warns instead of stopping the server. Polaris ships no worlds and no plugins of
+its own.
+
+**The address is a name.** `<label>.mc.<baseDomain>`, with an A record and - for
+Java - a `_minecraft._tcp` SRV record, so players type a name and no port at all.
+Bedrock clients do not resolve SRV, so theirs keeps the port. No domain
+configured means the machine's own address, as before.
 
 - **Both editions.** `minecraft` is Java (PC), `minecraft-bedrock` is Bedrock
   (phones, consoles, the Windows app). They are managed through one panel and
@@ -281,8 +300,19 @@ path, so a server made either way is the same object.
   they existed working.
 - **The firewall reaches it.** Polaris' firewall is an HTTP guard and a game
   server is not HTTP, so its blocked addresses are handed to the server's own ban
-  list from the Players screen. Ranges stay behind: Minecraft bans one address at
-  a time, and the screen says how many were left.
+  list - from the Players screen for right now, and from
+  `POST /api/cron/game-firewall` (same secret as the other cron routes) so a ban
+  added later reaches every running server without anyone pressing anything.
+  Ranges stay behind: Minecraft bans one address at a time, and the screen says
+  how many were left.
+- **Its files are Drive files.** The panel links the container's `/data` into the
+  Drive explorer (`?c=container:<applicationId>`), which already browses a
+  deployed container - so worlds, configs and plugin folders are read and edited
+  where every other file in Polaris is.
+- **UDP needed the daemon.** The compose spec's port carries a protocol now, and
+  polaris-hostd had to learn it: its `PortSpec` is `deny_unknown_fields`, so a
+  Bedrock server would have been refused by the local daemon. A host running an
+  older daemon cannot publish UDP.
 
 - **Install is one click.** The card installs on this server with the manifest's
   defaults and opens the app. `Configure` is the same install with the server,

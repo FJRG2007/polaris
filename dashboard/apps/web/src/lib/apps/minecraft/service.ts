@@ -104,6 +104,10 @@ interface MinecraftInstall {
     readonly edition: MinecraftEdition;
     /** The host port the deploy published this server on, when it pinned one. */
     readonly hostPort: number | null;
+    /** The name on the operator's domain this server answers to, when it has one. */
+    readonly hostname: string | null;
+    /** Whether that name carries the port for the client (a Java SRV record). */
+    readonly portless: boolean;
 }
 
 /** Resolve an installed app to the container its server runs in, asserting the
@@ -127,6 +131,15 @@ async function resolveInstall(ownerId: string, installedAppId: string): Promise<
     } catch {
         // An unreadable config pins no port; the derived one still applies.
     }
+    let hostname: string | null = null;
+    let portless = false;
+    try {
+        const config = JSON.parse(install.config) as { hostname?: unknown; portless?: unknown };
+        if (typeof config.hostname === "string") hostname = config.hostname;
+        portless = config.portless === true;
+    } catch {
+        // No name recorded; the address falls back to the machine's own.
+    }
     return {
         installedAppId: install.id,
         applicationId: app.id,
@@ -135,7 +148,9 @@ async function resolveInstall(ownerId: string, installedAppId: string): Promise<
         target: app.target,
         running: app.desiredState === "running",
         edition: editionOf(install.catalogId),
-        hostPort
+        hostPort,
+        hostname,
+        portless
     };
 }
 
@@ -357,6 +372,12 @@ export async function getServerRoster(ownerId: string, installedAppId: string): 
  * better an absent address than one that does not resolve.
  */
 async function serverAddress(install: MinecraftInstall, ownerId: string): Promise<string | null> {
+    // A name on the operator's domain is the address when there is one: it is what
+    // players are given, and it keeps working when the machine's own changes.
+    if (install.hostname) {
+        const port = install.hostPort ?? hostPortForApp(install.portSubject);
+        return install.portless ? install.hostname : `${install.hostname}:${port}`;
+    }
     const ip =
         install.target.kind === "local" || !install.target.hostId
             ? await getHostLanIp()

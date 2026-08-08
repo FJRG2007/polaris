@@ -12,8 +12,9 @@
  * minute to say anything at all.
  */
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Save } from "lucide-react";
+import { FolderOpen, Loader2, Save } from "lucide-react";
 import { MinecraftMods } from "./minecraft-mods";
 import { CopyButton } from "@/components/copy-button";
 import { saveWorldAction } from "./minecraft-actions";
@@ -111,7 +112,13 @@ export function MinecraftPanel({
 
     return (
         <div className="flex flex-col gap-4">
-            <ConnectCard status={status} running={running} settings={settings} installedAppId={installedAppId} />
+            <ConnectCard
+                status={status}
+                running={running}
+                settings={settings}
+                installedAppId={installedAppId}
+                applicationId={applicationId}
+            />
 
             {error && <p className="text-sm text-danger">{error}</p>}
 
@@ -172,12 +179,14 @@ function ConnectCard({
     status,
     running,
     settings,
-    installedAppId
+    installedAppId,
+    applicationId
 }: {
     status: MinecraftStatus | null;
     running: boolean;
     settings: InstalledAppSetting[];
     installedAppId: string;
+    applicationId: string | null;
 }) {
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState<string | null>(null);
@@ -216,6 +225,15 @@ function ConnectCard({
 
                 <div className="flex items-center gap-3">
                     <StatusBadge status={status} running={running} />
+                    {applicationId && (
+                        // The world, the configs and the plugin folders, in the same
+                        // explorer every other file in Polaris is browsed from.
+                        <Link href={`/drive?c=container:${applicationId}&p=/data`}>
+                            <Button size="sm" variant="secondary" title="Browse this server's files in Drive">
+                                <FolderOpen className="size-4" /> Files
+                            </Button>
+                        </Link>
+                    )}
                     <Button
                         size="sm"
                         variant="secondary"

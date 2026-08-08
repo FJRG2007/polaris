@@ -50,6 +50,7 @@ const CAPABILITY_LABEL: Record<AppCapability, string> = {
     "messaging-hub": "Messaging",
     "messaging-channel": "Channel",
     "ai-assistant": "AI assistant",
+    "game-manager": "Game servers",
     "game-server": "Game server",
     tool: "Tool"
 };

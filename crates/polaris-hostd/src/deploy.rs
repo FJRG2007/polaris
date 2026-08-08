@@ -75,6 +75,11 @@ pub struct ServiceSpec {
 pub struct PortSpec {
     pub host: u16,
     pub container: u16,
+    /// Transport to publish on. Absent means TCP, which is what every service
+    /// before game servers wanted; a Bedrock Minecraft server is UDP, and
+    /// published as TCP it answers nothing at all.
+    #[serde(default)]
+    pub protocol: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

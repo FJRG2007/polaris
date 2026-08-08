@@ -1477,6 +1477,22 @@ async function buildAppPlan(
     // derived one nobody would guess. Pinned at install; absent for everything else.
     const storedHostPort = typeof source.hostPort === "number" ? source.hostPort : undefined;
     const hostProtocol = source.hostProtocol === "udp" ? "udp" : undefined;
+    // Further doors into the same service (a Java Minecraft server that Bedrock
+    // clients join answers on a UDP port beside its own).
+    const extraPorts = Array.isArray(source.extraPorts)
+        ? source.extraPorts.flatMap((entry: unknown) => {
+              if (typeof entry !== "object" || entry === null) return [];
+              const port = entry as { host?: unknown; container?: unknown; protocol?: unknown };
+              if (typeof port.host !== "number" || typeof port.container !== "number") return [];
+              return [
+                  {
+                      host: port.host,
+                      container: port.container,
+                      ...(port.protocol === "udp" ? { protocol: "udp" as const } : {})
+                  }
+              ];
+          })
+        : [];
 
     // Everything a builder produces from source reads PORT to decide where to
     // listen - it is the convention every framework and every buildpack follows -
@@ -1518,6 +1534,7 @@ async function buildAppPlan(
             container: containerPort,
             ...(hostProtocol ? { protocol: hostProtocol } : {})
         },
+        ...(extraPorts.length > 0 ? { extraPorts } : {}),
         // When the user has not pinned a container port, the value above is a guess
         // (a domain's target port or a source default); let the runtime refine it from
         // the image's own exposed port so IP:port reaches a live socket, not a dead one.

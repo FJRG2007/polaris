@@ -1,72 +1,91 @@
 "use server";
 
 /**
- * Creating a game server from the Game servers page. It is the marketplace
- * install with the edition chosen up front, so a server made here and one made
- * from a marketplace card are the same thing - there is one install path, and
- * this is a shorter way into it.
+ * What the Minecraft manager does. Creating a server is the one action with any
+ * weight to it, and it is deliberately the only place that decides what a server
+ * is made of - the dialog asks, this authorizes and records, and games-create
+ * turns the answers into an install.
  */
 
 import { revalidatePath } from "next/cache";
-import { listHosts } from "@/lib/host-service";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { installApp } from "@/lib/apps/install-service";
-import { appInstallInputSchema, type AppInstallInput } from "@/lib/apps/install-schema";
-import { appHasCapability, findApp, POLARIS_APP_CATALOG, isInstallable } from "@/lib/apps/catalog";
+import { createGameServer } from "@/lib/apps/games-create";
+import { gameHostname } from "@/lib/apps/minecraft/address";
+import { listGameMachines, type GameMachine } from "@/lib/apps/games-service";
+import { createGameServerSchema, type CreateGameServerInput } from "@/lib/apps/games-schema";
+import { GAME_BLUEPRINTS, recommendedMemoryMb, formatMemory } from "@/lib/apps/minecraft/blueprints";
 
-export interface GameEditionOption {
-    catalogId: string;
-    name: string;
-    summary: string;
+/** The manager itself, as the marketplace knows it. */
+const MANAGER_CATALOG_ID = "minecraft-manager";
+
+export interface GameSetup {
+    /** Machines a server can run on, with what each has left. */
+    readonly machines: GameMachine[];
+    /** The domain servers get names under, when one is configured. */
+    readonly domainExample: string | null;
 }
 
-export interface GameTargetOption {
-    id: string;
-    name: string;
-}
-
-/** The editions a server can be created as: every installable game-server app. */
-export async function listGameEditionsAction(): Promise<GameEditionOption[]> {
-    await requirePermission("games.read");
-    return POLARIS_APP_CATALOG.filter((app) => appHasCapability(app, "game-server") && isInstallable(app)).map(
-        (app) => ({ catalogId: app.id, name: app.name, summary: app.summary })
-    );
-}
-
-/** The machines a server can run on: this one, plus every connected server. */
-export async function listGameTargetsAction(): Promise<GameTargetOption[]> {
+/** Everything the create dialog needs that only the server knows. */
+export async function gameSetupAction(): Promise<GameSetup> {
     const user = await requirePermission("games.manage");
-    const hosts = await listHosts(user.id);
-    return [
-        { id: "local", name: "Local (this server)" },
-        ...hosts.map((host) => ({ id: host.id, name: host.name }))
-    ];
+    const [machines, domainExample] = await Promise.all([listGameMachines(user.id), gameHostname("survival")]);
+    return { machines, domainExample };
+}
+
+/** What memory a server for this many players would be given, so the dialog can
+ *  say it before anything is created. */
+export async function suggestedMemoryAction(concurrentPlayers: number, blueprintId: string): Promise<string> {
+    await requirePermission("games.read");
+    const blueprint = GAME_BLUEPRINTS.find((entry) => entry.id === blueprintId);
+    return formatMemory(recommendedMemoryMb(concurrentPlayers, blueprint?.weight ?? "normal"));
 }
 
 /** Create a server. Returns its installed-app id so the page can open it. */
 export async function createGameServerAction(
-    input: AppInstallInput
-): Promise<{ installedAppId?: string; error?: string }> {
+    input: CreateGameServerInput
+): Promise<{ installedAppId?: string; hostname?: string | null; error?: string }> {
     const user = await requirePermission("games.manage");
-    const parsed = appInstallInputSchema.safeParse(input);
+    const parsed = createGameServerSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
-    const manifest = findApp(parsed.data.catalogId);
-    // This page creates game servers; anything else is installed from the
-    // marketplace, where its own description and consent are shown.
-    if (!manifest || !appHasCapability(manifest, "game-server")) return { error: "That is not a game server" };
     try {
-        const result = await installApp(user.id, user.id, parsed.data);
+        const created = await createGameServer(user.id, user.id, parsed.data);
         await recordAudit({
             actorId: user.id,
             action: "games.create",
             targetType: "installedApp",
-            targetId: result.installedAppId,
-            metadata: { catalogId: parsed.data.catalogId }
+            targetId: created.installedAppId,
+            metadata: { edition: parsed.data.edition, blueprint: parsed.data.blueprintId }
         });
         revalidatePath("/apps/games");
-        return { installedAppId: result.installedAppId };
+        return { installedAppId: created.installedAppId, hostname: created.hostname };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not create the server" };
+    }
+}
+
+/** Install the manager, from the page that needs it. */
+export async function installManagerAction(): Promise<{ error?: string }> {
+    const user = await requirePermission("games.manage");
+    try {
+        const result = await installApp(user.id, user.id, {
+            catalogId: MANAGER_CATALOG_ID,
+            name: "Minecraft",
+            serverId: "local",
+            storage: [],
+            env: []
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "apps.install",
+            targetType: "installedApp",
+            targetId: result.installedAppId
+        });
+        revalidatePath("/apps/games");
+        revalidatePath("/apps/marketplace");
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not install the manager" };
     }
 }

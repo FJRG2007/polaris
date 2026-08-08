@@ -53,6 +53,23 @@ function adaptedPanelFor(app: InstalledAppDetail, settings: InstalledAppSetting[
     switch (app.catalogId) {
         case "messaging-bridge":
             return <MessagingBridgePanel />;
+        // The manager runs nothing itself - its dashboard is the Game servers page,
+        // and this is the door to it rather than a second copy of the list.
+        case "minecraft-manager":
+            return (
+                <Card>
+                    <CardBody className="flex flex-col items-center gap-3 py-10 text-center">
+                        <p className="text-sm font-medium">Your servers live on the Game servers page</p>
+                        <p className="max-w-md text-sm text-muted-foreground">
+                            Create as many as you want, Java or Bedrock, each with its own address, console, players and
+                            mods. The manager itself runs nothing.
+                        </p>
+                        <Link href="/apps/games">
+                            <Button size="sm">Open Game servers</Button>
+                        </Link>
+                    </CardBody>
+                </Card>
+            );
         // Both editions are driven by the same panel; what differs is underneath,
         // and the panel offers what the edition it is looking at actually has.
         case "minecraft":
