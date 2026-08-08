@@ -119,7 +119,10 @@ jobs:
             while IFS=$'\t' read -r id digest tags; do
               [ -n "${id:-}" ] || continue
               case ",${tags:-}," in *,latest,*) continue;; esac
-              echo "$keep" | grep -qx "$digest" && continue
+              # Fed by a here-string, not a pipe: `grep -q` closing the pipe on
+              # its first hit fails the writer under `pipefail`, and a digest
+              # that is on the keep list would read as one that is not.
+              grep -qx "$digest" <<<"$keep" && continue
               if [ "${DRY_RUN:-false}" = "true" ]; then
                 echo "would delete $digest ${tags:+(tagged $tags)}"
                 continue

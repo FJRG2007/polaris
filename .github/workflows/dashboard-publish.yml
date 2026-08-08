@@ -71,9 +71,17 @@ jobs:
              || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
             all; exit 0
           fi
-          CHANGED=$(git diff --name-only "$BEFORE" "$SHA")
-          echo "Changed files:"; echo "$CHANGED"
-          has() { echo "$CHANGED" | grep -qE "$1"; }
+          CHANGED="$RUNNER_TEMP/changed.txt"
+          git diff --name-only "$BEFORE" "$SHA" > "$CHANGED"
+          echo "Changed files ($(wc -l < "$CHANGED")):"; head -100 "$CHANGED"
+          # Matched against a file rather than through a pipe. `grep -q` stops at
+          # its first hit and closes the pipe; under `pipefail` the EPIPE that
+          # hands the writer becomes the pipeline's status, so `has` returned
+          # false for a pattern it had just matched. It only bites once the list
+          # outgrows the 64K pipe buffer - a push of a few files always fit, and
+          # the first one that did not reported every filter as "nothing changed"
+          # and published no image at all.
+          has() { grep -qE "$1" "$CHANGED"; }
           if has '^\.github/workflows/dashboard-publish\.yml$'; then all; exit 0; fi
           has '^dashboard/(apps|packages|cli|patches)/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$' && out web true || out web false
           has '^dashboard/mdns/' && out mdns true || out mdns false
