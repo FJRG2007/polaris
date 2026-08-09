@@ -12,6 +12,7 @@
  * nobody waiting for the table should pay for it.
  */
 
+import { readJson } from "./read-json";
 import { protectAction } from "./actions";
 import { useEffect, useState } from "react";
 import { Loader2, ShieldCheck } from "lucide-react";
@@ -47,14 +48,9 @@ export function ProtectDialog({
 
     useEffect(() => {
         let live = true;
-        fetch("/api/backups/discover", { cache: "no-store" })
-            .then((response) => (response.ok ? response.json() : { candidates: [] }))
-            .then((data: { candidates: DiscoveredCandidate[] }) => {
-                if (live) setCandidates(data.candidates);
-            })
-            .catch(() => {
-                if (live) setCandidates([]);
-            });
+        void readJson<{ candidates: DiscoveredCandidate[] }>("/api/backups/discover").then((data) => {
+            if (live) setCandidates(data?.candidates ?? []);
+        });
         return () => {
             live = false;
         };

@@ -17,6 +17,7 @@
  */
 
 import Link from "next/link";
+import { readJson } from "./read-json";
 import { PlansPanel } from "./plans-panel";
 import { formatBytes } from "@polaris/core";
 import { ProtectDialog } from "./protect-dialog";
@@ -24,9 +25,9 @@ import { ActivityPanel } from "./activity-panel";
 import { DestinationsPanel } from "./destinations-panel";
 import { useDisplayFormat } from "@/components/display-format";
 import { RESOURCE_KINDS, RESOURCE_KINDS_INFO } from "@/lib/backups/kinds";
-import { backUpNowAction, setPausedAction, setPlanAction, unprotectAction } from "./actions";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { BackupOverview, DestinationSummary, PlanSummary, ResourceRow } from "./types";
+import { backUpNowAction, setPausedAction, setPlanAction, unprotectAction } from "./actions";
 import {
     AlertTriangle,
     Clock,
@@ -76,8 +77,8 @@ export function BackupsView() {
     const [overview, setOverview] = useState<BackupOverview | null>(null);
 
     const loadOverview = useCallback(async () => {
-        const response = await fetch("/api/backups/overview", { cache: "no-store" });
-        if (response.ok) setOverview((await response.json()) as BackupOverview);
+        const next = await readJson<BackupOverview>("/api/backups/overview");
+        if (next) setOverview(next);
     }, []);
 
     useEffect(() => {
@@ -241,12 +242,11 @@ function ProtectedTable({
                     return;
                 }
             }
-            const response = await fetch(`/api/backups/resources?${params}`, { cache: "no-store" });
-            if (!response.ok) {
+            const next = await readJson<Page>(`/api/backups/resources?${params}`);
+            if (!next) {
                 setError("The list could not be loaded.");
                 return;
             }
-            const next = (await response.json()) as Page;
             setPage((current) =>
                 cursor && current ? { ...next, rows: [...current.rows, ...next.rows] } : next
             );

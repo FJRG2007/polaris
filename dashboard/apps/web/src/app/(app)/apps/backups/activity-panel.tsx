@@ -10,6 +10,7 @@
 
 import Link from "next/link";
 import type { JobRow } from "./types";
+import { readJson } from "./read-json";
 import { formatBytes } from "@polaris/core";
 import { useEffect, useState } from "react";
 import { Badge, Card, Skeleton } from "@polaris/ui";
@@ -28,14 +29,9 @@ export function ActivityPanel() {
 
     useEffect(() => {
         let live = true;
-        fetch("/api/backups/activity", { cache: "no-store" })
-            .then((response) => (response.ok ? response.json() : { jobs: [] }))
-            .then((data: { jobs: JobRow[] }) => {
-                if (live) setJobs(data.jobs);
-            })
-            .catch(() => {
-                if (live) setJobs([]);
-            });
+        void readJson<{ jobs: JobRow[] }>("/api/backups/activity").then((data) => {
+            if (live) setJobs(data?.jobs ?? []);
+        });
         return () => {
             live = false;
         };

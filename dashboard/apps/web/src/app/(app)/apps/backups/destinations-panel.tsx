@@ -10,6 +10,7 @@
  * one is choosing what their backups survive.
  */
 
+import { readJson } from "./read-json";
 import { useEffect, useState } from "react";
 import { formatBytes } from "@polaris/core";
 import type { DestinationSummary } from "./types";
@@ -206,20 +207,15 @@ function DestinationDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
     // Loaded on open rather than with the console: most visits never add one.
     useEffect(() => {
         let live = true;
-        void fetch("/api/backups/targets", { cache: "no-store" })
-            .then((response) => (response.ok ? response.json() : { connections: [], hosts: [] }))
-            .then((data: { connections: ConnectionOption[]; hosts: ConnectionOption[] }) => {
-                if (!live) return;
-                setConnections(data.connections);
-                setHosts(data.hosts);
-                setConnectionId(data.connections[0]?.id ?? "");
-                setHostId(data.hosts[0]?.id ?? "");
-            })
-            .catch(() => {
-                if (!live) return;
-                setConnections([]);
-                setHosts([]);
-            });
+        void readJson<{ connections: ConnectionOption[]; hosts: ConnectionOption[] }>(
+            "/api/backups/targets"
+        ).then((data) => {
+            if (!live) return;
+            setConnections(data?.connections ?? []);
+            setHosts(data?.hosts ?? []);
+            setConnectionId(data?.connections[0]?.id ?? "");
+            setHostId(data?.hosts[0]?.id ?? "");
+        });
         return () => {
             live = false;
         };
