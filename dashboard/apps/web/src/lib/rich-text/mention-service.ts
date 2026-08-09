@@ -38,6 +38,18 @@ export interface MentionCandidate {
     readonly status?: { readonly name: string; readonly color: string } | null;
 }
 
+/** One account, as a field that names people by their sign-in identity needs
+ *  it: the picker shows the person, but what gets stored is what the server
+ *  matches on later. */
+export interface AccountCandidate {
+    readonly id: string;
+    readonly name: string;
+    /** Null on an account that never set one; then the email is the identity. */
+    readonly username: string | null;
+    readonly email: string;
+    readonly image: string | null;
+}
+
 /** How many of each kind one search returns, so a popup stays a popup. The
  *  global search asks for more, because a panel is not a popup. */
 const PER_KIND = 6;
@@ -107,6 +119,47 @@ async function searchPeople(actor: access.TaskActor, term: string, limit: number
         id: user.id,
         label: user.name || user.email,
         detail: user.name ? user.email : "",
+        image: user.image
+    }));
+}
+
+/**
+ * The same people, for a field that stores an identity rather than a mention.
+ *
+ * A drop point's allowlist, a successor, somebody being given a server: all of
+ * them are matched later by username or email, so the picker has to hand back
+ * the identity and not the id. The reach is deliberately the one above - naming
+ * an account in a field does not make it visible, and a picker that offered the
+ * whole instance would be a user directory nobody agreed to publish.
+ *
+ * @param actor - The caller, already past the permission check.
+ * @param query - What has been typed. Empty offers the first names in reach.
+ * @param limit - Rows to return. The default is what a popup can show.
+ */
+export async function searchAccounts(
+    actor: access.TaskActor,
+    query: string,
+    limit: number = PER_KIND
+): Promise<AccountCandidate[]> {
+    const term = query.trim();
+    const contains = term ? like(term) : undefined;
+    const scope = actor.isAdmin ? null : await reachablePeople(actor);
+    const users = await prisma.user.findMany({
+        where: {
+            ...(scope ? { id: { in: scope } } : {}),
+            ...(contains
+                ? { OR: [{ name: contains }, { email: contains }, { username: contains }] }
+                : {})
+        },
+        select: { id: true, name: true, username: true, email: true, image: true },
+        orderBy: { name: "asc" },
+        take: limit
+    });
+    return users.map((user) => ({
+        id: user.id,
+        name: user.name || user.email,
+        username: user.username,
+        email: user.email,
         image: user.image
     }));
 }

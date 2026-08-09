@@ -14,6 +14,7 @@
  */
 
 import { CopyButton } from "@/components/copy-button";
+import { AccountInput } from "@/components/account-input";
 import { useDisplayFormat } from "@/components/display-format";
 import { Crown, Loader2, Trash2, UserPlus } from "lucide-react";
 import { useCallback, useEffect, useState, useTransition } from "react";
@@ -32,7 +33,6 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input,
     Select,
     Skeleton,
     Switch
@@ -316,11 +316,11 @@ function ShareDialog({
                     <div className="flex flex-col gap-4">
                         <label className="flex flex-col gap-1 text-sm">
                             <span className="font-medium">Email or username</span>
-                            <Input
+                            <AccountInput
                                 value={identifier}
-                                onChange={(event) => setIdentifier(event.target.value)}
+                                onValueChange={setIdentifier}
                                 placeholder="ana@example.com"
-                                autoComplete="off"
+                                aria-label="Email or username"
                             />
                             <span className="text-xs text-muted-foreground">
                                 {canInvite

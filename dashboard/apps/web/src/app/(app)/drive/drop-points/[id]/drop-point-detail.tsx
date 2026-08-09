@@ -9,9 +9,17 @@
  * re-validated server-side; this view only reflects the result.
  */
 
-import { useMemo, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { formatBytes } from "@polaris/core";
+import { tokenList } from "@/lib/token-field";
+import { GeoPicker } from "@/components/geo-picker";
+import { useFormChanged } from "@/lib/use-form-changed";
+import { useConfirm } from "@/components/confirm-dialog";
+import { AccountInput } from "@/components/account-input";
+import { useDisplayFormat } from "@/components/display-format";
+import { RequestDialog } from "@/app/(app)/drive/request-dialog";
+import { useMemo, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import {
     Ban,
     ChevronLeft,
@@ -25,7 +33,6 @@ import {
     Trash2,
     Users
 } from "lucide-react";
-import { formatBytes } from "@polaris/core";
 import {
     cn,
     Card,
@@ -40,18 +47,13 @@ import {
     DialogContent,
     DialogDescription
 } from "@polaris/ui";
-import { GeoPicker } from "@/components/geo-picker";
-import { useConfirm } from "@/components/confirm-dialog";
-import { useDisplayFormat } from "@/components/display-format";
-import { useFormChanged } from "@/lib/use-form-changed";
-import { RequestDialog } from "../../request-dialog";
 import {
     deleteSubmissionAction,
     reopenFileRequestAction,
     revokeFileRequestAction,
     saveDropPointTemplateAction,
     updateFileRequestAction
-} from "../../request-actions";
+} from "@/app/(app)/drive/request-actions";
 
 export interface DropPointConfig {
     id: string;
@@ -688,18 +690,9 @@ function EditDropPointDialog({
         setError(null);
         const form = new FormData(event.currentTarget);
 
-        const tokens = (raw: string, stripLeading: RegExp) =>
-            Array.from(
-                new Set(
-                    String(raw)
-                        .split(/[\s,]+/)
-                        .map((value) => value.trim().replace(stripLeading, "").toLowerCase())
-                        .filter(Boolean)
-                )
-            );
-        const allowedExtensions = tokens(String(form.get("extensions") ?? ""), /^\./);
-        const deniedExtensions = tokens(String(form.get("deniedExtensions") ?? ""), /^\./);
-        const allowedUsers = tokens(String(form.get("allowedUsers") ?? ""), /^@+/);
+        const allowedExtensions = tokenList(String(form.get("extensions") ?? ""), /^\./);
+        const deniedExtensions = tokenList(String(form.get("deniedExtensions") ?? ""), /^\./);
+        const allowedUsers = tokenList(String(form.get("allowedUsers") ?? ""), /^@+/);
         const allowedCidrs = String(form.get("allowedCidrs") ?? "")
             .split(/[\s,]+/)
             .map((value) => value.trim())
@@ -923,11 +916,12 @@ function EditDropPointDialog({
                     </div>
                     <label className="flex flex-col gap-1 text-sm">
                         Restrict to specific users (optional)
-                        <Input
+                        <AccountInput
+                            multiple
                             name="allowedUsers"
                             defaultValue={config.allowedUsers.join(", ")}
                             placeholder="e.g. @alice, bob@example.com"
-                            autoComplete="off"
+                            aria-label="Restrict to specific users"
                         />
                         <span className="text-xs text-muted-foreground">
                             Only these accounts may upload (sign-in required). Match by username or

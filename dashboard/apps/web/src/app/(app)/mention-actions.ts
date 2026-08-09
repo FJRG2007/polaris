@@ -45,6 +45,35 @@ export async function searchMentionsAction(
     }
 }
 
+const accountInput = z.object({ query: z.string().max(120) });
+
+/**
+ * The accounts a field naming people can offer.
+ *
+ * Same reach as the @ picker, for the same reason: this is the other half of the
+ * question, asked by a form field rather than by a caret. A drop point's
+ * allowlist is stored as usernames and addresses, so what comes back is the
+ * identity to write into the field, not a reference to insert.
+ */
+export async function searchAccountsAction(
+    input: unknown
+): Promise<{ results?: mentions.AccountCandidate[]; error?: string }> {
+    const parsed = accountInput.safeParse(input);
+    if (!parsed.success) return { error: "That search could not be read" };
+
+    const user = await requireUser();
+    try {
+        const results = await mentions.searchAccounts(
+            { id: user.id, isAdmin: user.isAdmin },
+            parsed.data.query
+        );
+        return { results };
+    } catch (caught) {
+        console.error(caught);
+        return { error: "Those could not be looked up" };
+    }
+}
+
 const resolveInput = z
     .array(z.object({ kind: z.enum(REFERENCE_KINDS), id: z.string().uuid() }))
     // A paste is one document, not a crawl of the instance.

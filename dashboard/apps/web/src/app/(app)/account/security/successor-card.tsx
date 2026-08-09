@@ -25,11 +25,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import type { StepUpProofInput } from "@polaris/core";
+import { AccountInput } from "@/components/account-input";
 import { StepUpFields } from "@/components/step-up-fields";
 import { Feedback, type SettingLock } from "./setting-card";
 import { HeartHandshake, Loader2, Trash2, UserPlus } from "lucide-react";
 import { clearSuccessorAction, setSuccessorAction } from "./successor-actions";
-import { Button, Card, CardBody, Dialog, DialogContent, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import { Button, Card, CardBody, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
 
 export interface SuccessorPerson {
     userId: string;
@@ -166,12 +167,13 @@ function SuccessorDialog({
                     ) : (
                         <label className="text-muted-foreground flex flex-col gap-1 text-xs">
                             Search by username, full name, or email address
-                            <Input
+                            <AccountInput
                                 autoFocus
                                 value={identifier}
                                 className="h-9"
                                 placeholder="someone@example.com"
-                                onChange={(event) => setIdentifier(event.target.value)}
+                                aria-label="Search by username, full name, or email address"
+                                onValueChange={setIdentifier}
                             />
                         </label>
                     )}

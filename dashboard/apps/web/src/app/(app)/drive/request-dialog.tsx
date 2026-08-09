@@ -11,8 +11,14 @@
  * re-validated server-side on every upload. The generated link is shown once.
  */
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { tokenList } from "@/lib/token-field";
 import { Check, Copy, Inbox } from "lucide-react";
+import { GeoPicker } from "@/components/geo-picker";
+import { AccountInput } from "@/components/account-input";
+import { ExpirySelect } from "@/components/expiry-select";
+import { createFileRequestAction } from "./request-actions";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { FILE_CATEGORIES, categoryDef, type FileCategory } from "./file-categories";
 import {
     cn,
     Input,
@@ -25,10 +31,6 @@ import {
     DialogContent,
     DialogDescription
 } from "@polaris/ui";
-import { GeoPicker } from "@/components/geo-picker";
-import { ExpirySelect } from "@/components/expiry-select";
-import { FILE_CATEGORIES, categoryDef, type FileCategory } from "./file-categories";
-import { createFileRequestAction } from "./request-actions";
 
 export interface RequestTarget {
     connectionId: string;
@@ -54,15 +56,6 @@ export interface RequestInitial {
     allowUploaderDelete?: boolean;
     deleteWindowMin?: number;
     startsAt?: string;
-}
-
-/** Split a free-form "a, b c" field into trimmed, lowercased, deduped tokens. */
-function tokenList(value: string, stripLeading: RegExp): string[] {
-    const parts = value
-        .split(/[\s,]+/)
-        .map((token) => token.trim().replace(stripLeading, "").toLowerCase())
-        .filter(Boolean);
-    return Array.from(new Set(parts));
 }
 
 /** A collapsible group of advanced options, closed by default. */
@@ -136,12 +129,16 @@ function toggle(
 export function RequestDialog({
     target,
     onOpenChange,
+    onCreated,
     connections,
     initial,
     scheduleFocus = false
 }: {
     target: RequestTarget | null;
     onOpenChange: (open: boolean) => void;
+    /** Told once the drop point exists, while the dialog is still showing its
+     *  link, so a list of drop points behind it can pick the new one up. */
+    onCreated?: () => void;
     /** When the target has no connectionId, these let the user pick a destination. */
     connections?: { id: string; name: string }[];
     /** Optional values to prefill the form with (clone or template). */
@@ -255,6 +252,7 @@ export function RequestDialog({
             return;
         }
         setUrl(result.url ?? null);
+        onCreated?.();
     }
 
     async function onCopy() {
@@ -479,11 +477,12 @@ export function RequestDialog({
                             </div>
                             <label className="flex flex-col gap-1 text-sm">
                                 Restrict to specific users (optional)
-                                <Input
+                                <AccountInput
+                                    multiple
                                     name="allowedUsers"
                                     defaultValue={initial?.allowedUsers}
                                     placeholder="e.g. @alice, bob@example.com"
-                                    autoComplete="off"
+                                    aria-label="Restrict to specific users"
                                 />
                                 <span className="text-xs text-muted-foreground">
                                     Only these accounts may upload (sign-in required). Match by
