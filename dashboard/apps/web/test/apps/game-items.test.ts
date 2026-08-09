@@ -124,4 +124,20 @@ describe("searchItems", () => {
     it("finds nothing rather than everything when nothing matches", () => {
         expect(searchItems(catalog, "beacon", 10)).toEqual([]);
     });
+
+    it("forgives a typo, which is the whole reason it is a search and not a filter", () => {
+        // Nothing contains "dimaond", so the literal pass has no answer. Coming
+        // back empty for one transposed pair is the failure this catches.
+        expect(searchItems(catalog, "dimaond sword", 10).map((item) => item.id)).toContain(
+            "minecraft:diamond_sword"
+        );
+    });
+
+    it("stays precise while the query still matches something literally", () => {
+        // "diamond sw" names one item. A fuzzy pass folded in beside the literal
+        // one would put every other diamond behind it for no reason.
+        expect(searchItems(catalog, "diamond sw", 10).map((item) => item.id)).toEqual([
+            "minecraft:diamond_sword"
+        ]);
+    });
 });

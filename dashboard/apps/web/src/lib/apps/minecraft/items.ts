@@ -12,6 +12,8 @@
  * resolves to a URL that 404s, which the slot renders as a placeholder.
  */
 
+import Fuse from "fuse.js";
+
 /** An item id as the game writes it, the namespace optional because `give Alice
  *  stone` is what an operator types. Shared with the form and the server action so
  *  all three agree on what is typeable. */
@@ -110,11 +112,52 @@ export function readItemCatalog(manifest: unknown): CatalogItem[] {
 }
 
 /**
+ * How far a fuzzy match may stray. Low enough that a query naming nothing still
+ * finds nothing - an operator typing "beacon" into a catalogue without one wants
+ * to be told so, not handed five things that share four letters with it.
+ */
+const FUZZY_THRESHOLD = 0.3;
+
+/**
+ * The fuzzy index for one catalogue, built once.
+ *
+ * Keyed on the array itself rather than rebuilt per keystroke: the catalogue is
+ * ~1400 entries and is fetched once per tab, so the index outlives every search
+ * run against it. Weak, so a catalogue that is replaced is not kept alive by its
+ * own index.
+ */
+const fuzzyIndexes = new WeakMap<readonly CatalogItem[], Fuse<CatalogItem>>();
+
+function fuzzyIndex(items: readonly CatalogItem[]): Fuse<CatalogItem> {
+    let index = fuzzyIndexes.get(items);
+    if (!index) {
+        index = new Fuse(items, {
+            keys: ["label", "search", "id"],
+            threshold: FUZZY_THRESHOLD,
+            // The word somebody wants is rarely the first one in the id, so where
+            // in the string it matched must not decide whether it matched at all.
+            ignoreLocation: true
+        });
+        fuzzyIndexes.set(items, index);
+    }
+    return index;
+}
+
+/**
  * The catalog entries matching what somebody typed, best first.
  *
  * "Best" is where the match starts: an operator typing "diamond" wants the
  * diamond before the diamond-encrusted everything else, and a list that buries it
- * under `block_of_diamond` is one they scroll past their own answer in.
+ * under `block_of_diamond` is one they scroll past their own answer in. So what
+ * literally contains the query is ranked first and by exactly that rule.
+ *
+ * A typo contains nothing, though, and "dimaond" is the query that made this a
+ * search box rather than a filter. So a query that matched nothing literally is
+ * asked of a fuzzy index instead of coming back empty.
+ *
+ * Only then. Fuzzy hits appended to a literal answer would mean "diamond sw" -
+ * which names one item exactly - dragging in every other diamond behind it, and
+ * an operator who typed enough to be precise should be answered precisely.
  */
 export function searchItems(items: readonly CatalogItem[], query: string, limit: number): CatalogItem[] {
     const needle = query.trim().toLowerCase().replace(/[\s_]+/g, " ");
@@ -129,7 +172,10 @@ export function searchItems(items: readonly CatalogItem[], query: string, limit:
         scored.push({ item, score });
     }
     scored.sort((left, right) => left.score - right.score || left.item.label.localeCompare(right.item.label));
-    return scored.slice(0, limit).map((entry) => entry.item);
+    if (scored.length > 0) return scored.slice(0, limit).map((entry) => entry.item);
+    return fuzzyIndex(items)
+        .search(needle, { limit })
+        .map((hit) => hit.item);
 }
 
 /**
