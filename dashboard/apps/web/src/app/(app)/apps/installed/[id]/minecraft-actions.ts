@@ -13,30 +13,31 @@ import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { clientIp } from "@/lib/request-context";
 import { recordAudit } from "@/lib/audit-service";
-import { applyWorldSchedule } from "@/lib/backups/manage";
 import { setEnvVars } from "@/lib/env-var-service";
 import { requirePermissionAny } from "@/lib/session";
 import { deployApplication } from "@/lib/deploy-service";
+import { applyWorldSchedule } from "@/lib/backups/manage";
+import { DIFFICULTIES } from "@/lib/apps/minecraft/rules";
 import { ITEM_ID_PATTERN } from "@/lib/apps/minecraft/items";
 import { stripFormatting } from "@/lib/apps/minecraft/parse";
 import { requireGameServer } from "@/lib/apps/install-access";
 import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import { setGameHostname } from "@/lib/apps/minecraft/address";
 import { patchInstallConfig } from "@/lib/apps/install-config";
+import { isMissingEntityReply } from "@/lib/apps/minecraft/snbt";
 import { writeContainerFile } from "@/lib/container-files-service";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/minecraft/timeout";
+import type { InventoryItem } from "@/lib/apps/minecraft/inventory";
 import { setGameSchedule } from "@/lib/apps/minecraft/schedule-service";
-import { isDataReply, isMissingEntityReply } from "@/lib/apps/minecraft/snbt";
 import { liftTimeout, timeoutPlayer } from "@/lib/apps/minecraft/timeout-service";
-import { parseInventory, type InventoryItem } from "@/lib/apps/minecraft/inventory";
-import { readSnapshot, writeSnapshot } from "@/lib/apps/minecraft/inventory-service";
 import { MAX_BACKUP_BYTES, MAX_KEEP_LAST } from "@/lib/apps/minecraft/backup-policy";
 import { cancelAction, pendingFor, queueAction } from "@/lib/apps/minecraft/queue-service";
 import { isBackupName, isBiome, isLevelName, isLevelType } from "@/lib/apps/minecraft/world";
 import { parseDimension, parsePosition, type PlayerPosition } from "@/lib/apps/minecraft/position";
 import { MAX_IDLE_MINUTES, MIN_IDLE_MINUTES, type GameSchedule } from "@/lib/apps/minecraft/schedule";
+import { readLiveInventory, readSnapshot, writeSnapshot } from "@/lib/apps/minecraft/inventory-service";
 import { envFormatHint, findApp, isAllowedEnvValue, normalizeEnvValue, tunableEnvVars } from "@/lib/apps/catalog";
-import { applyFirewallBans, getServerPlayers, runConsoleLine, runServerCommand } from "@/lib/apps/minecraft/service";
+import { readRulesFor, setWorldDifficulty, setWorldRule, type WorldRules } from "@/lib/apps/minecraft/rules-service";
 import {
     clearItem,
     clearSlot,
@@ -45,6 +46,13 @@ import {
     moveStack,
     recentlyGivenItems
 } from "@/lib/apps/minecraft/item-service";
+import {
+    applyFirewallBans,
+    getServerPlayers,
+    runConsoleLine,
+    runServerCommand,
+    withServerContainer
+} from "@/lib/apps/minecraft/service";
 import {
     createWorldBackup,
     deleteLevel,
@@ -266,6 +274,13 @@ export interface InventoryReading {
      *  ever kept - an empty bag that is empty because nobody has looked, which
      *  is not the same as one that is empty because they are carrying nothing. */
     readonly takenAt: string | null;
+    /** True when the bag was too big for one reply and had to be read a stack at a
+     *  time. A round trip per stack, so what polls slows down rather than asking
+     *  forty questions every two seconds. */
+    readonly chunked?: boolean;
+    /** Stacks the server named that could not be read whole. Shown rather than
+     *  quietly missing from the grid. */
+    readonly unreadable?: number;
 }
 
 /**
@@ -287,20 +302,17 @@ export async function readPlayerInventoryAction(
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
         const { access } = await requireGameServer("games.read", parsed.data.installedAppId);
-        const output = await runServerCommand(access.ownerId, parsed.data.installedAppId, [
-            "data",
-            "get",
-            "entity",
-            parsed.data.player,
-            "Inventory"
-        ]);
-        const text = stripFormatting(output);
-        const items = parseInventory(text);
+        // One handshake for the whole read. A bag too big for a single RCON reply
+        // is read a stack at a time, and forty of those through `runServerCommand`
+        // would be forty connections to the machine.
+        const reading = await withServerContainer(access.ownerId, parsed.data.installedAppId, (server) =>
+            readLiveInventory(server.say, parsed.data.player)
+        );
         // An empty bag and a reply that was never an inventory both read as no
         // items, and they are not the same thing to tell somebody checking what a
         // player is carrying. Only the server's own sentence proves it answered,
         // so without it the reader is shown what it actually said instead.
-        if (items.length === 0 && !isDataReply(text)) {
+        if (!reading.answered) {
             // Not an answer. Whatever Polaris kept last is a better one than the
             // sentence the server printed instead, so it is offered before the
             // error is.
@@ -308,12 +320,20 @@ export async function readPlayerInventoryAction(
             if (kept) return { reading: { items: kept.items, live: false, takenAt: kept.takenAt } };
             // Offline is the ordinary case here, not a fault, and quoting the
             // server's "No entity was found" at somebody reads as one.
-            if (isMissingEntityReply(text)) {
+            if (isMissingEntityReply(reading.said)) {
                 return {
                     error: "This player is not on the server, and Polaris has no copy of their bag yet. It keeps one every ten minutes while they are playing."
                 };
             }
-            const said = text.trim().replace(/\s+/g, " ").slice(0, 160);
+            const said = reading.said.trim().replace(/\s+/g, " ").slice(0, 160);
+            // `/data` arrived in Java 1.13. Before that there is no command that
+            // reads a player's bag at all, so quoting the parser error at somebody
+            // is quoting a fact about their server version at them sideways.
+            if (/unknown or incomplete command/i.test(said)) {
+                return {
+                    error: "This server does not have the /data command, so it cannot report what a player is carrying. Java 1.13 or newer can."
+                };
+            }
             return {
                 error: said
                     ? `The server did not answer with an inventory: ${said}`
@@ -322,10 +342,18 @@ export async function readPlayerInventoryAction(
         }
         // A live reading is also worth keeping: this is the one moment the bag is
         // known, and the next person to ask will be asking about somebody offline.
-        await writeSnapshot(parsed.data.installedAppId, parsed.data.player, items, new Date()).catch(
+        await writeSnapshot(parsed.data.installedAppId, parsed.data.player, reading.items, new Date()).catch(
             () => undefined
         );
-        return { reading: { items, live: true, takenAt: new Date().toISOString() } };
+        return {
+            reading: {
+                items: reading.items,
+                live: true,
+                takenAt: new Date().toISOString(),
+                ...(reading.chunked ? { chunked: true } : {}),
+                ...(reading.unreadable > 0 ? { unreadable: reading.unreadable } : {})
+            }
+        };
     } catch (caught) {
         const kept = await readSnapshot(parsed.data.installedAppId, parsed.data.player).catch(() => null);
         if (kept) return { reading: { items: kept.items, live: false, takenAt: kept.takenAt } };
@@ -1107,6 +1135,94 @@ export async function updateServerSettingsAction(
         return { error: caught instanceof Error ? caught.message : "Could not save the settings" };
     }
 }
+/**
+ * What the world is being played under.
+ *
+ * A read, so it is `games.read`: an operator who may look at a server may see
+ * whether deaths cost people their inventory. Changing one is `games.manage`
+ * below.
+ */
+export async function readWorldRulesAction(
+    installedAppId: string
+): Promise<{ rules?: WorldRules; error?: string }> {
+    const parsed = z.string().uuid().safeParse(installedAppId);
+    if (!parsed.success) return { error: "That server does not exist" };
+    try {
+        const { access } = await requireGameServer("games.read", parsed.data);
+        return { rules: await readRulesFor(access.ownerId, parsed.data) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not read the rules" };
+    }
+}
+
+/**
+ * Change one rule while the server keeps running.
+ *
+ * Deliberately not a form with a Save button: every rule here takes effect the
+ * instant the server is told, so a screen that batched them would be inventing a
+ * pending state the game does not have. The value that comes back is the server's
+ * own, which is what the screen then shows.
+ */
+export async function setWorldRuleAction(
+    installedAppId: string,
+    rule: string,
+    value: string
+): Promise<{ value?: string; error?: string }> {
+    const parsed = z
+        .object({
+            installedAppId: z.string().uuid(),
+            rule: z.string().trim().min(1).max(64),
+            value: z.string().trim().min(1).max(16)
+        })
+        .safeParse({ installedAppId, rule, value });
+    if (!parsed.success) return { error: "Check the value and try again" };
+    try {
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const applied = await setWorldRule(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.rule,
+            parsed.data.value
+        );
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.gamerule",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { rule: parsed.data.rule, value: applied }
+        });
+        return { value: applied };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not change that rule" };
+    }
+}
+
+/** The difficulty, live. `server.properties` carries one too, and changing that
+ *  one rebuilds the container - this does not. */
+export async function setWorldDifficultyAction(
+    installedAppId: string,
+    difficulty: string
+): Promise<{ error?: string }> {
+    const parsed = z
+        .object({ installedAppId: z.string().uuid(), difficulty: z.enum(DIFFICULTIES) })
+        .safeParse({ installedAppId, difficulty });
+    if (!parsed.success) return { error: "That is not a difficulty" };
+    try {
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        await setWorldDifficulty(access.ownerId, parsed.data.installedAppId, parsed.data.difficulty);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.difficulty",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { difficulty: parsed.data.difficulty }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not change the difficulty" };
+    }
+}
+
 /** One stack as a screen holds it, for a write that says what it believed. */
 const stackSchema = z.object({
     slot: z.number().int().min(-128).max(127),

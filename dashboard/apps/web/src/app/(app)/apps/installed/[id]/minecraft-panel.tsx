@@ -22,6 +22,7 @@ import Link from "next/link";
 import type { Permission } from "@polaris/core";
 import { MinecraftMods } from "./minecraft-mods";
 import type { GameContext } from "./game-context";
+import { MinecraftRules } from "./minecraft-rules";
 import { MinecraftWorld } from "./minecraft-world";
 import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
@@ -31,9 +32,9 @@ import { MinecraftConsole } from "./minecraft-console";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
 import { MinecraftAppearance } from "./minecraft-appearance";
+import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PlayerTimeout } from "@/lib/apps/minecraft/timeout";
-import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import { FirewallSection, MinecraftPlayers } from "./minecraft-players";
@@ -285,6 +286,9 @@ export function MinecraftPanel({
                 />
             )}
             {tab === "world" && <MinecraftWorld installedAppId={installedAppId} name={name} />}
+            {tab === "rules" && (
+                <MinecraftRules installedAppId={installedAppId} canManage={held.includes("games.manage")} />
+            )}
             {tab === "access" && <MinecraftAccess installedAppId={installedAppId} />}
             {tab === "usage" &&
                 (applicationId ? (

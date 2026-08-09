@@ -41,6 +41,10 @@ const MOST_THAT_FITS = 2304;
 /** How often the bag is re-read while the editor is open and the player is on. */
 const POLL_MS = 2000;
 
+/** The same, for a bag big enough that reading it costs a round trip per stack.
+ *  Forty questions every two seconds is a poll that competes with the game. */
+const SLOW_POLL_MS = 8000;
+
 /** What is being dragged: a slot already in the bag, or an item from the palette. */
 type Held = { readonly kind: "slot"; readonly slot: number } | { readonly kind: "palette"; readonly id: string };
 
@@ -119,15 +123,19 @@ export function InventoryEditor({
         };
     }, [installedAppId]);
 
+    const slowRead = reading?.chunked === true;
     useEffect(() => {
         if (!live) return;
-        const timer = setInterval(() => {
-            // Not while something is in the air: the grid moving under the cursor
-            // is how a drag ends on the slot next to the one somebody aimed at.
-            if (!dragging.current && !pending) void reload();
-        }, POLL_MS);
+        const timer = setInterval(
+            () => {
+                // Not while something is in the air: the grid moving under the cursor
+                // is how a drag ends on the slot next to the one somebody aimed at.
+                if (!dragging.current && !pending) void reload();
+            },
+            slowRead ? SLOW_POLL_MS : POLL_MS
+        );
         return () => clearInterval(timer);
-    }, [live, pending, reload]);
+    }, [live, pending, reload, slowRead]);
 
     /** The stacks waiting on a slot, which the grid draws in it, and everything
      *  else that is waiting, which is a line under it. */
@@ -298,6 +306,16 @@ export function InventoryEditor({
                         {live
                             ? "Drag to move a stack. Hold Ctrl to move one of it, and right-click to split it in half."
                             : "Drag an item from the palette onto the slot it should land in."}
+                    </p>
+                )}
+                {(reading?.unreadable ?? 0) > 0 && (
+                    // Named rather than silently absent: a grid one shulker short
+                    // looks exactly like a complete one, and somebody checking what
+                    // a player is carrying would believe it.
+                    <p className="text-xs text-warning">
+                        {reading?.unreadable} {reading?.unreadable === 1 ? "stack was" : "stacks were"} too large for
+                        the server to hand over in one reply, so {reading?.unreadable === 1 ? "it is" : "they are"}{" "}
+                        not drawn here.
                     </p>
                 )}
                 {stuck.length > 0 && (
