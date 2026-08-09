@@ -7,8 +7,9 @@
  * setting, and a non-administrator creating an account to give it to is another,
  * stricter one.
  *
- * The default is the middle: whoever runs a server can bring in people who
- * already have an account here, and nobody but an administrator can mint one.
+ * The default is the strict end: an administrator gives out access, and loosening
+ * that is a decision somebody makes on purpose rather than one an instance starts
+ * out having made.
  */
 
 import { z } from "zod";
@@ -39,7 +40,7 @@ export const DELEGATED_SHARING_HINTS: Readonly<Record<DelegatedSharingMode, stri
 };
 
 export const sharingPolicySchema = z.object({
-    delegated: z.enum(DELEGATED_SHARING_MODES).default("existing"),
+    delegated: z.enum(DELEGATED_SHARING_MODES).default("off"),
     /** The role an account made this way is created with. `guest` grants nothing
      *  on its own, which is the point: what the account reaches is the one thing
      *  it was invited to. */
