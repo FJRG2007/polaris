@@ -34,6 +34,21 @@ export const GOOGLE_SCOPES = ["openid", "email", "https://www.googleapis.com/aut
  *  consent screen whose whole job is to name an account. */
 export const GOOGLE_SIGN_IN_SCOPES = ["openid", "email"];
 
+/**
+ * What linking Drive as a backup destination asks for.
+ *
+ * `drive.file` reaches only the files this application created - not the rest of
+ * somebody's Drive, which a backup destination has no business reading. It is
+ * asked for separately rather than added to the ordinary link, so somebody who
+ * only wanted their calendar beside their tasks is never shown a consent screen
+ * requesting access to their files.
+ *
+ * Google grants scopes cumulatively when `include_granted_scopes` is set, so an
+ * account linked for the calendar and later used for backups ends up holding
+ * both without either authorization having to be repeated.
+ */
+export const GOOGLE_DRIVE_SCOPES = ["openid", "email", "https://www.googleapis.com/auth/drive.file"];
+
 export interface GoogleOAuthClient {
     readonly clientId: string;
     readonly clientSecret: string;
@@ -69,14 +84,15 @@ export function googleAuthorizeUrl(
     client: GoogleOAuthClient,
     redirectUri: string,
     state: string,
-    flow: "link" | "signin" = "link"
+    flow: "link" | "signin" | "storage" = "link"
 ): string {
     const signIn = flow === "signin";
+    const scopes = signIn ? GOOGLE_SIGN_IN_SCOPES : flow === "storage" ? GOOGLE_DRIVE_SCOPES : GOOGLE_SCOPES;
     const url = new URL(OAUTH_AUTHORIZE);
     url.searchParams.set("client_id", client.clientId);
     url.searchParams.set("redirect_uri", redirectUri);
     url.searchParams.set("response_type", "code");
-    url.searchParams.set("scope", (signIn ? GOOGLE_SIGN_IN_SCOPES : GOOGLE_SCOPES).join(" "));
+    url.searchParams.set("scope", scopes.join(" "));
     if (!signIn) url.searchParams.set("access_type", "offline");
     url.searchParams.set("prompt", signIn ? "select_account" : "consent");
     url.searchParams.set("include_granted_scopes", "true");

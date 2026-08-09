@@ -7,8 +7,13 @@
  * unit-tested without a running daemon.
  */
 
+import { S3Driver } from "./drivers/s3.js";
 import { LocalDriver } from "./drivers/local.js";
+import { GDriveDriver } from "./drivers/gdrive.js";
 import type { Capabilities } from "@polaris/config";
+import { DropboxDriver } from "./drivers/dropbox.js";
+import { OneDriveDriver } from "./drivers/onedrive.js";
+import type { TokenSource } from "./drivers/cloud-http.js";
 import { prefersHostd, requiresHostd } from "@polaris/core";
 import { StorageError, type StorageDriver } from "./driver.js";
 import { SmbDriver, type SmbSessionOptions } from "./drivers/smb.js";
@@ -38,11 +43,28 @@ export type SmbSessionFactory = (
     record: ConnectionRecord
 ) => Pick<SmbSessionOptions, "session" | "endSession">;
 
+/**
+ * Injected by the app to supply an access token for a connection that authorizes
+ * through somebody's linked account.
+ *
+ * A function per request rather than a token per driver: these expire hourly and
+ * a large upload outlives one, so the driver asks again instead of signing the
+ * last chunk with a credential that died mid-transfer. This package holds no
+ * database and no OAuth client, which is why it is injected rather than built.
+ */
+export type OAuthTokenFactory = (record: ConnectionRecord) => TokenSource;
+
+/** Persist a folder id the driver had to create, so the next operation reuses it
+ *  instead of creating a second one. */
+export type RootFolderRecorder = (record: ConnectionRecord, folderId: string) => void | Promise<void>;
+
 export interface DriverDeps {
     readonly capabilities: Capabilities;
     readonly hostdFactory?: HostdDriverFactory;
     readonly sftpSessionFactory?: SftpSessionFactory;
     readonly smbSessionFactory?: SmbSessionFactory;
+    readonly oauthTokenFactory?: OAuthTokenFactory;
+    readonly onRootFolderResolved?: RootFolderRecorder;
 }
 
 /**
@@ -114,10 +136,68 @@ export function createDriver(record: ConnectionRecord, deps: DriverDeps): Storag
                 password: creds.password
             });
         }
+        case "s3": {
+            const config = record.config as Extract<StorageConfig, { kind: "s3" }>;
+            const creds = record.credentials as Extract<StorageCredentials, { kind: "s3" }>;
+            return new S3Driver({
+                id: record.id,
+                bucket: config.bucket,
+                region: config.region,
+                accessKeyId: config.accessKeyId,
+                secretAccessKey: creds.secretAccessKey,
+                endpoint: config.endpoint,
+                forcePathStyle: config.forcePathStyle
+            });
+        }
+        case "gdrive": {
+            const config = record.config as Extract<StorageConfig, { kind: "gdrive" }>;
+            return new GDriveDriver({
+                id: record.id,
+                token: linkedToken(record, deps),
+                rootFolderId: config.rootFolderId,
+                rootFolderName: config.rootFolderName,
+                onRootResolved: (folderId) => deps.onRootFolderResolved?.(record, folderId)
+            });
+        }
+        case "onedrive": {
+            const config = record.config as Extract<StorageConfig, { kind: "onedrive" }>;
+            return new OneDriveDriver({
+                id: record.id,
+                token: linkedToken(record, deps),
+                driveId: config.driveId,
+                rootFolderName: config.rootFolderName
+            });
+        }
+        case "dropbox": {
+            const config = record.config as Extract<StorageConfig, { kind: "dropbox" }>;
+            return new DropboxDriver({
+                id: record.id,
+                token: linkedToken(record, deps),
+                rootPath: config.rootPath
+            });
+        }
         default:
             throw new StorageError(
                 "not_supported",
                 `The ${record.kind} driver is not implemented yet`
             );
     }
+}
+
+/**
+ * The token supply for a linked-account provider.
+ *
+ * Missing it is a wiring mistake rather than a user-facing one, but it surfaces
+ * when somebody opens a connection - so it says which piece is absent instead of
+ * failing later as an unauthorized request nobody can explain.
+ */
+function linkedToken(record: ConnectionRecord, deps: DriverDeps): TokenSource {
+    const factory = deps.oauthTokenFactory;
+    if (!factory) {
+        throw new StorageError(
+            "capability_required",
+            `${record.kind} needs a linked account; no token supplier is configured`
+        );
+    }
+    return factory(record);
 }

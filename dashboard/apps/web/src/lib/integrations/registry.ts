@@ -232,6 +232,54 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         apiKeyHelp: "Shown once when the client is created, and downloadable from the client afterwards."
     },
     {
+        slug: "microsoft",
+        name: "Microsoft",
+        category: "Automation",
+        summary: "Let people connect their Microsoft account and keep backups in their OneDrive.",
+        description:
+            "Register an Entra application and everyone here gets a Connect button for their own Microsoft account. Their OneDrive can then be chosen as a backup destination, and Polaris only ever touches the folder it creates there. Polaris holds no credential that reaches anybody's files - only the access each person granted.",
+        docsUrl: "https://learn.microsoft.com/entra/identity-platform/quickstart-register-app",
+        setupLinks: [
+            {
+                label: "Register an application",
+                url: "https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/CreateApplicationBlade",
+                help: "Supported account types: any organizational directory and personal Microsoft accounts. Paste the redirect URI below into the Web platform."
+            },
+            {
+                label: "Add the Files.ReadWrite permission",
+                url: "https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade",
+                help: "Delegated, on the same application. Without it the account links fine and every upload is refused."
+            }
+        ],
+        requiresApiKey: true,
+        apiKeyLabel: "Client secret",
+        apiKeyHelp: "The secret's value, not its id. Shown once when it is created."
+    },
+    {
+        slug: "dropbox",
+        name: "Dropbox",
+        category: "Automation",
+        summary: "Let people connect their Dropbox and keep backups in it.",
+        description:
+            "Create a Dropbox app and everyone here gets a Connect button for their own account. Their Dropbox can then be chosen as a backup destination. An app scoped to its own folder is the one to create: everything Polaris writes then lives in one folder, and nothing else in anybody's Dropbox is reachable from here.",
+        docsUrl: "https://www.dropbox.com/developers/reference/getting-started",
+        setupLinks: [
+            {
+                label: "Create an app",
+                url: "https://www.dropbox.com/developers/apps/create",
+                help: "Scoped access, app folder. Paste the redirect URI below into the app's OAuth 2 redirect URIs."
+            },
+            {
+                label: "Grant the file scopes",
+                url: "https://www.dropbox.com/developers/apps",
+                help: "On the app's Permissions tab: account_info.read, files.metadata.read/write and files.content.read/write. Submit them before linking, or the token comes back without them."
+            }
+        ],
+        requiresApiKey: true,
+        apiKeyLabel: "App secret",
+        apiKeyHelp: "Shown on the app's Settings tab, next to the app key."
+    },
+    {
         slug: "cloudflare",
         name: "Cloudflare",
         category: "Automation",

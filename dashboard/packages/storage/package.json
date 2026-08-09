@@ -21,6 +21,7 @@
         "@polaris/config": "0.1.0",
         "@polaris/core": "0.1.0",
         "@polaris/ssh": "0.1.0",
+        "aws4fetch": "1.0.20",
         "ssh2": "1.16.0",
         "v9u-smb2": "1.0.6"
     },

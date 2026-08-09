@@ -13,7 +13,7 @@
  * will one day be half added.
  */
 
-export type ConnectionProviderSlug = "github" | "google";
+export type ConnectionProviderSlug = "github" | "google" | "microsoft" | "dropbox";
 
 export interface ConnectionProvider {
     slug: ConnectionProviderSlug;
@@ -70,13 +70,42 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
     {
         slug: "google",
         name: "Google",
-        summary: "Show your calendar next to your work.",
+        summary: "Show your calendar next to your work, and keep backups in your Drive.",
         description:
-            "Read-only access to your calendar, so the schedule views can put your meetings beside your tasks. Polaris never writes to it.",
+            "Read-only access to your calendar, so the schedule views can put your meetings beside your tasks. Polaris never writes to it. Connecting Drive as a backup destination asks separately, and only for the folder it creates.",
         acceptsToken: false,
         defaultLimit: 1,
         requires: "a Google OAuth client",
         signInDefault: true
+    },
+    {
+        slug: "microsoft",
+        name: "Microsoft",
+        summary: "Keep backups in your OneDrive.",
+        description:
+            "Access to the files Polaris creates in your OneDrive, so a backup can be copied somewhere that survives this machine. Unlinking stops the copies; the ones already there stay where they are.",
+        acceptsToken: false,
+        defaultLimit: 1,
+        requires: "a Microsoft Entra application",
+        // An account that unlocks a work mailbox and a company tenant is a larger
+        // prize than a Polaris one, and it is linked here for file storage - not
+        // as a way in. Somebody can still allow it, having read why.
+        signInDefault: false,
+        signInWarning:
+            "This account often reaches a work mailbox and a company tenant. It is linked here to store files, and allowing it to sign in makes it a way into Polaris too."
+    },
+    {
+        slug: "dropbox",
+        name: "Dropbox",
+        summary: "Keep backups in your Dropbox.",
+        description:
+            "Access to the folder Polaris creates in your Dropbox, so a backup can be copied off this machine. Unlinking stops the copies; the ones already there stay where they are.",
+        acceptsToken: false,
+        defaultLimit: 1,
+        requires: "a Dropbox app",
+        signInDefault: false,
+        signInWarning:
+            "This account is linked here to store files. Allowing it to sign in makes whoever holds it able to reach Polaris as well."
     }
 ];
 

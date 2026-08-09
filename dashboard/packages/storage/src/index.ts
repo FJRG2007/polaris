@@ -23,3 +23,8 @@ export {
     type SmbSession,
     type SmbSessionOptions
 } from "./drivers/smb.js";
+export { S3Driver, type S3DriverOptions } from "./drivers/s3.js";
+export { GDriveDriver, type GDriveDriverOptions } from "./drivers/gdrive.js";
+export { DropboxDriver, type DropboxDriverOptions } from "./drivers/dropbox.js";
+export { OneDriveDriver, type OneDriveDriverOptions } from "./drivers/onedrive.js";
+export type { TokenSource } from "./drivers/cloud-http.js";

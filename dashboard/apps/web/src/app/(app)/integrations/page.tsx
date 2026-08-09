@@ -28,12 +28,17 @@ async function signInAllowances(): Promise<Map<string, boolean>> {
     return new Map(entries);
 }
 
+/** The services whose card configures an OAuth application the operator
+ *  registers. Kept beside the page because it decides which cards get a client
+ *  id, a redirect URI and an account limit. */
+const OAUTH_APP_SLUGS: readonly string[] = ["google", "microsoft", "dropbox"];
+
 export default async function IntegrationsPage() {
     await requireAdmin();
     // Three of these reach outside the box (GitHub twice, Cloudflare once), so
     // they are awaited together rather than one after another - in sequence the
     // page took as long as all of them added up.
-    const [states, github, domains, cloudflare, baseUrl, publicUrl, githubLimit, googleLimit, signIn] = await Promise.all([
+    const [states, github, domains, cloudflare, baseUrl, publicUrl, githubLimit, oauthLimits, signIn] = await Promise.all([
         listIntegrationStates(),
         getGithubStatus(),
         // DuckDNS config lives with the domain settings (Setting keys), not an Integration row.
@@ -42,7 +47,7 @@ export default async function IntegrationsPage() {
         // marketplace connector token that runs the server-wide tunnel.
         getCloudflareAccountStatus(),
         // The address the deployment is reachable at, which is what decides the
-        // redirect URI an operator has to register on their Google client.
+        // redirect URI an operator has to register on their OAuth client.
         appBaseUrl(),
         // The same address, but only when GitHub's own servers could reach it: a
         // new App is created without a webhook when they cannot, and the dialog
@@ -51,11 +56,12 @@ export default async function IntegrationsPage() {
         // How many accounts of each service one person may connect, shown in the
         // dialog that sets it.
         connectionLimit("github"),
-        connectionLimit("google"),
+        Promise.all(OAUTH_APP_SLUGS.map(async (slug) => [slug, await connectionLimit(slug)] as const)),
         // Whether each of those services may sign anybody in here. Resolved for
         // every provider at once so the card mapping below stays synchronous.
         signInAllowances()
     ]);
+    const accountLimits = new Map(oauthLimits);
     // Whether that connection can also register self-hosted runners. Neither
     // method asks for the permission by default, so this is where the operator
     // finds out - before provisioning a machine, not after. It needs the status
@@ -104,13 +110,19 @@ export default async function IntegrationsPage() {
             cloudflareApiConnected: entry.slug === "cloudflare" ? cloudflare.connected : undefined,
             cloudflareDnsConnected: entry.slug === "cloudflare" ? cloudflare.dnsReady : undefined,
             cloudflareAccountName: entry.slug === "cloudflare" ? cloudflare.accountName ?? undefined : undefined,
-            googleClientId:
-                entry.slug === "google" && typeof state?.config.clientId === "string"
+            oauthClientId:
+                OAUTH_APP_SLUGS.includes(entry.slug) && typeof state?.config.clientId === "string"
                     ? state.config.clientId
                     : undefined,
-            googleCallbackUrl: entry.slug === "google" ? connectionCallbackUrl("google", baseUrl) : undefined,
+            oauthCallbackUrl: OAUTH_APP_SLUGS.includes(entry.slug)
+                ? connectionCallbackUrl(entry.slug, baseUrl)
+                : undefined,
             accountLimit:
-                entry.slug === "github" ? githubLimit : entry.slug === "google" ? googleLimit : undefined
+                entry.slug === "github"
+                    ? githubLimit
+                    : OAUTH_APP_SLUGS.includes(entry.slug)
+                      ? (accountLimits.get(entry.slug) ?? 1)
+                      : undefined
         };
     });
 

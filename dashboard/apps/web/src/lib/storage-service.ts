@@ -14,6 +14,7 @@ import { getCapabilities, loadEnv } from "@polaris/config";
 import { canHostMount, requiresHostd } from "@polaris/core";
 import { grantedConnectionIds } from "@/lib/drive-acl-service";
 import { ContainerDriver } from "@/lib/deploy/container-driver";
+import { linkedAccountToken } from "@/lib/connections/storage-token";
 import { fetchUnasMetrics, type UnasMetrics } from "@/lib/unifi-unas";
 import { deleteMetricsForSubject } from "@/lib/metrics-history-service";
 import type { StorageConfig, StorageCredentials, StorageProviderKind } from "@polaris/core";
@@ -363,6 +364,21 @@ async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
         hostdFactory: (rec) =>
             new LocalDriver({ id: rec.id, root: `${HOSTD_MOUNT_ROOT}/${rec.id}` }),
         sftpSessionFactory: (rec) => pooledSftpSession(rec),
+        // The consumer drives authorize through somebody's linked account rather
+        // than a credential of their own; this is what turns one into a token.
+        oauthTokenFactory: (rec) => linkedAccountToken(rec),
+        // Google Drive has no paths, so the folder everything lives under has to
+        // be created and then remembered. Without this it would be created again
+        // on every operation and the copies would scatter across duplicates.
+        onRootFolderResolved: async (rec, folderId) => {
+            const current = rec.config as Extract<StorageConfig, { kind: "gdrive" | "onedrive" }>;
+            await prisma.storageConnection
+                .update({
+                    where: { id: rec.id },
+                    data: { config: JSON.stringify({ ...current, rootFolderId: folderId }) }
+                })
+                .catch(() => undefined);
+        },
         smbSessionFactory: (rec) => {
             const cfg = rec.config as Extract<StorageConfig, { kind: "smb" }>;
             const creds = rec.credentials as Extract<StorageCredentials, { kind: "smb" }>;

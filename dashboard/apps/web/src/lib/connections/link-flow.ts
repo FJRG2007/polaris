@@ -56,7 +56,9 @@ const SIGN_IN_LIMIT = 10;
 const SIGN_IN_WINDOW_MS = 10 * 60 * 1000;
 
 /** What the round trip was started for. */
-type ConnectionMode = "link" | "signin";
+/** `storage` is a link that also asks for access to the files Polaris creates.
+ *  Everything downstream treats it as a link; only the consent screen differs. */
+type ConnectionMode = "link" | "signin" | "storage";
 
 /** What the round trip came back with, as the screen reads it. */
 export type LinkOutcome = "linked" | "cancelled" | "state_error" | "taken" | "limit" | "unavailable" | "error";
@@ -148,14 +150,22 @@ async function begin(
     return response;
 }
 
-/** Send somebody to the provider's own authorization screen, and nowhere else. */
+/**
+ * Send somebody to the provider's own authorization screen, and nowhere else.
+ *
+ * `?scope=storage` asks for the extra permission a backup destination needs -
+ * lasting access to the files Polaris creates. It is a separate request rather
+ * than part of the ordinary link so that somebody connecting Google to see their
+ * calendar is never shown a consent screen asking to reach their files.
+ */
 export async function startConnectionLink(request: Request, provider: string): Promise<Response> {
     await requireUser();
-    const origin = new URL(request.url).origin;
+    const url = new URL(request.url);
+    const origin = url.origin;
     if (!findConnectionProvider(provider)) {
         return NextResponse.redirect(backToConnections(origin, provider, "unavailable"));
     }
-    return begin(request, provider, "link");
+    return begin(request, provider, url.searchParams.get("scope") === "storage" ? "storage" : "link");
 }
 
 /**

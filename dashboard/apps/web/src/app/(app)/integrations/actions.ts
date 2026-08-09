@@ -100,22 +100,36 @@ export async function saveConnectionSignInAction(provider: string, allowed: bool
  * link attempt, where the person hitting the error would be somebody who cannot
  * fix it.
  */
-export async function saveGoogleCalendarAction(input: {
+/**
+ * Register the operator's OAuth application for one of the services people link
+ * a personal account of.
+ *
+ * One action for all of them because the shape is identical - a client id, a
+ * secret, and whether it is on. The slug is checked against the catalog rather
+ * than trusted, so this cannot be used to write an Integration row for something
+ * that is not an OAuth app.
+ */
+export async function saveOAuthAppAction(input: {
+    slug: string;
     enabled: boolean;
     clientId: string;
     clientSecret?: string;
 }): Promise<{ error?: string }> {
     const user = await requireAdmin();
+    const slug = input.slug;
+    if (!["google", "microsoft", "dropbox"].includes(slug)) {
+        return { error: "That integration does not take an OAuth application" };
+    }
     const clientId = input.clientId.trim();
     const clientSecret = input.clientSecret?.trim() ? input.clientSecret.trim() : undefined;
 
     try {
-        const existing = await getIntegrationState("google");
+        const existing = await getIntegrationState(slug);
         if (input.enabled && !clientId) return { error: "Add the client ID before enabling it" };
         if (input.enabled && !clientSecret && !existing?.hasSecret) {
             return { error: "Add the client secret before enabling it" };
         }
-        await upsertIntegration("google", {
+        await upsertIntegration(slug, {
             enabled: input.enabled,
             config: { ...existing?.config, clientId },
             secret: clientSecret,
@@ -125,7 +139,7 @@ export async function saveGoogleCalendarAction(input: {
             actorId: user.id,
             action: "integration.configure",
             targetType: "integration",
-            targetId: "google",
+            targetId: slug,
             metadata: { enabled: input.enabled }
         });
     } catch (caught) {

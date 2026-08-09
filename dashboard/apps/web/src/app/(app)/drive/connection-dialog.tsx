@@ -10,14 +10,28 @@
  * source of truth.
  */
 
-import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { ConnectionSummary } from "./types";
+import { useFormChanged } from "@/lib/use-form-changed";
+import { type ConnectionProviderSlug, type StorageProviderKind } from "@polaris/core";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronRight, Plus, Radar, XCircle } from "lucide-react";
-import { type StorageProviderKind } from "@polaris/core";
+import {
+    createConnectionAction,
+    detectNasAction,
+    linkedAccountsAction,
+    testUnasConnectionAction,
+    updateConnectionAction,
+    type LinkedAccountOption,
+    type UnasTestResult
+} from "./actions";
 import {
     Input,
     Button,
     Dialog,
+    Select,
+    Skeleton,
     Textarea,
     DialogClose,
     DialogTitle,
@@ -26,23 +40,16 @@ import {
     DialogTrigger,
     DialogDescription
 } from "@polaris/ui";
-import { useFormChanged } from "@/lib/use-form-changed";
-import {
-    createConnectionAction,
-    detectNasAction,
-    testUnasConnectionAction,
-    updateConnectionAction,
-    type UnasTestResult
-} from "./actions";
-import type { ConnectionSummary } from "./types";
 
 interface FieldDef {
     name: string;
     label: string;
-    type?: "text" | "number" | "password" | "checkbox" | "keyfile";
+    type?: "text" | "number" | "password" | "checkbox" | "keyfile" | "account";
     required?: boolean;
     placeholder?: string;
     group: "config" | "credentials";
+    /** For type=account: which linked service the account is chosen from. */
+    provider?: ConnectionProviderSlug;
 }
 
 const LABELS: Record<StorageProviderKind, string> = {
@@ -55,7 +62,10 @@ const LABELS: Record<StorageProviderKind, string> = {
     synology: "Synology DSM",
     qnap: "QNAP QTS",
     truenas: "TrueNAS",
-    "unifi-unas": "UniFi UNAS"
+    "unifi-unas": "UniFi UNAS",
+    gdrive: "Google Drive",
+    onedrive: "OneDrive",
+    dropbox: "Dropbox"
 };
 
 // One-line "what is this" per provider, shown on the picker cards.
@@ -69,7 +79,10 @@ const DESCRIPTIONS: Record<StorageProviderKind, string> = {
     s3: "S3-compatible object storage (AWS, MinIO, R2).",
     synology: "Synology DiskStation (DSM).",
     qnap: "QNAP (QTS).",
-    truenas: "TrueNAS via API key."
+    truenas: "TrueNAS via API key.",
+    gdrive: "Your Google Drive, through an account you have linked.",
+    onedrive: "Your OneDrive, through a Microsoft account you have linked.",
+    dropbox: "Your Dropbox, through an account you have linked."
 };
 
 // Display order for the picker: UniFi first (the featured quick connect), then
@@ -82,10 +95,65 @@ const PROVIDER_ORDER: StorageProviderKind[] = [
     "nfs",
     "webdav",
     "s3",
+    "gdrive",
+    "onedrive",
+    "dropbox",
     "synology",
     "qnap",
     "truenas"
 ];
+
+/**
+ * Pick which linked account a consumer drive is reached through.
+ *
+ * The accounts are loaded when the field appears rather than with the page: most
+ * connections are to a NAS and never open this, and asking for somebody's linked
+ * accounts on every render of the dialog would be a query nobody reads.
+ *
+ * With none linked there is nothing to choose, so it says so and points at the
+ * screen that fixes it - an empty select somebody cannot submit explains nothing.
+ */
+function LinkedAccountField({ field }: { field: FieldDef }) {
+    const [accounts, setAccounts] = useState<LinkedAccountOption[] | null>(null);
+    const [chosen, setChosen] = useState("");
+
+    useEffect(() => {
+        let live = true;
+        if (!field.provider) return;
+        linkedAccountsAction(field.provider).then((rows) => {
+            if (!live) return;
+            setAccounts(rows);
+            // One account is the common case; preselecting it saves a click and
+            // makes the form submittable the moment it renders.
+            setChosen(rows[0]?.accountId ?? "");
+        });
+        return () => {
+            live = false;
+        };
+    }, [field.provider]);
+
+    if (accounts === null) return <Skeleton className="h-9 w-full" />;
+    if (accounts.length === 0) {
+        return (
+            <span className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                No {field.label.replace(/ account$/, "")} account is linked yet.{" "}
+                <Link href="/account/connections" className="text-primary hover:underline">
+                    Link one
+                </Link>
+                , then come back.
+            </span>
+        );
+    }
+    return (
+        <Select
+            name={field.name}
+            value={chosen}
+            onValueChange={setChosen}
+            aria-label={field.label}
+            options={accounts.map((account) => ({ value: account.accountId, label: account.label }))}
+        />
+    );
+}
 
 /** SSH private-key input: paste it, or load it from a file into the textarea. */
 function KeyFileField({ name, label }: { name: string; label: string }) {
@@ -168,6 +236,21 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
         { name: "username", label: "Console username", required: true, group: "config" },
         { name: "password", label: "Console password", type: "password", group: "credentials" },
         { name: "smbShare", label: "SMB share (optional, for file browsing)", group: "config" }
+    ],
+    // The consumer drives hold no credentials of their own: the account is
+    // chosen from the ones somebody has already linked, and the token comes from
+    // there. All that is left to decide is which folder to live in.
+    gdrive: [
+        { name: "accountId", label: "Google account", type: "account", provider: "google", required: true, group: "config" },
+        { name: "rootFolderName", label: "Folder name", placeholder: "Polaris", group: "config" }
+    ],
+    onedrive: [
+        { name: "accountId", label: "Microsoft account", type: "account", provider: "microsoft", required: true, group: "config" },
+        { name: "rootFolderName", label: "Folder name", placeholder: "Polaris", group: "config" }
+    ],
+    dropbox: [
+        { name: "accountId", label: "Dropbox account", type: "account", provider: "dropbox", required: true, group: "config" },
+        { name: "rootPath", label: "Folder", placeholder: "/Polaris", group: "config" }
     ]
 };
 
@@ -276,6 +359,11 @@ export function EditConnectionDialog({
                                     </span>
                                 ) : field.type === "keyfile" ? (
                                     <KeyFileField name={field.name} label={field.label} />
+                                ) : field.type === "account" ? (
+                                    <>
+                                        {field.label}
+                                        <LinkedAccountField field={field} />
+                                    </>
                                 ) : (
                                     <>
                                         {field.label}
@@ -495,6 +583,11 @@ export function ConnectionDialog() {
                                     </span>
                                 ) : field.type === "keyfile" ? (
                                     <KeyFileField name={field.name} label={field.label} />
+                                ) : field.type === "account" ? (
+                                    <>
+                                        {field.label}
+                                        <LinkedAccountField field={field} />
+                                    </>
                                 ) : (
                                     <>
                                         {field.label}

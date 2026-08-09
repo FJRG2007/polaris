@@ -92,11 +92,11 @@ export interface IntegrationCard {
     /** GitHub: the address GitHub's own servers can reach this instance at, unset
      *  when there is none - then a new App gets no webhook. */
     githubPublicUrl?: string;
-    /** Google: the OAuth client id, which is not a secret. */
-    googleClientId?: string;
-    /** Google: the redirect URI to register on that client. */
-    googleCallbackUrl?: string;
-    /** GitHub/Google: how many accounts of this service one person may connect. */
+    /** Google/Microsoft/Dropbox: the OAuth client id, which is not a secret. */
+    oauthClientId?: string;
+    /** Google/Microsoft/Dropbox: the redirect URI to register on that client. */
+    oauthCallbackUrl?: string;
+    /** GitHub and the OAuth apps: how many accounts one person may connect. */
     accountLimit?: number;
     /** Where the vendor makes the credential this dialog is asking for. */
     setupLinks?: readonly IntegrationSetupLink[];
@@ -119,7 +119,7 @@ export function dialogFor(card: IntegrationCard): ComponentType<IntegrationDialo
     if (card.slug === "github") return GitHubDialog;
     if (card.slug === "cloudflare" || card.slug === "ngrok") return TunnelDialog;
     if (card.slug === "duckdns") return DuckDnsDialog;
-    if (card.slug === "google") return GoogleDialog;
+    if (OAUTH_APPS[card.slug]) return OAuthAppDialog;
     // The gateway asks for an endpoint rather than a provider key, so it is told
     // apart by carrying those settings and not by its slug.
     if (card.gateway) return GatewayDialog;
@@ -697,9 +697,33 @@ function GatewayDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
  * client, and that URI is decided by this deployment's address rather than by
  * anything the operator can guess - so it is shown here to be pasted in.
  */
-function GoogleDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+/**
+ * The services somebody links a personal account of, and what their app is
+ * called where it is registered.
+ *
+ * One dialog for all of them: the fields are identical - a client id, a secret,
+ * a redirect URI to paste back, how many accounts one person may link, and
+ * whether the service may sign anybody in. Only the vocabulary differs, and a
+ * second copy of this form would be a second place to fix the next bug in it.
+ */
+const OAUTH_APPS: Record<string, { name: string; idLabel: string; idPlaceholder: string }> = {
+    google: {
+        name: "Google",
+        idLabel: "Client ID",
+        idPlaceholder: "1234567890-abc.apps.googleusercontent.com"
+    },
+    microsoft: {
+        name: "Microsoft",
+        idLabel: "Application (client) ID",
+        idPlaceholder: "00000000-0000-0000-0000-000000000000"
+    },
+    dropbox: { name: "Dropbox", idLabel: "App key", idPlaceholder: "abcdefghijklmno" }
+};
+
+function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const app = OAUTH_APPS[card.slug] ?? { name: card.name, idLabel: "Client ID", idPlaceholder: "" };
     const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
-    const [clientId, setClientId] = useState(card.googleClientId ?? "");
+    const [clientId, setClientId] = useState(card.oauthClientId ?? "");
     const [clientSecret, setClientSecret] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -711,7 +735,8 @@ function GoogleDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
         startTransition(async () => {
             const result = await runAction(
                 () =>
-                    integrationActions.saveGoogleCalendarAction({
+                    integrationActions.saveOAuthAppAction({
+                        slug: card.slug,
                         enabled,
                         clientId: clientId.trim(),
                         clientSecret: clientSecret.trim() || undefined
@@ -729,7 +754,7 @@ function GoogleDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <IntegrationLogo slug="google" className="size-5" />
+                        <IntegrationLogo slug={card.slug} className="size-5" />
                         {card.name}
                     </DialogTitle>
                     <DialogDescription>{card.description}</DialogDescription>
@@ -744,11 +769,11 @@ function GoogleDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
                     </div>
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Client ID</span>
+                        <span className="font-medium">{app.idLabel}</span>
                         <Input
                             value={clientId}
                             onChange={(event) => setClientId(event.target.value)}
-                            placeholder="1234567890-abc.apps.googleusercontent.com"
+                            placeholder={app.idPlaceholder}
                             autoComplete="off"
                         />
                     </label>
@@ -767,27 +792,27 @@ function GoogleDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
                         ) : null}
                     </label>
 
-                    <AccountLimitField slug="google" current={card.accountLimit ?? 1} />
+                    <AccountLimitField slug={card.slug} current={card.accountLimit ?? 1} />
 
                     {card.signInAllowed === undefined ? null : (
                         <SignInSwitch
-                            slug="google"
-                            name="Google"
+                            slug={card.slug}
+                            name={app.name}
                             allowed={card.signInAllowed}
                             warning={card.signInWarning}
                         />
                     )}
 
-                    {card.googleCallbackUrl ? (
+                    {card.oauthCallbackUrl ? (
                         <div className="flex flex-col gap-1 rounded-md border border-border bg-muted/30 p-3 text-sm">
                             <span className="font-medium">Authorized redirect URI</span>
                             <div className="flex items-center gap-2">
-                                <code className="min-w-0 flex-1 truncate text-xs">{card.googleCallbackUrl}</code>
-                                <CopyButton value={card.googleCallbackUrl} label="Copy the redirect URI" />
+                                <code className="min-w-0 flex-1 truncate text-xs" title={card.oauthCallbackUrl}>{card.oauthCallbackUrl}</code>
+                                <CopyButton value={card.oauthCallbackUrl} label="Copy the redirect URI" />
                             </div>
                             <span className="text-xs text-muted-foreground">
-                                Paste this into the OAuth client under Authorized redirect URIs. Google refuses an
-                                authorization that arrives from any other address.
+                                Paste this into the app under its redirect URIs. {app.name} refuses an authorization
+                                that arrives from any other address.
                             </span>
                         </div>
                     ) : null}

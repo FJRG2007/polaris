@@ -12,6 +12,7 @@ import { revalidatePath } from "next/cache";
 import { recordAudit } from "@/lib/audit-service";
 import { fetchUnasMetrics } from "@/lib/unifi-unas";
 import { listLocks } from "@/lib/access-lock-service";
+import { listConnections } from "@/lib/connections/store";
 import { requirePermission, requireUser } from "@/lib/session";
 import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 import { detectHost, type NasDetection } from "@/lib/nas-detect";
@@ -46,20 +47,21 @@ import {
     setItemNote
 } from "@/lib/drive-meta-service";
 import {
-    baseName,
-    createConnectionSchema,
-    normalizeRelPath,
-    removeConnectionSchema,
-    storageConfigSchema,
-    storageCredentialsSchema
-} from "@polaris/core";
-import {
     getConnectionRemovalPlan,
     removeConnection,
     type ConnectionRemovalMode,
     type ConnectionRemovalPlan,
     type RemoveConnectionResult
 } from "@/lib/connection-removal-service";
+import {
+    baseName,
+    createConnectionSchema,
+    findConnectionProvider,
+    normalizeRelPath,
+    removeConnectionSchema,
+    storageConfigSchema,
+    storageCredentialsSchema
+} from "@polaris/core";
 
 /** Result of a UNAS connection dry-run: what the console reported, or why not. */
 export interface UnasTestResult {
@@ -118,6 +120,28 @@ export async function detectNasAction(host: string): Promise<NasDetection | { er
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Detection failed" };
     }
+}
+
+/** One account somebody has linked, as the connection form needs to offer it. */
+export interface LinkedAccountOption {
+    readonly accountId: string;
+    readonly label: string;
+}
+
+/**
+ * The caller's own linked accounts of one service, for the drives reached
+ * through one.
+ *
+ * Scoped to the session rather than taking a user id: whose accounts these are
+ * is never something the client gets to say. It returns the provider's account
+ * id and a label and nothing else - no tokens, no scopes, nothing that would be
+ * worth reading if this were ever called by something that should not.
+ */
+export async function linkedAccountsAction(provider: string): Promise<LinkedAccountOption[]> {
+    const user = await requirePermission("connections.manage");
+    if (!findConnectionProvider(provider)) return [];
+    const rows = await listConnections(user.id, provider);
+    return rows.map((row) => ({ accountId: row.accountId, label: row.label }));
 }
 
 export async function createConnectionAction(input: unknown): Promise<{ error?: string }> {

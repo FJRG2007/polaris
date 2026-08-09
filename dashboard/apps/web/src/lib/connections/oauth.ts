@@ -18,6 +18,18 @@ import type { ConnectionCredential } from "./store";
 import { findConnectionProvider } from "@polaris/core";
 import { authorizeGithubUser, getGithubUserAuth, githubLinkCallbackUrl } from "@/lib/github-service";
 import {
+    dropboxAuthorizeUrl,
+    exchangeDropboxCode,
+    getDropboxOAuthClient,
+    identifyDropboxAccount
+} from "./dropbox";
+import {
+    exchangeMicrosoftCode,
+    getMicrosoftOAuthClient,
+    identifyMicrosoftAccount,
+    microsoftAuthorizeUrl
+} from "./microsoft";
+import {
     exchangeGoogleCode,
     getGoogleOAuthClient,
     googleAuthorizeUrl,
@@ -49,10 +61,14 @@ export interface ConnectionIdentity {
     readonly accountId: string;
 }
 
-/** What the round trip is for. A sign-in asks for less than a link: it only has
- *  to learn who is at the other end, and asking for more would put a permission
- *  on the consent screen that nothing would use. */
-export type ConnectionFlow = "link" | "signin";
+/**
+ * What the round trip is for. A sign-in asks for less than a link: it only has to
+ * learn who is at the other end. `storage` asks for more than either - lasting
+ * access to the files this application creates - and is kept separate so
+ * somebody linking an account for one reason is never shown a consent screen
+ * asking for the other.
+ */
+export type ConnectionFlow = "link" | "signin" | "storage";
 
 interface ProviderOAuth {
     /** Where the provider returns somebody after they authorize. Registered on
@@ -121,6 +137,26 @@ const ADAPTERS: Record<string, ProviderOAuth> = {
             };
         },
         identify: identifyGoogleAccount
+    },
+    microsoft: {
+        callbackUrl: (baseUrl) => `${baseUrl}/api/connections/microsoft/callback`,
+        client: getMicrosoftOAuthClient,
+        authorizeUrl: microsoftAuthorizeUrl,
+        exchange: async (client, code, redirectUri) => {
+            const granted = await exchangeMicrosoftCode(client, code, redirectUri);
+            return { ...granted, avatarUrl: null };
+        },
+        identify: identifyMicrosoftAccount
+    },
+    dropbox: {
+        callbackUrl: (baseUrl) => `${baseUrl}/api/connections/dropbox/callback`,
+        client: getDropboxOAuthClient,
+        authorizeUrl: dropboxAuthorizeUrl,
+        exchange: async (client, code, redirectUri) => {
+            const granted = await exchangeDropboxCode(client, code, redirectUri);
+            return { ...granted, avatarUrl: null };
+        },
+        identify: identifyDropboxAccount
     }
 };
 
