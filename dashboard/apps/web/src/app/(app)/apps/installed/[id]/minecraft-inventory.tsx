@@ -50,6 +50,22 @@ const COUNT_OUTLINE = {
     ].join(", ")
 } as const;
 
+/**
+ * The two halves of the drag contract, kept together because they only work as a
+ * pair.
+ *
+ * A browser cancels a drop outright when the drop effect the target asks for is
+ * not among the effects the source allows - no drop event, no error, the item
+ * simply never arrives. The palette used to allow only "copy" while the slots
+ * asked for "move", which is why an item dragged out of it vanished on release.
+ *
+ * `DRAG_EFFECT_ALLOWED` is what anything draggable into this grid must set, and
+ * `SLOT_DROP_EFFECT` is what the slots ask for. Both live here so the next thing
+ * that can be dragged into a slot cannot pick a third answer.
+ */
+export const DRAG_EFFECT_ALLOWED = "copyMove";
+export const SLOT_DROP_EFFECT = "move";
+
 /** How small a slot is allowed to get, and how large it is allowed to grow. A bag
  *  is nine columns whatever it is drawn inside, so without a floor a narrow column
  *  turns the game's own layout into forty stamps nobody can read. */
@@ -211,7 +227,7 @@ function Slot({
         ? {
               onDragOver: (event: React.DragEvent) => {
                   event.preventDefault();
-                  event.dataTransfer.dropEffect = "move" as const;
+                  event.dataTransfer.dropEffect = SLOT_DROP_EFFECT as typeof event.dataTransfer.dropEffect;
               },
               onDrop: (event: React.DragEvent) => {
                   event.preventDefault();
@@ -280,7 +296,7 @@ function Slot({
             draggable={canDrag}
             onDragStart={(event) => {
                 if (!canDrag) return;
-                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.effectAllowed = DRAG_EFFECT_ALLOWED as typeof event.dataTransfer.effectAllowed;
                 // Something has to be set or Firefox refuses to start the drag.
                 event.dataTransfer.setData("text/plain", String(slot));
                 handlers.onPick(slot);

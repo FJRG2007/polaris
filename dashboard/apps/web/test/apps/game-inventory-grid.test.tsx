@@ -10,7 +10,11 @@
 
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { InventoryGrid } from "@/app/(app)/apps/installed/[id]/minecraft-inventory";
+import {
+    DRAG_EFFECT_ALLOWED,
+    InventoryGrid,
+    SLOT_DROP_EFFECT
+} from "@/app/(app)/apps/installed/[id]/minecraft-inventory";
 
 /** Every slot the grid draws, filled or not. */
 function slotCount(markup: string): number {
@@ -109,5 +113,15 @@ describe("InventoryGrid", () => {
         const markup = renderToStaticMarkup(<InventoryGrid items={[]} />);
         expect(markup).toContain("Nothing in it.");
         expect(slotCount(markup)).toBe(41);
+    });
+});
+
+describe("the drag contract", () => {
+    it("lets the slots ask for an effect the sources actually allow", () => {
+        // A browser cancels the drop when the target's dropEffect is not among the
+        // source's effectAllowed: no drop event, no error, the item simply never
+        // arrives. That is the whole of the bug this pair exists to stop, and the
+        // only way it comes back is the two drifting apart.
+        expect(DRAG_EFFECT_ALLOWED.toLowerCase()).toContain(SLOT_DROP_EFFECT.toLowerCase());
     });
 });

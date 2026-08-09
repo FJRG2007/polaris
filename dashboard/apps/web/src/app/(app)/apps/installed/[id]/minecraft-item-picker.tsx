@@ -18,6 +18,7 @@ import { Input, cn } from "@polaris/ui";
 import { Loader2, Search } from "lucide-react";
 import { ItemIcon } from "./minecraft-item-icon";
 import { useEffect, useMemo, useState } from "react";
+import { DRAG_EFFECT_ALLOWED } from "./minecraft-inventory";
 import {
     ITEM_CATALOG_URL,
     itemLabel,
@@ -203,7 +204,13 @@ function Tile({
                 draggable={onDragItem !== undefined}
                 onDragStart={(event) => {
                     if (!onDragItem) return;
-                    event.dataTransfer.effectAllowed = "copy";
+                    // The grid's own constant, not a value chosen here: a source
+                    // that allows an effect the slot does not ask for is a drop the
+                    // browser cancels outright, with no event and no error - which
+                    // is exactly how an item dragged from this palette used to
+                    // vanish on release.
+                    event.dataTransfer.effectAllowed =
+                        DRAG_EFFECT_ALLOWED as typeof event.dataTransfer.effectAllowed;
                     // Something has to be set or Firefox refuses the drag.
                     event.dataTransfer.setData("text/plain", id);
                     // Picking it up selects it too, so the count field and the
