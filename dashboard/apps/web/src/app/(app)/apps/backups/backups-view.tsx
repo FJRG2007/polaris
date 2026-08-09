@@ -75,10 +75,20 @@ const TABS: readonly { readonly id: Tab; readonly label: string }[] = [
 export function BackupsView() {
     const [tab, setTab] = useState<Tab>("protected");
     const [overview, setOverview] = useState<BackupOverview | null>(null);
+    // Why the console has nothing to draw, when that is the answer. Held apart
+    // from the data so a refresh that fails does not blank what is already on
+    // screen, and shown rather than swallowed: skeletons that never resolve are
+    // a broken page with the reason removed.
+    const [unread, setUnread] = useState<string | null>(null);
 
     const loadOverview = useCallback(async () => {
         const next = await readJson<BackupOverview>("/api/backups/overview");
-        if (next) setOverview(next);
+        if (next.ok) {
+            setOverview(next.value);
+            setUnread(null);
+        } else {
+            setUnread(next.reason);
+        }
     }, []);
 
     useEffect(() => {
@@ -87,7 +97,15 @@ export function BackupsView() {
 
     return (
         <div className="flex flex-col gap-4">
-            <SummaryStrip overview={overview} />
+            {unread ? (
+                <Card>
+                    <CardBody className="flex items-start gap-2 py-3 text-sm text-danger">
+                        <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                        <span>{unread}</span>
+                    </CardBody>
+                </Card>
+            ) : null}
+            <SummaryStrip overview={overview} failed={unread !== null} />
 
             <div className="flex flex-wrap items-center gap-1 border-b border-border">
                 {TABS.map((entry) => (
@@ -140,16 +158,19 @@ export function BackupsView() {
  * Skeletons rather than zeros while they load: "0 protected" is a statement,
  * and showing it before the answer is known is showing something false.
  */
-function SummaryStrip({ overview }: { overview: BackupOverview | null }) {
+function SummaryStrip({ overview, failed }: { overview: BackupOverview | null; failed: boolean }) {
     const summary = overview?.summary;
+    // A dash once the read has failed, not a skeleton: a skeleton says the answer
+    // is on its way, and it is not.
+    const missing = failed ? "-" : null;
     return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat label="Protected" value={summary ? String(summary.protectedCount) : null} />
-            <Stat label="Copies" value={summary ? String(summary.copyCount) : null} />
-            <Stat label="Stored" value={summary ? formatBytes(BigInt(summary.storedBytes)) : null} />
+            <Stat label="Protected" value={summary ? String(summary.protectedCount) : missing} />
+            <Stat label="Copies" value={summary ? String(summary.copyCount) : missing} />
+            <Stat label="Stored" value={summary ? formatBytes(BigInt(summary.storedBytes)) : missing} />
             <Stat
                 label="Failed in 24h"
-                value={summary ? String(summary.failedRecently) : null}
+                value={summary ? String(summary.failedRecently) : missing}
                 bad={Boolean(summary && summary.failedRecently > 0)}
             />
             {summary && !summary.cronConfigured ? (
@@ -243,14 +264,20 @@ function ProtectedTable({
                 }
             }
             const next = await readJson<Page>(`/api/backups/resources?${params}`);
-            if (!next) {
-                setError("The list could not be loaded.");
+            if (!next.ok) {
+                setError(next.reason);
+                // An empty page rather than nothing: the table draws its "nothing
+                // here" row instead of skeletons that never resolve, and the
+                // sentence above it says why it is empty.
+                setPage((current) => current ?? { rows: [], nextCursor: null, total: 0 });
                 return;
             }
+            const answer = next.value;
+            setError(null);
             setPage((current) =>
-                cursor && current ? { ...next, rows: [...current.rows, ...next.rows] } : next
+                cursor && current ? { ...answer, rows: [...current.rows, ...answer.rows] } : answer
             );
-            if (!cursor) cache.current.set(key, { at: Date.now(), page: next });
+            if (!cursor) cache.current.set(key, { at: Date.now(), page: answer });
         },
         [key, kind, query]
     );

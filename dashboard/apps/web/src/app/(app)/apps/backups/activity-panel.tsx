@@ -30,7 +30,9 @@ export function ActivityPanel() {
     useEffect(() => {
         let live = true;
         void readJson<{ jobs: JobRow[] }>("/api/backups/activity").then((data) => {
-            if (live) setJobs(data?.jobs ?? []);
+            // A failed read shows an empty history rather than skeletons that
+            // never resolve; the console's own banner says what went wrong.
+            if (live) setJobs(data.ok ? data.value.jobs : []);
         });
         return () => {
             live = false;

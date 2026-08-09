@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Read one of the console's routes, or nothing.
+ * Read one of the console's routes, and say what happened when it could not be
+ * read.
  *
  * `response.ok` is not enough on its own. These routes are admin-gated, and a
  * session that has expired is answered with a redirect to the sign-in page -
@@ -11,18 +12,52 @@
  * page down with "This page stopped working" rather than showing that it has
  * nothing to draw.
  *
- * A dropped connection did the same thing, for the same reason. Both come back
- * as null here, which every caller already had a state for.
+ * Catching that is right and swallowing it is not. A console whose every read
+ * failed silently holds its skeletons forever and says nothing about why - which
+ * is the same dead screen the crash was, minus the clue. So a failure comes back
+ * as a sentence somebody can act on, and the caller has to decide what to do with
+ * it rather than treating it as "no data yet".
  */
-export async function readJson<T>(url: string): Promise<T | null> {
+
+/** A read that worked, or why it did not. */
+export type ReadResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly reason: string };
+
+export async function readJson<T>(url: string): Promise<ReadResult<T>> {
+    let response: Response;
     try {
-        const response = await fetch(url, { cache: "no-store" });
-        if (!response.ok) return null;
-        // The content type is what separates an answer from the sign-in page
-        // standing in for one.
-        if (!(response.headers.get("content-type") ?? "").includes("application/json")) return null;
-        return (await response.json()) as T;
+        response = await fetch(url, { cache: "no-store" });
     } catch {
-        return null;
+        return { ok: false, reason: "Polaris could not be reached. Check the connection and try again." };
     }
+    // The content type is what separates an answer from the sign-in page standing
+    // in for one: the redirect was already followed, so the status is 200 either
+    // way and only the body says which happened.
+    const isJson = (response.headers.get("content-type") ?? "").includes("application/json");
+    if (!response.ok) {
+        return { ok: false, reason: await failureReason(response, isJson) };
+    }
+    if (!isJson) {
+        return { ok: false, reason: "Your session has expired. Sign in again to see this." };
+    }
+    try {
+        return { ok: true, value: (await response.json()) as T };
+    } catch {
+        return { ok: false, reason: "The answer could not be read." };
+    }
+}
+
+/** The server's own sentence when it wrote one, and the status when it did not. */
+async function failureReason(response: Response, isJson: boolean): Promise<string> {
+    if (response.status === 401 || response.status === 403) {
+        return "You do not have access to backups. Only an administrator does.";
+    }
+    if (isJson) {
+        const body: unknown = await response.json().catch(() => null);
+        const said =
+            typeof body === "object" && body !== null && typeof (body as { error?: unknown }).error === "string"
+                ? (body as { error: string }).error
+                : "";
+        if (said) return said;
+    }
+    return `The server answered ${response.status}.`;
 }

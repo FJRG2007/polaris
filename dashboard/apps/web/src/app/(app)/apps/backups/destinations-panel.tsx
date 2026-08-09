@@ -211,10 +211,12 @@ function DestinationDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
             "/api/backups/targets"
         ).then((data) => {
             if (!live) return;
-            setConnections(data?.connections ?? []);
-            setHosts(data?.hosts ?? []);
-            setConnectionId(data?.connections[0]?.id ?? "");
-            setHostId(data?.hosts[0]?.id ?? "");
+            const answer = data.ok ? data.value : { connections: [], hosts: [] };
+            setConnections(answer.connections);
+            setHosts(answer.hosts);
+            setConnectionId(answer.connections[0]?.id ?? "");
+            setHostId(answer.hosts[0]?.id ?? "");
+            if (!data.ok) setError(data.reason);
         });
         return () => {
             live = false;

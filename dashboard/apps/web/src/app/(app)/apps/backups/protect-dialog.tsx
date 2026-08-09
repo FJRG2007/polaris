@@ -49,7 +49,11 @@ export function ProtectDialog({
     useEffect(() => {
         let live = true;
         void readJson<{ candidates: DiscoveredCandidate[] }>("/api/backups/discover").then((data) => {
-            if (live) setCandidates(data?.candidates ?? []);
+            if (!live) return;
+            // "Everything is already protected" is a claim, and a read that failed
+            // cannot make it - so the reason goes where the list would have been.
+            setCandidates(data.ok ? data.value.candidates : []);
+            if (!data.ok) setError(data.reason);
         });
         return () => {
             live = false;
