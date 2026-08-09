@@ -134,6 +134,24 @@ export function isMissingEntityReply(output: string): boolean {
 }
 
 /**
+ * Whether the value in a reply closes at all.
+ *
+ * The one thing that tells a bag which is genuinely empty apart from a bag whose
+ * reply was cut off: `[]` closes, and half of a list of forty stacks does not.
+ * RCON hands back at most one packet's worth - 4096 bytes - and a client that
+ * does not reassemble the rest leaves the answer ending mid-compound, which reads
+ * downstream as an inventory holding nothing.
+ *
+ * See https://github.com/itzg/rcon-cli/issues/42 for the client this is true of,
+ * and https://minecraft.wiki/w/RCON for the limit itself.
+ */
+export function replyIsWhole(output: string, bracket: "[" | "{"): boolean {
+    const value = dataReplyValue(output);
+    const open = value.indexOf(bracket);
+    return open !== -1 && readBalanced(value, open) !== null;
+}
+
+/**
  * The first balanced span in `text` that a reader accepts.
  *
  * Every opening bracket is tried in turn rather than only the first, because the

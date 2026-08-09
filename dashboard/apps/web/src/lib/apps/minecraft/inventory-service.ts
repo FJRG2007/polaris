@@ -17,8 +17,9 @@
 
 import { prisma } from "@polaris/db";
 import { stripFormatting } from "./parse";
-import { parseInventory, type InventoryItem } from "./inventory";
+import { isDataReply, replyIsWhole } from "./snbt";
 import { withServerContainer, type ServerContainer } from "./service";
+import { parseInventory, parseStack, type InventoryItem } from "./inventory";
 
 /** How often a bag is worth re-reading. Ten minutes is short enough to be useful
  *  after somebody logs off mid-session and long enough that a busy server is not
@@ -29,6 +30,78 @@ export interface InventorySnapshot {
     readonly items: InventoryItem[];
     /** When the server was asked, ISO 8601. */
     readonly takenAt: string;
+}
+
+/**
+ * How many stacks a player's `Inventory` list can hold: 36 in the bag and on the
+ * hotbar, 4 worn, 1 in the offhand. The list is compact - no gaps - so reading it
+ * an entry at a time ends at the first index the server has nothing for.
+ */
+const MOST_ENTRIES = 41;
+
+/** Asking the game something and getting its answer. Injected so this reads the
+ *  same whether it is driven by a screen or by the snapshot sweep. */
+type Ask = (argv: readonly string[]) => Promise<string>;
+
+/** A live read, and how it went. */
+export interface LiveReading {
+    readonly items: InventoryItem[];
+    /** Whether the server answered the question at all. False for a refusal - the
+     *  player is not on, the command does not exist on this version. */
+    readonly answered: boolean;
+    /** Whether the bag had to be read a stack at a time because the whole-bag
+     *  reply came back cut off. Slower, so what polls says so. */
+    readonly chunked: boolean;
+    /** Stacks the server named and this could not read whole even alone. Reported
+     *  rather than dropped: a grid one shulker short looks like a complete one. */
+    readonly unreadable: number;
+    /** What the server said, for a refusal worth quoting back. */
+    readonly said: string;
+}
+
+/**
+ * What a player is carrying, read so the answer survives a big bag.
+ *
+ * The obvious way - one `data get entity <player> Inventory` - is right until the
+ * bag is worth looking at. RCON answers in packets of at most 4096 bytes and the
+ * client in the server's own image does not reassemble the rest (itzg/rcon-cli#42),
+ * so a player wearing enchanted armour and carrying a shulker gets an answer that
+ * stops mid-compound. That parses to no stacks, which is indistinguishable from an
+ * empty bag - the panel drew a full inventory as empty and said "Live" over it.
+ *
+ * So the whole bag is still asked for first, because for most players it fits and
+ * costs one round trip. When what comes back does not close, the same question is
+ * asked one entry at a time: each stack is its own reply, and a single stack fits.
+ * That costs a round trip per stack and is only paid by the bags that need it.
+ */
+export async function readLiveInventory(ask: Ask, player: string): Promise<LiveReading> {
+    const whole = stripFormatting(await ask(["data", "get", "entity", player, "Inventory"]));
+    if (!isDataReply(whole)) return { items: [], answered: false, chunked: false, unreadable: 0, said: whole };
+
+    const items = parseInventory(whole);
+    // A reply that closed is the whole answer, empty or not. One that did not is a
+    // reply that ran out of room, whatever it managed to parse to.
+    if (replyIsWhole(whole, "[")) {
+        return { items, answered: true, chunked: false, unreadable: 0, said: whole };
+    }
+
+    const found: InventoryItem[] = [];
+    let unreadable = 0;
+    for (let index = 0; index < MOST_ENTRIES; index += 1) {
+        const reply = stripFormatting(await ask(["data", "get", "entity", player, `Inventory[${index}]`]));
+        // "Found no elements matching Inventory[7]" - the list ended.
+        if (!isDataReply(reply)) break;
+        const stack = parseStack(reply);
+        if (stack) found.push(stack);
+        else unreadable += 1;
+    }
+    return {
+        items: found.sort((left, right) => left.slot - right.slot),
+        answered: true,
+        chunked: true,
+        unreadable,
+        said: whole
+    };
 }
 
 /** Decode a stored snapshot. A row that cannot be read is no snapshot rather than
@@ -87,9 +160,12 @@ export async function snapshotOnlinePlayers(
     let kept = 0;
     for (const player of players) {
         try {
-            const reply = await server.say(["data", "get", "entity", player, "Inventory"]);
-            const items = parseInventory(stripFormatting(reply));
-            await writeSnapshot(server.installedAppId, player, items, takenAt);
+            const reading = await readLiveInventory(server.say, player);
+            // A refusal is not a bag. Storing what it parsed to would replace a
+            // real copy from ten minutes ago with an empty one, which is the copy
+            // somebody reads after the player has already logged off.
+            if (!reading.answered) continue;
+            await writeSnapshot(server.installedAppId, player, reading.items, takenAt);
             kept += 1;
         } catch {
             // One player who was mid-disconnect must not cost the rest their turn.
