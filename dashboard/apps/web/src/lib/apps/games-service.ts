@@ -18,13 +18,13 @@ import { getLocalEnvironment } from "@/lib/network-service";
 import { readInstallConfig } from "@/lib/apps/install-config";
 import { appHasCapability, findApp } from "@/lib/apps/catalog";
 import { getServerMetrics } from "@/lib/server-metrics-service";
+import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { gameServerAddress } from "@/lib/apps/minecraft/address";
 import type { PortBlocks, PortPolicy } from "@/lib/apps/port-block";
-import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { sweepTimeouts } from "@/lib/apps/minecraft/timeout-service";
-import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
 import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
 import { enforcePlayerAddresses } from "@/lib/apps/minecraft/player-access";
+import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
 import { gamePorts, probeListening, probeReach, reachConfirmed } from "@/lib/apps/minecraft/reach";
 import { gameReachAdvice, type GamePort, type GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { applyFirewallBans, editionOf, getServerPlayers, type MinecraftEdition } from "@/lib/apps/minecraft/service";
@@ -337,9 +337,17 @@ async function committedMemoryByTarget(ownerId: string): Promise<Map<string, num
     return byMachine;
 }
 
-/** "2G", "2560M" or a bare number of megabytes, as megabytes. */
+/**
+ * "2G", "2560M" or a bare number of megabytes, as megabytes.
+ *
+ * `8GB` is read too, though nothing writes it any more: the settings form corrects
+ * that spelling into `8G` before storing it, but rows written before it did are
+ * still in the database. Refusing them here does not report a problem, it silently
+ * bills that server at zero against the machine's memory - which is how a host ends
+ * up promised more heap than it has.
+ */
 export function parseMemoryMb(value: string): number {
-    const match = /^(\d+(?:\.\d+)?)\s*([gGmM])?$/.exec(value.trim());
+    const match = /^(\d+(?:\.\d+)?)\s*([gm])b?$/i.exec(value.trim()) ?? /^(\d+(?:\.\d+)?)$/.exec(value.trim());
     if (!match) return 0;
     const amount = Number(match[1]);
     if (!Number.isFinite(amount)) return 0;

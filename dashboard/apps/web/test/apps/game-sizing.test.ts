@@ -45,11 +45,21 @@ describe("parseMemoryMb", () => {
         expect(parseMemoryMb("1024")).toBe(1024);
     });
 
+    // Written before the settings form corrected the spelling on the way in, and
+    // still in the database. Read as nothing, one server's whole heap goes missing
+    // from what the machine is judged to have promised.
+    it("reads the spelling the JVM rejects but an operator still typed", () => {
+        expect(parseMemoryMb("8GB")).toBe(8192);
+        expect(parseMemoryMb("2048MB")).toBe(2048);
+        expect(parseMemoryMb("8 gb")).toBe(8192);
+    });
+
     // A server whose memory cannot be read counts as nothing rather than as a
     // guess, so placement never reports capacity that is not there.
     it("counts an unreadable value as nothing", () => {
         expect(parseMemoryMb("")).toBe(0);
         expect(parseMemoryMb("lots")).toBe(0);
+        expect(parseMemoryMb("8TB")).toBe(0);
     });
 });
 
