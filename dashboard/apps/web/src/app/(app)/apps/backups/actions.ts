@@ -12,10 +12,10 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
+import * as manage from "@/lib/backups/manage";
 import { recordAudit } from "@/lib/audit-service";
 import { runBackup } from "@/lib/backups/service";
 import { destinationSchema, planSchema, protectSchema, restoreSchema } from "@/lib/backups/schemas";
-import * as manage from "@/lib/backups/manage";
 
 /** What every action answers with: a sentence to show, or what it produced. */
 type Result<T = object> = { error: string } | ({ error?: undefined } & T);
@@ -182,7 +182,17 @@ export async function testDestinationAction(
     destinationId: string
 ): Promise<{ ok: boolean; error?: string; usedBytes?: number; freeBytes?: number }> {
     const user = await requireAdmin();
-    return manage.testDestination(user.id, destinationId);
+    try {
+        return await manage.testDestination(user.id, destinationId);
+    } catch (error) {
+        // Every other action here catches, and this one has to for a reason the
+        // others do not: an error thrown out of a Server Action is rethrown in the
+        // React tree, so a destination that could not even be looked up did not
+        // report "it did not answer" - it took the whole console down with "This
+        // page stopped working", from the one button whose entire job is to find
+        // out whether something is reachable.
+        return { ok: false, ...failed(error) };
+    }
 }
 
 /** Store a password for a source that needs one of its own. */

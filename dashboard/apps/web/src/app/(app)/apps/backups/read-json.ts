@@ -19,8 +19,11 @@
  * it rather than treating it as "no data yet".
  */
 
-/** A read that worked, or why it did not. */
-export type ReadResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly reason: string };
+/** A read that worked, or why it did not. `status` is the server's, absent when
+ *  the request never got an answer at all. */
+export type ReadResult<T> =
+    | { readonly ok: true; readonly value: T }
+    | { readonly ok: false; readonly reason: string; readonly status?: number };
 
 export async function readJson<T>(url: string): Promise<ReadResult<T>> {
     let response: Response;
@@ -34,7 +37,7 @@ export async function readJson<T>(url: string): Promise<ReadResult<T>> {
     // way and only the body says which happened.
     const isJson = (response.headers.get("content-type") ?? "").includes("application/json");
     if (!response.ok) {
-        return { ok: false, reason: await failureReason(response, isJson) };
+        return { ok: false, reason: await failureReason(response, isJson), status: response.status };
     }
     if (!isJson) {
         return { ok: false, reason: "Your session has expired. Sign in again to see this." };
@@ -44,6 +47,17 @@ export async function readJson<T>(url: string): Promise<ReadResult<T>> {
     } catch {
         return { ok: false, reason: "The answer could not be read." };
     }
+}
+
+/**
+ * Why a mutation failed, out of whatever was thrown.
+ *
+ * An error thrown out of a Server Action is rethrown in the React tree, where the
+ * nearest boundary replaces the console with "This page stopped working". Every
+ * handler here catches its own, and this is the sentence it shows instead.
+ */
+export function reasonFor(caught: unknown): string {
+    return caught instanceof Error && caught.message ? caught.message : "That did not work";
 }
 
 /** The server's own sentence when it wrote one, and the status when it did not. */

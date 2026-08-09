@@ -13,6 +13,7 @@
  */
 
 import Link from "next/link";
+import { readJson } from "../read-json";
 import { formatBytes } from "@polaris/core";
 import { useCallback, useEffect, useState } from "react";
 import type { PointRow, ResourceDetail } from "../types";
@@ -43,13 +44,19 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
     const [restoring, setRestoring] = useState<{ copyId: string; where: string } | null>(null);
     const [deleting, setDeleting] = useState<PointRow | null>(null);
 
+    // Read the way the console reads: a session that has run out is answered with
+    // the sign-in page, which `json()` throws on - and a throw inside this effect
+    // is what takes the page down rather than showing that it has nothing to draw.
     const load = useCallback(async () => {
-        const response = await fetch(`/api/backups/resources/${resourceId}`, { cache: "no-store" });
-        if (response.status === 404) {
-            setMissing(true);
+        const result = await readJson<ResourceDetail>(`/api/backups/resources/${resourceId}`);
+        if (result.ok) {
+            setDetail(result.value);
+            setError(null);
             return;
         }
-        if (response.ok) setDetail((await response.json()) as ResourceDetail);
+        // A row somebody deleted in another tab is gone, not broken.
+        if (result.status === 404) setMissing(true);
+        else setError(result.reason);
     }, [resourceId]);
 
     useEffect(() => {

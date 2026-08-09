@@ -10,6 +10,7 @@
  */
 
 import { useState } from "react";
+import { reasonFor } from "./read-json";
 import { formatBytes } from "@polaris/core";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { deletePlanAction, savePlanAction } from "./actions";
@@ -48,12 +49,19 @@ export function PlansPanel({
     const [removing, setRemoving] = useState<PlanSummary | null>(null);
     const [error, setError] = useState<string | null>(null);
 
+    // Catches its own failure: an error thrown out of a Server Action is rethrown
+    // in the React tree, where the boundary replaces the console with "This page
+    // stopped working" rather than a line saying what refused.
     async function onDelete() {
         if (!removing) return;
         const target = removing;
         setRemoving(null);
-        const result = await deletePlanAction(target.id);
-        if (result.error) setError(result.error);
+        try {
+            const result = await deletePlanAction(target.id);
+            if (result.error) setError(result.error);
+        } catch (caught) {
+            setError(reasonFor(caught));
+        }
         await onChanged();
     }
 
@@ -206,25 +214,30 @@ function PlanDialog({
     async function onSave() {
         setPending(true);
         setError(null);
-        const result = await savePlanAction(
-            {
-                name: name.trim(),
-                every,
-                keepLast: Number(keepLast) || 0,
-                keepDays: Number(keepDays) || 0,
-                maxBytes: maxGb ? Math.round(Number(maxGb) * 1024 ** 3) : 0,
-                notifyOnFailure: notify,
-                destinationIds: chosen
-            },
-            plan?.id
-        );
-        setPending(false);
-        if (result.error) {
-            setError(result.error);
-            return;
+        try {
+            const result = await savePlanAction(
+                {
+                    name: name.trim(),
+                    every,
+                    keepLast: Number(keepLast) || 0,
+                    keepDays: Number(keepDays) || 0,
+                    maxBytes: maxGb ? Math.round(Number(maxGb) * 1024 ** 3) : 0,
+                    notifyOnFailure: notify,
+                    destinationIds: chosen
+                },
+                plan?.id
+            );
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            await onSaved();
+            onClose();
+        } catch (caught) {
+            setError(reasonFor(caught));
+        } finally {
+            setPending(false);
         }
-        await onSaved();
-        onClose();
     }
 
     return (

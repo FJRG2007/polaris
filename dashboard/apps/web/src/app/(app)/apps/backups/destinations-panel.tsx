@@ -10,9 +10,9 @@
  * one is choosing what their backups survive.
  */
 
-import { readJson } from "./read-json";
 import { useEffect, useState } from "react";
 import { formatBytes } from "@polaris/core";
+import { readJson, reasonFor } from "./read-json";
 import type { DestinationSummary } from "./types";
 import { useDisplayFormat } from "@/components/display-format";
 import { createDestinationAction, deleteDestinationAction, testDestinationAction } from "./actions";
@@ -57,12 +57,21 @@ export function DestinationsPanel({
     const [testing, setTesting] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
+    // Each of these catches its own failure, because an error thrown out of a
+    // Server Action is rethrown in the React tree: unguarded, one that refused
+    // replaced the console with "This page stopped working" instead of a line
+    // saying what refused.
     async function onTest(destination: DestinationSummary) {
         setTesting(destination.id);
         setError(null);
-        const result = await testDestinationAction(destination.id);
-        setTesting(null);
-        if (!result.ok) setError(`${destination.name}: ${result.error ?? "it did not answer"}`);
+        try {
+            const result = await testDestinationAction(destination.id);
+            if (!result.ok) setError(`${destination.name}: ${result.error ?? "it did not answer"}`);
+        } catch (caught) {
+            setError(`${destination.name}: ${reasonFor(caught)}`);
+        } finally {
+            setTesting(null);
+        }
         await onChanged();
     }
 
@@ -70,8 +79,12 @@ export function DestinationsPanel({
         if (!removing) return;
         const target = removing;
         setRemoving(null);
-        const result = await deleteDestinationAction(target.id);
-        if (result.error) setError(result.error);
+        try {
+            const result = await deleteDestinationAction(target.id);
+            if (result.error) setError(result.error);
+        } catch (caught) {
+            setError(reasonFor(caught));
+        }
         await onChanged();
     }
 
@@ -233,6 +246,16 @@ function DestinationDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
     async function onSave() {
         setPending(true);
         setError(null);
+        try {
+            await create();
+        } catch (caught) {
+            setError(reasonFor(caught));
+        } finally {
+            setPending(false);
+        }
+    }
+
+    async function create() {
         const payload =
             kind === "connection"
                 ? { kind, name: name.trim(), connectionId, basePath }
@@ -242,7 +265,6 @@ function DestinationDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
                     ? { kind, name: name.trim(), basePath }
                     : { kind, name: name.trim() };
         const result = await createDestinationAction(payload);
-        setPending(false);
         if (result.error) {
             setError(result.error);
             return;
