@@ -10,7 +10,7 @@
  */
 
 import { useState } from "react";
-import { reasonFor } from "./read-json";
+import { reasonFor } from "@/lib/read-json";
 import { formatBytes } from "@polaris/core";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { deletePlanAction, savePlanAction } from "./actions";

@@ -10,7 +10,7 @@
 
 import Link from "next/link";
 import type { JobRow } from "./types";
-import { readJson } from "./read-json";
+import { readJson } from "@/lib/read-json";
 import { formatBytes } from "@polaris/core";
 import { useEffect, useState } from "react";
 import { Badge, Card, Skeleton } from "@polaris/ui";

@@ -13,7 +13,7 @@
  */
 
 import Link from "next/link";
-import { readJson } from "../read-json";
+import { readJson } from "@/lib/read-json";
 import { formatBytes } from "@polaris/core";
 import { useCallback, useEffect, useState } from "react";
 import type { PointRow, ResourceDetail } from "../types";

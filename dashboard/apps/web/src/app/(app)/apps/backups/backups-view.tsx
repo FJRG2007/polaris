@@ -17,7 +17,7 @@
  */
 
 import Link from "next/link";
-import { readJson } from "./read-json";
+import { readJson } from "@/lib/read-json";
 import { PlansPanel } from "./plans-panel";
 import { formatBytes } from "@polaris/core";
 import { ProtectDialog } from "./protect-dialog";

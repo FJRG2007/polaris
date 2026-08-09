@@ -12,8 +12,8 @@
  * nobody waiting for the table should pay for it.
  */
 
-import { readJson } from "./read-json";
 import { protectAction } from "./actions";
+import { readJson } from "@/lib/read-json";
 import { useEffect, useState } from "react";
 import { Loader2, ShieldCheck } from "lucide-react";
 import type { DestinationSummary, DiscoveredCandidate, PlanSummary } from "./types";

@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * Read one of the console's routes, and say what happened when it could not be
+ * Read one of the app's own routes, and say what happened when it could not be
  * read.
  *
- * `response.ok` is not enough on its own. These routes are admin-gated, and a
+ * `response.ok` is not enough on its own. These routes are session-gated, and a
  * session that has expired is answered with a redirect to the sign-in page -
  * which fetch follows, so what arrives is a perfectly fine 200 carrying HTML.
  * `json()` then throws inside an effect with nothing catching it, the rejection
@@ -12,11 +12,15 @@
  * page down with "This page stopped working" rather than showing that it has
  * nothing to draw.
  *
- * Catching that is right and swallowing it is not. A console whose every read
+ * Catching that is right and swallowing it is not. A screen whose every read
  * failed silently holds its skeletons forever and says nothing about why - which
  * is the same dead screen the crash was, minus the clue. So a failure comes back
  * as a sentence somebody can act on, and the caller has to decide what to do with
  * it rather than treating it as "no data yet".
+ *
+ * In `lib` rather than beside one screen: every panel that paints before its data
+ * arrives needs the same two answers, and a second copy of them is a second place
+ * for an expired session to be handled differently.
  */
 
 /** A read that worked, or why it did not. `status` is the server's, absent when
@@ -53,8 +57,8 @@ export async function readJson<T>(url: string): Promise<ReadResult<T>> {
  * Why a mutation failed, out of whatever was thrown.
  *
  * An error thrown out of a Server Action is rethrown in the React tree, where the
- * nearest boundary replaces the console with "This page stopped working". Every
- * handler here catches its own, and this is the sentence it shows instead.
+ * nearest boundary replaces the screen with "This page stopped working". Every
+ * handler catches its own, and this is the sentence it shows instead.
  */
 export function reasonFor(caught: unknown): string {
     return caught instanceof Error && caught.message ? caught.message : "That did not work";
@@ -63,7 +67,7 @@ export function reasonFor(caught: unknown): string {
 /** The server's own sentence when it wrote one, and the status when it did not. */
 async function failureReason(response: Response, isJson: boolean): Promise<string> {
     if (response.status === 401 || response.status === 403) {
-        return "You do not have access to backups. Only an administrator does.";
+        return "You do not have access to this. Only an administrator does.";
     }
     if (isJson) {
         const body: unknown = await response.json().catch(() => null);

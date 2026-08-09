@@ -12,8 +12,8 @@
 
 import { useEffect, useState } from "react";
 import { formatBytes } from "@polaris/core";
-import { readJson, reasonFor } from "./read-json";
 import type { DestinationSummary } from "./types";
+import { readJson, reasonFor } from "@/lib/read-json";
 import { useDisplayFormat } from "@/components/display-format";
 import { createDestinationAction, deleteDestinationAction, testDestinationAction } from "./actions";
 import { AlertTriangle, CheckCircle2, HardDrive, Loader2, Plus, Server, Trash2 } from "lucide-react";
