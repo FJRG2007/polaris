@@ -20,7 +20,14 @@ import type { AppInstallInput } from "@/lib/apps/install-schema";
 import { invalidateBridgeCache } from "@/lib/messaging/bridge-endpoint";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { createApplication, createProject, deleteApplication, deployApplication } from "@/lib/deploy-service";
-import { appHasCapability, findApp, isAllowedEnvValue, isInstallable, tunableEnvVars } from "@/lib/apps/catalog";
+import {
+    appHasCapability,
+    findApp,
+    isAllowedEnvValue,
+    isInstallable,
+    normalizeEnvValue,
+    tunableEnvVars
+} from "@/lib/apps/catalog";
 
 /** All marketplace installs live under one project per owner, so the Deploy
  *  canvas stays uncluttered and the apps share a default environment. */
@@ -164,8 +171,10 @@ export async function installApp(
         // A value the form should never have sent (an unknown key, or one outside a
         // field's declared options) is dropped rather than trusted: the manifest is
         // the contract, and the client is not the one that enforces it.
-        if (!declared || declared.generated || !isAllowedEnvValue(declared, entry.value)) continue;
-        envByKey.set(entry.key, { value: entry.value, isSecret: Boolean(declared.secret) });
+        if (!declared || declared.generated) continue;
+        const value = normalizeEnvValue(declared, entry.value);
+        if (!isAllowedEnvValue(declared, value)) continue;
+        envByKey.set(entry.key, { value, isSecret: Boolean(declared.secret) });
     }
     // Generated vars are the app's own credentials (Minecraft's RCON password): minted
     // here so nobody is asked for them and no app ships a default one.

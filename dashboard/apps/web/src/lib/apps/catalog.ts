@@ -41,6 +41,16 @@ export interface TemplateEnvOption {
     label: string;
 }
 
+/**
+ * A shape a settings value has to fit, named rather than spelled out at each
+ * field so the wizard, the settings form and the save path judge it identically.
+ *
+ * `jvm-heap` exists because free text here is not free: the JVM accepts `8G` and
+ * dies on `8GB`, and the death is a container restart loop with the reason buried
+ * in a log nobody opens. A server sat down for ten days on exactly that.
+ */
+export type EnvValueFormat = "jvm-heap";
+
 /** A single environment variable the install wizard collects or defaults. */
 export interface TemplateEnvVar {
     key: string;
@@ -52,6 +62,9 @@ export interface TemplateEnvVar {
     required?: boolean;
     /** When set, the value must be one of these and the form renders a select. */
     options?: TemplateEnvOption[];
+    /** A shape the value has to fit beyond being text, for the fields where free
+     *  text reaches a runtime that will reject it. */
+    format?: EnvValueFormat;
     /** Minted at install time as a random secret (an app's own admin password),
      *  never shown and never asked for. Implies `secret`. */
     generated?: boolean;
@@ -218,8 +231,9 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                 {
                     key: "MEMORY",
                     label: "Memory",
-                    help: "JVM heap, e.g. 2G. Leave the machine at least a gigabyte for itself.",
+                    help: "JVM heap, with a unit: 2G or 2048M. Leave the machine at least a gigabyte for itself.",
                     default: "2G",
+                    format: "jvm-heap",
                     tunable: true,
                     group: "Server"
                 },
@@ -626,11 +640,42 @@ export function tunableEnvVars(app: AppManifest): readonly TemplateEnvVar[] {
     return (app.template?.env ?? []).filter((field) => field.tunable);
 }
 
+/** What people actually type for a heap: `8G`, `8GB`, `8 gb`, `2048M`. A unit is
+ *  required - a bare number means bytes to the JVM, which is nobody's intent and
+ *  not a thing to guess at. */
+const JVM_HEAP = /^(\d{1,6})\s*(g|gb|m|mb|k|kb)$/i;
+
+/**
+ * The value as it will be stored, which is the only one worth validating.
+ *
+ * Normalizing first is the point: `8GB` is a reasonable thing to type and an
+ * invalid heap, so it is corrected into `8G` rather than refused. Anything that
+ * cannot be read as a heap at all is left exactly as typed, for the check below
+ * to reject - a normalizer that patches a value into validity is a check that
+ * cannot fail.
+ */
+export function normalizeEnvValue(field: TemplateEnvVar, value: string): string {
+    const trimmed = value.trim();
+    if (field.format !== "jvm-heap") return trimmed;
+    const heap = JVM_HEAP.exec(trimmed);
+    if (!heap) return trimmed;
+    return `${heap[1]}${heap[2]![0]!.toUpperCase()}`;
+}
+
+/** What to say when a value does not fit the field's format. Lives here so the
+ *  refusal names the shape the same way wherever the value was typed. */
+export function envFormatHint(field: TemplateEnvVar): string {
+    if (field.format === "jvm-heap") return "give a size with a unit, like 2G or 2048M";
+    return "that is not a value this setting accepts";
+}
+
 /** Whether a value is one the manifest allows for this field. A field with
- *  options accepts only those; everything else is bounded free text. */
+ *  options accepts only those, one with a format has to fit it, and everything
+ *  else is bounded free text. Judge the normalized value - see above. */
 export function isAllowedEnvValue(field: TemplateEnvVar, value: string): boolean {
     if (field.required && value.trim().length === 0) return false;
     if (field.options) return field.options.some((option) => option.value === value);
+    if (field.format === "jvm-heap") return /^\d{1,6}[GMK]$/.test(value);
     return value.length <= 4096;
 }
 

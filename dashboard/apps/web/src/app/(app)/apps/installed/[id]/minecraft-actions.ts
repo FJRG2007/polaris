@@ -20,31 +20,23 @@ import { deployApplication } from "@/lib/deploy-service";
 import { ITEM_ID_PATTERN } from "@/lib/apps/minecraft/items";
 import { stripFormatting } from "@/lib/apps/minecraft/parse";
 import { requireGameServer } from "@/lib/apps/install-access";
-import { cancelAction, pendingFor, queueAction } from "@/lib/apps/minecraft/queue-service";
-import { clearItem, clearSlot, giveToSlot, moveStack } from "@/lib/apps/minecraft/item-service";
-import { readSnapshot, writeSnapshot } from "@/lib/apps/minecraft/inventory-service";
 import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import { setGameHostname } from "@/lib/apps/minecraft/address";
 import { patchInstallConfig } from "@/lib/apps/install-config";
 import { writeContainerFile } from "@/lib/container-files-service";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/minecraft/timeout";
 import { setGameSchedule } from "@/lib/apps/minecraft/schedule-service";
-import { findApp, isAllowedEnvValue, tunableEnvVars } from "@/lib/apps/catalog";
 import { liftTimeout, timeoutPlayer } from "@/lib/apps/minecraft/timeout-service";
 import { parseInventory, type InventoryItem } from "@/lib/apps/minecraft/inventory";
+import { readSnapshot, writeSnapshot } from "@/lib/apps/minecraft/inventory-service";
 import { MAX_BACKUP_BYTES, MAX_KEEP_LAST } from "@/lib/apps/minecraft/backup-policy";
+import { cancelAction, pendingFor, queueAction } from "@/lib/apps/minecraft/queue-service";
 import { isBackupName, isBiome, isLevelName, isLevelType } from "@/lib/apps/minecraft/world";
+import { clearItem, clearSlot, giveToSlot, moveStack } from "@/lib/apps/minecraft/item-service";
 import { parseDimension, parsePosition, type PlayerPosition } from "@/lib/apps/minecraft/position";
-import { applyFirewallBans, getServerPlayers, runConsoleLine, runServerCommand } from "@/lib/apps/minecraft/service";
 import { MAX_IDLE_MINUTES, MIN_IDLE_MINUTES, type GameSchedule } from "@/lib/apps/minecraft/schedule";
-import {
-    grantPlayerAccess,
-    listPlayerAccess,
-    revokePlayerAccess,
-    revokePlayerAddress,
-    setAddressBinding,
-    type PlayerAccessView
-} from "@/lib/apps/minecraft/player-access";
+import { envFormatHint, findApp, isAllowedEnvValue, normalizeEnvValue, tunableEnvVars } from "@/lib/apps/catalog";
+import { applyFirewallBans, getServerPlayers, runConsoleLine, runServerCommand } from "@/lib/apps/minecraft/service";
 import {
     createWorldBackup,
     deleteLevel,
@@ -54,6 +46,14 @@ import {
     setBackupPolicy,
     switchLevel
 } from "@/lib/apps/minecraft/world-service";
+import {
+    grantPlayerAccess,
+    listPlayerAccess,
+    revokePlayerAccess,
+    revokePlayerAddress,
+    setAddressBinding,
+    type PlayerAccessView
+} from "@/lib/apps/minecraft/player-access";
 
 /** A Minecraft (Java Edition) account name. */
 const playerNameSchema = z
@@ -1043,8 +1043,13 @@ export async function updateServerSettingsAction(
         const tunables = tunableEnvVars(manifest);
         const vars = parsed.data.values.flatMap((entry) => {
             const field = tunables.find((item) => item.key === entry.key);
-            if (!field || !isAllowedEnvValue(field, entry.value)) return [];
-            return [{ key: entry.key, value: entry.value, isSecret: Boolean(field.secret) }];
+            if (!field) return [];
+            const value = normalizeEnvValue(field, entry.value);
+            // A declared field whose value does not fit is said out loud rather
+            // than dropped. Dropping it is how a setting looks saved, is not, and
+            // the server it feeds restarts forever on the old value.
+            if (!isAllowedEnvValue(field, value)) throw new Error(`${field.label}: ${envFormatHint(field)}`);
+            return [{ key: entry.key, value, isSecret: Boolean(field.secret) }];
         });
         if (vars.length === 0) throw new Error("Nothing to save");
         await setEnvVars("application", install.applicationId, access.ownerId, vars);
