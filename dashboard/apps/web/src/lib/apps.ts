@@ -41,6 +41,7 @@ import {
     Radio,
     Rocket,
     ScanLine,
+    Scale,
     ScrollText,
     Server,
     Settings,
@@ -51,6 +52,7 @@ import {
     Star,
     Store,
     Target,
+    Terminal,
     Timer,
     Trash2,
     UserCog,
@@ -553,6 +555,132 @@ export const APP_SUBAPPS: AppSubapp[] = [
         ]
     }
 ];
+
+/** Where an installed app's own screens live. */
+export const INSTALLED_BASE = "/apps/installed";
+
+const RUNNING_GROUP = "Running it";
+const CONTENT_GROUP = "What is on it";
+const ACCESS_GROUP = "Who gets in";
+
+/**
+ * How each of a game server's screens is drawn in the rail, by the slug the
+ * server's own tab bar uses for it.
+ *
+ * The tab bar is a row of nine and reads as one undifferentiated row. They are
+ * not nine of a kind - one is the server itself, three are what is happening on
+ * it, three are what is on it, two are who may touch it - and the rail has the
+ * room to say so. What is in this map is presentation; which of them a viewer
+ * gets is decided on the server.
+ */
+const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
+    "": { label: "Overview", icon: LayoutDashboard, keywords: ["status", "address", "players online"] },
+    console: {
+        label: "Console",
+        icon: Terminal,
+        group: RUNNING_GROUP,
+        keywords: ["commands", "rcon", "logs", "say"]
+    },
+    players: {
+        label: "Players",
+        icon: Users,
+        group: RUNNING_GROUP,
+        keywords: ["who is on", "kick", "ban", "op", "inventory", "give item"]
+    },
+    usage: {
+        label: "Usage",
+        icon: ChartColumn,
+        group: RUNNING_GROUP,
+        keywords: ["cpu", "memory", "history", "metrics"]
+    },
+    world: {
+        label: "World",
+        icon: Globe,
+        group: CONTENT_GROUP,
+        keywords: ["level", "seed", "backups", "restore", "new world"]
+    },
+    rules: {
+        label: "Rules",
+        icon: Scale,
+        group: CONTENT_GROUP,
+        keywords: [
+            "gamerule",
+            "keep inventory",
+            "keepinventory",
+            "respawn",
+            "difficulty",
+            "mob griefing",
+            "fire spread",
+            "daylight",
+            "weather"
+        ]
+    },
+    mods: {
+        label: "Mods",
+        icon: Blocks,
+        group: CONTENT_GROUP,
+        keywords: ["plugins", "datapacks", "modrinth", "fabric", "forge"]
+    },
+    access: {
+        label: "Access",
+        icon: IdCard,
+        group: ACCESS_GROUP,
+        keywords: ["invite", "who can manage", "moderator", "grants"]
+    },
+    security: {
+        label: "Security",
+        icon: ShieldCheck,
+        group: ACCESS_GROUP,
+        keywords: ["whitelist", "bans", "firewall", "addresses"]
+    },
+    settings: {
+        label: "Settings",
+        icon: SlidersHorizontal,
+        keywords: ["server.properties", "memory", "version", "restart", "uninstall"]
+    }
+};
+
+/** What the rail needs to know about the app a path is inside. Answered by the
+ *  server, because the path carries an id and nothing else. */
+export interface InstalledAppNav {
+    readonly name: string;
+    /** The screen slugs this viewer may open, in the order the tab bar has them.
+     *  Empty for an installed app that is not a game server - it has one screen,
+     *  and a rail that replaced the app's own list with a list of one would be a
+     *  worse place to stand than the list it replaced. */
+    readonly tabs: readonly string[];
+}
+
+/**
+ * A game server's rail.
+ *
+ * Not in APP_SUBAPPS for the same reason an organization is not: there is no
+ * fixed list of them, and its base is only known once a path names it. Null when
+ * this install has no screens of its own to show.
+ */
+export function installedAppSubapp(id: string, nav: InstalledAppNav): AppSubapp | null {
+    const base = `${INSTALLED_BASE}/${id}`;
+    const sections = nav.tabs.flatMap((slug) => {
+        const entry = GAME_RAIL[slug];
+        return entry ? [{ ...entry, href: slug ? `${base}/${slug}` : base }] : [];
+    });
+    if (sections.length === 0) return null;
+    return {
+        id: `installed:${id}`,
+        label: nav.name,
+        icon: Gamepad2,
+        base,
+        parent: { label: "Game servers", href: "/apps/games" },
+        sections
+    };
+}
+
+/** The installed app id in a path, or null when the path is not inside one. */
+export function installedAppIdForPath(pathname: string): string | null {
+    if (!pathname.startsWith(`${INSTALLED_BASE}/`)) return null;
+    const id = pathname.slice(INSTALLED_BASE.length + 1).split("/")[0] ?? "";
+    return id ? decodeURIComponent(id) : null;
+}
 
 /** Where an organization's own screens live. */
 export const ORG_BASE = "/account/organizations";

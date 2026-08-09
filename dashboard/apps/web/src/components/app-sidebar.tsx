@@ -23,8 +23,11 @@ import { ChevronLeft } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { hasOrgPermission } from "@polaris/core";
 import { useOrgNav } from "@/components/use-org-nav";
+import { useInstalledNav } from "@/components/use-installed-nav";
 import {
     APP_SECTIONS,
+    installedAppIdForPath,
+    installedAppSubapp,
     isSectionActive,
     orgSlugForPath,
     resolveActiveApp,
@@ -34,11 +37,17 @@ import {
 
 export function AppSidebar() {
     const pathname = usePathname();
-    const subapp = resolveSubapp(pathname);
     const app = resolveActiveApp(pathname);
     // Null everywhere except inside an organization, where it says what this
     // reader may open. Absent until it arrives, which draws the baseline rail.
     const org = useOrgNav(orgSlugForPath(pathname));
+    // The same, for an installed app: the path carries an id, and what that id is
+    // called and which of its screens this reader may open only the server knows.
+    // A bridge or a database answers with no screens and keeps the Apps rail.
+    const installedId = installedAppIdForPath(pathname);
+    const installed = useInstalledNav(installedId);
+    const subapp =
+        (installedId && installed ? installedAppSubapp(installedId, installed) : null) ?? resolveSubapp(pathname);
 
     // Hidden sections still nest under a root, so the whole list decides what is
     // an exact match even though only some of it is drawn.
