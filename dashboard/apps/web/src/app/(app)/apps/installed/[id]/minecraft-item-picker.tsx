@@ -90,17 +90,22 @@ export function ItemPicker({
     const searching = query.trim().length > 0;
     const matches = useMemo(() => {
         if (!items) return [];
-        // Nothing typed and a history to show: open on it. Not a filter over the
-        // catalogue - the order is the point, and it is the order things were
-        // given in, which no search can reproduce.
-        if (!searching && recent && recent.length > 0) {
-            return recent.map((id) => items.find((item) => item.id === id) ?? { id, label: itemLabel(id), search: id });
-        }
-        return searchItems(items, query, SHOWN + 1);
+        const found = searchItems(items, query, SHOWN + 1);
+        // Recent goes in front of the list, not in place of it. What was given
+        // here lately is the better first row, but the rest of the catalogue is
+        // still what somebody browses when the thing they want was not given
+        // recently - dropping it made the picker useless for anything new.
+        if (searching || !recent || recent.length === 0) return found;
+        const lately = recent.map(
+            (id) => items.find((item) => item.id === id) ?? { id, label: itemLabel(id), search: id }
+        );
+        return [...lately, ...found.filter((item) => !recent.includes(item.id))];
     }, [items, query, searching, recent]);
     const shown = matches.slice(0, SHOWN);
     const more = matches.length > SHOWN;
-    const showingRecent = !searching && recent !== undefined && recent.length > 0;
+    /** How many of the tiles on screen are the recent ones, so the note under the
+     *  grid describes what is actually there rather than the whole of it. */
+    const lately = searching || !recent ? 0 : Math.min(recent.length, SHOWN);
     // A written-out id nobody has a picture for is still a real item on a modded
     // server, so it is offered rather than refused.
     const typed = typedItemId(query);
@@ -131,8 +136,10 @@ export function ItemPicker({
                 </p>
             ) : (
                 <>
-                    {showingRecent && (
-                        <p className="text-xs text-muted-foreground">Given here lately. Search for anything else.</p>
+                    {lately > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                            {lately === 1 ? "The first one was" : `The first ${lately} were`} given here lately.
+                        </p>
                     )}
                     <ul
                         aria-label="Items"
@@ -157,7 +164,7 @@ export function ItemPicker({
                             </li>
                         )}
                     </ul>
-                    {more && !showingRecent && (
+                    {more && (
                         <p className="text-xs text-muted-foreground">
                             More than {SHOWN} match. Type more to narrow it.
                         </p>
