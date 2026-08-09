@@ -440,7 +440,9 @@ export function MinecraftPlayers({
 
             {acting?.dialog === "give" && (
                 <GiveItemDialog
+                    installedAppId={installedAppId}
                     player={acting.player.name}
+                    online={acting.player.online}
                     pending={pending}
                     onClose={() => setActing(null)}
                     onGive={(item, count) => {
@@ -832,6 +834,8 @@ function MoreActions({
                 <DropdownMenuItem disabled={!live} onSelect={() => onOpen("inventory")}>
                     <Backpack className="size-4" /> Inventory
                 </DropdownMenuItem>
+                {/* Offline is not a reason to hide it: what cannot happen now is
+                    written down and happens when they next join. */}
                 <DropdownMenuItem disabled={!live} onSelect={() => onOpen("give")}>
                     <PackagePlus className="size-4" /> Give an item
                 </DropdownMenuItem>

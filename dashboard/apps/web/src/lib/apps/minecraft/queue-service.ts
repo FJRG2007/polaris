@@ -12,7 +12,7 @@
  */
 
 import { prisma } from "@polaris/db";
-import { giveToSlot } from "./item-service";
+import { giveItem, giveToSlot } from "./item-service";
 import { withServerContainer, type ServerContainer } from "./service";
 import {
     NEEDS_PLAYER,
@@ -236,6 +236,13 @@ async function apply(
             action.payload.item,
             action.payload.count
         );
+        return;
+    }
+    // A waiting give carries a total, which arrives as stacks - the same split the
+    // give itself does, rather than one command with a number the server may
+    // refuse once nobody is watching.
+    if (action.payload.kind === "give") {
+        await giveItem(ownerId, installedAppId, action.username, action.payload.item, action.payload.count);
         return;
     }
     const argv = commandFor(action.username, action.payload);

@@ -197,3 +197,22 @@ export function maxStackFor(id: string): number {
     if (SIXTEEN.some((word) => endsWithWord(name, word))) return 16;
     return 64;
 }
+
+/**
+ * A total, cut into the stacks it actually arrives as.
+ *
+ * Asking for 128 diamonds is asking for two stacks, and saying so is the whole
+ * job: `/give` takes a count, but what a player receives is stacks, and a tool
+ * that refused anything over 64 made somebody press the button twice for a
+ * number they had already typed once. Items that do not stack are the reason
+ * this reads the size per item rather than assuming 64 - 128 saddles is 128
+ * stacks of one, and pretending otherwise hands out two.
+ */
+export function stacksFor(id: string, total: number): number[] {
+    const size = maxStackFor(id);
+    const stacks: number[] = [];
+    for (let left = Math.max(0, Math.trunc(total)); left > 0; left -= size) {
+        stacks.push(Math.min(size, left));
+    }
+    return stacks;
+}

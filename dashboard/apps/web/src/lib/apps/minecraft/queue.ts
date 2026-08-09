@@ -53,7 +53,10 @@ export const QUEUE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 const itemPayload = z.object({
     item: z.string().trim().min(1).max(128),
-    count: z.number().int().min(1).max(64)
+    /** A total, not a stack: what is waiting is the amount somebody asked for, and
+     *  it is cut into stacks when it is handed over. A bag's worth is the ceiling,
+     *  the same one the give itself takes. */
+    count: z.number().int().min(1).max(2304)
 });
 
 export const queuePayloadSchema = z.discriminatedUnion("kind", [

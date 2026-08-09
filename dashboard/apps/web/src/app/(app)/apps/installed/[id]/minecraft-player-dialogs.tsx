@@ -18,11 +18,11 @@
 import * as actions from "./minecraft-actions";
 import { ItemPicker } from "./minecraft-item-picker";
 import { InventoryGrid } from "./minecraft-inventory";
-import { InventoryEditor } from "./minecraft-inventory-editor";
 import { CopyButton } from "@/components/copy-button";
 import { useCallback, useEffect, useState } from "react";
-import { typedItemId } from "@/lib/apps/minecraft/items";
+import { InventoryEditor } from "./minecraft-inventory-editor";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/minecraft/timeout";
+import { stacksFor, typedItemId } from "@/lib/apps/minecraft/items";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
 import { Backpack, Loader2, MapPin, RefreshCw, TriangleAlert } from "lucide-react";
 import { dimensionLabel, formatCoordinates, type PlayerPosition } from "@/lib/apps/minecraft/position";
@@ -48,13 +48,37 @@ const TIMEOUT_PRESETS = [
     { value: "custom", label: "Another length" }
 ];
 
+/** A bag's worth: 36 slots of 64. Past it the rest is on the floor, so it is
+ *  where the field stops rather than a number pulled out of the air. */
+const MOST_THAT_FITS = 2304;
+
+/**
+ * Hand somebody something, with their bag on the screen.
+ *
+ * It used to be a search box and a number, which answers the question "what is
+ * the id of the thing I want" and none of the ones an operator actually has:
+ * whether they already have one, whether there is room, what they are carrying
+ * that this is meant to go with. So the bag is here, and when the player is on
+ * the server it is the editor - the same drag-into-a-slot the inventory screen
+ * has, because "put this in their off-hand" is a different request from "give
+ * them one" and both were being asked through the same form.
+ *
+ * A bag that cannot be read is drawn empty rather than left out. Empty is what
+ * an operator can act on; a missing panel is one they have to go and check.
+ */
 export function GiveItemDialog({
+    installedAppId,
     player,
+    online,
     pending,
     onClose,
     onGive
 }: {
+    installedAppId: string;
     player: string;
+    /** Whether they are standing on the server, which decides whether this hands
+     *  the item over now or writes it down for when they next join. */
+    online: boolean;
     pending: boolean;
     onClose: () => void;
     onGive: (item: string, count: number) => void;
@@ -62,28 +86,72 @@ export function GiveItemDialog({
     const [query, setQuery] = useState("");
     const [picked, setPicked] = useState<string | null>(null);
     const [count, setCount] = useState("1");
+    const [reading, setReading] = useState<actions.InventoryReading | null>(null);
+    const [recent, setRecent] = useState<string[]>([]);
+    const [loaded, setLoaded] = useState(false);
     const parsedCount = Number.parseInt(count, 10);
     // A written-out id counts as a choice, so an operator who knows exactly what
     // they want can type it and press Enter. Half a word on the way to one does
     // not: `minecraft:swor` is a well-formed id and no item at all.
     const item = picked ?? typedItemId(query);
     const countError =
-        !Number.isInteger(parsedCount) || parsedCount < 1 || parsedCount > 64 ? "Between 1 and 64" : null;
+        !Number.isInteger(parsedCount) || parsedCount < 1 || parsedCount > MOST_THAT_FITS
+            ? `Between 1 and ${MOST_THAT_FITS}`
+            : null;
+    const stacks = item && !countError ? stacksFor(item, parsedCount) : [];
+
+    useEffect(() => {
+        let live = true;
+        void Promise.all([
+            actions.readPlayerInventoryAction(installedAppId, player),
+            actions.recentItemsAction(installedAppId)
+        ]).then(([bag, items]) => {
+            if (!live) return;
+            setReading(bag.reading ?? null);
+            setRecent(items.items);
+            setLoaded(true);
+        });
+        return () => {
+            live = false;
+        };
+    }, [installedAppId, player]);
 
     return (
         <Shell
-            size="md"
+            size="lg"
             title={`Give ${player} an item`}
-            description="It goes straight into their inventory, or drops at their feet when there is no room."
+            description={
+                online
+                    ? "It goes straight into their inventory, or drops at their feet when there is no room."
+                    : "They are not on the server, so this is written down and happens when they next join."
+            }
             onClose={onClose}
             pending={pending}
             ready={item !== null && !countError && !pending}
-            confirmLabel="Give"
+            confirmLabel={online ? "Give" : "Save it for later"}
             onConfirm={() => item !== null && onGive(item, parsedCount)}
         >
+            {/* Live and editable: the whole editor, so an item can be dropped into
+                the slot it is meant for instead of landing wherever there is room. */}
+            {online && reading?.live ? (
+                <InventoryEditor installedAppId={installedAppId} player={player} reading={reading} />
+            ) : (
+                <div className="flex flex-col gap-1">
+                    <InventoryGrid items={reading?.items ?? []} />
+                    <p className="text-xs text-muted-foreground">
+                        {!loaded
+                            ? "Reading their bag..."
+                            : reading
+                              ? "As the server last had it."
+                              : "No copy of their bag yet - one is kept every ten minutes while they play."}
+                    </p>
+                </div>
+            )}
+
             <ItemPicker
                 value={item}
                 query={query}
+                recent={recent}
                 onQueryChange={(next) => {
                     setQuery(next);
                     // Typing again is somebody looking for something else; keeping
@@ -96,11 +164,16 @@ export function GiveItemDialog({
                 <Input
                     type="number"
                     min={1}
-                    max={64}
+                    max={MOST_THAT_FITS}
                     value={count}
                     onChange={(event) => setCount(event.target.value)}
                 />
             </Field>
+            {stacks.length > 1 && (
+                <p className="text-xs text-muted-foreground">
+                    {stacks.length} stacks: {stacks.join(" + ")}.
+                </p>
+            )}
         </Shell>
     );
 }
@@ -544,12 +617,21 @@ function Shell({
     ready: boolean;
     pending: boolean;
     danger?: boolean;
-    /** Wider for the form that holds a grid of pictures rather than two fields. */
-    size?: "sm" | "md";
+    /** Wider for the form that holds a grid of pictures rather than two fields,
+     *  and wider still for the one that holds a whole bag as well. */
+    size?: "sm" | "md" | "lg";
 }) {
     return (
         <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
-            <DialogContent className={size === "md" ? "max-w-md" : "max-w-sm"}>
+            <DialogContent
+                className={
+                    size === "lg"
+                        ? "max-h-[85vh] max-w-2xl overflow-y-auto"
+                        : size === "md"
+                          ? "max-w-md"
+                          : "max-w-sm"
+                }
+            >
                 <DialogHeader>
                     <DialogTitle>{title}</DialogTitle>
                     <DialogDescription>{description}</DialogDescription>

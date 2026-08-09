@@ -32,11 +32,18 @@ import { readSnapshot, writeSnapshot } from "@/lib/apps/minecraft/inventory-serv
 import { MAX_BACKUP_BYTES, MAX_KEEP_LAST } from "@/lib/apps/minecraft/backup-policy";
 import { cancelAction, pendingFor, queueAction } from "@/lib/apps/minecraft/queue-service";
 import { isBackupName, isBiome, isLevelName, isLevelType } from "@/lib/apps/minecraft/world";
-import { clearItem, clearSlot, giveToSlot, moveStack } from "@/lib/apps/minecraft/item-service";
 import { parseDimension, parsePosition, type PlayerPosition } from "@/lib/apps/minecraft/position";
 import { MAX_IDLE_MINUTES, MIN_IDLE_MINUTES, type GameSchedule } from "@/lib/apps/minecraft/schedule";
 import { envFormatHint, findApp, isAllowedEnvValue, normalizeEnvValue, tunableEnvVars } from "@/lib/apps/catalog";
 import { applyFirewallBans, getServerPlayers, runConsoleLine, runServerCommand } from "@/lib/apps/minecraft/service";
+import {
+    clearItem,
+    clearSlot,
+    giveItem,
+    giveToSlot,
+    moveStack,
+    recentlyGivenItems
+} from "@/lib/apps/minecraft/item-service";
 import {
     createWorldBackup,
     deleteLevel,
@@ -149,9 +156,10 @@ const giveSchema = z.object({
     installedAppId: z.string().uuid(),
     player: playerNameSchema,
     item: itemIdSchema,
-    /** One stack at a time; more than that is several presses, which is the
-     *  honest amount of deliberation for handing out items. */
-    count: z.number().int().min(1).max(64)
+    /** A total, not a stack. What arrives is stacks - 128 diamonds is two of
+     *  them - and the ceiling is a bag's worth: 36 slots of 64 is everything a
+     *  player can hold, and past that the rest is on the floor. */
+    count: z.number().int().min(1).max(2304)
 });
 
 const teleportSchema = z.object({
@@ -172,28 +180,52 @@ export type TeleportInput = z.infer<typeof teleportSchema>;
 export type TimeoutInput = z.infer<typeof timeoutSchema>;
 
 /** Put items in a player's bag. */
-export async function givePlayerItemAction(input: GiveItemInput): Promise<{ output?: string; error?: string }> {
+export async function givePlayerItemAction(
+    input: GiveItemInput
+): Promise<{ output?: string; error?: string; queued?: true }> {
     const parsed = giveSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const { installedAppId, player, item, count } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
-        const output = await runServerCommand(access.ownerId, installedAppId, [
-            "give",
-            player,
-            item,
-            String(count)
-        ]);
+        // `/give` needs somebody standing there. Deciding at four in the afternoon
+        // to hand something to a player who is asleep is the ordinary case, so it
+        // is written down and happens when they next join - the same way putting
+        // something in a particular slot already worked.
+        if (!(await isOnline(access.ownerId, installedAppId, player))) {
+            await queueAction({
+                installedAppId,
+                username: player,
+                payload: { kind: "give", item, count },
+                requestedById: user.id
+            });
+            return { queued: true };
+        }
+        const { given, output } = await giveItem(access.ownerId, installedAppId, player, item, count);
         await recordAudit({
             actorId: user.id,
             action: "minecraft.give",
             targetType: "installedApp",
             targetId: installedAppId,
-            metadata: { player, item, count }
+            metadata: { player, item, count: given }
         });
         return { output: output.trim() };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+    }
+}
+
+/** What was handed out on this server lately, for the palette to open on rather
+ *  than on the whole catalogue. Empty is an answer: a server nobody has given
+ *  anything on has no recent items, and the picker falls back to the full list. */
+export async function recentItemsAction(installedAppId: string): Promise<{ items: string[] }> {
+    const parsed = z.string().uuid().safeParse(installedAppId);
+    if (!parsed.success) return { items: [] };
+    try {
+        await requireGameServer("games.read", parsed.data);
+        return { items: await recentlyGivenItems(parsed.data) };
+    } catch {
+        return { items: [] };
     }
 }
 

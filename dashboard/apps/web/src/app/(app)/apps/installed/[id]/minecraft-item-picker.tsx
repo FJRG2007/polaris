@@ -57,7 +57,8 @@ export function ItemPicker({
     query,
     onQueryChange,
     onSelect,
-    onDragItem
+    onDragItem,
+    recent
 }: {
     /** The id that will be given, or null while nothing is chosen. */
     value: string | null;
@@ -67,6 +68,10 @@ export function ItemPicker({
     /** Makes the results draggable, for a screen that drops one onto a slot.
      *  Called with the id when a drag starts and null when it ends. */
     onDragItem?: (id: string | null) => void;
+    /** What was handed out on this server lately, shown before anybody types.
+     *  The catalogue's own order answers nobody's question - what somebody
+     *  reaches for is nearly always what was reached for last. */
+    recent?: readonly string[];
 }) {
     const [items, setItems] = useState<CatalogItem[] | null>(null);
     const [failed, setFailed] = useState(false);
@@ -82,9 +87,20 @@ export function ItemPicker({
         };
     }, []);
 
-    const matches = useMemo(() => (items ? searchItems(items, query, SHOWN + 1) : []), [items, query]);
+    const searching = query.trim().length > 0;
+    const matches = useMemo(() => {
+        if (!items) return [];
+        // Nothing typed and a history to show: open on it. Not a filter over the
+        // catalogue - the order is the point, and it is the order things were
+        // given in, which no search can reproduce.
+        if (!searching && recent && recent.length > 0) {
+            return recent.map((id) => items.find((item) => item.id === id) ?? { id, label: itemLabel(id), search: id });
+        }
+        return searchItems(items, query, SHOWN + 1);
+    }, [items, query, searching, recent]);
     const shown = matches.slice(0, SHOWN);
     const more = matches.length > SHOWN;
+    const showingRecent = !searching && recent !== undefined && recent.length > 0;
     // A written-out id nobody has a picture for is still a real item on a modded
     // server, so it is offered rather than refused.
     const typed = typedItemId(query);
@@ -115,6 +131,9 @@ export function ItemPicker({
                 </p>
             ) : (
                 <>
+                    {showingRecent && (
+                        <p className="text-xs text-muted-foreground">Given here lately. Search for anything else.</p>
+                    )}
                     <ul
                         aria-label="Items"
                         className="grid max-h-56 grid-cols-8 gap-1 overflow-y-auto rounded-md border border-border bg-surface/40 p-1"
@@ -138,7 +157,7 @@ export function ItemPicker({
                             </li>
                         )}
                     </ul>
-                    {more && (
+                    {more && !showingRecent && (
                         <p className="text-xs text-muted-foreground">
                             More than {SHOWN} match. Type more to narrow it.
                         </p>

@@ -14,6 +14,7 @@
 
 import { prisma } from "@polaris/db";
 import { stripFormatting } from "./parse";
+import { normalizeItemId, stacksFor } from "./items";
 import { parseStack, type InventoryItem } from "./inventory";
 import { withServerContainer, type ServerContainer } from "./service";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
@@ -219,4 +220,73 @@ export async function clearItem(
     return withServerContainer(ownerId, installedAppId, (server) =>
         server.say(["clear", player, itemId, String(count)])
     );
+}
+
+/**
+ * Hand a player an amount, as the stacks it actually arrives as.
+ *
+ * `/give` is issued once per stack rather than once with a big number. The count
+ * argument's ceiling is a version detail nobody operating a panel should have to
+ * know, and a refusal at the far end - after some of it went in - is a harder
+ * thing to report than one stack that did not.
+ *
+ * Returns what the server said about each, so a partial delivery can say which
+ * part happened rather than reporting the last line as the whole story.
+ */
+export async function giveItem(
+    ownerId: string,
+    installedAppId: string,
+    player: string,
+    itemId: string,
+    total: number
+): Promise<{ given: number; output: string }> {
+    const stacks = stacksFor(itemId, total);
+    return withServerContainer(ownerId, installedAppId, async (server) => {
+        const said: string[] = [];
+        let given = 0;
+        for (const stack of stacks) {
+            said.push(stripFormatting(await server.say(["give", player, itemId, String(stack)])).trim());
+            given += stack;
+        }
+        return { given, output: said.filter(Boolean).join("\n") };
+    });
+}
+
+/**
+ * What has recently been handed out on this server, most recent first.
+ *
+ * The palette's default was every item this game has, in whatever order the
+ * catalogue lists them, which is 120-odd tiles that answer nobody's question.
+ * What an operator reaches for is nearly always what they or somebody else
+ * reached for last on this same server - a kit for a new player, the thing being
+ * tested this evening - so that is what the palette opens on.
+ *
+ * Read from the audit log, which already records every give: a second table for
+ * this would be a duplicate of a record that has to exist anyway.
+ */
+export async function recentlyGivenItems(installedAppId: string, limit = 12): Promise<string[]> {
+    const rows = await prisma.auditLog.findMany({
+        where: { action: "minecraft.give", targetId: installedAppId },
+        orderBy: { at: "desc" },
+        // Enough history that a handful of repeats of one item still leave room
+        // for the ones before it, without reading the whole log.
+        take: limit * 12,
+        select: { metadata: true }
+    });
+    const seen: string[] = [];
+    for (const row of rows) {
+        if (!row.metadata) continue;
+        let item: unknown;
+        try {
+            item = (JSON.parse(row.metadata) as { item?: unknown }).item;
+        } catch {
+            continue;
+        }
+        if (typeof item !== "string") continue;
+        const id = normalizeItemId(item);
+        if (!id || seen.includes(id)) continue;
+        seen.push(id);
+        if (seen.length === limit) break;
+    }
+    return seen;
 }
