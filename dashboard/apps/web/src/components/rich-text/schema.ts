@@ -10,6 +10,7 @@
 import * as refs from "./references";
 import Image from "@tiptap/extension-image";
 import StarterKit from "@tiptap/starter-kit";
+import { Link } from "@tiptap/extension-link";
 import { chipClass, chipLabel } from "./chip";
 import { Placeholder } from "@tiptap/extensions";
 import { mergeAttributes, Node } from "@tiptap/core";
@@ -83,6 +84,18 @@ export const MarkdownBlock = Node.create({
 });
 
 /**
+ * A link that ends where the address does.
+ *
+ * The stock mark declares itself inclusive whenever autolink is on, which means
+ * the caret resting at the end of one carries the link into whatever is typed
+ * next: paste an address, press space, keep writing, and the sentence is part of
+ * the link. Non-inclusive, a space is where the URL stopped and the words after
+ * it are words - which is also the honest reading, since nothing re-points the
+ * href at the longer text.
+ */
+const BoundedLink = Link.extend({ inclusive: () => false });
+
+/**
  * The extension set every Polaris editor runs.
  *
  * Headings stop at three: this is a description or a note, and a document that
@@ -94,14 +107,17 @@ export function baseExtensions(placeholder: string) {
     return [
         // Everything visual is left to the shared type styles the surface
         // carries, so a heading is the same size here as it is once saved.
+        // Links come from `BoundedLink` instead, so StarterKit's own copy of the
+        // mark is turned off rather than registered twice.
         StarterKit.configure({
             heading: { levels: [1, 2, 3] },
-            link: {
-                openOnClick: false,
-                autolink: true,
-                linkOnPaste: true,
-                HTMLAttributes: { rel: "noopener noreferrer nofollow", target: "_blank" }
-            }
+            link: false
+        }),
+        BoundedLink.configure({
+            openOnClick: false,
+            autolink: true,
+            linkOnPaste: true,
+            HTMLAttributes: { rel: "noopener noreferrer nofollow", target: "_blank" }
         }),
         Placeholder.configure({ placeholder }),
         TaskList,
