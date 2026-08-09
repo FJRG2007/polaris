@@ -15,6 +15,7 @@
 
 import { connect } from "node:net";
 import { prisma } from "@polaris/db";
+import { pingBedrock } from "@/lib/apps/minecraft/raknet";
 import { isCarrierGradeNat, isPublicIpv4 } from "@polaris/core";
 import { getHostLanIp, isLanAddress } from "@/lib/host-address";
 import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
@@ -79,8 +80,8 @@ const PROBE_TIMEOUT_MS = 4000;
  * Positive evidence only: a connection that completes went out to the public
  * address and came back in, which is the forward working. A refusal or a timeout
  * is reported as false and means nothing on its own - most routers do not loop
- * their own WAN address back inward. UDP is not probed at all, because an
- * unanswered UDP packet and a blocked one are the same silence.
+ * their own WAN address back inward. This one speaks TCP; a UDP port is asked the
+ * only question it can answer, in `raknet.ts`.
  */
 export function probeGamePort(host: string, port: number, timeoutMs = PROBE_TIMEOUT_MS): Promise<boolean> {
     return new Promise((resolve) => {
@@ -108,13 +109,18 @@ const LOCAL_PROBE_TIMEOUT_MS = 700;
  * already opened - and then ticked it by itself once the server finished booting.
  *
  * Null when there is no address to try, so the advice can say nothing about it
- * rather than infer. UDP is not probed for the reason it is never probed: silence
- * and a block are the same thing.
+ * rather than infer. A UDP port can only ever answer yes here: a Bedrock server
+ * replies to a RakNet ping, but a UDP game that speaks anything else is silent
+ * whether it is up or down, and reading that silence as "down" would be the same
+ * mistake in the other direction.
  */
 export async function probeListening(ports: readonly GamePort[], lanIp: string | null): Promise<boolean | null> {
+    const host = lanIp ?? "127.0.0.1";
+    for (const port of ports.filter((entry) => entry.protocol === "udp")) {
+        if (await pingBedrock(host, port.port, LOCAL_PROBE_TIMEOUT_MS)) return true;
+    }
     const tcp = ports.filter((entry) => entry.protocol === "tcp");
     if (tcp.length === 0) return null;
-    const host = lanIp ?? "127.0.0.1";
     for (const port of tcp) {
         if (await probeGamePort(host, port.port, LOCAL_PROBE_TIMEOUT_MS)) return true;
     }
@@ -160,10 +166,14 @@ export async function probeReach(pending: readonly PendingReach[]): Promise<stri
         if (Date.now() - last < PROBE_EVERY_MS) continue;
         probedAt.set(entry.installedAppId, Date.now());
         for (const port of entry.ports) {
-            // UDP is not probed: an unanswered packet and a blocked one are the
-            // same silence, so a Bedrock-only server waits for a player.
-            if (port.protocol !== "tcp") continue;
-            if (!(await probeGamePort(host, port.port))) continue;
+            // A UDP port is asked in RakNet, which is the one thing a Bedrock
+            // server will answer - without it a Bedrock server could never be
+            // proven at all, since its log prints no player address either.
+            const answered =
+                port.protocol === "tcp"
+                    ? await probeGamePort(host, port.port)
+                    : await pingBedrock(host, port.port, PROBE_TIMEOUT_MS);
+            if (!answered) continue;
             if (await noteReachedFrom(entry.installedAppId, host)) reached.push(entry.installedAppId);
             break;
         }

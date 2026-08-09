@@ -9,6 +9,7 @@
  */
 
 import { createServer, type Server } from "node:net";
+import { createSocket, type Socket } from "node:dgram";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /** Every write the probe made, in place of the install row it would patch. */
@@ -50,6 +51,40 @@ async function listener(): Promise<{ port: number; server: Server }> {
 
 function close(server: Server): Promise<void> {
     return new Promise((resolve) => server.close(() => resolve()));
+}
+
+/** The constant every RakNet offline packet carries. */
+const MAGIC = Buffer.from([
+    0x00, 0xff, 0xff, 0x00, 0xfe, 0xfe, 0xfe, 0xfe, 0xfd, 0xfd, 0xfd, 0xfd, 0x12, 0x34, 0x56, 0x78
+]);
+
+/**
+ * A UDP port that answers like a Bedrock server, or like anything else.
+ *
+ * `speaks` is the whole point of having both: a port that replies without the
+ * magic is some other service sitting on the number, and taking that as proof
+ * would clear the warning for an operator whose game is not reachable at all.
+ */
+async function bedrock(speaks: "raknet" | "gibberish"): Promise<{ port: number; socket: Socket }> {
+    const socket = createSocket("udp4");
+    socket.on("message", (message, from) => {
+        if (message.readUInt8(0) !== 0x01) return;
+        if (speaks === "gibberish") {
+            socket.send(Buffer.from("not a pong"), from.port, from.address);
+            return;
+        }
+        const pong = Buffer.alloc(1 + 8 + 8 + MAGIC.length + 2);
+        pong.writeUInt8(0x1c, 0);
+        message.copy(pong, 1, 1, 9);
+        MAGIC.copy(pong, 17);
+        socket.send(pong, from.port, from.address);
+    });
+    await new Promise<void>((resolve) => socket.bind(0, "127.0.0.1", resolve));
+    return { port: socket.address().port, socket };
+}
+
+function closeSocket(socket: Socket): Promise<void> {
+    return new Promise((resolve) => socket.close(() => resolve()));
 }
 
 afterEach(() => {
@@ -94,10 +129,33 @@ describe("proving a server's ports", () => {
         await close(server);
     });
 
-    it("stays silent on UDP, where a blocked port and an open one sound the same", async () => {
+    it("proves a UDP port when a Bedrock server answers on it", async () => {
+        const { port, socket } = await bedrock("raknet");
+
+        // Without this a Bedrock server could never be proven at all: UDP was
+        // skipped here and its log prints no player address either, so the panel
+        // asked for a forward that already existed and never took it back.
+        expect(await probeReach([{ installedAppId: "bedrock", ports: [{ port, protocol: "udp" }] }])).toEqual([
+            "bedrock"
+        ]);
+        expect(patched).toHaveLength(1);
+        await closeSocket(socket);
+    });
+
+    it("refuses a UDP answer that is not RakNet", async () => {
+        const { port, socket } = await bedrock("gibberish");
+
+        // Something replied, which is exactly the trap: only a packet carrying
+        // RakNet's magic came from the game server the operator is asking about.
+        expect(await probeReach([{ installedAppId: "impostor", ports: [{ port, protocol: "udp" }] }])).toEqual([]);
+        expect(patched).toEqual([]);
+        await closeSocket(socket);
+    });
+
+    it("stays silent on a UDP port that answers nothing", async () => {
         const { port, server } = await listener();
 
-        expect(await probeReach([{ installedAppId: "bedrock", ports: [{ port, protocol: "udp" }] }])).toEqual([]);
+        expect(await probeReach([{ installedAppId: "quiet", ports: [{ port, protocol: "udp" }] }])).toEqual([]);
         expect(patched).toEqual([]);
         await close(server);
     });
@@ -140,9 +198,14 @@ describe("whether the server is even listening", () => {
         expect(await probeListening([{ port, protocol: "tcp" }], "127.0.0.1")).toBe(false);
     });
 
-    it("answers nothing at all for a server that publishes only UDP", async () => {
-        // Silence and a block sound the same on UDP, so there is no state to report.
-        expect(await probeListening([{ port: 19132, protocol: "udp" }], "127.0.0.1")).toBeNull();
+    it("hears a Bedrock server on UDP, and nothing else", async () => {
+        const { port, socket } = await bedrock("raknet");
+
+        expect(await probeListening([{ port, protocol: "udp" }], "127.0.0.1")).toBe(true);
+        await closeSocket(socket);
+        // Once it stops answering there is no state to report rather than a "no":
+        // a UDP game that does not speak RakNet is silent whether it is up or down.
+        expect(await probeListening([{ port, protocol: "udp" }], "127.0.0.1")).toBeNull();
         expect(await probeListening([], "127.0.0.1")).toBeNull();
     });
 });
