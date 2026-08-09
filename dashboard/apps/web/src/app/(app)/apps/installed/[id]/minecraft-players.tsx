@@ -443,6 +443,10 @@ export function MinecraftPlayers({
                     installedAppId={installedAppId}
                     player={acting.player.name}
                     online={acting.player.online}
+                    canEdit={!bedrock}
+                    waiting={waiting.filter(
+                        (entry) => entry.username.toLowerCase() === acting.player.name.toLowerCase()
+                    )}
                     pending={pending}
                     onClose={() => setActing(null)}
                     onGive={(item, count) => {
@@ -497,10 +501,11 @@ export function MinecraftPlayers({
                     installedAppId={installedAppId}
                     player={acting.player.name}
                     // Bedrock answers no `data get` at all, so there is nothing to
-                    // read live and nothing to write back. Neither is a player who
-                    // is not on the server: what is shown then is a snapshot, and
-                    // dragging a stack around a copy would write nowhere.
-                    canEdit={!bedrock && acting.player.online}
+                    // read live and nothing to write back. Being offline is not the
+                    // same case: the editor says so itself, refuses to move what it
+                    // cannot re-read, and still takes an item dropped in from the
+                    // palette - which is written down and given when they join.
+                    canEdit={!bedrock}
                     onClose={() => setActing(null)}
                 />
             )}

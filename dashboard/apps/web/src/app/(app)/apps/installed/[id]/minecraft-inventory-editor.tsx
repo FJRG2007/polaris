@@ -22,16 +22,21 @@
 
 import { ItemPicker } from "./minecraft-item-picker";
 import { InventoryGrid } from "./minecraft-inventory";
-import { maxStackFor } from "@/lib/apps/minecraft/items";
+import { bySlot } from "@/lib/apps/minecraft/inventory";
+import { maxStackFor, stacksFor } from "@/lib/apps/minecraft/items";
+
+/** A bag's worth: 36 slots of 64, which is everything a player can hold. */
+const MOST_THAT_FITS = 2304;
 import { useDisplayFormat } from "@/components/display-format";
 import { Badge, Button, Input, Skeleton, cn } from "@polaris/ui";
-import { bySlot } from "@/lib/apps/minecraft/inventory";
 import { isMovable, writableSlots } from "@/lib/apps/minecraft/item-argument";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
     clearInventorySlotAction,
+    givePlayerItemAction,
     moveInventorySlotAction,
     readPlayerInventoryAction,
+    recentItemsAction,
     setInventorySlotAction,
     type InventoryReading
 } from "./minecraft-actions";
@@ -60,6 +65,7 @@ export function InventoryEditor({
     const [query, setQuery] = useState("");
     const [picked, setPicked] = useState<string | null>(null);
     const [amount, setAmount] = useState(1);
+    const [recent, setRecent] = useState<string[]>([]);
     const [note, setNote] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -77,6 +83,16 @@ export function InventoryEditor({
             onReloaded?.(result.reading);
         }
     }, [installedAppId, player, onReloaded]);
+
+    // What has been handed out here lately, so the palette opens on it. Read once:
+    // it is a hint about where to start, not a live figure.
+    useEffect(() => {
+        let alive = true;
+        void recentItemsAction(installedAppId).then((result) => alive && setRecent(result.items));
+        return () => {
+            alive = false;
+        };
+    }, [installedAppId]);
 
     useEffect(() => {
         if (!live) return;
@@ -102,21 +118,31 @@ export function InventoryEditor({
         });
     }
 
+    /**
+     * Put the chosen item in one slot, and the rest of the amount in the bag.
+     *
+     * A slot holds one stack, so asking for 128 is asking for one stack where the
+     * cursor went and another 64 wherever they fit. Capping it at the slot's worth
+     * silently dropped the difference - a number typed and then ignored.
+     */
+    async function putInSlot(id: string, slot: number): Promise<{ error?: string; queued?: true }> {
+        const [first, ...rest] = stacksFor(id, amount);
+        if (first === undefined) return {};
+        const placed = await setInventorySlotAction({ installedAppId, player, slot, item: id, count: first });
+        if (placed.error || rest.length === 0) return placed;
+        const spare = rest.reduce((sum, stack) => sum + stack, 0);
+        const given = await givePlayerItemAction({ installedAppId, player, item: id, count: spare });
+        if (given.error) return given;
+        return placed;
+    }
+
     function dropOn(slot: number, modifiers: { whole: boolean; single: boolean }): void {
         const carrying = held;
         setHeld(null);
         if (!carrying) return;
 
         if (carrying.kind === "palette") {
-            run(() =>
-                setInventorySlotAction({
-                    installedAppId,
-                    player,
-                    slot,
-                    item: carrying.id,
-                    count: Math.min(amount, maxStackFor(carrying.id))
-                })
-            );
+            run(() => putInSlot(carrying.id, slot));
             return;
         }
         if (carrying.slot === slot) return;
@@ -166,10 +192,20 @@ export function InventoryEditor({
             <div className="flex min-w-0 flex-1 flex-col gap-2">
                 {!live && (
                     <p className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs">
-                        <span className="font-medium">{player} is not on the server.</span> This is the last copy
-                        Polaris kept, from{" "}
-                        <span title={display.dateTime(current.takenAt)}>{ago(current.takenAt)}</span>. Nothing in it can
-                        be moved, but an item dropped in from the palette is saved and given to them when they join.
+                        <span className="font-medium">{player} is not on the server.</span>{" "}
+                        {current.takenAt ? (
+                            <>
+                                This is the last copy Polaris kept, from{" "}
+                                <span title={display.dateTime(current.takenAt)}>{ago(current.takenAt)}</span>. Nothing
+                                in it can be moved,
+                            </>
+                        ) : (
+                            <>
+                                Polaris has no copy of their bag yet - one is kept every ten minutes while they play -
+                                so it is drawn empty. Nothing can be moved out of it,
+                            </>
+                        )}{" "}
+                        but an item dropped in from the palette is saved and given to them when they join.
                     </p>
                 )}
 
@@ -207,20 +243,29 @@ export function InventoryEditor({
                     <Input
                         type="number"
                         min={1}
-                        max={64}
+                        max={MOST_THAT_FITS}
                         value={amount}
                         aria-label="How many to give"
                         className="w-20"
-                        onChange={(event) => setAmount(Math.max(1, Math.min(64, Number(event.target.value) || 1)))}
+                        onChange={(event) =>
+                            setAmount(Math.max(1, Math.min(MOST_THAT_FITS, Number(event.target.value) || 1)))
+                        }
                     />
                     <span className="text-xs text-muted-foreground">at a time</span>
                 </div>
+                {picked && amount > maxStackFor(picked) && (
+                    <p className="text-xs text-muted-foreground">
+                        {stacksFor(picked, amount).length} stacks. One lands where you drop it and the rest go into the
+                        bag.
+                    </p>
+                )}
                 {/* Dragged onto a slot rather than clicked into one: the whole
                     point of the grid is that the operator picks where it lands. */}
                 <div className={cn("min-h-0 flex-1", pending && "pointer-events-none opacity-60")}>
                     <ItemPicker
                         value={picked}
                         query={query}
+                        recent={recent}
                         onQueryChange={setQuery}
                         onSelect={setPicked}
                         onDragItem={(id) => setHeld(id === null ? null : { kind: "palette", id })}
@@ -242,15 +287,7 @@ export function InventoryEditor({
                                 setError("There is no free slot to put it in.");
                                 return;
                             }
-                            run(() =>
-                                setInventorySlotAction({
-                                    installedAppId,
-                                    player,
-                                    slot: free,
-                                    item: picked,
-                                    count: Math.min(amount, maxStackFor(picked))
-                                })
-                            );
+                            run(() => putInSlot(picked, free));
                         }}
                     >
                         Put it in the first free slot

@@ -24,6 +24,7 @@ import { InventoryEditor } from "./minecraft-inventory-editor";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/minecraft/timeout";
 import { stacksFor, typedItemId } from "@/lib/apps/minecraft/items";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
+import { describeQueued, type QueuedAction } from "@/lib/apps/minecraft/queue";
 import { Backpack, Loader2, MapPin, RefreshCw, TriangleAlert } from "lucide-react";
 import { dimensionLabel, formatCoordinates, type PlayerPosition } from "@/lib/apps/minecraft/position";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
@@ -52,6 +53,10 @@ const TIMEOUT_PRESETS = [
  *  where the field stops rather than a number pulled out of the air. */
 const MOST_THAT_FITS = 2304;
 
+/** A bag nobody has a copy of. Not empty-because-they-carry-nothing - `takenAt`
+ *  is null, which is how the editor knows to say which of the two it is. */
+const EMPTY_BAG = { items: [], live: false, takenAt: null } as const satisfies actions.InventoryReading;
+
 /**
  * Hand somebody something, with their bag on the screen.
  *
@@ -70,6 +75,8 @@ export function GiveItemDialog({
     installedAppId,
     player,
     online,
+    canEdit,
+    waiting,
     pending,
     onClose,
     onGive
@@ -79,6 +86,11 @@ export function GiveItemDialog({
     /** Whether they are standing on the server, which decides whether this hands
      *  the item over now or writes it down for when they next join. */
     online: boolean;
+    /** False on Bedrock, which answers no `data get`, so the bag is a picture. */
+    canEdit: boolean;
+    /** What is already written down for this player, so nobody queues a second
+     *  copy of something they cannot see they already asked for. */
+    waiting: readonly QueuedAction[];
     pending: boolean;
     onClose: () => void;
     onGive: (item: string, count: number) => void;
@@ -127,14 +139,27 @@ export function GiveItemDialog({
             }
             onClose={onClose}
             pending={pending}
-            ready={item !== null && !countError && !pending}
-            confirmLabel={online ? "Give" : "Save it for later"}
-            onConfirm={() => item !== null && onGive(item, parsedCount)}
+            // With the editor on screen the giving happens in it, as it happens -
+            // so the footer closes rather than offering a second, weaker way to do
+            // the same thing, and a button that could only ever sit disabled.
+            ready={canEdit ? !pending : item !== null && !countError && !pending}
+            confirmLabel={canEdit ? "Done" : online ? "Give" : "Save it for later"}
+            onConfirm={() => {
+                if (canEdit) {
+                    onClose();
+                    return;
+                }
+                if (item !== null) onGive(item, parsedCount);
+            }}
         >
-            {/* Live and editable: the whole editor, so an item can be dropped into
-                the slot it is meant for instead of landing wherever there is room. */}
-            {online && reading?.live ? (
-                <InventoryEditor installedAppId={installedAppId} player={player} reading={reading} />
+            {/* The whole editor, so an item can be dropped into the slot it is
+                meant for instead of landing wherever there is room. Offline is not
+                an exception: the editor refuses to move what it cannot re-read and
+                still takes a drop from the palette, which is saved for their next
+                join. On Bedrock there is nothing to read or write, so it is a
+                picture. */}
+            {canEdit ? (
+                <InventoryEditor installedAppId={installedAppId} player={player} reading={reading ?? EMPTY_BAG} />
             ) : (
                 <div className="flex flex-col gap-1">
                     <InventoryGrid items={reading?.items ?? []} />
@@ -148,31 +173,52 @@ export function GiveItemDialog({
                 </div>
             )}
 
-            <ItemPicker
-                value={item}
-                query={query}
-                recent={recent}
-                onQueryChange={(next) => {
-                    setQuery(next);
-                    // Typing again is somebody looking for something else; keeping
-                    // the old tile selected would hand out the previous item.
-                    setPicked(null);
-                }}
-                onSelect={setPicked}
-            />
-            <Field label="How many" error={countError}>
-                <Input
-                    type="number"
-                    min={1}
-                    max={MOST_THAT_FITS}
-                    value={count}
-                    onChange={(event) => setCount(event.target.value)}
-                />
-            </Field>
-            {stacks.length > 1 && (
-                <p className="text-xs text-muted-foreground">
-                    {stacks.length} stacks: {stacks.join(" + ")}.
-                </p>
+            {waiting.length > 0 && (
+                <div className="flex flex-col gap-1 rounded-md border border-border bg-surface/40 px-3 py-2">
+                    <p className="text-xs font-medium">Already waiting for {player}</p>
+                    <ul className="flex flex-col gap-0.5">
+                        {waiting.map((entry) => (
+                            <li key={entry.id} className="text-xs text-muted-foreground">
+                                {describeQueued(entry)}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            {/* Only where the editor is not. Two palettes in one form is one
+                palette that drags and one that looks identical and does not,
+                which is indistinguishable from the drag being broken. */}
+            {!canEdit && (
+                <>
+                    <ItemPicker
+                        value={item}
+                        query={query}
+                        recent={recent}
+                        onQueryChange={(next) => {
+                            setQuery(next);
+                            // Typing again is somebody looking for something else;
+                            // keeping the old tile selected would hand out the
+                            // previous item.
+                            setPicked(null);
+                        }}
+                        onSelect={setPicked}
+                    />
+                    <Field label="How many" error={countError}>
+                        <Input
+                            type="number"
+                            min={1}
+                            max={MOST_THAT_FITS}
+                            value={count}
+                            onChange={(event) => setCount(event.target.value)}
+                        />
+                    </Field>
+                    {stacks.length > 1 && (
+                        <p className="text-xs text-muted-foreground">
+                            {stacks.length} stacks: {stacks.join(" + ")}.
+                        </p>
+                    )}
+                </>
             )}
         </Shell>
     );
@@ -333,16 +379,23 @@ export function InventoryDialog({
             loadingLabel="Reading it from the server..."
             empty="Nothing in it."
             loading={loading}
-            error={error}
+            // A bag that could not be read is not a dead end for somebody who may
+            // edit it: the shell shows an error INSTEAD of its children, so
+            // passing this one through is what left an operator with a sentence
+            // and nothing to drag onto. The editor draws the empty bag and says
+            // why itself.
+            error={canEdit ? null : error}
             onRefresh={refresh}
             onClose={onClose}
         >
-            {reading &&
-                (canEdit ? (
-                    <InventoryEditor installedAppId={installedAppId} player={player} reading={reading} />
-                ) : (
-                    <InventoryGrid items={reading.items} />
-                ))}
+            {canEdit ? (
+                <div className="flex flex-col gap-2">
+                    {error && <p className="text-xs text-muted-foreground">{error}</p>}
+                    <InventoryEditor installedAppId={installedAppId} player={player} reading={reading ?? EMPTY_BAG} />
+                </div>
+            ) : reading ? (
+                <InventoryGrid items={reading.items} />
+            ) : null}
         </Reading>
     );
 }

@@ -261,8 +261,10 @@ export interface InventoryReading {
     readonly items: InventoryItem[];
     /** True when the server was asked just now, false when this is the snapshot. */
     readonly live: boolean;
-    /** When it was read, ISO 8601. On a live reading, now. */
-    readonly takenAt: string;
+    /** When it was read, ISO 8601. On a live reading, now. Null when nothing was
+     *  ever kept - an empty bag that is empty because nobody has looked, which
+     *  is not the same as one that is empty because they are carrying nothing. */
+    readonly takenAt: string | null;
 }
 
 /**
