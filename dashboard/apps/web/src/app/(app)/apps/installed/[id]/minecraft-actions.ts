@@ -13,6 +13,7 @@ import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { clientIp } from "@/lib/request-context";
 import { recordAudit } from "@/lib/audit-service";
+import { applyWorldSchedule } from "@/lib/backups/manage";
 import { setEnvVars } from "@/lib/env-var-service";
 import { requirePermissionAny } from "@/lib/session";
 import { deployApplication } from "@/lib/deploy-service";
@@ -894,8 +895,13 @@ export async function saveBackupPolicyAction(input: BackupPolicyInput): Promise<
     try {
         // The policy is written straight to the install's config, so nothing else
         // on the way would refuse a server this person may not touch.
-        const { user } = await requireGameServer("games.manage", installedAppId);
+        const { user, access } = await requireGameServer("games.manage", installedAppId);
         await setBackupPolicy(installedAppId, rules);
+        // Write it through to the backup engine as well. The sweep that actually
+        // takes these copies reads plans now, so a schedule saved only into this
+        // app's config would be a control that looks like it works and does
+        // nothing. Both screens end up describing the same plan.
+        await applyWorldSchedule(access.install.ownerId, installedAppId, access.install.name, rules).catch(() => undefined);
         await recordAudit({
             actorId: user.id,
             action: "games.backup-policy",

@@ -1,209 +1,589 @@
 "use client";
 
 /**
- * Backups app view. Two targets are live: the Polaris database, as a gzipped
- * logical backup taken here, and every Minecraft world, as an archive taken
- * inside the server that runs it. NAS and other-app targets are shown as upcoming
- * so the platform's direction is visible, matching how the locked apps appear in
- * the switcher.
+ * The backup console.
  *
- * The game cards are the server's own, imported rather than rebuilt: this page
- * and the server's World screen have to agree about what is on disk, and two
- * lists of the same archives would eventually not.
+ * A table, not a stack of cards. What this replaced showed one card per thing
+ * being backed up, which reads fine at three and is unusable at thirty - and the
+ * point of the rebuild is that an instance has hundreds. So: one row per
+ * protected thing, sorted by when it was last copied, filtered in the database,
+ * paged by cursor.
+ *
+ * The shell paints immediately and the rows arrive after. Everything that does
+ * not depend on the query - the header, the tabs, the filters, the table's own
+ * chrome - is on screen in the first frame, and only the rows hold a skeleton.
+ * The old page awaited its data before rendering anything, which meant opening
+ * it showed nothing at all until the slowest game server had answered.
  */
 
 import Link from "next/link";
-import { useState } from "react";
+import { PlansPanel } from "./plans-panel";
 import { formatBytes } from "@polaris/core";
-import type { BackupInfo } from "@/lib/backup-service";
+import { ProtectDialog } from "./protect-dialog";
+import { ActivityPanel } from "./activity-panel";
+import { DestinationsPanel } from "./destinations-panel";
 import { useDisplayFormat } from "@/components/display-format";
-import { createBackupAction, deleteBackupAction } from "./actions";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
-import { Boxes, Database, Download, Gamepad2, HardDriveDownload, Server, Trash2 } from "lucide-react";
-import { GameServerBackups, WorldMessage, useWorldView } from "@/app/(app)/apps/installed/[id]/minecraft-world";
+import { RESOURCE_KINDS, RESOURCE_KINDS_INFO } from "@/lib/backups/kinds";
+import { backUpNowAction, setPausedAction, setPlanAction, unprotectAction } from "./actions";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import type { BackupOverview, DestinationSummary, PlanSummary, ResourceRow } from "./types";
+import {
+    AlertTriangle,
+    Clock,
+    HardDriveDownload,
+    Loader2,
+    Pause,
+    Play,
+    Plus,
+    Search
+} from "lucide-react";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    cn,
+    ConfirmDeleteDialog,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuLabel,
+    ContextMenuSeparator,
+    ContextMenuTrigger,
+    Input,
+    Select,
+    Skeleton
+} from "@polaris/ui";
 
-/** A game server there is a world to back up on. */
-export interface BackupGameServer {
-    readonly id: string;
-    readonly name: string;
-}
+/** How many rows a page holds. Enough to fill a screen twice over. */
+const PAGE_SIZE = 50;
 
-export function BackupsView({
-    initialBackups,
-    servers
-}: {
-    initialBackups: BackupInfo[];
-    servers: BackupGameServer[];
-}) {
-    const format = useDisplayFormat();
-    const [backups, setBackups] = useState(initialBackups);
-    const [backingUp, setBackingUp] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [busy, setBusy] = useState<string | null>(null);
+/** Read-side cache TTL. A console somebody is clicking around should not
+ *  re-query the same page on every tab switch. */
+const CACHE_MS = 30_000;
 
-    async function onBackup() {
-        setBackingUp(true);
-        setError(null);
-        const result = await createBackupAction();
-        setBackingUp(false);
-        if (result.error) setError(result.error);
-        else if (result.backups) setBackups(result.backups);
-    }
+type Tab = "protected" | "plans" | "destinations" | "activity";
 
-    async function onDelete(name: string) {
-        setBusy(name);
-        const result = await deleteBackupAction(name);
-        setBackups(result.backups);
-        setBusy(null);
-    }
+const TABS: readonly { readonly id: Tab; readonly label: string }[] = [
+    { id: "protected", label: "Protected" },
+    { id: "plans", label: "Plans" },
+    { id: "destinations", label: "Destinations" },
+    { id: "activity", label: "Activity" }
+];
+
+export function BackupsView() {
+    const [tab, setTab] = useState<Tab>("protected");
+    const [overview, setOverview] = useState<BackupOverview | null>(null);
+
+    const loadOverview = useCallback(async () => {
+        const response = await fetch("/api/backups/overview", { cache: "no-store" });
+        if (response.ok) setOverview((await response.json()) as BackupOverview);
+    }, []);
+
+    useEffect(() => {
+        void loadOverview();
+    }, [loadOverview]);
 
     return (
         <div className="flex flex-col gap-4">
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between gap-2">
-                        <CardTitle className="flex items-center gap-2">
-                            <Database className="size-4 text-primary" />
-                            Polaris database
-                        </CardTitle>
-                        <Button size="sm" onClick={onBackup} disabled={backingUp}>
-                            <HardDriveDownload className={`size-4 ${backingUp ? "animate-pulse" : ""}`} />
-                            {backingUp ? "Backing up..." : "Back up now"}
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardBody className="flex flex-col gap-3">
-                    <p className="text-xs text-muted-foreground">
-                        A gzipped snapshot of every table, taken through Prisma - no external tools, works on Postgres
-                        and SQLite. Take one before an upgrade or a migration, then keep it somewhere safe.
-                    </p>
-                    {backups.some((backup) => backup.ephemeral) ? (
-                        <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
-                            The data dir isn&apos;t writable, so backups are kept in a temporary location and won&apos;t
-                            survive a restart - download them now.
-                        </p>
-                    ) : null}
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
-                    {backups.length === 0 ? (
-                        <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                            No backups yet.
-                        </p>
-                    ) : (
-                        <ul className="flex flex-col gap-1.5">
-                            {backups.map((backup) => (
-                                <li
-                                    key={backup.name}
-                                    className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-2 text-sm"
-                                >
-                                    <div className="flex min-w-0 items-center gap-2">
-                                        <Database className="size-4 shrink-0 text-muted-foreground" />
-                                        <div className="min-w-0">
-                                            <p className="truncate font-medium" title={backup.name}>
-                                                {backup.name}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {formatBytes(BigInt(backup.sizeBytes))} -{" "}
-                                                {format.dateTime(backup.createdAt)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <Button size="icon" variant="ghost" asChild aria-label="Download backup">
-                                            <a href={`/api/backups/${encodeURIComponent(backup.name)}`} download>
-                                                <Download className="size-4" />
-                                            </a>
-                                        </Button>
-                                        <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            aria-label="Delete backup"
-                                            disabled={busy === backup.name}
-                                            onClick={() => onDelete(backup.name)}
-                                        >
-                                            <Trash2 className="size-4" />
-                                        </Button>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </CardBody>
-            </Card>
+            <SummaryStrip overview={overview} />
 
-            {servers.length > 0 && (
-                <div className="flex flex-col gap-4">
-                    <div className="flex items-center gap-2">
-                        <Gamepad2 className="size-4 text-muted-foreground" />
-                        <h2 className="text-sm font-medium">Game worlds</h2>
-                    </div>
-                    {servers.map((server) => (
-                        <GameServerCard key={server.id} id={server.id} name={server.name} />
-                    ))}
-                </div>
-            )}
-
-            <div className="grid gap-4 sm:grid-cols-2">
-                <UpcomingTarget
-                    icon={Server}
-                    title="NAS backups"
-                    description="Snapshot files from a storage connection to another location on a schedule."
-                />
-                <UpcomingTarget
-                    icon={Boxes}
-                    title="Other apps"
-                    description="Back up data from other Polaris apps as they land."
-                />
+            <div className="flex flex-wrap items-center gap-1 border-b border-border">
+                {TABS.map((entry) => (
+                    <button
+                        key={entry.id}
+                        type="button"
+                        onClick={() => setTab(entry.id)}
+                        className={cn(
+                            "-mb-px border-b-2 px-3 py-2 text-sm transition-colors",
+                            tab === entry.id
+                                ? "border-primary font-medium text-foreground"
+                                : "border-transparent text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        {entry.label}
+                    </button>
+                ))}
             </div>
+
+            {tab === "protected" ? (
+                <ProtectedTable
+                    plans={overview?.plans ?? []}
+                    destinations={overview?.destinations ?? []}
+                    onChanged={loadOverview}
+                />
+            ) : null}
+            {tab === "plans" ? (
+                <PlansPanel
+                    plans={overview?.plans ?? []}
+                    destinations={overview?.destinations ?? []}
+                    loading={overview === null}
+                    onChanged={loadOverview}
+                />
+            ) : null}
+            {tab === "destinations" ? (
+                <DestinationsPanel
+                    destinations={overview?.destinations ?? []}
+                    loading={overview === null}
+                    onChanged={loadOverview}
+                />
+            ) : null}
+            {tab === "activity" ? <ActivityPanel /> : null}
         </div>
     );
 }
 
 /**
- * One game server's worlds, on the page that manages every backup.
+ * The numbers across the top.
  *
- * The card is the same one the server's own screen shows, so backing up here and
- * backing up there are the same act rather than two that drift. It loads its own
- * view because measuring a world walks the whole folder: doing that for four
- * servers before the page rendered would hold the database backups - the thing
- * most people opened this page for - behind them.
+ * Skeletons rather than zeros while they load: "0 protected" is a statement,
+ * and showing it before the answer is known is showing something false.
  */
-function GameServerCard({ id, name }: { id: string; name: string }) {
-    const { view, reload } = useWorldView(id);
+function SummaryStrip({ overview }: { overview: BackupOverview | null }) {
+    const summary = overview?.summary;
     return (
-        <div className="flex flex-col gap-1">
-            <WorldMessage view={view} />
-            <GameServerBackups installedAppId={id} serverName={name} view={view} onChanged={reload} heading={name} />
-            <Link
-                href={`/apps/installed/${id}/world`}
-                className="self-end text-xs text-muted-foreground hover:text-foreground"
-            >
-                Open {name}
-            </Link>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Stat label="Protected" value={summary ? String(summary.protectedCount) : null} />
+            <Stat label="Copies" value={summary ? String(summary.copyCount) : null} />
+            <Stat label="Stored" value={summary ? formatBytes(BigInt(summary.storedBytes)) : null} />
+            <Stat
+                label="Failed in 24h"
+                value={summary ? String(summary.failedRecently) : null}
+                bad={Boolean(summary && summary.failedRecently > 0)}
+            />
+            {summary && !summary.cronConfigured ? (
+                <Card className="sm:col-span-2 lg:col-span-4">
+                    <CardBody className="flex items-start gap-2 py-3 text-xs text-warning">
+                        <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                        <span>
+                            Nothing is set to run the schedules. Plans are saved but no copy will be taken on its
+                            own until <code>POLARIS_CRON_SECRET</code> is set and something calls{" "}
+                            <code>/api/cron/backups</code>. Backing up by hand works either way.
+                        </span>
+                    </CardBody>
+                </Card>
+            ) : null}
+            {summary && summary.destinationsDown > 0 ? (
+                <Card className="sm:col-span-2 lg:col-span-4">
+                    <CardBody className="flex items-start gap-2 py-3 text-xs text-danger">
+                        <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                        <span>
+                            {summary.destinationsDown === 1
+                                ? "One destination stopped answering."
+                                : `${summary.destinationsDown} destinations stopped answering.`}{" "}
+                            Copies bound for them are failing - open Destinations to see which.
+                        </span>
+                    </CardBody>
+                </Card>
+            ) : null}
         </div>
     );
 }
 
-function UpcomingTarget({
-    icon: Icon,
-    title,
-    description
-}: {
-    icon: typeof Server;
-    title: string;
-    description: string;
-}) {
+function Stat({ label, value, bad }: { label: string; value: string | null; bad?: boolean }) {
     return (
-        <Card className="opacity-70">
-            <CardBody className="flex flex-col gap-2">
-                <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2 text-sm font-medium">
-                        <Icon className="size-4 text-muted-foreground" />
-                        {title}
-                    </span>
-                    <Badge variant="neutral">Coming soon</Badge>
-                </div>
-                <p className="text-xs text-muted-foreground">{description}</p>
+        <Card>
+            <CardBody className="flex flex-col gap-1 py-3">
+                <span className="text-xs text-muted-foreground">{label}</span>
+                {value === null ? (
+                    <Skeleton className="h-6 w-20" />
+                ) : (
+                    <span className={cn("text-lg font-medium", bad && "text-danger")}>{value}</span>
+                )}
             </CardBody>
         </Card>
+    );
+}
+
+interface Page {
+    rows: ResourceRow[];
+    nextCursor: string | null;
+    total: number;
+}
+
+function ProtectedTable({
+    plans,
+    destinations,
+    onChanged
+}: {
+    plans: PlanSummary[];
+    destinations: DestinationSummary[];
+    onChanged: () => Promise<void>;
+}) {
+    const format = useDisplayFormat();
+    const [query, setQuery] = useState("");
+    const [kind, setKind] = useState("");
+    const [page, setPage] = useState<Page | null>(null);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [busy, setBusy] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [removing, setRemoving] = useState<ResourceRow | null>(null);
+    const [protecting, setProtecting] = useState(false);
+    const [, startTransition] = useTransition();
+    // Debounced search: a keystroke per query would re-page the table five times
+    // on the way to one word.
+    const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const cache = useRef(new Map<string, { at: number; page: Page }>());
+
+    const key = useMemo(() => `${query}|${kind}`, [query, kind]);
+
+    const load = useCallback(
+        async (cursor?: string) => {
+            const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+            if (query) params.set("query", query);
+            if (kind) params.set("kind", kind);
+            if (cursor) params.set("cursor", cursor);
+
+            if (!cursor) {
+                const cached = cache.current.get(key);
+                if (cached && Date.now() - cached.at < CACHE_MS) {
+                    setPage(cached.page);
+                    return;
+                }
+            }
+            const response = await fetch(`/api/backups/resources?${params}`, { cache: "no-store" });
+            if (!response.ok) {
+                setError("The list could not be loaded.");
+                return;
+            }
+            const next = (await response.json()) as Page;
+            setPage((current) =>
+                cursor && current ? { ...next, rows: [...current.rows, ...next.rows] } : next
+            );
+            if (!cursor) cache.current.set(key, { at: Date.now(), page: next });
+        },
+        [key, kind, query]
+    );
+
+    useEffect(() => {
+        if (debounce.current) clearTimeout(debounce.current);
+        debounce.current = setTimeout(() => void load(), query ? 250 : 0);
+        return () => {
+            if (debounce.current) clearTimeout(debounce.current);
+        };
+    }, [load, query]);
+
+    /** Re-read after a mutation, ignoring the cache it just invalidated. */
+    const refresh = useCallback(async () => {
+        cache.current.clear();
+        await Promise.all([load(), onChanged()]);
+    }, [load, onChanged]);
+
+    async function onBackUpNow(row: ResourceRow) {
+        setBusy(row.id);
+        setError(null);
+        const result = await backUpNowAction(row.id);
+        setBusy(null);
+        // `!== undefined` rather than truthiness: the error arm is typed
+        // `string`, which includes "", so a truthy check narrows neither arm.
+        if (result.error !== undefined) {
+            setError(result.error);
+        } else if (result.status === "partial") {
+            setError(`${row.name}: the copy landed in some destinations but not all. Open it to see which.`);
+        }
+        await refresh();
+    }
+
+    async function onTogglePause(row: ResourceRow) {
+        setBusy(row.id);
+        const result = await setPausedAction(row.id, row.status !== "paused");
+        setBusy(null);
+        if (result.error) setError(result.error);
+        await refresh();
+    }
+
+    async function onRemove(deleteCopies: boolean) {
+        if (!removing) return;
+        const target = removing;
+        setRemoving(null);
+        setBusy(target.id);
+        const result = await unprotectAction(target.id, deleteCopies);
+        setBusy(null);
+        if (result.error) setError(result.error);
+        await refresh();
+    }
+
+    const rows = page?.rows ?? null;
+
+    return (
+        <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+                <div className="relative min-w-48 flex-1">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder="Search what is protected"
+                        className="pl-8"
+                        aria-label="Search what is protected"
+                    />
+                </div>
+                <Select
+                    value={kind}
+                    onValueChange={setKind}
+                    aria-label="Filter by type"
+                    className="w-44"
+                    options={[
+                        { value: "", label: "Every type" },
+                        ...RESOURCE_KINDS.map((entry) => ({
+                            value: entry,
+                            label: RESOURCE_KINDS_INFO[entry].label
+                        }))
+                    ]}
+                />
+                <Button onClick={() => setProtecting(true)}>
+                    <Plus className="size-4" />
+                    Protect something
+                </Button>
+            </div>
+
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
+
+            <Card>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead className="border-b border-border text-left text-xs text-muted-foreground">
+                            <tr>
+                                <th className="px-3 py-2 font-medium">Name</th>
+                                <th className="px-3 py-2 font-medium">Type</th>
+                                <th className="px-3 py-2 font-medium">Plan</th>
+                                <th className="px-3 py-2 font-medium">Last copy</th>
+                                <th className="px-3 py-2 font-medium">Next</th>
+                                <th className="px-3 py-2 text-right font-medium">Copies</th>
+                                <th className="px-3 py-2 text-right font-medium">Size</th>
+                                <th className="px-3 py-2 font-medium">Destinations</th>
+                                <th className="px-3 py-2" />
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rows === null ? (
+                                Array.from({ length: 5 }, (_, index) => (
+                                    <tr key={index} className="border-b border-border last:border-0">
+                                        <td colSpan={9} className="px-3 py-2.5">
+                                            <Skeleton className="h-5 w-full" />
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : rows.length === 0 ? (
+                                <tr>
+                                    <td colSpan={9} className="px-3 py-10 text-center text-sm text-muted-foreground">
+                                        {query || kind
+                                            ? "Nothing matches that."
+                                            : "Nothing is being backed up yet. Protect something to start."}
+                                    </td>
+                                </tr>
+                            ) : (
+                                rows.map((row) => (
+                                    <ResourceLine
+                                        key={row.id}
+                                        row={row}
+                                        plans={plans}
+                                        busy={busy === row.id}
+                                        format={format}
+                                        onBackUp={() => void onBackUpNow(row)}
+                                        onTogglePause={() => void onTogglePause(row)}
+                                        onRemove={() => setRemoving(row)}
+                                        onChanged={refresh}
+                                    />
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </Card>
+
+            {page?.nextCursor ? (
+                <Button
+                    variant="ghost"
+                    disabled={loadingMore}
+                    onClick={() => {
+                        setLoadingMore(true);
+                        startTransition(async () => {
+                            await load(page.nextCursor ?? undefined);
+                            setLoadingMore(false);
+                        });
+                    }}
+                >
+                    {loadingMore ? <Loader2 className="size-4 animate-spin" /> : null}
+                    Show more
+                </Button>
+            ) : null}
+
+            {protecting ? (
+                <ProtectDialog
+                    plans={plans}
+                    destinations={destinations}
+                    onClose={() => setProtecting(false)}
+                    onProtected={refresh}
+                />
+            ) : null}
+
+            {removing ? (
+                <ConfirmDeleteDialog
+                    open
+                    onOpenChange={(open) => !open && setRemoving(null)}
+                    name={removing.name}
+                    kind="protected item"
+                    requireTyping={false}
+                    description={
+                        removing.copyCount > 0
+                            ? `Its ${removing.copyCount} ${removing.copyCount === 1 ? "copy stays" : "copies stay"} where they are and can still be restored. Delete them separately if you want them gone.`
+                            : "It has no copies yet, so nothing is lost."
+                    }
+                    confirmLabel="Stop backing up"
+                    onConfirm={() => void onRemove(false)}
+                />
+            ) : null}
+        </div>
+    );
+}
+
+/** One row. Every verb is here: the two anybody uses, and a right-click for the rest. */
+function ResourceLine({
+    row,
+    plans,
+    busy,
+    format,
+    onBackUp,
+    onTogglePause,
+    onRemove,
+    onChanged
+}: {
+    row: ResourceRow;
+    plans: PlanSummary[];
+    busy: boolean;
+    format: ReturnType<typeof useDisplayFormat>;
+    onBackUp: () => void;
+    onTogglePause: () => void;
+    onRemove: () => void;
+    onChanged: () => Promise<void>;
+}) {
+    const paused = row.status === "paused";
+    return (
+        <ContextMenu>
+            <ContextMenuTrigger asChild>
+                <tr className="border-b border-border last:border-0 hover:bg-muted/40">
+                    <td className="px-3 py-2.5">
+                        <Link href={`/apps/backups/${row.id}`} className="font-medium hover:underline">
+                            {row.name}
+                        </Link>
+                        {row.lastStatus === "failed" || row.lastStatus === "partial" ? (
+                            <p className="truncate text-xs text-danger" title={row.lastError ?? undefined}>
+                                {row.lastError ?? "The last copy did not land."}
+                            </p>
+                        ) : null}
+                    </td>
+                    <td className="px-3 py-2.5 text-muted-foreground">{row.kindLabel}</td>
+                    <td className="px-3 py-2.5">
+                        {row.planName ? (
+                            <span className="text-muted-foreground">{row.planName}</span>
+                        ) : (
+                            <span className="text-xs text-muted-foreground">On demand</span>
+                        )}
+                    </td>
+                    <td className="px-3 py-2.5 text-muted-foreground">
+                        {row.lastBackupAt ? format.dateTime(row.lastBackupAt) : "Never"}
+                    </td>
+                    <td className="px-3 py-2.5 text-muted-foreground">
+                        {paused ? (
+                            <Badge variant="neutral">Paused</Badge>
+                        ) : row.nextDueAt ? (
+                            <span className="flex items-center gap-1 text-xs">
+                                <Clock className="size-3.5" />
+                                {format.dateTime(row.nextDueAt)}
+                            </span>
+                        ) : (
+                            <span className="text-xs">-</span>
+                        )}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">{row.copyCount}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                        {formatBytes(BigInt(row.sizeBytes))}
+                    </td>
+                    <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                        {row.destinations.length > 0 ? row.destinations.join(", ") : "Default"}
+                    </td>
+                    <td className="px-3 py-2.5">
+                        <div className="flex items-center justify-end gap-1">
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                aria-label={`Back up ${row.name} now`}
+                                title="Back up now"
+                                disabled={busy}
+                                onClick={onBackUp}
+                            >
+                                {busy ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                    <HardDriveDownload className="size-4" />
+                                )}
+                            </Button>
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                aria-label={paused ? `Resume ${row.name}` : `Pause ${row.name}`}
+                                title={paused ? "Resume the schedule" : "Pause the schedule"}
+                                disabled={busy}
+                                onClick={onTogglePause}
+                            >
+                                {paused ? <Play className="size-4" /> : <Pause className="size-4" />}
+                            </Button>
+                        </div>
+                    </td>
+                </tr>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+                <ContextMenuLabel>{row.name}</ContextMenuLabel>
+                <ContextMenuItem asChild>
+                    <Link href={`/apps/backups/${row.id}`}>Open</Link>
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={onBackUp}>Back up now</ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuLabel>Plan</ContextMenuLabel>
+                <PlanChoices row={row} plans={plans} onChanged={onChanged} />
+                <ContextMenuSeparator />
+                <ContextMenuItem onSelect={onRemove}>Stop backing up</ContextMenuItem>
+            </ContextMenuContent>
+        </ContextMenu>
+    );
+}
+
+/** The plans this row could be on, so changing one is a right-click. */
+function PlanChoices({
+    row,
+    plans,
+    onChanged
+}: {
+    row: ResourceRow;
+    plans: PlanSummary[];
+    onChanged: () => Promise<void>;
+}) {
+    return (
+        <>
+            <ContextMenuItem
+                onSelect={async () => {
+                    await setPlanAction(row.id, null);
+                    await onChanged();
+                }}
+            >
+                {row.planId === null ? "- " : ""}On demand only
+            </ContextMenuItem>
+            {plans.map((plan) => (
+                <ContextMenuItem
+                    key={plan.id}
+                    onSelect={async () => {
+                        await setPlanAction(row.id, plan.id);
+                        await onChanged();
+                    }}
+                >
+                    {row.planId === plan.id ? "- " : ""}
+                    {plan.name}
+                </ContextMenuItem>
+            ))}
+            {plans.length === 0 ? (
+                <ContextMenuItem disabled>No plans yet - make one under Plans</ContextMenuItem>
+            ) : null}
+        </>
     );
 }

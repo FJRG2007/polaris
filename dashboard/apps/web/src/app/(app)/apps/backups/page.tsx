@@ -1,35 +1,30 @@
 /**
- * Backups app (/apps/backups). A first-class Polaris app for managing backups:
- * the Polaris database and every Minecraft world today, with NAS and other-app
- * targets to follow. Admin-only. Server component that loads the current backups
- * and the game servers there are worlds to back up on, and hands them to the
- * client view - the worlds themselves are measured inside each container, so that
- * part is loaded per server after the page has painted rather than before it.
+ * Backups (/apps/backups). What is protected, under which policy, where the
+ * copies went, and what has run.
+ *
+ * The page awaits nothing. It renders the header and hands over to the console,
+ * which fetches its own data after the first paint - the version this replaced
+ * awaited a filesystem listing and a round trip into every game server before it
+ * rendered a single pixel, so opening it showed an empty screen for as long as
+ * the slowest server took to answer.
+ *
+ * Admin-only: a backup reaches every app's data.
  */
 
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { BackupsView } from "./backups-view";
-import { listBackups } from "@/lib/backup-service";
-import { listGameServerFacts } from "@/lib/apps/games-service";
-
-export const dynamic = "force-dynamic";
 
 export default async function BackupsPage() {
-    const user = await requireAdmin();
-    const [backups, servers] = await Promise.all([listBackups(), listGameServerFacts(user.id).catch(() => [])]);
+    await requireAdmin();
 
     return (
-        // Narrow page: centre the column in the content area, header included.
-        <div className="mx-auto flex w-full max-w-3xl flex-col">
+        <div className="mx-auto flex w-full max-w-6xl flex-col">
             <PageHeader
                 title="Backups"
-                description="Back up and restore Polaris and your game worlds, with NAS and other apps to follow."
+                description="What is protected, how often it is copied, and where those copies live."
             />
-            <BackupsView
-                initialBackups={backups}
-                servers={servers.map((server) => ({ id: server.id, name: server.name }))}
-            />
+            <BackupsView />
         </div>
     );
 }

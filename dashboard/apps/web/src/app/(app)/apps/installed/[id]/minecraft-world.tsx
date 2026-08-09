@@ -809,8 +809,8 @@ function BackupScheduleCard({
                                 <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
                                 <span className="text-muted-foreground">
                                     Nothing is scheduled to run this yet. Set POLARIS_CRON_SECRET and point a scheduler
-                                    at <code className="font-mono">/api/cron/game-backups</code>, or keep taking copies
-                                    with the button above.
+                                    at <code className="font-mono">/api/cron/backups</code>, or keep taking copies with
+                                    the button above.
                                 </span>
                             </p>
                         )}
