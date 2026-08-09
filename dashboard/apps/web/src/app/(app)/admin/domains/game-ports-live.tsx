@@ -8,9 +8,9 @@
  * this card - so it re-reads on its own and knocks on the ports as it goes, rather
  * than holding "not confirmed" until somebody reloads or a player joins by luck.
  *
- * It paints from what the page already rendered, so nothing is blank while the
- * first read is in flight, and a failed refresh leaves the last answer on screen
- * with a note rather than emptying the card.
+ * The reading itself belongs to the card above, which is the thing that decides
+ * whether there is a card at all: one read, one poll, and a refresh that fails
+ * leaves the last answer on screen with a note rather than emptying the card.
  */
 
 import { RefreshCw } from "lucide-react";
@@ -18,24 +18,21 @@ import { Badge, Button } from "@polaris/ui";
 import { RouterSteps } from "./router-steps";
 import { inBlock } from "@/lib/apps/port-block";
 import { gameForwardRules } from "@/lib/router-guide";
-import { useLiveResource } from "@/components/use-live-resource";
 import type { GamePortsReading } from "@/lib/apps/games-service";
 import { describePorts } from "@/lib/apps/minecraft/reach-advice";
 
-/** How often the card re-reads. The knock behind it is rate limited to one every
- *  thirty seconds per server, so this is about how soon the answer shows. */
-const POLL_MS = 15_000;
-
-export function GamePortsLive({ initial }: { initial: GamePortsReading }) {
-    const { data, stale, refreshing, refresh } = useLiveResource<GamePortsReading>({
-        url: "/api/admin/domains/game-ports",
-        cacheKey: "admin.gamePorts",
-        intervalMs: POLL_MS,
-        select: (body) => body as GamePortsReading
-    });
-    // The server's own read until the first poll answers: a card that renders
-    // nothing while it waits is a card the operator scrolls past.
-    const reading = data ?? initial;
+export function GamePortsLive({
+    reading,
+    stale,
+    refreshing,
+    onRefresh
+}: {
+    reading: GamePortsReading;
+    /** Why the ports on screen stopped updating, when a refresh failed over them. */
+    stale: string | null;
+    refreshing: boolean;
+    onRefresh: () => void;
+}) {
     const { servers, advice, lanIp, policy, blocks } = reading;
     const pending = servers.filter((server) => !server.confirmed);
     // A server whose port predates the block is one the range rule does not cover,
@@ -53,7 +50,7 @@ export function GamePortsLive({ initial }: { initial: GamePortsReading }) {
                 <Button
                     variant="ghost"
                     size="icon"
-                    onClick={refresh}
+                    onClick={onRefresh}
                     disabled={refreshing}
                     aria-label="Check the ports now"
                     title="Check the ports now"

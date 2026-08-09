@@ -14,29 +14,36 @@ import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DEFAULT_PORT_BLOCKS, parseBlockInput } from "../../src/lib/apps/port-block";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 vi.mock("../../src/app/(app)/admin/domains/actions", () => ({
     savePortPolicyAction: async () => ({ policy: "range" as const, blocks: DEFAULT_PORT_BLOCKS })
 }));
 
 const { PortPolicyForm } = await import("../../src/app/(app)/admin/domains/port-policy-form");
 
+/** Re-reading the card afterwards is the card's business, and none of these get
+ *  as far as saving. */
+function markupFor(policy: "range" | "per-port"): string {
+    return renderToStaticMarkup(
+        <PortPolicyForm policy={policy} blocks={DEFAULT_PORT_BLOCKS} onSaved={() => {}} />
+    );
+}
+
 describe("the port policy form", () => {
     it("shows the blocks as they are typed, not as JSON", () => {
-        const markup = renderToStaticMarkup(<PortPolicyForm policy="range" blocks={DEFAULT_PORT_BLOCKS} />);
+        const markup = markupFor("range");
 
         expect(markup).toContain("25565-25664");
         expect(markup).toContain("19132-19231");
     });
 
     it("opens on the policy in force rather than on a default", () => {
-        const markup = renderToStaticMarkup(<PortPolicyForm policy="per-port" blocks={DEFAULT_PORT_BLOCKS} />);
+        const markup = markupFor("per-port");
 
         expect(markup).toContain("another rule in the router");
     });
 
     it("leaves Save disabled until something differs from what was loaded", () => {
-        const markup = renderToStaticMarkup(<PortPolicyForm policy="range" blocks={DEFAULT_PORT_BLOCKS} />);
+        const markup = markupFor("range");
 
         expect(markup).toMatch(/<button[^>]*type="submit"[^>]*disabled/);
     });

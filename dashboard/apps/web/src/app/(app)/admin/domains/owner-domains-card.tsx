@@ -11,7 +11,6 @@
  */
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { saveOwnerDomainPolicyAction } from "./actions";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
@@ -25,8 +24,17 @@ import {
 
 const OPTIONS = OWNER_DOMAIN_MODES.map((mode) => ({ value: mode, label: OWNER_DOMAIN_LABELS[mode] }));
 
-export function OwnerDomainsCard({ policy }: { policy: OwnerDomainPolicy }) {
-    const router = useRouter();
+export function OwnerDomainsCard({
+    policy,
+    onSaved
+}: {
+    policy: OwnerDomainPolicy;
+    /** What was stored, so the panel around this holds one copy of it. Saving used
+     *  to re-render the page from the server; the page reads its own data now, and
+     *  a Save that only wrote would leave the form comparing against the old value
+     *  and reading as unsaved. */
+    onSaved: (next: OwnerDomainPolicy) => void;
+}) {
     const [mode, setMode] = useState<OwnerDomainMode>(policy.mode);
     const [cap, setCap] = useState(String(policy.maxPerOwner));
     const [busy, setBusy] = useState(false);
@@ -59,11 +67,11 @@ export function OwnerDomainsCard({ policy }: { policy: OwnerDomainPolicy }) {
                             setError
                         );
                         setBusy(false);
-                        if (!result || result.error) {
+                        if (!result?.policy || result.error) {
                             if (result?.error) setError(result.error);
                             return;
                         }
-                        router.refresh();
+                        onSaved(result.policy);
                     }}
                 >
                     <label className="text-muted-foreground flex min-w-48 flex-1 flex-col gap-1 text-xs">

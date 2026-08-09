@@ -4,32 +4,23 @@
  * app domain and the sharing domain used for share links and drop points), the root
  * certificate for `polaris.local`, and - under Advanced - the manual exposure and
  * DuckDNS controls. Admin-only.
+ *
+ * The page awaits nothing but the admin check. Everything on it reads through the
+ * network to answer - the address list dials the tunnel daemon and probes each
+ * hostname, the game ports knock on a router, the guided setup checks DNS - and
+ * awaiting those here meant the navigation itself stalled until the slowest of
+ * them came back, with the previous page still on screen. The panel fetches after
+ * the first paint instead.
  */
 
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { DomainsView } from "./domains-view";
-import { GamePortsCard } from "./game-ports-card";
-import { getDomainZones } from "@/lib/domain-zones";
-import { ownerDomainPolicy } from "@/lib/owner-domains";
-import { checkedAddresses } from "@/lib/address-health";
-import { OwnerDomainsCard } from "./owner-domains-card";
-import { appBaseUrl, getDomainConfig } from "@/lib/domain-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function DomainsPage() {
     await requireAdmin();
-    // The zone layout is read here as well as by the setup, so the addresses below can
-    // propose the configured domain on the first paint instead of after the setup has
-    // finished loading and reported it.
-    const [config, effectiveAppUrl, zones, addresses, ownerPolicy] = await Promise.all([
-        getDomainConfig(),
-        appBaseUrl(),
-        getDomainZones(),
-        checkedAddresses(),
-        ownerDomainPolicy()
-    ]);
 
     return (
         // Narrow page: centre the column in the content area, header included.
@@ -38,26 +29,7 @@ export default async function DomainsPage() {
                 title="Domains"
                 description="Choose the domains Polaris uses for the dashboard and for the links it hands out."
             />
-            <DomainsView
-                initialConfig={config}
-                initialZones={zones}
-                initialAddresses={addresses}
-                effectiveAppUrl={effectiveAppUrl}
-            />
-            {/* The zone check above is finished once 80 and 443 arrive, and a game
-                server answers on neither - so what it needs is asked for here
-                rather than folded into advice that disappears when the website
-                works. Renders nothing when no game server exists. */}
-            <div className="mt-4">
-                <GamePortsCard />
-            </div>
-
-            {/* Below the instance's own addresses, because it is a different
-                decision: not what Polaris answers on, but what other people are
-                allowed to point at it. */}
-            <div className="mt-4">
-                <OwnerDomainsCard policy={ownerPolicy} />
-            </div>
+            <DomainsView />
         </div>
     );
 }

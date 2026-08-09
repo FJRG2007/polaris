@@ -25,8 +25,19 @@ import { connectCloudflareAccountAction } from "@/app/(app)/integrations/actions
 import { CLOUDFLARE_DNS_TOKEN_URL } from "@/lib/integrations/cloudflare-token-link";
 import { FORWARD_RULES, gameForwardRules, type RouterForwardRule } from "@/lib/router-guide";
 import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "@/app/(app)/apps/servers/environment-meta";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Checkbox, Input, Select } from "@polaris/ui";
 import { clearSetupDraft, isUntouched, readSetupDraft, savedAnswers, writeSetupDraft } from "./setup-draft";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    Checkbox,
+    Input,
+    Select,
+    Skeleton
+} from "@polaris/ui";
 import {
     approachesFor,
     approachOf,
@@ -188,8 +199,23 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
 
     if (!state) {
         return (
+            // The card's own chrome, because none of it waits on the read: the setup is
+            // recognisable and its place on the page is held while the state - which
+            // re-checks DNS and looks up the public IP - is still on its way.
             <Card>
-                <CardBody className="flex flex-col gap-2 text-sm text-muted-foreground">
+                <CardHeader>
+                    <div className="flex items-center justify-between gap-2">
+                        <CardTitle className="flex items-center gap-2">
+                            <Wand2 className="size-4 text-primary" /> Guided setup
+                        </CardTitle>
+                        <div className="flex items-center gap-1.5">
+                            {STEPS.map((title) => (
+                                <span key={title} className="h-1.5 w-6 rounded-full bg-border" title={title} />
+                            ))}
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardBody className="flex flex-col gap-4">
                     {loadError ? (
                         <>
                             <p className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
@@ -200,9 +226,20 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                             </Button>
                         </>
                     ) : (
-                        <span className="flex items-center gap-2">
-                            <Loader2 className="size-4 animate-spin" /> Reading your setup...
-                        </span>
+                        // The shape of the first question: what it asks, the choices it
+                        // lays out, and what picking one would mean.
+                        <>
+                            <div className="flex flex-col gap-1.5">
+                                <Skeleton className="h-4 w-56" />
+                                <Skeleton className="h-3 w-4/5" />
+                            </div>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                                {ENVIRONMENT_CHOICES.map((option) => (
+                                    <Skeleton key={option} className="h-16" />
+                                ))}
+                            </div>
+                            <Skeleton className="h-10 w-full" />
+                        </>
                     )}
                 </CardBody>
             </Card>

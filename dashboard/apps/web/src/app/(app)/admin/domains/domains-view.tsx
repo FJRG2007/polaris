@@ -11,17 +11,39 @@
  * are the same settings a second time: an exposure mode the setup already stored and a
  * DuckDNS pair it already asked for, each with its own Save. Two panels editing one
  * setting is the fastest way to leave an operator unsure which one won.
+ *
+ * The panel reads its own data once the page is on screen, and every card is drawn
+ * before that read lands: the titles, the certificate card and the Advanced toggle do
+ * not depend on it, and the ones that do hold a skeleton shaped like the fields that
+ * are coming. What this replaced was rendered on the server, so the navigation itself
+ * waited on a tunnel daemon and a probe of every configured hostname before the
+ * browser was handed anything at all - the previous page sat there, and Domains looked
+ * like a link that did nothing.
  */
 
+import { readJson } from "@/lib/read-json";
+import { GamePortsCard } from "./game-ports-card";
 import { DomainSetupWizard } from "./setup-wizard";
 import { AddressList } from "@/components/address-list";
+import { OwnerDomainsCard } from "./owner-domains-card";
 import type { DomainConfig } from "@/lib/domain-service";
-import type { DomainZoneConfig } from "@/lib/domain-zones";
 import type { CheckedAddress } from "@/lib/address-health";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
+import { DOMAINS_OVERVIEW_URL, type DomainsOverview } from "./overview";
 import type { NetworkMode, NetworkStatus } from "@/lib/network-service";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { domainSuggestions, type DomainSuggestions } from "@/lib/domain-suggestions";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    Input,
+    Select,
+    Skeleton
+} from "@polaris/ui";
 import {
     CheckCircle2,
     ChevronDown,
@@ -45,53 +67,130 @@ import {
     syncDuckDnsAction
 } from "./actions";
 
-export function DomainsView({
-    initialConfig,
-    initialZones,
-    initialAddresses,
-    effectiveAppUrl
-}: {
-    initialConfig: DomainConfig;
-    initialZones: DomainZoneConfig;
-    initialAddresses: CheckedAddress[];
-    effectiveAppUrl: string;
-}) {
-    const [config, setConfig] = useState(initialConfig);
-    const [addresses, setAddresses] = useState(initialAddresses);
-    // Followed rather than read once: the setup edits the zone layout on the same page,
-    // so the addresses it feeds would otherwise keep proposing the domain the operator
-    // had configured when they opened the page.
-    const [zones, setZones] = useState(initialZones);
+/** How stale a kept read may be and still be worth painting while the fresh one is
+ *  on its way. Past a few minutes an address that has gone down since misleads
+ *  more than a skeleton would. */
+const MAX_AGE_MS = 5 * 60_000;
+
+/** Where the kept read lives, namespaced like every other snapshot. */
+const CACHE_KEY = "admin.domainsOverview";
+
+/** What the guided setup owns of the panel's data, when it has reported. */
+type SetupState = Pick<DomainsOverview, "config" | "zones">;
+
+export function DomainsView() {
+    const [overview, setOverview] = useState<DomainsOverview | null>(null);
+    // Why there is nothing to draw, when that is the answer. Kept apart from the data
+    // so a failed refresh does not blank what is already on screen, and shown rather
+    // than swallowed: a skeleton that never resolves is a dead page with the reason
+    // taken out.
+    const [unread, setUnread] = useState<string | null>(null);
     const [advanced, setAdvanced] = useState(false);
     // Bumped on every read the wizard makes, not only after a save: creating the records
     // from the setup is what first proves the zone resolves, which promotes the exposure
     // mode - so the panel would otherwise keep reporting "lan" underneath a setup that
     // says the DNS is in place.
     const [setupNonce, setSetupNonce] = useState(0);
+    // What the setup has said about the domains and the zone layout, if anything. It
+    // re-checks the DNS and can move the dashboard onto a zone, so its answer is newer
+    // than the one this read was given - and the two land in whichever order the
+    // network decides, so the read defers to it rather than racing it.
+    const fromSetup = useRef<SetupState | null>(null);
+
+    /** Fold a change into what is on screen and into the kept copy, so a save shows
+     *  at once and a revisit does not paint what it replaced. */
+    const apply = useCallback((patch: Partial<DomainsOverview>) => {
+        setOverview((current) => {
+            if (!current) return current;
+            const next = { ...current, ...patch };
+            writeSnapshot(CACHE_KEY, next);
+            return next;
+        });
+    }, []);
+
+    const load = useCallback(async () => {
+        const result = await readJson<DomainsOverview>(DOMAINS_OVERVIEW_URL);
+        if (!result.ok) {
+            setUnread(result.reason);
+            return;
+        }
+        setUnread(null);
+        const next = fromSetup.current ? { ...result.value, ...fromSetup.current } : result.value;
+        writeSnapshot(CACHE_KEY, next);
+        setOverview(next);
+    }, []);
+
+    useEffect(() => {
+        // The kept copy first, from an effect rather than from the initial state: this
+        // component is rendered on the server too, and seeding it from sessionStorage
+        // during render would have the browser hydrate what the HTML does not contain.
+        const kept = readSnapshot<DomainsOverview>(CACHE_KEY, MAX_AGE_MS);
+        if (kept) setOverview(kept.value);
+        void load();
+    }, [load]);
 
     return (
         <div className="flex w-full flex-col gap-4">
+            {unread && !overview ? (
+                <Card>
+                    <CardBody className="flex flex-col items-start gap-2">
+                        <ErrorNote message={unread} />
+                        <Button size="sm" variant="secondary" onClick={() => void load()}>
+                            <RefreshCw className="size-4" /> Try again
+                        </Button>
+                    </CardBody>
+                </Card>
+            ) : null}
+
             <DomainSetupWizard
                 onState={(next) => {
-                    setConfig(next.domains);
-                    setZones(next.zones);
+                    fromSetup.current = { config: next.domains, zones: next.zones };
+                    apply(fromSetup.current);
                     setSetupNonce((nonce) => nonce + 1);
                 }}
             />
 
-            <AppDomains
-                config={config}
-                suggestions={domainSuggestions(zones)}
-                effectiveAppUrl={effectiveAppUrl}
-                onSaved={setConfig}
-            />
+            {overview ? (
+                <AppDomains
+                    config={overview.config}
+                    suggestions={domainSuggestions(overview.zones)}
+                    effectiveAppUrl={overview.effectiveAppUrl}
+                    onSaved={(config) => apply({ config })}
+                />
+            ) : (
+                <PendingCard
+                    title={
+                        <>
+                            <Globe className="size-4 text-primary" /> Polaris&apos;s own addresses
+                        </>
+                    }
+                >
+                    <FieldSkeleton />
+                    <FieldSkeleton />
+                </PendingCard>
+            )}
 
-            <DashboardDomains
-                config={config}
-                addresses={addresses}
-                onConfig={setConfig}
-                onAddresses={setAddresses}
-            />
+            {overview ? (
+                <DashboardDomains
+                    config={overview.config}
+                    addresses={overview.addresses}
+                    onConfig={(config) => apply({ config })}
+                    onAddresses={(addresses) => apply({ addresses })}
+                />
+            ) : (
+                <PendingCard
+                    title={
+                        <>
+                            <Globe className="size-4 text-primary" /> Where Polaris answers
+                        </>
+                    }
+                >
+                    <AddressesSkeleton />
+                    <div className="border-t border-border pt-4">
+                        <FieldSkeleton />
+                    </div>
+                </PendingCard>
+            )}
 
             <LocalCertificate />
 
@@ -107,10 +206,90 @@ export function DomainsView({
                 {advanced && (
                     <>
                         <NetworkExposure nonce={setupNonce} />
-                        <DuckDns config={config} onConfig={setConfig} />
+                        {overview ? (
+                            <DuckDns config={overview.config} onConfig={(config) => apply({ config })} />
+                        ) : (
+                            <PendingCard title="DuckDNS">
+                                <FieldSkeleton />
+                                <FieldSkeleton />
+                            </PendingCard>
+                        )}
                     </>
                 )}
             </div>
+
+            {/* The zone check above is finished once 80 and 443 arrive, and a game
+                server answers on neither - so what it needs is asked for here
+                rather than folded into advice that disappears when the website
+                works. Renders nothing when no game server exists. */}
+            <GamePortsCard />
+
+            {/* Below the instance's own addresses, because it is a different
+                decision: not what Polaris answers on, but what other people are
+                allowed to point at it. */}
+            {overview ? (
+                <OwnerDomainsCard
+                    policy={overview.ownerPolicy}
+                    onSaved={(ownerPolicy) => apply({ ownerPolicy })}
+                />
+            ) : (
+                <PendingCard title="Domains of their own">
+                    <div className="flex flex-col gap-1.5">
+                        <Skeleton className="h-3.5 w-full" />
+                        <Skeleton className="h-3.5 w-4/5" />
+                    </div>
+                    <div className="flex flex-wrap items-end gap-2">
+                        <Skeleton className="h-9 min-w-48 flex-1" />
+                        <Skeleton className="h-9 w-32" />
+                        <Skeleton className="h-9 w-16" />
+                    </div>
+                </PendingCard>
+            )}
+        </div>
+    );
+}
+
+/**
+ * A card whose chrome is on screen before its contents are.
+ *
+ * The title is the real one rather than a block: it does not depend on the read, and
+ * a page an operator can already navigate by is the entire point of painting before
+ * the data lands. Only what is genuinely waiting pulses, in the shape it will take.
+ */
+function PendingCard({ title, children }: { title: ReactNode; children: ReactNode }) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">{title}</CardTitle>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-4">{children}</CardBody>
+        </Card>
+    );
+}
+
+/** A labelled field's shape: the label, the box, and the line of help under it. */
+function FieldSkeleton() {
+    return (
+        <div className="flex flex-col gap-1">
+            <Skeleton className="h-3.5 w-28" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-3 w-4/5" />
+        </div>
+    );
+}
+
+/** The address list's shape: a URL, what kind of address it is, and its buttons.
+ *  Three rows, which is what a deployment with a domain configured has. */
+function AddressesSkeleton() {
+    return (
+        <div className="flex flex-col gap-1.5">
+            {[0, 1, 2].map((row) => (
+                <div key={row} className="flex items-center gap-2">
+                    <Skeleton className="h-4 w-56 max-w-[60%]" />
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="ml-auto h-6 w-6" />
+                </div>
+            ))}
         </div>
     );
 }
@@ -643,11 +822,24 @@ function NetworkExposure({ nonce }: { nonce: number }) {
 
     if (loading) {
         return (
-            <Card>
-                <CardBody className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="size-4 animate-spin" /> Detecting network...
-                </CardBody>
-            </Card>
+            <PendingCard
+                title={
+                    <>
+                        <Network className="size-4 text-primary" /> Network &amp; exposure
+                    </>
+                }
+            >
+                {/* The six facts it reports, in the grid they land in. */}
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 rounded-md border border-border/60 p-3">
+                    {[0, 1, 2, 3, 4, 5].map((row) => (
+                        <div key={row} className="flex items-center justify-between gap-2">
+                            <Skeleton className="h-3 w-20" />
+                            <Skeleton className="h-3 w-24" />
+                        </div>
+                    ))}
+                </div>
+                <FieldSkeleton />
+            </PendingCard>
         );
     }
 

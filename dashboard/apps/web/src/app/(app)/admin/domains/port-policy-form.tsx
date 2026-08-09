@@ -16,7 +16,6 @@
  */
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { savePortPolicyAction } from "./actions";
 import { Button, Input, Select } from "@polaris/ui";
@@ -32,8 +31,18 @@ const HINTS: Record<PortPolicy, string> = {
     "per-port": "Exact, but every new server needs another rule in the router."
 };
 
-export function PortPolicyForm({ policy, blocks }: { policy: PortPolicy; blocks: PortBlocks }) {
-    const router = useRouter();
+export function PortPolicyForm({
+    policy,
+    blocks,
+    onSaved
+}: {
+    policy: PortPolicy;
+    blocks: PortBlocks;
+    /** Re-read the card this sits in. The ranges decide which ports the advice
+     *  above tells the operator to forward, so a save that left them showing the
+     *  previous block would be sending somebody to their router for the wrong rule. */
+    onSaved: () => void;
+}) {
     const [mode, setMode] = useState<PortPolicy>(policy);
     const [tcp, setTcp] = useState(describeBlock(blocks.tcp));
     const [udp, setUdp] = useState(describeBlock(blocks.udp));
@@ -61,7 +70,7 @@ export function PortPolicyForm({ policy, blocks }: { policy: PortPolicy; blocks:
                     if (result?.error) setError(result.error);
                     return;
                 }
-                router.refresh();
+                onSaved();
             }}
         >
             <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs text-muted-foreground">

@@ -2,12 +2,13 @@
  * The game-ports section of the Domains panel.
  *
  * It is read by someone with their router open in the other window, so the two
- * things it must never do are paint nothing while it waits for its own first poll,
- * and print a rule the form in front of them will refuse. Both are asserted from
- * the markup the server hands over.
+ * things it must never do are paint nothing over a reading it was handed, and
+ * print a rule the form in front of them will refuse. Both are asserted from the
+ * markup it renders.
  *
- * Rendered to static markup: the poll itself belongs to `useLiveResource`, which
- * has no part in what the first paint says.
+ * Rendered to static markup: the reading and the poll behind it belong to the card
+ * this sits in, which is what decides there is a card at all - so every case here
+ * differs only in what this one is handed.
  */
 
 import { describe, expect, it } from "vitest";
@@ -18,6 +19,12 @@ import { gameReachAdvice } from "../../src/lib/apps/minecraft/reach-advice";
 import { GamePortsLive } from "../../src/app/(app)/admin/domains/game-ports-live";
 
 const pending = [{ port: 25565, protocol: "tcp" as const }];
+
+function markupFor(shown: GamePortsReading): string {
+    return renderToStaticMarkup(
+        <GamePortsLive reading={shown} stale={null} refreshing={false} onRefresh={() => {}} />
+    );
+}
 
 const reading: GamePortsReading = {
     servers: [
@@ -34,7 +41,7 @@ const reading: GamePortsReading = {
 
 describe("the game ports section", () => {
     it("paints the servers it was handed rather than waiting for its own read", () => {
-        const markup = renderToStaticMarkup(<GamePortsLive initial={reading} />);
+        const markup = markupFor(reading);
 
         expect(markup).toContain("Survival");
         expect(markup).toContain("Not confirmed");
@@ -42,7 +49,7 @@ describe("the game ports section", () => {
     });
 
     it("says what is still in the way, for the servers that are not proven", () => {
-        const markup = renderToStaticMarkup(<GamePortsLive initial={reading} />);
+        const markup = markupFor(reading);
 
         // Unconfirmed, not "has to be forwarded": from in here a forward that
         // exists and one that does not look the same, and demanding the operator
@@ -58,7 +65,7 @@ describe("the game ports section", () => {
             ...reading,
             advice: gameReachAdvice("home-nat", pending, false, "192.168.1.142", "range", DEFAULT_PORT_BLOCKS, false)
         };
-        const markup = renderToStaticMarkup(<GamePortsLive initial={starting} />);
+        const markup = markupFor(starting);
 
         expect(markup).not.toContain("If it is not open yet");
         expect(markup).toContain("cannot be checked");
@@ -70,7 +77,7 @@ describe("the game ports section", () => {
             servers: reading.servers.map((server) => ({ ...server, confirmed: true })),
             advice: gameReachAdvice("home-nat", pending, true, "192.168.1.142", "range", DEFAULT_PORT_BLOCKS, true)
         };
-        const markup = renderToStaticMarkup(<GamePortsLive initial={done} />);
+        const markup = markupFor(done);
 
         expect(markup).not.toContain("Not confirmed");
         expect(markup).not.toContain("If it is not open yet");

@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * The ports the game servers answer on, and what still has to be opened for them.
  *
@@ -12,19 +14,49 @@
  * has actually arrived on it from a public address, which is the one piece of
  * evidence a router cannot fake.
  *
- * The card itself renders what is already known and nothing more - the knocking is
- * the live half, and it happens under `GamePortsLive` where waiting on a router
- * costs nobody the page.
+ * It reads in two passes for the same reason it exists at all. The first asks what
+ * is already known, which is a database read; every one after it knocks, which
+ * waits out a timeout on each port nobody has opened. Rendering this on the server
+ * meant the whole page waited for the first of those, so both now happen in the
+ * browser and the card appears as soon as there is something in it.
+ *
+ * Nothing is drawn until that first read answers - not even a skeleton. A
+ * deployment that runs no game server has no card here at all, and a placeholder
+ * that resolves into nothing is a page that moves under whoever is reading it.
  */
 
+import { useEffect, useState } from "react";
 import { Card, CardBody } from "@polaris/ui";
 import { GamePortsLive } from "./game-ports-live";
 import { PortPolicyForm } from "./port-policy-form";
 import { describeBlock } from "@/lib/apps/port-block";
-import { readGamePorts } from "@/lib/apps/games-service";
+import { useLiveResource } from "@/components/use-live-resource";
+import type { GamePortsReading } from "@/lib/apps/games-service";
 
-export async function GamePortsCard() {
-    const reading = await readGamePorts().catch(() => null);
+/** How often the card re-reads. The knock behind it is rate limited to one every
+ *  thirty seconds per server, so this is about how soon the answer shows. */
+const POLL_MS = 15_000;
+
+const PORTS_URL = "/api/admin/domains/game-ports";
+
+export function GamePortsCard() {
+    // Off for the first read and on for every one after: knocking on a closed port
+    // waits out a timeout, so the card is on screen before it starts.
+    const [url, setUrl] = useState(PORTS_URL);
+    const live = useLiveResource<GamePortsReading>({
+        url,
+        cacheKey: "admin.gamePorts",
+        intervalMs: POLL_MS,
+        select: (body) => body as GamePortsReading
+    });
+
+    useEffect(() => {
+        // Once the first read has answered either way. A card that never loaded has
+        // nothing to knock for, and would otherwise retry against the slow URL.
+        if (!live.loading) setUrl(`${PORTS_URL}?probe=1`);
+    }, [live.loading]);
+
+    const reading = live.data;
     // Nothing to say on a deployment that runs no game servers, and a card that
     // explains a situation nobody is in is noise on an admin page.
     if (!reading || reading.servers.length === 0) return null;
@@ -55,9 +87,14 @@ export async function GamePortsCard() {
                     </p>
                 </div>
 
-                <PortPolicyForm policy={reading.policy} blocks={reading.blocks} />
+                <PortPolicyForm policy={reading.policy} blocks={reading.blocks} onSaved={live.refresh} />
 
-                <GamePortsLive initial={reading} />
+                <GamePortsLive
+                    reading={reading}
+                    stale={live.stale}
+                    refreshing={live.refreshing}
+                    onRefresh={live.refresh}
+                />
             </CardBody>
         </Card>
     );
