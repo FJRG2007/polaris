@@ -24,6 +24,14 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
+// Access written for one space alone is a fifth way in, resolved in @polaris/auth
+// against tables these cases do not set up. Answering "none" keeps each case about
+// the way in it is actually pinning: membership, a team, or the organization.
+vi.mock("@polaris/auth", () => ({
+    canOn: async () => false,
+    grantedResourceIds: async () => ({ ids: [], everyOne: false })
+}));
+
 const { resolveSpaceRole } = await import("../../src/lib/tasks/access");
 
 /** One space, described by the ways in it offers this reader. Every field is

@@ -1,6 +1,6 @@
 import { prisma } from "@polaris/db";
 import { NextResponse } from "next/server";
-import { requirePermission } from "@/lib/session";
+import { requireGameServer } from "@/lib/apps/install-access";
 import { readContainerFile } from "@/lib/container-files-service";
 
 export const runtime = "nodejs";
@@ -22,15 +22,15 @@ const ICON_PATH = "/data/server-icon.png";
  * what it can see either way.
  */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
-    const user = await requirePermission("games.read");
     const { id } = await params;
+    const { access } = await requireGameServer("games.read", id);
     const install = await prisma.installedApp.findFirst({
-        where: { id, ownerId: user.id, status: { not: "removed" } },
+        where: { id, ownerId: access.ownerId, status: { not: "removed" } },
         select: { applicationId: true }
     });
     if (!install?.applicationId) return NextResponse.json({ error: "No icon" }, { status: 404 });
     try {
-        const stream = await readContainerFile(install.applicationId, user.id, ICON_PATH);
+        const stream = await readContainerFile(install.applicationId, access.ownerId, ICON_PATH);
         const chunks: Buffer[] = [];
         for await (const chunk of stream) chunks.push(Buffer.from(chunk as Buffer));
         const bytes = Buffer.concat(chunks);

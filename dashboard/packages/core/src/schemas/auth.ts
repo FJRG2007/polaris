@@ -5,6 +5,7 @@
  */
 
 import { z } from "zod";
+import { pendingGrantSchema } from "./sharing.js";
 import { accessRulesSchema } from "./account-security.js";
 import { MAX_ROLE_NAME_LENGTH, PERMISSIONS } from "../permissions.js";
 
@@ -113,7 +114,11 @@ export const createInviteSchema = accessRulesSchema.extend({
     email: emailField,
     role: roleNameField.default("member"),
     method: z.enum(INVITE_METHODS).default("link"),
-    oneTimePassword: inviteOneTimePasswordField.optional()
+    oneTimePassword: inviteOneTimePasswordField.optional(),
+    /** Sent by somebody who is not an administrator, under the sharing policy. */
+    delegated: z.boolean().default(false),
+    /** The access it promises on one thing, applied when it is claimed. */
+    pendingGrant: pendingGrantSchema.optional()
 });
 
 /** A role's grants, as the roles editor saves them. The wildcard is not offered:

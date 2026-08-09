@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requirePermission } from "@/lib/session";
+import { requireGameServer } from "@/lib/apps/install-access";
 import { readWorldView } from "@/lib/apps/minecraft/world-service";
 
 export const runtime = "nodejs";
@@ -15,10 +15,10 @@ export const dynamic = "force-dynamic";
  * disagree about what is on disk.
  */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
-    const user = await requirePermission("games.read");
     const { id } = await params;
+    const { access } = await requireGameServer("games.read", id);
     try {
-        return NextResponse.json(await readWorldView(user.id, id));
+        return NextResponse.json(await readWorldView(access.ownerId, id));
     } catch (caught) {
         return NextResponse.json(
             { error: caught instanceof Error ? caught.message : "Could not read the world" },

@@ -11,13 +11,17 @@ import { revalidatePath } from "next/cache";
 import { clientIp } from "@/lib/request-context";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
+import { clearResourceGrants } from "@polaris/auth";
+import { clearQueue } from "@/lib/apps/minecraft/queue-service";
+import { clearSnapshots } from "@/lib/apps/minecraft/inventory-service";
 import { gameHostname } from "@/lib/apps/minecraft/address";
+import { installApp, uninstallApp } from "@/lib/apps/install-service";
 import { flushWorldForStop } from "@/lib/apps/minecraft/world-service";
 import { blueprintVersion, createGameServer } from "@/lib/apps/games-create";
+import { listGameMachines, type GameMachine } from "@/lib/apps/games-service";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
-import { getInstalledApp, installApp, uninstallApp } from "@/lib/apps/install-service";
 import { createGameServerSchema, type CreateGameServerInput } from "@/lib/apps/games-schema";
-import { isGameServerApp, listGameMachines, type GameMachine } from "@/lib/apps/games-service";
+import { installRef, requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
 import { GAME_BLUEPRINTS, recommendedMemoryMb, formatMemory } from "@/lib/apps/minecraft/blueprints";
 
 /** The manager itself, as the marketplace knows it. */
@@ -91,32 +95,18 @@ export async function createGameServerAction(
     }
 }
 
-/**
- * One of this owner's game servers, refusing anything that is not one.
- *
- * The games grants are about game servers, so they may not be spent on an
- * arbitrary install: without this check a `games.manage` holder could stop or
- * delete the messaging bridge by passing its id to a game action.
- */
-async function ownedGameServer(ownerId: string, installedAppId: string) {
-    const install = await getInstalledApp(ownerId, installedAppId);
-    if (!install || !isGameServerApp(install.catalogId)) throw new Error("Server not found");
-    return install;
-}
-
 /** Start or stop a server from the list, without opening it. */
 export async function setGameServerRunningAction(
     installedAppId: string,
     running: boolean
 ): Promise<{ error?: string }> {
-    const user = await requirePermission("games.manage");
     try {
-        const install = await ownedGameServer(user.id, installedAppId);
-        if (!install.applicationId) throw new Error("This server has not been deployed yet");
+        const { user, access } = await requireGameServer("games.manage", installedAppId);
+        if (!access.install.applicationId) throw new Error("This server has not been deployed yet");
         // Written out before it goes down. A stop that does not finish gracefully
         // is killed, and what a kill costs is the last few minutes everyone played.
-        if (!running) await flushWorldForStop(user.id, installedAppId);
-        await setApplicationRunning(install.applicationId, user.id, running);
+        if (!running) await flushWorldForStop(access.ownerId, installedAppId);
+        await setApplicationRunning(access.install.applicationId, access.ownerId, running);
         await recordAudit({
             actorId: user.id,
             action: running ? "games.start" : "games.stop",
@@ -132,11 +122,10 @@ export async function setGameServerRunningAction(
 
 /** Deploy the server again, for a container that is wedged or out of date. */
 export async function redeployGameServerAction(installedAppId: string): Promise<{ error?: string }> {
-    const user = await requirePermission("games.manage");
     try {
-        const install = await ownedGameServer(user.id, installedAppId);
-        if (!install.applicationId) throw new Error("This server has not been deployed yet");
-        await deployApplication(install.applicationId, user.id, user.id);
+        const { user, access } = await requireGameServer("games.manage", installedAppId);
+        if (!access.install.applicationId) throw new Error("This server has not been deployed yet");
+        await deployApplication(access.install.applicationId, access.ownerId, user.id);
         revalidatePath("/apps/games");
         return {};
     } catch (caught) {
@@ -152,10 +141,17 @@ export async function redeployGameServerAction(installedAppId: string): Promise<
  * a failed create leaves a row whose page has nothing to render.
  */
 export async function deleteGameServerAction(installedAppId: string): Promise<{ error?: string }> {
-    const user = await requirePermission("games.manage");
     try {
-        await ownedGameServer(user.id, installedAppId);
-        await uninstallApp(user.id, installedAppId);
+        const { user, access } = await requireGameServerOwner(installedAppId);
+        await uninstallApp(access.ownerId, installedAppId);
+        // The server is gone, so the access people were given to it is too. An
+        // orphan grant reaches nothing, but leaving it would show up on their page
+        // as access to a thing that no longer exists.
+        await clearResourceGrants(installRef(installedAppId));
+        // And so is everything that only described this server: the bags it was
+        // keeping copies of, and the decisions still waiting for players who will
+        // never join it again.
+        await Promise.all([clearSnapshots(installedAppId), clearQueue(installedAppId)]);
         await recordAudit({
             actorId: user.id,
             action: "games.delete",

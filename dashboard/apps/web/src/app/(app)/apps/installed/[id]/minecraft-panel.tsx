@@ -19,19 +19,21 @@
  */
 
 import Link from "next/link";
+import type { Permission } from "@polaris/core";
 import { MinecraftMods } from "./minecraft-mods";
 import type { GameContext } from "./game-context";
 import { MinecraftWorld } from "./minecraft-world";
+import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
 import { CopyButton } from "@/components/copy-button";
 import { saveWorldAction } from "./minecraft-actions";
 import { MinecraftConsole } from "./minecraft-console";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
-import { GAME_TABS, gameTabHref, isGameTab } from "./tabs";
 import { MinecraftAppearance } from "./minecraft-appearance";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PlayerTimeout } from "@/lib/apps/minecraft/timeout";
+import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import { FirewallSection, MinecraftPlayers } from "./minecraft-players";
@@ -40,6 +42,7 @@ import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import { FolderOpen, Loader2, Save, ShieldAlert, UserPlus } from "lucide-react";
+import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
 import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
 
@@ -74,6 +77,8 @@ interface ServerReading {
     now: number;
     /** Bans with an end, and when each one lifts. */
     timeouts: readonly PlayerTimeout[];
+    /** Decisions the server could not be told yet. */
+    pending: readonly QueuedAction[];
 }
 
 export function MinecraftPanel({
@@ -83,6 +88,7 @@ export function MinecraftPanel({
     settings,
     running,
     game,
+    held,
     onStatus
 }: {
     installedAppId: string;
@@ -95,6 +101,9 @@ export function MinecraftPanel({
     /** The server's address, and what still has to be opened for players outside
      *  this network. */
     game: GameContext | null;
+    /** What the viewer holds on this server. Decides which screens are offered;
+     *  the route refuses the rest by URL, and each action asks again. */
+    held: readonly Permission[];
     /** Told what the server is actually doing, so the page has one answer rather
      *  than a header that reports what Polaris intends and a card beneath it
      *  reporting what the container is up to. */
@@ -107,8 +116,12 @@ export function MinecraftPanel({
     const tab = useMemo(() => {
         const base = `/apps/installed/${installedAppId}`;
         const slug = pathname.startsWith(base) ? pathname.slice(base.length).replace(/^\//, "") : "";
-        return isGameTab(slug) ? slug : "";
-    }, [pathname, installedAppId]);
+        // A screen this viewer does not hold falls back to the overview rather than
+        // rendering empty. The route already refuses it; this is what keeps a
+        // history entry from an earlier, wider grant from landing on nothing.
+        return isGameTab(slug) && canOpenGameTab(slug, held) ? slug : "";
+    }, [pathname, installedAppId, held]);
+    const tabs = useMemo(() => visibleGameTabs(held), [held]);
     const openTab = useCallback(
         (slug: string) => {
             if (slug === tab) return;
@@ -124,7 +137,8 @@ export function MinecraftPanel({
         access: null,
         sessions: [],
         now: Date.now(),
-        timeouts: []
+        timeouts: [],
+        pending: []
     });
     const [error, setError] = useState<string | null>(null);
 
@@ -146,6 +160,7 @@ export function MinecraftPanel({
                 access?: PlayerAccessView;
                 sessions?: PlayerSessionEvent[];
                 timeouts?: PlayerTimeout[];
+                pending?: QueuedAction[];
                 now?: string;
                 error?: string;
             };
@@ -176,6 +191,11 @@ export function MinecraftPanel({
                     ? data.timeouts
                     : wantsRoster
                       ? current.timeouts
+                      : [],
+                pending: Array.isArray(data.pending)
+                    ? data.pending
+                    : wantsRoster
+                      ? current.pending
                       : [],
                 now: data.now ? Date.parse(data.now) : current.now
             }));
@@ -215,13 +235,14 @@ export function MinecraftPanel({
                 applicationId={applicationId}
                 reach={reading.reach ?? game?.reach ?? null}
                 access={reading.access}
+                canSaveWorld={held.includes("games.moderate")}
                 onOpenPlayers={() => openTab("players")}
             />
 
             {error && <p className="text-sm text-danger">{error}</p>}
 
             <nav className="no-scrollbar flex items-center gap-1 overflow-x-auto border-b border-border/60 text-sm">
-                {GAME_TABS.map((entry) => (
+                {tabs.map((entry) => (
                     // A real href, so a screen can be middle-clicked, opened in a
                     // new tab and copied; the plain click is taken over to keep the
                     // panel's poll alive across the switch.
@@ -259,10 +280,12 @@ export function MinecraftPanel({
                     sessions={reading.sessions}
                     now={reading.now}
                     timeouts={reading.timeouts}
+                    pending={reading.pending}
                     onChanged={() => void load()}
                 />
             )}
             {tab === "world" && <MinecraftWorld installedAppId={installedAppId} name={name} />}
+            {tab === "access" && <MinecraftAccess installedAppId={installedAppId} />}
             {tab === "usage" &&
                 (applicationId ? (
                     // The same history Deploy draws for any service, because a game
@@ -357,6 +380,7 @@ function ConnectCard({
     applicationId,
     reach,
     access,
+    canSaveWorld,
     onOpenPlayers
 }: {
     status: MinecraftStatus | null;
@@ -367,6 +391,9 @@ function ConnectCard({
     reach: GameReachAdvice | null;
     /** Who may connect. Null until the first poll answers. */
     access: PlayerAccessView | null;
+    /** Flushing the world writes to it, so it is the moderator grant rather than
+     *  something every reader is offered. */
+    canSaveWorld: boolean;
     onOpenPlayers: () => void;
 }) {
     const [saving, setSaving] = useState(false);
@@ -415,16 +442,18 @@ function ConnectCard({
                             </Button>
                         </Link>
                     )}
-                    <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => void saveWorld()}
-                        disabled={saving || !(status?.answering ?? false)}
-                        title="Write the world to disk now"
-                    >
-                        {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                        Save world
-                    </Button>
+                    {canSaveWorld && (
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => void saveWorld()}
+                            disabled={saving || !(status?.answering ?? false)}
+                            title="Write the world to disk now"
+                        >
+                            {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                            Save world
+                        </Button>
+                    )}
                 </div>
                 {saved && <p className="w-full text-xs text-muted-foreground">{saved}</p>}
 

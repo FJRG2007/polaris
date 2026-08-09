@@ -161,18 +161,54 @@ export async function principalsOfUser(
  * Drive-resource decisions (the caller supplies the action and resource).
  */
 export async function resolvePrincipalPolicyStatements(userId: string): Promise<PolicyStatement[]> {
+    return (await resolvePrincipalPolicyStatementsBySource(userId)).flatMap((entry) => entry.statements);
+}
+
+/** One policy's statements, and which principal brought them. */
+export interface SourcedPolicyStatements {
+    readonly policyId: string;
+    readonly policyName: string;
+    readonly principalType: PrincipalType;
+    readonly principalId: string;
+    readonly statements: PolicyStatement[];
+}
+
+/**
+ * The same resolution, keeping track of where each statement came from.
+ *
+ * `resolvePrincipalPolicyStatements` flattens this, and flattening loses the one
+ * thing a person looking at somebody's access actually wants: not "they may do
+ * this" but "they may do this because of that". Split rather than written twice,
+ * so the explanation can never disagree with the decision.
+ */
+export async function resolvePrincipalPolicyStatementsBySource(
+    userId: string
+): Promise<SourcedPolicyStatements[]> {
     const principals = await principalsOfUser(userId);
 
     const attachments = await prisma.policyAttachment.findMany({
         where: { OR: principals },
-        select: { policyId: true }
+        select: { policyId: true, principalType: true, principalId: true }
     });
     const policyIds = [...new Set(attachments.map((row) => row.policyId))];
     if (policyIds.length === 0) return [];
 
     const policies = await prisma.policy.findMany({
         where: { id: { in: policyIds } },
-        select: { document: true }
+        select: { id: true, name: true, document: true }
     });
-    return policies.flatMap((policy) => parseDocument(policy.document));
+    const byId = new Map(policies.map((policy) => [policy.id, policy]));
+    return attachments.flatMap((attachment) => {
+        const policy = byId.get(attachment.policyId);
+        if (!policy) return [];
+        return [
+            {
+                policyId: policy.id,
+                policyName: policy.name,
+                principalType: attachment.principalType as PrincipalType,
+                principalId: attachment.principalId,
+                statements: parseDocument(policy.document)
+            }
+        ];
+    });
 }

@@ -34,6 +34,14 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
+// Access written for one space alone is a fifth way in, resolved in @polaris/auth
+// against tables these cases do not set up. Answering "none" keeps each case about
+// the way in it is actually pinning: membership, a team, or the organization.
+vi.mock("@polaris/auth", () => ({
+    canOn: async () => false,
+    grantedResourceIds: async () => ({ ids: [], everyOne: false })
+}));
+
 const { writableTasks } = await import("../../src/lib/tasks/access");
 
 /** One task per list, so a case is written by naming the lists it spans. */

@@ -19,13 +19,23 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@polaris/db";
+import * as core from "@polaris/core";
 import { sendAuthEmail } from "@/lib/auth-mail";
+import { recordAudit } from "@/lib/audit-service";
 import { appBaseUrl } from "@/lib/domain-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { evaluateNetworkRules } from "@/lib/network-rules";
 import { generateShortCode, generateToken, hashToken } from "@polaris/core/tokens";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
-import { assignRole, emailOwner, provisionUser, seedDefaultRoles, updateEnforcedRules } from "@polaris/auth";
+import {
+    assignRole,
+    canOn,
+    emailOwner,
+    provisionUser,
+    seedDefaultRoles,
+    setResourceGrant,
+    updateEnforcedRules
+} from "@polaris/auth";
 import {
     INVITE_CODE_LENGTH,
     normalizeInviteCode,
@@ -70,6 +80,7 @@ interface InviteRow {
     allowedCountries: string;
     allowedContinents: string;
     accessGroupIds: string;
+    pendingGrant: string | null;
 }
 
 const INVITE_FIELDS = {
@@ -84,7 +95,8 @@ const INVITE_FIELDS = {
     allowedCidrs: true,
     allowedCountries: true,
     allowedContinents: true,
-    accessGroupIds: true
+    accessGroupIds: true,
+    pendingGrant: true
 } as const;
 
 /** The URL a link or magic invite is claimed at. Built on the address Polaris is
@@ -181,7 +193,11 @@ export async function createInvite(
             allowedCidrs: stringifyList(input.allowedCidrs),
             allowedCountries: stringifyList(input.allowedCountries),
             allowedContinents: stringifyList(input.allowedContinents),
-            accessGroupIds: stringifyList(groups.map((group) => group.id))
+            accessGroupIds: stringifyList(groups.map((group) => group.id)),
+            delegated: input.delegated === true,
+            // What it promises on one thing. Only an intention until the claim,
+            // which resolves it again against what the inviter still holds.
+            pendingGrant: input.pendingGrant ? JSON.stringify(input.pendingGrant) : null
         },
         select: { id: true }
     });
@@ -275,6 +291,62 @@ function enforcedFromInvite(invite: InviteRow): AccessRulesInput {
     };
 }
 
+/**
+ * Give the new account the access its invite promised, narrowed to what the
+ * person who sent it still holds.
+ *
+ * An invite is written now and claimed later, and in between the sender can have
+ * lost the very reach they were passing on - their own grant revoked, or expired.
+ * Re-resolving here is what stops an invite becoming a way to hand out access
+ * somebody no longer has. Nothing left after the narrowing means no grant at all,
+ * and the account simply arrives with whatever its role gives it.
+ *
+ * Never fatal. Somebody standing on the join page has typed a password and is
+ * waiting; an access rule that could not be written is worth an audit entry and a
+ * conversation, not a refusal to create the account they were invited to.
+ */
+async function applyPendingGrant(invite: InviteRow, userId: string): Promise<void> {
+    const promised = core.parsePendingGrant(invite.pendingGrant);
+    if (!promised) return;
+    const ref = core.resourceRef(promised.resourceKind, promised.resourceId);
+    try {
+        const inviter = await prisma.user.findUnique({
+            where: { id: promised.grantedById },
+            select: { id: true, isAdmin: true }
+        });
+        if (!inviter) return;
+        const still = inviter.isAdmin
+            ? [...promised.actions]
+            : (
+                  await Promise.all(
+                      promised.actions.map(async (action) =>
+                          (await canOn(inviter.id, action, ref)) ? action : null
+                      )
+                  )
+              ).filter((action): action is core.Permission => action !== null);
+        if (still.length === 0) return;
+        await setResourceGrant({
+            principalType: "user",
+            principalId: userId,
+            ref,
+            actions: still,
+            effect: "allow",
+            canShare: promised.canShare,
+            expiresAt: promised.expiresAt ? new Date(promised.expiresAt) : null,
+            grantedById: promised.grantedById
+        });
+        await recordAudit({
+            actorId: promised.grantedById,
+            action: "app.access.grant",
+            targetType: ref.kind === "install" ? "installedApp" : ref.kind,
+            targetId: ref.id,
+            metadata: { to: userId, actions: still, via: "invite" }
+        });
+    } catch {
+        // The account is made and its role assigned either way.
+    }
+}
+
 export interface ClaimInput {
     token?: string;
     code?: string;
@@ -334,6 +406,8 @@ export async function claimInvite(input: ClaimInput): Promise<{ email?: string; 
         rules.allowedCountries.length > 0 ||
         rules.allowedContinents.length > 0;
     if (restricted) await updateEnforcedRules(user.id, invite.invitedById, rules);
+
+    await applyPendingGrant(invite, user.id);
 
     await prisma.$transaction([
         prisma.invite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } }),

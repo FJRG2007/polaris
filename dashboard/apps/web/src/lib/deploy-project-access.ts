@@ -14,7 +14,8 @@
  */
 
 import { prisma } from "@polaris/db";
-import { roleAtLeast, type ProjectRole } from "@polaris/core";
+import { canOn, grantedResourceIds } from "@polaris/auth";
+import { resourceRef, roleAtLeast, type ProjectRole } from "@polaris/core";
 import { memberOrgIds, orgCan, orgIdsWhere, resolveOrgAccess } from "@/lib/orgs/org-service";
 
 /** The owner outranks every role, and is never a membership row. */
@@ -62,6 +63,18 @@ export async function projectAccess(projectId: string, userId: string): Promise<
             role: membership.role as ProjectRole,
             isOwner: false
         };
+    }
+
+    // Access written for this project alone, which is what lets somebody reach one
+    // without being on the roster of anything. Mapped onto the same ladder every
+    // other way in uses, and deliberately never "admin": settings and deletion stay
+    // with the people the project belongs to.
+    const ref = resourceRef("project", project.id);
+    if (await canOn(userId, "deploy.manage", ref, { ownerId: project.ownerId })) {
+        return { projectId: project.id, ownerId: project.ownerId, role: "developer", isOwner: false };
+    }
+    if (await canOn(userId, "deploy.read", ref, { ownerId: project.ownerId })) {
+        return { projectId: project.id, ownerId: project.ownerId, role: "viewer", isOwner: false };
     }
 
     // A project on an organization's shelf answers to that organization first.
@@ -138,15 +151,18 @@ export async function requireApplicationAccess(
 /** Ids of every project the user may at least read. Used to widen the Deploy
  *  landing beyond what they own without loading each project to check. */
 export async function visibleProjectIds(userId: string): Promise<string[]> {
-    const [belongsTo, runs] = await Promise.all([
+    const [belongsTo, runs, granted] = await Promise.all([
         memberOrgIds(userId),
-        orgIdsWhere({ id: userId, isAdmin: false }, "deploy.manage")
+        orgIdsWhere({ id: userId, isAdmin: false }, "deploy.manage"),
+        grantedResourceIds(userId, "project", "deploy.read")
     ]);
     const rows = await prisma.project.findMany({
         where: {
             OR: [
                 { ownerId: userId },
                 { members: { some: { userId } } },
+                // Written for one project, rather than through a roster.
+                ...(granted.ids.length > 0 ? [{ id: { in: granted.ids } }] : []),
                 // Internal on a personal project is the whole instance; on an
                 // organization's it is that roster and no further.
                 { visibility: "internal", orgId: null },

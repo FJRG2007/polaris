@@ -3,7 +3,9 @@ import { UsersAdmin } from "./users-admin";
 import { requireAdmin } from "@/lib/session";
 import { listInvites } from "@/lib/invite-service";
 import { getAuthMailStatus } from "@/lib/auth-mail";
+import { sharingPolicy } from "@/lib/sharing-policy";
 import { listRoleOptions } from "@/lib/role-service";
+import { SharingPolicyForm } from "./sharing-policy-form";
 import { listRecoveryRequests } from "@/lib/account-recovery-service";
 import { listImposableGroups, listUserDirectory } from "@/lib/user-admin-service";
 
@@ -19,7 +21,7 @@ export default async function UsersAdminPage({
 }) {
     const { user } = await searchParams;
     const admin = await requireAdmin();
-    const [users, invites, recoveries, groups, mail, roles] = await Promise.all([
+    const [users, invites, recoveries, groups, mail, roles, sharing] = await Promise.all([
         listUserDirectory(),
         listInvites(),
         listRecoveryRequests(),
@@ -27,7 +29,8 @@ export default async function UsersAdminPage({
         getAuthMailStatus(),
         // Roles are rows an operator adds to under Management > Roles, so the
         // pickers offer whatever this instance actually defines.
-        listRoleOptions()
+        listRoleOptions(),
+        sharingPolicy()
     ]);
 
     return (
@@ -45,6 +48,10 @@ export default async function UsersAdminPage({
                 canSendMail={mail.ready}
                 viewerId={admin.id}
                 openUserId={user ?? null}
+            />
+            <SharingPolicyForm
+                policy={sharing}
+                roles={roles.map((role) => ({ value: role.name, label: role.name }))}
             />
         </>
     );

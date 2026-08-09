@@ -15,8 +15,8 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { homePathFor } from "@/lib/app-access";
-import { userHasPermission } from "@polaris/auth";
 import { guardSession } from "@/lib/session-guard";
+import { canAny, userHasPermission } from "@polaris/auth";
 import { hasPermission, type Permission } from "@polaris/core";
 import { resolveViewAs, type ViewAsIdentity } from "@/lib/view-as-service";
 
@@ -110,9 +110,28 @@ export async function sessionCan(user: SessionUser, permission: Permission): Pro
     return userHasPermission(user.id, permission);
 }
 
-/** This user's own capability check, in the shape the app registry asks for. */
+/**
+ * Whether this user holds a capability globally, or on at least one thing.
+ *
+ * The question navigation asks, and only navigation. Somebody given one game
+ * server holds no global `games.read`, so on the strict answer the rail hides Game
+ * servers and "home" sends them to their account - they would reach the one screen
+ * they were given access to only by being sent the link, every time.
+ *
+ * Never a substitute for sessionCan: creating a server, or anything else that is
+ * not about a particular thing, stays on the global question.
+ */
+export async function sessionCanAny(user: SessionUser, permission: Permission): Promise<boolean> {
+    if (user.viewingAs?.mode === "role") return hasPermission(user.viewingAs.grants ?? [], permission);
+    if (user.isAdmin) return true;
+    return canAny(user.id, permission);
+}
+
+/** This user's own capability check, in the shape the app registry asks for. Built
+ *  on the "anywhere at all" answer, because that is what deciding whether to draw
+ *  a link means. */
 export function accessFor(user: SessionUser): { isAdmin: boolean; can: (permission: Permission) => Promise<boolean> } {
-    return { isAdmin: user.isAdmin, can: (permission) => sessionCan(user, permission) };
+    return { isAdmin: user.isAdmin, can: (permission) => sessionCanAny(user, permission) };
 }
 
 /** Where this user belongs: the first app they can open, or their own account. */
@@ -129,6 +148,20 @@ export async function homePathForUser(user: SessionUser): Promise<string> {
 export async function requirePermission(permission: Permission): Promise<SessionUser> {
     const user = await requireUser();
     if (await sessionCan(user, permission)) return user;
+    redirect(`${await homePathForUser(user)}?denied=1`);
+}
+
+/**
+ * Require a permission held globally or on at least one thing.
+ *
+ * For the landing page of an app whose contents are then narrowed thing by thing -
+ * the game server list, which shows what you own and what you were given, and
+ * refuses each of them separately. Anything that acts on one thing uses
+ * requireResource; anything instance-wide stays on requirePermission.
+ */
+export async function requirePermissionAny(permission: Permission): Promise<SessionUser> {
+    const user = await requireUser();
+    if (await sessionCanAny(user, permission)) return user;
     redirect(`${await homePathForUser(user)}?denied=1`);
 }
 

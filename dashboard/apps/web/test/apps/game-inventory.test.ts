@@ -17,8 +17,8 @@ describe("parseInventory", () => {
             '{Slot: 1b, id: "minecraft:cobblestone", Count: 64b}]'
         ].join(" ");
         expect(parseInventory(reply)).toEqual([
-            { slot: 0, id: "minecraft:diamond_pickaxe", count: 1 },
-            { slot: 1, id: "minecraft:cobblestone", count: 64 }
+            { slot: 0, id: "minecraft:diamond_pickaxe", count: 1, data: null },
+            { slot: 1, id: "minecraft:cobblestone", count: 64, data: null }
         ]);
     });
 
@@ -30,12 +30,18 @@ describe("parseInventory", () => {
             'components: {"minecraft:stored_enchantments": {levels: {"minecraft:sharpness": 5},',
             'id: "minecraft:sharpness"}}}]'
         ].join(" ");
-        expect(parseInventory(reply)).toEqual([{ slot: 0, id: "minecraft:enchanted_book", count: 1 }]);
+        const [book] = parseInventory(reply);
+        expect(book?.id).toBe("minecraft:enchanted_book");
+        expect(book?.count).toBe(1);
+        // The components are kept whole rather than read: they are handed back to
+        // the server unchanged, and understanding them is how they get destroyed.
+        expect(book?.data?.era).toBe("components");
+        expect(book?.data?.snbt).toContain("minecraft:stored_enchantments");
     });
 
     it("reads the componentised shape, where a single item names no count", () => {
         const reply = 'Bob has the following entity data: [{slot: 3, id: "minecraft:shield"}]';
-        expect(parseInventory(reply)).toEqual([{ slot: 3, id: "minecraft:shield", count: 1 }]);
+        expect(parseInventory(reply)).toEqual([{ slot: 3, id: "minecraft:shield", count: 1, data: null }]);
     });
 
     it("puts the stacks in slot order however the server listed them", () => {
@@ -64,12 +70,32 @@ describe("parseInventory", () => {
             "2026/08/08 21:45:30 [WARN] connection reset, retrying",
             'Alice has the following entity data: [{Slot: 0b, id: "minecraft:stone", Count: 64b}]'
         ].join("\n");
-        expect(parseInventory(reply)).toEqual([{ slot: 0, id: "minecraft:stone", count: 64 }]);
+        expect(parseInventory(reply)).toEqual([{ slot: 0, id: "minecraft:stone", count: 64, data: null }]);
+    });
+
+    it("keeps the older shape's tag compound, and says which era wrote it", () => {
+        // A server before the componentised items still answers, and its data has
+        // to be written back with braces rather than brackets.
+        const reply = [
+            'Bob has the following entity data: [{Slot: 0b, id: "minecraft:diamond_sword", Count: 1b,',
+            "tag: {Enchantments: [{id: \"minecraft:sharpness\", lvl: 5s}]}}]"
+        ].join(" ");
+        const [sword] = parseInventory(reply);
+        expect(sword?.data?.era).toBe("tag");
+        expect(sword?.data?.snbt.startsWith("{")).toBe(true);
+        expect(sword?.data?.snbt).toContain("Enchantments");
+    });
+
+    it("keeps nothing from a field that arrived truncated", () => {
+        // Half a compound is not a shorter compound, and handing it back would
+        // write a command the server refuses - or worse, one it accepts.
+        const reply = 'Bob has the following entity data: [{Slot: 0b, id: "minecraft:stone", Count: 1b, components: {broken]';
+        expect(parseInventory(reply)).toEqual([]);
     });
 
     it("skips a bracket that holds no stack and keeps looking", () => {
         const reply = 'Alice has the following entity data: [] [{Slot: 2b, id: "minecraft:torch", Count: 3b}]';
-        expect(parseInventory(reply)).toEqual([{ slot: 2, id: "minecraft:torch", count: 3 }]);
+        expect(parseInventory(reply)).toEqual([{ slot: 2, id: "minecraft:torch", count: 3, data: null }]);
     });
 });
 
@@ -102,23 +128,25 @@ describe("the drawn layout", () => {
 describe("extraSlots", () => {
     it("is empty when every stack has a slot the grid draws", () => {
         const items = [
-            { slot: 0, id: "minecraft:stone", count: 1 },
-            { slot: 35, id: "minecraft:apple", count: 3 },
-            { slot: -106, id: "minecraft:shield", count: 1 },
-            { slot: 103, id: "minecraft:diamond_helmet", count: 1 }
+            { slot: 0, id: "minecraft:stone", count: 1, data: null },
+            { slot: 35, id: "minecraft:apple", count: 3, data: null },
+            { slot: -106, id: "minecraft:shield", count: 1, data: null },
+            { slot: 103, id: "minecraft:diamond_helmet", count: 1, data: null }
         ];
         expect(extraSlots(items)).toEqual([]);
     });
 
     it("keeps what a modded slot holds, rather than reporting a full bag as empty", () => {
-        const backpack = { slot: 200, id: "curios:ring", count: 1 };
-        expect(extraSlots([{ slot: 0, id: "minecraft:stone", count: 1 }, backpack])).toEqual([backpack]);
+        const backpack = { slot: 200, id: "curios:ring", count: 1, data: null };
+        expect(extraSlots([{ slot: 0, id: "minecraft:stone", count: 1, data: null }, backpack])).toEqual([
+            backpack
+        ]);
     });
 });
 
 describe("bySlot", () => {
     it("indexes the stacks the way a grid asks for them", () => {
-        const apple = { slot: 4, id: "minecraft:apple", count: 2 };
+        const apple = { slot: 4, id: "minecraft:apple", count: 2, data: null };
         const index = bySlot([apple]);
         expect(index.get(4)).toEqual(apple);
         expect(index.get(5)).toBeUndefined();

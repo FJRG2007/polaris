@@ -27,6 +27,7 @@ import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import { foldPlayers, type PlayerEntry } from "@/lib/apps/minecraft/players";
 import { timeoutFor, type PlayerTimeout } from "@/lib/apps/minecraft/timeout";
+import { describeQueued, waitingOn, type QueuedAction } from "@/lib/apps/minecraft/queue";
 import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
 import {
     GiveItemDialog,
@@ -56,6 +57,7 @@ import {
 import {
     Backpack,
     Ban,
+    Clock,
     Crown,
     DoorOpen,
     History,
@@ -71,7 +73,8 @@ import {
     Timer,
     UserMinus,
     UserPlus,
-    Users
+    Users,
+    X
 } from "lucide-react";
 
 /** The cuts an operator reaches for; anything finer is what search is for. */
@@ -93,6 +96,7 @@ export function MinecraftPlayers({
     sessions,
     now,
     timeouts,
+    pending: waiting,
     onChanged
 }: {
     installedAppId: string;
@@ -106,6 +110,8 @@ export function MinecraftPlayers({
     now: number;
     /** Bans with an end, and when each one lifts. */
     timeouts: readonly PlayerTimeout[];
+    /** Decisions the server could not be told yet, oldest first. */
+    pending: readonly QueuedAction[];
     onChanged: () => void;
 }) {
     const [pending, startTransition] = useTransition();
@@ -171,11 +177,11 @@ export function MinecraftPlayers({
         const needle = query.trim().toLowerCase();
         return players.filter((player) => {
             if (filter === "online" && !player.online) return false;
-            if (filter === "allowed" && player.address === null) return false;
+            if (filter === "allowed" && player.addresses.length === 0) return false;
             if (filter === "operators" && !player.operator) return false;
             if (filter === "banned" && !player.banned) return false;
             if (!needle) return true;
-            return [player.name, player.address, player.note]
+            return [player.name, ...player.addresses, player.note]
                 .filter((value): value is string => Boolean(value))
                 .some((value) => value.toLowerCase().includes(needle));
         });
@@ -299,6 +305,57 @@ export function MinecraftPlayers({
                 </CardBody>
             </Card>
 
+            {waiting.length > 0 && (
+                <Card>
+                    <CardBody className="flex flex-col gap-2">
+                        <div>
+                            <p className="text-sm font-medium">Waiting to happen</p>
+                            <p className="text-xs text-muted-foreground">
+                                Decided while the server or the player was away. Each one runs by itself as soon as it
+                                can, and lapses if it never can.
+                            </p>
+                        </div>
+                        <ul className="flex flex-col divide-y divide-border/60">
+                            {waiting.map((entry) => (
+                                <li key={entry.id} className="flex items-center justify-between gap-3 py-2">
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm">
+                                            {entry.username}: {describeQueued(entry)}
+                                        </p>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            {entry.lastError ?? waitingOn(entry)} - lapses{" "}
+                                            {new Date(entry.expiresAt).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        disabled={pending}
+                                        aria-label={`Cancel ${describeQueued(entry)} for ${entry.username}`}
+                                        title={`Cancel ${describeQueued(entry)} for ${entry.username}`}
+                                        onClick={() =>
+                                            startTransition(async () => {
+                                                const result = await actions.cancelQueuedActionAction(
+                                                    installedAppId,
+                                                    entry.id
+                                                );
+                                                if (result.error) {
+                                                    setError(result.error);
+                                                    return;
+                                                }
+                                                onChanged();
+                                            })
+                                        }
+                                    >
+                                        <X className="size-4" />
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
+                    </CardBody>
+                </Card>
+            )}
+
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="relative flex-1">
                     <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -365,6 +422,11 @@ export function MinecraftPlayers({
                                     onModerate={moderate}
                                     onModerateWithConfirm={moderateWithConfirm}
                                     timeout={timeoutFor(timeouts, player.name)}
+                                    waiting={
+                                        waiting.filter(
+                                            (entry) => entry.username.toLowerCase() === player.name.toLowerCase()
+                                        ).length
+                                    }
                                     onOpen={(dialog) => setActing({ player, dialog })}
                                     onRevoke={() =>
                                         run(() => actions.revokePlayerAccessAction(installedAppId, player.name))
@@ -432,6 +494,9 @@ export function MinecraftPlayers({
                 <InventoryDialog
                     installedAppId={installedAppId}
                     player={acting.player.name}
+                    // Bedrock answers no `data get` at all, so there is nothing to
+                    // read live and nothing to write back.
+                    canEdit={!bedrock}
                     onClose={() => setActing(null)}
                 />
             )}
@@ -446,7 +511,12 @@ export function MinecraftPlayers({
                 <HistoryDialog
                     player={acting.player.name}
                     sessions={acting.player.sessions}
+                    registered={acting.player.addresses}
                     onClose={() => setActing(null)}
+                    onRegister={(address) => {
+                        const name = acting.player.name;
+                        void addPlayer({ username: name, address });
+                    }}
                 />
             )}
 
@@ -461,6 +531,7 @@ function PlayerRow({
     answering,
     pending,
     timeout,
+    waiting,
     onModerate,
     onModerateWithConfirm,
     onOpen,
@@ -472,6 +543,8 @@ function PlayerRow({
     pending: boolean;
     /** The timeout they are serving, when they are serving one. */
     timeout: PlayerTimeout | null;
+    /** How many decisions are still waiting to reach this player. */
+    waiting: number;
     onModerate: (input: Omit<MinecraftModeration, "installedAppId">) => void;
     onModerateWithConfirm: (
         input: Omit<MinecraftModeration, "installedAppId">,
@@ -507,7 +580,7 @@ function PlayerRow({
             </td>
             <td className="px-3 py-2">
                 <div className="flex flex-wrap items-center gap-1">
-                    {player.address !== null && <Badge variant="primary">allowed</Badge>}
+                    {player.addresses.length > 0 && <Badge variant="primary">allowed</Badge>}
                     {player.operator && <Badge>operator</Badge>}
                     {player.whitelisted && <Badge>whitelisted</Badge>}
                     {player.banned &&
@@ -524,11 +597,34 @@ function PlayerRow({
                         ))}
                     {/* A name the game knows and Polaris does not is the gap that
                         lets somebody in on the username alone. */}
-                    {player.address === null && !player.banned && <Badge variant="warning">not registered</Badge>}
+                    {player.addresses.length === 0 && !player.banned && (
+                        <Badge variant="warning">not registered</Badge>
+                    )}
+                    {/* Something was decided about them that the server has not
+                        been told yet. Said on the row rather than only in the list
+                        below, because the row is where somebody wonders why their
+                        last action appears to have done nothing. */}
+                    {waiting > 0 && (
+                        <Badge title="Waiting to reach them">
+                            <Clock className="size-3" />
+                            {waiting} waiting
+                        </Badge>
+                    )}
                 </div>
             </td>
             <td className="hidden px-3 py-2 text-xs text-muted-foreground md:table-cell">
-                {player.address ?? "-"}
+                {/* Every place they play from, not the first one written down.
+                    Wrapped rather than truncated: which address is missing is the
+                    whole question when somebody cannot get in. */}
+                {player.addresses.length === 0 ? (
+                    "-"
+                ) : (
+                    <span className="flex flex-wrap gap-1">
+                        {player.addresses.map((address) => (
+                            <Badge key={address}>{address}</Badge>
+                        ))}
+                    </span>
+                )}
             </td>
             <td className="px-3 py-2">
                 <div className="flex justify-end gap-1">
@@ -606,7 +702,7 @@ function PlayerRow({
                                 }
                             />
                         ))}
-                    {player.address !== null && (
+                    {player.addresses.length > 0 && (
                         <IconAction
                             label={`Remove ${name} from the player list`}
                             icon={<UserMinus className="size-4" />}

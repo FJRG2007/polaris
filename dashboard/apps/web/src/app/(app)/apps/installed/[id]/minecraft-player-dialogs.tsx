@@ -18,6 +18,7 @@
 import * as actions from "./minecraft-actions";
 import { ItemPicker } from "./minecraft-item-picker";
 import { InventoryGrid } from "./minecraft-inventory";
+import { InventoryEditor } from "./minecraft-inventory-editor";
 import { CopyButton } from "@/components/copy-button";
 import { useCallback, useEffect, useState } from "react";
 import { typedItemId } from "@/lib/apps/minecraft/items";
@@ -219,11 +220,13 @@ export function TimeoutDialog({
 }
 
 /**
- * What a player is carrying, in the shape the game keeps it.
+ * What a player is carrying, and the way to change it.
  *
- * Read when the dialog opens rather than polled: an inventory changes constantly
- * and a grid that reshuffled under the operator reading it would be worse than
- * one they refresh when they want to - so there is a button that does.
+ * Opened with one read, and from there the editor owns the refreshing: while the
+ * player is on the server it re-reads every couple of seconds so two people
+ * moving things around see the same bag, and it stops while a drag is in the air.
+ * For a player who is not on, the read falls back to the last copy Polaris kept
+ * and the editor says how old it is.
  *
  * The install is named rather than handed a reader, because the screen behind
  * this polls: a closure passed down would be a new function on every tick and the
@@ -232,10 +235,14 @@ export function TimeoutDialog({
 export function InventoryDialog({
     installedAppId,
     player,
+    canEdit,
     onClose
 }: {
     installedAppId: string;
     player: string;
+    /** False for a viewer who may look and not touch, and on Bedrock, whose
+     *  commands cannot answer this at all. */
+    canEdit: boolean;
     onClose: () => void;
 }) {
     const read = useCallback(
@@ -243,12 +250,12 @@ export function InventoryDialog({
         [installedAppId, player]
     );
     const { data, error, loading, refresh } = useServerRead(read);
-    const items = data?.items ?? null;
+    const reading = data?.reading ?? null;
 
     return (
         <Reading
             title={`${player}'s inventory`}
-            description="As the server has it right now."
+            description={canEdit ? "Drag to rearrange it." : "As the server last had it."}
             icon={<Backpack className="size-6" />}
             loadingLabel="Reading it from the server..."
             empty="Nothing in it."
@@ -257,7 +264,12 @@ export function InventoryDialog({
             onRefresh={refresh}
             onClose={onClose}
         >
-            {items && <InventoryGrid items={items} />}
+            {reading &&
+                (canEdit ? (
+                    <InventoryEditor installedAppId={installedAppId} player={player} reading={reading} />
+                ) : (
+                    <InventoryGrid items={reading.items} />
+                ))}
         </Reading>
     );
 }
@@ -439,13 +451,21 @@ function Reading({
 export function HistoryDialog({
     player,
     sessions,
-    onClose
+    registered = [],
+    onClose,
+    onRegister
 }: {
     player: string;
     sessions: readonly PlayerSessionEvent[];
+    /** The addresses this player is already allowed from, so the ones that are
+     *  not can be offered rather than left as text somebody retypes. */
+    registered?: readonly string[];
     onClose: () => void;
+    /** Absent when the viewer may not change the list. */
+    onRegister?: (address: string) => void;
 }) {
     const newestFirst = [...sessions].reverse();
+    const known = new Set(registered);
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -472,6 +492,20 @@ export function HistoryDialog({
                                 </span>
                                 <span className="flex items-center gap-3 text-xs text-muted-foreground">
                                     {event.address && <span className="font-mono">{event.address}</span>}
+                                    {/* The address is right here and the list is
+                                        one click away, which is the whole reason
+                                        several of them per player is worth having:
+                                        somebody who moved house adds the new line
+                                        from the log rather than retyping it. */}
+                                    {event.address && onRegister && !known.has(event.address) && (
+                                        <button
+                                            type="button"
+                                            className="text-primary hover:underline"
+                                            onClick={() => onRegister(event.address as string)}
+                                        >
+                                            Allow this address
+                                        </button>
+                                    )}
                                     <span>{event.at ? new Date(event.at).toLocaleString() : "time not logged"}</span>
                                 </span>
                             </li>

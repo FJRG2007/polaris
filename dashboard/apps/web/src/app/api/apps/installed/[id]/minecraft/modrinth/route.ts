@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
-import { requirePermission } from "@/lib/session";
+import { requireGameServer } from "@/lib/apps/install-access";
 import { searchModrinth } from "@/lib/apps/minecraft/modrinth";
 
 export const runtime = "nodejs";
@@ -17,8 +17,10 @@ const querySchema = z.object({
  *  browser never calls a third party directly, and gated on the same permission
  *  as the rest of the app - the results end up in an install. */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
-    await requirePermission("games.manage");
-    await params;
+    // Against the server the search is for, not against the instance: the results
+    // end up in one install's mod list, so the grant that matters is the one on it.
+    const { id } = await params;
+    await requireGameServer("games.manage", id);
     const url = new URL(request.url);
     const parsed = querySchema.safeParse({
         query: url.searchParams.get("query") ?? "",

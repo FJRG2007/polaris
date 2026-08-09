@@ -28,6 +28,7 @@
 import * as core from "@polaris/core";
 import { prisma, type Prisma } from "@polaris/db";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import { canOn, grantedResourceIds } from "@polaris/auth";
 import { administeredOrgIds, memberOrgIds } from "@/lib/orgs/org-service";
 
 /** The caller, as the action layer resolved them. */
@@ -103,6 +104,12 @@ export async function resolveSpaceRole(actor: TaskActor, spaceId: string): Promi
         const granted = grant.role as core.SpaceRole;
         role = role ? core.strongerRole(role, granted) : granted;
     }
+    // A fifth way in, and the only one written for one space without a roster of
+    // any kind: access given to this account directly. Folded through the same
+    // strongest-wins rule rather than short-circuiting, so it can widen what a
+    // membership already gave and never narrow it.
+    const written = await spaceGrantRole(actor, spaceId);
+    if (written) role = role ? core.strongerRole(role, written) : written;
     if (role) return role;
 
     // An internal space is readable by anyone already trusted with the app -
@@ -111,6 +118,16 @@ export async function resolveSpaceRole(actor: TaskActor, spaceId: string): Promi
     if (space.visibility !== "internal") return null;
     if (!space.orgId) return "guest";
     return space.org && space.org.members.length > 0 ? "guest" : null;
+}
+
+/** What a grant written for this space alone is worth, on the same ladder every
+ *  other way in uses. Reading is a guest, changing things is a member; running
+ *  the space stays with the people it belongs to. */
+async function spaceGrantRole(actor: TaskActor, spaceId: string): Promise<core.SpaceRole | null> {
+    const ref = core.resourceRef("space", spaceId);
+    if (await canOn(actor.id, "tasks.manage", ref)) return "member";
+    if (await canOn(actor.id, "tasks.read", ref)) return "guest";
+    return null;
 }
 
 /**
@@ -367,9 +384,10 @@ export async function visibleScope(actor: TaskActor): Promise<TaskScope> {
     // Which organizations this account runs, and which it merely belongs to.
     // The first opens every space they own; the second only opens the ones the
     // organization marked internal.
-    const [administered, onRoster] = await Promise.all([
+    const [administered, onRoster, written] = await Promise.all([
         administeredOrgIds(actor),
-        memberOrgIds(actor.id)
+        memberOrgIds(actor.id),
+        grantedResourceIds(actor.id, "space", "tasks.read")
     ]);
 
     const [full, personalGrants, teamGrants] = await Promise.all([
@@ -385,7 +403,9 @@ export async function visibleScope(actor: TaskActor): Promise<TaskScope> {
                     // case this had before organizations existed; one with an
                     // organization is internal to that roster only.
                     { visibility: "internal", orgId: null },
-                    { visibility: "internal", orgId: { in: onRoster } }
+                    { visibility: "internal", orgId: { in: onRoster } },
+                    // Written for one space, rather than through a roster.
+                    ...(written.ids.length > 0 ? [{ id: { in: written.ids } }] : [])
                 ]
             },
             select: { id: true }

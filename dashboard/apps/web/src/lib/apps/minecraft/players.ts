@@ -23,9 +23,10 @@ export interface PlayerEntry {
     readonly online: boolean;
     readonly operator: boolean;
     readonly whitelisted: boolean;
-    /** The address they are registered to here, or null when they are not
-     *  registered at all - a name the game knows and Polaris does not. */
-    readonly address: string | null;
+    /** Every address they are registered to here, oldest first. Empty when they
+     *  are not registered at all - a name the game knows and Polaris does not. A
+     *  person plays from more than one place, so this is a list. */
+    readonly addresses: readonly string[];
     readonly note: string | null;
     readonly banReason: string | null;
     readonly banned: boolean;
@@ -66,7 +67,7 @@ export function foldPlayers(
             online: false,
             operator: false,
             whitelisted: false,
-            address: null,
+            addresses: [],
             note: null,
             banReason: null,
             banned: false,
@@ -78,7 +79,15 @@ export function foldPlayers(
     };
 
     for (const player of status?.players.players ?? []) upsert(player, { online: true });
-    for (const rule of access?.rules ?? []) upsert(rule.username, { address: rule.address, note: rule.note });
+    // One rule per address, so a player with three of them arrives here three
+    // times and the addresses accumulate rather than the last one winning.
+    for (const rule of access?.rules ?? []) {
+        const held = byKey.get(rule.username.toLowerCase())?.addresses ?? [];
+        upsert(rule.username, {
+            addresses: held.includes(rule.address) ? held : [...held, rule.address],
+            ...(rule.note ? { note: rule.note } : {})
+        });
+    }
     for (const player of roster?.ops ?? []) upsert(player, { operator: true });
     for (const player of roster?.whitelist ?? []) upsert(player, { whitelisted: true });
     for (const ban of roster?.bans ?? []) upsert(ban.name, { banned: true, banReason: ban.reason });

@@ -57,7 +57,7 @@ describe("foldPlayers", () => {
             online: true,
             operator: true,
             whitelisted: true,
-            address: "203.0.113.9",
+            addresses: ["203.0.113.9"],
             note: "Created this server",
             banned: false
         });
@@ -71,7 +71,12 @@ describe("foldPlayers", () => {
             access([rule("sTeVe", "any")])
         );
         expect(folded).toHaveLength(1);
-        expect(folded[0]).toMatchObject({ online: true, operator: true, whitelisted: true, address: "any" });
+        expect(folded[0]).toMatchObject({
+            online: true,
+            operator: true,
+            whitelisted: true,
+            addresses: ["any"]
+        });
     });
 
     it("keeps a banned player with the reason the server gave", () => {
@@ -87,13 +92,26 @@ describe("foldPlayers", () => {
     // has no address for it, so nothing checks where they connect from.
     it("reports a player the game knows and Polaris does not as unregistered", () => {
         const folded = foldPlayers(status(["Alex"]), roster({ whitelist: ["Alex"] }), access([]));
-        expect(folded[0]).toMatchObject({ name: "Alex", whitelisted: true, address: null });
+        expect(folded[0]).toMatchObject({ name: "Alex", whitelisted: true, addresses: [] });
+    });
+
+    it("keeps every address one player is registered to", () => {
+        // The point of the whole change: somebody who plays from home and from a
+        // laptop is one person with two ways in, not two rows or one overwritten.
+        const folded = foldPlayers(
+            status([]),
+            roster(),
+            access([rule("Alex", "203.0.113.9"), rule("Alex", "198.51.100.0/24", "On the road")])
+        );
+        expect(folded).toHaveLength(1);
+        expect(folded[0]?.addresses).toEqual(["203.0.113.9", "198.51.100.0/24"]);
+        expect(folded[0]?.note).toBe("On the road");
     });
 
     it("lists a registered player who has never connected", () => {
         const folded = foldPlayers(status([]), roster(), access([rule("Alex", "203.0.113.0/24")]));
         expect(folded).toHaveLength(1);
-        expect(folded[0]).toMatchObject({ name: "Alex", online: false, address: "203.0.113.0/24" });
+        expect(folded[0]).toMatchObject({ name: "Alex", online: false, addresses: ["203.0.113.0/24"] });
     });
 
     // Online first because they are who something can be done about right now,

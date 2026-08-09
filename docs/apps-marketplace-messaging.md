@@ -298,6 +298,48 @@ configured means the machine's own address, as before.
   a moderator can kick and whitelist without being able to deploy anything.
   `deploy.manage` carries all three, which is what keeps roles written before
   they existed working.
+- **And they can be scoped to one server.** A role only ever answers "may this
+  account use game servers at all"; which server is answered by ownership or by a
+  `ResourceGrant` written for that install (`install:<uuid>`, see
+  `RESOURCE_KINDS`). The two are separate gates and both have to pass, because a
+  role's grants compile to `resources: ["*"]` - feeding those into the second gate
+  would make every holder of the seeded `member` role reach every other account's
+  server. Pinned by the first test in `packages/auth/test/access/`.
+  A grant is given from the server's own **Access** screen rather than from
+  `/admin/roles`, so the person who runs a server can bring in a moderator
+  without being an administrator. What they may hand out is exactly what they
+  hold there, `canShare` only passes on from somebody who has it, and an end date
+  is clamped to their own. Inviting an address that has no account is a further
+  step, off by default, under **Who can invite** on `/admin/users`: Polaris has no
+  public registration, and sharing a server must not quietly become a way around
+  that. Everything one account may do, and where each permission comes from, is on
+  `/admin/users/<id>`.
+- **A bag that outlives the session.** `data get entity` only answers about a
+  player who is standing on the server, and the question is nearly always asked
+  about one who is not - somebody who logged off, or who was banned an hour ago.
+  So every online player's inventory is copied on a ten-minute cadence
+  (`PlayerInventorySnapshot`, `POST /api/cron/game-inventories`, plus a lazy sweep
+  from the panel read), and every screen showing a copy says how old it is rather
+  than drawing the same picture as a live one.
+- **A bag that can be rearranged.** Drag to move a stack, Ctrl to move one of it,
+  right-click to split it in half, and the item palette drags straight into a
+  slot. Nothing is ever rebuilt from an id and a count: the stack's own data is
+  read back and re-emitted verbatim, and where it cannot be - an unreadable
+  component span, or an argument over the 512-character transport ceiling - the
+  drag is refused and says which. Vanilla has no `/data modify` for players, so a
+  move is two `item replace` writes and each re-reads its slot first; a stack the
+  player moved underneath refuses instead of overwriting.
+- **Decisions that wait.** Giving an item needs the player present; banning only
+  needs the server up. Either way the decision gets made while they are asleep, so
+  it is written down (`PlayerActionQueue`) and applied by the same passes that
+  already sweep timeouts and firewall bans. It lapses after thirty days rather
+  than surprising somebody months later, and the Players screen lists what is
+  waiting with a way to cancel it.
+- **A player is one name and several addresses.** Somebody who plays from home
+  and from a laptop is one person, so the access rule is keyed on
+  `(server, name, address)` and any one of their addresses lets them in. A join
+  from an address they are not registered to offers to add it, straight from the
+  history the log already carried.
 - **The firewall reaches it.** Polaris' firewall is an HTTP guard and a game
   server is not HTTP, so its blocked addresses are handed to the server's own ban
   list - from the Players screen for right now, and from

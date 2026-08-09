@@ -522,6 +522,14 @@ model Invite {
     allowedCountries  String @default("[]")
     allowedContinents String @default("[]")
     accessGroupIds    String @default("[]")
+    // What the claimant is given on one resource, as a stringified ResourceGrant
+    // intent. Set when somebody who runs a server invites a helper to it, so the
+    // grant arrives with the account rather than having to be given afterwards.
+    // Narrowed again at claim time to what the inviter still holds: an invite must
+    // not be a way to hand out reach you have since lost.
+    pendingGrant      String?
+    // Created by somebody who is not an administrator, under the sharing policy.
+    delegated         Boolean @default(false)
 
     invitedBy User @relation("InviteInviter", fields: [invitedById], references: [id], onDelete: Cascade)
 
@@ -954,6 +962,56 @@ model DriveAcl {
 
     @@index([connectionId])
     @@index([principalType, principalId])
+}
+
+// A grant of specific actions on ONE resource to ONE principal: the generic form
+// of DriveAcl. Where that scopes Drive verbs to a connection subtree, this scopes
+// any permission key to any addressable thing - "install:<uuid>", "project:<uuid>",
+// see RESOURCE_KINDS in @polaris/core. Rows are compiled into PolicyStatements and
+// resolved by the same engine, so there is still exactly one evaluator.
+//
+// This is what a role cannot express. A role permission is compiled as
+// resources:["*"], which is why it may only answer "can this account use the
+// feature at all"; whether it may act on one particular server is this table's
+// question, and ownership's.
+//
+// principalType/principalId stay generic (no FK), following PolicyAttachment.
+// resourceId is likewise a soft pointer - it names four different tables - with
+// cleanup in app code, following InstalledApp.
+model ResourceGrant {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    // user | group | role - the same three principals every other grant resolves to.
+    principalType String
+    principalId   String    @db.Uuid
+    // install | project | domain | space | drive.
+    resourceKind  String
+    // The thing's id, or "*" for every resource of this kind. Not @db.Uuid: the
+    // wildcard is not a uuid, and a Drive reference carries a path.
+    resourceId    String
+    // JSON array of permission keys, expanded through IMPLIED_PERMISSIONS on write
+    // exactly as a role's grants are. Unknown keys are dropped on read.
+    actions       String
+    // allow | deny. An explicit deny overrides every allow, ownership included.
+    effect        String    @default("allow")
+    // Whether the holder may pass on what they hold here, and no more. This is how
+    // somebody who runs a server invites a helper without being an administrator.
+    canShare      Boolean   @default(false)
+    // Why this exists, for whoever reads it in six months.
+    note          String?
+    grantedById   String    @db.Uuid
+    // When it stops applying. Null is indefinite.
+    expiresAt     DateTime?
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    // One row per (principal, resource): replaced rather than stacked, the way
+    // setDriveAcl already treats a repeated grant.
+    @@unique([principalType, principalId, resourceKind, resourceId])
+    // "everything this principal reaches" - the per-request resolve and the lists.
+    @@index([principalType, principalId])
+    // "who reaches this thing" - the owner's access panel.
+    @@index([resourceKind, resourceId])
+    @@index([expiresAt])
 }
 
 // A password gate ("Polaris access gate") on a Drive path. Browsing, opening, or
@@ -2097,8 +2155,70 @@ model GamePlayerAccess {
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
 
+    // One row per address rather than per player: somebody who plays from home
+    // and from a laptop is one person and two addresses, and keying this on the
+    // name alone meant registering the second quietly replaced the first.
+    @@unique([installedAppId, username, address])
+    @@index([installedAppId])
+    @@index([installedAppId, username])
+}
+
+// The last inventory Polaris saw a player carrying.
+//
+// `data get entity` only answers for somebody who is on the server, and the
+// question - what was this person carrying - is nearly always asked about
+// somebody who has just logged off, or who was banned an hour ago. So it is read
+// on a cadence while they are on and kept, and every screen that shows it says
+// how old it is rather than implying it is now.
+//
+// The latest only. A history would answer a different question (what changed, and
+// when) and cost a row per player per cycle to do it.
+model PlayerInventorySnapshot {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    installedAppId String   @db.Uuid
+    username       String
+    // Stringified InventoryItem[], each stack's own data span included, so what
+    // is shown offline is what would be written back.
+    items          String
+    // When the server was actually asked. Not when the row was written: a sweep
+    // that found nothing to do must not make a stale snapshot look fresh.
+    takenAt        DateTime
+
     @@unique([installedAppId, username])
     @@index([installedAppId])
+}
+
+// Something an operator decided that the server could not be told yet.
+//
+// Giving an item needs the player standing there; banning only needs the server
+// up. Either way the decision is made at four in the afternoon about somebody who
+// is asleep, and until now a human had to remember it. This is that memory, and
+// it is drained by the same passes that already run for timeouts and firewall
+// bans - no new watcher, no new schedule.
+model PlayerActionQueue {
+    id             String    @id @default(uuid(7)) @db.Uuid
+    installedAppId String    @db.Uuid
+    username       String
+    // give | clear | set-slot | ban | pardon | op | deop | whitelist-add |
+    // whitelist-remove - see QUEUED_KINDS in lib/apps/minecraft/queue.
+    kind           String
+    // Stringified, shaped by the kind (an item and a count, a slot and a stack).
+    payload        String    @default("{}")
+    // Whether it waits for the player, or only for the server. A ban lands on a
+    // name whether or not it is connected.
+    needsPlayer    Boolean   @default(true)
+    requestedById  String?   @db.Uuid
+    // Dropped rather than applied once this passes: something decided months ago
+    // and executed without warning is worse than something that quietly lapsed.
+    expiresAt      DateTime
+    appliedAt      DateTime?
+    // Why the last attempt did not take, for the row that shows it.
+    lastError      String?
+    createdAt      DateTime  @default(now())
+
+    @@index([installedAppId, username])
+    @@index([installedAppId, appliedAt])
+    @@index([expiresAt])
 }
 
 // ---------------------------------------------------------------------------

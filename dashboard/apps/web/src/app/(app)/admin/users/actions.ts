@@ -14,7 +14,8 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
-import { accessRulesSchema, createInviteSchema } from "@polaris/core";
+import { setSharingPolicy } from "@/lib/sharing-policy";
+import { accessRulesSchema, createInviteSchema, sharingPolicySchema } from "@polaris/core";
 import { decideRecoveryRequest } from "@/lib/account-recovery-service";
 import { listUserSessions, type SessionView } from "@/lib/session-directory";
 import { createInvite, revokeInvite, type CreatedInvite } from "@/lib/invite-service";
@@ -157,4 +158,21 @@ export async function deleteUserAction(userId: string): Promise<{ error?: string
     const result = await deleteUser(admin.id, userId);
     revalidatePath("/admin/users");
     return result;
+}
+
+/** Who, besides an administrator, may bring somebody in. */
+export async function setSharingPolicyAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = sharingPolicySchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the settings and try again" };
+    await setSharingPolicy(parsed.data);
+    await recordAudit({
+        actorId: admin.id,
+        action: "settings.sharing",
+        targetType: "setting",
+        targetId: "sharing.policy",
+        metadata: { delegated: parsed.data.delegated, inviteRole: parsed.data.inviteRole }
+    });
+    revalidatePath("/admin/users");
+    return {};
 }

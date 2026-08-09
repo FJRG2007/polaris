@@ -17,9 +17,9 @@
 import { cache } from "react";
 import { prisma } from "@polaris/db";
 import { resolveSession } from "@/lib/session";
-import { userHasPermission } from "@polaris/auth";
 import { resolveViewAs } from "@/lib/view-as-service";
-import { hasPermission, type Permission } from "@polaris/core";
+import { canOn, userHasPermission } from "@polaris/auth";
+import { hasPermission, type Permission, type ResourceRef } from "@polaris/core";
 
 /** The role standing in for this request's own access, or null. */
 const previewedRole = cache(async (): Promise<{ actorId: string; grants: Permission[] } | null> => {
@@ -53,4 +53,24 @@ export async function effectiveIsAdmin(userId: string, isAdmin: boolean): Promis
 export async function effectiveCan(userId: string, permission: Permission): Promise<boolean> {
     const grants = await standingIn(userId);
     return grants ? hasPermission(grants, permission) : userHasPermission(userId, permission);
+}
+
+/**
+ * Whether this user may act on one particular thing right now.
+ *
+ * A previewed role reaches no resource grant at all. A role is a set of global
+ * permissions with no resource dimension, and the grants that do have one belong
+ * to the administrator doing the previewing - counting them would show them their
+ * own access wearing somebody else's name. What remains is what the role itself
+ * says, on the things the account actually owns.
+ */
+export async function effectiveCanOn(
+    userId: string,
+    permission: Permission,
+    ref: ResourceRef,
+    opts?: { ownerId?: string | null }
+): Promise<boolean> {
+    const grants = await standingIn(userId);
+    if (!grants) return canOn(userId, permission, ref, opts);
+    return opts?.ownerId === userId && hasPermission(grants, permission);
 }

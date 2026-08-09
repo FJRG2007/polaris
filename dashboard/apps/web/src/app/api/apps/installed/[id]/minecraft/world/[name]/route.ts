@@ -1,7 +1,5 @@
 import { Readable } from "node:stream";
-import { requirePermission } from "@/lib/session";
-import { isGameServerApp } from "@/lib/apps/games-service";
-import { getInstalledApp } from "@/lib/apps/install-service";
+import { requireGameServer } from "@/lib/apps/install-access";
 import { readContainerFile } from "@/lib/container-files-service";
 import { backupPathInContainer } from "@/lib/apps/minecraft/world-service";
 
@@ -21,11 +19,11 @@ export async function GET(
     _request: Request,
     { params }: { params: Promise<{ id: string; name: string }> }
 ): Promise<Response> {
-    const user = await requirePermission("games.manage");
     const { id, name } = await params;
-
-    const install = await getInstalledApp(user.id, id);
-    if (!install || !isGameServerApp(install.catalogId)) return new Response("Not found", { status: 404 });
+    // Resolved once: this both authorizes the caller and reads the install on the
+    // owner's behalf, and it has already refused anything that is not a game server.
+    const { access } = await requireGameServer("games.manage", id);
+    const install = access.install;
     if (!install.applicationId) return new Response("This server has not been deployed yet", { status: 409 });
 
     let path: string;
@@ -38,7 +36,7 @@ export async function GET(
     }
 
     try {
-        const stream = await readContainerFile(install.applicationId, user.id, path);
+        const stream = await readContainerFile(install.applicationId, access.ownerId, path);
         return new Response(Readable.toWeb(stream) as ReadableStream<Uint8Array>, {
             headers: {
                 "Content-Type": "application/gzip",

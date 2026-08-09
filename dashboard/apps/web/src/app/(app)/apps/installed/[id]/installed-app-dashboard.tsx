@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import type { Permission } from "@polaris/core";
 import type { GameContext } from "./game-context";
 import { useRuntimeLog } from "./use-runtime-log";
 import { MinecraftPanel } from "./minecraft-panel";
@@ -43,6 +44,9 @@ function adaptedPanelFor(
     settings: InstalledAppSetting[],
     running: boolean,
     game: GameContext | null,
+    /** What the viewer holds on THIS app, so a panel offers only what its actions
+     *  would accept. */
+    held: readonly Permission[],
     /** Handed to a panel that polls, so what it learns reaches the header. */
     onStatus: (label: string | null) => void
 ) {
@@ -78,6 +82,7 @@ function adaptedPanelFor(
                     settings={settings}
                     running={running}
                     game={game}
+                    held={held}
                     onStatus={onStatus}
                 />
             );
@@ -89,7 +94,10 @@ function adaptedPanelFor(
 export function InstalledAppDashboard({
     app,
     settings,
-    game = null
+    game = null,
+    held = [],
+    canManage = true,
+    canRemove = true
 }: {
     app: InstalledAppDetail;
     /** What the app was deployed with, for a panel that edits its settings. */
@@ -97,6 +105,13 @@ export function InstalledAppDashboard({
     /** For a game server: its address, and what still has to be opened for
      *  players outside this network. Null for anything that is not one. */
     game?: GameContext | null;
+    /** What the viewer holds on this app, resolved on the server. Cosmetic here -
+     *  every action behind these controls asks again. */
+    held?: readonly Permission[];
+    /** Whether they may start, stop and redeploy it. */
+    canManage?: boolean;
+    /** Whether they may remove it. The owner's, and an administrator's. */
+    canRemove?: boolean;
 }) {
     const router = useRouter();
     const [pending, startTransition] = useTransition();
@@ -113,7 +128,7 @@ export function InstalledAppDashboard({
     const running = app.applicationStatus === "running";
     const applicationId = app.applicationId;
     // Apps with an adapted panel lead with it and fold the raw log away by default.
-    const adaptedPanel = adaptedPanelFor(app, settings, running, game, setLiveStatus);
+    const adaptedPanel = adaptedPanelFor(app, settings, running, game, held, setLiveStatus);
     const [showLogs, setShowLogs] = useState(adaptedPanel === null);
     const { log, refresh: loadLog } = useRuntimeLog(applicationId, running && showLogs);
     // Back goes where this app is listed, which for a game server is the Game
@@ -160,31 +175,37 @@ export function InstalledAppDashboard({
                                     ? (STATUS_LABEL[app.applicationStatus] ?? app.applicationStatus)
                                     : "-")}
                         </Badge>
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => run(() => setInstalledAppRunningAction(app.id, !running))}
-                            disabled={pending || !applicationId}
-                        >
-                            {running ? <Square className="size-4" /> : <Play className="size-4" />}
-                            {running ? "Stop" : "Start"}
-                        </Button>
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => run(() => redeployInstalledAppAction(app.id))}
-                            disabled={pending || !applicationId}
-                        >
-                            <RefreshCw className="size-4" /> Redeploy
-                        </Button>
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setConfirmingUninstall(true)}
-                            disabled={pending}
-                        >
-                            <Trash2 className="size-4" /> Uninstall
-                        </Button>
+                        {canManage && (
+                            <>
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => run(() => setInstalledAppRunningAction(app.id, !running))}
+                                    disabled={pending || !applicationId}
+                                >
+                                    {running ? <Square className="size-4" /> : <Play className="size-4" />}
+                                    {running ? "Stop" : "Start"}
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => run(() => redeployInstalledAppAction(app.id))}
+                                    disabled={pending || !applicationId}
+                                >
+                                    <RefreshCw className="size-4" /> Redeploy
+                                </Button>
+                            </>
+                        )}
+                        {canRemove && (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setConfirmingUninstall(true)}
+                                disabled={pending}
+                            >
+                                <Trash2 className="size-4" /> Uninstall
+                            </Button>
+                        )}
                     </div>
                 }
             />

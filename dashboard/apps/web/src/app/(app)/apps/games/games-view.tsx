@@ -76,6 +76,12 @@ export interface GameServerSeed {
     /** The service behind it, for the screens that reach past the game. */
     applicationId: string | null;
     status: string;
+    /** Whether this viewer may start, stop and redeploy THIS server. Access is per
+     *  server now: a table can hold one somebody runs and one they were only
+     *  invited to watch. */
+    canManage: boolean;
+    /** Whether they may delete it. The owner's, and an administrator's. */
+    canRemove: boolean;
 }
 
 /** What a row is, as its two reads catch up with the seed. */
@@ -89,13 +95,14 @@ interface ServerView extends GameServerSeed {
 export function GamesView({
     servers,
     managerInstalled,
-    canManage
+    canCreate
 }: {
     servers: GameServerSeed[];
     managerInstalled: boolean;
-    /** Whether this viewer may start, stop or delete. A reader still sees
-     *  everything the table reports. */
-    canManage: boolean;
+    /** Whether this viewer may make a new server. Instance-wide, unlike what they
+     *  may do to the ones already in the table - being invited to help run one is
+     *  not an offer to start more. */
+    canCreate: boolean;
 }) {
     const router = useRouter();
     const [facts, setFacts] = useState<Map<string, GameServerFacts>>(new Map());
@@ -206,7 +213,7 @@ export function GamesView({
                         : `${servers.length} ${servers.length === 1 ? "server" : "servers"}, ${playing} playing right now.`
                 }
                 actions={
-                    canManage ? (
+                    canCreate ? (
                         <Button onClick={() => setCreating(true)}>
                             <Plus className="size-4" /> New server
                         </Button>
@@ -226,7 +233,7 @@ export function GamesView({
                             address. Java is the PC edition, Bedrock is phones and consoles, and one server can take
                             both.
                         </p>
-                        {canManage && (
+                        {canCreate && (
                             <Button onClick={() => setCreating(true)}>
                                 <Plus className="size-4" /> New server
                             </Button>
@@ -251,7 +258,8 @@ export function GamesView({
                                 <ServerRow
                                     key={server.id}
                                     server={server}
-                                    canManage={canManage}
+                                    canManage={server.canManage}
+                                    canRemove={server.canRemove}
                                     pending={pending}
                                     onRun={run}
                                     onDelete={() => {
@@ -342,12 +350,14 @@ function filesHref(applicationId: string | null): string | null {
 function ServerRow({
     server,
     canManage,
+    canRemove,
     pending,
     onRun,
     onDelete
 }: {
     server: ServerView;
     canManage: boolean;
+    canRemove: boolean;
     pending: boolean;
     onRun: (action: () => Promise<{ error?: string }>) => void;
     onDelete: () => void;
@@ -408,10 +418,12 @@ function ServerRow({
                                     >
                                         {running ? <Square className="size-4" /> : <Play className="size-4" />}
                                     </IconButton>
-                                    <IconButton label={`Delete ${server.name}`} disabled={pending} onClick={onDelete}>
-                                        <Trash2 className="size-4" />
-                                    </IconButton>
                                 </>
+                            )}
+                            {canRemove && (
+                                <IconButton label={`Delete ${server.name}`} disabled={pending} onClick={onDelete}>
+                                    <Trash2 className="size-4" />
+                                </IconButton>
                             )}
                         </div>
                     </td>
@@ -454,6 +466,10 @@ function ServerRow({
                         >
                             <RefreshCw className="size-4" /> Redeploy
                         </ContextMenuItem>
+                    </>
+                )}
+                {canRemove && (
+                    <>
                         <ContextMenuSeparator />
                         <ContextMenuItem variant="danger" disabled={pending} onSelect={onDelete}>
                             <Trash2 className="size-4" /> Delete

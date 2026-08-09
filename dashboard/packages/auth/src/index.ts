@@ -32,7 +32,29 @@ export {
     MAX_ALTERNATE_EMAILS,
     type UserEmailView
 } from "./account.js";
-export { can, resolveGlobalStatements, usersWithPermission } from "./authz.js";
+export {
+    can,
+    canAny,
+    canOn,
+    resolveGlobalStatements,
+    resolveGlobalStatementsBySource,
+    resolveResourceStatements,
+    usersWithPermission,
+    type SourcedStatements,
+    type StatementSource
+} from "./authz.js";
+export {
+    clearResourceGrants,
+    grantedResourceIds,
+    grantsForPrincipal,
+    grantsForUser,
+    grantsOnResource,
+    holdsAnyGrantCarrying,
+    removeResourceGrant,
+    setResourceGrant,
+    type ResourceGrantRow,
+    type SetResourceGrantInput
+} from "./resource-grants.js";
 export {
     createGroup,
     deleteGroup,

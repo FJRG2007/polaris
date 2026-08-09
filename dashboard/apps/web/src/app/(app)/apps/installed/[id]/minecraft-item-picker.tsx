@@ -56,13 +56,17 @@ export function ItemPicker({
     value,
     query,
     onQueryChange,
-    onSelect
+    onSelect,
+    onDragItem
 }: {
     /** The id that will be given, or null while nothing is chosen. */
     value: string | null;
     query: string;
     onQueryChange: (query: string) => void;
     onSelect: (id: string) => void;
+    /** Makes the results draggable, for a screen that drops one onto a slot.
+     *  Called with the id when a drag starts and null when it ends. */
+    onDragItem?: (id: string | null) => void;
 }) {
     const [items, setItems] = useState<CatalogItem[] | null>(null);
     const [failed, setFailed] = useState(false);
@@ -125,6 +129,7 @@ export function ItemPicker({
                                 label={item.label}
                                 selected={value === item.id}
                                 onSelect={onSelect}
+                                {...(onDragItem ? { onDragItem } : {})}
                             />
                         ))}
                         {shown.length === 0 && !offerTyped && (
@@ -160,12 +165,14 @@ function Tile({
     id,
     label,
     selected,
-    onSelect
+    onSelect,
+    onDragItem
 }: {
     id: string;
     label: string;
     selected: boolean;
     onSelect: (id: string) => void;
+    onDragItem?: (id: string | null) => void;
 }) {
     return (
         <li>
@@ -175,6 +182,18 @@ function Tile({
                 aria-label={label}
                 aria-pressed={selected}
                 onClick={() => onSelect(id)}
+                draggable={onDragItem !== undefined}
+                onDragStart={(event) => {
+                    if (!onDragItem) return;
+                    event.dataTransfer.effectAllowed = "copy";
+                    // Something has to be set or Firefox refuses the drag.
+                    event.dataTransfer.setData("text/plain", id);
+                    // Picking it up selects it too, so the count field and the
+                    // caption below agree with what is in the air.
+                    onSelect(id);
+                    onDragItem(id);
+                }}
+                onDragEnd={() => onDragItem?.(null)}
                 className={cn(
                     "flex aspect-square w-full items-center justify-center rounded border p-1 transition-colors",
                     selected

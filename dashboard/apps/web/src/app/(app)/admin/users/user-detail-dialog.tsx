@@ -10,6 +10,7 @@
  * "sign them out" and "ban them" wait on a role change nobody asked to make.
  */
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { RoleOption } from "@/lib/role-service";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -144,6 +145,13 @@ export function UserDetailDialog({
                     </DialogTitle>
                     <DialogDescription>{user.email}</DialogDescription>
                 </DialogHeader>
+
+                {/* The quick view. Everything about what they may do - groups,
+                    policies, access to one particular server - and where each
+                    permission comes from is one page, and this is the way to it. */}
+                <Link href={`/admin/users/${user.id}`} className="w-fit text-sm text-primary hover:underline">
+                    What they can do, and why
+                </Link>
 
                 <div className="flex flex-col gap-5">
                     <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">

@@ -12,14 +12,18 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { clientIp } from "@/lib/request-context";
-import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { setEnvVars } from "@/lib/env-var-service";
+import { requirePermissionAny } from "@/lib/session";
 import { isDataReply } from "@/lib/apps/minecraft/snbt";
 import { deployApplication } from "@/lib/deploy-service";
-import { getInstalledApp } from "@/lib/apps/install-service";
 import { ITEM_ID_PATTERN } from "@/lib/apps/minecraft/items";
 import { stripFormatting } from "@/lib/apps/minecraft/parse";
+import { requireGameServer } from "@/lib/apps/install-access";
+import { cancelAction, pendingFor, queueAction } from "@/lib/apps/minecraft/queue-service";
+import { clearItem, clearSlot, giveToSlot, moveStack } from "@/lib/apps/minecraft/item-service";
+import { readSnapshot, writeSnapshot } from "@/lib/apps/minecraft/inventory-service";
+import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import { setGameHostname } from "@/lib/apps/minecraft/address";
 import { patchInstallConfig } from "@/lib/apps/install-config";
 import { writeContainerFile } from "@/lib/container-files-service";
@@ -31,12 +35,13 @@ import { parseInventory, type InventoryItem } from "@/lib/apps/minecraft/invento
 import { MAX_BACKUP_BYTES, MAX_KEEP_LAST } from "@/lib/apps/minecraft/backup-policy";
 import { isBackupName, isBiome, isLevelName, isLevelType } from "@/lib/apps/minecraft/world";
 import { parseDimension, parsePosition, type PlayerPosition } from "@/lib/apps/minecraft/position";
-import { applyFirewallBans, runConsoleLine, runServerCommand } from "@/lib/apps/minecraft/service";
+import { applyFirewallBans, getServerPlayers, runConsoleLine, runServerCommand } from "@/lib/apps/minecraft/service";
 import { MAX_IDLE_MINUTES, MIN_IDLE_MINUTES, type GameSchedule } from "@/lib/apps/minecraft/schedule";
 import {
     grantPlayerAccess,
     listPlayerAccess,
     revokePlayerAccess,
+    revokePlayerAddress,
     setAddressBinding,
     type PlayerAccessView
 } from "@/lib/apps/minecraft/player-access";
@@ -100,11 +105,15 @@ function moderationArgv(input: MinecraftModeration): string[] {
 }
 
 export async function moderatePlayerAction(input: MinecraftModeration): Promise<{ output?: string; error?: string }> {
-    const user = await requirePermission("games.moderate");
     const parsed = moderationSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        const output = await runServerCommand(user.id, parsed.data.installedAppId, moderationArgv(parsed.data));
+        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        const output = await runServerCommand(
+            access.ownerId,
+            parsed.data.installedAppId,
+            moderationArgv(parsed.data)
+        );
         await recordAudit({
             actorId: user.id,
             action: `minecraft.${parsed.data.action}`,
@@ -164,12 +173,17 @@ export type TimeoutInput = z.infer<typeof timeoutSchema>;
 
 /** Put items in a player's bag. */
 export async function givePlayerItemAction(input: GiveItemInput): Promise<{ output?: string; error?: string }> {
-    const user = await requirePermission("games.moderate");
     const parsed = giveSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const { installedAppId, player, item, count } = parsed.data;
     try {
-        const output = await runServerCommand(user.id, installedAppId, ["give", player, item, String(count)]);
+        const { user, access } = await requireGameServer("games.moderate", installedAppId);
+        const output = await runServerCommand(access.ownerId, installedAppId, [
+            "give",
+            player,
+            item,
+            String(count)
+        ]);
         await recordAudit({
             actorId: user.id,
             action: "minecraft.give",
@@ -185,14 +199,14 @@ export async function givePlayerItemAction(input: GiveItemInput): Promise<{ outp
 
 /** Move a player to another player, or to a place. */
 export async function teleportPlayerAction(input: TeleportInput): Promise<{ output?: string; error?: string }> {
-    const user = await requirePermission("games.moderate");
     const parsed = teleportSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const { installedAppId, player, destination } = parsed.data;
     try {
+        const { user, access } = await requireGameServer("games.moderate", installedAppId);
         // Split here rather than in the schema so coordinates reach the server as
         // three arguments and a player name as one, which is what `tp` expects.
-        const output = await runServerCommand(user.id, installedAppId, [
+        const output = await runServerCommand(access.ownerId, installedAppId, [
             "tp",
             player,
             ...destination.split(/\s+/)
@@ -210,20 +224,35 @@ export async function teleportPlayerAction(input: TeleportInput): Promise<{ outp
     }
 }
 
-/** What a player is carrying, read out of the server rather than guessed from
- *  what anyone has handed them. */
+/** What a bag reading is: live off the server, or the last copy Polaris kept. */
+export interface InventoryReading {
+    readonly items: InventoryItem[];
+    /** True when the server was asked just now, false when this is the snapshot. */
+    readonly live: boolean;
+    /** When it was read, ISO 8601. On a live reading, now. */
+    readonly takenAt: string;
+}
+
+/**
+ * What a player is carrying.
+ *
+ * Live while they are on the server, and the last copy Polaris kept when they are
+ * not - which is most of the time this gets asked. Which of the two it is comes
+ * back with it, because a bag from twenty minutes ago looks exactly like one from
+ * this second and only one of them can be changed.
+ */
 export async function readPlayerInventoryAction(
     installedAppId: string,
     player: string
-): Promise<{ items?: InventoryItem[]; error?: string }> {
-    const user = await requirePermission("games.read");
+): Promise<{ reading?: InventoryReading; error?: string }> {
     const parsed = z.object({ installedAppId: z.string().uuid(), player: playerNameSchema }).safeParse({
         installedAppId,
         player
     });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        const output = await runServerCommand(user.id, parsed.data.installedAppId, [
+        const { access } = await requireGameServer("games.read", parsed.data.installedAppId);
+        const output = await runServerCommand(access.ownerId, parsed.data.installedAppId, [
             "data",
             "get",
             "entity",
@@ -237,20 +266,32 @@ export async function readPlayerInventoryAction(
         // player is carrying. Only the server's own sentence proves it answered,
         // so without it the reader is shown what it actually said instead.
         if (items.length === 0 && !isDataReply(text)) {
+            // Not an answer. Whatever Polaris kept last is a better one than the
+            // sentence the server printed instead, so it is offered before the
+            // error is.
+            const kept = await readSnapshot(parsed.data.installedAppId, parsed.data.player);
+            if (kept) return { reading: { items: kept.items, live: false, takenAt: kept.takenAt } };
             const said = text.trim().replace(/\s+/g, " ").slice(0, 160);
             return {
                 error: said
                     ? `The server did not answer with an inventory: ${said}`
-                    : "The server did not answer - the player has to be on the server"
+                    : "The server did not answer, and Polaris has no copy of this player's bag yet"
             };
         }
-        return { items };
+        // A live reading is also worth keeping: this is the one moment the bag is
+        // known, and the next person to ask will be asking about somebody offline.
+        await writeSnapshot(parsed.data.installedAppId, parsed.data.player, items, new Date()).catch(
+            () => undefined
+        );
+        return { reading: { items, live: true, takenAt: new Date().toISOString() } };
     } catch (caught) {
+        const kept = await readSnapshot(parsed.data.installedAppId, parsed.data.player).catch(() => null);
+        if (kept) return { reading: { items: kept.items, live: false, takenAt: kept.takenAt } };
         return {
             error:
                 caught instanceof Error
                     ? caught.message
-                    : "Could not read the inventory - the player has to be on the server"
+                    : "Could not read the inventory, and Polaris has no copy of this player's bag yet"
         };
     }
 }
@@ -267,13 +308,13 @@ export async function readPlayerPositionAction(
     installedAppId: string,
     player: string
 ): Promise<{ position?: PlayerPosition; error?: string }> {
-    const user = await requirePermission("games.read");
     const parsed = z
         .object({ installedAppId: z.string().uuid(), player: playerNameSchema })
         .safeParse({ installedAppId, player });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        const output = await runServerCommand(user.id, parsed.data.installedAppId, [
+        const { access } = await requireGameServer("games.read", parsed.data.installedAppId);
+        const output = await runServerCommand(access.ownerId, parsed.data.installedAppId, [
             "data",
             "get",
             "entity",
@@ -284,7 +325,7 @@ export async function readPlayerPositionAction(
         if (coordinates === null) {
             return { error: "The server did not report a position - the player has to be on the server" };
         }
-        const dimension = await runServerCommand(user.id, parsed.data.installedAppId, [
+        const dimension = await runServerCommand(access.ownerId, parsed.data.installedAppId, [
             "data",
             "get",
             "entity",
@@ -307,12 +348,12 @@ export async function readPlayerPositionAction(
 
 /** Ban a player for a while, and let Polaris lift it. */
 export async function timeoutPlayerAction(input: TimeoutInput): Promise<{ until?: string; error?: string }> {
-    const user = await requirePermission("games.moderate");
     const parsed = timeoutSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const { installedAppId, player, minutes, reason } = parsed.data;
     try {
-        const entry = await timeoutPlayer(user.id, installedAppId, player, minutes, reason);
+        const { user, access } = await requireGameServer("games.moderate", installedAppId);
+        const entry = await timeoutPlayer(access.ownerId, installedAppId, player, minutes, reason);
         await recordAudit({
             actorId: user.id,
             action: "minecraft.timeout",
@@ -328,14 +369,14 @@ export async function timeoutPlayerAction(input: TimeoutInput): Promise<{ until?
 
 /** End one early. */
 export async function liftTimeoutAction(installedAppId: string, player: string): Promise<{ error?: string }> {
-    const user = await requirePermission("games.moderate");
     const parsed = z.object({ installedAppId: z.string().uuid(), player: playerNameSchema }).safeParse({
         installedAppId,
         player
     });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        await liftTimeout(user.id, parsed.data.installedAppId, parsed.data.player);
+        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        await liftTimeout(access.ownerId, parsed.data.installedAppId, parsed.data.player);
         await recordAudit({
             actorId: user.id,
             action: "minecraft.timeout-lift",
@@ -390,14 +431,12 @@ export interface GameScheduleInput {
 
 /** Save when a server should be up, and when it may go quiet. */
 export async function saveGameScheduleAction(input: GameScheduleInput): Promise<{ error?: string }> {
-    const user = await requirePermission("games.manage");
     const parsed = scheduleSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        // Ownership: the schedule is written straight to the install's config, so
-        // nothing else on the way would refuse somebody else's server.
-        const install = await getInstalledApp(user.id, parsed.data.installedAppId);
-        if (!install) return { error: "Server not found" };
+        // The schedule is written straight to the install's config, so nothing else
+        // on the way would refuse a server this person may not touch.
+        const { user } = await requireGameServer("games.manage", parsed.data.installedAppId);
         await setGameSchedule(parsed.data.installedAppId, parsed.data.schedule);
         await recordAudit({
             actorId: user.id,
@@ -419,9 +458,12 @@ export async function setWhitelistEnforcedAction(
     installedAppId: string,
     enforced: boolean
 ): Promise<{ output?: string; error?: string }> {
-    const user = await requirePermission("games.moderate");
     try {
-        const output = await runServerCommand(user.id, installedAppId, ["whitelist", enforced ? "on" : "off"]);
+        const { access } = await requireGameServer("games.moderate", installedAppId);
+        const output = await runServerCommand(access.ownerId, installedAppId, [
+            "whitelist",
+            enforced ? "on" : "off"
+        ]);
         return { output: output.trim() };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not change the whitelist" };
@@ -445,11 +487,11 @@ export type PlayerAccessInput = z.infer<typeof accessSchema>;
  * who is thrown out today, this decides who can ever get in.
  */
 export async function grantPlayerAccessAction(input: PlayerAccessInput): Promise<{ error?: string }> {
-    const user = await requirePermission("games.manage");
     const parsed = accessSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        await grantPlayerAccess(user.id, parsed.data.installedAppId, user.id, {
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        await grantPlayerAccess(access.ownerId, parsed.data.installedAppId, user.id, {
             username: parsed.data.username,
             address: parsed.data.address,
             ...(parsed.data.note ? { note: parsed.data.note } : {})
@@ -469,8 +511,12 @@ export async function grantPlayerAccessAction(input: PlayerAccessInput): Promise
 
 /** The list as it stands, for a screen that is not polling the server itself. */
 export async function playerAccessAction(installedAppId: string): Promise<PlayerAccessView | null> {
-    const user = await requirePermission("games.read");
-    return listPlayerAccess(user.id, installedAppId).catch(() => null);
+    try {
+        const { access } = await requireGameServer("games.read", installedAppId);
+        return await listPlayerAccess(access.ownerId, installedAppId);
+    } catch {
+        return null;
+    }
 }
 
 /**
@@ -482,7 +528,9 @@ export async function playerAccessAction(installedAppId: string): Promise<Player
  * a suggestion: the field stays editable, and what is typed is what is stored.
  */
 export async function myAddressAction(): Promise<{ address: string | null }> {
-    await requirePermission("games.read");
+    // Nothing about a particular server: it is the caller's own address, read for
+    // the caller. Anybody who reaches a game server anywhere may ask.
+    await requirePermissionAny("games.read");
     return { address: (await clientIp()) ?? null };
 }
 
@@ -491,9 +539,9 @@ export async function revokePlayerAccessAction(
     installedAppId: string,
     username: string
 ): Promise<{ error?: string }> {
-    const user = await requirePermission("games.manage");
     try {
-        await revokePlayerAccess(user.id, installedAppId, username);
+        const { user, access } = await requireGameServer("games.manage", installedAppId);
+        await revokePlayerAccess(access.ownerId, installedAppId, username);
         await recordAudit({
             actorId: user.id,
             action: "minecraft.access-revoke",
@@ -507,6 +555,30 @@ export async function revokePlayerAccessAction(
     }
 }
 
+/** Take one address off a player, leaving whatever else they have. Removing the
+ *  last one removes them, which the service decides so the two screens that call
+ *  this cannot disagree about it. */
+export async function revokePlayerAddressAction(
+    installedAppId: string,
+    username: string,
+    address: string
+): Promise<{ error?: string }> {
+    try {
+        const { user, access } = await requireGameServer("games.manage", installedAppId);
+        await revokePlayerAddress(access.ownerId, installedAppId, username, address);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.access-revoke-address",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { player: username, address }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not remove that address" };
+    }
+}
+
 /**
  * Stop checking where a player connects from, or start again.
  *
@@ -517,9 +589,9 @@ export async function setAddressBindingAction(
     installedAppId: string,
     enabled: boolean
 ): Promise<{ error?: string }> {
-    const user = await requirePermission("games.manage");
     try {
-        await setAddressBinding(user.id, installedAppId, enabled);
+        const { user, access } = await requireGameServer("games.manage", installedAppId);
+        await setAddressBinding(access.ownerId, installedAppId, enabled);
         await recordAudit({
             actorId: user.id,
             action: "minecraft.access-binding",
@@ -544,13 +616,12 @@ export async function setGameHostnameAction(
     installedAppId: string,
     subdomain: string
 ): Promise<{ hostname?: string | null; error?: string }> {
-    const user = await requirePermission("games.manage");
     const parsed = z.string().trim().max(63).safeParse(subdomain);
     if (!parsed.success) return { error: "That subdomain is too long" };
     try {
-        const install = await getInstalledApp(user.id, installedAppId);
-        if (!install) throw new Error("Installed app not found");
-        const hostname = await setGameHostname(user.id, installedAppId, {
+        const { user, access } = await requireGameServer("games.manage", installedAppId);
+        const install = access.install;
+        const hostname = await setGameHostname(access.ownerId, installedAppId, {
             name: install.name,
             ...(parsed.data ? { subdomain: parsed.data } : {}),
             edition: install.catalogId === "minecraft-bedrock" ? "bedrock" : "java"
@@ -581,12 +652,11 @@ export async function renameGameServerAction(
     installedAppId: string,
     name: string
 ): Promise<{ name?: string; error?: string }> {
-    const user = await requirePermission("games.manage");
     const parsed = z.string().trim().min(1, "Give the server a name").max(60).safeParse(name);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That name will not do" };
     try {
-        const install = await getInstalledApp(user.id, installedAppId);
-        if (!install) throw new Error("Server not found");
+        const { user, access } = await requireGameServer("games.manage", installedAppId);
+        const install = access.install;
         await prisma.installedApp.update({ where: { id: install.id }, data: { name: parsed.data } });
         await recordAudit({
             actorId: user.id,
@@ -634,10 +704,10 @@ export async function setServerIconAction(input: {
     installedAppId: string;
     png: string;
 }): Promise<{ error?: string }> {
-    const user = await requirePermission("games.manage");
     const parsed = iconSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That image will not do" };
     try {
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
         const bytes = Buffer.from(parsed.data.png, "base64");
         if (bytes.length === 0) throw new Error("That image is empty");
         if (bytes.length > MAX_ICON_BYTES) throw new Error("That image is too large");
@@ -647,9 +717,8 @@ export async function setServerIconAction(input: {
             throw new Error(`A server icon has to be ${ICON_SIDE}x${ICON_SIDE}`);
         }
 
-        const install = await getInstalledApp(user.id, parsed.data.installedAppId);
-        if (!install?.applicationId) throw new Error("This server has not been deployed yet");
-        await writeContainerFile(install.applicationId, user.id, ICON_PATH, bytes);
+        if (!access.install.applicationId) throw new Error("This server has not been deployed yet");
+        await writeContainerFile(access.install.applicationId, access.ownerId, ICON_PATH, bytes);
         // What the panel shows without reaching into the container for it.
         await patchInstallConfig(parsed.data.installedAppId, { iconSetAt: new Date().toISOString() });
         await recordAudit({
@@ -681,9 +750,9 @@ function pngSize(bytes: Buffer): { width: number; height: number } | null {
 
 /** Hand the firewall's blocked addresses to the server's own ban list. */
 export async function applyFirewallBansAction(installedAppId: string): Promise<{ banned?: number; error?: string }> {
-    const user = await requirePermission("games.moderate");
     try {
-        const banned = await applyFirewallBans(user.id, installedAppId);
+        const { user, access } = await requireGameServer("games.moderate", installedAppId);
+        const banned = await applyFirewallBans(access.ownerId, installedAppId);
         if (banned > 0) {
             await recordAudit({
                 actorId: user.id,
@@ -701,9 +770,9 @@ export async function applyFirewallBansAction(installedAppId: string): Promise<{
 
 /** Flush the world to disk, for before a backup or a restart. */
 export async function saveWorldAction(installedAppId: string): Promise<{ output?: string; error?: string }> {
-    const user = await requirePermission("games.moderate");
     try {
-        const output = await runServerCommand(user.id, installedAppId, ["save-all"]);
+        const { access } = await requireGameServer("games.moderate", installedAppId);
+        const output = await runServerCommand(access.ownerId, installedAppId, ["save-all"]);
         return { output: output.trim() };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not save the world" };
@@ -748,9 +817,9 @@ export type NewWorldInput = z.infer<typeof newWorldSchema>;
 
 /** Copy the world into an archive on the server. */
 export async function backUpWorldAction(installedAppId: string): Promise<{ name?: string; error?: string }> {
-    const user = await requirePermission("games.manage");
     try {
-        const backup = await createWorldBackup(user.id, installedAppId);
+        const { user, access } = await requireGameServer("games.manage", installedAppId);
+        const backup = await createWorldBackup(access.ownerId, installedAppId);
         await recordAudit({
             actorId: user.id,
             action: "games.world-backup",
@@ -778,15 +847,13 @@ export type BackupPolicyInput = z.infer<typeof backupPolicySchema>;
 
 /** How often this server's world is copied, and how much of it is kept. */
 export async function saveBackupPolicyAction(input: BackupPolicyInput): Promise<{ error?: string }> {
-    const user = await requirePermission("games.manage");
     const parsed = backupPolicySchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const { installedAppId, ...rules } = parsed.data;
     try {
-        // Ownership: the policy is written straight to the install's config, so
-        // nothing else on the way would refuse somebody else's server.
-        const install = await getInstalledApp(user.id, installedAppId);
-        if (!install) return { error: "Server not found" };
+        // The policy is written straight to the install's config, so nothing else
+        // on the way would refuse a server this person may not touch.
+        const { user } = await requireGameServer("games.manage", installedAppId);
         await setBackupPolicy(installedAppId, rules);
         await recordAudit({
             actorId: user.id,
@@ -803,11 +870,11 @@ export async function saveBackupPolicyAction(input: BackupPolicyInput): Promise<
 
 /** Take an archive off the server. */
 export async function deleteWorldBackupAction(installedAppId: string, name: string): Promise<{ error?: string }> {
-    const user = await requirePermission("games.manage");
     const parsed = backupNameSchema.safeParse({ installedAppId, name });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a backup of this server" };
     try {
-        await deleteWorldBackup(user.id, parsed.data.installedAppId, parsed.data.name);
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        await deleteWorldBackup(access.ownerId, parsed.data.installedAppId, parsed.data.name);
         await recordAudit({
             actorId: user.id,
             action: "games.world-backup-delete",
@@ -826,11 +893,16 @@ export async function restoreWorldBackupAction(
     installedAppId: string,
     name: string
 ): Promise<{ level?: string; error?: string }> {
-    const user = await requirePermission("games.manage");
     const parsed = backupNameSchema.safeParse({ installedAppId, name });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a backup of this server" };
     try {
-        const restored = await restoreWorldBackup(user.id, parsed.data.installedAppId, parsed.data.name, user.id);
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const restored = await restoreWorldBackup(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.name,
+            user.id
+        );
         await recordAudit({
             actorId: user.id,
             action: "games.world-restore",
@@ -847,12 +919,12 @@ export async function restoreWorldBackupAction(
 
 /** Generate a new map, optionally carrying what every player is holding. */
 export async function newWorldAction(input: NewWorldInput): Promise<{ level?: string; carried?: boolean; error?: string }> {
-    const user = await requirePermission("games.manage");
     const parsed = newWorldSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
         const created = await newWorld(
-            user.id,
+            access.ownerId,
             parsed.data.installedAppId,
             {
                 ...(parsed.data.seed ? { seed: parsed.data.seed } : {}),
@@ -878,11 +950,11 @@ export async function newWorldAction(input: NewWorldInput): Promise<{ level?: st
 
 /** Boot the server onto a map it already has. */
 export async function switchWorldAction(installedAppId: string, level: string): Promise<{ error?: string }> {
-    const user = await requirePermission("games.manage");
     const parsed = worldNameSchema.safeParse({ installedAppId, level });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a world on this server" };
     try {
-        await switchLevel(user.id, parsed.data.installedAppId, parsed.data.level, user.id);
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        await switchLevel(access.ownerId, parsed.data.installedAppId, parsed.data.level, user.id);
         await recordAudit({
             actorId: user.id,
             action: "games.world-switch",
@@ -899,11 +971,11 @@ export async function switchWorldAction(installedAppId: string, level: string): 
 
 /** Delete a map the server is not on. */
 export async function deleteWorldAction(installedAppId: string, level: string): Promise<{ error?: string }> {
-    const user = await requirePermission("games.manage");
     const parsed = worldNameSchema.safeParse({ installedAppId, level });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a world on this server" };
     try {
-        await deleteLevel(user.id, parsed.data.installedAppId, parsed.data.level);
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        await deleteLevel(access.ownerId, parsed.data.installedAppId, parsed.data.level);
         await recordAudit({
             actorId: user.id,
             action: "games.world-delete",
@@ -922,13 +994,13 @@ export async function sendConsoleCommandAction(
     installedAppId: string,
     line: string
 ): Promise<{ output?: string; error?: string }> {
-    // The console runs any command the server takes, op included, so it is the
-    // full grant rather than the moderator one.
-    const user = await requirePermission("games.manage");
     const parsed = consoleSchema.safeParse({ installedAppId, line });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That command is not valid" };
     try {
-        const output = await runConsoleLine(user.id, parsed.data.installedAppId, parsed.data.line);
+        // The console runs any command the server takes, op included, so it is the
+        // full grant rather than the moderator one.
+        const { access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const output = await runConsoleLine(access.ownerId, parsed.data.installedAppId, parsed.data.line);
         return { output: output.trim() };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "The server did not accept that command" };
@@ -957,12 +1029,12 @@ export async function updateServerSettingsAction(
     /** False stores the values and leaves the running server alone. */
     restart = true
 ): Promise<{ error?: string }> {
-    const user = await requirePermission("games.manage");
     const parsed = settingsSchema.safeParse({ installedAppId, values });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the settings and try again" };
     try {
-        const install = await getInstalledApp(user.id, parsed.data.installedAppId);
-        if (!install?.applicationId) throw new Error("This server has not been deployed yet");
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const install = access.install;
+        if (!install.applicationId) throw new Error("This server has not been deployed yet");
         const manifest = findApp(install.catalogId);
         if (!manifest) throw new Error("Unknown app");
 
@@ -975,11 +1047,213 @@ export async function updateServerSettingsAction(
             return [{ key: entry.key, value: entry.value, isSecret: Boolean(field.secret) }];
         });
         if (vars.length === 0) throw new Error("Nothing to save");
-        await setEnvVars("application", install.applicationId, user.id, vars);
-        if (restart) await deployApplication(install.applicationId, user.id, user.id);
+        await setEnvVars("application", install.applicationId, access.ownerId, vars);
+        if (restart) await deployApplication(install.applicationId, access.ownerId, user.id);
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not save the settings" };
+    }
+}
+/** One stack as a screen holds it, for a write that says what it believed. */
+const stackSchema = z.object({
+    slot: z.number().int().min(-128).max(127),
+    id: z.string().trim().min(1).max(128),
+    count: z.number().int().min(1).max(127),
+    data: z
+        .object({ era: z.enum(["components", "tag"]), snbt: z.string().min(2).max(4096) })
+        .nullable()
+        .default(null)
+});
+
+const moveSchema = z.object({
+    installedAppId: z.string().uuid(),
+    player: playerNameSchema,
+    from: z.number().int().min(-128).max(127),
+    to: z.number().int().min(-128).max(127),
+    /** What the screen was showing in each of the two slots. The server compares
+     *  before it writes, so a stale dialog refuses instead of destroying. */
+    expected: z.object({ from: stackSchema.nullable(), to: stackSchema.nullable() }),
+    /** Fewer than the stack holds splits it, which needs an empty target. */
+    count: z.number().int().min(1).max(127).optional()
+});
+
+export type MoveSlotInput = z.infer<typeof moveSchema>;
+
+/** Move a stack from one slot to another, swapping with what is in the way. */
+export async function moveInventorySlotAction(input: MoveSlotInput): Promise<{ error?: string; }> {
+    const parsed = moveSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        await moveStack(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.player,
+            parsed.data.from,
+            parsed.data.to,
+            parsed.data.expected,
+            parsed.data.count
+        );
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.inventory-move",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { player: parsed.data.player, from: parsed.data.from, to: parsed.data.to }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not move that stack" };
+    }
+}
+
+const slotItemSchema = z.object({
+    installedAppId: z.string().uuid(),
+    player: playerNameSchema,
+    slot: z.number().int().min(-128).max(127),
+    item: itemIdSchema,
+    count: z.number().int().min(1).max(64)
+});
+
+export type SlotItemInput = z.infer<typeof slotItemSchema>;
+
+/** Whether this player is standing on the server right now. */
+async function isOnline(ownerId: string, installedAppId: string, player: string): Promise<boolean> {
+    const status = await getServerPlayers(ownerId, installedAppId).catch(() => null);
+    return status?.players.players.some((name) => name.toLowerCase() === player.toLowerCase()) === true;
+}
+
+/**
+ * Put an item in a slot.
+ *
+ * Queued instead when the player is not on: the command needs them present, and
+ * an operator deciding at four in the afternoon should not have to come back and
+ * remember it.
+ */
+export async function setInventorySlotAction(input: SlotItemInput): Promise<{ queued?: true; error?: string; }> {
+    const parsed = slotItemSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const { installedAppId, player, slot, item, count } = parsed.data;
+    try {
+        const { user, access } = await requireGameServer("games.moderate", installedAppId);
+        if (!(await isOnline(access.ownerId, installedAppId, player))) {
+            await queueAction({
+                installedAppId,
+                username: player,
+                payload: { kind: "set-slot", slot, item, count },
+                requestedById: user.id
+            });
+            return { queued: true };
+        }
+        await giveToSlot(access.ownerId, installedAppId, player, slot, item, count);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.inventory-set",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { player, slot, item, count }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not put that in the slot" };
+    }
+}
+
+/** Empty one slot. */
+export async function clearInventorySlotAction(
+    installedAppId: string,
+    player: string,
+    slot: number
+): Promise<{ error?: string; }> {
+    const parsed = z
+        .object({ installedAppId: z.string().uuid(), player: playerNameSchema, slot: z.number().int() })
+        .safeParse({ installedAppId, player, slot });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        await clearSlot(access.ownerId, parsed.data.installedAppId, parsed.data.player, parsed.data.slot);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.inventory-clear",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { player: parsed.data.player, slot: parsed.data.slot }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not empty that slot" };
+    }
+}
+
+const takeSchema = z.object({
+    installedAppId: z.string().uuid(),
+    player: playerNameSchema,
+    item: itemIdSchema,
+    count: z.number().int().min(1).max(64)
+});
+
+/** Take a number of one item away, wherever it is in the bag. Queued when the
+ *  player is not on. */
+export async function clearPlayerItemAction(
+    input: z.infer<typeof takeSchema>
+): Promise<{ queued?: true; output?: string; error?: string; }> {
+    const parsed = takeSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const { installedAppId, player, item, count } = parsed.data;
+    try {
+        const { user, access } = await requireGameServer("games.moderate", installedAppId);
+        if (!(await isOnline(access.ownerId, installedAppId, player))) {
+            await queueAction({
+                installedAppId,
+                username: player,
+                payload: { kind: "clear", item, count },
+                requestedById: user.id
+            });
+            return { queued: true };
+        }
+        const output = await clearItem(access.ownerId, installedAppId, player, item, count);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.inventory-take",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { player, item, count }
+        });
+        return { output: output.trim() };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not take that away" };
+    }
+}
+
+/** What is still waiting on this server, for the screen that shows it. */
+export async function pendingActionsAction(installedAppId: string): Promise<{ pending: QueuedAction[]; }> {
+    try {
+        await requireGameServer("games.read", installedAppId);
+        return { pending: await pendingFor(installedAppId) };
+    } catch {
+        return { pending: [] };
+    }
+}
+
+/** Change your mind about something that was waiting. */
+export async function cancelQueuedActionAction(installedAppId: string, id: string): Promise<{ error?: string; }> {
+    const parsed = z
+        .object({ installedAppId: z.string().uuid(), id: z.string().uuid() })
+        .safeParse({ installedAppId, id });
+    if (!parsed.success) return { error: "That is not a waiting action on this server" };
+    try {
+        const { user } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        await cancelAction(parsed.data.installedAppId, parsed.data.id);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.queued-cancel",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { queued: parsed.data.id }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not cancel that" };
     }
 }

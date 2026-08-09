@@ -104,7 +104,16 @@ export async function playerAccessRules(installedAppId: string): Promise<PlayerA
 }
 
 /**
- * Add a player, or move an existing one to a different address.
+ * Let a player in from an address.
+ *
+ * One row per address, not per player. Somebody who plays from home and from a
+ * laptop on the road is one person and two addresses, and keying this on the name
+ * alone meant registering the second silently replaced the first - the rule read
+ * as if it had been edited, and the player was locked out of wherever they were
+ * not sitting at the time.
+ *
+ * Adding an address a player already has is not an error, it is nothing: the same
+ * permission written twice.
  *
  * The game's own list is updated in the same breath when the server is up, so a
  * player added here can join without a restart; a server still booting takes the
@@ -124,7 +133,7 @@ export async function grantPlayerAccess(
     if (!isAddressRule(address)) throw new Error("Give one address, a range like 203.0.113.0/24, or \"any\"");
 
     await prisma.gamePlayerAccess.upsert({
-        where: { installedAppId_username: { installedAppId, username } },
+        where: { installedAppId_username_address: { installedAppId, username, address } },
         create: {
             installedAppId,
             username,
@@ -132,7 +141,10 @@ export async function grantPlayerAccess(
             note: input.note?.trim() || null,
             createdById: actorId
         },
-        update: { address, note: input.note?.trim() || null }
+        // A note given the second time replaces the first; an empty one leaves
+        // whatever was written there, since blank is what the form sends when
+        // somebody is only adding an address.
+        update: input.note?.trim() ? { note: input.note.trim() } : {}
     });
     // Best effort: the row is the record, and a server that is not answering yet
     // must not fail the grant - the next enforcement pass reconciles it.
@@ -141,7 +153,33 @@ export async function grantPlayerAccess(
     }
 }
 
-/** Take a player off the list and, if they are on right now, off the server. */
+/**
+ * Take one address off a player, leaving the rest.
+ *
+ * Removing their last one is removing them, and it says so rather than leaving a
+ * name on the list with nowhere to connect from - which would read as allowed and
+ * behave as refused.
+ */
+export async function revokePlayerAddress(
+    ownerId: string,
+    installedAppId: string,
+    username: string,
+    address: string
+): Promise<void> {
+    await resolve(ownerId, installedAppId);
+    await prisma.gamePlayerAccess.deleteMany({ where: { installedAppId, username, address } });
+    const left = await prisma.gamePlayerAccess.count({ where: { installedAppId, username } });
+    if (left === 0) {
+        await revokePlayerAccess(ownerId, installedAppId, username);
+        return;
+    }
+    // They still have a way in, so they are not thrown off - but the pass that
+    // checks who is on will kick them if they are sitting on the one just removed.
+    await enforcePlayerAddresses(ownerId, installedAppId).catch(() => null);
+}
+
+/** Take a player off the list entirely and, if they are on right now, off the
+ *  server. Every address they had goes with them. */
 export async function revokePlayerAccess(ownerId: string, installedAppId: string, username: string): Promise<void> {
     const install = await resolve(ownerId, installedAppId);
     await prisma.gamePlayerAccess.deleteMany({ where: { installedAppId, username } });

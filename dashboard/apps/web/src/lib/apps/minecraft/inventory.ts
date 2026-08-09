@@ -11,6 +11,25 @@
 
 import { dataReplyValue, readFirstAccepted, readInt, splitTopLevel, topLevelColon, unquote } from "./snbt";
 
+/**
+ * What a stack carries besides its id: enchantments, a name somebody typed, the
+ * damage on a tool, the contents of a shulker.
+ *
+ * Kept as the raw span the server wrote rather than modelled, because nothing
+ * here needs to understand it - it is read out of one reply and written back into
+ * one command, unchanged. Modelling it would mean modelling every component
+ * Minecraft has, and being wrong about one of them would quietly destroy it.
+ *
+ * The era is the reply's own: a server that answered `components` takes the
+ * bracket syntax, one that answered `tag` takes the braces. So which to write is
+ * never a guess about the version.
+ */
+export interface ItemData {
+    readonly era: "components" | "tag";
+    /** The compound as it arrived, braces included. */
+    readonly snbt: string;
+}
+
 /** One stack, as the server reported it. */
 export interface InventoryItem {
     /** Where it sits. 0-8 is the hotbar, 100-103 the armour, -106 the offhand. */
@@ -18,6 +37,8 @@ export interface InventoryItem {
     /** The namespaced id, e.g. "minecraft:diamond_pickaxe". */
     readonly id: string;
     readonly count: number;
+    /** Null for a plain stack, which most of them are. */
+    readonly data: ItemData | null;
 }
 
 /** The offhand, which the game numbers well outside the rest. */
@@ -82,6 +103,19 @@ export function parseInventory(output: string): InventoryItem[] {
     );
 }
 
+/**
+ * The one stack in a `data get entity ... Inventory[{Slot:Nb}]` reply.
+ *
+ * A single slot rather than the whole bag, which is what a write asks for before
+ * it touches one: the player is moving their own items while somebody drags them
+ * on a screen, and the only way to know the stack is still the one that was
+ * picked up is to look again. Null for a slot that is now empty, which is a real
+ * answer and not a failure.
+ */
+export function parseStack(output: string): InventoryItem | null {
+    return readFirstAccepted(dataReplyValue(output), "{", (span) => readItem(span));
+}
+
 /** One `{Slot: 0b, id: "minecraft:stone", count: 64}` entry, if it is one. */
 function readItem(entry: string): InventoryItem | null {
     if (!entry.startsWith("{")) return null;
@@ -95,5 +129,21 @@ function readItem(entry: string): InventoryItem | null {
     if (!id) return null;
     // "Count" in the old shape, "count" in the componentised one; a stack that
     // names neither is a single item, which is how the game writes one.
-    return { slot: readInt(fields.get("slot")) ?? 0, id, count: readInt(fields.get("count")) ?? 1 };
+    return {
+        slot: readInt(fields.get("slot")) ?? 0,
+        id,
+        count: readInt(fields.get("count")) ?? 1,
+        data: readData(fields)
+    };
+}
+
+/** The stack's own compound, whichever of the two names this server used for it.
+ *  Anything that is not a compound is nothing: a field that arrived truncated
+ *  must not be handed back as if it were whole. */
+function readData(fields: ReadonlyMap<string, string>): ItemData | null {
+    for (const era of ["components", "tag"] as const) {
+        const raw = fields.get(era)?.trim();
+        if (raw && raw.startsWith("{") && raw.endsWith("}")) return { era, snbt: raw };
+    }
+    return null;
 }

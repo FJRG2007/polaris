@@ -20,7 +20,9 @@ import { appHasCapability, findApp } from "@/lib/apps/catalog";
 import { getServerMetrics } from "@/lib/server-metrics-service";
 import { gameServerAddress } from "@/lib/apps/minecraft/address";
 import type { PortBlocks, PortPolicy } from "@/lib/apps/port-block";
+import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { sweepTimeouts } from "@/lib/apps/minecraft/timeout-service";
+import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
 import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
 import { enforcePlayerAddresses } from "@/lib/apps/minecraft/player-access";
 import { gamePorts, probeListening, probeReach, reachConfirmed } from "@/lib/apps/minecraft/reach";
@@ -97,12 +99,19 @@ function presentIds(values: readonly (string | null)[]): string[] {
     return values.filter((value): value is string => value !== null);
 }
 
-/** The owner's game servers and everything Polaris already knows about them,
- *  newest first. */
-export async function listGameServerFacts(ownerId: string): Promise<GameServerFacts[]> {
+/** The game servers this person runs, plus any they were given access to, and
+ *  everything Polaris already knows about them, newest first. */
+export async function listGameServerFacts(
+    ownerId: string,
+    alsoIds: readonly string[] = []
+): Promise<GameServerFacts[]> {
+    const mine = { ownerId, status: { not: "removed" } };
     const installs = (
         await prisma.installedApp.findMany({
-            where: { ownerId, status: { not: "removed" } },
+            where:
+                alsoIds.length > 0
+                    ? { OR: [mine, { id: { in: [...alsoIds] }, status: { not: "removed" } }] }
+                    : mine,
             orderBy: { createdAt: "desc" }
         })
     ).filter((install) => isGameServerApp(install.catalogId));
@@ -216,8 +225,11 @@ function publishedSubject(
  * is stopped is not asked at all, and one that refuses is a row that says so
  * rather than a list that fails.
  */
-export async function listGameServerLive(ownerId: string): Promise<GameServerLive[]> {
-    const servers = await listGameServerFacts(ownerId);
+export async function listGameServerLive(
+    ownerId: string,
+    alsoIds: readonly string[] = []
+): Promise<GameServerLive[]> {
+    const servers = await listGameServerFacts(ownerId, alsoIds);
     return Promise.all(
         servers.map(async (server) => {
             if (!server.running || !server.applicationId) {
@@ -366,6 +378,16 @@ export async function syncFirewallBans(ownerId: string): Promise<{ servers: numb
         // the game itself cannot hold: a name is only let in from its own address.
         const access = await enforcePlayerAddresses(ownerId, install.id).catch(() => null);
         kicked += access?.kicked.length ?? 0;
+        // Who is on is read once and used twice: a decision waiting for one of
+        // them, and a copy of what each is carrying so the bag can still be read
+        // after they log off.
+        const online = await getServerPlayers(ownerId, install.id)
+            .then((status) => (status.answering ? status.players.players : []))
+            .catch(() => [] as string[]);
+        if (online.length > 0) {
+            await drainQueue(ownerId, install.id, online).catch(() => null);
+            await sweepInventorySnapshots(ownerId, install.id, online).catch(() => 0);
+        }
     }
     return { servers, banned, kicked };
 }

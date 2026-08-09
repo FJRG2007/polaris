@@ -2,29 +2,35 @@
 
 /**
  * Lifecycle actions for one installed app, delegating to the same Deploy
- * primitives as the Deploy pillar. Reads need deploy.read; mutations need
- * deploy.manage and are re-checked server-side.
+ * primitives as the Deploy pillar.
+ *
+ * Each is resolved against the install itself rather than against a global grant,
+ * so somebody given `deploy.manage` on one app can restart that one and no other.
+ * Uninstalling is deliberately not among them: it is the owner's, because taking
+ * an app away is not something "manage this app" should ever have handed out.
  */
 
 import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/lib/session";
-import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
-import { getInstalledApp, uninstallApp } from "@/lib/apps/install-service";
 import { recordAudit } from "@/lib/audit-service";
+import { clearResourceGrants } from "@polaris/auth";
+import { installRef } from "@/lib/apps/install-access";
+import { getInstalledApp, uninstallApp } from "@/lib/apps/install-service";
+import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
+import { requirePermissionOn, type ResourceAccess } from "@/lib/resource-access";
 
-/** The backing application id, asserting the caller owns the install. */
-async function ownedApplicationId(id: string, ownerId: string): Promise<string> {
-    const app = await getInstalledApp(ownerId, id);
+/** The backing application, resolved on the owner's behalf. */
+async function applicationFor(access: ResourceAccess, id: string): Promise<string> {
+    const app = await getInstalledApp(access.ownerId, id);
     if (!app) throw new Error("Installed app not found");
     if (!app.applicationId) throw new Error("This app has no deployment yet");
     return app.applicationId;
 }
 
 export async function redeployInstalledAppAction(id: string): Promise<{ error?: string }> {
-    const user = await requirePermission("deploy.manage");
     try {
-        const applicationId = await ownedApplicationId(id, user.id);
-        await deployApplication(applicationId, user.id, user.id);
+        const { user, access } = await requirePermissionOn("deploy.manage", installRef(id));
+        const applicationId = await applicationFor(access, id);
+        await deployApplication(applicationId, access.ownerId, user.id);
         revalidatePath(`/apps/installed/${id}`);
         return {};
     } catch (caught) {
@@ -33,10 +39,10 @@ export async function redeployInstalledAppAction(id: string): Promise<{ error?: 
 }
 
 export async function setInstalledAppRunningAction(id: string, running: boolean): Promise<{ error?: string }> {
-    const user = await requirePermission("deploy.manage");
     try {
-        const applicationId = await ownedApplicationId(id, user.id);
-        await setApplicationRunning(applicationId, user.id, running);
+        const { access } = await requirePermissionOn("deploy.manage", installRef(id));
+        const applicationId = await applicationFor(access, id);
+        await setApplicationRunning(applicationId, access.ownerId, running);
         revalidatePath(`/apps/installed/${id}`);
         return {};
     } catch (caught) {
@@ -45,9 +51,14 @@ export async function setInstalledAppRunningAction(id: string, running: boolean)
 }
 
 export async function uninstallInstalledAppAction(id: string): Promise<{ error?: string }> {
-    const user = await requirePermission("deploy.manage");
     try {
-        await uninstallApp(user.id, id);
+        const { user, access } = await requirePermissionOn("deploy.manage", installRef(id));
+        if (!access.isOwner && !user.isAdmin) {
+            return { error: "Only the person who installed this app can remove it" };
+        }
+        await uninstallApp(access.ownerId, id);
+        // The app is gone, so the access people were given to it is too.
+        await clearResourceGrants(installRef(id));
         await recordAudit({ actorId: user.id, action: "apps.uninstall", targetType: "installedApp", targetId: id });
         revalidatePath("/apps/marketplace");
         return {};

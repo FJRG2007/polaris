@@ -131,3 +131,69 @@ export function searchItems(items: readonly CatalogItem[], query: string, limit:
     scored.sort((left, right) => left.score - right.score || left.item.label.localeCompare(right.item.label));
     return scored.slice(0, limit).map((entry) => entry.item);
 }
+
+/**
+ * How many of an item fit in one stack.
+ *
+ * The catalogue is a directory listing of icons - ids and nothing else - so this
+ * is derived from the id rather than looked up. Only the exceptions to
+ * sixty-four are worth encoding: the things that come one at a time, and the
+ * sixteens. Everything else is sixty-four, and the server clamps whatever this
+ * gets wrong, so the cost of a miss is an amount somebody retypes rather than an
+ * item that goes missing.
+ */
+const ONE_AT_A_TIME: readonly string[] = [
+    "sword",
+    "pickaxe",
+    "axe",
+    "shovel",
+    "hoe",
+    "helmet",
+    "chestplate",
+    "leggings",
+    "boots",
+    "boat",
+    "minecart",
+    "bed",
+    "horse_armor",
+    "shield",
+    "bow",
+    "crossbow",
+    "elytra",
+    "saddle",
+    "cake",
+    "potion",
+    "bucket",
+    "shears",
+    "flint_and_steel",
+    "fishing_rod",
+    "trident",
+    "totem_of_undying",
+    "written_book",
+    "writable_book",
+    "enchanted_book"
+];
+
+const SIXTEEN: readonly string[] = [
+    "ender_pearl",
+    "snowball",
+    "egg",
+    "sign",
+    "hanging_sign",
+    "armor_stand",
+    "honey_bottle",
+    "bucket_of"
+];
+
+/** The trailing word of an id, which is what names the kind of thing it is:
+ *  `diamond_sword` is a sword, `bucket_of_axolotl` is a bucket. */
+function endsWithWord(name: string, word: string): boolean {
+    return name === word || name.endsWith(`_${word}`);
+}
+
+export function maxStackFor(id: string): number {
+    const name = itemName(normalizeItemId(id) ?? id);
+    if (name.startsWith("bucket_of") || ONE_AT_A_TIME.some((word) => endsWithWord(name, word))) return 1;
+    if (SIXTEEN.some((word) => endsWithWord(name, word))) return 16;
+    return 64;
+}

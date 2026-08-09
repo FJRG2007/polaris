@@ -34,6 +34,9 @@ export interface InstalledAppView {
     applicationId: string | null;
     targetId: string | null;
     createdAt: string;
+    /** Who installed it. A list can now hold apps somebody was given access to as
+     *  well as their own, and the two do not offer the same things. */
+    ownerId: string;
 }
 
 /** A name no service in this environment is using yet, numbering repeats the way
@@ -238,10 +241,21 @@ export async function installApp(
     return { installedAppId: installed.id, applicationId: application.id };
 }
 
-/** The owner's installed apps, newest first, excluding removed ones. */
-export async function listInstalledApps(ownerId: string): Promise<InstalledAppView[]> {
+/**
+ * The owner's installed apps, newest first, excluding removed ones.
+ *
+ * `alsoIds` widens the answer to apps somebody was granted access to but does not
+ * own. One query rather than one per owner, and it stays a list: opening any of
+ * them still resolves the grant properly, so a row here can never be more than a
+ * row.
+ */
+export async function listInstalledApps(
+    ownerId: string,
+    alsoIds: readonly string[] = []
+): Promise<InstalledAppView[]> {
+    const mine = { ownerId, status: { not: "removed" } };
     const rows = await prisma.installedApp.findMany({
-        where: { ownerId, status: { not: "removed" } },
+        where: alsoIds.length > 0 ? { OR: [mine, { id: { in: [...alsoIds] }, status: { not: "removed" } }] } : mine,
         orderBy: { createdAt: "desc" }
     });
     return rows.map((row) => ({
@@ -251,7 +265,8 @@ export async function listInstalledApps(ownerId: string): Promise<InstalledAppVi
         status: row.status,
         applicationId: row.applicationId,
         targetId: row.targetId,
-        createdAt: row.createdAt.toISOString()
+        createdAt: row.createdAt.toISOString(),
+        ownerId: row.ownerId
     }));
 }
 
@@ -318,6 +333,7 @@ export async function getInstalledApp(ownerId: string, id: string): Promise<Inst
         applicationId: row.applicationId,
         targetId: row.targetId,
         createdAt: row.createdAt.toISOString(),
+        ownerId: row.ownerId,
         catalogName: manifest?.name ?? row.catalogId,
         dashboardKind: manifest?.dashboard ?? "generic",
         applicationStatus: application?.desiredState ?? null,

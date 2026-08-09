@@ -29,6 +29,7 @@
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { isIpv4 } from "@polaris/core";
+import { grantedResourceIds } from "@polaris/auth";
 import { randomBytes } from "node:crypto";
 import { detectPublicIp } from "./network-service";
 import { resolve4, resolveTxt } from "node:dns/promises";
@@ -156,9 +157,20 @@ function toView(row: {
     };
 }
 
+/**
+ * The domains on this shelf, plus any this account was given access to.
+ *
+ * A zone belongs to one account or one organization, and until now that was the
+ * only way to reach it - so handing somebody the domain a service answers on
+ * meant handing them the account. A grant written for one zone widens the list
+ * without widening anything else.
+ */
 export async function listOwnerDomains(owner: DomainOwner): Promise<OwnerDomainView[]> {
+    const mine = ownerWhere(owner);
+    const granted =
+        owner.kind === "user" ? (await grantedResourceIds(owner.id, "domain", "deploy.manage")).ids : [];
     const rows = await prisma.ownerDomain.findMany({
-        where: ownerWhere(owner),
+        where: granted.length > 0 ? { OR: [mine, { id: { in: granted } }] } : mine,
         orderBy: { createdAt: "asc" }
     });
     return rows.map(toView);

@@ -13,8 +13,8 @@
  * as what it costs rather than as a preference.
  */
 
-import { UserMinus } from "lucide-react";
-import { useState, useTransition } from "react";
+import { UserMinus, X } from "lucide-react";
+import { useMemo, useState, useTransition } from "react";
 import { GameAccessForm } from "@/components/game-access-form";
 import { ACCESS_REACH_NOTE } from "@/lib/apps/minecraft/access";
 import { Badge, Button, Card, CardBody, Switch } from "@polaris/ui";
@@ -22,6 +22,7 @@ import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import {
     grantPlayerAccessAction,
     revokePlayerAccessAction,
+    revokePlayerAddressAction,
     setAddressBindingAction
 } from "@/app/(app)/apps/installed/[id]/minecraft-actions";
 
@@ -42,6 +43,23 @@ export function GameAccessEditor({
 
     const edition = access?.edition ?? "java";
     const rules = access?.rules ?? [];
+    // One row per address in the table, one line per person on the screen. A
+    // player who plays from home and from a laptop is one entry with two badges,
+    // not two entries that read like two people.
+    const people = useMemo(() => {
+        const byName = new Map<string, { username: string; note: string | null; addresses: string[] }>();
+        for (const rule of rules) {
+            const key = rule.username.toLowerCase();
+            const held = byName.get(key);
+            if (held) {
+                if (!held.addresses.includes(rule.address)) held.addresses.push(rule.address);
+                if (!held.note && rule.note) held.note = rule.note;
+                continue;
+            }
+            byName.set(key, { username: rule.username, note: rule.note, addresses: [rule.address] });
+        }
+        return [...byName.values()];
+    }, [rules]);
 
     /** Report upward when the host screen collects errors, and locally otherwise -
      *  a failure that only one of the two screens can show is a failure the other
@@ -112,26 +130,55 @@ export function GameAccessEditor({
                     </p>
                 ) : (
                     <ul className="flex flex-col divide-y divide-border/60">
-                        {rules.map((rule) => (
-                            <li key={rule.id} className="flex items-center gap-2 py-2">
+                        {people.map((person) => (
+                            <li key={person.username} className="flex items-start gap-2 py-2">
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm" title={rule.username}>
-                                        {rule.username}
+                                    <p className="truncate text-sm" title={person.username}>
+                                        {person.username}
                                     </p>
-                                    {rule.note && (
-                                        <p className="truncate text-xs text-muted-foreground" title={rule.note}>
-                                            {rule.note}
+                                    {person.note && (
+                                        <p className="truncate text-xs text-muted-foreground" title={person.note}>
+                                            {person.note}
                                         </p>
                                     )}
                                 </div>
-                                <Badge>{rule.address}</Badge>
+                                <div className="flex max-w-[60%] flex-wrap justify-end gap-1">
+                                    {person.addresses.map((address) => (
+                                        <span key={address} className="inline-flex items-center gap-0.5">
+                                            <Badge>{address}</Badge>
+                                            {/* Each address goes on its own. Taking the last
+                                                one takes the player, which the service decides
+                                                so both screens agree about it. */}
+                                            <button
+                                                type="button"
+                                                disabled={pending}
+                                                aria-label={`Remove ${address} from ${person.username}`}
+                                                title={`Remove ${address} from ${person.username}`}
+                                                className="text-muted-foreground hover:text-danger disabled:opacity-50"
+                                                onClick={() =>
+                                                    run(() =>
+                                                        revokePlayerAddressAction(
+                                                            installedAppId,
+                                                            person.username,
+                                                            address
+                                                        )
+                                                    )
+                                                }
+                                            >
+                                                <X className="size-3" />
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
                                 <Button
                                     size="sm"
                                     variant="ghost"
                                     disabled={pending}
-                                    aria-label={`Remove ${rule.username}`}
-                                    title={`Remove ${rule.username}`}
-                                    onClick={() => run(() => revokePlayerAccessAction(installedAppId, rule.username))}
+                                    aria-label={`Remove ${person.username}`}
+                                    title={`Remove ${person.username} and every address they have`}
+                                    onClick={() =>
+                                        run(() => revokePlayerAccessAction(installedAppId, person.username))
+                                    }
                                 >
                                     <UserMinus className="size-4" />
                                 </Button>

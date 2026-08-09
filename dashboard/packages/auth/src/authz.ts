@@ -13,12 +13,35 @@
  * gate whether the Drive feature is usable, not which connections can be read.
  */
 
-import { ALL_PERMISSIONS, isAllowed, type PolicyStatement, type Permission } from "@polaris/core";
 import { prisma } from "@polaris/db";
-import { resolvePrincipalPolicyStatements } from "./policies.js";
+import {
+    resolvePrincipalPolicyStatements,
+    resolvePrincipalPolicyStatementsBySource,
+    type PrincipalType
+} from "./policies.js";
+import { holdsAnyGrantCarrying, resourceGrantStatements } from "./resource-grants.js";
+import {
+    ALL_PERMISSIONS,
+    evaluateStatements,
+    isAllowed,
+    resourceString,
+    type Permission,
+    type PolicyStatement,
+    type ResourceRef
+} from "@polaris/core";
 
 /** A sentinel resource for global (non-resource-scoped) capability checks. */
 const GLOBAL_RESOURCE = "*";
+
+/** A role's stored grant list. Malformed JSON grants nothing. */
+function parseRoleGrants(raw: string): string[] {
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+    } catch {
+        return [];
+    }
+}
 
 /** Compile a user's role permissions into allow-everywhere statements. */
 async function roleStatements(userId: string): Promise<PolicyStatement[]> {
@@ -26,20 +49,13 @@ async function roleStatements(userId: string): Promise<PolicyStatement[]> {
         where: { userId },
         select: { role: { select: { permissions: true } } }
     });
-    const statements: PolicyStatement[] = [];
-    for (const row of rows) {
-        let keys: string[] = [];
-        try {
-            const parsed = JSON.parse(row.role.permissions);
-            if (Array.isArray(parsed)) keys = parsed.filter((value): value is string => typeof value === "string");
-        } catch {
-            keys = [];
-        }
-        for (const key of keys) {
-            statements.push({ effect: "allow", actions: [key], resources: ["*"] });
-        }
-    }
-    return statements;
+    return rows.flatMap((row) =>
+        parseRoleGrants(row.role.permissions).map((key) => ({
+            effect: "allow" as const,
+            actions: [key],
+            resources: ["*"]
+        }))
+    );
 }
 
 /**
@@ -54,12 +70,137 @@ export async function resolveGlobalStatements(userId: string): Promise<PolicySta
     return [...roles, ...policies];
 }
 
+/** Where a statement came from, for the screen that has to explain an answer
+ *  rather than only give one. */
+export type StatementSource =
+    | { readonly kind: "role"; readonly id: string; readonly name: string }
+    | {
+          readonly kind: "policy";
+          readonly id: string;
+          readonly name: string;
+          readonly principalType: PrincipalType;
+          readonly principalId: string;
+      };
+
+export interface SourcedStatements {
+    readonly source: StatementSource;
+    readonly statements: PolicyStatement[];
+}
+
+/**
+ * The same statements, still attributed.
+ *
+ * `resolveGlobalStatements` is a flatten of this. Kept as one resolution rather
+ * than two so an explanation of somebody's access can never say something the
+ * decision would not.
+ */
+export async function resolveGlobalStatementsBySource(userId: string): Promise<SourcedStatements[]> {
+    const [roles, policies] = await Promise.all([
+        prisma.userRole.findMany({
+            where: { userId },
+            select: { role: { select: { id: true, name: true, permissions: true } } }
+        }),
+        resolvePrincipalPolicyStatementsBySource(userId)
+    ]);
+    const fromRoles: SourcedStatements[] = roles.map((row) => ({
+        source: { kind: "role", id: row.role.id, name: row.role.name },
+        statements: parseRoleGrants(row.role.permissions).map((key) => ({
+            effect: "allow" as const,
+            actions: [key],
+            resources: ["*"]
+        }))
+    }));
+    const fromPolicies: SourcedStatements[] = policies.map((entry) => ({
+        source: {
+            kind: "policy",
+            id: entry.policyId,
+            name: entry.policyName,
+            principalType: entry.principalType,
+            principalId: entry.principalId
+        },
+        statements: entry.statements
+    }));
+    return [...fromRoles, ...fromPolicies];
+}
+
 /** Whether a user holds a global capability. Admins are allowed everything. */
 export async function can(userId: string, permission: Permission | typeof ALL_PERMISSIONS): Promise<boolean> {
     const admin = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
     if (admin?.isAdmin) return true;
     const statements = await resolveGlobalStatements(userId);
     return isAllowed(statements, permission, GLOBAL_RESOURCE);
+}
+
+/**
+ * The statements that decide reach: the policies attached to this user and the
+ * grants written on individual things.
+ *
+ * Role grants are deliberately absent, and this is the load-bearing line of the
+ * whole design. `roleStatements` compiles every role permission as
+ * `resources: ["*"]`, so feeding them in here would make the seeded `member` role -
+ * which carries `games.manage`, `deploy.manage` and `tasks.manage` - reach every
+ * other account's server the moment a call site stopped filtering by owner. A role
+ * answers "may this account use the feature at all"; ownership and these
+ * statements answer "on which one".
+ *
+ * The same split Drive has always made (see drive-acl-service), now written once
+ * for every kind of thing.
+ */
+export async function resolveResourceStatements(userId: string): Promise<PolicyStatement[]> {
+    const [policies, grants] = await Promise.all([
+        resolvePrincipalPolicyStatements(userId),
+        resourceGrantStatements(userId)
+    ]);
+    return [...policies, ...grants];
+}
+
+/**
+ * Whether a user may do something to one particular thing.
+ *
+ * Two gates, both of which have to pass, and a deny that overrides either:
+ *
+ *   1. An administrator passes everything, as everywhere else.
+ *   2. Policies and resource grants are resolved at the thing itself. An explicit
+ *      deny ends it; an allow is enough on its own, which is what lets somebody
+ *      holding no global permission at all reach exactly one server.
+ *   3. Failing that, the owner passes - but only while they still hold the global
+ *      capability, so a viewer who owns a server stays a viewer on it.
+ *
+ * Note that (2) precedes (3), so a deny takes a thing away from its own owner.
+ * That is deliberate, and it is how an operator suspends somebody's reach without
+ * taking the thing off them. It differs from Drive, where the owner short-circuits
+ * before policies are read; Drive is left as it is rather than changed underneath
+ * rows that already exist.
+ */
+export async function canOn(
+    userId: string,
+    permission: Permission,
+    ref: ResourceRef,
+    opts?: { ownerId?: string | null }
+): Promise<boolean> {
+    const account = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
+    if (account?.isAdmin) return true;
+
+    const statements = await resolveResourceStatements(userId);
+    const decision = evaluateStatements(statements, permission, resourceString(ref));
+    if (decision === "deny") return false;
+    if (decision === "allow") return true;
+
+    return opts?.ownerId === userId && (await can(userId, permission));
+}
+
+/**
+ * Held globally, or on at least one thing.
+ *
+ * What a landing page and the app switcher ask. Without it an account granted one
+ * game server holds no global `games.read`, so the rail hides Game servers and the
+ * page it was given access to turns it away - access it can reach only by being
+ * sent the link every time. Never a substitute for `can`: the surfaces that create
+ * things stay on the global question.
+ */
+export async function canAny(userId: string, permission: Permission): Promise<boolean> {
+    if (await can(userId, permission)) return true;
+    return holdsAnyGrantCarrying(userId, permission);
 }
 
 /**

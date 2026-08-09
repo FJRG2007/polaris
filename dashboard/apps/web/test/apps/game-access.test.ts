@@ -12,7 +12,14 @@
 import { describe, expect, it } from "vitest";
 import { parseJoinAddresses } from "@/lib/apps/minecraft/parse";
 import { describePorts, gameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
-import { accessRefusal, addressMatches, isAddressRule, isPlayerName, joinAccess } from "@/lib/apps/minecraft/access";
+import {
+    accessRefusal,
+    addressesFor,
+    addressMatches,
+    isAddressRule,
+    isPlayerName,
+    joinAccess
+} from "@/lib/apps/minecraft/access";
 
 describe("addressMatches", () => {
     it("accepts the exact address it was given", () => {
@@ -90,6 +97,29 @@ describe("accessRefusal", () => {
 
     it("matches the name however it was capitalized", () => {
         expect(accessRefusal("steve", "203.0.113.9", allowed)).toBeNull();
+    });
+
+    // One person plays from more than one place. Reading only the first rule
+    // written for a name is what made a second address impossible: the same
+    // player on their laptop was refused by the rule written for their desk.
+    it("lets a player in from any address they are registered to", () => {
+        const both = [
+            { username: "Steve", address: "203.0.113.9" },
+            { username: "Steve", address: "198.51.100.0/24" }
+        ];
+        expect(accessRefusal("Steve", "203.0.113.9", both)).toBeNull();
+        expect(accessRefusal("Steve", "198.51.100.4", both)).toBeNull();
+        expect(accessRefusal("Steve", "192.0.2.7", both)).toContain("different network");
+    });
+
+    it("gathers every address one player holds", () => {
+        const both = [
+            { username: "Steve", address: "203.0.113.9" },
+            { username: "Alex", address: "any" },
+            { username: "steve", address: "198.51.100.0/24" }
+        ];
+        expect(addressesFor("STEVE", both)).toEqual(["203.0.113.9", "198.51.100.0/24"]);
+        expect(addressesFor("Nobody", both)).toEqual([]);
     });
 });
 

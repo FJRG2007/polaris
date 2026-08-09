@@ -108,16 +108,29 @@ export interface PlayerAccess {
     readonly address: string;
 }
 
-/** Why a connected player is not allowed to be, or null when they are. */
+/** Every address one player is allowed to arrive from. A person is one name and
+ *  as many places as they actually play from. */
+export function addressesFor(player: string, allowed: readonly PlayerAccess[]): string[] {
+    const name = player.toLowerCase();
+    return allowed.filter((item) => item.username.toLowerCase() === name).map((item) => item.address);
+}
+
+/**
+ * Why a connected player is not allowed to be, or null when they are.
+ *
+ * Any one of their addresses is enough. Matching only the first rule found was
+ * what made a second address impossible: the same person on their laptop was
+ * refused by the rule written for their desk.
+ */
 export function accessRefusal(
     player: string,
     address: string | null,
     allowed: readonly PlayerAccess[]
 ): string | null {
-    const entry = allowed.find((item) => item.username.toLowerCase() === player.toLowerCase());
-    if (!entry) return "You are not on this server's player list.";
+    const addresses = addressesFor(player, allowed);
+    if (addresses.length === 0) return "You are not on this server's player list.";
     if (address === null) return null;
-    return addressMatches(entry.address, address)
+    return addresses.some((rule) => addressMatches(rule, address))
         ? null
         : "Your account is registered to a different network. Ask the server's owner to add this one.";
 }
