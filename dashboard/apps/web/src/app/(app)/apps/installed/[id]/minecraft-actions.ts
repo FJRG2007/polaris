@@ -1236,7 +1236,10 @@ const takeSchema = z.object({
     installedAppId: z.string().uuid(),
     player: playerNameSchema,
     item: itemIdSchema,
-    count: z.number().int().min(1).max(64)
+    /** A total, not a stack, and the same ceiling giving has: taking back what was
+     *  just handed over is the commonest reason to reach for this, so a lower
+     *  limit here would refuse the mirror of an amount the panel accepted. */
+    count: z.number().int().min(1).max(2304)
 });
 
 /** Take a number of one item away, wherever it is in the bag. Queued when the

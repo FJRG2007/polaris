@@ -103,9 +103,6 @@ export function ItemPicker({
     }, [items, query, searching, recent]);
     const shown = matches.slice(0, SHOWN);
     const more = matches.length > SHOWN;
-    /** How many of the tiles on screen are the recent ones, so the note under the
-     *  grid describes what is actually there rather than the whole of it. */
-    const lately = searching || !recent ? 0 : Math.min(recent.length, SHOWN);
     // A written-out id nobody has a picture for is still a real item on a modded
     // server, so it is offered rather than refused.
     const typed = typedItemId(query);
@@ -136,11 +133,6 @@ export function ItemPicker({
                 </p>
             ) : (
                 <>
-                    {lately > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                            {lately === 1 ? "The first one was" : `The first ${lately} were`} given here lately.
-                        </p>
-                    )}
                     <ul
                         aria-label="Items"
                         className="grid max-h-56 grid-cols-8 gap-1 overflow-y-auto rounded-md border border-border bg-surface/40 p-1"

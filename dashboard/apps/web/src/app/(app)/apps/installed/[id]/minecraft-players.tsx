@@ -30,7 +30,6 @@ import { timeoutFor, type PlayerTimeout } from "@/lib/apps/minecraft/timeout";
 import { describeQueued, waitingOn, type QueuedAction } from "@/lib/apps/minecraft/queue";
 import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
 import {
-    GiveItemDialog,
     HistoryDialog,
     InventoryDialog,
     LocationDialog,
@@ -64,7 +63,6 @@ import {
     LocateFixed,
     MapPin,
     MoreHorizontal,
-    PackagePlus,
     Search,
     ShieldBan,
     ShieldMinus,
@@ -438,30 +436,6 @@ export function MinecraftPlayers({
                 </table>
             </div>
 
-            {acting?.dialog === "give" && (
-                <GiveItemDialog
-                    installedAppId={installedAppId}
-                    player={acting.player.name}
-                    online={acting.player.online}
-                    canEdit={!bedrock}
-                    waiting={waiting.filter(
-                        (entry) => entry.username.toLowerCase() === acting.player.name.toLowerCase()
-                    )}
-                    pending={pending}
-                    onClose={() => setActing(null)}
-                    onGive={(item, count) => {
-                        setActing(null);
-                        run(() =>
-                            actions.givePlayerItemAction({
-                                installedAppId,
-                                player: acting.player.name,
-                                item,
-                                count
-                            })
-                        );
-                    }}
-                />
-            )}
             {acting?.dialog === "teleport" && (
                 <TeleportDialog
                     player={acting.player.name}
@@ -507,6 +481,7 @@ export function MinecraftPlayers({
                     // palette - which is written down and given when they join.
                     canEdit={!bedrock}
                     onClose={() => setActing(null)}
+                    onChanged={onChanged}
                 />
             )}
             {acting?.dialog === "location" && (
@@ -831,18 +806,17 @@ function MoreActions({
             <DropdownMenuContent align="end">
                 <DropdownMenuLabel>{player.name}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {/* Not gated on being online. The question - what were they
+                {/* One door for looking at the bag and for changing what is in it:
+                    somebody who opens it to see what is missing is the same person
+                    who then hands it over, and they were two forms drawing the
+                    same grid twice.
+
+                    Not gated on being online either. The question - what were they
                     carrying - is nearly always asked about somebody who logged
-                    off, which is what the snapshots are for; gating this on
-                    `player.online` put the only door to them behind the one state
-                    they do not cover. */}
+                    off, which is what the snapshots are for, and what cannot happen
+                    now is written down and happens when they next join. */}
                 <DropdownMenuItem disabled={!live} onSelect={() => onOpen("inventory")}>
-                    <Backpack className="size-4" /> Inventory
-                </DropdownMenuItem>
-                {/* Offline is not a reason to hide it: what cannot happen now is
-                    written down and happens when they next join. */}
-                <DropdownMenuItem disabled={!live} onSelect={() => onOpen("give")}>
-                    <PackagePlus className="size-4" /> Give an item
+                    <Backpack className="size-4" /> Inventory and items
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={!live || !player.online} onSelect={() => onOpen("location")}>
                     <LocateFixed className="size-4" /> Where they are

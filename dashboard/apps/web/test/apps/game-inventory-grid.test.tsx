@@ -75,6 +75,36 @@ describe("InventoryGrid", () => {
         expect(markup).toContain("76 items in 2 stacks");
     });
 
+    it("draws a stack that is only written down in the slot it is waiting for", () => {
+        // The whole reason it is drawn: an item given to somebody who is not on
+        // the server cannot be in the bag yet, and a drop that left the square
+        // empty was indistinguishable from a drop that had failed.
+        const markup = renderToStaticMarkup(
+            <InventoryGrid
+                items={[]}
+                pending={[{ id: "queued-1", slot: 4, item: "minecraft:lantern", count: 3 }]}
+            />
+        );
+        expect(markup).toContain("/mcicons/minecraft_lantern.png");
+        expect(markup).toContain("Hotbar 5: 3 x Lantern waiting for them to join");
+        expect(markup).toContain(">3</span>");
+        expect(markup).toContain("1 stack is waiting for them to join.");
+    });
+
+    it("leaves a slot they are already carrying something in alone", () => {
+        // The queued write replaces it when they join. Drawing both in one square
+        // would be drawing a bag that exists in neither version.
+        const markup = renderToStaticMarkup(
+            <InventoryGrid
+                items={[{ slot: 4, id: "minecraft:stone", count: 1 }]}
+                pending={[{ id: "queued-1", slot: 4, item: "minecraft:lantern", count: 3 }]}
+            />
+        );
+        expect(markup).toContain("/mcicons/minecraft_stone.png");
+        expect(markup).not.toContain("minecraft_lantern");
+        expect(markup).not.toContain("waiting for them to join");
+    });
+
     it("says so when the bag is empty, instead of showing a wall of nothing", () => {
         const markup = renderToStaticMarkup(<InventoryGrid items={[]} />);
         expect(markup).toContain("Nothing in it.");

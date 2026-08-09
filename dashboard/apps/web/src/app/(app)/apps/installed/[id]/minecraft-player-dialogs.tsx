@@ -10,27 +10,23 @@
  *
  * Every field is checked here against the same rules the server action checks it
  * against, so a wrong item id says so before it is a failed command in the log.
- * The two that read rather than change - what somebody is carrying, where they
- * are standing - share their states, because a refresh that behaved differently
- * between them would be a difference nobody could see the reason for.
+ * What somebody is carrying is the one that reads and writes, and it owns its own
+ * reading: the editor inside it re-reads while the player is on the server, which
+ * is not something a one-shot read shared with the others could do.
  */
 
 import * as actions from "./minecraft-actions";
-import { ItemPicker } from "./minecraft-item-picker";
-import { InventoryGrid } from "./minecraft-inventory";
 import { CopyButton } from "@/components/copy-button";
 import { useCallback, useEffect, useState } from "react";
 import { InventoryEditor } from "./minecraft-inventory-editor";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/minecraft/timeout";
-import { stacksFor, typedItemId } from "@/lib/apps/minecraft/items";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
-import { describeQueued, type QueuedAction } from "@/lib/apps/minecraft/queue";
-import { Backpack, Loader2, MapPin, RefreshCw, TriangleAlert } from "lucide-react";
+import { Loader2, MapPin, RefreshCw, TriangleAlert } from "lucide-react";
 import { dimensionLabel, formatCoordinates, type PlayerPosition } from "@/lib/apps/minecraft/position";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
 
 /** Which of the forms is open, or none. */
-export type PlayerDialog = "give" | "teleport" | "timeout" | "inventory" | "location" | "history";
+export type PlayerDialog = "teleport" | "timeout" | "inventory" | "location" | "history";
 
 /** Three coordinates, absolute or `~` relative. */
 const COORDINATES = /^~?-?\d{1,7}(?:\.\d{1,3})?\s+~?-?\d{1,7}(?:\.\d{1,3})?\s+~?-?\d{1,7}(?:\.\d{1,3})?$/;
@@ -48,181 +44,6 @@ const TIMEOUT_PRESETS = [
     { value: "1440", label: "1 day" },
     { value: "custom", label: "Another length" }
 ];
-
-/** A bag's worth: 36 slots of 64. Past it the rest is on the floor, so it is
- *  where the field stops rather than a number pulled out of the air. */
-const MOST_THAT_FITS = 2304;
-
-/** A bag nobody has a copy of. Not empty-because-they-carry-nothing - `takenAt`
- *  is null, which is how the editor knows to say which of the two it is. */
-const EMPTY_BAG = { items: [], live: false, takenAt: null } as const satisfies actions.InventoryReading;
-
-/**
- * Hand somebody something, with their bag on the screen.
- *
- * It used to be a search box and a number, which answers the question "what is
- * the id of the thing I want" and none of the ones an operator actually has:
- * whether they already have one, whether there is room, what they are carrying
- * that this is meant to go with. So the bag is here, and when the player is on
- * the server it is the editor - the same drag-into-a-slot the inventory screen
- * has, because "put this in their off-hand" is a different request from "give
- * them one" and both were being asked through the same form.
- *
- * A bag that cannot be read is drawn empty rather than left out. Empty is what
- * an operator can act on; a missing panel is one they have to go and check.
- */
-export function GiveItemDialog({
-    installedAppId,
-    player,
-    online,
-    canEdit,
-    waiting,
-    pending,
-    onClose,
-    onGive
-}: {
-    installedAppId: string;
-    player: string;
-    /** Whether they are standing on the server, which decides whether this hands
-     *  the item over now or writes it down for when they next join. */
-    online: boolean;
-    /** False on Bedrock, which answers no `data get`, so the bag is a picture. */
-    canEdit: boolean;
-    /** What is already written down for this player, so nobody queues a second
-     *  copy of something they cannot see they already asked for. */
-    waiting: readonly QueuedAction[];
-    pending: boolean;
-    onClose: () => void;
-    onGive: (item: string, count: number) => void;
-}) {
-    const [query, setQuery] = useState("");
-    const [picked, setPicked] = useState<string | null>(null);
-    const [count, setCount] = useState("1");
-    const [reading, setReading] = useState<actions.InventoryReading | null>(null);
-    const [recent, setRecent] = useState<string[]>([]);
-    const [loaded, setLoaded] = useState(false);
-    const parsedCount = Number.parseInt(count, 10);
-    // A written-out id counts as a choice, so an operator who knows exactly what
-    // they want can type it and press Enter. Half a word on the way to one does
-    // not: `minecraft:swor` is a well-formed id and no item at all.
-    const item = picked ?? typedItemId(query);
-    const countError =
-        !Number.isInteger(parsedCount) || parsedCount < 1 || parsedCount > MOST_THAT_FITS
-            ? `Between 1 and ${MOST_THAT_FITS}`
-            : null;
-    const stacks = item && !countError ? stacksFor(item, parsedCount) : [];
-
-    useEffect(() => {
-        let live = true;
-        void Promise.all([
-            actions.readPlayerInventoryAction(installedAppId, player),
-            actions.recentItemsAction(installedAppId)
-        ]).then(([bag, items]) => {
-            if (!live) return;
-            setReading(bag.reading ?? null);
-            setRecent(items.items);
-            setLoaded(true);
-        });
-        return () => {
-            live = false;
-        };
-    }, [installedAppId, player]);
-
-    return (
-        <Shell
-            size="lg"
-            title={`Give ${player} an item`}
-            description={
-                online
-                    ? "It goes straight into their inventory, or drops at their feet when there is no room."
-                    : "They are not on the server, so this is written down and happens when they next join."
-            }
-            onClose={onClose}
-            pending={pending}
-            // With the editor on screen the giving happens in it, as it happens -
-            // so the footer closes rather than offering a second, weaker way to do
-            // the same thing, and a button that could only ever sit disabled.
-            ready={canEdit ? !pending : item !== null && !countError && !pending}
-            confirmLabel={canEdit ? "Done" : online ? "Give" : "Save it for later"}
-            onConfirm={() => {
-                if (canEdit) {
-                    onClose();
-                    return;
-                }
-                if (item !== null) onGive(item, parsedCount);
-            }}
-        >
-            {/* The whole editor, so an item can be dropped into the slot it is
-                meant for instead of landing wherever there is room. Offline is not
-                an exception: the editor refuses to move what it cannot re-read and
-                still takes a drop from the palette, which is saved for their next
-                join. On Bedrock there is nothing to read or write, so it is a
-                picture. */}
-            {canEdit ? (
-                <InventoryEditor installedAppId={installedAppId} player={player} reading={reading ?? EMPTY_BAG} />
-            ) : (
-                <div className="flex flex-col gap-1">
-                    <InventoryGrid items={reading?.items ?? []} />
-                    <p className="text-xs text-muted-foreground">
-                        {!loaded
-                            ? "Reading their bag..."
-                            : reading
-                              ? "As the server last had it."
-                              : "No copy of their bag yet - one is kept every ten minutes while they play."}
-                    </p>
-                </div>
-            )}
-
-            {waiting.length > 0 && (
-                <div className="flex flex-col gap-1 rounded-md border border-border bg-surface/40 px-3 py-2">
-                    <p className="text-xs font-medium">Already waiting for {player}</p>
-                    <ul className="flex flex-col gap-0.5">
-                        {waiting.map((entry) => (
-                            <li key={entry.id} className="text-xs text-muted-foreground">
-                                {describeQueued(entry)}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-
-            {/* Only where the editor is not. Two palettes in one form is one
-                palette that drags and one that looks identical and does not,
-                which is indistinguishable from the drag being broken. */}
-            {!canEdit && (
-                <>
-                    <ItemPicker
-                        value={item}
-                        query={query}
-                        recent={recent}
-                        onQueryChange={(next) => {
-                            setQuery(next);
-                            // Typing again is somebody looking for something else;
-                            // keeping the old tile selected would hand out the
-                            // previous item.
-                            setPicked(null);
-                        }}
-                        onSelect={setPicked}
-                    />
-                    <Field label="How many" error={countError}>
-                        <Input
-                            type="number"
-                            min={1}
-                            max={MOST_THAT_FITS}
-                            value={count}
-                            onChange={(event) => setCount(event.target.value)}
-                        />
-                    </Field>
-                    {stacks.length > 1 && (
-                        <p className="text-xs text-muted-foreground">
-                            {stacks.length} stacks: {stacks.join(" + ")}.
-                        </p>
-                    )}
-                </>
-            )}
-        </Shell>
-    );
-}
 
 export function TeleportDialog({
     player,
@@ -339,23 +160,25 @@ export function TimeoutDialog({
 }
 
 /**
- * What a player is carrying, and the way to change it.
+ * What a player is carrying, and everything done to it.
  *
- * Opened with one read, and from there the editor owns the refreshing: while the
- * player is on the server it re-reads every couple of seconds so two people
- * moving things around see the same bag, and it stops while a drag is in the air.
- * For a player who is not on, the read falls back to the last copy Polaris kept
- * and the editor says how old it is.
+ * One screen rather than two. Looking at a bag and handing somebody an item were
+ * separate forms, which meant an operator who opened the first to see what was
+ * missing had to close it and open the second to do anything about it - and the
+ * second drew the same bag again, from its own read.
  *
- * The install is named rather than handed a reader, because the screen behind
- * this polls: a closure passed down would be a new function on every tick and the
- * read would fire again with it, once every five seconds, unasked.
+ * The editor owns the reading and the refreshing: while the player is on the
+ * server it re-reads every couple of seconds so two people moving things around
+ * see the same bag, and it stops while a drag is in the air. Nothing here waits
+ * on that read - the grid is drawn empty and fills in - because a dialog that is
+ * a spinner for a second is a dialog somebody presses twice.
  */
 export function InventoryDialog({
     installedAppId,
     player,
     canEdit,
-    onClose
+    onClose,
+    onChanged
 }: {
     installedAppId: string;
     player: string;
@@ -363,40 +186,34 @@ export function InventoryDialog({
      *  commands cannot answer this at all. */
     canEdit: boolean;
     onClose: () => void;
+    /** The screen behind lists what is waiting to reach this player too, so a
+     *  write that lands in that queue has to ask it to read the list again. */
+    onChanged: () => void;
 }) {
-    const read = useCallback(
-        () => actions.readPlayerInventoryAction(installedAppId, player),
-        [installedAppId, player]
-    );
-    const { data, error, loading, refresh } = useServerRead(read);
-    const reading = data?.reading ?? null;
-
     return (
-        <Reading
-            title={`${player}'s inventory`}
-            description={canEdit ? "Drag to rearrange it." : "As the server last had it."}
-            icon={<Backpack className="size-6" />}
-            loadingLabel="Reading it from the server..."
-            empty="Nothing in it."
-            loading={loading}
-            // A bag that could not be read is not a dead end for somebody who may
-            // edit it: the shell shows an error INSTEAD of its children, so
-            // passing this one through is what left an operator with a sentence
-            // and nothing to drag onto. The editor draws the empty bag and says
-            // why itself.
-            error={canEdit ? null : error}
-            onRefresh={refresh}
-            onClose={onClose}
-        >
-            {canEdit ? (
-                <div className="flex flex-col gap-2">
-                    {error && <p className="text-xs text-muted-foreground">{error}</p>}
-                    <InventoryEditor installedAppId={installedAppId} player={player} reading={reading ?? EMPTY_BAG} />
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle>{player}&apos;s inventory</DialogTitle>
+                    <DialogDescription>
+                        {canEdit
+                            ? "Drag to rearrange it, or drop an item from the palette into a slot."
+                            : "As the server last had it."}
+                    </DialogDescription>
+                </DialogHeader>
+                <InventoryEditor
+                    installedAppId={installedAppId}
+                    player={player}
+                    editable={canEdit}
+                    onChanged={onChanged}
+                />
+                <div className="flex justify-end">
+                    <Button variant="ghost" onClick={onClose}>
+                        Close
+                    </Button>
                 </div>
-            ) : reading ? (
-                <InventoryGrid items={reading.items} />
-            ) : null}
-        </Reading>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -468,9 +285,9 @@ function Coordinates({ player, position }: { player: string; position: PlayerPos
     );
 }
 
-/** One read of the running server, with the states a read has. Shared because the
- *  inventory and the position are the same thing asked twice, and a refresh that
- *  behaved differently between them would be a bug nobody could see. */
+/** One read of the running server, with the states a read has, in the shape the
+ *  frame below expects. The bag no longer goes through it - a screen that is
+ *  written to has to re-read itself, which is the editor's own job. */
 function useServerRead<T extends { error?: string }>(read: () => Promise<T>): {
     data: T | null;
     error: string | null;
@@ -648,7 +465,7 @@ export function HistoryDialog({
     );
 }
 
-/** The frame the three forms share, so they agree about where the buttons are. */
+/** The frame the two forms share, so they agree about where the buttons are. */
 function Shell({
     title,
     description,
@@ -658,8 +475,7 @@ function Shell({
     confirmLabel,
     ready,
     pending,
-    danger,
-    size = "sm"
+    danger
 }: {
     title: string;
     description: string;
@@ -670,21 +486,10 @@ function Shell({
     ready: boolean;
     pending: boolean;
     danger?: boolean;
-    /** Wider for the form that holds a grid of pictures rather than two fields,
-     *  and wider still for the one that holds a whole bag as well. */
-    size?: "sm" | "md" | "lg";
 }) {
     return (
         <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
-            <DialogContent
-                className={
-                    size === "lg"
-                        ? "max-h-[85vh] max-w-2xl overflow-y-auto"
-                        : size === "md"
-                          ? "max-w-md"
-                          : "max-w-sm"
-                }
-            >
+            <DialogContent className="max-w-sm">
                 <DialogHeader>
                     <DialogTitle>{title}</DialogTitle>
                     <DialogDescription>{description}</DialogDescription>

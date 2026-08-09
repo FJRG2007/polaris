@@ -16,8 +16,14 @@
  * Read-only unless it is handed the handlers that make it otherwise. Without them
  * it renders exactly what it always did - inert cells with a title - so the places
  * that only report a bag are not paying for an editor they do not offer.
+ *
+ * It also draws what is not in the bag yet. An item given to somebody who is not
+ * on the server is written down rather than handed over, and a drop that left
+ * nothing on the screen read as a drop that had failed - so the waiting stack is
+ * drawn in the slot it is waiting for, faded, and can be called back off it.
  */
 
+import { X } from "lucide-react";
 import { cn } from "@polaris/ui";
 import { ItemIcon } from "./minecraft-item-icon";
 import { itemLabel } from "@/lib/apps/minecraft/items";
@@ -44,6 +50,22 @@ const COUNT_OUTLINE = {
     ].join(", ")
 } as const;
 
+/** How small a slot is allowed to get, and how large it is allowed to grow. A bag
+ *  is nine columns whatever it is drawn inside, so without a floor a narrow column
+ *  turns the game's own layout into forty stamps nobody can read. */
+const SLOT_MIN = "2.25rem";
+const SLOT_MAX = 3.25;
+
+/** A stack somebody asked for that the server could not be told about yet: the
+ *  player was not on, so it is waiting for them to join. */
+export interface PendingStack {
+    /** The queued action it came from, so it can be called back off the slot. */
+    readonly id: string;
+    readonly slot: number;
+    readonly item: string;
+    readonly count: number;
+}
+
 /** What a grid needs to be draggable. Absent on every screen that only reports. */
 export interface SlotHandlers {
     /** A stack was picked up. Null when the drag ended without a drop. */
@@ -58,24 +80,37 @@ export interface SlotHandlers {
 
 export function InventoryGrid({
     items,
-    handlers
+    pending,
+    handlers,
+    onCancelPending
 }: {
     items: readonly InventoryItem[];
+    /** Stacks waiting for the player to join, drawn in the slot they will land in. */
+    pending?: readonly PendingStack[];
     handlers?: SlotHandlers;
+    /** Called with a waiting stack's queued id to call it back off the slot. */
+    onCancelPending?: (id: string) => void;
 }) {
     const slots = bySlot(items);
     const extra = extraSlots(items);
     const total = items.reduce((sum, item) => sum + item.count, 0);
+    // A slot the player is already carrying something in wins: the queued write
+    // will replace it when they join, and drawing both in one square would be
+    // drawing a bag that does not exist in either version.
+    const waiting = new Map(
+        (pending ?? []).filter((stack) => !slots.has(stack.slot)).map((stack) => [stack.slot, stack])
+    );
+    const shared = { at: slots, waiting, handlers, ...(onCancelPending ? { onCancelPending } : {}) };
 
     return (
         <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-end gap-6">
-                <Section label="Worn" slots={ARMOUR_SLOTS} at={slots} columns={4} handlers={handlers} />
-                <Section label="Offhand" slots={[OFFHAND_SLOT]} at={slots} columns={1} handlers={handlers} />
+                <Section label="Worn" slots={ARMOUR_SLOTS} columns={4} {...shared} />
+                <Section label="Offhand" slots={[OFFHAND_SLOT]} columns={1} {...shared} />
             </div>
 
-            <Section label="Bag" slots={MAIN_SLOT_ROWS.flat()} at={slots} columns={9} grow handlers={handlers} />
-            <Section label="Hotbar" slots={HOTBAR_SLOTS} at={slots} columns={9} grow handlers={handlers} />
+            <Section label="Bag" slots={MAIN_SLOT_ROWS.flat()} columns={9} grow {...shared} />
+            <Section label="Hotbar" slots={HOTBAR_SLOTS} columns={9} grow {...shared} />
 
             {/* Vanilla has nowhere else to put an item, so anything here came from
                 a mod - worth showing rather than quietly dropping. Never editable:
@@ -90,6 +125,8 @@ export function InventoryGrid({
                     : `${total} ${total === 1 ? "item" : "items"} in ${items.length} ${
                           items.length === 1 ? "stack" : "stacks"
                       }.`}
+                {waiting.size > 0 &&
+                    ` ${waiting.size} ${waiting.size === 1 ? "stack is" : "stacks are"} waiting for them to join.`}
             </p>
         </div>
     );
@@ -101,30 +138,48 @@ function Section({
     label,
     slots,
     at,
+    waiting,
     columns,
     grow,
-    handlers
+    handlers,
+    onCancelPending
 }: {
     label: string;
     slots: readonly number[];
     at: Map<number, InventoryItem>;
+    /** What is queued for each slot, where nothing is in it yet. */
+    waiting?: Map<number, PendingStack>;
     columns: 1 | 4 | 9;
     /** Whether the block fills the width, which only the nine-wide ones do. */
     grow?: boolean;
     handlers?: SlotHandlers;
+    onCancelPending?: (id: string) => void;
 }) {
-    const template = { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` };
+    const template = { gridTemplateColumns: `repeat(${columns}, minmax(${SLOT_MIN}, 1fr))` };
 
     return (
-        <div className={grow ? "flex flex-col gap-1" : "flex shrink-0 flex-col gap-1"}>
+        <div className={grow ? "flex min-w-0 flex-col gap-1" : "flex shrink-0 flex-col gap-1"}>
             <span className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">{label}</span>
             <ul
                 aria-label={label}
-                style={grow ? template : { ...template, width: `${columns * 2.5}rem` }}
+                // Capped as well as floored: nine slots stretched across a wide
+                // dialog stop looking like the bag they are a picture of.
+                style={
+                    grow
+                        ? { ...template, maxWidth: `${columns * SLOT_MAX}rem` }
+                        : { ...template, width: `${columns * SLOT_MAX}rem` }
+                }
                 className="grid gap-1"
             >
                 {slots.map((slot) => (
-                    <Slot key={slot} slot={slot} item={at.get(slot) ?? null} handlers={handlers} />
+                    <Slot
+                        key={slot}
+                        slot={slot}
+                        item={at.get(slot) ?? null}
+                        pending={waiting?.get(slot) ?? null}
+                        handlers={handlers}
+                        {...(onCancelPending ? { onCancelPending } : {})}
+                    />
                 ))}
             </ul>
         </div>
@@ -134,11 +189,16 @@ function Section({
 function Slot({
     slot,
     item,
-    handlers
+    pending,
+    handlers,
+    onCancelPending
 }: {
     slot: number;
     item: InventoryItem | null;
+    /** A stack written down for this slot, where the slot is otherwise empty. */
+    pending?: PendingStack | null;
     handlers?: SlotHandlers;
+    onCancelPending?: (id: string) => void;
 }) {
     const where = slotLabel(slot);
     // A stack whose data cannot be written back exactly is not draggable at all,
@@ -159,6 +219,43 @@ function Slot({
               }
           }
         : {};
+
+    if (!item && pending) {
+        const name = itemLabel(pending.item);
+        const what = `${pending.count} x ${name}`;
+        return (
+            <li
+                title={`${what} - ${where}, when they next join`}
+                aria-label={`${where}: ${what} waiting for them to join`}
+                {...dropProps}
+                className="relative aspect-square rounded border border-dashed border-primary/60 bg-primary/5 p-0.5"
+            >
+                <ItemIcon id={pending.item} className="size-full opacity-60" />
+                {pending.count > 1 && (
+                    <span
+                        style={COUNT_OUTLINE}
+                        className="pointer-events-none absolute bottom-0 right-0.5 text-[0.625rem] font-bold leading-none tabular-nums"
+                    >
+                        {pending.count}
+                    </span>
+                )}
+                {/* Called back from the slot it is waiting in rather than only from
+                    a list somewhere else: the square is where somebody looks when
+                    they change their mind about what they just dropped. */}
+                {onCancelPending && (
+                    <button
+                        type="button"
+                        title={`Call back ${what}`}
+                        aria-label={`Call back ${what} from ${where}`}
+                        onClick={() => onCancelPending(pending.id)}
+                        className="absolute -right-1 -top-1 rounded-full border border-border bg-surface p-0.5 text-muted-foreground transition-colors hover:text-danger"
+                    >
+                        <X className="size-2.5" />
+                    </button>
+                )}
+            </li>
+        );
+    }
 
     if (!item) {
         return (
