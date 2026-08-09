@@ -123,6 +123,17 @@ export function isDataReply(output: string): boolean {
 }
 
 /**
+ * Whether the server's refusal was "that player is not here".
+ *
+ * The most ordinary reason a bag cannot be read live, and the one worth saying in
+ * those words: quoting the server's own sentence back at somebody reads as a
+ * fault, and this one is not - it is the exact case the kept copies exist for.
+ */
+export function isMissingEntityReply(output: string): boolean {
+    return /no (entit(y|ies)|players?) (was|were) found/i.test(output);
+}
+
+/**
  * The first balanced span in `text` that a reader accepts.
  *
  * Every opening bracket is tried in turn rather than only the first, because the

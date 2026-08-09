@@ -495,8 +495,10 @@ export function MinecraftPlayers({
                     installedAppId={installedAppId}
                     player={acting.player.name}
                     // Bedrock answers no `data get` at all, so there is nothing to
-                    // read live and nothing to write back.
-                    canEdit={!bedrock}
+                    // read live and nothing to write back. Neither is a player who
+                    // is not on the server: what is shown then is a snapshot, and
+                    // dragging a stack around a copy would write nowhere.
+                    canEdit={!bedrock && acting.player.online}
                     onClose={() => setActing(null)}
                 />
             )}
@@ -822,7 +824,12 @@ function MoreActions({
             <DropdownMenuContent align="end">
                 <DropdownMenuLabel>{player.name}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem disabled={!live || !player.online} onSelect={() => onOpen("inventory")}>
+                {/* Not gated on being online. The question - what were they
+                    carrying - is nearly always asked about somebody who logged
+                    off, which is what the snapshots are for; gating this on
+                    `player.online` put the only door to them behind the one state
+                    they do not cover. */}
+                <DropdownMenuItem disabled={!live} onSelect={() => onOpen("inventory")}>
                     <Backpack className="size-4" /> Inventory
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={!live} onSelect={() => onOpen("give")}>

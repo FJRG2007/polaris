@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isDataReply, isMissingEntityReply } from "@/lib/apps/minecraft/snbt";
 import {
     ARMOUR_SLOTS,
     HOTBAR_SLOTS,
@@ -96,6 +97,27 @@ describe("parseInventory", () => {
     it("skips a bracket that holds no stack and keeps looking", () => {
         const reply = 'Alice has the following entity data: [] [{Slot: 2b, id: "minecraft:torch", Count: 3b}]';
         expect(parseInventory(reply)).toEqual([{ slot: 2, id: "minecraft:torch", count: 3, data: null }]);
+    });
+});
+
+describe("telling a refusal apart from an answer", () => {
+    it("recognizes the server saying the player is not there", () => {
+        // The ordinary case for a bag: asked about somebody who logged off. It has
+        // to be said in those words, not quoted back as if something broke.
+        expect(isMissingEntityReply("No entity was found")).toBe(true);
+        expect(isMissingEntityReply("No player was found")).toBe(true);
+        // The plural is "entities", not "entitys" - the shape a naive pattern gets
+        // wrong, and the reply a selector that matched nobody actually returns.
+        expect(isMissingEntityReply("No entities were found")).toBe(true);
+        expect(isMissingEntityReply("No players were found")).toBe(true);
+    });
+
+    it("does not mistake a real answer, or another failure, for it", () => {
+        const reply = 'Alice has the following entity data: [{Slot: 0b, id: "minecraft:stone", Count: 1b}]';
+        expect(isMissingEntityReply(reply)).toBe(false);
+        expect(isDataReply(reply)).toBe(true);
+        // A different refusal keeps being reported as itself.
+        expect(isMissingEntityReply("Unknown or incomplete command")).toBe(false);
     });
 });
 

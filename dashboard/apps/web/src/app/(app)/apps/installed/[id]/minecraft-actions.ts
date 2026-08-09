@@ -15,7 +15,6 @@ import { clientIp } from "@/lib/request-context";
 import { recordAudit } from "@/lib/audit-service";
 import { setEnvVars } from "@/lib/env-var-service";
 import { requirePermissionAny } from "@/lib/session";
-import { isDataReply } from "@/lib/apps/minecraft/snbt";
 import { deployApplication } from "@/lib/deploy-service";
 import { ITEM_ID_PATTERN } from "@/lib/apps/minecraft/items";
 import { stripFormatting } from "@/lib/apps/minecraft/parse";
@@ -26,6 +25,7 @@ import { patchInstallConfig } from "@/lib/apps/install-config";
 import { writeContainerFile } from "@/lib/container-files-service";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/minecraft/timeout";
 import { setGameSchedule } from "@/lib/apps/minecraft/schedule-service";
+import { isDataReply, isMissingEntityReply } from "@/lib/apps/minecraft/snbt";
 import { liftTimeout, timeoutPlayer } from "@/lib/apps/minecraft/timeout-service";
 import { parseInventory, type InventoryItem } from "@/lib/apps/minecraft/inventory";
 import { readSnapshot, writeSnapshot } from "@/lib/apps/minecraft/inventory-service";
@@ -271,6 +271,13 @@ export async function readPlayerInventoryAction(
             // error is.
             const kept = await readSnapshot(parsed.data.installedAppId, parsed.data.player);
             if (kept) return { reading: { items: kept.items, live: false, takenAt: kept.takenAt } };
+            // Offline is the ordinary case here, not a fault, and quoting the
+            // server's "No entity was found" at somebody reads as one.
+            if (isMissingEntityReply(text)) {
+                return {
+                    error: "This player is not on the server, and Polaris has no copy of their bag yet. It keeps one every ten minutes while they are playing."
+                };
+            }
             const said = text.trim().replace(/\s+/g, " ").slice(0, 160);
             return {
                 error: said
