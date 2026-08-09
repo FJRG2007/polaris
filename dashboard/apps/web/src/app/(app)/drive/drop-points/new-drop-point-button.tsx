@@ -9,7 +9,10 @@
  */
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { CalendarClock, Inbox, LayoutTemplate, Trash2 } from "lucide-react";
+import { RequestDialog, type RequestInitial, type RequestTarget } from "../request-dialog";
+import { deleteDropPointTemplateAction, listDropPointTemplatesAction } from "../request-actions";
 import {
     Button,
     Dialog,
@@ -18,8 +21,6 @@ import {
     DialogHeader,
     DialogTitle
 } from "@polaris/ui";
-import { RequestDialog, type RequestInitial, type RequestTarget } from "../request-dialog";
-import { deleteDropPointTemplateAction, listDropPointTemplatesAction } from "../request-actions";
 
 interface TemplateRow {
     id: string;
@@ -80,6 +81,7 @@ export function NewDropPointButton({
 }: {
     connections: { id: string; name: string }[];
 }) {
+    const router = useRouter();
     const [target, setTarget] = useState<RequestTarget | null>(null);
     const [scheduleFocus, setScheduleFocus] = useState(false);
     const [initial, setInitial] = useState<RequestInitial | undefined>(undefined);
@@ -132,6 +134,11 @@ export function NewDropPointButton({
                 connections={connections}
                 initial={initial}
                 scheduleFocus={scheduleFocus}
+                // The list behind the dialog is server-rendered, so the new drop
+                // point only exists there after the page is asked again. Done as
+                // soon as it is created rather than on close, so it is already
+                // in place when the dialog showing its link is dismissed.
+                onCreated={() => router.refresh()}
                 onOpenChange={(next) => !next && setTarget(null)}
             />
 

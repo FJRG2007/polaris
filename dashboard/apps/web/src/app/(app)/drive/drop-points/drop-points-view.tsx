@@ -8,12 +8,12 @@
  * stored.
  */
 
-import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { Ban, Inbox, Lock, RotateCcw, Search } from "lucide-react";
-import { Badge, Button, Card, CardBody, Input } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useDisplayFormat } from "@/components/display-format";
+import { Ban, Inbox, Lock, RotateCcw, Search } from "lucide-react";
+import { Badge, Button, Card, CardBody, Input } from "@polaris/ui";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { reopenFileRequestAction, revokeFileRequestAction } from "../request-actions";
 
 export interface DropPointRow {
@@ -54,6 +54,12 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
     const [pending, startTransition] = useTransition();
     const [busy, setBusy] = useState<string | null>(null);
     const [confirm, confirmDialog] = useConfirm();
+
+    // The rows are held locally so closing or reopening one is instant. That
+    // copy is made once, though, so anything the server learns afterwards - a
+    // drop point just created, one closed in another tab - has to be taken back
+    // over, or the page looks unchanged until it is reloaded by hand.
+    useEffect(() => setRows(requests), [requests]);
 
     const filtered = useMemo(() => {
         const needle = query.trim().toLowerCase();
