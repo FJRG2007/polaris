@@ -22,7 +22,7 @@ import { baseExtensions } from "./schema";
 import { RICH_TEXT_PROSE } from "./prose";
 import { runAction } from "@/lib/run-action";
 import { SelectionToolbar } from "./toolbar";
-import { mentionExtension } from "./suggestion";
+import { mentionExtension, popupOpen } from "./suggestion";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import { resolveReferencesAction, searchMentionsAction } from "@/app/(app)/mention-actions";
@@ -97,9 +97,14 @@ export function RichTextEditor({
                     "[&_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]"
                 )
             },
-            handleKeyDown: (_view, event) => {
+            handleKeyDown: (view, event) => {
                 if (!handlers.current.onSubmit) return false;
                 if (event.key !== "Enter" || event.shiftKey) return false;
+                // A list open under the caret owns Enter: it is being pressed to
+                // take the name that is highlighted, not to send. This is a
+                // direct editor prop and those are asked before any plugin, so
+                // the popup cannot decline it on its own.
+                if (popupOpen(view.state)) return false;
                 handlers.current.onSubmit(md.docToMarkdown(editorRef.current?.getJSON()));
                 return true;
             },

@@ -19,8 +19,8 @@ import { Extension } from "@tiptap/core";
 import { cn, Skeleton } from "@polaris/ui";
 import Suggestion from "@tiptap/suggestion";
 import { Avatar } from "@/components/avatar";
-import { PluginKey } from "@tiptap/pm/state";
 import { ReactRenderer } from "@tiptap/react";
+import { PluginKey, type EditorState } from "@tiptap/pm/state";
 import type { MentionCandidate } from "@/lib/rich-text/mention-service";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import type { SuggestionOptions, SuggestionProps } from "@tiptap/suggestion";
@@ -28,6 +28,30 @@ import type { SuggestionOptions, SuggestionProps } from "@tiptap/suggestion";
 /** What the popup answers to while the caret is still in the editor. */
 export interface SuggestionHandle {
     onKeyDown: (props: { event: KeyboardEvent }) => boolean;
+}
+
+/**
+ * The three lists that can be open under the caret, named once.
+ *
+ * Kept here rather than beside each plugin because something outside them needs
+ * to ask whether any is open: a composer where Enter sends is a direct editor
+ * prop, and direct props are consulted before plugins, so without asking it
+ * would send the message out from under a list the writer was picking from.
+ */
+const POPUP_KEYS = {
+    people: new PluginKey("polarisMentionPeople"),
+    work: new PluginKey("polarisMentionWork"),
+    blocks: new PluginKey("polarisBlockMenu")
+} as const;
+
+/** The block menu's own key, so it registers as the one asked about below. */
+export const BLOCK_MENU_KEY = POPUP_KEYS.blocks;
+
+/** Whether a list is open under the caret and owns the keys that drive it. */
+export function popupOpen(state: EditorState): boolean {
+    return Object.values(POPUP_KEYS).some(
+        (key) => (key.getState(state) as { active?: boolean } | undefined)?.active === true
+    );
 }
 
 /** The popup shell, shared with the block menu so the two match. */
@@ -71,6 +95,9 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
 
     useImperativeHandle(ref, () => ({
         onKeyDown: ({ event }) => {
+            // With nothing to pick, the popup is not on screen and must not eat
+            // the keys: Enter belongs to the paragraph or to the composer's send.
+            if (items.length === 0) return false;
             if (event.key === "ArrowDown") {
                 setActive((current) => (current + 1) % Math.max(items.length, 1));
                 return true;
@@ -95,13 +122,10 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
         );
     }
 
-    if (items.length === 0) {
-        return (
-            <div className="w-72 rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground shadow-lg">
-                Nothing matches that.
-            </div>
-        );
-    }
+    // Nothing found is not a message. Somebody who typed "@" and kept writing an
+    // ordinary sentence is not looking at a picker, and telling them their
+    // sentence matches nobody is answering a question they never asked.
+    if (items.length === 0) return null;
 
     return (
         <ul className={POPUP_CLASS}>
@@ -161,17 +185,50 @@ export function mentionExtension(search: MentionSearch) {
             return [
                 Suggestion({
                     editor: this.editor,
-                    pluginKey: new PluginKey("polarisMentionPeople"),
+                    pluginKey: POPUP_KEYS.people,
                     ...mentionSuggestion("@", ["user", "team"], search)
                 }),
                 Suggestion({
                     editor: this.editor,
-                    pluginKey: new PluginKey("polarisMentionWork"),
+                    pluginKey: POPUP_KEYS.work,
                     ...mentionSuggestion("#", ["task", "doc", "note"], search)
                 })
             ];
         }
     });
+}
+
+/** What a name, a username or an address is spelled with, plus single spaces
+ *  between words so "@Ana Ruiz" survives the space in the middle of it. */
+const PERSON_QUERY = /^[\p{L}\p{M}\p{N}._+'@-]+(?: [\p{L}\p{M}\p{N}._+'@-]+)*(?: )?$/u;
+
+/** Long enough for a full name or a task title, short enough to still be a
+ *  search rather than the paragraph somebody is writing. */
+const MAX_QUERY = { person: 60, work: 120 } as const;
+
+/**
+ * Whether what has been typed after the trigger is still somebody looking
+ * something up.
+ *
+ * The trigger characters are also ordinary punctuation: "@" opens a sentence
+ * about an address, "# " opens a heading. Both would otherwise leave a picker
+ * hanging under the caret for the rest of the line, because the query is allowed
+ * to contain spaces and a space is not an exit. So the query has to keep looking
+ * like the thing the trigger finds - a name for "@", a title for "#" - and the
+ * moment it stops, the popup is gone rather than sitting there saying it found
+ * nothing.
+ *
+ * An empty query is the trigger on its own, which is the picker being opened
+ * deliberately: that one always shows.
+ */
+export function queryFits(char: string, query: string): boolean {
+    if (query === "") return true;
+    // A space straight after the trigger is the tell: nobody starts a name with
+    // one, and "@ " or "# " is punctuation or a Markdown heading.
+    if (/^\s/.test(query)) return false;
+    if (char === "@") return query.length <= MAX_QUERY.person && PERSON_QUERY.test(query);
+    // A title can hold almost anything, so the only limit is length.
+    return query.length <= MAX_QUERY.work;
 }
 
 /**
@@ -195,8 +252,12 @@ function mentionSuggestion(
         char,
         // A mention is a name, and names have spaces in them. Without this,
         // typing "@Ana Ruiz" closes the picker on the space and inserts nothing.
+        // `queryFits` is what stops that from also keeping the picker open over
+        // a sentence that merely happens to start with the trigger.
         allowSpaces: true,
+        shouldShow: ({ query }) => queryFits(char, query),
         items: async ({ query }) => {
+            if (!queryFits(char, query)) return [];
             searching = true;
             try {
                 return await search(kinds, query);

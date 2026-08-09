@@ -16,12 +16,12 @@
 import { cn } from "@polaris/ui";
 import { Extension } from "@tiptap/core";
 import Suggestion from "@tiptap/suggestion";
-import { PluginKey } from "@tiptap/pm/state";
 import { ReactRenderer } from "@tiptap/react";
 import type { Editor, Range } from "@tiptap/core";
 import type { SuggestionProps } from "@tiptap/suggestion";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import {
+    BLOCK_MENU_KEY,
     POPUP_CLASS,
     POPUP_ITEM_CLASS,
     POPUP_LAYER_CLASS,
@@ -168,8 +168,6 @@ const Menu = forwardRef<SuggestionHandle, SuggestionProps<BlockCommand>>(functio
     );
 });
 
-const blockMenuKey = new PluginKey("polarisBlockMenu");
-
 /** Typing "/" opens the list; typing on filters it. */
 export const BlockMenu = Extension.create({
     name: "polarisBlockMenu",
@@ -179,7 +177,7 @@ export const BlockMenu = Extension.create({
             Suggestion<BlockCommand>({
                 editor: this.editor,
                 char: "/",
-                pluginKey: blockMenuKey,
+                pluginKey: BLOCK_MENU_KEY,
                 // Only at the start of an empty-ish block: a slash inside a
                 // sentence is a slash, and inside code it is a path.
                 allow: ({ editor }) =>
