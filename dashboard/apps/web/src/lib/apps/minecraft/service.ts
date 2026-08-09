@@ -268,6 +268,16 @@ export interface ServerContainer {
     runOk(argv: readonly string[], failure: string): Promise<string>;
     /** Send a command to the game and hand back what it said. */
     say(argv: readonly string[]): Promise<string>;
+    /**
+     * Stream a file out of the container, as bytes.
+     *
+     * `run` collects its output into a string, which is right for a command's
+     * answer and wrong for a world archive - so copying one off the server to
+     * somewhere it survives the disk uses this instead. Works on a remote target
+     * as well as the local host, which reading through the daemon directly does
+     * not.
+     */
+    readFile(path: string): Promise<ReadableStream<Uint8Array>>;
 }
 
 export async function withServerContainer<T>(
@@ -288,7 +298,8 @@ export async function withServerContainer<T>(
                 if (result.code !== 0) throw new Error(containerFailure(result.output, failure));
                 return result.output;
             },
-            say: (argv) => sendGameCommand(ports, install, argv)
+            say: (argv) => sendGameCommand(ports, install, argv),
+            readFile: (path) => ports.readFile(install.container, path)
         };
         return work(server);
     });

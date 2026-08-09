@@ -130,6 +130,10 @@ model User {
     successorTo         AccountSuccessor[]   @relation("AccountSuccessorHeir")
     notes               Note[]
     searches            SearchHistory[]
+    backupDestinations  BackupDestination[]
+    backupPlans         BackupPlan[]
+    protectedResources  ProtectedResource[]
+    backupJobs          BackupJob[]
 }
 
 // What somebody last searched for, so the panel opens on their own work.
@@ -1065,6 +1069,7 @@ model StorageConnection {
     locks        AccessLock[]
     scheduledDeletions ScheduledDeletion[]
     deployVolumes      Volume[]
+    backupDestinations BackupDestination[]
 
     @@index([ownerId])
 }
@@ -1233,6 +1238,7 @@ model Host {
     enrollments   Enrollment[]
     runnerPools   RunnerPool[]
     groups        HostGroupMember[]
+    backupDestinations BackupDestination[]
 
     @@index([ownerId])
 }
@@ -4481,4 +4487,263 @@ model AgentRun {
     @@index([state])
     @@index([githubRunId])
     @@index([parentRunId])
+}
+
+// ---------------------------------------------------------------------------
+// Backups (what is protected, by which policy, and where the copies live)
+// ---------------------------------------------------------------------------
+
+// Somewhere copies are written.
+//
+// Four kinds, because "where" genuinely has four answers here and collapsing
+// them would only move the branch somewhere less visible. `local` is the data
+// dir Polaris already owns. `source-local` is beside the thing itself - a game
+// server's own disk, where an archive is cheap and instant - which is worth
+// naming rather than hiding, because it is the one destination that does NOT
+// survive the disk it protects. `connection` is any StorageConnection, so a NAS,
+// an S3 bucket and a linked Dropbox are the same row with a different driver
+// behind it. `host` is a machine already enrolled here, reached over the SSH
+// credentials Polaris holds, so replicating to a server somebody has connected
+// costs them no second set of credentials.
+//
+// Deleting a connection or a host that still holds copies is refused rather than
+// cascaded: the rows would survive as pointers to bytes nobody can fetch, which
+// reads on screen exactly like a backup that exists.
+model BackupDestination {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    ownerId       String    @db.Uuid
+    name          String
+    // local | source-local | connection | host
+    kind          String
+    // Set for kind=connection; the bucket/share this writes into.
+    connectionId  String?   @db.Uuid
+    // Set for kind=host; the enrolled machine copies are pushed to over SFTP.
+    hostId        String?   @db.Uuid
+    // Prefix everything is written under, so backups never share a namespace
+    // with whatever else lives on the target.
+    basePath      String    @default("polaris-backups")
+    // The one offered first when somebody protects something without choosing.
+    isDefault     Boolean   @default(false)
+    // active | unreachable. Set by the last write or the explicit test, so a
+    // destination that has started refusing says so before the next backup is due.
+    status        String    @default("active")
+    lastCheckedAt DateTime?
+    lastError     String?
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    owner      User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    connection StorageConnection? @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+    host       Host?              @relation(fields: [hostId], references: [id], onDelete: Restrict)
+    plans      BackupPlanDestination[]
+    copies     RecoveryPointCopy[]
+
+    @@unique([ownerId, name])
+    @@index([ownerId])
+    @@index([connectionId])
+    @@index([hostId])
+}
+
+// How often a copy is taken, how many are kept, and where they go.
+//
+// Schedule and retention are one row for the reason the Minecraft policy this
+// generalizes gave: a schedule without a retention rule is a disk that fills up,
+// and a full disk is the outcome backups existed to prevent. Three limits rather
+// than one because operators reason in all three - "a week of dailies" is a
+// count, "30 days" is an age, "under 200 GB" is a budget. Any may be off; when
+// several are on, the strictest simply bites first.
+model BackupPlan {
+    id              String   @id @default(uuid(7)) @db.Uuid
+    ownerId         String   @db.Uuid
+    name            String
+    // off | hourly | six-hourly | daily | weekly | monthly. Nothing faster than
+    // hourly: archiving a real world or database takes real seconds, and a
+    // schedule that overlaps its own last run is a thing permanently mid-backup.
+    every           String   @default("off")
+    // How many copies to keep per destination, newest first. 0 means no limit.
+    keepLast        Int      @default(7)
+    // How long a copy may live, in days. 0 means no limit.
+    keepDays        Int      @default(0)
+    // A budget for every copy in one destination together, in bytes. 0 means no limit.
+    maxBytes        BigInt   @default(0)
+    notifyOnFailure Boolean  @default(true)
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    owner        User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    destinations BackupPlanDestination[]
+    resources    ProtectedResource[]
+
+    @@unique([ownerId, name])
+    @@index([ownerId])
+}
+
+// One destination a plan writes to, and how early in the fan-out it is written.
+//
+// A plan with three of these makes three copies of every backup. `position` 0 is
+// produced first and is the one the other copies are replicated from, so the
+// cheapest reachable destination belongs at the front: the source is read once,
+// however many places the result ends up.
+model BackupPlanDestination {
+    id            String @id @default(uuid(7)) @db.Uuid
+    planId        String @db.Uuid
+    destinationId String @db.Uuid
+    position      Int    @default(0)
+
+    plan        BackupPlan        @relation(fields: [planId], references: [id], onDelete: Cascade)
+    destination BackupDestination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+
+    @@unique([planId, destinationId])
+    @@index([destinationId])
+}
+
+// One thing being backed up.
+//
+// The row exists so that "what is protected" is a question with an answer, which
+// is what the old screen could not do: backups were files in a folder and a
+// policy hidden in an app's config, so nothing could list them, count them, or
+// notice one had stopped running.
+//
+// `selector` is the normalized identity - "managed-database:<uuid>",
+// "nas-path:<uuid>:/photos" - and it is what uniqueness is enforced on, so the
+// same database cannot be protected twice under two names. The counters and
+// timestamps are denormalized on purpose: this table is read as a list of
+// hundreds of rows that has to sort by last backup and filter by status, and
+// deriving either from RecoveryPoint would make every page load a scan.
+model ProtectedResource {
+    id                  String    @id @default(uuid(7)) @db.Uuid
+    ownerId             String    @db.Uuid
+    // polaris-database | managed-database | external-database | minecraft-world |
+    // deploy-volume | nas-path
+    kind                String
+    selector            String
+    // What to call it on screen. A copy of the source's own name, refreshed when
+    // the source is read, so a list of 500 rows needs no join per row.
+    name                String
+    // Kind-specific settings as stringified JSON (the level, the subpath, the
+    // database engine and host).
+    config              String    @default("{}")
+    // Envelope-encrypted credentials, set only for external databases - the one
+    // kind whose source Polaris does not already hold credentials for.
+    encryptedCredential Bytes?
+    credentialNonce     Bytes?
+    credentialKeyId     String?
+    // Null means on-demand only: protected, backed up when somebody asks, never
+    // on a schedule. It is a legitimate state, not a half-configured one.
+    planId              String?   @db.Uuid
+    // active | paused | missing. `missing` is set when the source has gone (the
+    // server was deleted, the volume removed) - the copies are still there and
+    // still restorable, which is exactly when somebody needs them.
+    status              String    @default("active")
+    lastBackupAt        DateTime?
+    // ok | partial | failed
+    lastStatus          String?
+    lastError           String?
+    // When the schedule wants the next one. Written by the sweep so the cron can
+    // find due work with an index instead of evaluating every policy.
+    nextDueAt           DateTime?
+    copyCount           Int       @default(0)
+    sizeBytes           BigInt    @default(0)
+    createdAt           DateTime  @default(now())
+    updatedAt           DateTime  @updatedAt
+
+    owner  User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    plan   BackupPlan?     @relation(fields: [planId], references: [id], onDelete: SetNull)
+    points RecoveryPoint[]
+
+    @@unique([ownerId, selector])
+    @@index([ownerId, kind])
+    @@index([ownerId, status])
+    @@index([ownerId, lastBackupAt])
+    @@index([nextDueAt])
+    @@index([planId])
+}
+
+// One backup: a moment of a resource, however many places it ended up.
+//
+// Separate from the copies below because those are the same bytes in different
+// destinations. Somebody restoring picks a point in time first and a place to
+// fetch it from second - and a point whose S3 copy failed while its local copy
+// landed is still a restorable backup, which is what `partial` says.
+model RecoveryPoint {
+    id         String    @id @default(uuid(7)) @db.Uuid
+    resourceId String    @db.Uuid
+    // Which plan took it; null when somebody asked for it. Deliberately not a
+    // foreign key: deleting a plan must not rewrite the history of what ran.
+    planId     String?   @db.Uuid
+    takenAt    DateTime  @default(now())
+    // When retention says it may go. Null when no age limit applies.
+    expiresAt  DateTime?
+    sizeBytes  BigInt    @default(0)
+    // creating | available | partial | failed | deleting
+    status     String    @default("creating")
+    // What the source knew at the time (engine and version, the level's name),
+    // as stringified JSON. A restore needs it and the source may be gone by then.
+    metadata   String    @default("{}")
+    error      String?
+    createdAt  DateTime  @default(now())
+
+    resource ProtectedResource   @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+    copies   RecoveryPointCopy[]
+
+    @@index([resourceId, takenAt])
+    @@index([status])
+    @@index([expiresAt])
+}
+
+// The same backup, in one destination.
+//
+// Retention is applied per destination rather than per point, because the
+// destinations are not equivalent: a game server's own disk holds a few days and
+// a bucket holds a year, and forcing one number on both would either fill the
+// disk or throw away the archive somebody is paying to keep.
+model RecoveryPointCopy {
+    id            String   @id @default(uuid(7)) @db.Uuid
+    pointId       String   @db.Uuid
+    destinationId String   @db.Uuid
+    // Where it is inside the destination: the key, the path, the file id.
+    path          String
+    sizeBytes     BigInt   @default(0)
+    // pending | available | failed | deleting
+    status        String   @default("pending")
+    error         String?
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    point       RecoveryPoint     @relation(fields: [pointId], references: [id], onDelete: Cascade)
+    destination BackupDestination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+
+    @@unique([pointId, destinationId])
+    @@index([destinationId, status])
+}
+
+// What ran, when, and how it ended.
+//
+// Kept for every attempt including the ones that worked, because the question
+// somebody opens this for is usually "is it still running" rather than "what
+// broke" - and a log that only records failures cannot answer the first one.
+model BackupJob {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    ownerId     String    @db.Uuid
+    resourceId  String?   @db.Uuid
+    pointId     String?   @db.Uuid
+    // backup | restore | prune | replicate
+    type        String
+    // manual | scheduled
+    trigger     String    @default("manual")
+    // running | succeeded | failed
+    status      String    @default("running")
+    // Who asked. Null for the ones the schedule started. Not a foreign key: the
+    // record of what ran outlives the account that asked for it.
+    actorUserId String?   @db.Uuid
+    startedAt   DateTime  @default(now())
+    finishedAt  DateTime?
+    bytes       BigInt    @default(0)
+    error       String?
+
+    owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+    @@index([ownerId, startedAt])
+    @@index([resourceId, startedAt])
+    @@index([status])
 }

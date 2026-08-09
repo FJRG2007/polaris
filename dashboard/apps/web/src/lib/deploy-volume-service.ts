@@ -336,7 +336,14 @@ export async function getVolume(id: string, ownerId: string): Promise<VolumeDeta
  * because that is the one place all three kinds resolve to the same path - a
  * named volume, a host bind and a NAS mount all appear at `mountPath` there.
  */
-async function volumeRuntime(id: string, ownerId: string) {
+/**
+ * The volume, the container it is mounted in, and the server that runs it.
+ *
+ * Exported because backups need exactly this and nothing else: a volume is only
+ * readable through a container that has it mounted, and working that out twice
+ * would be two places to get "the service is not running" wrong.
+ */
+export async function volumeRuntime(id: string, ownerId: string) {
     const volume = await prisma.volume.findFirst({
         where: { id, target: { ownerId } },
         include: {

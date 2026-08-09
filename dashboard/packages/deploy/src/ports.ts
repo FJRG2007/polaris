@@ -108,5 +108,14 @@ export interface RuntimePorts {
      *  provisioning a database inside an engine that is already running has to
      *  know whether the statement was accepted. */
     runIn(container: string, argv: readonly string[]): Promise<ExecResult>;
+    /**
+     * Stream a file out of a container, as bytes.
+     *
+     * `runIn` collects its output into a string, which is fine for a status line
+     * and wrong for a database dump: a multi-gigabyte artifact would be held in
+     * memory and mangled by UTF-8 decoding on the way. Backups need the bytes
+     * themselves, so they get a stream and never a string.
+     */
+    readFile(container: string, path: string): Promise<ReadableStream<Uint8Array>>;
     dispose(): Promise<void>;
 }

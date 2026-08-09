@@ -266,6 +266,51 @@ export class SshPorts implements RuntimePorts {
         return { code: result.code, output };
     }
 
+    /**
+     * Stream a file out of a container on the remote host.
+     *
+     * The bytes ride the SSH channel untouched: no collecting into a string, no
+     * UTF-8 decoding, so a database dump or a world archive arrives as what it
+     * is. A non-zero exit closes the stream with an error rather than leaving a
+     * truncated file that looks like a complete backup.
+     */
+    public async readFile(container: string, path: string): Promise<ReadableStream<Uint8Array>> {
+        const command = `docker exec ${quoteArg(container)} cat -- ${quoteArg(path)}`;
+        const client = await this.connect();
+        return new Promise<ReadableStream<Uint8Array>>((resolve, reject) => {
+            client.exec(command, (error, channel) => {
+                if (error || !channel) {
+                    reject(error ?? new Error("could not open the exec channel"));
+                    return;
+                }
+                let stderr = "";
+                channel.stderr.on("data", (chunk: Buffer) => {
+                    // Bounded: this is a reason to show, not an output to keep.
+                    if (stderr.length < 2000) stderr += chunk.toString("utf8");
+                });
+                const web = new ReadableStream<Uint8Array>({
+                    start(controller) {
+                        channel.on("data", (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
+                        channel.on("close", (code: number) => {
+                            if (code === 0) {
+                                controller.close();
+                                return;
+                            }
+                            controller.error(
+                                new Error(`reading ${path} exited with code ${code}${stderr ? `: ${stderr.trim()}` : ""}`)
+                            );
+                        });
+                        channel.on("error", (channelError: Error) => controller.error(channelError));
+                    },
+                    cancel() {
+                        channel.close();
+                    }
+                });
+                resolve(web);
+            });
+        });
+    }
+
     private async run(command: string, onOutput?: OutputSink): Promise<void> {
         const client = await this.connect();
         const result = await execCommand(client, command, {

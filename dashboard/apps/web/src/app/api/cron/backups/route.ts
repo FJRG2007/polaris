@@ -1,14 +1,16 @@
 /**
- * The old world-backup cron path, kept so an installer that already calls it
- * keeps working.
+ * Cron endpoint that takes the backups that are due and prunes what has fallen
+ * out of retention.
  *
- * It now runs the same sweep as /api/cron/backups rather than a second one of
- * its own. Two sweeps over the same worlds would each see the other's archive as
- * the newest and take one anyway, which is how a nightly schedule quietly
- * becomes two backups a night.
+ * Cron is the mechanism rather than a guarantee on top of one: archiving a real
+ * world or dumping a real database takes seconds inside a container, and hanging
+ * that off somebody opening a screen would make the screen slow and the backup
+ * dependent on being watched. So there is no lazy counterpart - which is exactly
+ * why the console says out loud when nothing is configured to call this.
  *
- * New installs should call /api/cron/backups; this one is here for the ones that
- * were set up before it existed.
+ * Same contract as the other cron routes: disabled unless POLARIS_CRON_SECRET is
+ * set, and callers present it as a bearer token (or an x-cron-key header). Node
+ * runtime for Prisma.
  */
 
 import { loadEnv } from "@polaris/config";

@@ -5,7 +5,7 @@
  * only ever runs Polaris-shaped containers.
  */
 
-import type { Readable } from "node:stream";
+import { Readable } from "node:stream";
 import { HostdClient } from "@polaris/hostd-client";
 import type { BuildRequest, ComposeSpec, ExecResult, ExecSpec, ExecStream, LogOptions, MountTarget, OutputSink, RuntimePorts } from "@polaris/deploy";
 
@@ -142,6 +142,12 @@ export class HostdPorts implements RuntimePorts {
 
     public async runIn(container: string, argv: readonly string[]): Promise<ExecResult> {
         return this.client.execRun(container, [...argv]);
+    }
+
+    public async readFile(container: string, path: string): Promise<ReadableStream<Uint8Array>> {
+        // `--` so a path that begins with a dash is a path and not a flag.
+        const response = await this.client.fsRead(container, ["cat", "--", path]);
+        return Readable.toWeb(response) as ReadableStream<Uint8Array>;
     }
 
     public async dispose(): Promise<void> {
