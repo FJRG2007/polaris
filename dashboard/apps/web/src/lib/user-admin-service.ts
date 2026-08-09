@@ -45,64 +45,84 @@ export interface DirectoryUser {
     enforced: AccessRulesInput;
 }
 
+/**
+ * What describing one account takes, declared once.
+ *
+ * The list and one person's own page read it through the same select and the
+ * same mapper: a record that disagreed with the row it was opened from would be
+ * two answers to one question, and the row is the one nobody re-checks.
+ */
+const DIRECTORY_SELECT = {
+    id: true,
+    name: true,
+    email: true,
+    username: true,
+    company: true,
+    isAdmin: true,
+    bannedAt: true,
+    banReason: true,
+    emailVerified: true,
+    twoFactorEnabled: true,
+    createdAt: true,
+    roles: { select: { role: { select: { name: true } } } },
+    groups: { select: { group: { select: { name: true } } } },
+    accessGroupBindings: { where: { enforced: true }, select: { groupId: true } },
+    security: { select: { adminCidrs: true, adminCountries: true, adminContinents: true } },
+    // The freshest session tells the directory when this account was last
+    // actually used, and from where.
+    sessionStates: {
+        orderBy: { lastSeenAt: "desc" },
+        take: 1,
+        select: { lastSeenAt: true, ip: true, country: true }
+    }
+} as const;
+
+/** The rows the list reads, and the shape the mapper below is written against. */
+function readDirectoryRows() {
+    return prisma.user.findMany({ orderBy: { createdAt: "asc" }, select: DIRECTORY_SELECT });
+}
+
+type DirectoryRow = Awaited<ReturnType<typeof readDirectoryRows>>[number];
+
+function toDirectoryUser(row: DirectoryRow): DirectoryUser {
+    const latest = row.sessionStates[0];
+    return {
+        id: row.id,
+        name: row.name,
+        email: row.email,
+        username: row.username,
+        company: row.company,
+        isAdmin: row.isAdmin,
+        banned: row.bannedAt !== null,
+        banReason: row.banReason,
+        bannedAt: row.bannedAt?.toISOString() ?? null,
+        emailVerified: row.emailVerified,
+        twoFactorEnabled: row.twoFactorEnabled,
+        roles: row.roles.map((entry) => entry.role.name),
+        groups: row.groups.map((entry) => entry.group.name),
+        lastSeenAt: latest?.lastSeenAt.toISOString() ?? null,
+        lastIp: latest?.ip ?? null,
+        lastCountry: latest?.country ?? null,
+        createdAt: row.createdAt.toISOString(),
+        enforced: {
+            groupIds: row.accessGroupBindings.map((binding) => binding.groupId),
+            allowedCidrs: parseStringList(row.security?.adminCidrs),
+            allowedCountries: parseStringList(row.security?.adminCountries),
+            allowedContinents: parseStringList(row.security?.adminContinents)
+        }
+    };
+}
+
 /** Everyone, with what the directory needs to describe them. */
 export async function listUserDirectory(): Promise<DirectoryUser[]> {
-    const rows = await prisma.user.findMany({
-        orderBy: { createdAt: "asc" },
-        select: {
-            id: true,
-            name: true,
-            email: true,
-            username: true,
-            company: true,
-            isAdmin: true,
-            bannedAt: true,
-            banReason: true,
-            emailVerified: true,
-            twoFactorEnabled: true,
-            createdAt: true,
-            roles: { select: { role: { select: { name: true } } } },
-            groups: { select: { group: { select: { name: true } } } },
-            accessGroupBindings: { where: { enforced: true }, select: { groupId: true } },
-            security: { select: { adminCidrs: true, adminCountries: true, adminContinents: true } },
-            // The freshest session tells the directory when this account was last
-            // actually used, and from where.
-            sessionStates: {
-                orderBy: { lastSeenAt: "desc" },
-                take: 1,
-                select: { lastSeenAt: true, ip: true, country: true }
-            }
-        }
-    });
+    return (await readDirectoryRows()).map(toDirectoryUser);
+}
 
-    return rows.map((row) => {
-        const latest = row.sessionStates[0];
-        return {
-            id: row.id,
-            name: row.name,
-            email: row.email,
-            username: row.username,
-            company: row.company,
-            isAdmin: row.isAdmin,
-            banned: row.bannedAt !== null,
-            banReason: row.banReason,
-            bannedAt: row.bannedAt?.toISOString() ?? null,
-            emailVerified: row.emailVerified,
-            twoFactorEnabled: row.twoFactorEnabled,
-            roles: row.roles.map((entry) => entry.role.name),
-            groups: row.groups.map((entry) => entry.group.name),
-            lastSeenAt: latest?.lastSeenAt.toISOString() ?? null,
-            lastIp: latest?.ip ?? null,
-            lastCountry: latest?.country ?? null,
-            createdAt: row.createdAt.toISOString(),
-            enforced: {
-                groupIds: row.accessGroupBindings.map((binding) => binding.groupId),
-                allowedCidrs: parseStringList(row.security?.adminCidrs),
-                allowedCountries: parseStringList(row.security?.adminCountries),
-                allowedContinents: parseStringList(row.security?.adminContinents)
-            }
-        };
-    });
+/** One account, described exactly as the directory describes it. Null when there
+ *  is no such person, which the page turns into a 404. */
+export async function getDirectoryUser(id: string): Promise<DirectoryUser | null> {
+    const row = await prisma.user.findUnique({ where: { id }, select: DIRECTORY_SELECT });
+    return row ? toDirectoryUser(row) : null;
 }
 
 /** The access groups an administrator can impose, i.e. the ones they own. */

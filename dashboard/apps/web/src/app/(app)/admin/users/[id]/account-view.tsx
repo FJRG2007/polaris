@@ -1,16 +1,23 @@
 "use client";
 
 /**
- * One person's record, and everything an administrator can do about it. The
- * dialog is the whole account in one place - who they are, what they may do,
- * where they may do it from, and how to stop them - because deciding any of
- * those usually means looking at the others first.
+ * One person's record, and everything an administrator can do about it.
  *
- * Each control saves on its own. A single Save over a form this wide would make
- * "sign them out" and "ban them" wait on a role change nobody asked to make.
+ * This was a dialog over the people list. It stopped fitting: an account is who
+ * they are, what they may do, where they may do it from, every device signed in
+ * as them, and how to stop them - and deciding any of those usually means
+ * reading the others first. A panel that has to scroll inside a page that also
+ * scrolls is the wrong container for that, it cannot be linked to, and the one
+ * explanation an administrator actually arrives for - why this person can do
+ * that - was a link out of it to somewhere else.
+ *
+ * So the record is the page, and the resolution below it on the same page. What
+ * is left of the list is a list.
+ *
+ * Each control still saves on its own. A single Save over a form this wide would
+ * make "sign them out" and "ban them" wait on a role change nobody asked to make.
  */
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { RoleOption } from "@/lib/role-service";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -21,6 +28,7 @@ import { viewAsUserAction } from "@/app/(app)/view-as-actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { Ban, Eye, LogOut, Shield, Trash2, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { Button, Card, CardBody, Input, Select, Skeleton, Switch } from "@polaris/ui";
 import {
     AccessRulesEditor,
     accessRulesAreEmpty,
@@ -28,19 +36,6 @@ import {
     type AccessGroupOption,
     type AccessRulesValue
 } from "@/components/access-rules-editor";
-import {
-    Badge,
-    Button,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    Input,
-    Select,
-    Skeleton,
-    Switch
-} from "@polaris/ui";
 import {
     banUserAction,
     deleteUserAction,
@@ -51,7 +46,7 @@ import {
     setUserRoleAction,
     unbanUserAction,
     userSessionsAction
-} from "./actions";
+} from "../actions";
 
 /** A labelled fact in the identity grid. */
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -63,19 +58,17 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
     );
 }
 
-export function UserDetailDialog({
+export function AccountView({
     user,
     groups,
     roles,
-    isSelf,
-    onOpenChange
+    isSelf
 }: {
     user: DirectoryUser;
     groups: AccessGroupOption[];
     /** Every role this instance defines, for the picker. */
     roles: RoleOption[];
     isSelf: boolean;
-    onOpenChange: (open: boolean) => void;
 }) {
     const router = useRouter();
     const format = useDisplayFormat();
@@ -84,12 +77,11 @@ export function UserDetailDialog({
     const [banReason, setBanReason] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    // Null until the list arrives, so the section can hold its shape rather than
-    // the dialog waiting on a query nobody opened it for.
+    // Null until the list arrives, so the section holds its shape rather than the
+    // page waiting on a query nothing above it needs.
     const [sessions, setSessions] = useState<SessionView[] | null>(null);
 
-    /** The open sessions, re-read whenever an action may have ended one. The
-     *  directory's own refresh only carries the count. */
+    /** The open sessions, re-read whenever an action may have ended one. */
     const loadSessions = useCallback(async () => {
         const result = await userSessionsAction(user.id);
         setSessions(result.sessions ?? []);
@@ -99,7 +91,7 @@ export function UserDetailDialog({
         void loadSessions();
     }, [loadSessions]);
 
-    /** Run one action, keep its refusal on screen, and re-read the directory. */
+    /** Run one action, keep its refusal on screen, and re-read the page. */
     async function run(action: () => Promise<{ error?: string }>) {
         setBusy(true);
         setError(null);
@@ -129,31 +121,17 @@ export function UserDetailDialog({
             danger: true
         });
         if (!ok) return;
-        if (await run(() => deleteUserAction(user.id))) onOpenChange(false);
+        // The account this page is about is gone, so there is no page left to be
+        // on - back to the list rather than a record of nobody.
+        if (await run(() => deleteUserAction(user.id))) router.push("/admin/users");
     }
 
     const role = user.roles[0] ?? "";
 
     return (
-        <Dialog open onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle className="flex flex-wrap items-center gap-2">
-                        {user.name}
-                        {user.isAdmin ? <Badge variant="primary">admin</Badge> : null}
-                        {user.banned ? <Badge variant="danger">banned</Badge> : null}
-                    </DialogTitle>
-                    <DialogDescription>{user.email}</DialogDescription>
-                </DialogHeader>
-
-                {/* The quick view. Everything about what they may do - groups,
-                    policies, access to one particular server - and where each
-                    permission comes from is one page, and this is the way to it. */}
-                <Link href={`/admin/users/${user.id}`} className="w-fit text-sm text-primary hover:underline">
-                    What they can do, and why
-                </Link>
-
-                <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-4">
+            <Card>
+                <CardBody className="flex flex-col gap-5">
                     <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                         <Fact label="Username">{user.username ?? "-"}</Fact>
                         <Fact label="Company">{user.company ?? "-"}</Fact>
@@ -164,7 +142,7 @@ export function UserDetailDialog({
                     </dl>
 
                     <section className="flex flex-col gap-3 border-t border-border pt-4">
-                        <h3 className="text-sm font-medium">Access</h3>
+                        <h2 className="text-sm font-medium">Access</h2>
                         <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
                                 <p className="text-sm">Role</p>
@@ -193,12 +171,7 @@ export function UserDetailDialog({
                                     Nothing is signed in on their side and it is written to the activity log.
                                 </p>
                             </div>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                disabled={busy || isSelf}
-                                onClick={() => void onViewAs()}
-                            >
+                            <Button size="sm" variant="ghost" disabled={busy || isSelf} onClick={() => void onViewAs()}>
                                 <Eye className="size-4" />
                                 Open
                             </Button>
@@ -224,10 +197,10 @@ export function UserDetailDialog({
 
                     <section className="flex flex-col gap-3 border-t border-border pt-4">
                         <div>
-                            <h3 className="text-sm font-medium">Where they may sign in from</h3>
+                            <h2 className="text-sm font-medium">Where they may sign in from</h2>
                             <p className="text-xs text-muted-foreground">
-                                Applies on top of whatever they set for themselves, and they cannot remove it.
-                                Saving signs them out everywhere.
+                                Applies on top of whatever they set for themselves, and they cannot remove it. Saving
+                                signs them out everywhere.
                             </p>
                         </div>
                         <AccessRulesEditor value={limits} groups={groups} onChange={setLimits} />
@@ -250,10 +223,10 @@ export function UserDetailDialog({
                     <section className="flex flex-col gap-3 border-t border-border pt-4">
                         <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                                <h3 className="text-sm font-medium">Sessions</h3>
+                                <h2 className="text-sm font-medium">Sessions</h2>
                                 <p className="text-xs text-muted-foreground">
-                                    Every device signed in as {user.name}, and which of this instance&apos;s
-                                    addresses each one came in on.
+                                    Every device signed in as {user.name}, and which of this instance&apos;s addresses
+                                    each one came in on.
                                 </p>
                             </div>
                             <Button
@@ -272,9 +245,7 @@ export function UserDetailDialog({
                                 sessions={sessions}
                                 busyId={busy ? "all" : null}
                                 emptyLabel="Nothing is signed in."
-                                onRevoke={(session) =>
-                                    void run(() => revokeUserSessionAction(user.id, session.id))
-                                }
+                                onRevoke={(session) => void run(() => revokeUserSessionAction(user.id, session.id))}
                             />
                         ) : (
                             <Skeleton className="h-24 w-full rounded-lg" />
@@ -286,59 +257,62 @@ export function UserDetailDialog({
                         </p>
                     </section>
 
-                    <section className="flex flex-col gap-3 border-t border-border pt-4">
-                        <h3 className="text-sm font-medium text-danger">Danger zone</h3>
-                        {user.banned ? (
-                            <div className="flex items-center justify-between gap-3">
-                                <p className="text-xs text-muted-foreground">
-                                    Banned {user.bannedAt ? format.dateTime(user.bannedAt) : ""}
-                                    {user.banReason ? `: ${user.banReason}` : ""}
-                                </p>
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    disabled={busy}
-                                    onClick={() => void run(() => unbanUserAction(user.id))}
-                                >
-                                    <Undo2 className="size-4" />
-                                    Lift the ban
-                                </Button>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                                <Input
-                                    className="flex-1"
-                                    placeholder="Reason (optional, kept for the record)"
-                                    value={banReason}
-                                    disabled={isSelf}
-                                    onChange={(event) => setBanReason(event.target.value)}
-                                />
-                                <Button
-                                    size="sm"
-                                    variant="danger"
-                                    disabled={busy || isSelf}
-                                    onClick={() => void run(() => banUserAction(user.id, banReason))}
-                                >
-                                    <Ban className="size-4" />
-                                    Ban
-                                </Button>
-                            </div>
-                        )}
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardBody className="flex flex-col gap-3">
+                    <h2 className="text-sm font-medium text-danger">Danger zone</h2>
+                    {user.banned ? (
                         <div className="flex items-center justify-between gap-3">
                             <p className="text-xs text-muted-foreground">
-                                Deleting takes everything the account owns with it.
+                                Banned {user.bannedAt ? format.dateTime(user.bannedAt) : ""}
+                                {user.banReason ? `: ${user.banReason}` : ""}
                             </p>
-                            <Button size="sm" variant="danger" disabled={busy || isSelf} onClick={() => void onDelete()}>
-                                <Trash2 className="size-4" />
-                                Delete account
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={busy}
+                                onClick={() => void run(() => unbanUserAction(user.id))}
+                            >
+                                <Undo2 className="size-4" />
+                                Lift the ban
                             </Button>
                         </div>
-                    </section>
+                    ) : (
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <Input
+                                className="flex-1"
+                                placeholder="Reason (optional, kept for the record)"
+                                value={banReason}
+                                disabled={isSelf}
+                                onChange={(event) => setBanReason(event.target.value)}
+                            />
+                            <Button
+                                size="sm"
+                                variant="danger"
+                                disabled={busy || isSelf}
+                                onClick={() => void run(() => banUserAction(user.id, banReason))}
+                            >
+                                <Ban className="size-4" />
+                                Ban
+                            </Button>
+                        </div>
+                    )}
+                    <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs text-muted-foreground">
+                            Deleting takes everything the account owns with it.
+                        </p>
+                        <Button size="sm" variant="danger" disabled={busy || isSelf} onClick={() => void onDelete()}>
+                            <Trash2 className="size-4" />
+                            Delete account
+                        </Button>
+                    </div>
+                </CardBody>
+            </Card>
 
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
-                </div>
-            </DialogContent>
             {confirmElement}
-        </Dialog>
+        </div>
     );
 }

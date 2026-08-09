@@ -17,7 +17,6 @@ import { revokeInviteAction } from "./actions";
 import { useEffect, useMemo, useState } from "react";
 import type { RoleOption } from "@/lib/role-service";
 import { RecoveryRequests } from "./recovery-requests";
-import { UserDetailDialog } from "./user-detail-dialog";
 import type { InviteListItem } from "@/lib/invite-service";
 import type { DirectoryUser } from "@/lib/user-admin-service";
 import { useDisplayFormat } from "@/components/display-format";
@@ -80,17 +79,13 @@ export function UsersAdmin({
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState<Filter>("all");
     const [inviting, setInviting] = useState(false);
-    // Held by id, not by value: the row is re-read from the server after every
-    // change, and a copy taken when the dialog opened would go stale behind it.
-    const [openId, setOpenId] = useState<string | null>(openUserId ?? null);
 
-    // A link arriving at ?user= must open that account however it arrives. Seeded
-    // state alone only covers the first mount, so going back to a link already
-    // followed - the ordinary way to return to it - left the dialog shut on a URL
-    // that says it is open.
+    // A link that names somebody - the firewall, saying who is signed in from an
+    // address it is about to ban - hands the reader the account itself. That is
+    // now a page, so the link is followed rather than held as state.
     useEffect(() => {
-        if (openUserId) setOpenId(openUserId);
-    }, [openUserId]);
+        if (openUserId) router.replace(`/admin/users/${openUserId}`);
+    }, [openUserId, router]);
 
     const shown = useMemo(() => {
         const needle = query.trim().toLowerCase();
@@ -111,8 +106,6 @@ export function UsersAdmin({
                 .some((value) => value.toLowerCase().includes(needle));
         });
     }, [users, query, filter]);
-
-    const open = users.find((user) => user.id === openId) ?? null;
 
     return (
         <div className="flex flex-col gap-4">
@@ -172,11 +165,11 @@ export function UsersAdmin({
                                     tabIndex={0}
                                     role="button"
                                     aria-label={`Open ${user.name}`}
-                                    onClick={() => setOpenId(user.id)}
+                                    onClick={() => router.push(`/admin/users/${user.id}`)}
                                     onKeyDown={(event) => {
                                         if (event.key === "Enter" || event.key === " ") {
                                             event.preventDefault();
-                                            setOpenId(user.id);
+                                            router.push(`/admin/users/${user.id}`);
                                         }
                                     }}
                                     className={cn(
@@ -313,21 +306,6 @@ export function UsersAdmin({
                     roles={roles}
                     canSendMail={canSendMail}
                     onOpenChange={(next) => setInviting(next)}
-                />
-            ) : null}
-            {open ? (
-                <UserDetailDialog
-                    user={open}
-                    groups={groups}
-                    roles={roles}
-                    isSelf={open.id === viewerId}
-                    onOpenChange={(next) => {
-                        if (next) return;
-                        setOpenId(null);
-                        // Drop the id a link arrived with, so reloading the page
-                        // after closing does not open the same account again.
-                        if (openUserId) router.replace("/admin/users");
-                    }}
                 />
             ) : null}
         </div>
