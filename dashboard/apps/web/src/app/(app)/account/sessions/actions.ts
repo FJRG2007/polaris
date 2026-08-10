@@ -16,10 +16,12 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
+import { sessionName } from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { revokeTrustedDevice, revokeTrustedDevices } from "@polaris/auth";
+import { notifySessionsClosed } from "@/lib/notifications/session-events";
 import {
     decideLoginApproval,
     revokeDeviceSessions,
@@ -39,6 +41,30 @@ const trustedDeviceIdSchema = z.string().regex(/^trust-device-[A-Za-z0-9_-]{1,64
 /** Guess-throttling for the PIN that stands between a waiting sign-in and access. */
 const APPROVAL_LIMIT = 5;
 const APPROVAL_WINDOW_MS = 15 * 60 * 1000;
+
+/**
+ * Record that this device is signing itself out, immediately before it does.
+ *
+ * Sign-out itself is better-auth's, driven from the browser, so there is no
+ * server step to hang this on - but an account's history is meant to answer
+ * "where is this signed in, and when did that stop", and a sign-out that left no
+ * trace was the one gap in it. Called while the session is still valid, which is
+ * what lets it be attributed at all.
+ */
+export async function noteSignOutAction(): Promise<void> {
+    const user = await requireUser();
+    await recordAudit({
+        actorId: user.id,
+        action: "account.session.signed-out",
+        targetType: "session",
+        targetId: user.sessionId
+    });
+    await notifySessionsClosed({
+        userId: user.id,
+        count: 1,
+        reason: `${sessionName(user.sessionId)} signed itself out.`
+    });
+}
 
 export async function revokeSessionAction(sessionId: unknown): Promise<{ error?: string }> {
     const user = await requireUser();

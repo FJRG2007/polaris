@@ -29,12 +29,6 @@ import { SessionsTable } from "@/components/sessions-table";
 import { useDisplayFormat } from "@/components/display-format";
 import type { SessionView, TrustedDeviceDetail, TrustedDeviceRow } from "@/lib/session-directory";
 import {
-    forgetTrustedDeviceAction,
-    revokeSessionAction,
-    signOutTrustedDeviceAction,
-    trustedDeviceAction
-} from "./actions";
-import {
     Badge,
     Button,
     Dialog,
@@ -44,6 +38,13 @@ import {
     DialogTitle,
     Skeleton
 } from "@polaris/ui";
+import {
+    forgetTrustedDeviceAction,
+    noteSignOutAction,
+    revokeSessionAction,
+    signOutTrustedDeviceAction,
+    trustedDeviceAction
+} from "./actions";
 
 /** One fact about the device, as a row of the summary. */
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -101,6 +102,9 @@ export function DeviceDialog({
 
     async function signOutSession(session: SessionView) {
         if (session.current) {
+            // Only on this path. Signing the whole device out goes through
+            // revokeDeviceSessions, which reports the batch it ended itself.
+            await noteSignOutAction().catch(() => undefined);
             await leaveHere();
             return;
         }

@@ -15,6 +15,7 @@ import { prisma } from "@polaris/db";
 import { headers } from "next/headers";
 import { createHash } from "node:crypto";
 import { clientIp } from "@/lib/request-context";
+import { notifySecurityChange } from "@/lib/notifications/security-events";
 
 export interface AuditEvent {
     readonly actorId: string | null;
@@ -69,7 +70,16 @@ const requestSessionId = cache(async (): Promise<string | undefined> => {
     }
 });
 
-/** Record one activity event. Never throws - auditing must not break the action. */
+/**
+ * Record one activity event. Never throws - auditing must not break the action.
+ *
+ * An entry that describes a change to how an account is protected also raises
+ * that account's security alert. It is hung here rather than on each screen
+ * because the two questions have one answer: an action worth writing to the log
+ * is an action the account owner should be told about, and a control that logs
+ * but never tells is exactly the one somebody taking an account over would use.
+ * Which actions those are is decided in notifications/security-events.
+ */
 export async function recordAudit(event: AuditEvent): Promise<void> {
     try {
         await prisma.auditLog.create({
@@ -86,6 +96,12 @@ export async function recordAudit(event: AuditEvent): Promise<void> {
         });
     } catch {
         // Swallow: a failed audit write must not fail the user's action.
+    }
+    try {
+        await notifySecurityChange(event.actorId, event.action);
+    } catch (error) {
+        // Same rule: telling somebody about the change is never worth failing it.
+        console.error("polaris: could not raise the account security alert:", error);
     }
 }
 

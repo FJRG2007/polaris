@@ -18,6 +18,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { networkPublicIp } from "@/lib/network-service";
 import { sessionClient, sessionDevice } from "@/lib/session-device";
 import { listUserPasskeys, type PasskeyView } from "@/lib/passkey-directory";
+import { notifySessionOpened, notifySessionsClosed } from "@/lib/notifications/session-events";
 import { describeDevice, isIpv4, isPrivateIp, sessionName, type SignInRecord } from "@polaris/core";
 import {
     clientHost,
@@ -401,6 +402,7 @@ export async function revokeDeviceSessions(
             action: "account.session.revoked-device",
             metadata: { count, device: detail.device.device }
         });
+        await notifySessionsClosed({ userId, count, reason: `Everything open on ${detail.device.device}.` });
     }
     return { count, endedCurrent: ids.includes(currentSessionId) };
 }
@@ -414,6 +416,11 @@ export async function revokeUserSession(userId: string, sessionId: string): Prom
             action: "account.session.revoked",
             targetType: "session",
             targetId: sessionId
+        });
+        await notifySessionsClosed({
+            userId,
+            count: result.count,
+            reason: `${sessionName(sessionId)} was ended from your sessions list.`
         });
     }
 }
@@ -431,6 +438,11 @@ export async function revokeOtherSessions(
             actorId: userId,
             action: "account.session.revoked-others",
             metadata: { count: result.count }
+        });
+        await notifySessionsClosed({
+            userId,
+            count: result.count,
+            reason: "Everything signed in to your account except the device this was done from."
         });
     }
     return result.count;
@@ -481,7 +493,7 @@ export async function decideLoginApproval(
 ): Promise<{ error?: string }> {
     const state = await prisma.sessionState.findFirst({
         where: { sessionId, userId, approval: "pending" },
-        select: { sessionId: true }
+        select: { sessionId: true, ip: true, country: true, userAgent: true, userAgentBrands: true }
     });
     if (!state) return { error: "That sign-in is no longer waiting." };
 
@@ -500,6 +512,12 @@ export async function decideLoginApproval(
                 // laptop I lost" is the answer they need in the same place.
                 ...(await approver(userId, bySessionId))
             }
+        });
+        // The session only starts holding the account here, so this is where it
+        // is announced - the alert raised when it was created said it was waiting.
+        await notifySessionOpened({
+            userId,
+            origin: describeOrigin(state.ip, state.country, state.userAgent, state.userAgentBrands)
         });
     } else {
         await prisma.session.deleteMany({ where: { id: sessionId, userId } });

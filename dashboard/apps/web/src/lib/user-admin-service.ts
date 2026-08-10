@@ -17,6 +17,7 @@ import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
 import { revokeSessionsRefusedByRules } from "@/lib/session-guard";
 import { parseStringList, type AccessRulesInput } from "@polaris/core";
+import { notifySessionsClosed } from "@/lib/notifications/session-events";
 import { markPrincipalsMoved, updateEnforcedRules, type AccessGroupView } from "@polaris/auth";
 
 /** One person, as the directory lists them. */
@@ -160,9 +161,10 @@ async function wouldStrandInstance(userId: string): Promise<boolean> {
  * route they already held one for - for hours. Marking the account re-decided is what
  * reaches those guards.
  */
-async function dropSessions(userId: string): Promise<void> {
-    await prisma.session.deleteMany({ where: { userId } });
+async function dropSessions(userId: string): Promise<number> {
+    const { count } = await prisma.session.deleteMany({ where: { userId } });
     await markPrincipalsMoved([userId]);
+    return count;
 }
 
 export async function banUser(actorId: string, userId: string, reason: string): Promise<{ error?: string }> {
@@ -262,8 +264,11 @@ export async function setUserLimits(
 
 /** Sign a user out everywhere. */
 export async function revokeUserSessions(actorId: string, userId: string): Promise<{ error?: string }> {
-    await dropSessions(userId);
+    const count = await dropSessions(userId);
     await recordAudit({ actorId, action: "user.sessions.revoke", targetType: "user", targetId: userId });
+    // Told to the account it happened to, not to the operator who did it. Being
+    // signed out of everything by somebody else is the owner's news.
+    await notifySessionsClosed({ userId, count, reason: "An administrator signed your account out everywhere." });
     return {};
 }
 
@@ -288,6 +293,11 @@ export async function revokeSessionForUser(
         targetType: "session",
         targetId: sessionId,
         metadata: { userId }
+    });
+    await notifySessionsClosed({
+        userId,
+        count: result.count,
+        reason: "An administrator ended one of your sessions."
     });
     return {};
 }

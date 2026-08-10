@@ -22,7 +22,12 @@ import { TrustedDevicesCard } from "./trusted-devices-card";
 import { describeSignIn, signInSummary } from "@polaris/core";
 import { SessionsTable, sessionOrigin } from "@/components/sessions-table";
 import type { SessionView, TrustedDeviceRow } from "@/lib/session-directory";
-import { decideLoginApprovalAction, revokeOtherSessionsAction, revokeSessionAction } from "./actions";
+import {
+    decideLoginApprovalAction,
+    noteSignOutAction,
+    revokeOtherSessionsAction,
+    revokeSessionAction
+} from "./actions";
 import {
     Button,
     Card,
@@ -99,6 +104,7 @@ export function SessionsView({
     /** Ending your own session goes through the auth client, so the cookie is
      *  dropped here too - deleting the row alone would leave a stale one. */
     async function signOutHere() {
+        await noteSignOutAction().catch(() => undefined);
         await signOut();
         router.push("/oauth/login");
         router.refresh();

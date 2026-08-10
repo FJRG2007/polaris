@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth-client";
 import { Avatar } from "@/components/avatar";
 import { Bell, Link2, LogOut, UserCog } from "lucide-react";
+import { noteSignOutAction } from "@/app/(app)/account/sessions/actions";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -22,6 +23,10 @@ export function AccountMenu({ id, name, email }: { id: string; name: string; ema
     const router = useRouter();
 
     async function onSignOut() {
+        // While the session still exists, so the account's own history and its
+        // other devices record that this one left. Never a reason to refuse the
+        // sign-out itself.
+        await noteSignOutAction().catch(() => undefined);
         await signOut();
         router.push("/oauth/login");
         router.refresh();

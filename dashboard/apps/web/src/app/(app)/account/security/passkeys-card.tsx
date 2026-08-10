@@ -31,7 +31,7 @@ import { Feedback, type SettingLock } from "./setting-card";
 import { KeyRound, Trash2, Laptop, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
 import { PASSKEY_NAME_MAX, passkeyNameKey, passkeyRelyingPartyId } from "@polaris/core";
-import { confirmPasswordForPasskeyAction, removePasskeyAction } from "./passkey-actions";
+import { confirmPasswordForPasskeyAction, notePasskeyAddedAction, removePasskeyAction } from "./passkey-actions";
 import {
     Button,
     Card,
@@ -100,6 +100,10 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
         }
         setName("");
         setAsking(false);
+        // The credential was written by the passkey client, so the server is told
+        // to log it and alert the account. It has nothing to add to the screen,
+        // and a failure here must not read as a registration that did not happen.
+        await notePasskeyAddedAction().catch(() => undefined);
         router.refresh();
     }
 

@@ -181,6 +181,36 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "account.session.opened",
+        group: "security",
+        label: "A session was opened",
+        description: "Your account was signed in to, and from where.",
+        level: "info",
+        // The bell rather than mail: on an account used daily this fires every
+        // morning, and an alert that arrives that often stops being read.
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "account.session.closed",
+        group: "security",
+        label: "A session ended",
+        description: "A device was signed out, by you or by something else.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "account.security",
+        group: "security",
+        label: "Account security changed",
+        description: "A password, a second factor, a passkey, a key or a sign-in rule changed.",
+        level: "warning",
+        // Critical, and mailed by default: this is the alert that tells somebody
+        // their account is being taken over, and it is the first thing whoever
+        // took it would otherwise turn off.
+        critical: true,
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "account.aiKey.expiring",
         group: "security",
         label: "An AI provider key is about to expire",

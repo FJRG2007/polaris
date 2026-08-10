@@ -25,6 +25,7 @@ import { notify } from "@/lib/notifications/dispatch";
 import type { ViewAsRow } from "@/lib/view-as-service";
 import { describeOrigin } from "@/lib/session-directory";
 import { evaluateAccountAccess } from "@/lib/network-rules";
+import { notifySessionOpened, notifySessionsClosed } from "@/lib/notifications/session-events";
 import { clientHost, clientIp, clientUserAgent, clientUserAgentBrands } from "@/lib/request-context";
 import { consumeSessionRotation, rememberAccountDevice, resolveSignInRules, takeSignInRecord } from "@polaris/auth";
 
@@ -93,6 +94,11 @@ export async function revokeSessionsRefusedByRules(userId: string): Promise<numb
     if (refused.length === 0) return 0;
 
     const { count } = await prisma.session.deleteMany({ where: { userId, id: { in: refused } } });
+    await notifySessionsClosed({
+        userId,
+        count,
+        reason: "Your sign-in rules no longer allow the addresses they were at."
+    });
     return count;
 }
 
@@ -329,6 +335,14 @@ async function createSessionState(input: {
             body: describeOrigin(input.ip, input.country, userAgent, userAgentBrands),
             href: "/account/sessions",
             actionRequired: true
+        });
+    } else {
+        // Only for a session that can actually be used. One still waiting has its
+        // own alert above, and announcing it twice would report a sign-in that
+        // has not happened yet as one that has.
+        await notifySessionOpened({
+            userId: input.userId,
+            origin: describeOrigin(input.ip, input.country, userAgent, userAgentBrands)
         });
     }
     return { approval };
