@@ -2,32 +2,25 @@
  * The old world-backup cron path, kept so an installer that already calls it
  * keeps working.
  *
- * It now runs the same sweep as /api/cron/backups rather than a second one of
- * its own. Two sweeps over the same worlds would each see the other's archive as
- * the newest and take one anyway, which is how a nightly schedule quietly
- * becomes two backups a night.
+ * It runs the same job as /api/cron/backups rather than a second sweep of its
+ * own. Two sweeps over the same worlds would each see the other's archive as the
+ * newest and take one anyway, which is how a nightly schedule quietly becomes two
+ * backups a night.
  *
- * New installs should call /api/cron/backups; this one is here for the ones that
- * were set up before it existed.
+ * New installs need call neither: Polaris keeps the schedule itself now. This one
+ * is here for the ones that were set up before it did.
  */
 
-import { loadEnv } from "@polaris/config";
-import { sweepDueBackups } from "@/lib/backups/service";
+import { authorizeCron } from "@/lib/cron/authorize";
+import { runScheduledJob } from "@/lib/cron/scheduler";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function presentedToken(request: Request): string {
-    const auth = request.headers.get("authorization") ?? "";
-    if (auth.startsWith("Bearer ")) return auth.slice(7).trim();
-    return request.headers.get("x-cron-key")?.trim() ?? "";
-}
-
 export async function POST(request: Request): Promise<Response> {
-    const secret = loadEnv().POLARIS_CRON_SECRET;
-    if (!secret) return Response.json({ error: "Cron is not configured." }, { status: 503 });
-    if (presentedToken(request) !== secret) return Response.json({ error: "Not authorized." }, { status: 401 });
+    const refused = authorizeCron(request);
+    if (refused) return refused;
 
-    const swept = await sweepDueBackups();
-    return Response.json(swept);
+    const swept = await runScheduledJob("backups");
+    return Response.json(swept ?? { skipped: "already running" });
 }

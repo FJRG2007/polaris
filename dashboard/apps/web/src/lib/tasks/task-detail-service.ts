@@ -383,9 +383,24 @@ export async function deleteReminder(userId: string, reminderId: string): Promis
 }
 
 /**
- * Send every reminder that has come due and mark it sent. Driven by the same
- * cron surface as the rest of Polaris rather than a timer in the request path,
- * so a reminder still fires on an instance nobody has open.
+ * How late a reminder may be and still be worth sending.
+ *
+ * Past this it has been overtaken by whatever it was about, and the only thing
+ * telling somebody now achieves is a pile of notifications the first time an
+ * instance comes back from a long stop. Retired quietly instead.
+ */
+const REMINDER_STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Send every reminder that has come due and mark it sent. Run from the schedule
+ * rather than from a timer in the request path, so a reminder still fires on an
+ * instance nobody has open.
+ *
+ * One at a time, each marked as it goes and each failure kept to itself. It used
+ * to send the whole batch and then mark the batch, which meant a single refused
+ * notification left everything before it unmarked - so all of them went again on
+ * the next pass, and the one after that, forever. That was survivable while
+ * something external had to ask for it and is a notification a minute now.
  */
 export async function dispatchDueReminders(now = new Date()): Promise<number> {
     const due = await prisma.taskReminder.findMany({
@@ -396,24 +411,36 @@ export async function dispatchDueReminders(now = new Date()): Promise<number> {
             userId: true,
             note: true,
             taskId: true,
+            remindAt: true,
             task: { select: { name: true } }
         }
     });
 
+    let sent = 0;
     for (const reminder of due) {
-        await notify({
-            userId: reminder.userId,
-            event: "tasks.due",
-            title: reminder.task.name,
-            body: reminder.note || "The reminder you set on this task.",
-            href: `/tasks/t/${reminder.taskId}`
-        });
+        const late = now.getTime() - reminder.remindAt.getTime();
+        if (late <= REMINDER_STALE_AFTER_MS) {
+            try {
+                await notify({
+                    userId: reminder.userId,
+                    event: "tasks.due",
+                    title: reminder.task.name,
+                    body: reminder.note || "The reminder you set on this task.",
+                    href: `/tasks/t/${reminder.taskId}`
+                });
+                sent += 1;
+            } catch (error) {
+                console.error("polaris: a task reminder could not be delivered:", error);
+            }
+        }
+        // Marked either way. A reminder nobody could be told about is still a
+        // reminder that has had its moment, and leaving it unmarked only means
+        // trying again every minute until the end of time.
+        await prisma.taskReminder
+            .update({ where: { id: reminder.id }, data: { sentAt: now } })
+            .catch((error: unknown) =>
+                console.error("polaris: a sent reminder could not be marked, so it will be retried:", error)
+            );
     }
-    if (due.length > 0) {
-        await prisma.taskReminder.updateMany({
-            where: { id: { in: due.map((reminder) => reminder.id) } },
-            data: { sentAt: now }
-        });
-    }
-    return due.length;
+    return sent;
 }

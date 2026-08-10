@@ -173,18 +173,6 @@ function SummaryStrip({ overview, failed }: { overview: BackupOverview | null; f
                 value={summary ? String(summary.failedRecently) : missing}
                 bad={Boolean(summary && summary.failedRecently > 0)}
             />
-            {summary && !summary.cronConfigured ? (
-                <Card className="sm:col-span-2 lg:col-span-4">
-                    <CardBody className="flex items-start gap-2 py-3 text-xs text-warning">
-                        <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                        <span>
-                            Nothing is set to run the schedules. Plans are saved but no copy will be taken on its
-                            own until <code>POLARIS_CRON_SECRET</code> is set and something calls{" "}
-                            <code>/api/cron/backups</code>. Backing up by hand works either way.
-                        </span>
-                    </CardBody>
-                </Card>
-            ) : null}
             {summary && summary.destinationsDown > 0 ? (
                 <Card className="sm:col-span-2 lg:col-span-4">
                     <CardBody className="flex items-start gap-2 py-3 text-xs text-danger">

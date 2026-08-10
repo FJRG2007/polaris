@@ -161,6 +161,15 @@ export async function register(): Promise<void> {
     const { startAnalyticsCollector } = await import("./lib/analytics-collector");
     startAnalyticsCollector();
 
+    // Keep the schedules Polaris has been given: backup plans, task reminders, the
+    // walk that lifts a game timeout when it runs out, and the sweeps that used to
+    // happen only while somebody had the right screen open. These lived behind
+    // /api/cron/* and so ran only on an instance where somebody had wired an
+    // external scheduler to them - which meant a backup plan was, on most installs,
+    // a promise nothing kept.
+    const { startScheduledWork } = await import("./lib/cron/scheduler");
+    startScheduledWork();
+
     // Re-establish messaging channels in the bridge after a bridge or web restart:
     // the bridge holds adapters in memory, so without this a channel stays
     // "connected" in the DB but dead at the bridge until manually reconnected.

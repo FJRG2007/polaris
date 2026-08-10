@@ -476,7 +476,21 @@ export async function refreshResourceCounters(
 }
 
 /**
- * Take every backup that is due.
+ * How long one pass may spend taking copies before it leaves the rest for the
+ * next one.
+ *
+ * Everything overdue comes back at once, and "everything" is the normal case the
+ * first time a schedule is actually run - every plan on the instance has been
+ * waiting. Archiving a world or dumping a database takes real seconds each, so a
+ * pass with no ceiling is an hour of solid disk and CPU on a box somebody is
+ * using. Stopping partway costs nothing: `nextDueAt` is durable, the resources
+ * are taken oldest-due first, and the ones left over are simply the front of the
+ * queue next time.
+ */
+const SWEEP_BUDGET_MS = Number(process.env.POLARIS_BACKUP_SWEEP_BUDGET_MS) || 10 * 60 * 1000;
+
+/**
+ * Take every backup that is due, for as long as one pass is allowed to run.
  *
  * Driven by `nextDueAt`, which is written whenever a resource's copies change,
  * so finding the due ones is an index lookup rather than evaluating every
@@ -487,6 +501,8 @@ export async function sweepDueBackups(now: Date = new Date()): Promise<{
     taken: number;
     failed: number;
     pruned: number;
+    /** Due work this pass ran out of time for. Zero on an ordinary pass. */
+    left: number;
 }> {
     const due = await prisma.protectedResource.findMany({
         where: { status: "active", planId: { not: null }, nextDueAt: { lte: now } },
@@ -495,10 +511,19 @@ export async function sweepDueBackups(now: Date = new Date()): Promise<{
         take: 100
     });
 
+    const until = Date.now() + SWEEP_BUDGET_MS;
     let taken = 0;
     let failed = 0;
     let pruned = 0;
-    for (const resource of due) {
+    let left = 0;
+    for (const [index, resource] of due.entries()) {
+        // Checked before the work rather than after it, so the budget bounds when
+        // a pass stops starting things - it cannot cut a copy already running in
+        // half, and would not want to.
+        if (Date.now() >= until) {
+            left = due.length - index;
+            break;
+        }
         const policy = await policyFor(resource.planId);
         // `nextDueAt` is a hint written when the copies last changed; the policy
         // is the authority, and it is re-read here in case somebody turned the
@@ -521,7 +546,7 @@ export async function sweepDueBackups(now: Date = new Date()): Promise<{
             failed += 1;
         }
     }
-    return { taken, failed, pruned };
+    return { taken, failed, pruned, left };
 }
 
 /** Everything of every kind that exists and is not protected yet. */

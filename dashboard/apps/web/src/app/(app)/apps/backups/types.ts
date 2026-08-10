@@ -61,7 +61,6 @@ export interface BackupOverview {
         storedBytes: number;
         failedRecently: number;
         destinationsDown: number;
-        cronConfigured: boolean;
     };
     plans: PlanSummary[];
     destinations: DestinationSummary[];

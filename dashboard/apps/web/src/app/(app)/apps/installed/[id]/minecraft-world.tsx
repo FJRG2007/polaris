@@ -802,19 +802,6 @@ function BackupScheduleCard({
                             </span>
                         </label>
 
-                        {/* A schedule nothing sweeps is a promise this screen would
-                            otherwise make and not keep. */}
-                        {every !== "off" && !view.scheduleRuns && (
-                            <p className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs">
-                                <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
-                                <span className="text-muted-foreground">
-                                    Nothing is scheduled to run this yet. Set POLARIS_CRON_SECRET and point a scheduler
-                                    at <code className="font-mono">/api/cron/backups</code>, or keep taking copies with
-                                    the button above.
-                                </span>
-                            </p>
-                        )}
-
                         {error && <p className="text-sm text-danger">{error}</p>}
 
                         <div className="flex justify-end">

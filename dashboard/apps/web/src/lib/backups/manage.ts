@@ -16,10 +16,10 @@
 import { prisma } from "@polaris/db";
 import { Readable } from "node:stream";
 import type { Prisma } from "@polaris/db";
+import { loadEnv } from "@polaris/config";
 import { createReadStream } from "node:fs";
 import { sourceFor } from "./sources/registry";
 import { refreshResourceCounters } from "./service";
-import { loadEnv } from "@polaris/config";
 import { encryptCredentials } from "@polaris/storage";
 import { nextBackupAt, readPolicy, type RetentionPolicy } from "./policy";
 import { isResourceKind, RESOURCE_KINDS_INFO, type ResourceKind } from "./kinds";
@@ -145,7 +145,6 @@ export async function backupSummary(ownerId: string): Promise<{
     storedBytes: number;
     failedRecently: number;
     destinationsDown: number;
-    cronConfigured: boolean;
 }> {
     const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const [totals, failed, down] = await Promise.all([
@@ -162,8 +161,7 @@ export async function backupSummary(ownerId: string): Promise<{
         copyCount: totals._sum.copyCount ?? 0,
         storedBytes: Number(totals._sum.sizeBytes ?? 0n),
         failedRecently: failed,
-        destinationsDown: down,
-        cronConfigured: Boolean(process.env.POLARIS_CRON_SECRET)
+        destinationsDown: down
     };
 }
 

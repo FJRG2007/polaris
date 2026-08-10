@@ -20,7 +20,6 @@
 
 import * as world from "./world";
 import { prisma } from "@polaris/db";
-import { loadEnv } from "@polaris/config";
 import * as policy from "./backup-policy";
 import { deployApplication } from "@/lib/deploy-service";
 import { appHasCapability, findApp } from "@/lib/apps/catalog";
@@ -76,9 +75,6 @@ export interface WorldView {
     readonly backupBytes: number;
     /** When the next scheduled copy is due, or null when none is scheduled. */
     readonly nextBackupAt: string | null;
-    /** Whether anything is actually running the schedule. A schedule nothing
-     *  sweeps is a promise the screen would otherwise make and not keep. */
-    readonly scheduleRuns: boolean;
     /** Why the lists are empty, when the container could not be read. */
     readonly message: string | null;
 }
@@ -124,10 +120,7 @@ export async function readWorldView(ownerId: string, installedAppId: string): Pr
             level,
             seed,
             carriesPlayers: world.canCarryPlayers(server.edition),
-            policy: rules,
-            // A schedule is only real if something sweeps it. Saying so is the
-            // difference between a promise and a setting that looks like one.
-            scheduleRuns: Boolean(loadEnv().POLARIS_CRON_SECRET)
+            policy: rules
         };
         try {
             // Asked before anything is read, because a command against a container
