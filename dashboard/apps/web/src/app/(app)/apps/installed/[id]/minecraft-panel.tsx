@@ -28,7 +28,7 @@ import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
 import { CopyButton } from "@/components/copy-button";
 import { saveWorldAction } from "./minecraft-actions";
-import { MinecraftConsole } from "./minecraft-console";
+import { GameConsole } from "./game-console";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
 import { MinecraftAppearance } from "./minecraft-appearance";
@@ -120,9 +120,9 @@ export function MinecraftPanel({
         // A screen this viewer does not hold falls back to the overview rather than
         // rendering empty. The route already refuses it; this is what keeps a
         // history entry from an earlier, wider grant from landing on nothing.
-        return isGameTab(slug) && canOpenGameTab(slug, held) ? slug : "";
+        return isGameTab(slug, "minecraft") && canOpenGameTab(slug, held, "minecraft") ? slug : "";
     }, [pathname, installedAppId, held]);
-    const tabs = useMemo(() => visibleGameTabs(held), [held]);
+    const tabs = useMemo(() => visibleGameTabs(held, "minecraft"), [held]);
     const openTab = useCallback(
         (slug: string) => {
             if (slug === tab) return;
@@ -270,7 +270,7 @@ export function MinecraftPanel({
 
             {tab === "" && <OverviewTab status={status} settings={settings} onOpenPlayers={() => openTab("players")} />}
             {tab === "console" && (
-                <MinecraftConsole installedAppId={installedAppId} applicationId={applicationId} running={running} />
+                <GameConsole installedAppId={installedAppId} applicationId={applicationId} running={running} />
             )}
             {tab === "players" && (
                 <MinecraftPlayers

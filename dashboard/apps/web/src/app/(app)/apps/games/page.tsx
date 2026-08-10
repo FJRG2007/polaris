@@ -12,10 +12,10 @@
 
 import { GamesView } from "./games-view";
 import { findApp } from "@/lib/apps/catalog";
-import { editionOf } from "@/lib/apps/minecraft/service";
 import { isGameServerApp } from "@/lib/apps/games-service";
 import { listInstalledApps } from "@/lib/apps/install-service";
 import { requirePermissionAny, userHasManage } from "@/lib/session";
+import { GAMES, gameOfServer, type GameId } from "@/lib/apps/games-catalog";
 import { gamePermissionsFor, reachableInstallIds } from "@/lib/apps/install-access";
 
 export const dynamic = "force-dynamic";
@@ -32,9 +32,12 @@ export default async function GameServersPage() {
         userHasManage(user, "games.manage")
     ]);
     const installs = await listInstalledApps(user.id, granted);
-    // The manager is an installed app of its own; without it there is nothing to
-    // manage, and the page offers to install it instead of pretending otherwise.
-    const managerInstalled = installs.some((install) => install.catalogId === "minecraft-manager");
+    // Each game is an installed app of its own; without one of them there is
+    // nothing to manage, and the page offers to add a game instead of pretending
+    // otherwise. Which games are on decides what the create dialog may offer.
+    const installedGames: GameId[] = GAMES.filter((game) =>
+        installs.some((install) => install.catalogId === game.managerCatalogId)
+    ).map((game) => game.id);
     const servers = await Promise.all(
         installs
             .filter((install) => isGameServerApp(install.catalogId))
@@ -45,7 +48,7 @@ export default async function GameServersPage() {
                     name: install.name,
                     catalogId: install.catalogId,
                     catalogName: findApp(install.catalogId)?.name ?? install.catalogId,
-                    edition: editionOf(install.catalogId),
+                    game: gameOfServer(install.catalogId)?.id ?? null,
                     applicationId: install.applicationId,
                     status: install.status,
                     canManage: held.includes("games.manage"),
@@ -55,5 +58,5 @@ export default async function GameServersPage() {
                 };
             })
     );
-    return <GamesView servers={servers} managerInstalled={managerInstalled} canCreate={canCreate} />;
+    return <GamesView servers={servers} installedGames={installedGames} canCreate={canCreate} />;
 }

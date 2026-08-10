@@ -7,6 +7,11 @@
  * join a Java server - so the answer to "what did creating it actually do" lives
  * in one place rather than spread across a form.
  *
+ * One entry point and one branch per game, because the games differ in what they
+ * are made of and agree on what surrounds them: both are an install on a machine,
+ * both get a name on the operator's domain, and both are created closed. The
+ * shared half is at the bottom of this file and neither game gets its own copy.
+ *
  * The address is the last step and the only one allowed to fail quietly: a server
  * whose DNS could not be written is a working server that players reach by IP,
  * which is strictly better than no server.
@@ -14,14 +19,24 @@
 
 import { installApp } from "@/lib/apps/install-service";
 import { joinAccess } from "@/lib/apps/minecraft/access";
+import { allocateArkPorts } from "@/lib/apps/ark/create";
 import { availableHostPort } from "@/lib/apps/port-registry";
 import { promptedEnvVars, findApp } from "@/lib/apps/catalog";
 import { setGameHostname } from "@/lib/apps/minecraft/address";
+import { patchInstallConfig } from "@/lib/apps/install-config";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
-import type { CreateGameServerInput } from "@/lib/apps/games-schema";
+import { ALLOW_LIST_KEY, withPlayer } from "@/lib/apps/ark/access";
 import { grantPlayerAccess } from "@/lib/apps/minecraft/player-access";
+import { applyAllowList, ARK_CATALOG_ID } from "@/lib/apps/ark/service";
+import { findGame, type GameDefinition } from "@/lib/apps/games-catalog";
+import { arkServerEnv, expectedArkMemoryMb } from "@/lib/apps/ark/config";
 import { newestCommonVersion, wantsLatest } from "@/lib/apps/minecraft/blueprint-version";
 import { DEFAULT_BIOME, DEFAULT_LEVEL_TYPE, levelTypeEnv, seedEnvKey } from "@/lib/apps/minecraft/world";
+import type {
+    CreateArkServerInput,
+    CreateGameServerInput,
+    CreateMinecraftServerInput
+} from "@/lib/apps/games-schema";
 import {
     CROSSPLAY_PROJECTS,
     findBlueprint,
@@ -47,6 +62,16 @@ export async function createGameServer(
     ownerId: string,
     actorId: string,
     input: CreateGameServerInput
+): Promise<CreatedGameServer> {
+    return input.game === "ark"
+        ? createArkServer(ownerId, actorId, input)
+        : createMinecraftServer(ownerId, actorId, input);
+}
+
+async function createMinecraftServer(
+    ownerId: string,
+    actorId: string,
+    input: CreateMinecraftServerInput
 ): Promise<CreatedGameServer> {
     const catalogId = TEMPLATE_BY_EDITION[input.edition];
     const manifest = findApp(catalogId);
@@ -102,7 +127,7 @@ export async function createGameServer(
     // Crossplay is Geyser listening on the Bedrock port inside the same container,
     // so that port has to be published as well - one service, two doors. Geyser's
     // own default is 19132; the host side takes the next free one.
-    const extraPorts = input.crossplay
+    const extra = input.crossplay
         ? [
               {
                   host: await availableHostPort(BEDROCK_PORT, "udp"),
@@ -116,7 +141,7 @@ export async function createGameServer(
         ownerId,
         actorId,
         { ...base, name: input.name, env: [...env.entries()].map(([key, value]) => ({ key, value })) },
-        extraPorts
+        extra ? { extra } : undefined
     );
 
     // The address half of the pair, which the game has nowhere to keep. The image
@@ -128,7 +153,70 @@ export async function createGameServer(
         note: "Created this server"
     });
 
-    const hostname = await attachHostname(ownerId, install.installedAppId, input);
+    const hostname = await attachHostname(ownerId, install.installedAppId, input, {
+        srv: input.edition === "java"
+    });
+    return { installedAppId: install.installedAppId, hostname };
+}
+
+/**
+ * Create an ARK server: three ports, two passwords and a closed door.
+ *
+ * The ports are allocated as a run and handed to the image, because ARK's raw
+ * socket has to sit exactly one above its game port on the player's side of the
+ * mapping - see `ark/create.ts`. The passwords are the reason this cannot be a
+ * plain install: the image ships a default join password and a default admin
+ * password, both printed in its own documentation, and a server created on either
+ * of them is open to anybody who has read it.
+ *
+ * The allow list is recorded rather than applied. There is no server to tell yet -
+ * a new one spends its first while downloading about thirty gigabytes - so the
+ * person creating it is written down as allowed, and the first sweep that finds the
+ * server answering hands them over.
+ */
+async function createArkServer(
+    ownerId: string,
+    actorId: string,
+    input: CreateArkServerInput
+): Promise<CreatedGameServer> {
+    const manifest = findApp(ARK_CATALOG_ID);
+    if (!manifest) throw new Error("ARK is not available");
+
+    const ports = await allocateArkPorts();
+    const base = defaultInstallInput(manifest, input.serverId);
+    const env = new Map(base.env.map((entry) => [entry.key, entry.value]));
+    for (const [key, value] of Object.entries(arkServerEnv(input, ports))) env.set(key, value);
+
+    const install = await installApp(
+        ownerId,
+        actorId,
+        { ...base, name: input.name, env: [...env.entries()].map(([key, value]) => ({ key, value })) },
+        {
+            primary: { host: ports.game, container: ports.game, protocol: "udp" },
+            extra: [
+                { host: ports.raw, container: ports.raw, protocol: "udp" },
+                { host: ports.query, container: ports.query, protocol: "udp" }
+            ]
+        }
+    );
+
+    await patchInstallConfig(install.installedAppId, {
+        [ALLOW_LIST_KEY]: withPlayer(
+            [],
+            { steamId: input.ownerSteamId, label: input.ownerLabel?.trim() || "You" },
+            new Date().toISOString()
+        ),
+        // What the machine picker bills this server at. ARK has no heap to set, so
+        // without this a machine running four of them looks empty on the form that
+        // decides where the fifth goes.
+        memoryMb: expectedArkMemoryMb(input.concurrentPlayers)
+    });
+    // Almost certainly too early - the server is still installing - but free when
+    // it is, and the difference between "the sweep will get to it" and "it is
+    // already done" is the whole first evening on a server somebody just made.
+    await applyAllowList(ownerId, install.installedAppId).catch(() => 0);
+
+    const hostname = await attachHostname(ownerId, install.installedAppId, input, { srv: false });
     return { installedAppId: install.installedAppId, hostname };
 }
 
@@ -166,12 +254,15 @@ function projectList(blueprint: GameBlueprint, current: string | undefined, cros
 async function attachHostname(
     ownerId: string,
     installedAppId: string,
-    input: CreateGameServerInput
+    input: CreateGameServerInput,
+    dns: { srv: boolean }
 ): Promise<string | null> {
+    const game: GameDefinition | undefined = findGame(input.game);
     return setGameHostname(ownerId, installedAppId, {
         name: input.name,
         ...(input.subdomain ? { subdomain: input.subdomain } : {}),
-        edition: input.edition
+        srv: dns.srv,
+        ...(game ? { gameLabel: game.domainLabel } : {})
     });
 }
 

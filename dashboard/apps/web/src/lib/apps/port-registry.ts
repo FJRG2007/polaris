@@ -92,20 +92,53 @@ export async function takenHostPorts(): Promise<Set<PortKey>> {
  * inside it, because a port outside the block is a port nothing opened.
  */
 export async function availableHostPort(preferred: number, protocol: PortProtocol = "tcp"): Promise<number> {
+    return availableHostPortRun(preferred, 1, protocol);
+}
+
+/**
+ * The first of a run of free host ports, all inside the block its transport
+ * allocates from.
+ *
+ * A run rather than a port because some servers publish several doors that are
+ * arithmetically tied to each other: ARK's raw socket has to be exactly one above
+ * its game port, and that is true of the ports players reach, not only the ones
+ * inside the container. Allocating those one call at a time cannot work - the
+ * first is not recorded anywhere until the application exists, so the second call
+ * would hand out the same port again.
+ *
+ * The rules are otherwise `availableHostPort`'s: the preferred port is honoured
+ * whenever the run fits there, so the first server of a game lands where its
+ * players' clients assume, and the search walks forward from it before wrapping so
+ * the second lands beside the first.
+ */
+export async function availableHostPortRun(
+    preferred: number,
+    count: number,
+    protocol: PortProtocol = "tcp"
+): Promise<number> {
+    if (!Number.isInteger(count) || count < 1) throw new Error("A run of ports is at least one port long");
     const [taken, blocks] = await Promise.all([takenHostPorts(), getPortBlocks()]);
     const block = blocks[protocol];
-    const free = (port: number): boolean => !taken.has(portKey(port, protocol));
-    if (inBlock(preferred, block) && free(preferred)) return preferred;
+    const fits = (start: number): boolean => {
+        if (start < block.start || start + count - 1 > block.end) return false;
+        for (let port = start; port < start + count; port += 1) {
+            if (taken.has(portKey(port, protocol))) return false;
+        }
+        return true;
+    };
+    if (fits(preferred)) return preferred;
     // From the preferred port onward before wrapping, so a second server of the
     // same game lands next to the first rather than at the bottom of the block.
     const from = inBlock(preferred, block) ? preferred : block.start;
-    for (let port = from; port <= block.end; port += 1) {
-        if (free(port)) return port;
+    for (let start = from; start <= block.end; start += 1) {
+        if (fits(start)) return start;
     }
-    for (let port = block.start; port < from; port += 1) {
-        if (free(port)) return port;
+    for (let start = block.start; start < from; start += 1) {
+        if (fits(start)) return start;
     }
     throw new Error(
-        `Every port in the ${protocol.toUpperCase()} range ${describeBlock(block)} is in use. Widen it under Admin, Domains, or remove a server that is no longer running.`
+        count === 1
+            ? `Every port in the ${protocol.toUpperCase()} range ${describeBlock(block)} is in use. Widen it under Admin, Domains, or remove a server that is no longer running.`
+            : `No run of ${count} free ports is left in the ${protocol.toUpperCase()} range ${describeBlock(block)}. Widen it under Admin, Domains, or remove a server that is no longer running.`
     );
 }

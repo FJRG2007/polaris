@@ -7,16 +7,18 @@
  * turns the answers into an install.
  */
 
+import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { clientIp } from "@/lib/request-context";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { clearResourceGrants } from "@polaris/auth";
+import { gameDomainSuffix } from "@/lib/apps/minecraft/address";
 import { clearQueue } from "@/lib/apps/minecraft/queue-service";
-import { clearSnapshots } from "@/lib/apps/minecraft/inventory-service";
-import { gameHostname } from "@/lib/apps/minecraft/address";
 import { installApp, uninstallApp } from "@/lib/apps/install-service";
 import { flushWorldForStop } from "@/lib/apps/minecraft/world-service";
+import { findGame, GAMES, type GameId } from "@/lib/apps/games-catalog";
+import { clearSnapshots } from "@/lib/apps/minecraft/inventory-service";
 import { blueprintVersion, createGameServer } from "@/lib/apps/games-create";
 import { listGameMachines, type GameMachine } from "@/lib/apps/games-service";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
@@ -24,14 +26,16 @@ import { createGameServerSchema, type CreateGameServerInput } from "@/lib/apps/g
 import { installRef, requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
 import { GAME_BLUEPRINTS, recommendedMemoryMb, formatMemory } from "@/lib/apps/minecraft/blueprints";
 
-/** The manager itself, as the marketplace knows it. */
-const MANAGER_CATALOG_ID = "minecraft-manager";
-
 export interface GameSetup {
     /** Machines a server can run on, with what each has left. */
     readonly machines: GameMachine[];
-    /** The domain servers get names under, when one is configured. */
-    readonly domainExample: string | null;
+    /** What a server's name ends in, per game (".mc.example.com"), so the dialog
+     *  can show the address before anything exists. Null with no domain. */
+    readonly domainSuffixes: Readonly<Record<GameId, string | null>>;
+    /** The games this Polaris can create a server of right now - the ones whose
+     *  manager is installed. The rest are a trip to the marketplace, not a choice
+     *  the dialog can offer and then fail. */
+    readonly games: readonly GameId[];
     /** The address this operator is on right now, offered as the one their own
      *  player is registered to - it is where they would connect from too. */
     readonly yourAddress: string | null;
@@ -40,12 +44,32 @@ export interface GameSetup {
 /** Everything the create dialog needs that only the server knows. */
 export async function gameSetupAction(): Promise<GameSetup> {
     const user = await requirePermission("games.manage");
-    const [machines, domainExample, yourAddress] = await Promise.all([
+    const [machines, suffixes, games, yourAddress] = await Promise.all([
         listGameMachines(user.id),
-        gameHostname("survival"),
+        Promise.all(GAMES.map((game) => gameDomainSuffix(game.domainLabel).catch(() => null))),
+        installedGameIds(user.id),
         clientIp()
     ]);
-    return { machines, domainExample, yourAddress: yourAddress ?? null };
+    return {
+        machines,
+        domainSuffixes: Object.fromEntries(GAMES.map((game, index) => [game.id, suffixes[index] ?? null])) as Record<
+            GameId,
+            string | null
+        >,
+        games,
+        yourAddress: yourAddress ?? null
+    };
+}
+
+/** The games whose manager this person has installed. */
+async function installedGameIds(ownerId: string): Promise<GameId[]> {
+    const installs = await prisma.installedApp.findMany({
+        where: { ownerId, status: { not: "removed" } },
+        select: { catalogId: true }
+    });
+    return GAMES.filter((game) => installs.some((install) => install.catalogId === game.managerCatalogId)).map(
+        (game) => game.id
+    );
 }
 
 /** What memory a server for this many players would be given, so the dialog can
@@ -86,7 +110,10 @@ export async function createGameServerAction(
             action: "games.create",
             targetType: "installedApp",
             targetId: created.installedAppId,
-            metadata: { edition: parsed.data.edition, blueprint: parsed.data.blueprintId }
+            metadata:
+                parsed.data.game === "ark"
+                    ? { game: "ark", map: parsed.data.map, closed: parsed.data.exclusiveJoin }
+                    : { game: "minecraft", edition: parsed.data.edition, blueprint: parsed.data.blueprintId }
         });
         revalidatePath("/apps/games");
         return { installedAppId: created.installedAppId, hostname: created.hostname };
@@ -165,13 +192,16 @@ export async function deleteGameServerAction(installedAppId: string): Promise<{ 
     }
 }
 
-/** Install the manager, from the page that needs it. */
-export async function installManagerAction(): Promise<{ error?: string }> {
+/** Add a game, from the page that needs it. The manager runs nothing: installing
+ *  it is what makes this Polaris able to create servers of that game. */
+export async function installManagerAction(gameId: string): Promise<{ error?: string }> {
     const user = await requirePermission("games.manage");
+    const game = findGame(gameId);
+    if (!game) return { error: "That game is not one Polaris knows" };
     try {
         const result = await installApp(user.id, user.id, {
-            catalogId: MANAGER_CATALOG_ID,
-            name: "Minecraft",
+            catalogId: game.managerCatalogId,
+            name: game.name,
             serverId: "local",
             storage: [],
             env: []

@@ -20,6 +20,7 @@
  */
 
 import type { Permission } from "@polaris/core";
+import type { GameId } from "@/lib/apps/games-catalog";
 
 export interface GameTab {
     /** The path segment, and the empty string for the screen the bare id shows. */
@@ -27,34 +28,46 @@ export interface GameTab {
     readonly label: string;
     /** What the viewer needs on this server to open it. */
     readonly permission: Permission;
+    /** The games that actually have this screen. A Minecraft world can be
+     *  regenerated from a seed and an ARK one cannot; ARK has no mod loader Polaris
+     *  drives and no gamerules to toggle. Offering a screen the game has nothing
+     *  behind is worse than not offering it - it opens on an error. */
+    readonly games: readonly GameId[];
 }
 
+const EVERY_GAME: readonly GameId[] = ["minecraft", "ark"];
+
 export const GAME_TABS: readonly GameTab[] = [
-    { slug: "", label: "Overview", permission: "games.read" },
-    { slug: "console", label: "Console", permission: "games.manage" },
-    { slug: "players", label: "Players", permission: "games.read" },
-    { slug: "world", label: "World", permission: "games.manage" },
-    { slug: "rules", label: "Rules", permission: "games.read" },
-    { slug: "mods", label: "Mods", permission: "games.manage" },
-    { slug: "usage", label: "Usage", permission: "games.read" },
-    { slug: "security", label: "Security", permission: "games.manage" },
-    { slug: "access", label: "Access", permission: "games.read" },
-    { slug: "settings", label: "Settings", permission: "games.manage" }
+    { slug: "", label: "Overview", permission: "games.read", games: EVERY_GAME },
+    { slug: "console", label: "Console", permission: "games.manage", games: EVERY_GAME },
+    { slug: "players", label: "Players", permission: "games.read", games: EVERY_GAME },
+    { slug: "world", label: "World", permission: "games.manage", games: ["minecraft"] },
+    { slug: "rules", label: "Rules", permission: "games.read", games: ["minecraft"] },
+    { slug: "mods", label: "Mods", permission: "games.manage", games: ["minecraft"] },
+    { slug: "usage", label: "Usage", permission: "games.read", games: EVERY_GAME },
+    { slug: "security", label: "Security", permission: "games.manage", games: EVERY_GAME },
+    { slug: "access", label: "Access", permission: "games.read", games: EVERY_GAME },
+    { slug: "settings", label: "Settings", permission: "games.manage", games: EVERY_GAME }
 ];
 
-/** Whether a slug from the URL names one of the screens. */
-export function isGameTab(slug: string): boolean {
-    return GAME_TABS.some((tab) => tab.slug === slug);
+/** The screens one game has at all, before anything about the viewer. */
+export function tabsForGame(game: GameId | null): GameTab[] {
+    return GAME_TABS.filter((tab) => game === null || tab.games.includes(game));
+}
+
+/** Whether a slug from the URL names one of the screens this game has. */
+export function isGameTab(slug: string, game: GameId | null = null): boolean {
+    return tabsForGame(game).some((tab) => tab.slug === slug);
 }
 
 /** The screens this viewer may open, given what they hold on this server. */
-export function visibleGameTabs(held: readonly Permission[]): GameTab[] {
-    return GAME_TABS.filter((tab) => held.includes(tab.permission));
+export function visibleGameTabs(held: readonly Permission[], game: GameId | null = null): GameTab[] {
+    return tabsForGame(game).filter((tab) => held.includes(tab.permission));
 }
 
 /** Whether this viewer may open one screen. */
-export function canOpenGameTab(slug: string, held: readonly Permission[]): boolean {
-    const tab = GAME_TABS.find((entry) => entry.slug === slug);
+export function canOpenGameTab(slug: string, held: readonly Permission[], game: GameId | null = null): boolean {
+    const tab = tabsForGame(game).find((entry) => entry.slug === slug);
     return tab !== undefined && held.includes(tab.permission);
 }
 

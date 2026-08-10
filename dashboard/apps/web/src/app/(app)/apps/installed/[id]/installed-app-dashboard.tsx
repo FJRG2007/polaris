@@ -9,6 +9,7 @@
  */
 
 import Link from "next/link";
+import { ArkPanel } from "./ark-panel";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { Permission } from "@polaris/core";
@@ -16,6 +17,7 @@ import type { GameContext } from "./game-context";
 import { useRuntimeLog } from "./use-runtime-log";
 import { MinecraftPanel } from "./minecraft-panel";
 import { LogViewer } from "@/components/log-viewer";
+import { gameForCatalogId } from "@/lib/apps/games-catalog";
 import { MessagingBridgePanel } from "./messaging-bridge-panel";
 import type { InstalledAppDetail, InstalledAppSetting } from "@/lib/apps/install-service";
 import { Badge, Button, Card, CardBody, ConfirmDeleteDialog, PageHeader, cn } from "@polaris/ui";
@@ -53,22 +55,35 @@ function adaptedPanelFor(
     switch (app.catalogId) {
         case "messaging-bridge":
             return <MessagingBridgePanel />;
-        // The manager runs nothing itself - its dashboard is the Game servers page,
+        // A manager runs nothing itself - its dashboard is the Game servers page,
         // and this is the door to it rather than a second copy of the list.
         case "minecraft-manager":
+        case "ark-manager":
             return (
                 <Card>
                     <CardBody className="flex flex-col items-center gap-3 py-10 text-center">
                         <p className="text-sm font-medium">Your servers live on the Game servers page</p>
                         <p className="max-w-md text-sm text-muted-foreground">
-                            Create as many as you want, Java or Bedrock, each with its own address, console, players and
-                            mods. The manager itself runs nothing.
+                            Create as many as you want, each with its own address, console, players and settings. The
+                            manager itself runs nothing.
                         </p>
                         <Link href="/apps/games">
                             <Button size="sm">Open Game servers</Button>
                         </Link>
                     </CardBody>
                 </Card>
+            );
+        case "ark":
+            return (
+                <ArkPanel
+                    installedAppId={app.id}
+                    applicationId={app.applicationId}
+                    settings={settings}
+                    running={running}
+                    game={game}
+                    held={held}
+                    onStatus={onStatus}
+                />
             );
         // Both editions are driven by the same panel; what differs is underneath,
         // and the panel offers what the edition it is looking at actually has.
@@ -131,9 +146,10 @@ export function InstalledAppDashboard({
     const adaptedPanel = adaptedPanelFor(app, settings, running, game, held, setLiveStatus);
     const [showLogs, setShowLogs] = useState(adaptedPanel === null);
     const { log, refresh: loadLog } = useRuntimeLog(applicationId, running && showLogs);
-    // Back goes where this app is listed, which for a game server is the Game
-    // servers page rather than the marketplace it was installed from.
-    const isGame = app.catalogId.startsWith("minecraft");
+    // Back goes where this app is listed, which for anything belonging to a game -
+    // a server or the manager that creates them - is the Game servers page rather
+    // than the marketplace it was installed from.
+    const isGame = gameForCatalogId(app.catalogId) !== undefined;
     const backHref = isGame ? "/apps/games" : "/apps/marketplace";
     const backLabel = isGame ? "Game servers" : "Marketplace";
 

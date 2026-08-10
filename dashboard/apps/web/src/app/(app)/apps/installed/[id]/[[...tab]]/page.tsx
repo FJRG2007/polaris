@@ -18,6 +18,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/session";
 import { gameContextFor } from "../game-context";
 import { canOpenGameTab, isGameTab } from "../tabs";
+import { gameOfServer } from "@/lib/apps/games-catalog";
 import { heldOn, resourceAccess } from "@/lib/resource-access";
 import { InstalledAppDashboard } from "../installed-app-dashboard";
 import { gamePermissionsFor, installRef } from "@/lib/apps/install-access";
@@ -52,10 +53,14 @@ export default async function InstalledAppPage({
     // An unknown slug is a mistyped link, not an error worth a page of its own.
     // Only a game server has screens; anything else is its shell and nothing more.
     const slug = tab?.[0] ?? "";
-    if (slug && !isGameTab(slug)) notFound();
+    // Which game it is decides which screens exist at all: ARK has no world to
+    // regenerate and no Modrinth to install from, so those slugs are not screens
+    // that are merely hidden here - they are screens this server does not have.
+    const gameId = gameOfServer(app.catalogId)?.id ?? null;
+    if (slug && !isGameTab(slug, gameId)) notFound();
     // A screen they do not hold reads the same as one that is not there. Hiding the
     // tab is what the bar does; this is what makes the URL agree with it.
-    if (slug && !canOpenGameTab(slug, held)) notFound();
+    if (slug && !canOpenGameTab(slug, held, gameId)) notFound();
 
     // What the app was deployed with, so its panel can paint its settings without
     // waiting on a request of its own. Both are detail on a page whose job is to

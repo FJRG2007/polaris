@@ -77,13 +77,28 @@ async function ensureMarketplaceEnvironment(ownerId: string): Promise<string> {
 }
 
 /** Install a catalog app: create and deploy its stack, then record the install. */
+/** Ports a caller pins itself, instead of and beside the manifest's own. */
+export interface InstallPorts {
+    /**
+     * The port the app is reached on, when the caller has to decide it rather
+     * than let the allocator start from the manifest's.
+     *
+     * A game whose doors are arithmetically tied to each other cannot have them
+     * mapped independently - ARK's raw socket has to be one above its game port on
+     * the player's side of the mapping too - so its ports are allocated as a run
+     * and the container is told to bind exactly them.
+     */
+    readonly primary?: { host: number; container: number; protocol?: "tcp" | "udp" };
+    /** Further doors into the same service. A Java Minecraft server that Bedrock
+     *  clients join answers on a UDP port too. */
+    readonly extra?: readonly { host: number; container: number; protocol?: "tcp" | "udp" }[];
+}
+
 export async function installApp(
     ownerId: string,
     actorId: string,
     input: AppInstallInput,
-    /** Further ports the caller needs published beside the manifest's own. A Java
-     *  Minecraft server that Bedrock clients join answers on a UDP port too. */
-    extraPorts?: readonly { host: number; container: number; protocol?: "tcp" | "udp" }[]
+    ports?: InstallPorts
 ): Promise<{ installedAppId: string; applicationId: string | null }> {
     const app = findApp(input.catalogId);
     if (!app) throw new Error("Unknown app");
@@ -135,16 +150,19 @@ export async function installApp(
               })();
 
     const environmentId = await ensureMarketplaceEnvironment(ownerId);
-    const primary = template.ports?.[0];
+    const declared = template.ports?.[0];
+    const pinned = ports?.primary ?? null;
+    const containerPort = pinned?.container ?? declared?.container;
+    const protocol = (pinned?.protocol ?? declared?.protocol) === "udp" ? "udp" : "tcp";
     // One-click installs all arrive under the app's own name, and a service's slug
     // is unique within its environment - so the second one is numbered rather than
     // rejected with a database error nobody outside Polaris can read.
     const name = await availableInstanceName(environmentId, input.name);
     // An app that declares the host port it wants is one people reach by typing an
     // address (a game server): publish it there, on the transport its clients speak.
-    const hostPort = primary?.host
-        ? await availableHostPort(primary.host, primary.protocol === "udp" ? "udp" : "tcp")
-        : undefined;
+    // A caller that allocated the port itself has already done that arithmetic.
+    const hostPort = pinned ? pinned.host : declared?.host ? await availableHostPort(declared.host, protocol) : undefined;
+    const extraPorts = ports?.extra;
     const application = await createApplication(ownerId, {
         environmentId,
         targetId: target.id,
@@ -152,8 +170,8 @@ export async function installApp(
         sourceType: "image",
         sourceConfig: {
             imageRef: image,
-            ...(primary?.container ? { port: primary.container } : {}),
-            ...(hostPort ? { hostPort, hostProtocol: primary?.protocol === "udp" ? "udp" : "tcp" } : {}),
+            ...(containerPort ? { port: containerPort } : {}),
+            ...(hostPort ? { hostPort, hostProtocol: protocol } : {}),
             ...(extraPorts && extraPorts.length > 0 ? { extraPorts } : {})
         }
     });

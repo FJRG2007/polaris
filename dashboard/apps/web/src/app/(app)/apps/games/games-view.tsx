@@ -27,6 +27,7 @@ import { useRouter } from "next/navigation";
 import { CopyButton } from "@/components/copy-button";
 import { NewServerDialog } from "./new-server-dialog";
 import type { GameServerFacts, GameServerLive } from "@/lib/apps/games-service";
+import { GAMES, type GameDefinition, type GameId } from "@/lib/apps/games-catalog";
 import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import {
     deleteGameServerAction,
@@ -72,7 +73,8 @@ export interface GameServerSeed {
     name: string;
     catalogId: string;
     catalogName: string;
-    edition: "java" | "bedrock";
+    /** Which game it plays. Null only for a catalog that has drifted. */
+    game: GameId | null;
     /** The service behind it, for the screens that reach past the game. */
     applicationId: string | null;
     status: string;
@@ -94,16 +96,19 @@ interface ServerView extends GameServerSeed {
 
 export function GamesView({
     servers,
-    managerInstalled,
+    installedGames,
     canCreate
 }: {
     servers: GameServerSeed[];
-    managerInstalled: boolean;
+    /** The games this Polaris can create a server of. Empty means no game has been
+     *  added yet, and the page is an offer to add one. */
+    installedGames: readonly GameId[];
     /** Whether this viewer may make a new server. Instance-wide, unlike what they
      *  may do to the ones already in the table - being invited to help run one is
      *  not an offer to start more. */
     canCreate: boolean;
 }) {
+    const managerInstalled = installedGames.length > 0;
     const router = useRouter();
     const [facts, setFacts] = useState<Map<string, GameServerFacts>>(new Map());
     const [live, setLive] = useState<Map<string, GameServerLive>>(new Map());
@@ -201,7 +206,9 @@ export function GamesView({
         });
     }
 
-    if (!managerInstalled) return <InstallManager />;
+    const missing = GAMES.filter((game) => !installedGames.includes(game.id));
+
+    if (!managerInstalled) return <AddGames games={GAMES} canAdd={canCreate} />;
 
     return (
         <div className="flex flex-col gap-4">
@@ -209,7 +216,7 @@ export function GamesView({
                 title="Game servers"
                 description={
                     servers.length === 0
-                        ? "Run Minecraft servers on your own machines."
+                        ? "Run game servers on your own machines."
                         : `${servers.length} ${servers.length === 1 ? "server" : "servers"}, ${playing} playing right now.`
                 }
                 actions={
@@ -229,9 +236,8 @@ export function GamesView({
                         <Gamepad2 className="size-8 text-muted-foreground" />
                         <p className="text-sm font-medium">No servers yet</p>
                         <p className="max-w-md text-sm text-muted-foreground">
-                            Pick who it is for and what it plays, and Polaris sizes it, protects it and gives it an
-                            address. Java is the PC edition, Bedrock is phones and consoles, and one server can take
-                            both.
+                            Pick the game, say who plays on it, and Polaris sizes it, closes it to everyone else and
+                            gives it an address.
                         </p>
                         {canCreate && (
                             <Button onClick={() => setCreating(true)}>
@@ -273,6 +279,11 @@ export function GamesView({
                 </div>
             )}
 
+            {/* A game somebody has not added yet is one they cannot create a server
+                of, and the create dialog only offers what is on. Saying so here is
+                cheaper than a trip to the marketplace to find out what is missing. */}
+            {canCreate && missing.length > 0 && <AddGames games={missing} canAdd compact />}
+
             {creating && <NewServerDialog onClose={() => setCreating(false)} />}
             <ConfirmDeleteDialog
                 open={deleting !== null}
@@ -288,43 +299,98 @@ export function GamesView({
     );
 }
 
-/** The manager is an app: it is installed, and until it is there is nothing here
- *  to manage. One button rather than a trip to the marketplace to find it. */
-function InstallManager() {
+/**
+ * The games that can be added, and the button that adds one.
+ *
+ * A game is an app: it is installed, and until one is there is nothing on this
+ * page to manage. Adding it runs nothing - it is what makes this Polaris able to
+ * create servers of that game - so the card says what a server of it will actually
+ * cost, which is the one thing that differs by an order of magnitude between them
+ * and the one thing nobody finds out until the disk is full.
+ *
+ * `compact` is the same list under a table that already has servers in it, for
+ * adding the second game.
+ */
+function AddGames({
+    games,
+    canAdd,
+    compact = false
+}: {
+    games: readonly GameDefinition[];
+    canAdd: boolean;
+    compact?: boolean;
+}) {
     const router = useRouter();
     const [pending, startTransition] = useTransition();
+    const [adding, setAdding] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+
+    function add(gameId: string): void {
+        setError(null);
+        setAdding(gameId);
+        startTransition(async () => {
+            const result = await installManagerAction(gameId);
+            setAdding(null);
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            router.refresh();
+        });
+    }
+
+    const list = (
+        <div className="flex flex-col gap-2">
+            {games.map((game) => (
+                <div
+                    key={game.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-left"
+                >
+                    <div className="flex min-w-0 items-start gap-2">
+                        <Gamepad2 className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0">
+                            <p className="text-sm font-medium">{game.name}</p>
+                            <p className="text-xs text-muted-foreground">{game.summary}</p>
+                            <p className="text-xs text-muted-foreground/80">{game.demands}</p>
+                        </div>
+                    </div>
+                    {canAdd && (
+                        <Button size="sm" onClick={() => add(game.id)} disabled={pending}>
+                            {pending && adding === game.id && <Loader2 className="size-4 animate-spin" />}
+                            Add
+                        </Button>
+                    )}
+                </div>
+            ))}
+        </div>
+    );
+
+    if (compact) {
+        return (
+            <Card>
+                <CardBody className="flex flex-col gap-3">
+                    <p className="text-sm font-medium">Add another game</p>
+                    {error && <p className="text-sm text-danger">{error}</p>}
+                    {list}
+                </CardBody>
+            </Card>
+        );
+    }
 
     return (
         <div className="flex flex-col gap-6">
-            <PageHeader title="Game servers" description="Run Minecraft servers on your own machines." />
+            <PageHeader title="Game servers" description="Run game servers on your own machines." />
             <Card>
-                <CardBody className="flex flex-col items-center gap-3 py-12 text-center">
-                    <Gamepad2 className="size-8 text-muted-foreground" />
-                    <p className="text-sm font-medium">Install the Minecraft manager</p>
-                    <p className="max-w-md text-sm text-muted-foreground">
-                        It adds this page for real: create as many servers as you want, Java or Bedrock, each with its
-                        own address, console, players and mods. Nothing runs until you create a server.
+                <CardBody className="flex flex-col gap-3 py-8">
+                    <p className="text-sm font-medium">Add a game</p>
+                    <p className="max-w-xl text-sm text-muted-foreground">
+                        Adding one turns this page on for it: create as many servers as you want, each with its own
+                        address, console, players and settings. Nothing runs until you create a server.
                     </p>
                     {error && <p className="text-sm text-danger">{error}</p>}
-                    <Button
-                        onClick={() =>
-                            startTransition(async () => {
-                                const result = await installManagerAction();
-                                if (result.error) {
-                                    setError(result.error);
-                                    return;
-                                }
-                                router.refresh();
-                            })
-                        }
-                        disabled={pending}
-                    >
-                        {pending && <Loader2 className="size-4 animate-spin" />}
-                        Install
-                    </Button>
+                    {list}
                     <p className="text-xs text-muted-foreground">
-                        Creating a server accepts the{" "}
+                        Creating a Minecraft server accepts the{" "}
                         <a
                             href="https://www.minecraft.net/eula"
                             target="_blank"
@@ -342,9 +408,11 @@ function InstallManager() {
 }
 
 /** The world's files, in the same explorer every other file in Polaris is
- *  browsed from. Null for a server that has no container to browse. */
-function filesHref(applicationId: string | null): string | null {
-    return applicationId ? `/drive?c=container:${applicationId}&p=/data` : null;
+ *  browsed from. Null for a server that has no container to browse. Each game
+ *  keeps them somewhere else, and landing on an empty directory reads as a server
+ *  with nothing in it. */
+function filesHref(applicationId: string | null, game: GameId | null): string | null {
+    return applicationId ? `/drive?c=container:${applicationId}&p=${game === "ark" ? "/app" : "/data"}` : null;
 }
 
 function ServerRow({
@@ -364,7 +432,7 @@ function ServerRow({
 }) {
     const { facts, live } = server;
     const href = `/apps/installed/${server.id}`;
-    const files = filesHref(server.applicationId);
+    const files = filesHref(server.applicationId, server.game);
     const running = facts?.running ?? false;
     const address = facts?.address ?? null;
     // Start and stop act on what the server is meant to be doing, which is the

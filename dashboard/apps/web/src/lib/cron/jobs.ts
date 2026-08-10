@@ -50,18 +50,20 @@ async function ownersWithApps(): Promise<string[]> {
     return rows.map((row) => row.ownerId);
 }
 
-async function runFirewall(): Promise<{ servers: number; banned: number; kicked: number }> {
+async function runFirewall(): Promise<{ servers: number; banned: number; kicked: number; allowed: number }> {
     let servers = 0;
     let banned = 0;
     let kicked = 0;
+    let allowed = 0;
     for (const ownerId of await ownersWithApps()) {
         const result = await syncFirewallBans(ownerId).catch(() => null);
         if (!result) continue;
         servers += result.servers;
         banned += result.banned;
         kicked += result.kicked;
+        allowed += result.allowed;
     }
-    return { servers, banned, kicked };
+    return { servers, banned, kicked, allowed };
 }
 
 async function runGameSchedules(): Promise<{ started: number; stopped: number }> {

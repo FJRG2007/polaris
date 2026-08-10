@@ -23,7 +23,9 @@ import { loadCloudflareToken } from "@/lib/integrations/cloudflare-account-servi
 import { resolveZoneForHostname, upsertSrvRecord } from "@/lib/integrations/cloudflare-api";
 
 /** The label game servers live under, so they never collide with a deployed
- *  service's name: `survival.mc.example.com`. */
+ *  service's name: `survival.mc.example.com`. One per game, because two games'
+ *  servers would otherwise be competing for the same subdomain - and "survival"
+ *  is a name somebody will pick twice. */
 const GAME_LABEL = "mc";
 
 export interface GameAddress {
@@ -35,11 +37,11 @@ export interface GameAddress {
 
 /** The hostname a server would take on this Polaris, or null when no domain is
  *  configured. Deterministic from the name, so it survives a redeploy. */
-export async function gameHostname(name: string, subdomain?: string): Promise<string | null> {
+export async function gameHostname(name: string, subdomain?: string, gameLabel: string = GAME_LABEL): Promise<string | null> {
     const { baseDomain } = await getDomainZones();
     if (!baseDomain) return null;
     const label = normalizeZoneName(subdomain?.trim() || name);
-    return label ? `${label}.${GAME_LABEL}.${baseDomain}` : null;
+    return label ? `${label}.${gameLabel}.${baseDomain}` : null;
 }
 
 /** Whether a hostname is already taken by another of this owner's servers. */
@@ -66,14 +68,13 @@ export async function hostnameTaken(ownerId: string, hostname: string, exceptIns
  * record is what removes the port from what a player has to type, and it is only
  * written once the A record it targets exists.
  */
-export async function provisionGameDns(
-    hostname: string,
-    port: number,
-    edition: "java" | "bedrock"
-): Promise<GameAddress> {
+export async function provisionGameDns(hostname: string, port: number, srv: boolean): Promise<GameAddress> {
     const result = await provisionHostnameDns(hostname);
     if (result.status === "conflict" || result.status === "manual") return { hostname: null, portless: false };
-    if (edition === "bedrock") return { hostname, portless: false };
+    // Only a Minecraft: Java client looks a SRV record up. Bedrock does not, and
+    // neither does ARK - there the name is still worth having, it just carries its
+    // port the way it always did.
+    if (!srv) return { hostname, portless: false };
     try {
         const token = await loadCloudflareToken();
         if (!token) return { hostname, portless: false };
@@ -134,9 +135,16 @@ export function gameServerAddress(server: {
 export async function setGameHostname(
     ownerId: string,
     installedAppId: string,
-    input: { name: string; subdomain?: string; edition: "java" | "bedrock" }
+    input: {
+        name: string;
+        subdomain?: string;
+        /** Whether the client finds the port for itself once the name resolves. */
+        srv: boolean;
+        /** The game's own label, so two games' servers cannot take the same name. */
+        gameLabel?: string;
+    }
 ): Promise<string | null> {
-    const wanted = await gameHostname(input.name, input.subdomain);
+    const wanted = await gameHostname(input.name, input.subdomain, input.gameLabel);
     if (!wanted) return null;
     if (await hostnameTaken(ownerId, wanted, installedAppId)) {
         throw new Error(`${wanted} is already taken by another server - pick a different subdomain`);
@@ -147,7 +155,7 @@ export async function setGameHostname(
     });
     const port = install?.applicationId ? await publishedPort(install.applicationId) : null;
     if (!port) return null;
-    const address = await provisionGameDns(wanted, port, input.edition);
+    const address = await provisionGameDns(wanted, port, input.srv);
     if (!address.hostname) return null;
     await patchInstallConfig(installedAppId, { hostname: address.hostname, portless: address.portless });
     return address.hostname;
@@ -168,8 +176,8 @@ async function publishedPort(applicationId: string): Promise<number | null> {
 
 /** The suffix every game server's name ends in on this Polaris (".mc.example.com"),
  *  so a screen can show what a chosen label will become. Null with no domain. */
-export async function gameDomainSuffix(): Promise<string | null> {
-    const example = await gameHostname("server");
+export async function gameDomainSuffix(gameLabel?: string): Promise<string | null> {
+    const example = await gameHostname("server", undefined, gameLabel);
     return example ? example.slice("server".length) : null;
 }
 

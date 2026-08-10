@@ -24,14 +24,21 @@ interface Reply {
 
 const KEPT_REPLIES = 12;
 
-export function MinecraftConsole({
+export function GameConsole({
     installedAppId,
     applicationId,
-    running
+    running,
+    logName = "minecraft",
+    hint = "say Hello, or time set day"
 }: {
     installedAppId: string;
     applicationId: string | null;
     running: boolean;
+    /** What a downloaded copy of the log is called. */
+    logName?: string;
+    /** An example command, in the language of the game this console is attached
+     *  to - the two do not share a single command. */
+    hint?: string;
 }) {
     const { log, refresh } = useRuntimeLog(applicationId, true, 400);
     const [line, setLine] = useState("");
@@ -91,7 +98,7 @@ export function MinecraftConsole({
 
                 <LogViewer
                     log={log}
-                    name="minecraft"
+                    name={logName}
                     searchable
                     emptyText={running ? "Waiting for output..." : "The server is stopped."}
                     className="h-96"
@@ -113,7 +120,7 @@ export function MinecraftConsole({
                         value={line}
                         onChange={(event) => setLine(event.target.value)}
                         onKeyDown={onKeyDown}
-                        placeholder={running ? "say Hello, or time set day" : "Start the server to send commands"}
+                        placeholder={running ? hint : "Start the server to send commands"}
                         disabled={!running || pending}
                         aria-label="Server command"
                         className="font-mono"

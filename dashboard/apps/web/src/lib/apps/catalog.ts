@@ -11,6 +11,7 @@
  * runtime.
  */
 
+import { ARK_MAPS, DEFAULT_ARK_MAP } from "@/lib/apps/ark/maps";
 import { Bot, Gamepad2, MessagesSquare, type LucideIcon } from "lucide-react";
 
 export type AppCategory = "Messaging" | "AI" | "Game servers" | "Tools";
@@ -573,6 +574,213 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
             volumes: [{ name: "data", mountPath: "/data", label: "World data" }],
             // Bedrock speaks UDP; published as TCP it answers nothing at all.
             ports: [{ container: 19132, protocol: "udp", host: 19132, label: "Server port" }]
+        }
+    },
+    {
+        id: "ark-manager",
+        name: "ARK: Survival Evolved",
+        category: "Game servers",
+        icon: Gamepad2,
+        summary: "Create and run as many ARK servers as you want.",
+        description:
+            "The ARK: Survival Evolved server manager. Install it once, then create servers from the Game servers page: pick a map, say how many people play, and Polaris gives each one its ports, a join password nobody else has and an admin password it keeps for you. The game itself is about 30 GB and is downloaded on the first start, so a new server takes a while before anyone can join it.",
+        installMethod: "builtin",
+        capabilities: ["game-manager"],
+        dashboard: "builtin",
+        singleton: true
+    },
+    {
+        id: "ark",
+        name: "ARK: Survival Evolved",
+        internal: true,
+        category: "Game servers",
+        icon: Gamepad2,
+        summary: "An ARK server for PC players, closed to everyone you have not added.",
+        description:
+            "Runs an ARK: Survival Evolved dedicated server on the machine you choose, with the world on a server-local volume or a NAS. It comes closed: a join password only you have, BattlEye on, an admin password Polaris mints and keeps, and only the players you add allowed in. Manage it from the Game servers panel: console, players, mods and settings.",
+        docsUrl: "https://github.com/Hermsi1337/docker-ark-server",
+        installMethod: "compose-template",
+        capabilities: ["game-server"],
+        dashboard: "builtin",
+        template: {
+            image: "hermsi/ark-server:latest",
+            env: [
+                {
+                    // The in-game admin console and RCON share this one password,
+                    // and the image ships a default that is printed in its README.
+                    // Minted per server, never asked for, and shown only to whoever
+                    // can already read the server's secrets.
+                    key: "ADMIN_PASSWORD",
+                    label: "Admin password",
+                    generated: true
+                },
+                {
+                    // The other half of the same problem: the image's own default
+                    // join password is public. Always written by the create flow,
+                    // required so an empty one is refused rather than dropped back
+                    // onto the image's. Not tunable - a secret read back masked and
+                    // saved again would overwrite the real one with a blank.
+                    key: "SERVER_PASSWORD",
+                    label: "Join password",
+                    help: "Players type this when they connect. Change it from the server's Access screen.",
+                    secret: true,
+                    required: true
+                },
+                {
+                    key: "SESSION_NAME",
+                    label: "Server name",
+                    help: "The name shown in the in-game server browser.",
+                    default: "An ARK server on Polaris",
+                    tunable: true,
+                    group: "World"
+                },
+                {
+                    key: "SERVER_MAP",
+                    label: "Map",
+                    help: "Changing it loads that map's own world. The old one is kept and comes back if you switch back.",
+                    default: DEFAULT_ARK_MAP,
+                    options: ARK_MAPS.map((map) => ({
+                        value: map.value,
+                        label: map.dlc ? `${map.label} (needs the DLC)` : map.label
+                    })),
+                    tunable: true,
+                    group: "World"
+                },
+                {
+                    key: "SERVER_MAP_MOD_ID",
+                    label: "Modded map id",
+                    help: "The Steam Workshop id of a custom map. Leave blank for the maps that ship with the game.",
+                    tunable: true,
+                    group: "Mods"
+                },
+                {
+                    key: "GAME_MOD_IDS",
+                    label: "Mods",
+                    help: "Steam Workshop ids, comma separated. Installed on the next start.",
+                    tunable: true,
+                    group: "Mods"
+                },
+                {
+                    key: "MAX_PLAYERS",
+                    label: "Player slots",
+                    default: "20",
+                    tunable: true,
+                    group: "Players"
+                },
+                {
+                    // Epic clients as well as Steam ones. Off by default because it
+                    // widens who can reach the server, and a server is easier to
+                    // open later than it is to un-open.
+                    key: "ENABLE_CROSSPLAY",
+                    label: "Epic Games players",
+                    help: "On lets Epic clients join as well as Steam ones.",
+                    default: "false",
+                    options: [
+                        { value: "false", label: "Steam only" },
+                        { value: "true", label: "Steam and Epic" }
+                    ],
+                    tunable: true,
+                    group: "Players"
+                },
+                {
+                    key: "UPDATE_ON_START",
+                    label: "Update before starting",
+                    help: "Keeps the server and its mods current. Off starts faster and drifts behind the clients.",
+                    default: "true",
+                    options: [
+                        { value: "true", label: "Yes" },
+                        { value: "false", label: "No" }
+                    ],
+                    tunable: true,
+                    group: "Server"
+                },
+                {
+                    key: "VALIDATE_ON_START",
+                    label: "Verify the files",
+                    help: "Has Steam repair a damaged install on each start. Noticeably slower.",
+                    default: "false",
+                    options: [
+                        { value: "false", label: "No" },
+                        { value: "true", label: "Yes" }
+                    ],
+                    tunable: true,
+                    group: "Server"
+                },
+                {
+                    key: "PRE_UPDATE_BACKUP",
+                    label: "Back up before updating",
+                    default: "true",
+                    options: [
+                        { value: "true", label: "Yes" },
+                        { value: "false", label: "No" }
+                    ],
+                    tunable: true,
+                    group: "Server"
+                },
+                {
+                    key: "BACKUP_ON_STOP",
+                    label: "Back up when stopping",
+                    default: "true",
+                    options: [
+                        { value: "true", label: "Yes" },
+                        { value: "false", label: "No" }
+                    ],
+                    tunable: true,
+                    group: "Server"
+                },
+                {
+                    key: "WARN_ON_STOP",
+                    label: "Warn players before stopping",
+                    default: "true",
+                    options: [
+                        { value: "true", label: "Yes" },
+                        { value: "false", label: "No" }
+                    ],
+                    tunable: true,
+                    group: "Server"
+                },
+                {
+                    // BattlEye is the only anticheat an ARK server has. It stays on
+                    // unless somebody deliberately turns it off, and the label says
+                    // which way round that is.
+                    key: "DISABLE_BATTLEYE",
+                    label: "BattlEye anticheat",
+                    help: "Off means clients are not checked at all.",
+                    default: "false",
+                    options: [
+                        { value: "false", label: "On" },
+                        { value: "true", label: "Off" }
+                    ],
+                    tunable: true,
+                    group: "Security"
+                },
+                {
+                    // Carries `-exclusivejoin`, which is what makes the server let in
+                    // only the players Polaris added. Deliberately not tunable: it is
+                    // one string holding several flags, and a free-text edit that
+                    // dropped that one word would reopen the server silently. The
+                    // Security screen owns it.
+                    key: "ARK_EXTRA_OPTS",
+                    label: "Launch options"
+                },
+                // The ports the server binds inside its container. Set by the create
+                // flow to the ones Polaris published for it, because ARK's raw socket
+                // has to be exactly one above its game port on the player's side too -
+                // so the two cannot be mapped independently. Not tunable: changing one
+                // without republishing is a server nobody can reach.
+                { key: "GAME_CLIENT_PORT", label: "Game port" },
+                { key: "UDP_SOCKET_PORT", label: "Raw socket port" },
+                { key: "SERVER_LIST_PORT", label: "Server list port" }
+            ],
+            volumes: [{ name: "data", mountPath: "/app", label: "Server files and world" }],
+            // ARK speaks UDP on all three. RCON (27020/tcp) is deliberately absent:
+            // commands are run inside the container, so nothing has to be exposed for
+            // the console and the player list to work.
+            ports: [
+                { container: 7777, protocol: "udp", host: 7777, label: "Game port" },
+                { container: 7778, protocol: "udp", host: 7778, label: "Raw socket" },
+                { container: 27015, protocol: "udp", host: 27015, label: "Server list" }
+            ]
         }
     },
     {

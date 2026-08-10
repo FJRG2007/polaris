@@ -15,6 +15,8 @@ import { clientIp } from "@/lib/request-context";
 import { recordAudit } from "@/lib/audit-service";
 import { setEnvVars } from "@/lib/env-var-service";
 import { requirePermissionAny } from "@/lib/session";
+import { runArkCommand } from "@/lib/apps/ark/service";
+import { gameOfServer } from "@/lib/apps/games-catalog";
 import { deployApplication } from "@/lib/deploy-service";
 import { applyWorldSchedule } from "@/lib/backups/manage";
 import { DIFFICULTIES } from "@/lib/apps/minecraft/rules";
@@ -691,10 +693,14 @@ export async function setGameHostnameAction(
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         const install = access.install;
+        // Which game it is decides both halves of the name: the label its servers
+        // live under, and whether a client will look the port up for itself.
+        const game = gameOfServer(install.catalogId);
         const hostname = await setGameHostname(access.ownerId, installedAppId, {
             name: install.name,
             ...(parsed.data ? { subdomain: parsed.data } : {}),
-            edition: install.catalogId === "minecraft-bedrock" ? "bedrock" : "java"
+            srv: (game?.srv ?? true) && install.catalogId !== "minecraft-bedrock",
+            ...(game ? { gameLabel: game.domainLabel } : {})
         });
         await recordAudit({
             actorId: user.id,
@@ -1075,7 +1081,12 @@ export async function sendConsoleCommandAction(
         // The console runs any command the server takes, op included, so it is the
         // full grant rather than the moderator one.
         const { access } = await requireGameServer("games.manage", parsed.data.installedAppId);
-        const output = await runConsoleLine(access.ownerId, parsed.data.installedAppId, parsed.data.line);
+        // One console, two languages underneath. Which one is decided here rather
+        // than by the screen: the panel that renders the console is the same one.
+        const output =
+            gameOfServer(access.install.catalogId)?.id === "ark"
+                ? await runArkCommand(access.ownerId, parsed.data.installedAppId, parsed.data.line.replace(/^\//, ""))
+                : await runConsoleLine(access.ownerId, parsed.data.installedAppId, parsed.data.line);
         return { output: output.trim() };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "The server did not accept that command" };

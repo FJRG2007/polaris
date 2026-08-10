@@ -7,11 +7,12 @@
  */
 
 import { prisma } from "@polaris/db";
+import { gameOfServer } from "@/lib/apps/games-catalog";
 import { reachAdviceFor } from "@/lib/apps/minecraft/reach";
 import { readInstallConfig } from "@/lib/apps/install-config";
 import { gameDomainSuffix } from "@/lib/apps/minecraft/address";
-import { readSchedule, type GameSchedule } from "@/lib/apps/minecraft/schedule";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
+import { readSchedule, type GameSchedule } from "@/lib/apps/minecraft/schedule";
 
 export interface GameContext {
     /** What is still in the way of players outside this network. */
@@ -39,11 +40,14 @@ export async function gameContextFor(app: {
     applicationId: string | null;
     id: string;
 }): Promise<GameContext | null> {
-    if (!app.catalogId.startsWith("minecraft") || !app.applicationId) return null;
+    const game = gameOfServer(app.catalogId);
+    if (!game || !app.applicationId) return null;
     const [reach, install, suffix] = await Promise.all([
         reachAdviceFor(app.id),
         prisma.installedApp.findUnique({ where: { id: app.id }, select: { config: true } }),
-        gameDomainSuffix().catch(() => null)
+        // Each game's servers live under a label of their own, so the address
+        // picker has to be told which one it is naming a server in.
+        gameDomainSuffix(game.domainLabel).catch(() => null)
     ]);
     const config = readInstallConfig(install?.config);
     return {

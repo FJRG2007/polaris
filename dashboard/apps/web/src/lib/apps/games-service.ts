@@ -21,12 +21,14 @@ import { getServerMetrics } from "@/lib/server-metrics-service";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { gameServerAddress } from "@/lib/apps/minecraft/address";
 import type { PortBlocks, PortPolicy } from "@/lib/apps/port-block";
+import { gameOfServer, type GameId } from "@/lib/apps/games-catalog";
 import { sweepTimeouts } from "@/lib/apps/minecraft/timeout-service";
+import { applyAllowList, getArkPlayers } from "@/lib/apps/ark/service";
 import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
 import { enforcePlayerAddresses } from "@/lib/apps/minecraft/player-access";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
+import { applyFirewallBans, editionOf, getServerPlayers } from "@/lib/apps/minecraft/service";
 import { gamePorts, probeListening, probeReach, reachConfirmedAt } from "@/lib/apps/minecraft/reach";
-import { applyFirewallBans, editionOf, getServerPlayers, type MinecraftEdition } from "@/lib/apps/minecraft/service";
 import { gameReachAdvice, gameStoppedAdvice, type GamePort, type GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 
 /** Whether a catalog id names a game server rather than any other installed app.
@@ -61,7 +63,11 @@ export interface GameServerFacts {
     readonly name: string;
     readonly catalogId: string;
     readonly catalogName: string;
-    readonly edition: MinecraftEdition;
+    /** Which game it plays, for the screens that offer different things per game.
+     *  Null for an install whose manifest calls itself a game server and which no
+     *  game claims, which is a catalog that has drifted rather than a state a row
+     *  should render as something. */
+    readonly game: GameId | null;
     /** The service backing it, for the screens that reach past the game - its
      *  files, its logs. Null for an install whose deploy never completed. */
     readonly applicationId: string | null;
@@ -92,6 +98,19 @@ export interface GameServerLive {
     readonly players: readonly string[];
     /** Why it is not answering, when it is not. */
     readonly message: string | null;
+}
+
+/**
+ * One server's facts, for a panel rather than a list.
+ *
+ * Built from the same read as the list on purpose: where a server lives and what a
+ * player types are worked out in exactly one place, and a server's own page saying
+ * something different from its row would be the kind of disagreement nobody can
+ * resolve without reading both.
+ */
+export async function gameServerFacts(ownerId: string, installedAppId: string): Promise<GameServerFacts | null> {
+    const servers = await listGameServerFacts(ownerId, [installedAppId]);
+    return servers.find((server) => server.id === installedAppId) ?? null;
 }
 
 /** The ids of a set of rows that have one, for an `in` filter. */
@@ -175,7 +194,7 @@ export async function listGameServerFacts(
             name: install.name,
             catalogId: install.catalogId,
             catalogName: findApp(install.catalogId)?.name ?? install.catalogId,
-            edition: editionOf(install.catalogId),
+            game: gameOfServer(install.catalogId)?.id ?? null,
             applicationId: install.applicationId,
             serverName: install.targetId ? (targetName.get(install.targetId) ?? null) : null,
             running,
@@ -243,6 +262,28 @@ export async function listGameServerLive(
                     message: server.message
                 };
             }
+            // Each game is asked in its own language - Minecraft over rcon-cli, ARK
+            // through arkmanager - and both answer the same shape, because the row
+            // that renders it is one row.
+            if (server.game === "ark") {
+                const ark = await getArkPlayers(ownerId, server.id).catch((caught: unknown) => ({
+                    answering: false,
+                    containerRunning: null,
+                    players: [],
+                    message: caught instanceof Error ? caught.message : "The server is not answering"
+                }));
+                return {
+                    id: server.id,
+                    answering: ark.answering,
+                    containerRunning: ark.containerRunning,
+                    online: ark.players.length,
+                    // ARK does not report its own cap over RCON, so the setting is
+                    // the only number there is - and the list already reads it.
+                    max: server.slots ?? 0,
+                    players: ark.players.map((player) => player.name),
+                    message: ark.message
+                };
+            }
             const live = await getServerPlayers(ownerId, server.id).catch((caught: unknown) => ({
                 answering: false,
                 containerRunning: null,
@@ -307,7 +348,7 @@ export async function listGameMachines(ownerId: string): Promise<GameMachine[]> 
 async function committedMemoryByTarget(ownerId: string): Promise<Map<string, number>> {
     const installs = await prisma.installedApp.findMany({
         where: { ownerId, status: { not: "removed" }, applicationId: { not: null } },
-        select: { catalogId: true, applicationId: true, targetId: true }
+        select: { catalogId: true, applicationId: true, targetId: true, config: true }
     });
     const games = installs.filter((install) => isGameServerApp(install.catalogId));
     if (games.length === 0) return new Map();
@@ -331,7 +372,13 @@ async function committedMemoryByTarget(ownerId: string): Promise<Map<string, num
     const byMachine = new Map<string, number>();
     for (const game of games) {
         const machine = game.targetId ? (machineOf.get(game.targetId) ?? "local") : "local";
-        const megabytes = memoryOf.get(game.applicationId as string) ?? 0;
+        // A heap when the game has one to hand out, and what the install expects it
+        // to use when it does not: ARK is given no memory limit, it simply grows to
+        // around six gigabytes - and a machine already running two of them must not
+        // read as empty on the form deciding where the third goes.
+        const declared = readInstallConfig(game.config).memoryMb;
+        const megabytes =
+            memoryOf.get(game.applicationId as string) || (typeof declared === "number" ? declared : 0);
         byMachine.set(machine, (byMachine.get(machine) ?? 0) + megabytes);
     }
     return byMachine;
@@ -363,7 +410,9 @@ export function parseMemoryMb(value: string): number {
  * per server - one that is still starting is skipped, not fatal - and it reports
  * what it did so the caller can log it.
  */
-export async function syncFirewallBans(ownerId: string): Promise<{ servers: number; banned: number; kicked: number }> {
+export async function syncFirewallBans(
+    ownerId: string
+): Promise<{ servers: number; banned: number; kicked: number; allowed: number }> {
     const installs = await prisma.installedApp.findMany({
         where: { ownerId, status: { not: "removed" } },
         select: { id: true, catalogId: true }
@@ -371,8 +420,20 @@ export async function syncFirewallBans(ownerId: string): Promise<{ servers: numb
     let servers = 0;
     let banned = 0;
     let kicked = 0;
+    /** Players an ARK server was finally told it may let in. */
+    let allowed = 0;
     for (const install of installs) {
         if (!isGameServerApp(install.catalogId)) continue;
+        // An ARK server is driven by none of what follows - it has no ban command,
+        // no whitelist file and no decision queue. What it does have is an allow
+        // list that was written down while the server was still installing thirty
+        // gigabytes, and this walk is what finally hands it over. Without it a
+        // server created closed stays closed to the person who created it.
+        if (gameOfServer(install.catalogId)?.id === "ark") {
+            servers += 1;
+            allowed += await applyAllowList(ownerId, install.id).catch(() => 0);
+            continue;
+        }
         // Bedrock has no ban command at all, so there is nothing to hand it.
         if (editionOf(install.catalogId) === "bedrock") continue;
         const applied = await applyFirewallBans(ownerId, install.id).catch(() => null);
@@ -397,7 +458,7 @@ export async function syncFirewallBans(ownerId: string): Promise<{ servers: numb
             await sweepInventorySnapshots(ownerId, install.id, online).catch(() => 0);
         }
     }
-    return { servers, banned, kicked };
+    return { servers, banned, kicked, allowed };
 }
 
 /** One game server's published ports, named so a forwarding rule can be written
@@ -428,13 +489,13 @@ export interface GamePortRow {
 export async function gameServerForApplication(
     ownerId: string,
     applicationId: string
-): Promise<{ installedAppId: string; name: string } | null> {
+): Promise<{ installedAppId: string; name: string; game: GameId | null } | null> {
     const install = await prisma.installedApp.findFirst({
         where: { ownerId, applicationId, status: { not: "removed" } },
         select: { id: true, name: true, catalogId: true }
     });
     if (!install || !isGameServerApp(install.catalogId)) return null;
-    return { installedAppId: install.id, name: install.name };
+    return { installedAppId: install.id, name: install.name, game: gameOfServer(install.catalogId)?.id ?? null };
 }
 
 /** Every game server's published ports, for the screens that ask an operator to
