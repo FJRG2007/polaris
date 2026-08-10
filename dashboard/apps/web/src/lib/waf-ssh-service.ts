@@ -116,6 +116,71 @@ async function blockAtHost(client: Client, sudo: boolean, ip: string): Promise<b
     }
 }
 
+/** The other direction: take the address back out of the host's own firewall. Same
+ *  two backends, same refusal to interpolate anything that is not an address, and
+ *  the same tolerance for a rule that is not there - lifting a ban twice has to be
+ *  as harmless as lifting one that never landed. */
+async function unblockAtHost(client: Client, sudo: boolean, ip: string): Promise<boolean> {
+    if (!sudo) return false;
+    if (!/^[0-9a-fA-F:.]{3,45}$/.test(ip)) return false;
+
+    const script = [
+        "if command -v nft >/dev/null 2>&1; then",
+        "  handle=$(sudo nft -a list chain inet polaris input 2>/dev/null |",
+        `    grep '${ip} drop' | grep -oE 'handle [0-9]+' | awk '{print $2}')`,
+        "  for h in $handle; do sudo nft delete rule inet polaris input handle $h; done",
+        "fi",
+        "if command -v iptables >/dev/null 2>&1; then",
+        `  while sudo iptables -C INPUT -s ${ip} -j DROP 2>/dev/null; do`,
+        `    sudo iptables -D INPUT -s ${ip} -j DROP || break`,
+        "  done",
+        "fi",
+        "exit 0"
+    ].join("\n");
+
+    try {
+        const result = await execCommand(client, "sh -s", { input: script });
+        return result.code === 0;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Take an address out of every enrolled machine's firewall.
+ *
+ * Lifting a ban used to mean deleting a row and republishing the snapshot the edge
+ * reads, which is only where half of a ban lives: the SSH jail also drops the
+ * address in the host's own kernel firewall, and nothing ever took that back out. So
+ * an address cleared in Polaris went on being refused by the machine itself - the
+ * web console said it was allowed, sshd and everything else on that host disagreed,
+ * and the difference is invisible from the dashboard. A ban with no expiry at the
+ * kernel is also a ban that outlives its own `until`.
+ *
+ * Best-effort per host and never fatal: a machine that is off or unreachable must not
+ * stop the ban being lifted everywhere else, and the sweep re-applies a block that is
+ * genuinely still earned.
+ */
+export async function liftHostBlocks(ip: string): Promise<{ hosts: number; lifted: number }> {
+    const hosts = await prisma.host.findMany({ select: { id: true, ownerId: true, sudo: true } });
+    let lifted = 0;
+    for (const host of hosts) {
+        if (!host.sudo) continue;
+        let client: Client;
+        try {
+            client = await connect(host.id, host.ownerId);
+        } catch {
+            continue;
+        }
+        try {
+            if (await unblockAtHost(client, host.sudo, ip)) lifted += 1;
+        } finally {
+            client.end();
+        }
+    }
+    return { hosts: hosts.length, lifted };
+}
+
 /**
  * One pass over every managed server.
  *

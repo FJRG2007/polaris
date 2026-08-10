@@ -16,6 +16,7 @@ import { syncAppRoutes } from "@/lib/deploy-service";
 import { syncDashboardRoute } from "@/lib/domain-edge";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { accountsAtAddress, type AddressAccounts } from "@/lib/address-accounts";
+import { liftHostBlocks } from "@/lib/waf-ssh-service";
 import { getWafJails, setWafJails, type WafJailSettings } from "@/lib/waf-ban-service";
 import { wafAddressActivity, wafLogWindow, wafTraffic } from "@/lib/waf-analytics-service";
 import {
@@ -487,6 +488,12 @@ export async function setWafIgnoreListAction(entries: string[]): Promise<{ error
     if (!parsed.success) return { error: "Enter valid IP addresses or CIDR ranges" };
     try {
         await intel.setWafIgnoreList(parsed.data);
+        // Trusting lifts the bans, and a ban reaches the machines as well as the edge.
+        for (const ip of parsed.data) {
+            await liftHostBlocks(ip).catch((error) => {
+                console.error("polaris: could not lift a host-level block:", error);
+            });
+        }
         await recordAudit({
             actorId: user.id,
             action: "waf.jails.ignore",
@@ -508,6 +515,11 @@ export async function liftWafBanAction(ip: string): Promise<{ error?: string }> 
     if (!parsed.success) return { error: "That is not a valid address" };
     try {
         await intel.removeWafBan(parsed.data);
+        // The edge is only half of where a ban lives; the SSH jail drops the address
+        // in each machine's own firewall, and a row deleted here left that in place.
+        await liftHostBlocks(parsed.data).catch((error) => {
+            console.error("polaris: could not lift a host-level block:", error);
+        });
         await recordAudit({
             actorId: user.id,
             action: "waf.ban.lift",
