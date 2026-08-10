@@ -164,6 +164,16 @@ RUN mkdir -p /var/lib/polaris /dynamic && chown -R node:node /var/lib/polaris /d
 # leave the responder unable to write the address at all.
 RUN mkdir -p /run/polaris-host && chown -R node:node /run/polaris-host
 
+# Where the firewall's address list is published for the edge guard to read. Same
+# reasoning as above, and the same failure when it is missing: the mountpoint is
+# created root-owned, the volume seeds from it, and every publish from this
+# container - which runs as node - dies on EACCES. That failure is caught and
+# logged rather than fatal, so what it produces is a guard enforcing whatever list
+# it last managed to read (on a volume this new, none at all) for as long as nobody
+# reads the logs. Created in the guard's image too, since a fresh volume seeds from
+# whichever container mounts it first.
+RUN mkdir -p /edge-intel && chown -R node:node /edge-intel
+
 # Run as the unprivileged `node` user shipped with the base image.
 RUN chown -R node:node /app
 USER node

@@ -34,6 +34,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 # The bundle is self-contained; nothing else from the workspace is needed.
 COPY --from=builder /build/services/edge-guard/dist/index.js ./index.js
+# The intel volume is mounted read-only here, but ownership is decided by whichever
+# container mounts it first: if that is this one and the mountpoint is root-owned,
+# the control plane can never write the list this guard reads. Created node-owned
+# in both images so the order stops mattering.
+RUN mkdir -p /edge-intel && chown -R node:node /edge-intel
 USER node
 # 8080 answers Traefik's forwardAuth question; 8081 IS the upstream for a route whose
 # response gets rewritten. Both are declared so `docker ps` shows what the container
