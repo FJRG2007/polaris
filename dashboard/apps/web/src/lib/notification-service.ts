@@ -31,6 +31,13 @@ export interface NotificationInput {
     audienceLabel?: string | null;
     actionRequired?: boolean;
     metadata?: Record<string, unknown> | null;
+    /**
+     * Write it already read. For an alert about something the recipient is
+     * demonstrably looking at: it belongs in the history, but there is nothing
+     * left for a badge to tell them. Decided by the dispatcher, never by the
+     * feature raising the alert - see notifications/presence.
+     */
+    read?: boolean;
 }
 
 export interface NotificationView {
@@ -106,7 +113,8 @@ export async function createNotification(input: NotificationInput): Promise<void
                 audience: input.audience ?? "you",
                 audienceLabel: input.audienceLabel ?? null,
                 actionRequired: input.actionRequired ?? false,
-                metadata: input.metadata ? JSON.stringify(input.metadata) : null
+                metadata: input.metadata ? JSON.stringify(input.metadata) : null,
+                readAt: input.read ? new Date() : null
             }
         });
     } catch {

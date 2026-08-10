@@ -13,6 +13,15 @@
  * write - see `notify`, which resolves once the record exists.
  */
 
+import { prisma } from "@polaris/db";
+import { isViewing } from "./presence";
+import { sendSms } from "./sms-service";
+import { sendWebhook } from "./webhook-sender";
+import { sendAuthEmail } from "@/lib/auth-mail";
+import { appBaseUrl } from "@/lib/domain-service";
+import { getNotificationPreferences } from "./preferences";
+import { createNotification, type NotificationAudience } from "@/lib/notification-service";
+import { destinationSummary, recordDestinationResult, resolveDestination } from "./destinations";
 import {
     notificationEvent,
     resolveRule,
@@ -20,14 +29,6 @@ import {
     type NotificationRule,
     type WebhookFormat
 } from "@polaris/core";
-import { prisma } from "@polaris/db";
-import { createNotification, type NotificationAudience } from "@/lib/notification-service";
-import { appBaseUrl } from "@/lib/domain-service";
-import { sendAuthEmail } from "@/lib/auth-mail";
-import { getNotificationPreferences } from "./preferences";
-import { destinationSummary, recordDestinationResult, resolveDestination } from "./destinations";
-import { sendWebhook } from "./webhook-sender";
-import { sendSms } from "./sms-service";
 
 /** One thing worth telling somebody about. */
 export interface NotifyInput {
@@ -221,6 +222,16 @@ export async function notify(input: NotifyInput): Promise<void> {
     }
 
     if (rule.inapp) {
+        // Somebody with the page open has already been told by the page. The
+        // record still belongs in their history, so it is written and marked
+        // read rather than dropped: the bell stays quiet, and the alert is still
+        // there to be found afterwards.
+        //
+        // Never for a critical event. Those are the ones the catalogue keeps on
+        // the bell however the account's rules are set, because they are what a
+        // break-in looks like - and whoever is holding the session is also
+        // whoever would be reporting the page as watched.
+        const watching = !event.critical && isViewing(input.userId, input.href);
         await createNotification({
             userId: input.userId,
             type: input.event,
@@ -231,9 +242,16 @@ export async function notify(input: NotifyInput): Promise<void> {
             audience: input.audience,
             audienceLabel: input.audienceLabel,
             actionRequired: input.actionRequired,
-            metadata: input.metadata
+            metadata: input.metadata,
+            read: watching
         });
-        await record({ userId: input.userId, event: input.event, kind: "inapp", status: "sent" });
+        await record({
+            userId: input.userId,
+            event: input.event,
+            kind: "inapp",
+            status: "sent",
+            detail: watching ? "Marked read: you had the page it points at open." : null
+        });
     } else {
         await record({
             userId: input.userId,

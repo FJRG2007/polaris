@@ -21,6 +21,7 @@ import { RouteSkeletonCapture } from "@/components/route-skeleton";
 import { DisplayFormatProvider } from "@/components/display-format";
 import { AppShell, CapabilityProvider, EditionBadge } from "@polaris/ui";
 import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
+import { PresenceReporter } from "@/components/notifications/presence-reporter";
 import { NotificationFavicon } from "@/components/notifications/notification-favicon";
 import { NotificationsProvider } from "@/components/notifications/notifications-provider";
 
@@ -53,6 +54,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                     <SessionScopeProvider userId={user.id}>
                         <NotificationsProvider initial={notifications}>
                             <NotificationFavicon />
+                            <PresenceReporter />
                             <AppShell
                                 switcher={
                                     <>
