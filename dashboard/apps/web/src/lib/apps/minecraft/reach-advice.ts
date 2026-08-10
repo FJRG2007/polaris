@@ -52,6 +52,43 @@ export function describeBlocksFor(ports: readonly GamePort[], blocks: PortBlocks
     return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
 }
 
+/** A server that publishes nothing has nothing to say about a router, whichever
+ *  of the two questions below was asked. */
+const NO_PORTS: GameReachAdvice = {
+    ok: true,
+    actionable: false,
+    title: "No published port",
+    detail: "This server publishes no port, so there is nothing to open.",
+    steps: [],
+    forward: false
+};
+
+/**
+ * What to say about a server that is stopped and has never been proven.
+ *
+ * A different question from the advice below, and one that has to be asked first:
+ * nothing on this machine can tell an open port from a closed one while nothing is
+ * listening behind it. Judging a stopped server is how a port that was forwarded
+ * months ago reads as unopened every time its server is turned off - and a page
+ * that sends somebody into their router over that has spent their trust on nothing.
+ *
+ * So this claims nothing either way. What was already proven is not reached
+ * through here at all: that answer is kept, and a stopped server that has been
+ * reached stays reached.
+ */
+export function gameStoppedAdvice(ports: readonly GamePort[]): GameReachAdvice {
+    if (ports.length === 0) return NO_PORTS;
+    const named = describePorts(ports);
+    return {
+        ok: false,
+        actionable: false,
+        title: "Stopped, so its port cannot be checked",
+        detail: `Nothing answers on ${named} while this server is down, and from here that looks exactly like a port nobody has opened. Start it and Polaris checks this by itself.`,
+        steps: [],
+        forward: false
+    };
+}
+
 /**
  * What still has to happen for players outside the network to get in.
  *
@@ -59,6 +96,9 @@ export function describeBlocksFor(ports: readonly GamePort[], blocks: PortBlocks
  * phrased as unconfirmed rather than broken, because from in here the two are
  * indistinguishable and telling an operator their working server is down is the
  * more expensive mistake.
+ *
+ * Ask this about a server that is up. A stopped one is `gameStoppedAdvice`, which
+ * is the same refusal to guess taken one step earlier.
  */
 export function gameReachAdvice(
     environment: ServerEnvironment,
@@ -71,16 +111,7 @@ export function gameReachAdvice(
      *  it was not checked. */
     listening: boolean | null = null
 ): GameReachAdvice {
-    if (ports.length === 0) {
-        return {
-            ok: true,
-            actionable: false,
-            title: "No published port",
-            detail: "This server publishes no port, so there is nothing to open.",
-            steps: [],
-            forward: false
-        };
-    }
+    if (ports.length === 0) return NO_PORTS;
     const named = describePorts(ports);
     if (confirmed) {
         return {

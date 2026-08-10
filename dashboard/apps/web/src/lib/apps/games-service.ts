@@ -25,9 +25,9 @@ import { sweepTimeouts } from "@/lib/apps/minecraft/timeout-service";
 import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
 import { enforcePlayerAddresses } from "@/lib/apps/minecraft/player-access";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
-import { gamePorts, probeListening, probeReach, reachConfirmed } from "@/lib/apps/minecraft/reach";
-import { gameReachAdvice, type GamePort, type GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
+import { gamePorts, probeListening, probeReach, reachConfirmedAt } from "@/lib/apps/minecraft/reach";
 import { applyFirewallBans, editionOf, getServerPlayers, type MinecraftEdition } from "@/lib/apps/minecraft/service";
+import { gameReachAdvice, gameStoppedAdvice, type GamePort, type GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 
 /** Whether a catalog id names a game server rather than any other installed app.
  *  The manifest's capability is the authority - a game server is not a list of
@@ -409,6 +409,13 @@ export interface GamePortRow {
     readonly ports: readonly GamePort[];
     /** Whether a player has already arrived on it from outside the network. */
     readonly confirmed: boolean;
+    /** When that last happened, so a row can date what it is remembering rather
+     *  than assert it. Null for a port nothing has ever arrived on. */
+    readonly confirmedAt: string | null;
+    /** Whether it is meant to be up. A stopped server answers nothing, so it is
+     *  neither knocked on nor reported as unreachable - the port it published is
+     *  not what is silent. */
+    readonly running: boolean;
 }
 
 /**
@@ -438,13 +445,28 @@ export async function listGamePorts(): Promise<GamePortRow[]> {
         select: { id: true, name: true, catalogId: true, applicationId: true, config: true }
     });
     const games = installs.filter((install) => isGameServerApp(install.catalogId));
+    // Which of them are meant to be up, in one query rather than one per row: it
+    // decides which ports are worth knocking on at all.
+    const running = new Set(
+        (
+            await prisma.application.findMany({
+                where: { id: { in: presentIds(games.map((game) => game.applicationId)) }, desiredState: "running" },
+                select: { id: true }
+            })
+        ).map((app) => app.id)
+    );
     const rows = await Promise.all(
-        games.map(async (install) => ({
-            installedAppId: install.id,
-            name: install.name,
-            ports: await gamePorts(install.applicationId),
-            confirmed: reachConfirmed(install.config)
-        }))
+        games.map(async (install) => {
+            const confirmedAt = reachConfirmedAt(install.config);
+            return {
+                installedAppId: install.id,
+                name: install.name,
+                ports: await gamePorts(install.applicationId),
+                confirmed: confirmedAt !== null,
+                confirmedAt,
+                running: install.applicationId !== null && running.has(install.applicationId)
+            };
+        })
     );
     return rows.filter((row) => row.ports.length > 0);
 }
@@ -478,16 +500,22 @@ export async function readGamePorts(probe = false): Promise<GamePortsReading> {
         getPortPolicy(),
         getPortBlocks()
     ]);
+    // Only a running server is knocked on. One that is stopped would refuse the
+    // knock because there is nothing behind its port, and that refusal is
+    // indistinguishable from a router that never forwarded it.
     const proven = probe
-        ? new Set(await probeReach(servers.filter((server) => !server.confirmed)))
+        ? new Set(await probeReach(servers.filter((server) => !server.confirmed && server.running)))
         : new Set<string>();
     const rows =
         proven.size === 0
             ? servers
             : servers.map((server) =>
-                  proven.has(server.installedAppId) ? { ...server, confirmed: true } : server
+                  proven.has(server.installedAppId)
+                      ? { ...server, confirmed: true, confirmedAt: new Date().toISOString() }
+                      : server
               );
-    const pending = rows.filter((server) => !server.confirmed);
+    const unproven = rows.filter((server) => !server.confirmed);
+    const pending = unproven.filter((server) => server.running);
     // Whether any of the unproven servers is even up. Without it the card told the
     // operator to forward a port whenever a server happened to be starting, which
     // is exactly when it has nothing to say about the router at all.
@@ -500,15 +528,21 @@ export async function readGamePorts(probe = false): Promise<GamePortsReading> {
               ).catch(() => null);
     return {
         servers: rows,
-        advice: gameReachAdvice(
-            environment,
-            pending.flatMap((server) => server.ports),
-            pending.length === 0,
-            lanIp,
-            policy,
-            blocks,
-            listening
-        ),
+        // Nothing running and something unproven is the one case the advice below
+        // cannot speak to: it would read the stopped server's silence as the
+        // router's, and send an operator to open a port that is already open.
+        advice:
+            pending.length === 0 && unproven.length > 0
+                ? gameStoppedAdvice(unproven.flatMap((server) => server.ports))
+                : gameReachAdvice(
+                      environment,
+                      pending.flatMap((server) => server.ports),
+                      pending.length === 0,
+                      lanIp,
+                      policy,
+                      blocks,
+                      listening
+                  ),
         lanIp,
         policy,
         blocks

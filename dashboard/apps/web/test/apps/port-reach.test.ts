@@ -16,7 +16,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const patched: { id: string; patch: Record<string, unknown> }[] = [];
 let publicIp: string | null = "127.0.0.1";
 
-vi.mock("@polaris/db", () => ({ prisma: {} }));
+/** The install the advice is asked about, and the application behind it - the
+ *  ports it published and whether Polaris means it to be up. */
+let install: { applicationId: string | null; config: string | null } = { applicationId: "app", config: null };
+let application: { sourceConfig: string; desiredState: string } | null = null;
+
+vi.mock("@polaris/db", () => ({
+    prisma: {
+        installedApp: { findUnique: async () => install },
+        application: { findUnique: async () => application }
+    }
+}));
 vi.mock("@/lib/network-service", () => ({
     detectPublicIp: async () => publicIp,
     getLocalEnvironment: async () => ({ environment: "home-nat", detected: "home-nat", confirmed: true })
@@ -38,7 +48,9 @@ vi.mock("@polaris/core", async (importActual) => ({
     isPublicIpv4: (value: string) => value === "127.0.0.1"
 }));
 
-const { noteReachedFrom, probeGamePort, probeListening, probeReach } = await import("@/lib/apps/minecraft/reach");
+const { noteReachedFrom, probeGamePort, probeListening, probeReach, reachAdviceFor } = await import(
+    "@/lib/apps/minecraft/reach"
+);
 
 /** A port with something listening on it, and the same port once nothing is. */
 async function listener(): Promise<{ port: number; server: Server }> {
@@ -90,6 +102,8 @@ function closeSocket(socket: Socket): Promise<void> {
 afterEach(() => {
     patched.length = 0;
     publicIp = "127.0.0.1";
+    install = { applicationId: "app", config: null };
+    application = null;
 });
 
 describe("knocking on a single port", () => {
@@ -183,6 +197,34 @@ describe("recording what arrived", () => {
     it("takes one from a public address", async () => {
         expect(await noteReachedFrom("player", "203.0.113.9")).toBe(true);
         expect(patched[0]?.id).toBe("player");
+    });
+});
+
+describe("what a server that is turned off is told", () => {
+    /** A Bedrock server: UDP only, which is the case silence says nothing about. */
+    const bedrockPorts = JSON.stringify({ hostPort: 19132, hostProtocol: "udp" });
+
+    it("does not knock on it, and refuses to name the router", async () => {
+        application = { sourceConfig: bedrockPorts, desiredState: "stopped" };
+
+        const advice = await reachAdviceFor("off", true);
+
+        // The bug this exists for: a stopped server answers nothing, the knock
+        // fails for that reason alone, and the operator was sent to re-open a port
+        // that had been forwarded for months.
+        expect(advice.forward).toBe(false);
+        expect(advice.actionable).toBe(false);
+        expect(advice.title).toContain("cannot be checked");
+        expect(patched).toEqual([]);
+    });
+
+    it("asks about the forward again once it is running", async () => {
+        application = { sourceConfig: bedrockPorts, desiredState: "running" };
+
+        const advice = await reachAdviceFor("on");
+
+        expect(advice.forward).toBe(true);
+        expect(advice.title).toContain("not confirmed");
     });
 });
 

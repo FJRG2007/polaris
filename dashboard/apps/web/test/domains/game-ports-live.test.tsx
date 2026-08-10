@@ -15,8 +15,8 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DEFAULT_PORT_BLOCKS } from "../../src/lib/apps/port-block";
 import type { GamePortsReading } from "../../src/lib/apps/games-service";
-import { gameReachAdvice } from "../../src/lib/apps/minecraft/reach-advice";
 import { GamePortsLive } from "../../src/app/(app)/admin/domains/game-ports-live";
+import { gameReachAdvice, gameStoppedAdvice } from "../../src/lib/apps/minecraft/reach-advice";
 
 const pending = [{ port: 25565, protocol: "tcp" as const }];
 
@@ -28,8 +28,15 @@ function markupFor(shown: GamePortsReading): string {
 
 const reading: GamePortsReading = {
     servers: [
-        { installedAppId: "one", name: "Survival", ports: pending, confirmed: false },
-        { installedAppId: "two", name: "Creative", ports: [{ port: 25566, protocol: "tcp" }], confirmed: true }
+        { installedAppId: "one", name: "Survival", ports: pending, confirmed: false, confirmedAt: null, running: true },
+        {
+            installedAppId: "two",
+            name: "Creative",
+            ports: [{ port: 25566, protocol: "tcp" }],
+            confirmed: true,
+            confirmedAt: "2026-08-01T10:00:00.000Z",
+            running: true
+        }
     ],
     // Listening: the server is up and simply unproven, which is the state that
     // has anything to say about the router at all.
@@ -69,6 +76,36 @@ describe("the game ports section", () => {
 
         expect(markup).not.toContain("If it is not open yet");
         expect(markup).toContain("cannot be checked");
+    });
+
+    it("asks for nothing about a server that is turned off, and does not call it unconfirmed", () => {
+        const off: GamePortsReading = {
+            ...reading,
+            servers: reading.servers.map((server) =>
+                server.installedAppId === "one" ? { ...server, running: false } : server
+            ),
+            advice: gameStoppedAdvice(pending)
+        };
+        const markup = markupFor(off);
+
+        // The whole point of the state: the port was never measured, so neither
+        // claim about the router may be printed over it.
+        expect(markup).not.toContain("Not confirmed");
+        expect(markup).not.toContain("If it is not open yet");
+        expect(markup).toContain("Checked once it starts");
+        expect(markup).toContain("cannot be checked");
+    });
+
+    it("keeps a proven port proven while its server is stopped", () => {
+        const off: GamePortsReading = {
+            ...reading,
+            servers: reading.servers.map((server) => ({ ...server, confirmed: true, running: false })),
+            advice: gameReachAdvice("home-nat", [], true, "192.168.1.142", "range", DEFAULT_PORT_BLOCKS, null)
+        };
+        const markup = markupFor(off);
+
+        expect(markup).toContain("Reached from outside");
+        expect(markup).not.toContain("Checked once it starts");
     });
 
     it("has nothing to open once every port has answered", () => {

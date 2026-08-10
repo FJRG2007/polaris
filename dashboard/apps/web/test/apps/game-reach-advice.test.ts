@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { gameReachAdvice, type GamePort } from "@/lib/apps/minecraft/reach-advice";
+import { gameReachAdvice, gameStoppedAdvice, type GamePort } from "@/lib/apps/minecraft/reach-advice";
 
 const TCP: readonly GamePort[] = [{ port: 25566, protocol: "tcp" }];
 const BLOCKS = { tcp: { start: 25565, end: 25664 }, udp: { start: 19132, end: 19231 } };
@@ -26,6 +26,25 @@ describe("a server that is not up yet", () => {
         expect(advice.forward).toBe(false);
         expect(advice.steps).toEqual([]);
         expect(`${advice.title} ${advice.detail}`.toLowerCase()).not.toContain("router");
+    });
+});
+
+describe("a server that is turned off", () => {
+    it("refuses to judge the port at all, and names the server rather than the router", () => {
+        const advice = gameStoppedAdvice(TCP);
+
+        expect(advice.ok).toBe(false);
+        expect(advice.actionable).toBe(false);
+        expect(advice.forward).toBe(false);
+        expect(advice.steps).toEqual([]);
+        // Nothing was measured, so nothing about a forward may be said - this is
+        // the state that had an operator opening a port that was already open.
+        expect(`${advice.title} ${advice.detail}`.toLowerCase()).not.toContain("router");
+        expect(advice.detail).toContain("TCP 25566");
+    });
+
+    it("has nothing to say about a server that publishes no port", () => {
+        expect(gameStoppedAdvice([]).ok).toBe(true);
     });
 });
 

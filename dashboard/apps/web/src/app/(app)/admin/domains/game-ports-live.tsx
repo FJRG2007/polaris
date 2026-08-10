@@ -11,6 +11,11 @@
  * The reading itself belongs to the card above, which is the thing that decides
  * whether there is a card at all: one read, one poll, and a refresh that fails
  * leaves the last answer on screen with a note rather than emptying the card.
+ *
+ * Three states per row, not two. Reached and unconfirmed are both claims about the
+ * network; a server that is stopped supports neither, because its port is silent
+ * for a reason that has nothing to do with the router. That row says so and asks
+ * for nothing, and a port already proven stays proven while its server is off.
  */
 
 import { RefreshCw } from "lucide-react";
@@ -34,7 +39,11 @@ export function GamePortsLive({
     onRefresh: () => void;
 }) {
     const { servers, advice, lanIp, policy, blocks } = reading;
-    const pending = servers.filter((server) => !server.confirmed);
+    // Split by what can be judged rather than by what is proven. A stopped server
+    // is silent on every port it has, so it is not asked about and no rule is
+    // written for it - the router is not what is failing to answer.
+    const unproven = servers.filter((server) => !server.confirmed);
+    const pending = unproven.filter((server) => server.running);
     // A server whose port predates the block is one the range rule does not cover,
     // and it is worth saying which: the operator would otherwise forward the range,
     // see this server still unreachable, and have nothing to go on.
@@ -45,7 +54,7 @@ export function GamePortsLive({
             <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
                     {stale ??
-                        "Checked while this page is open: a port is ticked as soon as it answers from outside, or as soon as somebody joins on it."}
+                        "Checked while this page is open, on the servers that are running: a port is ticked as soon as it answers from outside, or as soon as somebody joins on it."}
                 </p>
                 <Button
                     variant="ghost"
@@ -69,16 +78,38 @@ export function GamePortsLive({
                             <p className="font-mono text-xs text-muted-foreground">{describePorts(server.ports)}</p>
                         </div>
                         {server.confirmed ? (
-                            <Badge className="border-success/40 text-success">Reached from outside</Badge>
-                        ) : (
+                            <Badge
+                                className="border-success/40 text-success"
+                                title={
+                                    server.confirmedAt
+                                        ? `Last answered from outside on ${new Date(server.confirmedAt).toLocaleString()}`
+                                        : undefined
+                                }
+                            >
+                                Reached from outside
+                            </Badge>
+                        ) : server.running ? (
                             <Badge className="border-warning/40 text-warning">Not confirmed</Badge>
+                        ) : (
+                            // Neither reached nor unreachable: nothing was measured, because
+                            // there was nothing behind the port to measure. Saying "not
+                            // confirmed" here reads as a fault and is a fault in this card.
+                            <Badge title="A stopped server answers nothing, so its port cannot be checked from here">
+                                Checked once it starts
+                            </Badge>
                         )}
                     </li>
                 ))}
             </ul>
 
-            {pending.length > 0 && (
-                <div className="flex flex-col gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs">
+            {unproven.length > 0 && (
+                <div
+                    className={
+                        advice.actionable
+                            ? "flex flex-col gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs"
+                            : "flex flex-col gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs"
+                    }
+                >
                     <p className="font-medium text-foreground">{advice.title}</p>
                     <p className="text-muted-foreground">{advice.detail}</p>
                     {advice.steps.length > 0 && (

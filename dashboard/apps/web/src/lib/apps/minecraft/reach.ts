@@ -21,7 +21,7 @@ import { getHostLanIp, isLanAddress } from "@/lib/host-address";
 import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
 import { detectPublicIp, getLocalEnvironment } from "@/lib/network-service";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
-import { gameReachAdvice, type GamePort, type GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
+import { gameReachAdvice, gameStoppedAdvice, type GamePort, type GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 
 /** The ports a game install actually publishes, from what its deploy pinned. */
 export async function gamePorts(applicationId: string | null): Promise<GamePort[]> {
@@ -53,9 +53,33 @@ export async function gamePorts(applicationId: string | null): Promise<GamePort[
     return ports;
 }
 
+/** When this install was last seen answering from outside, if it ever was. Kept
+ *  so a row can say a stopped server was proven rather than merely unchecked. */
+export function reachConfirmedAt(config: string | null | undefined): string | null {
+    const at = readInstallConfig(config).portReachableAt;
+    return typeof at === "string" ? at : null;
+}
+
 /** Whether this install has ever been seen answering from outside. */
 export function reachConfirmed(config: string | null | undefined): boolean {
-    return typeof readInstallConfig(config).portReachableAt === "string";
+    return reachConfirmedAt(config) !== null;
+}
+
+/**
+ * Whether Polaris means this server to be up.
+ *
+ * Asked before anything is knocked on rather than after the knock has failed. A
+ * stopped server answers nothing on any port, so a probe against one measures the
+ * server rather than the router - and reading that silence as "not forwarded" is
+ * what puts "not confirmed" on a port that has worked for months.
+ */
+export async function gameServerRunning(applicationId: string | null): Promise<boolean> {
+    if (!applicationId) return false;
+    const app = await prisma.application.findUnique({
+        where: { id: applicationId },
+        select: { desiredState: true }
+    });
+    return app?.desiredState === "running";
 }
 
 /**
@@ -203,20 +227,26 @@ export async function reachAdviceFor(installedAppId: string, probe = false): Pro
         where: { id: installedAppId },
         select: { applicationId: true, config: true }
     });
-    const [{ environment }, lanIp, ports, policy, blocks] = await Promise.all([
+    const [{ environment }, lanIp, ports, policy, blocks, running] = await Promise.all([
         getLocalEnvironment().catch(() => ({ environment: "unknown" as const })),
         getHostLanIp().catch(() => null),
         gamePorts(install?.applicationId ?? null),
         getPortPolicy(),
-        getPortBlocks()
+        getPortBlocks(),
+        gameServerRunning(install?.applicationId ?? null)
     ]);
     let confirmed = reachConfirmed(install?.config);
-    if (!confirmed && probe) {
+    // Nothing is knocked on while the server is down: the knock would fail because
+    // there is nothing behind the port, and the answer would be read as the router.
+    if (!confirmed && probe && running) {
         confirmed = (await probeReach([{ installedAppId, ports }])).length > 0;
     }
-    // Only asked when it would change what is said. A server already proven from
-    // outside is reachable whatever it is doing right now, and a local connect on
-    // every render would be a page waiting on a socket for nothing.
-    const listening = confirmed ? null : await probeListening(ports, lanIp).catch(() => null);
-    return gameReachAdvice(environment, ports, confirmed, lanIp, policy, blocks, listening);
+    // What was proven stands whatever the server is doing this second, so it is
+    // answered before the server's state is even looked at.
+    if (confirmed) return gameReachAdvice(environment, ports, true, lanIp, policy, blocks, null);
+    if (!running) return gameStoppedAdvice(ports);
+    // Only asked when it would change what is said: a local connect on every
+    // render would be a page waiting on a socket for nothing.
+    const listening = await probeListening(ports, lanIp).catch(() => null);
+    return gameReachAdvice(environment, ports, false, lanIp, policy, blocks, listening);
 }
