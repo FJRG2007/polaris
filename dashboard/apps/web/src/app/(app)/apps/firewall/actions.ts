@@ -15,6 +15,7 @@ import { syncAppRoutes } from "@/lib/deploy-service";
 import { syncDashboardRoute } from "@/lib/domain-edge";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { accountsAtAddress, type AddressAccounts } from "@/lib/address-accounts";
+import { getWafJails, setWafJails, type WafJailSettings } from "@/lib/waf-ban-service";
 import { wafAddressActivity, wafLogWindow, wafTraffic } from "@/lib/waf-analytics-service";
 import {
     getWafInherited,
@@ -23,13 +24,6 @@ import {
     type WafInheritedView,
     type WafRuleView
 } from "@/lib/waf-service";
-import {
-    getWafIgnoreList,
-    getWafJails,
-    setWafIgnoreList,
-    setWafJails,
-    type WafJailSettings
-} from "@/lib/waf-ban-service";
 import {
     currentWafAnomalies,
     getWafAnomalySettings,
@@ -43,7 +37,9 @@ import {
     recordWafBan,
     removeWafBan,
     setWafFeedEnabled,
-    wafFeedEnabled
+    wafFeedEnabled,
+    getWafIgnoreList,
+    setWafIgnoreList
 } from "@/lib/waf-intel-service";
 
 type WafAddressActivity = core.WafAddressActivity;

@@ -10,10 +10,9 @@
 
 import { readFile } from "node:fs/promises";
 import { parseHttpLogs } from "@polaris/deploy";
-import { wafTrustedAddresses } from "@/lib/waf-ban-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
-import { recordWafBan, publishWafIntel } from "@/lib/waf-intel-service";
 import { detectWafAnomalies, type WafAnomaly, type WafAnomalyOptions } from "@polaris/core";
+import { recordWafBan, publishWafIntel, wafTrustedAddresses } from "@/lib/waf-intel-service";
 
 const ACCESS_LOG_FILE = process.env.POLARIS_TRAEFIK_ACCESSLOG ?? "/traefik-log/access.log";
 const SETTINGS_KEY = "waf.anomalies";

@@ -17,13 +17,18 @@ import { readFile } from "node:fs/promises";
 import { parseHttpLogs } from "@polaris/deploy";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { DEFAULT_WAF_JAILS, detectWafBans, type WafJail } from "@polaris/core";
-import { checkReputation, priorBanCounts, publishWafIntel, recordWafBan } from "@/lib/waf-intel-service";
+import {
+    checkReputation,
+    priorBanCounts,
+    publishWafIntel,
+    recordWafBan,
+    wafTrustedAddresses
+} from "@/lib/waf-intel-service";
 
 /** The edge's per-request access log, the same file the HTTP Logs view reads. */
 const ACCESS_LOG_FILE = process.env.POLARIS_TRAEFIK_ACCESSLOG ?? "/traefik-log/access.log";
 
 const JAILS_KEY = "waf.jails";
-const IGNORE_KEY = "waf.jails.ignore";
 
 /**
  * How much of the log tail to read. The longest default window is ten minutes; this
@@ -31,17 +36,6 @@ const IGNORE_KEY = "waf.jails.ignore";
  * been growing for months into memory.
  */
 const TAIL_BYTES = 4 * 1024 * 1024;
-
-/** The addresses a jail never bans, whatever they do. Loopback is here from the
- *  start: banning it would take out the instance's own health checks. */
-export const ALWAYS_IGNORED = ["127.0.0.1", "::1"];
-
-/** Every address the firewall leaves alone: loopback plus whatever the operator
- *  added. One list rather than two, because "never ban this" is one decision and an
- *  address the jails spare has no business being reported as an anomaly either. */
-export async function wafTrustedAddresses(): Promise<string[]> {
-    return [...ALWAYS_IGNORED, ...(await getWafIgnoreList())];
-}
 
 /** The configured jails, falling back to the defaults for anything unsaved. Stored
  *  settings are merged onto the shipped list rather than replacing it, so a jail
@@ -77,15 +71,6 @@ export async function setWafJails(jails: readonly WafJailSettings[]): Promise<vo
         banTimeSec: jail.banTimeSec
     }));
     await setSetting(JAILS_KEY, JSON.stringify(stored));
-}
-
-/** Addresses jails never ban, as the operator configured them. */
-export async function getWafIgnoreList(): Promise<string[]> {
-    return parseJson<string[]>(await getSetting(IGNORE_KEY))?.filter((ip) => typeof ip === "string") ?? [];
-}
-
-export async function setWafIgnoreList(entries: readonly string[]): Promise<void> {
-    await setSetting(IGNORE_KEY, JSON.stringify([...new Set(entries)]));
 }
 
 /**

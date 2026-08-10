@@ -18,11 +18,11 @@
 
 import type { Client } from "ssh2";
 import { prisma } from "@polaris/db";
+import { getWafJails } from "@/lib/waf-ban-service";
 import { getHostConnection } from "@/lib/host-service";
 import { execCommand, openSshClient } from "@polaris/ssh";
-import { getWafIgnoreList, getWafJails } from "@/lib/waf-ban-service";
-import { recordWafBan, publishWafIntel } from "@/lib/waf-intel-service";
 import { authAttemptsAsEntries, detectWafBans, parseAuthFailures } from "@polaris/core";
+import { recordWafBan, publishWafIntel, wafTrustedAddresses } from "@/lib/waf-intel-service";
 
 /** One authenticated session to a host, for the two commands this makes. Opened per
  *  pass rather than pooled: the pass runs every few minutes and holding a connection
@@ -127,7 +127,7 @@ export async function runSshJails(now = Date.now()): Promise<{ hosts: number; ba
     const jails = (await getWafJails()).filter((jail) => jail.id === "ssh-auth" && jail.enabled);
     if (jails.length === 0) return { hosts: 0, banned: 0 };
 
-    const ignore = ["127.0.0.1", "::1", ...(await getWafIgnoreList())];
+    const ignore = await wafTrustedAddresses();
     // Every enrolled server, whoever owns it. This is instance-wide protection, not
     // one account's, so it is scoped by the instance rather than by a caller - there
     // is no caller, it runs on a timer.

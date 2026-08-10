@@ -18,6 +18,7 @@ import { dirname, join } from "node:path";
 import { verifyIp } from "@/lib/integrations/dymo";
 import { EDGE_TOKEN_TTL_SECONDS } from "@polaris/core/waf";
 import { mkdir, rename, writeFile } from "node:fs/promises";
+import { getSetting, setSetting } from "@/lib/setting-store";
 import { readDymoConfig } from "@/lib/integrations/registry";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 import { checkCriminalIp, readCriminalIpConfig } from "@/lib/integrations/criminalip";
@@ -220,6 +221,12 @@ export interface WafBanInput {
  * lapses - the row stays, holding an expiry in the past, until it is pruned.
  */
 export async function recordWafBan(input: WafBanInput): Promise<void> {
+    // Every path that bans comes through here - jails, anomalies, reputation, the SSH
+    // watcher, the operator's own button - so this is where "never ban this address"
+    // is answered. Each caller filtering its own candidates first is how one of them
+    // ends up not doing it, and the address that gets through is by definition the one
+    // somebody trusted enough to say so.
+    if ((await wafTrustedAddresses()).includes(input.ip)) return;
     const existing = await prisma.wafBan.findUnique({ where: { ip: input.ip }, select: { until: true, offences: true } });
     // A ban that is still running is extended, not re-counted: one jail firing twice
     // inside its own window is one offence, not two. A permanent ban is always still
@@ -242,8 +249,55 @@ export async function recordWafBan(input: WafBanInput): Promise<void> {
 
 /** Lift a ban by hand. */
 export async function removeWafBan(ip: string): Promise<void> {
-    await prisma.wafBan.deleteMany({ where: { ip } });
+    await removeWafBans([ip]);
+}
+
+/** Lift every ban held against these addresses, and republish once rather than per
+ *  address - the edge reads a snapshot, not a stream of edits. */
+export async function removeWafBans(ips: readonly string[]): Promise<number> {
+    if (ips.length === 0) return 0;
+    const { count } = await prisma.wafBan.deleteMany({ where: { ip: { in: [...new Set(ips)] } } });
     await publishWafIntel();
+    return count;
+}
+
+const IGNORE_KEY = "waf.jails.ignore";
+
+/** The addresses the firewall never bans, whatever they do. Loopback is here from the
+ *  start: banning it would take out the instance's own health checks. */
+export const ALWAYS_IGNORED = ["127.0.0.1", "::1"];
+
+/** The addresses an operator has marked as theirs. */
+export async function getWafIgnoreList(): Promise<string[]> {
+    const raw = await getSetting(IGNORE_KEY);
+    try {
+        const parsed: unknown = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed.filter((ip): ip is string => typeof ip === "string") : [];
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Replace the list of addresses the firewall leaves alone.
+ *
+ * Trusting an address lifts whatever ban it is already serving, which is the whole
+ * point of the button and was not what it did: the flag only told the detectors to
+ * stop judging it from then on, so the row already written kept the operator locked
+ * out of their own instance and the screen said they had fixed it. An address cannot
+ * be both trusted and blocked, and of the two, the one they just asked for wins.
+ */
+export async function setWafIgnoreList(entries: readonly string[]): Promise<void> {
+    const trusted = [...new Set(entries)];
+    await setSetting(IGNORE_KEY, JSON.stringify(trusted));
+    await removeWafBans(trusted);
+}
+
+/** Every address the firewall leaves alone: loopback plus whatever the operator
+ *  added. One list rather than two, because "never ban this" is one decision and an
+ *  address the jails spare has no business being reported as an anomaly either. */
+export async function wafTrustedAddresses(): Promise<string[]> {
+    return [...ALWAYS_IGNORED, ...(await getWafIgnoreList())];
 }
 
 /** Active bans, newest first, for the firewall page. */
