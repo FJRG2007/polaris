@@ -559,7 +559,7 @@ export const taskViewSchema = z.object({
     listId: uuid.nullable().default(null),
     spaceId: uuid.nullable().default(null),
     groupBy: z.enum(TASK_GROUP_FIELDS).default("status"),
-    sort: taskSortSchema.default({ field: "manual", direction: "asc" }),
+    sort: taskSortSchema.default({ field: "priority", direction: "asc" }),
     filter: taskFilterSchema.default(EMPTY_FILTER),
     /** Columns shown in table view, by field id or `custom:<uuid>`. */
     columns: z.array(z.string().max(64)).max(30).default([]),
@@ -571,6 +571,29 @@ export const taskViewSchema = z.object({
 });
 
 export type TaskViewInput = z.infer<typeof taskViewSchema>;
+
+/**
+ * How one person left one screen looking, as their browser remembers it.
+ *
+ * The same choices a saved view records, minus the ones that belong to the list
+ * rather than to whoever is reading it - a name, who it is shared with, the
+ * columns a table shows. Minus the search box too: a half-typed name is a
+ * question somebody asked once, and a screen that reopened still narrowed to it
+ * looks empty for no reason anybody could see.
+ *
+ * Every field falls back rather than failing, so a preference written by an
+ * older build - or edited by hand - opens the board on the defaults instead of
+ * breaking the page.
+ */
+export const taskViewPreferencesSchema = z.object({
+    type: z.enum(TASK_VIEW_TYPES).default("board"),
+    groupBy: z.enum(TASK_GROUP_FIELDS).default("status"),
+    sort: taskSortSchema.default({ field: "priority", direction: "asc" }),
+    filter: taskFilterSchema.default(EMPTY_FILTER),
+    showClosed: z.boolean().default(false)
+});
+
+export type TaskViewPreferences = z.infer<typeof taskViewPreferencesSchema>;
 
 // ---------------------------------------------------------------------------
 // Recurrence

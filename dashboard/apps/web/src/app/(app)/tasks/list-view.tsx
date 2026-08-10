@@ -25,6 +25,7 @@ import { runAction } from "@/lib/run-action";
 import { GanttView } from "./views/schedule";
 import { CalendarView } from "./views/calendar";
 import { keyboardIsBusy } from "@/lib/keyboard";
+import { useStableOrder } from "./stable-order";
 import { ListView, TableView } from "./views/rows";
 import { bulkOverlay, taskOverlay } from "./optimistic";
 import { TaskCreateDialog } from "./task-create-dialog";
@@ -35,6 +36,7 @@ import { holdSelection, shortfallMessage } from "./views/shared";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Button, ConfirmDeleteDialog, Select, cn } from "@polaris/ui";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
+import { readViewPreferences, viewScopeKey, writeViewPreferences } from "./view-preferences";
 import { CalendarDays, GanttChart, LayoutList, Plus, Rows3, Search, Table2, X } from "lucide-react";
 import type {
     BulkVerb,
@@ -44,6 +46,17 @@ import type {
     TaskListRef,
     ViewProps
 } from "./views/shared";
+
+/**
+ * What a screen opens on when nothing has said otherwise.
+ *
+ * Priority rather than manual order, because manual order only means something
+ * once somebody has dragged a card: on a list nobody has arranged by hand it is
+ * creation order wearing another name, which puts the most urgent work wherever
+ * it happened to be typed. Held at module scope so restoring it is a no-op React
+ * can skip rather than another render.
+ */
+const DEFAULT_SORT: core.TaskSort = { field: "priority", direction: "asc" };
 
 const VIEW_ICONS: Record<core.TaskViewType, typeof LayoutList> = {
     list: LayoutList,
@@ -99,13 +112,14 @@ export function ListScreen({
     const initial = ownView ?? savedViews[0];
     const [viewType, setViewType] = useState<core.TaskViewType>(initial?.type ?? "board");
     const [groupBy, setGroupBy] = useState<core.TaskGroupField>(initial?.groupBy ?? "status");
-    const [sort, setSort] = useState<core.TaskSort>(
-        initial?.sort ?? { field: "priority", direction: "asc" }
-    );
+    const [sort, setSort] = useState<core.TaskSort>(initial?.sort ?? DEFAULT_SORT);
     const [filter, setFilter] = useState<core.TaskFilter>(
         initialFilter ?? initial?.filter ?? core.EMPTY_FILTER
     );
     const [showClosed, setShowClosed] = useState(initial?.showClosed ?? false);
+    // Not remembered anywhere: a half-typed name is a question somebody asked
+    // once, and a screen that reopened still narrowed to it looks empty for no
+    // reason anybody could see.
     const [search, setSearch] = useState("");
     const [openTaskId, setOpenTaskId] = useState<string | null>(initialTaskId);
     // The create dialog, and what was already known when it was asked for.
@@ -119,14 +133,74 @@ export function ListScreen({
     // Optimistic overlay: what a drag or a tick changed before the server said so.
     const [pending, setPending] = useState<Record<string, Partial<TaskRow>>>({});
 
+    /**
+     * How this reader left this screen, read back out of their own browser.
+     *
+     * After mount rather than during render: the server has no localStorage, and
+     * a first paint that disagreed with what it rendered would be a hydration
+     * mismatch rather than a preference. So the screen paints on the saved view -
+     * which for a list is usually the same arrangement anyway - and settles onto
+     * this reader's a moment later.
+     *
+     * It runs again whenever the screen changes, because moving between two
+     * lists reuses this component, and a list nobody has arranged should open on
+     * its own saved view rather than inheriting the last one's sort. A link that
+     * arrives already narrowed - one person's work - says what to show, and what
+     * was left here last time does not get to widen it.
+     */
+    const scope = viewScopeKey(listId, context.spaceId);
+    const [restored, setRestored] = useState<string | null>(null);
+
+    useEffect(() => {
+        const stored = readViewPreferences(scope);
+        setViewType(stored?.type ?? initial?.type ?? "board");
+        setGroupBy(stored?.groupBy ?? initial?.groupBy ?? "status");
+        setSort(stored?.sort ?? initial?.sort ?? DEFAULT_SORT);
+        setShowClosed(stored?.showClosed ?? initial?.showClosed ?? false);
+        setFilter(initialFilter ?? stored?.filter ?? initial?.filter ?? core.EMPTY_FILTER);
+        setRestored(scope);
+        // The saved view and the incoming filter belong to the screen, so they
+        // are already current whenever the screen changes; watching their
+        // identities as well would re-read storage on every reload instead.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scope]);
+
+    /**
+     * Remember it, now rather than on the way out: a tab that is closed, or a
+     * link followed away from, never gets the chance to save on leaving.
+     *
+     * Held back until this screen's own preferences have been read, or the
+     * commit that moves between two lists would write the list being left behind
+     * over the one being opened.
+     */
+    useEffect(() => {
+        if (restored !== scope) return;
+        writeViewPreferences(scope, { type: viewType, groupBy, sort, filter, showClosed });
+    }, [restored, scope, viewType, groupBy, sort, filter, showClosed]);
+
     const rows = useMemo(
         () => tasks.map((task) => ({ ...task, ...pending[task.id] })),
         [tasks, pending]
     );
 
-    const refresh = () =>
+    /**
+     * Go and get what the server now has, and drop the overlay that was standing
+     * in for it.
+     *
+     * `settled` names the tasks the write covered; without it the whole overlay
+     * goes, which is what a reload after something structural wants. Naming them
+     * matters wherever a row was painted optimistically: two tasks ticked in
+     * quick succession share one overlay, and clearing all of it on the first
+     * reload flickers the second row back to what it was until its own lands.
+     */
+    const refresh = (settled?: readonly string[]) =>
         startRefresh(() => {
-            setPending({});
+            setPending((current) => {
+                if (!settled) return {};
+                const next = { ...current };
+                for (const id of settled) delete next[id];
+                return next;
+            });
             router.refresh();
         });
 
@@ -140,6 +214,8 @@ export function ListScreen({
     // and the row is looked back up by id wherever one is drawn.
     const rowById = useMemo(() => new Map(rows.map((task) => [task.id, task])), [rows]);
 
+    const needle = search.trim();
+
     /**
      * Search is fuzzy, because the way people look for a task is by half
      * remembering it. A substring match only finds "user agent" if that is what
@@ -147,35 +223,54 @@ export function ListScreen({
      * transposed letter - which is exactly when they are searching in the first
      * place. Reference and tags are searchable too, at lower weight, so quoting
      * "ENG-42" still lands on it.
+     *
+     * Built only while something is being searched for. The index is over every
+     * task on the screen and the rows change on every tick of a checkbox, so
+     * building it regardless would rebuild a few thousand entries on each edit
+     * to answer a question nobody asked.
      */
     const index = useMemo(
         () =>
-            new Fuse(rows, {
-                keys: [
-                    { name: "name", weight: 3 },
-                    { name: "reference", weight: 2 },
-                    { name: "description", weight: 1 },
-                    { name: "tags.name", weight: 1 }
-                ],
-                threshold: 0.4,
-                ignoreLocation: true,
-                minMatchCharLength: 2
-            }),
-        [rows]
+            needle
+                ? new Fuse(rows, {
+                      keys: [
+                          { name: "name", weight: 3 },
+                          { name: "reference", weight: 2 },
+                          { name: "description", weight: 1 },
+                          { name: "tags.name", weight: 1 }
+                      ],
+                      threshold: 0.4,
+                      ignoreLocation: true,
+                      minMatchCharLength: 2
+                  })
+                : null,
+        [rows, needle]
     );
 
-    const visibleFacts = useMemo(() => {
+    const sortedFacts = useMemo(() => {
         const now = new Date();
-        const needle = search.trim();
-        const matched = needle ? index.search(needle).map((hit) => hit.item) : rows;
+        const matched = index ? index.search(needle).map((hit) => hit.item) : rows;
         const working = matched
             .filter((task) => showClosed || task.statusType !== "closed")
             .map(toFacts)
             .filter((facts) => core.matchesFilter(facts, filter, now, format.weekStartsOn));
         // A search is already ranked by how well each row matched; re-sorting it
         // by due date would throw that away.
-        return needle ? working : core.sortTasks(working, sort, statusOrder);
-    }, [rows, index, filter, showClosed, search, sort, statusOrder, format.weekStartsOn]);
+        return index ? working : core.sortTasks(working, sort, statusOrder);
+    }, [rows, index, needle, filter, showClosed, sort, statusOrder, format.weekStartsOn]);
+
+    /**
+     * What the reader asked to see, as opposed to what the data happens to be.
+     *
+     * The engine sorts; this screen then holds that arrangement until one of
+     * these changes, so raising a task's priority does not tear the row out from
+     * under the pointer of whoever is triaging. The screen belongs in the key
+     * because a soft navigation between two lists reuses the component, and the
+     * needle because a search is ranked rather than sorted - carrying the old
+     * positions into it would put the best match wherever it used to be.
+     */
+    const arrangement = `${listId ?? ""}|${sort.field}|${sort.direction}|${needle}`;
+    const { items: visibleFacts, arrange } = useStableOrder(sortedFacts, arrangement);
 
     const visible = useMemo(
         () =>
@@ -240,7 +335,7 @@ export function ListScreen({
             setError
         );
         if (result?.error) setError(result.error);
-        refresh();
+        refresh([task.id]);
     };
 
     const duplicateTask = async (task: TaskRow) => {
@@ -256,7 +351,9 @@ export function ListScreen({
      * It is saved as the reader's own view, since the order they dragged into
      * place is theirs and a view somebody shared with the list belongs to whoever
      * made it. A screen spanning spaces has no list or space of its own to hang a
-     * view on, so there the arrangement holds until the tab is closed.
+     * view on, so there it is only this browser that remembers - which is enough,
+     * because the order itself was written down on the tasks and all that was
+     * missing was being told to open on it.
      */
     const keepManualOrder = async () => {
         const owner = listId
@@ -306,9 +403,12 @@ export function ListScreen({
         const inList = rows.filter((row) => row.listId === task.listId);
         // The whole list, not just what passes the filter: re-spacing only the
         // visible rows would interleave them with the ones a filter is hiding.
-        const arranged = core
-            .sortTasks(inList.map(toFacts), sort, statusOrder)
-            .map((facts) => facts.id);
+        // Put through the arrangement the screen is holding, because that - and
+        // not what the engine would sort to now - is the order somebody dropped
+        // the card into.
+        const arranged = arrange(
+            core.sortTasks(inList.map(toFacts), sort, statusOrder).map((facts) => facts.id)
+        );
         const taskIds = core.arrangeAround(arranged, task.id, position);
 
         const result = await runAction(() => actions.arrangeTasksAction({ taskIds }), setError);
@@ -520,7 +620,7 @@ export function ListScreen({
         if (result?.error) setError(result.error);
         else reportShortfall(result?.count, taskIds.length, "Changed");
         if (leaves) clearSelection();
-        refresh();
+        refresh(taskIds);
     };
 
     /**
@@ -530,8 +630,12 @@ export function ListScreen({
      * board, and stand down whenever something else owns the keyboard - a field
      * being typed in, an open dialog, an open menu - which is the same rule the
      * file explorer follows and the reason a task named "New plan" can be typed
-     * at all. Re-bound on every render, so the handler reads the selection that
-     * is on screen rather than one it closed over.
+     * at all.
+     *
+     * Re-bound when what the handler reads changes rather than on every render,
+     * which is the same thing while somebody is pressing keys and is not while
+     * they are editing: a screen that swaps its window listener on each tick of
+     * a checkbox is doing that work for nothing.
      */
     useEffect(() => {
         function onKeyDown(event: KeyboardEvent) {
@@ -551,7 +655,10 @@ export function ListScreen({
         }
         window.addEventListener("keydown", onKeyDown);
         return () => window.removeEventListener("keydown", onKeyDown);
-    });
+        // `clearSelection` only ever calls setState, which React keeps stable, so
+        // what the handler actually reads is the three below.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selection.size, context.canEdit, createTarget]);
 
     /**
      * Whether this screen may change the columns at all.
@@ -571,7 +678,7 @@ export function ListScreen({
         canEdit: context.canEdit,
         // A search is ranked by how well each row matched, so a position among
         // those rows is not one anybody could keep.
-        orderable: search.trim() === "",
+        orderable: needle === "",
         selection,
         selected,
         lists,

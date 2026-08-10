@@ -14,6 +14,7 @@ import * as core from "@polaris/core";
 import { TaskPanel } from "./task-panel";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
+import { useStableOrder } from "./stable-order";
 import { Fragment, useMemo, useState } from "react";
 import type { RunningTimer } from "@/lib/tasks/time-service";
 import { useDisplayFormat } from "@/components/display-format";
@@ -74,20 +75,38 @@ export function HomeView({
     const [pending, setPending] = useState<Record<string, TaskOverlay>>({});
     const rows = useMemo(() => tasks.map((task) => ({ ...task, ...pending[task.id] })), [tasks, pending]);
 
-    const refresh = () => {
-        setPending({});
+    /** `settled` names the task the write covered, so a second row changed while
+     *  the first is still reloading keeps the paint it was given. */
+    const refresh = (settled?: string) => {
+        setPending((current) => {
+            if (!settled) return {};
+            const next = { ...current };
+            delete next[settled];
+            return next;
+        });
         router.refresh();
     };
+
+    // Soonest first, which is what the screen says it is - and inside a pile
+    // where the dates are equal or absent, most urgent first. "No due date" has
+    // nothing else to go on, so without this it is in the order the database
+    // happened to return.
+    const sorted = useMemo(
+        () => core.sortTasks(rows.map(toFacts), { field: "dueDate", direction: "asc" }),
+        [rows]
+    );
+
+    // Held, for the same reason a board holds its arrangement: raising a task's
+    // priority from the row's own menu breaks the tie it was sitting on, and a
+    // row that jumps out from under the pointer is a row nobody can triage.
+    // Nothing here chooses the arrangement, so there is only ever the one.
+    const { items: arranged } = useStableOrder(sorted, "dueDate");
 
     const groups = useMemo(() => {
         const now = new Date();
         const byId = new Map(rows.map((task) => [task.id, task]));
         const buckets = new Map<core.DueBucket, TaskRow[]>();
-        // Soonest first, which is what the screen says it is - and inside a pile
-        // where the dates are equal or absent, most urgent first. "No due date"
-        // has nothing else to go on, so without this it is in the order the
-        // database happened to return.
-        for (const facts of core.sortTasks(rows.map(toFacts), { field: "dueDate", direction: "asc" })) {
+        for (const facts of arranged) {
             const task = byId.get(facts.id);
             if (!task) continue;
             const bucket = core.dueBucket(facts, now, format.weekStartsOn);
@@ -98,7 +117,7 @@ export function HomeView({
         return core.DUE_BUCKETS.map((bucket) => ({ bucket, tasks: buckets.get(bucket) ?? [] })).filter(
             (group) => group.tasks.length > 0
         );
-    }, [rows, format.weekStartsOn]);
+    }, [arranged, rows, format.weekStartsOn]);
 
     // The panel belongs to the space of whatever task is open.
     const openSpaceId = rows.find((task) => task.id === openTaskId)?.spaceId;
@@ -117,7 +136,7 @@ export function HomeView({
         }
         const result = await runAction(() => actions.updateTaskAction({ taskId: task.id, ...change }), setError);
         if (result?.error) setError(result.error);
-        refresh();
+        refresh(task.id);
     };
 
     /**
@@ -142,7 +161,7 @@ export function HomeView({
         }
         const result = await runAction(() => actions.bulkUpdateAction({ taskIds: [task.id], ...change }), setError);
         if (result?.error) setError(result.error);
-        refresh();
+        refresh(task.id);
     };
 
     const commandsFor = (task: TaskRow): TaskCommands | null => {
