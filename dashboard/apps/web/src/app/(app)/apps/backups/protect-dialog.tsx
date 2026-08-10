@@ -87,7 +87,7 @@ export function ProtectDialog({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <ShieldCheck className="size-5 text-primary" />
-                        Protect something
+                        Add resource
                     </DialogTitle>
                     <DialogDescription>
                         Everything here that is not being backed up yet. Pick what matters and give it a plan, or

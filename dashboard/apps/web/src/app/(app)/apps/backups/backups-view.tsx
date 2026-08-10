@@ -360,7 +360,7 @@ function ProtectedTable({
                 />
                 <Button onClick={() => setProtecting(true)}>
                     <Plus className="size-4" />
-                    Protect something
+                    Add resource
                 </Button>
             </div>
 
@@ -396,7 +396,7 @@ function ProtectedTable({
                                     <td colSpan={9} className="px-3 py-10 text-center text-sm text-muted-foreground">
                                         {query || kind
                                             ? "Nothing matches that."
-                                            : "Nothing is being backed up yet. Protect something to start."}
+                                            : "Nothing is being backed up yet. Add a resource to start."}
                                     </td>
                                 </tr>
                             ) : (

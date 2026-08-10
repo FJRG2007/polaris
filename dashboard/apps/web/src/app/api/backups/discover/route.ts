@@ -1,7 +1,7 @@
 /**
  * What exists here and is not being backed up yet.
  *
- * Loaded when somebody opens "Protect something" rather than with the console:
+ * Loaded when somebody opens "Add resource" rather than with the console:
  * it asks every source to enumerate, which for game servers and deploy databases
  * is several queries, and nobody waiting for the table wants to pay for it.
  *
