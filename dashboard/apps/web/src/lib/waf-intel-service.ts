@@ -247,6 +247,17 @@ export async function recordWafBan(input: WafBanInput): Promise<void> {
     });
 }
 
+/** The ban held against one address, for the screen that has to say why it is being
+ *  turned away. Expired rows are returned too: "banned until 04:20, and it is 04:25"
+ *  answers the question, and "no ban" in front of somebody who was just blocked does
+ *  not. */
+export async function wafBanFor(ip: string) {
+    return prisma.wafBan.findUnique({
+        where: { ip },
+        select: { reason: true, source: true, note: true, until: true, offences: true, createdAt: true }
+    });
+}
+
 /** Lift a ban by hand. */
 export async function removeWafBan(ip: string): Promise<void> {
     await removeWafBans([ip]);

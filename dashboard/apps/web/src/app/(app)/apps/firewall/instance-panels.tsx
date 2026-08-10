@@ -1002,6 +1002,43 @@ function statusTone(status: number): string {
  * panel above the requests answers directly, for the reader it is willing to name
  * accounts to.
  */
+/**
+ * The ban held against the address being looked at, in the words of whatever made it.
+ *
+ * `note` is written by the jail or detector that decided ("Missing-page flood: 10 in
+ * 5m"), so it already says what happened and how much of it; what it never said is
+ * whether the thing is still running, which is the difference between "this is why
+ * you cannot get in" and "this is why you could not, twenty minutes ago".
+ */
+function BanReason({
+    ban,
+    format
+}: {
+    ban: NonNullable<AddressReport["ban"]>;
+    format: ReturnType<typeof useDisplayFormat>;
+}) {
+    const active = ban.until === null || new Date(ban.until) > new Date();
+    return (
+        <div
+            className={`mb-4 flex flex-col gap-1 rounded-md border p-3 ${active ? "border-danger/40 bg-danger/5" : "border-border"}`}
+        >
+            <p className="text-sm font-medium">
+                {active ? "Blocked by the firewall" : "Was blocked by the firewall"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+                {ban.note ?? "No reason was recorded."}{" "}
+                {ban.until === null
+                    ? "It stands until somebody lifts it."
+                    : `${active ? "Lifts" : "Lifted"} ${format.dateTime(ban.until)}.`}
+            </p>
+            <p className="text-xs text-muted-foreground">
+                Decided by {ban.source}
+                {ban.offences > 1 ? `, after ${ban.offences} separate offences` : ""}.
+            </p>
+        </div>
+    );
+}
+
 function AddressDialog({
     ip,
     hours,
@@ -1042,6 +1079,12 @@ function AddressDialog({
                         edge&apos;s own log.
                     </DialogDescription>
                 </DialogHeader>
+
+                {/* Why the address is being turned away, before anything it did: the
+                    request list below is a wall of 403s that never names the rule
+                    behind them, and an operator looking at their own address is asking
+                    this question first. */}
+                {loaded?.ban ? <BanReason ban={loaded.ban} format={format} /> : null}
 
                 {/* Who was signed in from here does not come from the log and does not
                     depend on the window, so it sits above the requests and is still

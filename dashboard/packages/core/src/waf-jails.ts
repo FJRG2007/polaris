@@ -153,11 +153,34 @@ function hostMiss(entry: HttpLogLike): boolean {
     return router === "" || router.startsWith(VACANT_ROUTER);
 }
 
+/**
+ * A 404 the visitor never asked for.
+ *
+ * Two of these, and neither is the shape this jail is looking for. A framework
+ * navigation carries `_rsc`: the app's own client fetching a route it was told
+ * about, which means a missing one is the app being wrong about itself and the
+ * person reading the page finding out on its behalf. A browser asks for
+ * `/favicon.ico` whether or not anybody wanted it.
+ *
+ * They are excluded because leaving them in bans the operator. Opening the
+ * dashboard prefetches every route in the nav at once, so three dead ones land in
+ * the same second and eight in five minutes is a normal morning - which is exactly
+ * what happened on the instance this was written for. Someone enumerating URLs is
+ * not doing it through the app's own router, and the paths that give a scan away
+ * are the `probes` jail's business rather than this one's.
+ */
+function selfInflicted(entry: HttpLogLike): boolean {
+    const path = entry.path ?? "";
+    const query = path.slice(path.indexOf("?") + 1);
+    if (path.includes("?") && (query === "_rsc" || query.includes("_rsc="))) return true;
+    return path.split("?")[0] === "/favicon.ico";
+}
+
 /** Whether a log entry counts as a failure for a jail. */
 function counts(jail: WafJailId, entry: HttpLogLike): boolean {
     switch (jail) {
         case "not-found":
-            return entry.status === 404;
+            return entry.status === 404 && !selfInflicted(entry);
         case "subdomain-listing":
             return hostMiss(entry) && hostOf(entry) !== "";
         case "rate-limited":

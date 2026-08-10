@@ -10,6 +10,7 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
+import * as intel from "@/lib/waf-intel-service";
 import { recordAudit } from "@/lib/audit-service";
 import { syncAppRoutes } from "@/lib/deploy-service";
 import { syncDashboardRoute } from "@/lib/domain-edge";
@@ -30,17 +31,6 @@ import {
     setWafAnomalySettings,
     type WafAnomalySettings
 } from "@/lib/waf-anomaly-service";
-import {
-    getWafFeed,
-    listWafBans,
-    publishWafIntel,
-    recordWafBan,
-    removeWafBan,
-    setWafFeedEnabled,
-    wafFeedEnabled,
-    getWafIgnoreList,
-    setWafIgnoreList
-} from "@/lib/waf-intel-service";
 
 type WafAddressActivity = core.WafAddressActivity;
 type WafAnomaly = core.WafAnomaly;
@@ -124,8 +114,8 @@ export async function getWafRuleAction(input: {
  * an operator.
  */
 async function torFeedView(detailed: boolean): Promise<WafFeedView> {
-    const feed = await getWafFeed("tor");
-    const enabled = wafFeedEnabled(feed);
+    const feed = await intel.getWafFeed("tor");
+    const enabled = intel.wafFeedEnabled(feed);
     if (!detailed) return { enabled, count: 0, fetchedAt: null, error: null };
     return {
         enabled,
@@ -341,9 +331,9 @@ export async function getWafOverviewAction(hours = 24): Promise<{
     try {
         const [traffic, bans, jails, trusted, anomalies, anomalySettings] = await Promise.all([
             wafTraffic(hours),
-            listWafBans(),
+            intel.listWafBans(),
             getWafJails(),
-            getWafIgnoreList(),
+            intel.getWafIgnoreList(),
             currentWafAnomalies(),
             getWafAnomalySettings()
         ]);
@@ -416,7 +406,12 @@ function countEntries(json: string | undefined): number {
 export async function getWafAddressActivityAction(
     ip: string,
     hours = 24
-): Promise<{ activity?: WafAddressActivity; accounts?: AddressAccounts; error?: string }> {
+): Promise<{
+    activity?: WafAddressActivity;
+    accounts?: AddressAccounts;
+    ban?: Awaited<ReturnType<typeof intel.wafBanFor>>;
+    error?: string;
+}> {
     const user = await requirePermission("system.manage");
     const address = core.cidrOrIp.safeParse(ip);
     if (!address.success) return { error: "That is not a valid address" };
@@ -428,14 +423,22 @@ export async function getWafAddressActivityAction(
         // with an empty list would say "nobody has ever signed in from here" about
         // addresses nobody looked at. Left out instead, which the screen already
         // reads as "not asked" rather than as "none".
-        const [activity, accounts] = await Promise.all([
+        const [activity, accounts, ban] = await Promise.all([
             wafAddressActivity(address.data, window.data),
             user.isAdmin && core.isIpAddress(address.data)
                 ? accountsAtAddress(address.data).catch((error) => {
                       console.error("polaris: could not read the accounts at an address:", error);
                       return undefined;
                   })
-                : undefined
+                : undefined,
+            // Why this address is being turned away, which the request list cannot
+            // say: it shows 403s without the rule that produced them, and reading a
+            // reason out of a wall of them is the operator's job only because nothing
+            // here was doing it.
+            intel.wafBanFor(address.data).catch((error) => {
+                console.error("polaris: could not read the ban on an address:", error);
+                return undefined;
+            })
         ]);
         // Only when they were actually named: a range, a reader who may not have
         // them, and a lookup that failed all leave nothing to have looked at.
@@ -448,7 +451,7 @@ export async function getWafAddressActivityAction(
                 metadata: { accounts: accounts.list.length }
             });
         }
-        return { activity, accounts };
+        return { activity, accounts, ban: ban ?? undefined };
     } catch (caught) {
         return {
             error:
@@ -483,7 +486,7 @@ export async function setWafIgnoreListAction(entries: string[]): Promise<{ error
     const parsed = z.array(core.cidrOrIp).max(core.WAF_LIST_MAX).safeParse(entries);
     if (!parsed.success) return { error: "Enter valid IP addresses or CIDR ranges" };
     try {
-        await setWafIgnoreList(parsed.data);
+        await intel.setWafIgnoreList(parsed.data);
         await recordAudit({
             actorId: user.id,
             action: "waf.jails.ignore",
@@ -504,7 +507,7 @@ export async function liftWafBanAction(ip: string): Promise<{ error?: string }> 
     const parsed = core.cidrOrIp.safeParse(ip);
     if (!parsed.success) return { error: "That is not a valid address" };
     try {
-        await removeWafBan(parsed.data);
+        await intel.removeWafBan(parsed.data);
         await recordAudit({
             actorId: user.id,
             action: "waf.ban.lift",
@@ -523,7 +526,7 @@ export async function liftWafBanAction(ip: string): Promise<{ error?: string }> 
 export async function setTorBlockedAction(enabled: boolean): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     try {
-        await setWafFeedEnabled("tor", enabled);
+        await intel.setWafFeedEnabled("tor", enabled);
         await recordAudit({
             actorId: user.id,
             action: "waf.feed.tor",
@@ -582,14 +585,14 @@ export async function blockAnomalyAction(ip: string, note: string): Promise<{ er
     if (!parsed.success) return { error: "That is not a valid address" };
     try {
         const settings = await getWafAnomalySettings();
-        await recordWafBan({
+        await intel.recordWafBan({
             ip: parsed.data,
             reason: "manual",
             source: "anomaly",
             note: note.slice(0, 200),
             until: new Date(Date.now() + settings.banTimeSec * 1000)
         });
-        await publishWafIntel();
+        await intel.publishWafIntel();
         await recordAudit({
             actorId: user.id,
             action: "waf.anomaly.block",

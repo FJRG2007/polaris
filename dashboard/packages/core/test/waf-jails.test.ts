@@ -61,6 +61,34 @@ describe("detectWafBans", () => {
         expect(at[0]!.until).toBe(NOW + 1800 * 1000);
     });
 
+    // What actually locked an operator out of their own instance: opening the
+    // dashboard prefetches every route in the nav at once, so the dead ones arrive
+    // as a burst of 404s from the person the firewall exists to protect.
+    it("does not count the app's own navigation asking for a route that is gone", () => {
+        const prefetch = hits("203.0.113.7", 12, { path: "/apps/runners/secrets?_rsc=yqrV8C" });
+        expect(detectWafBans({ entries: prefetch, jails: [NOT_FOUND], now: NOW })).toEqual([]);
+    });
+
+    it("does not count a favicon the browser asked for on its own", () => {
+        const favicon = hits("203.0.113.7", 12, { path: "/favicon.ico" });
+        expect(detectWafBans({ entries: favicon, jails: [NOT_FOUND], now: NOW })).toEqual([]);
+    });
+
+    // The exclusion is for the query the framework adds, not for any path that
+    // happens to carry those four letters.
+    it("still counts a plain URL that only looks like one", () => {
+        const enumerated = hits("203.0.113.7", 8, { path: "/_rsc/admin.php" });
+        expect(detectWafBans({ entries: enumerated, jails: [NOT_FOUND], now: NOW })).toHaveLength(1);
+    });
+
+    it("still counts enumeration mixed in with the navigation", () => {
+        const entries = [
+            ...hits("203.0.113.7", 20, { path: "/dash/notes?_rsc=1a6wp" }),
+            ...hits("203.0.113.7", 8, { path: "/wp-login.php", agoSec: 30 })
+        ];
+        expect(detectWafBans({ entries, jails: [NOT_FOUND], now: NOW })).toHaveLength(1);
+    });
+
     it("only counts what happened inside the window", () => {
         const old = hits("203.0.113.7", 8, { agoSec: 3600 });
         expect(detectWafBans({ entries: old, jails: [NOT_FOUND], now: NOW })).toEqual([]);
