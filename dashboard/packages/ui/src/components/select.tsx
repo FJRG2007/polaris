@@ -164,8 +164,8 @@ export function Select({
 
     return (
         <RadixSelect.Root
-            value={value}
-            onValueChange={onValueChange}
+            value={toRadixValue(value)}
+            onValueChange={(next) => onValueChange(fromRadixValue(next))}
             disabled={disabled}
             name={name}
         >
@@ -181,11 +181,43 @@ export function Select({
             </SelectTrigger>
             <SelectContent className={contentClassName}>
                 {options.map((option) => (
-                    <SelectItem key={option.value} value={option.value} disabled={option.disabled} icon={option.icon}>
+                    <SelectItem
+                        key={option.value}
+                        value={toRadixValue(option.value)}
+                        disabled={option.disabled}
+                        icon={option.icon}
+                    >
                         {option.label}
                     </SelectItem>
                 ))}
             </SelectContent>
         </RadixSelect.Root>
     );
+}
+
+/**
+ * What an option worth "" is called on the way through Radix, which throws on an
+ * empty item value - it reserves that string for clearing the selection.
+ *
+ * "Any type", "Not set", "On demand only": a list of things plus the absence of one
+ * is an ordinary shape, and the absence is honestly written as "". Radix's rule is
+ * about its own internals, so it is answered here rather than by every screen
+ * inventing a sentinel and translating it back at each end - which was the standing
+ * instruction, and which eight call sites did not follow, each of them taking down
+ * its page the moment the option list included the empty entry.
+ *
+ * A value nothing in the app would ever hold, so it can never collide with a real
+ * one; it exists between this component and Radix and is translated at both edges,
+ * so `value` and `onValueChange` still speak in "".
+ */
+const EMPTY = "__polaris_empty__";
+
+/** "" as Radix will accept it. Every other value passes through untouched. */
+export function toRadixValue(value: string): string {
+    return value === "" ? EMPTY : value;
+}
+
+/** The caller's own value, back out of what Radix reports. */
+export function fromRadixValue(value: string): string {
+    return value === EMPTY ? "" : value;
 }
