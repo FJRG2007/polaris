@@ -15,7 +15,7 @@
  * exactly the ports Polaris published for it.
  */
 
-import { withExclusiveJoin } from "@/lib/apps/ark/access";
+import { GAME_LOG, withExclusiveJoin, withLaunchFlag } from "@/lib/apps/ark/access";
 import type { CreateArkServerInput } from "@/lib/apps/games-schema";
 
 /** The port an ARK client assumes, and what Polaris starts looking from. */
@@ -72,7 +72,9 @@ export function arkServerEnv(
         ADMIN_PASSWORD: adminPassword,
         MAX_PLAYERS: String(input.maxPlayers),
         ...(input.mods && input.mods.length > 0 ? { GAME_MOD_IDS: normalizeModIds(input.mods) } : {}),
-        ARK_EXTRA_OPTS: withExclusiveJoin("", input.exclusiveJoin),
+        // The log is on from the start, because the moment it is wanted is the
+        // moment something has already happened unrecorded.
+        ARK_EXTRA_OPTS: withLaunchFlag(withExclusiveJoin("", input.exclusiveJoin), GAME_LOG, true),
         GAME_CLIENT_PORT: String(ports.game),
         UDP_SOCKET_PORT: String(ports.raw),
         SERVER_LIST_PORT: String(ports.query)

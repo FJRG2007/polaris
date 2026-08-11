@@ -48,6 +48,7 @@ import {
     saveArkWorldAction,
     setArkAdminPasswordAction,
     setArkExclusiveJoinAction,
+    setArkGameLogAction,
     setArkJoinPasswordAction
 } from "./ark-actions";
 
@@ -911,16 +912,20 @@ function ClosedServerCard({
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
-    function setClosed(closed: boolean): void {
+    function run(work: () => Promise<{ error?: string }>): void {
         setError(null);
         startTransition(async () => {
-            const result = await setArkExclusiveJoinAction(installedAppId, closed);
+            const result = await work();
             if (result.error) {
                 setError(result.error);
                 return;
             }
             onChanged();
         });
+    }
+
+    function setClosed(closed: boolean): void {
+        run(() => setArkExclusiveJoinAction(installedAppId, closed));
     }
 
     return (
@@ -941,6 +946,22 @@ function ClosedServerCard({
                         onChange={setClosed}
                         disabled={!canManage || pending || access === null}
                         aria-label="Only players on the list can join"
+                    />
+                </label>
+                <label className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+                    <span className="flex flex-col gap-0.5 text-sm">
+                        <span className="font-medium">Record what happens in the game</span>
+                        <span className="text-xs text-muted-foreground">
+                            The chat, and the admin commands somebody ran. ARK keeps none of it otherwise, so a command
+                            the server declined leaves nothing to read. Under Files, in
+                            server/ShooterGame/Saved/Logs.
+                        </span>
+                    </span>
+                    <Switch
+                        checked={access?.logging ?? false}
+                        onChange={(on) => run(() => setArkGameLogAction(installedAppId, on))}
+                        disabled={!canManage || pending || access === null}
+                        aria-label="Record what happens in the game"
                     />
                 </label>
             </CardBody>

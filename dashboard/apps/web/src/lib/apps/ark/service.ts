@@ -235,6 +235,9 @@ export async function getArkStatus(ownerId: string, installedAppId: string): Pro
 export interface ArkAccessView {
     /** Whether `-exclusivejoin` is on, which is what makes the list mean anything. */
     readonly closed: boolean;
+    /** Whether the server records the chat and the admin commands that were run.
+     *  Off, a command it declined leaves no trace to read. */
+    readonly logging: boolean;
     readonly players: readonly arkAccess.ArkAllowedPlayer[];
 }
 
@@ -251,6 +254,7 @@ export async function readArkAccess(ownerId: string, installedAppId: string): Pr
         : null;
     return {
         closed: arkAccess.isExclusiveJoin(options?.value ?? undefined),
+        logging: arkAccess.hasLaunchFlag(options?.value ?? undefined, arkAccess.GAME_LOG),
         players: arkAccess.readAllowList(readInstallConfig(install?.config))
     };
 }
@@ -363,13 +367,29 @@ async function requireApplication(ownerId: string, installedAppId: string): Prom
  * them. It only takes effect on the next start, which is what the screen says.
  */
 export async function setExclusiveJoin(ownerId: string, installedAppId: string, closed: boolean): Promise<void> {
+    await setLaunchFlag(ownerId, installedAppId, arkAccess.EXCLUSIVE_JOIN, closed);
+}
+
+/**
+ * Turn one launch flag on or off, keeping every other flag the server runs with.
+ *
+ * Both of the switches Polaris offers write into the same string, so they go
+ * through one function: two of them each rewriting it from their own idea of what
+ * it held would have the second quietly undo the first.
+ */
+export async function setLaunchFlag(
+    ownerId: string,
+    installedAppId: string,
+    flag: string,
+    on: boolean
+): Promise<void> {
     const applicationId = await requireApplication(ownerId, installedAppId);
     const current = await prisma.envVar.findFirst({
         where: { scopeType: "application", scopeId: applicationId, key: "ARK_EXTRA_OPTS" },
         select: { value: true }
     });
     await setEnvVars("application", applicationId, ownerId, [
-        { key: "ARK_EXTRA_OPTS", value: arkAccess.withExclusiveJoin(current?.value ?? "", closed), isSecret: false }
+        { key: "ARK_EXTRA_OPTS", value: arkAccess.withLaunchFlag(current?.value ?? "", flag, on), isSecret: false }
     ]);
 }
 

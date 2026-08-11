@@ -18,7 +18,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import * as ark from "@/lib/apps/ark/service";
 import { recordAudit } from "@/lib/audit-service";
-import { isJoinPassword, isSteamId } from "@/lib/apps/ark/access";
+import { GAME_LOG, isJoinPassword, isSteamId } from "@/lib/apps/ark/access";
 import { requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
 
 const playerSchema = z.object({
@@ -121,6 +121,30 @@ export async function setArkJoinPasswordAction(
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not change the password" };
+    }
+}
+
+/**
+ * Turn the game log on or off.
+ *
+ * ARK records neither chat nor admin commands unless it is asked to, which is why
+ * a command that the server declined leaves nothing to read anywhere. Takes effect
+ * on the next start, like every other launch option.
+ */
+export async function setArkGameLogAction(installedAppId: string, on: boolean): Promise<{ error?: string }> {
+    try {
+        const { user, access } = await requireGameServer("games.manage", installedAppId);
+        await ark.setLaunchFlag(access.ownerId, installedAppId, GAME_LOG, on);
+        await recordAudit({
+            actorId: user.id,
+            action: on ? "games.ark.log-on" : "games.ark.log-off",
+            targetType: "installedApp",
+            targetId: installedAppId
+        });
+        revalidatePath(`/apps/installed/${installedAppId}`);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not change the log" };
     }
 }
 

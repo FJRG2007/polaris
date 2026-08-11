@@ -126,22 +126,48 @@ export function pendingPlayers(list: readonly ArkAllowedPlayer[]): ArkAllowedPla
 }
 
 /**
- * The launch options a server runs with, given whether it is meant to be closed.
+ * One flag in the launch options, turned on or off.
  *
- * One string holds every flag the image passes on the command line, so this
+ * A single string holds every flag the image passes on the command line, so this
  * rewrites that string rather than replacing it: an operator who added
- * `-PreventHibernation` keeps it when the door is opened or shut.
+ * `-PreventHibernation` keeps it when any other flag is toggled.
  */
-export function withExclusiveJoin(options: string, closed: boolean): string {
+export function withLaunchFlag(options: string, flag: string, on: boolean): string {
+    const wanted = flag.toLowerCase();
     const flags = options
         .split(/\s+/)
-        .map((flag) => flag.trim())
-        .filter((flag) => flag.length > 0 && flag.toLowerCase() !== "-exclusivejoin");
-    if (closed) flags.push("-exclusivejoin");
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0 && entry.toLowerCase() !== wanted);
+    if (on) flags.push(flag);
     return flags.join(" ");
+}
+
+/** Whether a flag is already among a server's launch options. */
+export function hasLaunchFlag(options: string | undefined, flag: string): boolean {
+    const wanted = flag.toLowerCase();
+    return (options ?? "").split(/\s+/).some((entry) => entry.trim().toLowerCase() === wanted);
+}
+
+/** Refuses anybody the server was not told about. */
+export const EXCLUSIVE_JOIN = "-exclusivejoin";
+
+/**
+ * Makes the server keep a log of what happened in the game: the chat, and the
+ * admin commands somebody ran.
+ *
+ * ARK leaves this off, and off it records nothing anywhere - so an admin command
+ * the server quietly declined to carry out leaves no trace in the container's
+ * output, in the game's own log, or on any screen. That is an impossible place to
+ * debug from, and it is exactly where an operator lands the first time a command
+ * appears to do nothing. On by default for a server Polaris creates.
+ */
+export const GAME_LOG = "-servergamelog";
+
+export function withExclusiveJoin(options: string, closed: boolean): string {
+    return withLaunchFlag(options, EXCLUSIVE_JOIN, closed);
 }
 
 /** Whether a server's launch options close it to everyone but the allow list. */
 export function isExclusiveJoin(options: string | undefined): boolean {
-    return (options ?? "").split(/\s+/).some((flag) => flag.trim().toLowerCase() === "-exclusivejoin");
+    return hasLaunchFlag(options, EXCLUSIVE_JOIN);
 }
