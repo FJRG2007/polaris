@@ -49,6 +49,20 @@ export interface ConnectionProvider {
      * turning it on reads the reason first.
      */
     signInWarning?: string;
+    /**
+     * Whether this service's word is taken as proof that somebody reads mail at
+     * the address it hands over, on a deployment that has not said otherwise.
+     *
+     * Undefined for a service that vouches for no address at all: there is
+     * nothing to take anybody's word about, so no switch is offered for it.
+     *
+     * True only where the provider states in its own response that it confirmed
+     * the address, and where losing that account is already as bad as losing a
+     * Polaris one. False elsewhere - the address is still held for its owner,
+     * because that is what stops a second account being created under it, but it
+     * arrives unconfirmed and the owner proves it the ordinary way.
+     */
+    emailTrustDefault?: boolean;
 }
 
 export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
@@ -65,7 +79,10 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
         tokenUrl: "https://github.com/settings/tokens",
         defaultLimit: 1,
         requires: "a GitHub App",
-        signInDefault: true
+        signInDefault: true,
+        // GitHub only lets an address be published once it has been confirmed, so
+        // the one it hands back is one GitHub itself proved.
+        emailTrustDefault: true
     },
     {
         slug: "google",
@@ -76,7 +93,10 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
         acceptsToken: false,
         defaultLimit: 1,
         requires: "a Google OAuth client",
-        signInDefault: true
+        signInDefault: true,
+        // Google states on the token itself whether it confirmed the address, and
+        // nothing is held unless it says so.
+        emailTrustDefault: true
     },
     {
         slug: "microsoft",
@@ -92,7 +112,11 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
         // as a way in. Somebody can still allow it, having read why.
         signInDefault: false,
         signInWarning:
-            "This account often reaches a work mailbox and a company tenant. It is linked here to store files, and allowing it to sign in makes it a way into Polaris too."
+            "This account often reaches a work mailbox and a company tenant. It is linked here to store files, and allowing it to sign in makes it a way into Polaris too.",
+        // Graph returns the mailbox on the account without saying whether anybody
+        // proved they read it, and on a tenant an administrator can set it to
+        // anything. The address is held; confirming it stays the owner's to do.
+        emailTrustDefault: false
     },
     {
         slug: "steam",
@@ -154,7 +178,11 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
         requires: "a Dropbox app",
         signInDefault: false,
         signInWarning:
-            "This account is linked here to store files. Allowing it to sign in makes whoever holds it able to reach Polaris as well."
+            "This account is linked here to store files. Allowing it to sign in makes whoever holds it able to reach Polaris as well.",
+        // Dropbox does say it confirmed the address. It arrives off all the same:
+        // this is a file store somebody linked to keep backups in, and it is not
+        // what a deployment should be taking anybody's identity from by default.
+        emailTrustDefault: false
     }
 ];
 
@@ -171,4 +199,10 @@ export function connectionLimitKey(slug: string): string {
  *  Absent, the provider's own default applies. */
 export function connectionSignInKey(slug: string): string {
     return `connections.${slug}.signin`;
+}
+
+/** The Setting key holding whether this service's word confirms the address it
+ *  hands over. Absent, the provider's own default applies. */
+export function connectionEmailTrustKey(slug: string): string {
+    return `connections.${slug}.email-trust`;
 }

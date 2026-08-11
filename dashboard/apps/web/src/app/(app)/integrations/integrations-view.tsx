@@ -118,6 +118,9 @@ export interface IntegrationCard {
     signInAllowed?: boolean;
     /** Why this service is a poor way in, when it is. */
     signInWarning?: string;
+    /** Whether this service's word confirms the address it hands over. Undefined
+     *  for a service that hands over none, which is most of them. */
+    emailTrusted?: boolean;
 }
 
 /** What a card's button opens. Every card in the catalog has to resolve to
@@ -500,6 +503,89 @@ function SignInSwitch({
             ) : null}
             {error ? <p className="text-xs text-danger">{error}</p> : null}
         </div>
+    );
+}
+
+/**
+ * Whether this service's word confirms the address it hands over.
+ *
+ * Worth an operator's attention rather than a default nobody sees: a confirmed
+ * address is where a password reset and a sign-in code go, so trusting a service
+ * makes that company's account recovery part of this deployment's. Turning it off
+ * costs nothing but a confirmation link - the address is held for its owner
+ * either way, which is the part that stops anybody else being given it.
+ */
+function EmailTrustSwitch({ slug, name, trusted }: { slug: string; name: string; trusted: boolean }) {
+    const [value, setValue] = useState(trusted);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    function toggle(next: boolean) {
+        setValue(next);
+        setError(null);
+        startTransition(async () => {
+            const result = await runAction(
+                () => integrationActions.saveConnectionEmailTrustAction(slug, next),
+                setError
+            );
+            if (!result || result.error) {
+                setValue(!next);
+                if (result?.error) setError(result.error);
+            }
+        });
+    }
+
+    return (
+        <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
+            <div className="flex items-start justify-between gap-3">
+                <span>
+                    <span className="font-medium">Take {name}&apos;s word for an email address</span>
+                    <span className="block text-xs text-muted-foreground">
+                        An address on a connected {name} account is added to that person&apos;s Polaris account
+                        already confirmed, instead of them being sent a link to confirm it.
+                    </span>
+                </span>
+                <Switch
+                    checked={value}
+                    disabled={pending}
+                    onChange={toggle}
+                    aria-label={`Take ${name}'s word for an email address`}
+                />
+            </div>
+            <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
+                A confirmed address is where a password reset and a sign-in code are sent. With this off the
+                address is still held for whoever connected it, so nobody else can be given an account under it.
+            </p>
+            {error ? <p className="text-xs text-danger">{error}</p> : null}
+        </div>
+    );
+}
+
+/**
+ * What an operator decides about a service people link an account of: whether it
+ * may sign them in, and whether its word confirms the address it hands over.
+ *
+ * Drawn together because they are the same judgement about the same company, and
+ * every dialog that offers one offers the other. Each half draws only where the
+ * service has that half to decide - a provider that vouches for no address gets
+ * no switch about addresses.
+ */
+function ConnectionPolicy({ card, slug, name }: { card: IntegrationCard; slug: string; name: string }) {
+    return (
+        <>
+            {card.signInAllowed === undefined ? null : (
+                <SignInSwitch
+                    slug={slug}
+                    name={name}
+                    allowed={card.signInAllowed}
+                    warning={card.signInWarning}
+                />
+            )}
+            {card.emailTrusted === undefined ? null : (
+                <EmailTrustSwitch slug={slug} name={name} trusted={card.emailTrusted} />
+            )}
+        </>
     );
 }
 
@@ -975,14 +1061,7 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
                         <ProvenState slug={card.slug} name={app.name} proven={card.proven} />
                     ) : null}
 
-                    {card.signInAllowed === undefined ? null : (
-                        <SignInSwitch
-                            slug={card.slug}
-                            name={app.name}
-                            allowed={card.signInAllowed}
-                            warning={card.signInWarning}
-                        />
-                    )}
+                    <ConnectionPolicy card={card} slug={card.slug} name={app.name} />
 
                     {card.oauthCallbackUrl ? (
                         <div className="flex flex-col gap-1 rounded-md border border-border bg-muted/30 p-3 text-sm">
@@ -1080,14 +1159,7 @@ function SteamDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
 
                     <AccountLimitField slug={card.slug} current={card.accountLimit ?? 1} />
 
-                    {card.signInAllowed === undefined ? null : (
-                        <SignInSwitch
-                            slug={card.slug}
-                            name={card.name}
-                            allowed={card.signInAllowed}
-                            warning={card.signInWarning}
-                        />
-                    )}
+                    <ConnectionPolicy card={card} slug={card.slug} name={card.name} />
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end gap-2">
@@ -1729,14 +1801,7 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                         <ProvenState slug="github" name="GitHub" proven={card.proven} />
                     ) : null}
 
-                    {card.signInAllowed === undefined ? null : (
-                        <SignInSwitch
-                            slug="github"
-                            name="GitHub"
-                            allowed={card.signInAllowed}
-                            warning={card.signInWarning}
-                        />
-                    )}
+                    <ConnectionPolicy card={card} slug="github" name="GitHub" />
 
                     {isApp ? (
                         <div className="flex flex-col gap-2 text-sm">
@@ -1953,14 +2018,7 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
 
                     <AccountLimitField slug="github" current={card.accountLimit ?? 1} />
 
-                    {card.signInAllowed === undefined ? null : (
-                        <SignInSwitch
-                            slug="github"
-                            name="GitHub"
-                            allowed={card.signInAllowed}
-                            warning={card.signInWarning}
-                        />
-                    )}
+                    <ConnectionPolicy card={card} slug="github" name="GitHub" />
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>

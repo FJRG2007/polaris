@@ -16,7 +16,7 @@ interface Row {
     createdAt: Date;
 }
 
-const users = new Map<string, { email: string }>();
+const users = new Map<string, { email: string; emailVerified: boolean }>();
 let alternates: Row[] = [];
 let password = "hunter22";
 
@@ -29,9 +29,31 @@ const prisma = {
             }
             return null;
         },
-        update: async ({ where, data }: { where: { id: string }; data: { email: string } }) => {
-            users.set(where.id, { email: data.email });
+        update: async ({
+            where,
+            data
+        }: {
+            where: { id: string };
+            data: { email: string; emailVerified: boolean };
+        }) => {
+            users.set(where.id, { email: data.email, emailVerified: data.emailVerified });
             return data;
+        },
+        updateMany: async ({
+            where,
+            data
+        }: {
+            where: { id: string; email?: string; emailVerified?: boolean };
+            data: { emailVerified: boolean };
+        }) => {
+            const user = users.get(where.id);
+            const matches =
+                user !== undefined &&
+                (where.email === undefined || user.email === where.email) &&
+                (where.emailVerified === undefined || user.emailVerified === where.emailVerified);
+            if (!matches) return { count: 0 };
+            users.set(where.id, { ...user, emailVerified: data.emailVerified });
+            return { count: 1 };
         }
     },
     userEmail: {
@@ -105,7 +127,7 @@ const auth = {
 
 const {
     addUserEmail,
-    adoptVerifiedEmail,
+    adoptProviderEmail,
     emailOwner,
     listUserEmails,
     promoteUserEmail,
@@ -116,8 +138,8 @@ const {
 
 beforeEach(() => {
     users.clear();
-    users.set("user-1", { email: "owner@example.com" });
-    users.set("user-2", { email: "other@example.com" });
+    users.set("user-1", { email: "owner@example.com", emailVerified: false });
+    users.set("user-2", { email: "other@example.com", emailVerified: false });
     alternates = [];
     password = "hunter22";
 });
@@ -167,9 +189,9 @@ describe("adding an address", () => {
     });
 });
 
-describe("an address a linked provider vouched for", () => {
+describe("an address a linked provider handed over", () => {
     it("is held for its owner, already proved, so nobody else can be given it", async () => {
-        expect(await adoptVerifiedEmail("user-1", " Work@Example.com ")).toEqual({});
+        expect(await adoptProviderEmail("user-1", " Work@Example.com ", { verified: true })).toEqual({});
         const [, adopted] = await listUserEmails("user-1");
         expect(adopted).toMatchObject({ email: "work@example.com", verified: true });
         expect(await emailOwner("work@example.com")).toBe("user-1");
@@ -179,22 +201,45 @@ describe("an address a linked provider vouched for", () => {
     it("proves an address the account had already claimed but not confirmed", async () => {
         await addUserEmail("user-1", "spare@example.com");
         expect((await listUserEmails("user-1"))[1]?.verified).toBe(false);
-        expect(await adoptVerifiedEmail("user-1", "spare@example.com")).toEqual({});
+        expect(await adoptProviderEmail("user-1", "spare@example.com", { verified: true })).toEqual({});
         expect((await listUserEmails("user-1"))[1]?.verified).toBe(true);
     });
 
     it("leaves an address somebody else holds exactly where it is", async () => {
         await addUserEmail("user-2", "theirs@example.com");
-        expect((await adoptVerifiedEmail("user-1", "theirs@example.com")).error).toBe(
+        expect((await adoptProviderEmail("user-1", "theirs@example.com", { verified: true })).error).toBe(
             "That address is already on another account."
         );
         expect(await emailOwner("theirs@example.com")).toBe("user-2");
         expect(await listUserEmails("user-1")).toHaveLength(1);
     });
 
-    it("says nothing new about an address that is already the primary", async () => {
-        expect(await adoptVerifiedEmail("user-1", "owner@example.com")).toEqual({});
-        expect(await listUserEmails("user-1")).toHaveLength(1);
+    it("confirms the address the account already signs in with", async () => {
+        expect((await listUserEmails("user-1"))[0]).toMatchObject({ primary: true, verified: false });
+        expect(await adoptProviderEmail("user-1", "owner@example.com", { verified: true })).toEqual({});
+        const emails = await listUserEmails("user-1");
+        expect(emails).toHaveLength(1);
+        expect(emails[0]).toMatchObject({ primary: true, verified: true });
+    });
+});
+
+describe("an address from a provider this deployment does not trust", () => {
+    it("is held for its owner, but still has to be proved", async () => {
+        expect(await adoptProviderEmail("user-1", "work@example.com", { verified: false })).toEqual({});
+        const [, adopted] = await listUserEmails("user-1");
+        expect(adopted).toMatchObject({ email: "work@example.com", verified: false });
+        expect((await addUserEmail("user-2", "work@example.com")).error).toBe("That email is already in use.");
+    });
+
+    it("leaves the primary unconfirmed", async () => {
+        expect(await adoptProviderEmail("user-1", "owner@example.com", { verified: false })).toEqual({});
+        expect((await listUserEmails("user-1"))[0]).toMatchObject({ primary: true, verified: false });
+    });
+
+    it("never takes back what another provider already proved", async () => {
+        await adoptProviderEmail("user-1", "work@example.com", { verified: true });
+        expect(await adoptProviderEmail("user-1", "work@example.com", { verified: false })).toEqual({});
+        expect((await listUserEmails("user-1"))[1]?.verified).toBe(true);
     });
 });
 

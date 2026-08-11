@@ -27,7 +27,7 @@ export {
     removeUserEmail,
     setUserEmailRecovery,
     promoteUserEmail,
-    adoptVerifiedEmail,
+    adoptProviderEmail,
     emailOwner,
     MAX_ALTERNATE_EMAILS,
     type UserEmailView

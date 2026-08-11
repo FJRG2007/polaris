@@ -16,7 +16,12 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { getSetting } from "@/lib/setting-store";
 import { encryptSecret, decryptSecret, CredentialDecryptError } from "@polaris/storage";
-import { connectionLimitKey, connectionSignInKey, findConnectionProvider } from "@polaris/core";
+import {
+    connectionEmailTrustKey,
+    connectionLimitKey,
+    connectionSignInKey,
+    findConnectionProvider
+} from "@polaris/core";
 
 /** Auditing is imported where it is used rather than at the top, because the
  *  audit service reaches the auth instance and this module sits on the read path
@@ -152,6 +157,24 @@ export async function connectionSignInAllowed(provider: string): Promise<boolean
     return stored === "true";
 }
 
+/**
+ * Whether this deployment takes this service's word for the address it hands
+ * over, or only holds it.
+ *
+ * The operator's decision, because it is a decision about a company rather than
+ * about a person: how much a Google account is worth as proof of who somebody is
+ * depends on who runs the deployment and who signs in to it, and nobody but the
+ * operator is in a position to weigh that. Absent, the provider's own default
+ * applies - taken only from the services that say in their own response that they
+ * confirmed the address, so a provider added later never arrives already trusted.
+ */
+export async function connectionEmailTrusted(provider: string): Promise<boolean> {
+    const fallback = findConnectionProvider(provider)?.emailTrustDefault ?? false;
+    const stored = await getSetting(connectionEmailTrustKey(provider));
+    if (stored === null) return fallback;
+    return stored === "true";
+}
+
 /** Somebody's linked accounts, newest first, optionally for one provider. */
 export async function listConnections(userId: string, provider?: string): Promise<ConnectionView[]> {
     const rows = await prisma.userConnection.findMany({
@@ -236,7 +259,7 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
         select: VIEW_COLUMNS
     });
 
-    await reserveEmail(userId, input.email);
+    await reserveEmail(userId, input.provider, input.email);
     await audit({
         actorId: userId,
         action: claimed ? "connection.refresh" : "connection.link",
@@ -250,20 +273,30 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
 /**
  * Hold the address on a linked account for the person who linked it.
  *
- * The provider has just vouched for it, which is the same proof a confirmation
- * link gives, so it is kept as one of their addresses - and an address one
- * account holds is one no other account can be created with. Every way this can
- * fail is a reason to leave things as they are rather than to fail the link: an
- * address somebody else already holds simply stays theirs.
+ * Held either way, because that is what stops a second account being created
+ * under an address this one already owns. Whether it also arrives confirmed is
+ * the deployment's decision about this service, read here rather than assumed:
+ * on a trusted one the provider has given the same proof a confirmation link
+ * gives, and on any other the owner still proves it themselves.
+ *
+ * Every way this can fail is a reason to leave things as they are rather than to
+ * fail the link: an address somebody else already holds simply stays theirs.
  *
  * Imported where it is used for the reason the audit service is: this module
  * sits on the read path of every deploy, and the auth package is a large thing
  * to pull into that build plan for something only a link ever does.
  */
-async function reserveEmail(userId: string, email: string | null | undefined): Promise<void> {
+async function reserveEmail(
+    userId: string,
+    provider: string,
+    email: string | null | undefined
+): Promise<void> {
     if (!email) return;
-    const { adoptVerifiedEmail } = await import("@polaris/auth");
-    const result = await adoptVerifiedEmail(userId, email).catch((error: unknown) => ({ error: String(error) }));
+    const { adoptProviderEmail } = await import("@polaris/auth");
+    const verified = await connectionEmailTrusted(provider);
+    const result = await adoptProviderEmail(userId, email, { verified }).catch((error: unknown) => ({
+        error: String(error)
+    }));
     if (result.error) console.warn("linked address not held:", result.error);
 }
 

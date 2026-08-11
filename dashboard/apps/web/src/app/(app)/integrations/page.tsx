@@ -10,15 +10,15 @@ import { getRunnerAccess } from "@/lib/github-runners";
 import { connectionProven } from "@/lib/connections/proven";
 import { listIntegrationStates } from "@/lib/integration-service";
 import { readConnectionFailure } from "@/lib/connections/attention";
-import { commonSetupValues, setupValuesFor } from "@/lib/integrations/setup-values";
 import { readCriminalIpConfig } from "@/lib/integrations/criminalip";
 import { getDomainConfig, publicAppUrl } from "@/lib/domain-service";
 import { CONNECTION_PROVIDERS, findConnectionProvider } from "@polaris/core";
 import { IntegrationsView, type IntegrationCard } from "./integrations-view";
-import { connectionLimit, connectionSignInAllowed } from "@/lib/connections/store";
+import { commonSetupValues, setupValuesFor } from "@/lib/integrations/setup-values";
 import { connectionCallbackUrl, connectionFlowOrigin } from "@/lib/connections/oauth";
 import { getCloudflareAccountStatus } from "@/lib/integrations/cloudflare-account-service";
 import { SERVICE_INTEGRATIONS, readDymoConfig, readVirusTotalConfig } from "@/lib/integrations/registry";
+import { connectionEmailTrusted, connectionLimit, connectionSignInAllowed } from "@/lib/connections/store";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +27,17 @@ export const dynamic = "force-dynamic";
 async function signInAllowances(): Promise<Map<string, boolean>> {
     const entries = await Promise.all(
         CONNECTION_PROVIDERS.map(async (provider) => [provider.slug, await connectionSignInAllowed(provider.slug)] as const)
+    );
+    return new Map(entries);
+}
+
+/** Whether each service's word confirms the address it hands over, keyed by slug.
+ *  Only the services that hand one over are in it; the rest have no switch. */
+async function emailTrustAllowances(): Promise<Map<string, boolean>> {
+    const entries = await Promise.all(
+        CONNECTION_PROVIDERS.filter((provider) => provider.emailTrustDefault !== undefined).map(
+            async (provider) => [provider.slug, await connectionEmailTrusted(provider.slug)] as const
+        )
     );
     return new Map(entries);
 }
@@ -50,7 +61,7 @@ export default async function IntegrationsPage() {
     // Three of these reach outside the box (GitHub twice, Cloudflare once), so
     // they are awaited together rather than one after another - in sequence the
     // page took as long as all of them added up.
-    const [states, github, domains, cloudflare, baseUrl, publicUrl, githubLimit, oauthLimits, signIn, proven] = await Promise.all([
+    const [states, github, domains, cloudflare, baseUrl, publicUrl, githubLimit, oauthLimits, signIn, proven, emailTrust] = await Promise.all([
         listIntegrationStates(),
         getGithubStatus(),
         // DuckDNS config lives with the domain settings (Setting keys), not an Integration row.
@@ -74,7 +85,10 @@ export default async function IntegrationsPage() {
         // Whether each of those services may sign anybody in here. Resolved for
         // every provider at once so the card mapping below stays synchronous.
         signInAllowances(),
-        provenApplications()
+        provenApplications(),
+        // And whether each one's word confirms the address it hands over. Same
+        // reason: resolved up front so the mapping below stays synchronous.
+        emailTrustAllowances()
     ]);
     const accountLimits = new Map(oauthLimits);
     // What a step can ask the operator to paste in: the public pages a review desk
@@ -118,6 +132,9 @@ export default async function IntegrationsPage() {
             failure: connection ? readConnectionFailure(state?.config) ?? undefined : undefined,
             signInAllowed: connection ? signIn.get(entry.slug) ?? connection.signInDefault : undefined,
             signInWarning: connection?.signInWarning,
+            // Undefined for a service that vouches for no address, which is what
+            // leaves the switch out rather than drawing one that decides nothing.
+            emailTrusted: emailTrust.get(entry.slug),
             requiresApiKey: entry.requiresApiKey,
             apiKeyLabel: entry.apiKeyLabel,
             apiKeyHelp: entry.apiKeyHelp,

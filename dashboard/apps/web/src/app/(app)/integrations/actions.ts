@@ -23,13 +23,18 @@ import { isTunnelToken, tunnelTokenHint } from "@/lib/integrations/tunnel-token"
 import type { CloudflareTokenScope } from "@/lib/integrations/cloudflare-token-link";
 import { connectionRedirectUri, verifyConnectionOAuthApp } from "@/lib/connections/oauth";
 import { DYMO_IP_RULES, findIntegration, type ScanAction } from "@/lib/integrations/registry";
-import { connectionLimitKey, connectionSignInKey, findConnectionProvider } from "@polaris/core";
 import { connectGithubApp, disconnectGithub, refreshInstallations } from "@/lib/github-service";
 import { getIntegrationSecret, getIntegrationState, upsertIntegration } from "@/lib/integration-service";
 import {
     connectCloudflareToken,
     disconnectCloudflareToken
 } from "@/lib/integrations/cloudflare-account-service";
+import {
+    connectionEmailTrustKey,
+    connectionLimitKey,
+    connectionSignInKey,
+    findConnectionProvider
+} from "@polaris/core";
 
 const SCAN_ACTIONS = new Set<ScanAction>(["block", "quarantine", "notify"]);
 
@@ -89,6 +94,35 @@ export async function saveConnectionSignInAction(provider: string, allowed: bool
     });
     revalidatePath("/integrations");
     revalidatePath("/account/security");
+    return {};
+}
+
+/**
+ * Whether this service's word confirms the address it hands over.
+ *
+ * Only offered for the services that hand one over at all. Turning it off does
+ * not release any address already held, and does not un-confirm one already
+ * confirmed: what was proved was proved, and taking it back would ask people to
+ * re-prove an address on the strength of a switch they never saw.
+ */
+export async function saveConnectionEmailTrustAction(
+    provider: string,
+    trusted: boolean
+): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    const entry = findConnectionProvider(provider);
+    if (!entry) return { error: "Unknown service" };
+    if (entry.emailTrustDefault === undefined) return { error: `${entry.name} does not hand over an address.` };
+
+    await setSetting(connectionEmailTrustKey(provider), trusted === true ? "true" : "false");
+    await recordAudit({
+        actorId: user.id,
+        action: "integration.configure",
+        targetType: "integration",
+        targetId: provider,
+        metadata: { emailTrust: trusted === true }
+    });
+    revalidatePath("/integrations");
     return {};
 }
 

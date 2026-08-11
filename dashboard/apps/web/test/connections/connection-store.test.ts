@@ -117,6 +117,16 @@ vi.mock("@polaris/storage", () => ({
 
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
 
+/** What the link handed the account package about the address on it. */
+let adopted: { userId: string; email: string; verified: boolean } | null = null;
+
+vi.mock("@polaris/auth", () => ({
+    adoptProviderEmail: async (userId: string, email: string, options: { verified: boolean }) => {
+        adopted = { userId, email, verified: options.verified };
+        return {};
+    }
+}));
+
 vi.mock("@/lib/setting-store", () => ({
     getSetting: async (name: string) => settings.get(name) ?? null,
     setSetting: async (name: string, value: string | null) => {
@@ -128,6 +138,7 @@ vi.mock("@/lib/setting-store", () => ({
 const {
     ConnectionClaimedError,
     ConnectionLimitError,
+    connectionEmailTrusted,
     connectionLimit,
     connectionSignInAllowed,
     deleteConnection,
@@ -150,6 +161,7 @@ beforeEach(() => {
     nextId = 1;
     settings.clear();
     banned.clear();
+    adopted = null;
 });
 
 describe("how many accounts one person may link", () => {
@@ -252,6 +264,43 @@ describe("whether a linked account may sign its owner in", () => {
         const linked = await saveConnection("ana", account("1", "ana"));
         expect(await setConnectionSignIn("bruno", linked.id, false)).toBeNull();
         expect(await signInConnection("github", "1")).toMatchObject({ userId: "ana" });
+    });
+});
+
+describe("whether a service's word confirms the address it hands over", () => {
+    it("takes the provider's own default until the operator says otherwise", async () => {
+        // The two Polaris trusts out of the box, and the two it does not.
+        expect(await connectionEmailTrusted("google")).toBe(true);
+        expect(await connectionEmailTrusted("github")).toBe(true);
+        expect(await connectionEmailTrusted("microsoft")).toBe(false);
+        expect(await connectionEmailTrusted("dropbox")).toBe(false);
+        // A service that vouches for no address is never trusted for one, and
+        // neither is a provider nobody has heard of.
+        expect(await connectionEmailTrusted("steam")).toBe(false);
+        expect(await connectionEmailTrusted("myspace")).toBe(false);
+    });
+
+    it("obeys the operator in both directions", async () => {
+        settings.set("connections.github.email-trust", "false");
+        expect(await connectionEmailTrusted("github")).toBe(false);
+        settings.set("connections.microsoft.email-trust", "true");
+        expect(await connectionEmailTrusted("microsoft")).toBe(true);
+    });
+
+    it("holds the address confirmed when the link is with a trusted service", async () => {
+        await saveConnection("ana", { ...account("1", "ana"), email: "ana@example.com" });
+        expect(adopted).toEqual({ userId: "ana", email: "ana@example.com", verified: true });
+    });
+
+    it("still holds it, unconfirmed, when the operator has withdrawn that trust", async () => {
+        settings.set("connections.github.email-trust", "false");
+        await saveConnection("ana", { ...account("1", "ana"), email: "ana@example.com" });
+        expect(adopted).toEqual({ userId: "ana", email: "ana@example.com", verified: false });
+    });
+
+    it("says nothing about an address when the provider handed none over", async () => {
+        await saveConnection("ana", account("1", "ana"));
+        expect(adopted).toBeNull();
     });
 });
 

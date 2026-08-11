@@ -171,33 +171,55 @@ export async function addUserEmail(userId: string, newEmail: string): Promise<{ 
 }
 
 /**
- * Record an address an outside provider has just vouched for as one of this
+ * Record an address an outside provider has just handed over as one of this
  * account's own.
  *
- * Linking a Google or GitHub account says, on that provider's authority, that
- * this person reads mail at that address - the same thing a confirmation link
- * says, which is why it lands verified. Recording it is what reserves it: an
- * address one account holds is one no other account can be created with, so
- * somebody who signs in with their work Google cannot later be shadowed by a
- * second Polaris account under the same address.
+ * Recording it is what reserves it, and that happens whatever anybody thinks of
+ * the provider: an address one account holds is one no other account can be
+ * created with, so somebody who signs in with their work Google cannot later be
+ * shadowed by a second Polaris account under the same address.
+ *
+ * Whether it also arrives confirmed is `verified`, and it is the caller's call
+ * rather than this function's - it turns on which service vouched and what the
+ * deployment has decided that service's word is worth, neither of which is
+ * knowable here. When it is true the provider is saying the same thing a
+ * confirmation link says: this person reads mail at that address. When it is
+ * false the address is still held, and its owner proves it the ordinary way.
+ *
+ * An address that is already the one they sign in with is confirmed in place. It
+ * is the same address and the same proof; leaving the primary alone would have
+ * the account showing "unverified" next to an address a provider had just
+ * vouched for, with a Verify button that sends mail nobody needed to read.
  *
  * Every way this can fail is a reason to leave things exactly as they are, never
  * to fail the link that triggered it: an address somebody else already holds
  * stays theirs, and an account already at its limit simply does not collect
  * another. The caller treats the reason as a note, not an error.
  */
-export async function adoptVerifiedEmail(userId: string, newEmail: string): Promise<{ error?: string }> {
+export async function adoptProviderEmail(
+    userId: string,
+    newEmail: string,
+    options: { verified: boolean }
+): Promise<{ error?: string }> {
     const email = normalizeEmail(newEmail);
     if (!isEmail(email)) return { error: "That is not an address Polaris can hold." };
 
     const owner = await emailOwner(email);
     if (owner === userId) {
-        // Already theirs. An alternate they had not proved yet is proved now;
-        // the primary's own flag is better-auth's and is left alone.
-        await prisma.userEmail.updateMany({
-            where: { userId, email, verifiedAt: null },
-            data: { verifiedAt: new Date() }
-        });
+        if (!options.verified) return {};
+        // Whichever of the two this address is. Both are narrowed to the
+        // unconfirmed case, so an address that was already proved keeps the
+        // stamp it earned rather than being re-dated by every re-authorization.
+        await Promise.all([
+            prisma.user.updateMany({
+                where: { id: userId, email, emailVerified: false },
+                data: { emailVerified: true }
+            }),
+            prisma.userEmail.updateMany({
+                where: { userId, email, verifiedAt: null },
+                data: { verifiedAt: new Date() }
+            })
+        ]);
         return {};
     }
     if (owner) return { error: "That address is already on another account." };
@@ -206,7 +228,9 @@ export async function adoptVerifiedEmail(userId: string, newEmail: string): Prom
     if (held >= MAX_ALTERNATE_EMAILS) {
         return { error: `That account already holds ${MAX_ALTERNATE_EMAILS} extra addresses.` };
     }
-    await prisma.userEmail.create({ data: { userId, email, verifiedAt: new Date() } });
+    await prisma.userEmail.create({
+        data: { userId, email, verifiedAt: options.verified ? new Date() : null }
+    });
     return {};
 }
 
