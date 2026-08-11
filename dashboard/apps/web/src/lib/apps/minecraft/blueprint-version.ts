@@ -17,12 +17,7 @@
  */
 
 import { z } from "zod";
-
-/** Modrinth asks API clients to identify themselves. */
-const USER_AGENT = "polaris-dashboard (https://github.com/FJRG2007/polaris)";
-
-const API = "https://api.modrinth.com/v2";
-const TIMEOUT_MS = 8000;
+import { modrinthApi, modrinthJson, projectSlug } from "./modrinth";
 
 /** Modrinth's own answers move about as often as Minecraft is released, so one
  *  lookup covers every dialog opened for the rest of the day. */
@@ -36,20 +31,6 @@ const tagSchema = z.array(z.object({ version: z.string().max(32), version_type: 
  *  remembered for as long as they are worth remembering. */
 const cache = new Map<string, { at: number; versions: string[] }>();
 
-/**
- * The slug out of a MODRINTH_PROJECTS entry.
- *
- * The image's own syntax: a trailing "?" makes a project optional, a ":" pins a
- * version, and a leading "@" names a file rather than a project. Only a plain
- * slug can be asked about.
- */
-export function projectSlug(entry: string): string | null {
-    const trimmed = entry.trim().replace(/\?+$/, "");
-    if (trimmed.length === 0 || trimmed.startsWith("@")) return null;
-    const slug = trimmed.split(":")[0]?.trim() ?? "";
-    return /^[A-Za-z0-9!@$()`.+,_-]{1,64}$/.test(slug) ? slug : null;
-}
-
 /** One cached lookup, or a fresh one. Empty on any failure, which callers read
  *  as "nothing is known about this" rather than as "this supports nothing". */
 async function cached(key: string, load: () => Promise<string[]>): Promise<string[]> {
@@ -62,19 +43,10 @@ async function cached(key: string, load: () => Promise<string[]>): Promise<strin
     return versions;
 }
 
-async function fetchJson(url: string): Promise<unknown> {
-    const response = await fetch(url, {
-        headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-        signal: AbortSignal.timeout(TIMEOUT_MS)
-    });
-    if (!response.ok) throw new Error(`Modrinth answered ${response.status}`);
-    return response.json();
-}
-
 /** The Minecraft releases a project has a build for. */
 async function projectVersions(slug: string): Promise<string[]> {
     return cached(`project:${slug}`, async () => {
-        const parsed = projectSchema.safeParse(await fetchJson(`${API}/project/${encodeURIComponent(slug)}`));
+        const parsed = projectSchema.safeParse(await modrinthJson(`${modrinthApi}/project/${encodeURIComponent(slug)}`));
         return parsed.success ? parsed.data.game_versions : [];
     });
 }
@@ -83,7 +55,7 @@ async function projectVersions(slug: string): Promise<string[]> {
  *  pinned one would put the whole server on a version nobody plays. */
 async function releases(): Promise<string[]> {
     return cached("releases", async () => {
-        const parsed = tagSchema.safeParse(await fetchJson(`${API}/tag/game_version`));
+        const parsed = tagSchema.safeParse(await modrinthJson(`${modrinthApi}/tag/game_version`));
         return parsed.success
             ? parsed.data.filter((entry) => entry.version_type === "release").map((entry) => entry.version)
             : [];
