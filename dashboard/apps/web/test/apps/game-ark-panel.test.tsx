@@ -16,6 +16,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { GameContext } from "@/app/(app)/apps/installed/[id]/game-context";
+import { playerAction, playerFilters, playerStanding } from "@/lib/apps/player-vocabulary";
 
 const INSTALL = "aaaaaaaa-1111-4111-8111-111111111111";
 
@@ -109,5 +110,43 @@ describe("the ARK panel before the server has answered", () => {
         // An install that was never deployed has no context. The page it belongs to
         // is the one somebody opens to find out why.
         expect(() => render(null)).not.toThrow();
+    });
+});
+
+/**
+ * The same screen, in the same words, as the Minecraft one.
+ *
+ * The two tables do the same handful of things to a person, and each had invented
+ * its own vocabulary for them - one kicked and the other "threw off", one filtered
+ * on Online and the other on Playing now. Nothing at runtime forces them to agree,
+ * so what an operator who runs both actually reads is asserted here against the one
+ * list the words come from.
+ */
+describe("the words on the ARK players screen", () => {
+    const markup = render(context());
+
+    it("names each verb the way the other game names it", () => {
+        // Not kick: nobody has been reported as playing yet, and throwing off
+        // somebody who is not on is a button that does nothing.
+        expect(markup).toContain(playerAction.ban("Pau"));
+        expect(markup).toContain(playerAction.remove("Pau"));
+        expect(markup).toContain(playerAction.more("Pau"));
+        // The words that used to differ, in their old form. Each of these is what
+        // the same button said here while Minecraft said something else.
+        expect(markup).not.toContain("Throw Pau off");
+        expect(markup).not.toContain("Take Pau off the list");
+        expect(markup).not.toContain("Let Pau in");
+    });
+
+    it("stands somebody on the list in the same words the other game does", () => {
+        expect(markup).toContain(playerStanding.allowed);
+        expect(markup).toContain(playerStanding.waiting);
+    });
+
+    it("opens on the filter every game's table opens on", () => {
+        // The rest of the options live inside the select and are not rendered
+        // until it is opened; what this can see is which one it starts on, and
+        // ARK used to start on a value of its own invention.
+        expect(markup).toContain(playerFilters()[0]!.label);
     });
 });

@@ -30,6 +30,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
 import { RelativeTime } from "@/components/relative-time";
+import { ToolbarSwitch } from "@/components/toolbar-switch";
 import type { ServerPresence } from "@/lib/apps/games-service";
 import { useGamePresence } from "@/components/use-game-presence";
 import { findArkMap, mapRequirementHint } from "@/lib/apps/ark/maps";
@@ -38,18 +39,29 @@ import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import type { ArkAccessView, ArkStatus } from "@/lib/apps/ark/service";
 import { ArkMessageDialog, ArkPlayerDialog } from "./ark-player-dialogs";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
+import { PlayerTimeoutDialog } from "@/components/player-timeout-dialog";
 import { PlayerIconAction, PlayersTable } from "@/components/game-players-table";
 import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { timeoutFor, timeoutRemaining, type PlayerTimeout } from "@/lib/apps/player-timeout";
 import { foldArkPlayers, matchesArkPlayer, type ArkPlayerEntry } from "@/lib/apps/ark/players";
 import { generateJoinPassword, isJoinPassword, JOIN_PASSWORD_HINT } from "@/lib/apps/ark/access";
+import {
+    playerAction,
+    playerConfirm,
+    playerFilters,
+    playerMenuItem,
+    playerPresence,
+    playerStanding
+} from "@/lib/apps/player-vocabulary";
 import {
     Ban,
     Clock,
     DoorOpen,
     Eye,
     FolderOpen,
+    Timer,
     Loader2,
     Megaphone,
     MessageSquare,
@@ -111,6 +123,9 @@ interface ServerReading {
      *  poll. Null until the first one answers. */
     reach: GameReachAdvice | null;
     access: ArkAccessView | null;
+    /** Bans with an end, and when each one lifts. Keyed by Steam id, which is what
+     *  ARK bans by. */
+    timeouts: readonly PlayerTimeout[];
 }
 
 export function ArkPanel({
@@ -158,7 +173,8 @@ export function ArkPanel({
         status: null,
         address: game?.address ?? null,
         reach: null,
-        access: game?.arkAccess ?? null
+        access: game?.arkAccess ?? null,
+        timeouts: []
     });
     const [error, setError] = useState<string | null>(null);
     /** What Polaris last said it intends the server to do. Kept so the page can
@@ -176,6 +192,7 @@ export function ArkPanel({
                 address?: string | null;
                 reach?: GameReachAdvice | null;
                 access?: ArkAccessView | null;
+                timeouts?: PlayerTimeout[];
                 error?: string;
             };
             if (!response.ok || !data.status) {
@@ -189,7 +206,8 @@ export function ArkPanel({
                 // Kept when a poll could not work it out rather than dropped: the
                 // warning would flicker on every failed read.
                 reach: data.reach ?? current.reach,
-                access: data.access ?? current.access
+                access: data.access ?? current.access,
+                timeouts: data.timeouts ?? current.timeouts
             }));
             // The header's Start and Stop, and everything else the page rendered
             // on the server, come from the install row. A poll that finds the
@@ -306,7 +324,9 @@ export function ArkPanel({
                     installedAppId={installedAppId}
                     status={status}
                     access={reading.access}
+                    timeouts={reading.timeouts}
                     canModerate={held.includes("games.moderate")}
+                    canManage={held.includes("games.manage")}
                     onChanged={(next) => {
                         if (next) setReading((current) => ({ ...current, access: next }));
                         void load();
@@ -785,17 +805,24 @@ function PlayersTab({
     installedAppId,
     status,
     access,
+    timeouts,
     canModerate,
+    canManage,
     onChanged
 }: {
     installedAppId: string;
     status: ArkStatus | null;
     access: ArkAccessView | null;
+    /** Bans with an end, so a row can say how much of one is left. */
+    timeouts: readonly PlayerTimeout[];
     canModerate: boolean;
+    /** Whether they may change what the list means, which is a heavier grant than
+     *  being allowed to add somebody to it. */
+    canManage: boolean;
     onChanged: (access?: ArkAccessView) => void;
 }) {
     const [query, setQuery] = useState("");
-    const [filter, setFilter] = useState("everyone");
+    const [filter, setFilter] = useState("all");
     const [error, setError] = useState<string | null>(null);
     const [note, setNote] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -804,7 +831,7 @@ function PlayersTab({
      *  about nobody yet. */
     const [acting, setActing] = useState<{
         entry: ArkPlayerEntry | null;
-        dialog: "player" | "message";
+        dialog: "player" | "message" | "timeout";
     } | null>(null);
     /** A refusal belongs in the dialog that asked for it, not behind it on a page
      *  the reader has stopped looking at. */
@@ -864,7 +891,13 @@ function PlayersTab({
         });
     }
 
-    function open(dialog: "player" | "message", entry: ArkPlayerEntry | null): void {
+    /** Whether the server lets in anybody it was not told about. Applied on the
+     *  next start, which the card under the table says. */
+    function onSetClosed(closed: boolean): void {
+        run(() => actions.setArkExclusiveJoinAction(installedAppId, closed));
+    }
+
+    function open(dialog: "player" | "message" | "timeout", entry: ArkPlayerEntry | null): void {
         setDialogError(null);
         setActing({ entry, dialog });
     }
@@ -917,17 +950,34 @@ function PlayersTab({
                 searchPlaceholder="Search by name or Steam id"
                 filter={filter}
                 onFilter={setFilter}
-                filters={[
-                    { value: "everyone", label: "Everyone" },
-                    { value: "online", label: "Playing now" },
-                    { value: "allowed", label: "On the list" }
-                ]}
+                // Named once for every game - see `player-vocabulary`. No
+                // operators and no banned: ARK's admins are a password rather than
+                // a list, and its ban list cannot be read back, so both would be
+                // filters that always came back empty.
+                filters={playerFilters()}
                 toolbar={
-                    canModerate ? (
-                        <Button onClick={() => open("player", null)} disabled={pending}>
-                            <UserPlus className="size-4" /> Add player
-                        </Button>
-                    ) : null
+                    <>
+                        {/* Whether the list underneath is enforced at all, above
+                            the list itself - the same place Minecraft keeps its
+                            whitelist switch. It used to live on the Security
+                            screen, which is the one place somebody reading the
+                            list would never see it, and a list nobody is checked
+                            against is the commonest way to think you are private
+                            and not be. */}
+                        {canManage && (
+                            <ToolbarSwitch
+                                label={{ on: "List enforced", off: "Anyone may join" }}
+                                checked={access?.closed ?? false}
+                                disabled={pending || access === null}
+                                onChange={onSetClosed}
+                            />
+                        )}
+                        {canModerate && (
+                            <Button onClick={() => open("player", null)} disabled={pending}>
+                                <UserPlus className="size-4" /> {playerAction.add}
+                            </Button>
+                        )}
+                    </>
                 }
                 isEmpty={shown.length === 0}
                 empty={
@@ -943,6 +993,8 @@ function PlayersTab({
                         canModerate={canModerate}
                         answering={answering}
                         pending={pending}
+                        timeout={timeoutFor(timeouts, entry.steamId)}
+                        onTimeout={() => open("timeout", entry)}
                         onAllow={() =>
                             run(() =>
                                 actions.addArkPlayerAction(
@@ -954,9 +1006,7 @@ function PlayersTab({
                         }
                         onRemove={() =>
                             void confirm({
-                                title: `Take ${entry.name} off the list?`,
-                                description:
-                                    "The running server is told at once. On a closed server they cannot join again until they are added back.",
+                                ...playerConfirm.remove(entry.name),
                                 confirmLabel: "Remove",
                                 danger: true
                             }).then((agreed) => {
@@ -970,8 +1020,7 @@ function PlayersTab({
                         onMessage={() => open("message", entry)}
                         onKick={() =>
                             void confirm({
-                                title: `Throw ${entry.name} off?`,
-                                description: "They are disconnected and can come straight back.",
+                                ...playerConfirm.kick(entry.name),
                                 confirmLabel: "Kick",
                                 danger: true
                             }).then((agreed) => {
@@ -983,16 +1032,14 @@ function PlayersTab({
                                                 entry.steamId,
                                                 "kick"
                                             ),
-                                        `${entry.name} was thrown off.`
+                                        `${entry.name} was kicked.`
                                     );
                                 }
                             })
                         }
                         onBan={() =>
                             void confirm({
-                                title: `Ban ${entry.name}?`,
-                                description:
-                                    "They are disconnected and refused from now on, whatever the join list says.",
+                                ...playerConfirm.ban(entry.name),
                                 confirmLabel: "Ban",
                                 danger: true
                             }).then((agreed) => {
@@ -1010,19 +1057,23 @@ function PlayersTab({
                             })
                         }
                         onUnban={() =>
+                            // Through the timeout service rather than the bare
+                            // command: somebody let back in early has to have their
+                            // note forgotten too, or the sweep would find it later
+                            // and unban a person nobody had banned since.
                             run(
-                                () =>
-                                    actions.moderateArkPlayerAction(
-                                        installedAppId,
-                                        entry.steamId,
-                                        "unban"
-                                    ),
+                                () => actions.liftArkTimeoutAction(installedAppId, entry.steamId),
                                 `The ban on ${entry.name} is lifted.`
                             )
                         }
                     />
                 ))}
             />
+
+            <p className="text-xs text-muted-foreground">
+                Enforcing the list takes effect the next time the server starts, and is on top of the
+                join password. Adding and removing somebody reaches a running server at once.
+            </p>
 
             <p className="text-xs text-muted-foreground">
                 Teleporting to a player is not possible from here: ARK moves players relative to an
@@ -1066,6 +1117,26 @@ function PlayersTab({
                                     message
                                 ),
                             `Sent to ${target.name}.`
+                        )
+                    }
+                />
+            )}
+            {acting?.dialog === "timeout" && target && (
+                <PlayerTimeoutDialog
+                    player={target.name}
+                    pending={pending}
+                    error={dialogError}
+                    onClose={() => setActing(null)}
+                    onTimeout={(minutes, reason) =>
+                        runInDialog(
+                            () =>
+                                actions.timeoutArkPlayerAction({
+                                    installedAppId,
+                                    steamId: target.steamId,
+                                    minutes,
+                                    reason
+                                }),
+                            `${target.name} is out for a while.`
                         )
                     }
                 />
@@ -1155,13 +1226,15 @@ function ArkPlayerRow({
     canModerate,
     answering,
     pending,
+    timeout,
     onAllow,
     onRemove,
     onEdit,
     onMessage,
     onKick,
     onBan,
-    onUnban
+    onUnban,
+    onTimeout
 }: {
     entry: ArkPlayerEntry;
     /** Whether the server has been asked yet who is on it. Before that nobody is
@@ -1171,6 +1244,9 @@ function ArkPlayerRow({
     canModerate: boolean;
     answering: boolean;
     pending: boolean;
+    /** The timeout they are serving, when they are serving one. The only ban this
+     *  screen can know about: ARK's own list cannot be read back. */
+    timeout: PlayerTimeout | null;
     onAllow: () => void;
     onRemove: () => void;
     onEdit: () => void;
@@ -1178,6 +1254,7 @@ function ArkPlayerRow({
     onKick: () => void;
     onBan: () => void;
     onUnban: () => void;
+    onTimeout: () => void;
 }) {
     // Every verb that reaches the game needs a server that is answering. Editing
     // the list is Polaris' own and does not.
@@ -1216,9 +1293,9 @@ function ArkPlayerRow({
                     {!read ? (
                         <Skeleton className="h-5 w-16" />
                     ) : entry.online ? (
-                        <Badge variant="success">Playing</Badge>
+                        <Badge variant="success">{playerPresence.playing}</Badge>
                     ) : (
-                        <Badge>Offline</Badge>
+                        <Badge>{playerPresence.offline}</Badge>
                     )}
                     {entry.addedAt && (
                         <span className="text-xs text-muted-foreground">
@@ -1229,14 +1306,23 @@ function ArkPlayerRow({
             </td>
             <td className="px-3 py-2">
                 <div className="flex flex-wrap items-center gap-1">
-                    {entry.standing === "allowed" && <Badge variant="primary">allowed</Badge>}
+                    {entry.standing === "allowed" && <Badge variant="primary">{playerStanding.allowed}</Badge>}
                     {entry.standing === "waiting" && (
                         <Badge title="Recorded here. The server is told as soon as it answers.">
-                            <Clock className="size-3" /> waiting
+                            <Clock className="size-3" /> {playerStanding.waiting}
                         </Badge>
                     )}
                     {entry.standing === "not-allowed" && (
-                        <Badge variant="warning">not on the list</Badge>
+                        <Badge variant="warning">{playerStanding.notAllowed}</Badge>
+                    )}
+                    {/* The only ban this screen can be sure of. ARK keeps its ban
+                        list to itself, so a permanent one leaves nothing to show;
+                        a timeout is Polaris' own note and says when it lifts. */}
+                    {timeout && (
+                        <Badge variant="danger" title={`Lifts ${new Date(timeout.until).toLocaleString()}`}>
+                            <Timer className="size-3" />
+                            timed out, {timeoutRemaining(timeout.until)}
+                        </Badge>
                     )}
                 </div>
             </td>
@@ -1245,14 +1331,14 @@ function ArkPlayerRow({
                     {canModerate &&
                         (entry.standing === "not-allowed" ? (
                             <PlayerIconAction
-                                label={`Let ${entry.name} in`}
+                                label={playerAction.allow(entry.name)}
                                 icon={<UserPlus className="size-4" />}
                                 disabled={pending}
                                 onClick={onAllow}
                             />
                         ) : (
                             <PlayerIconAction
-                                label={`Take ${entry.name} off the list`}
+                                label={playerAction.remove(entry.name)}
                                 icon={<UserMinus className="size-4" />}
                                 disabled={pending}
                                 onClick={onRemove}
@@ -1260,28 +1346,39 @@ function ArkPlayerRow({
                         ))}
                     {canModerate && entry.online && (
                         <PlayerIconAction
-                            label={`Throw ${entry.name} off`}
+                            label={playerAction.kick(entry.name)}
                             icon={<DoorOpen className="size-4" />}
                             disabled={!live}
                             onClick={onKick}
                         />
                     )}
-                    {canModerate && (
-                        <PlayerIconAction
-                            label={`Ban ${entry.name}`}
-                            icon={<Ban className="size-4" />}
-                            disabled={!live}
-                            danger
-                            onClick={onBan}
-                        />
-                    )}
+                    {/* Whichever of the two applies: somebody serving a timeout is
+                        already banned, and the verb they need is the one that ends
+                        it - the same swap the Minecraft row makes. */}
+                    {canModerate &&
+                        (timeout ? (
+                            <PlayerIconAction
+                                label={playerAction.pardon(entry.name)}
+                                icon={<UserPlus className="size-4" />}
+                                disabled={!live}
+                                onClick={onUnban}
+                            />
+                        ) : (
+                            <PlayerIconAction
+                                label={playerAction.ban(entry.name)}
+                                icon={<Ban className="size-4" />}
+                                disabled={!live}
+                                danger
+                                onClick={onBan}
+                            />
+                        ))}
                     {canModerate && (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button
                                     size="icon"
                                     variant="ghost"
-                                    aria-label={`More for ${entry.name}`}
+                                    aria-label={playerAction.more(entry.name)}
                                     title="More"
                                 >
                                     <MoreHorizontal className="size-4" />
@@ -1291,7 +1388,7 @@ function ArkPlayerRow({
                                 <DropdownMenuLabel>{entry.name}</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem disabled={pending} onSelect={onEdit}>
-                                    <Pencil className="size-4" /> Edit name
+                                    <Pencil className="size-4" /> {playerMenuItem.edit}
                                 </DropdownMenuItem>
                                 {/* The id is a number, and the question behind it
                                     is always "who is this" - which only Steam can
@@ -1310,14 +1407,26 @@ function ArkPlayerRow({
                                     disabled={!live || !entry.online}
                                     onSelect={onMessage}
                                 >
-                                    <MessageSquare className="size-4" /> Message them
+                                    <MessageSquare className="size-4" /> {playerMenuItem.message}
                                 </DropdownMenuItem>
                                 {/* Offered to anybody, because ARK does not say who
                                     is banned: the ban list is the server's own and
                                     nothing reads it back, so the only honest thing
                                     is to let it be lifted for whoever it was. */}
                                 <DropdownMenuItem disabled={!live} onSelect={onUnban}>
-                                    <UserPlus className="size-4" /> Lift their ban
+                                    <UserPlus className="size-4" /> {playerMenuItem.pardon}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                {/* A ban with an end. ARK has no such command - this
+                                    is its own ban plus a note Polaris comes back to
+                                    lift - which is why it is offered here and not
+                                    against somebody already serving one. */}
+                                <DropdownMenuItem
+                                    className="text-danger"
+                                    disabled={!live || timeout !== null}
+                                    onSelect={onTimeout}
+                                >
+                                    <Timer className="size-4" /> {playerMenuItem.timeout}
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -1328,8 +1437,8 @@ function ArkPlayerRow({
     );
 }
 
-/** Whether the server lets in anybody it was not told about. The list itself is on
- *  the Players screen, where the people are. */
+/** What the server writes down about itself. Who may join is not here: that
+ *  switch sits above the list it decides, on the Players screen. */
 function ClosedServerCard({
     installedAppId,
     access,
@@ -1356,31 +1465,11 @@ function ClosedServerCard({
         });
     }
 
-    function setClosed(closed: boolean): void {
-        run(() => actions.setArkExclusiveJoinAction(installedAppId, closed));
-    }
-
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-sm font-medium">Who may join</p>
+                <p className="text-sm font-medium">What the server records</p>
                 {error && <p className="text-sm text-danger">{error}</p>}
-                <label className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
-                    <span className="flex flex-col gap-0.5 text-sm">
-                        <span className="font-medium">Only players on the list can join</span>
-                        <span className="text-xs text-muted-foreground">
-                            On top of the join password. Off leaves the password as the only lock,
-                            and takes effect the next time the server starts. The list itself is on
-                            the Players screen.
-                        </span>
-                    </span>
-                    <Switch
-                        checked={access?.closed ?? false}
-                        onChange={setClosed}
-                        disabled={!canManage || pending || access === null}
-                        aria-label="Only players on the list can join"
-                    />
-                </label>
                 <label className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
                     <span className="flex flex-col gap-0.5 text-sm">
                         <span className="font-medium">Record what happens in the game</span>

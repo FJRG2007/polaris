@@ -19,23 +19,32 @@
 
 import * as actions from "./minecraft-actions";
 import { useConfirm } from "@/components/confirm-dialog";
+import { ToolbarSwitch } from "@/components/toolbar-switch";
 import type { MinecraftModeration } from "./minecraft-actions";
 import { ACCESS_REACH_NOTE } from "@/lib/apps/minecraft/access";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
+import { PlayerTimeoutDialog } from "@/components/player-timeout-dialog";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import { foldPlayers, type PlayerEntry } from "@/lib/apps/minecraft/players";
-import { timeoutFor, type PlayerTimeout } from "@/lib/apps/minecraft/timeout";
 import { PlayerIconAction, PlayersTable } from "@/components/game-players-table";
 import { describeQueued, waitingOn, type QueuedAction } from "@/lib/apps/minecraft/queue";
+import { timeoutFor, timeoutRemaining, type PlayerTimeout } from "@/lib/apps/player-timeout";
 import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
+import {
+    playerAction,
+    playerConfirm,
+    playerFilters,
+    playerMenuItem,
+    playerPresence,
+    playerStanding
+} from "@/lib/apps/player-vocabulary";
 import {
     HistoryDialog,
     InventoryDialog,
     LocationDialog,
     PlayerAccessDialog,
     TeleportDialog,
-    TimeoutDialog,
     type PlayerDialog
 } from "./minecraft-player-dialogs";
 import {
@@ -75,16 +84,12 @@ import {
     X
 } from "lucide-react";
 
-/** The cuts an operator reaches for; anything finer is what search is for. */
-const FILTERS = [
-    { value: "all", label: "Everyone" },
-    { value: "online", label: "Online" },
-    { value: "allowed", label: "Allowed in" },
-    { value: "operators", label: "Operators" },
-    { value: "banned", label: "Banned" }
-] as const;
+/** The cuts an operator reaches for; anything finer is what search is for. Named
+ *  once for every game - see `player-vocabulary`. Minecraft has operators, so it
+ *  asks for that one. */
+const FILTERS = playerFilters({ operators: true });
 
-type Filter = (typeof FILTERS)[number]["value"];
+type Filter = "all" | "online" | "allowed" | "operators" | "banned";
 
 export function MinecraftPlayers({
     installedAppId,
@@ -392,7 +397,7 @@ export function MinecraftPlayers({
                 searchPlaceholder="Search by name, address or note"
                 filter={filter}
                 onFilter={(value) => setFilter(value as Filter)}
-                filters={FILTERS.map((entry) => ({ value: entry.value, label: entry.label }))}
+                filters={FILTERS}
                 toolbar={
                     <>
                         {!bedrock && (
@@ -411,7 +416,7 @@ export function MinecraftPlayers({
                             }}
                             disabled={pending}
                         >
-                            <UserPlus className="size-4" /> Add player
+                            <UserPlus className="size-4" /> {playerAction.add}
                         </Button>
                     </>
                 }
@@ -439,7 +444,15 @@ export function MinecraftPlayers({
                                 .length
                         }
                         onOpen={(dialog) => setActing({ player, dialog })}
-                        onRevoke={() => run(() => actions.revokePlayerAccessAction(installedAppId, player.name))}
+                        onRevoke={() =>
+                            void confirm({
+                                ...playerConfirm.remove(player.name),
+                                confirmLabel: "Remove",
+                                danger: true
+                            }).then((agreed) => {
+                                if (agreed) run(() => actions.revokePlayerAccessAction(installedAppId, player.name));
+                            })
+                        }
                     />
                 ))}
             />
@@ -482,7 +495,7 @@ export function MinecraftPlayers({
                 />
             )}
             {acting?.dialog === "timeout" && target && (
-                <TimeoutDialog
+                <PlayerTimeoutDialog
                     player={target.name}
                     pending={pending}
                     onClose={() => setActing(null)}
@@ -596,25 +609,25 @@ function PlayerRow({
             </td>
             <td className="px-3 py-2">
                 <div className="flex flex-wrap items-center gap-1">
-                    {player.addresses.length > 0 && <Badge variant="primary">allowed</Badge>}
-                    {player.operator && <Badge>operator</Badge>}
+                    {player.addresses.length > 0 && <Badge variant="primary">{playerStanding.allowed}</Badge>}
+                    {player.operator && <Badge>{playerStanding.operator}</Badge>}
                     {player.whitelisted && <Badge>whitelisted</Badge>}
                     {player.banned &&
                         (timeout ? (
                             <Badge variant="danger" title={`Lifts ${new Date(timeout.until).toLocaleString()}`}>
                                 <Timer className="size-3" />
-                                timed out, {remaining(timeout.until)}
+                                timed out, {timeoutRemaining(timeout.until)}
                             </Badge>
                         ) : (
                             <Badge variant="danger">
                                 <Ban className="size-3" />
-                                banned
+                                {playerStanding.banned}
                             </Badge>
                         ))}
                     {/* A name the game knows and Polaris does not is the gap that
                         lets somebody in on the username alone. */}
                     {player.addresses.length === 0 && !player.banned && (
-                        <Badge variant="warning">not registered</Badge>
+                        <Badge variant="warning">{playerStanding.notAllowed}</Badge>
                     )}
                     {/* Something was decided about them that the server has not
                         been told yet. Said on the row rather than only in the list
@@ -683,44 +696,38 @@ function PlayerRow({
                     )}
                     {player.online && (
                         <PlayerIconAction
-                            label={`Kick ${name}`}
+                            label={playerAction.kick(name)}
                             icon={<DoorOpen className="size-4" />}
                             disabled={!live}
-                            onClick={() =>
-                                void onModerateWithConfirm(
-                                    { action: "kick", player: name },
-                                    `Kick ${name}?`,
-                                    "They are disconnected and can join again straight away."
-                                )
-                            }
+                            onClick={() => {
+                                const { title, description } = playerConfirm.kick(name);
+                                void onModerateWithConfirm({ action: "kick", player: name }, title, description);
+                            }}
                         />
                     )}
                     {!bedrock &&
                         (player.banned ? (
                             <PlayerIconAction
-                                label={`Lift the ban on ${name}`}
+                                label={playerAction.pardon(name)}
                                 icon={<UserPlus className="size-4" />}
                                 disabled={!live}
                                 onClick={() => onModerate({ action: "pardon", player: name })}
                             />
                         ) : (
                             <PlayerIconAction
-                                label={`Ban ${name}`}
+                                label={playerAction.ban(name)}
                                 icon={<Ban className="size-4" />}
                                 danger
                                 disabled={!live}
-                                onClick={() =>
-                                    void onModerateWithConfirm(
-                                        { action: "ban", player: name },
-                                        `Ban ${name}?`,
-                                        "They are disconnected and cannot rejoin until the ban is lifted."
-                                    )
-                                }
+                                onClick={() => {
+                                    const { title, description } = playerConfirm.ban(name);
+                                    void onModerateWithConfirm({ action: "ban", player: name }, title, description);
+                                }}
                             />
                         ))}
                     {player.addresses.length > 0 && (
                         <PlayerIconAction
-                            label={`Remove ${name} from the player list`}
+                            label={playerAction.remove(name)}
                             icon={<UserMinus className="size-4" />}
                             danger
                             disabled={pending}
@@ -752,13 +759,13 @@ function PlayerRow({
 function StatusCell({ player, onOpen }: { player: PlayerEntry; onOpen: (dialog: PlayerDialog) => void }) {
     const badge =
         player.presence === "playing" ? (
-            <Badge variant="success">Playing</Badge>
+            <Badge variant="success">{playerPresence.playing}</Badge>
         ) : player.presence === "connecting" ? (
-            <Badge variant="warning">Connecting</Badge>
+            <Badge variant="warning">{playerPresence.connecting}</Badge>
         ) : player.presence === "never" ? (
-            <Badge>Never joined</Badge>
+            <Badge>{playerPresence.never}</Badge>
         ) : (
-            <Badge>Offline</Badge>
+            <Badge>{playerPresence.offline}</Badge>
         );
 
     return (
@@ -777,15 +784,6 @@ function StatusCell({ player, onOpen }: { player: PlayerEntry; onOpen: (dialog: 
             )}
         </div>
     );
-}
-
-/** How much of a timeout is left, in the same shape as how long ago. */
-function remaining(iso: string): string {
-    const minutes = Math.max(0, Math.round((Date.parse(iso) - Date.now()) / 60_000));
-    if (minutes < 1) return "lifting now";
-    if (minutes < 60) return `${minutes}m left`;
-    const hours = Math.round(minutes / 60);
-    return hours < 24 ? `${hours}h left` : `${Math.round(hours / 24)}d left`;
 }
 
 /** How long ago, as somebody says it out loud. Absolute below a minute is noise;
@@ -827,7 +825,7 @@ function MoreActions({
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button size="icon" variant="ghost" aria-label={`More for ${player.name}`} title="More">
+                <Button size="icon" variant="ghost" aria-label={playerAction.more(player.name)} title="More">
                     <MoreHorizontal className="size-4" />
                 </Button>
             </DropdownMenuTrigger>
@@ -838,7 +836,7 @@ function MoreActions({
                     and the note beside the name - so it does not need the server to
                     be answering, and Bedrock reaches it too. */}
                 <DropdownMenuItem onSelect={() => onOpen("access")}>
-                    <Pencil className="size-4" /> Edit player
+                    <Pencil className="size-4" /> {playerMenuItem.edit}
                 </DropdownMenuItem>
                 {/* One door for looking at the bag and for changing what is in it:
                     somebody who opens it to see what is missing is the same person
@@ -859,7 +857,7 @@ function MoreActions({
                     <MapPin className="size-4" /> Teleport
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={player.sessions.length === 0} onSelect={() => onOpen("history")}>
-                    <History className="size-4" /> Joins and leaves
+                    <History className="size-4" /> {playerMenuItem.history}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -880,7 +878,7 @@ function MoreActions({
                     disabled={!live || bedrock || player.banned}
                     onSelect={() => onOpen("timeout")}
                 >
-                    <Timer className="size-4" /> Time out
+                    <Timer className="size-4" /> {playerMenuItem.timeout}
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
@@ -905,27 +903,22 @@ function WhitelistSwitch({
     const [pending, startTransition] = useTransition();
 
     return (
-        <div className="flex h-10 items-center gap-2 rounded-md border border-border px-3">
-            <span className="whitespace-nowrap text-xs text-muted-foreground">
-                Whitelist {enforced ? "enforced" : "off"}
-            </span>
-            <Switch
-                checked={enforced}
-                disabled={disabled || pending}
-                aria-label="Enforce the whitelist"
-                onChange={(next) => {
-                    onError(null);
-                    startTransition(async () => {
-                        const result = await actions.setWhitelistEnforcedAction(installedAppId, next);
-                        if (result.error) {
-                            onError(result.error);
-                            return;
-                        }
-                        onChanged();
-                    });
-                }}
-            />
-        </div>
+        <ToolbarSwitch
+            label={{ on: "Whitelist enforced", off: "Whitelist off" }}
+            checked={enforced}
+            disabled={disabled || pending}
+            onChange={(next) => {
+                onError(null);
+                startTransition(async () => {
+                    const result = await actions.setWhitelistEnforcedAction(installedAppId, next);
+                    if (result.error) {
+                        onError(result.error);
+                        return;
+                    }
+                    onChanged();
+                });
+            }}
+        />
     );
 }
 

@@ -20,6 +20,7 @@ import { appHasCapability, findApp } from "@/lib/apps/catalog";
 import { getServerMetrics } from "@/lib/server-metrics-service";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { gameServerAddress } from "@/lib/apps/minecraft/address";
+import { sweepArkTimeouts } from "@/lib/apps/ark/timeout-service";
 import type { PortBlocks, PortPolicy } from "@/lib/apps/port-block";
 import { gameOfServer, type GameId } from "@/lib/apps/games-catalog";
 import { sweepTimeouts } from "@/lib/apps/minecraft/timeout-service";
@@ -474,6 +475,9 @@ export async function syncFirewallBans(
         if (gameOfServer(install.catalogId)?.id === "ark") {
             servers += 1;
             allowed += await applyAllowList(ownerId, install.id).catch(() => 0);
+            // It does have timeouts, though - Polaris' own, built on the ban it
+            // does have - and this walk is what comes back to lift them.
+            await sweepArkTimeouts(ownerId, install.id).catch(() => 0);
             continue;
         }
         // Bedrock has no ban command at all, so there is nothing to hand it.

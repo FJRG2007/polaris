@@ -19,7 +19,9 @@ import { revalidatePath } from "next/cache";
 import * as ark from "@/lib/apps/ark/service";
 import { recordAudit } from "@/lib/audit-service";
 import { findGameIdentity } from "@/lib/apps/game-identity";
+import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/player-timeout";
 import { GAME_LOG, isJoinPassword, isSteamId } from "@/lib/apps/ark/access";
+import { liftArkTimeout, timeoutArkPlayer } from "@/lib/apps/ark/timeout-service";
 import { requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
 
 const playerSchema = z.object({
@@ -236,6 +238,76 @@ export async function moderateArkPlayerAction(
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+    }
+}
+
+/**
+ * Ban somebody until a moment, rather than for good.
+ *
+ * The verb every moderator actually wants and no game has: ARK's `BanPlayer` is
+ * forever and `UnbanPlayer` is somebody remembering a week later. Polaris keeps
+ * the note and lifts it - see `player-timeout-service` - so the ban list does not
+ * fill up with people nobody meant to exclude permanently.
+ */
+const timeoutSchema = z.object({
+    installedAppId: z.string().trim().min(1),
+    steamId: z.string().trim().refine(isSteamId, "That is not a Steam id"),
+    minutes: z.number().int().min(1).max(MAX_TIMEOUT_MINUTES),
+    reason: z.string().trim().max(200).default("")
+});
+
+export async function timeoutArkPlayerAction(input: {
+    installedAppId: string;
+    steamId: string;
+    minutes: number;
+    reason?: string;
+}): Promise<{ until?: string; error?: string }> {
+    const parsed = timeoutSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        const entry = await timeoutArkPlayer(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.steamId,
+            parsed.data.minutes,
+            parsed.data.reason
+        );
+        await recordAudit({
+            actorId: user.id,
+            action: "games.ark.timeout",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { steamId: parsed.data.steamId, minutes: parsed.data.minutes, until: entry.until }
+        });
+        return { until: entry.until };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+    }
+}
+
+/** Let them back in early, and forget the note. */
+export async function liftArkTimeoutAction(installedAppId: string, steamId: string): Promise<{ error?: string }> {
+    const parsed = z
+        .object({
+            installedAppId: z.string().trim().min(1),
+            steamId: z.string().trim().refine(isSteamId, "That is not a Steam id")
+        })
+        .safeParse({ installedAppId, steamId });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a Steam id" };
+    try {
+        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        await liftArkTimeout(access.ownerId, parsed.data.installedAppId, parsed.data.steamId);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.ark.unban",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { steamId: parsed.data.steamId }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not lift that" };
     }
 }
 

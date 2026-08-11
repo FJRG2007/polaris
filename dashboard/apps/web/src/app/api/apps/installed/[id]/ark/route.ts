@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { gameServerFacts } from "@/lib/apps/games-service";
 import { reachAdviceFor } from "@/lib/apps/minecraft/reach";
 import { requireGameServer } from "@/lib/apps/install-access";
+import { sweepArkTimeouts } from "@/lib/apps/ark/timeout-service";
+import { readPlayerTimeouts } from "@/lib/apps/player-timeout-service";
 import { sweepGameSchedules } from "@/lib/apps/minecraft/schedule-service";
 import { applyAllowList, getArkStatus, readArkAccess } from "@/lib/apps/ark/service";
 
@@ -55,7 +57,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
             // never asks the same container the same question twice.
             known: new Map([[id, status.answering ? status.players.length : null]])
         }).catch(() => undefined);
-        return NextResponse.json({ status, reach, access, address: facts?.address ?? null });
+        // And the bans that were only ever meant to last an hour. Swept here for
+        // the same reason the schedule is: an instance with no cron configured
+        // would otherwise hand out timeouts that never end. Only against a server
+        // that is answering - unbanning is a command inside the container.
+        if (status.answering) await sweepArkTimeouts(server.ownerId, id).catch(() => 0);
+        const timeouts = await readPlayerTimeouts(id).catch(() => []);
+        return NextResponse.json({ status, reach, access, timeouts, address: facts?.address ?? null });
     } catch (caught) {
         return NextResponse.json(
             { error: caught instanceof Error ? caught.message : "Could not read the server" },

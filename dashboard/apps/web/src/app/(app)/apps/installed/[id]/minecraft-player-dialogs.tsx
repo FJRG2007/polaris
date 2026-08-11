@@ -19,7 +19,6 @@ import * as actions from "./minecraft-actions";
 import { CopyButton } from "@/components/copy-button";
 import { AccountInput } from "@/components/account-input";
 import { InventoryEditor } from "./minecraft-inventory-editor";
-import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/minecraft/timeout";
 import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
@@ -27,7 +26,7 @@ import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
 import { PlayerFormDialog, PlayerFormField } from "@/components/player-form-dialog";
 import { Loader2, Locate, MapPin, RefreshCw, TriangleAlert, UserSearch, X } from "lucide-react";
 import { dimensionLabel, formatCoordinates, type PlayerPosition } from "@/lib/apps/minecraft/position";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
+import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 
 /** Which of the forms is open, or none. */
 export type PlayerDialog = "teleport" | "timeout" | "inventory" | "location" | "history" | "access";
@@ -37,17 +36,6 @@ const COORDINATES = /^~?-?\d{1,7}(?:\.\d{1,3})?\s+~?-?\d{1,7}(?:\.\d{1,3})?\s+~?
 
 /** A Java account name, which a teleport destination may also be. */
 const PLAYER_NAME = /^[A-Za-z0-9_]{1,16}$/;
-
-/** The lengths a moderator actually reaches for, and the one that means "the rest
- *  of the day". Anything else is typed. */
-const TIMEOUT_PRESETS = [
-    { value: "5", label: "5 minutes" },
-    { value: "15", label: "15 minutes" },
-    { value: "60", label: "1 hour" },
-    { value: "480", label: "8 hours" },
-    { value: "1440", label: "1 day" },
-    { value: "custom", label: "Another length" }
-];
 
 export function TeleportDialog({
     player,
@@ -94,69 +82,6 @@ export function TeleportDialog({
                     spellCheck={false}
                     placeholder="Alice, or 100 64 -220"
                     onChange={(event) => setDestination(event.target.value)}
-                />
-            </PlayerFormField>
-        </PlayerFormDialog>
-    );
-}
-
-export function TimeoutDialog({
-    player,
-    pending,
-    onClose,
-    onTimeout
-}: {
-    player: string;
-    pending: boolean;
-    onClose: () => void;
-    onTimeout: (minutes: number, reason: string) => void;
-}) {
-    const [preset, setPreset] = useState("15");
-    const [custom, setCustom] = useState("30");
-    const [reason, setReason] = useState("");
-    const minutes = preset === "custom" ? Number.parseInt(custom, 10) : Number.parseInt(preset, 10);
-    const error =
-        !Number.isInteger(minutes) || minutes < 1 || minutes > MAX_TIMEOUT_MINUTES
-            ? `Between 1 minute and ${MAX_TIMEOUT_MINUTES / (24 * 60)} days`
-            : null;
-
-    return (
-        <PlayerFormDialog
-            title={`Time ${player} out`}
-            description="They are banned now and let back in when it runs out, without anybody having to remember."
-            onClose={onClose}
-            pending={pending}
-            ready={!error && !pending}
-            confirmLabel="Time out"
-            danger
-            onConfirm={() => onTimeout(minutes, reason.trim())}
-        >
-            <PlayerFormField label="How long">
-                <Select
-                    value={preset}
-                    onValueChange={setPreset}
-                    options={TIMEOUT_PRESETS}
-                    aria-label="How long the timeout lasts"
-                />
-            </PlayerFormField>
-            {preset === "custom" && (
-                <PlayerFormField label="Minutes" error={error}>
-                    <Input
-                        autoFocus
-                        type="number"
-                        min={1}
-                        max={MAX_TIMEOUT_MINUTES}
-                        value={custom}
-                        onChange={(event) => setCustom(event.target.value)}
-                    />
-                </PlayerFormField>
-            )}
-            <PlayerFormField label="Reason (shown to them)">
-                <Input
-                    value={reason}
-                    maxLength={200}
-                    placeholder="Optional"
-                    onChange={(event) => setReason(event.target.value)}
                 />
             </PlayerFormField>
         </PlayerFormDialog>
