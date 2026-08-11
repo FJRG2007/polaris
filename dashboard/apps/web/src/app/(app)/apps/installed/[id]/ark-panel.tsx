@@ -38,9 +38,10 @@ import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs"
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
 import { Badge, Button, Card, CardBody, Input, Skeleton, Switch, cn } from "@polaris/ui";
 import { generateJoinPassword, isJoinPassword, isSteamId, JOIN_PASSWORD_HINT } from "@/lib/apps/ark/access";
-import { Ban, Clock, Eye, FolderOpen, LogOut, Loader2, RefreshCw, Save, ShieldAlert, UserMinus, UserPlus } from "lucide-react";
+import { Ban, Clock, Eye, FolderOpen, LogOut, Loader2, Megaphone, RefreshCw, Save, ShieldAlert, UserMinus, UserPlus } from "lucide-react";
 import {
     addArkPlayerAction,
+    broadcastArkAction,
     moderateArkPlayerAction,
     removeArkPlayerAction,
     revealArkPasswordsAction,
@@ -651,6 +652,8 @@ function PlayersTab({
                 {error && <p className="text-sm text-danger">{error}</p>}
                 {note && <p className="text-sm text-muted-foreground">{note}</p>}
 
+                {canModerate && <Broadcast installedAppId={installedAppId} answering={answering} />}
+
                 <PlayersTable
                     columns={[
                         { label: "Player" },
@@ -738,6 +741,61 @@ function PlayersTab({
                 </p>
             </CardBody>
         </Card>
+    );
+}
+
+/**
+ * Say something to everyone who is playing.
+ *
+ * The one thing an operator needs before every restart and the only way to say it
+ * without being in the game: a restart nobody was warned about costs whatever
+ * everyone was carrying. It sits above the table because the people it reaches are
+ * the rows underneath it.
+ */
+function Broadcast({ installedAppId, answering }: { installedAppId: string; answering: boolean }) {
+    const [message, setMessage] = useState("");
+    const [note, setNote] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    function send(): void {
+        setError(null);
+        setNote(null);
+        startTransition(async () => {
+            const result = await broadcastArkAction(installedAppId, message.trim());
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            setMessage("");
+            setNote("Sent to everyone playing.");
+        });
+    }
+
+    return (
+        <div className="flex flex-wrap items-end gap-2">
+            <label className="flex min-w-56 flex-1 flex-col gap-1 text-sm">
+                <span className="text-muted-foreground">Say something to everyone</span>
+                <Input
+                    value={message}
+                    onChange={(event) => setMessage(event.target.value)}
+                    onKeyDown={(event) => {
+                        if (event.key !== "Enter") return;
+                        event.preventDefault();
+                        if (message.trim().length > 0 && answering) send();
+                    }}
+                    placeholder="Restarting in 5 minutes"
+                    disabled={!answering}
+                />
+                <span className={cn("text-xs", error ? "text-danger" : "text-muted-foreground")}>
+                    {error ?? note ?? (answering ? "Appears in everyone's chat." : "The server is not answering.")}
+                </span>
+            </label>
+            <Button onClick={send} disabled={pending || !answering || message.trim().length === 0}>
+                {pending && <Loader2 className="size-4 animate-spin" />}
+                <Megaphone className="size-4" /> Send
+            </Button>
+        </div>
     );
 }
 
