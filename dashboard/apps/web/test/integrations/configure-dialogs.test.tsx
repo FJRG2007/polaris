@@ -16,6 +16,10 @@ import type { IntegrationCard } from "../../src/app/(app)/integrations/integrati
 // The dialogs call the page's server actions, which reach the database on import.
 vi.mock("../../src/app/(app)/integrations/actions", () => ({}));
 
+// The grid asks the router to re-read the cards when a dialog closes, and there is
+// no mounted router in a static render.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => undefined }) }));
+
 const { dialogFor, IntegrationsView } = await import("../../src/app/(app)/integrations/integrations-view");
 
 /** A card as the pages build one: catalog entry, nothing configured yet. */

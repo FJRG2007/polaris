@@ -8,6 +8,7 @@
  * through the admin-gated server actions.
  */
 
+import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import * as integrationActions from "./actions";
 import { IntegrationLogo } from "@/components/logos";
@@ -129,11 +130,25 @@ export function dialogFor(card: IntegrationCard): ComponentType<IntegrationDialo
 }
 
 export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
+    const router = useRouter();
     const [configuring, setConfiguring] = useState<IntegrationCard | null>(null);
     const ConfigureDialog = configuring ? dialogFor(configuring) : null;
     // The category badge sorts a mixed grid. On a screen that is all one category
     // it repeats the page title on every card, so it is left off there.
     const mixed = new Set(cards.map((card) => card.category)).size > 1;
+
+    /**
+     * These cards were rendered on the server, and a dialog saves through an
+     * action rather than by navigating - so without this the grid behind it keeps
+     * saying "Set up" over an integration that is configured and on, until
+     * somebody reloads the page and finds out it worked. Asked for on every close
+     * because several of these dialogs save on their own (the account limit, the
+     * sign-in switch, a Cloudflare token) and never reach a Save button.
+     */
+    function closeDialog() {
+        setConfiguring(null);
+        router.refresh();
+    }
 
     return (
         <>
@@ -178,7 +193,7 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
             </div>
 
             {configuring && ConfigureDialog ? (
-                <ConfigureDialog card={configuring} onClose={() => setConfiguring(null)} />
+                <ConfigureDialog card={configuring} onClose={closeDialog} />
             ) : null}
         </>
     );
