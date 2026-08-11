@@ -16,7 +16,7 @@ import { clearResourceGrants } from "@polaris/auth";
 import { gameDomainSuffix } from "@/lib/apps/minecraft/address";
 import { clearQueue } from "@/lib/apps/minecraft/queue-service";
 import { installApp, uninstallApp } from "@/lib/apps/install-service";
-import { flushWorldForStop } from "@/lib/apps/minecraft/world-service";
+import { flushGameWorld } from "@/lib/apps/games-flush";
 import { findGame, GAMES, type GameId } from "@/lib/apps/games-catalog";
 import { clearSnapshots } from "@/lib/apps/minecraft/inventory-service";
 import { blueprintVersion, createGameServer } from "@/lib/apps/games-create";
@@ -132,7 +132,7 @@ export async function setGameServerRunningAction(
         if (!access.install.applicationId) throw new Error("This server has not been deployed yet");
         // Written out before it goes down. A stop that does not finish gracefully
         // is killed, and what a kill costs is the last few minutes everyone played.
-        if (!running) await flushWorldForStop(access.ownerId, installedAppId);
+        if (!running) await flushGameWorld(access.ownerId, installedAppId);
         await setApplicationRunning(access.install.applicationId, access.ownerId, running);
         await recordAudit({
             actorId: user.id,
@@ -152,6 +152,9 @@ export async function redeployGameServerAction(installedAppId: string): Promise<
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         if (!access.install.applicationId) throw new Error("This server has not been deployed yet");
+        // A redeploy tears the container down and builds it again, so it costs the
+        // same unwritten minutes a stop does - and used to take them silently.
+        await flushGameWorld(access.ownerId, installedAppId);
         await deployApplication(access.install.applicationId, access.ownerId, user.id);
         revalidatePath("/apps/games");
         return {};

@@ -14,6 +14,7 @@ import { revalidatePath } from "next/cache";
 import { recordAudit } from "@/lib/audit-service";
 import { clearResourceGrants } from "@polaris/auth";
 import { installRef } from "@/lib/apps/install-access";
+import { flushGameWorld } from "@/lib/apps/games-flush";
 import { getInstalledApp, uninstallApp } from "@/lib/apps/install-service";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import { requirePermissionOn, type ResourceAccess } from "@/lib/resource-access";
@@ -30,6 +31,10 @@ export async function redeployInstalledAppAction(id: string): Promise<{ error?: 
     try {
         const { user, access } = await requirePermissionOn("deploy.manage", installRef(id));
         const applicationId = await applicationFor(access, id);
+        // A game server's world lives in memory between autosaves, and a redeploy
+        // destroys the container. Anything that is not a game server has nothing to
+        // flush and this costs it one query.
+        await flushGameWorld(access.ownerId, id);
         await deployApplication(applicationId, access.ownerId, user.id);
         revalidatePath(`/apps/installed/${id}`);
         return {};
@@ -42,6 +47,7 @@ export async function setInstalledAppRunningAction(id: string, running: boolean)
     try {
         const { access } = await requirePermissionOn("deploy.manage", installRef(id));
         const applicationId = await applicationFor(access, id);
+        if (!running) await flushGameWorld(access.ownerId, id);
         await setApplicationRunning(applicationId, access.ownerId, running);
         revalidatePath(`/apps/installed/${id}`);
         return {};
