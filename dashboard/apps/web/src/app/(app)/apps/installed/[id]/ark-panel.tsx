@@ -29,13 +29,14 @@ import { CopyButton } from "@/components/copy-button";
 import { useConfirm } from "@/components/confirm-dialog";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
+import { RelativeTime } from "@/components/relative-time";
+import type { ServerPresence } from "@/lib/apps/games-service";
+import { useGamePresence } from "@/components/use-game-presence";
 import { findArkMap, mapRequirementHint } from "@/lib/apps/ark/maps";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import type { ArkAccessView, ArkStatus } from "@/lib/apps/ark/service";
-import type { ServerPresence } from "@/lib/apps/games-service";
 import { ArkMessageDialog, ArkPlayerDialog } from "./ark-player-dialogs";
-import { useGamePresence } from "@/components/use-game-presence";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { PlayerIconAction, PlayersTable } from "@/components/game-players-table";
 import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs";
@@ -135,7 +136,9 @@ export function ArkPanel({
     const pathname = usePathname();
     const tab = useMemo(() => {
         const base = `/apps/installed/${installedAppId}`;
-        const slug = pathname.startsWith(base) ? pathname.slice(base.length).replace(/^\//, "") : "";
+        const slug = pathname.startsWith(base)
+            ? pathname.slice(base.length).replace(/^\//, "")
+            : "";
         return isGameTab(slug, "ark") && canOpenGameTab(slug, held, "ark") ? slug : "";
     }, [pathname, installedAppId, held]);
     const tabs = useMemo(() => visibleGameTabs(held, "ark"), [held]);
@@ -165,7 +168,9 @@ export function ArkPanel({
 
     const load = useCallback(async () => {
         try {
-            const response = await fetch(`/api/apps/installed/${installedAppId}/ark`, { cache: "no-store" });
+            const response = await fetch(`/api/apps/installed/${installedAppId}/ark`, {
+                cache: "no-store"
+            });
             const data = (await response.json()) as {
                 status?: ArkStatus;
                 address?: string | null;
@@ -329,7 +334,10 @@ export function ArkPanel({
                         canManage={held.includes("games.manage")}
                         onChanged={() => void load()}
                     />
-                    <PasswordCard installedAppId={installedAppId} canManage={held.includes("games.manage")} />
+                    <PasswordCard
+                        installedAppId={installedAppId}
+                        canManage={held.includes("games.manage")}
+                    />
                     <MinecraftSettings
                         installedAppId={installedAppId}
                         settings={settings.filter((setting) => setting.group === SECURITY_GROUP)}
@@ -413,7 +421,8 @@ function ConnectCard({
                             <Skeleton className="h-7 w-56" />
                         ) : (
                             <span className="text-sm text-muted-foreground">
-                                Not published yet - the address appears once the server has deployed.
+                                Not published yet - the address appears once the server has
+                                deployed.
                             </span>
                         )
                     ) : (
@@ -444,7 +453,9 @@ function ConnectCard({
                         screen naming the map. From here it looks like a server
                         refusing connections. */}
                     {findArkMap(map)?.requires !== "base" && (
-                        <span className="text-xs text-warning">{mapRequirementHint(findArkMap(map))}</span>
+                        <span className="text-xs text-warning">
+                            {mapRequirementHint(findArkMap(map))}
+                        </span>
                     )}
                 </div>
 
@@ -452,7 +463,11 @@ function ConnectCard({
                     <StatusBadge status={status} running={running} />
                     {applicationId && (
                         <Link href={`/drive?c=container:${applicationId}&p=/app`}>
-                            <Button size="sm" variant="secondary" title="Browse this server's files in Drive">
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                title="Browse this server's files in Drive"
+                            >
                                 <FolderOpen className="size-4" /> Files
                             </Button>
                         </Link>
@@ -465,7 +480,11 @@ function ConnectCard({
                             disabled={saving || !(status?.answering ?? false)}
                             title="Write the world to disk now"
                         >
-                            {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                            {saving ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <Save className="size-4" />
+                            )}
                             Save world
                         </Button>
                     )}
@@ -475,22 +494,29 @@ function ConnectCard({
                 {/* A server that lets in only the players it was told about, and was
                     never told about anybody, is a server nobody can join - the state
                     a brand-new one is in until it finishes installing. */}
-                {access !== null && access.closed && access.players.every((player) => player.appliedAt === null) && (
-                    <div className="flex w-full items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2">
-                        <UserPlus className="mt-0.5 size-4 shrink-0 text-warning" />
-                        <div className="flex flex-col items-start gap-1 text-xs">
-                            <p className="font-medium text-foreground">Nobody can join yet</p>
-                            <p className="text-muted-foreground">
-                                This server only lets in players it has been told about, and it has not been told about
-                                anybody yet - it is still installing. Polaris hands the list over as soon as the server
-                                answers; nothing else is needed.
-                            </p>
-                            <button type="button" onClick={onOpenAccess} className="text-primary hover:underline">
-                                See who is on the list
-                            </button>
+                {access !== null &&
+                    access.closed &&
+                    access.players.every((player) => player.appliedAt === null) && (
+                        <div className="flex w-full items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2">
+                            <UserPlus className="mt-0.5 size-4 shrink-0 text-warning" />
+                            <div className="flex flex-col items-start gap-1 text-xs">
+                                <p className="font-medium text-foreground">Nobody can join yet</p>
+                                <p className="text-muted-foreground">
+                                    This server only lets in players it has been told about, and it
+                                    has not been told about anybody yet - it is still installing.
+                                    Polaris hands the list over as soon as the server answers;
+                                    nothing else is needed.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={onOpenAccess}
+                                    className="text-primary hover:underline"
+                                >
+                                    See who is on the list
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
                 {reach && !reach.ok && reach.actionable && (
                     <div className="flex w-full items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2">
@@ -506,7 +532,10 @@ function ConnectCard({
                                 </ul>
                             )}
                             {reach.forward && (
-                                <Link href="/admin/domains#game-ports" className="w-fit text-primary hover:underline">
+                                <Link
+                                    href="/admin/domains#game-ports"
+                                    className="w-fit text-primary hover:underline"
+                                >
                                     Open the router walkthrough
                                 </Link>
                             )}
@@ -598,7 +627,8 @@ function StatusBadge({ status, running }: { status: ArkStatus | null; running: b
     const label = statusLabel(status, running);
     if (label === null) return <Skeleton className="h-6 w-20" />;
     if (label === "Not running") return <Badge variant="danger">Not running</Badge>;
-    if (label === "Starting") return <Badge className="border-warning/40 text-warning">Starting</Badge>;
+    if (label === "Starting")
+        return <Badge className="border-warning/40 text-warning">Starting</Badge>;
     if (label === "Stopped") return <Badge>Stopped</Badge>;
     return (
         <Badge className="border-success/40 text-success">
@@ -619,11 +649,23 @@ function formatBytes(bytes: number): string {
     return `${value < 10 && unit > 0 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
 }
 
-function OverviewTab({ status, settings }: { status: ArkStatus | null; settings: InstalledAppSetting[] }) {
+function OverviewTab({
+    status,
+    settings
+}: {
+    status: ArkStatus | null;
+    settings: InstalledAppSetting[];
+}) {
     const shown = useMemo(
         () =>
             settings.filter((setting) =>
-                ["SERVER_MAP", "SESSION_NAME", "MAX_PLAYERS", "GAME_MOD_IDS", "ENABLE_CROSSPLAY"].includes(setting.key)
+                [
+                    "SERVER_MAP",
+                    "SESSION_NAME",
+                    "MAX_PLAYERS",
+                    "GAME_MOD_IDS",
+                    "ENABLE_CROSSPLAY"
+                ].includes(setting.key)
             ),
         [settings]
     );
@@ -640,7 +682,9 @@ function OverviewTab({ status, settings }: { status: ArkStatus | null; settings:
                             {status.message ?? "The server is not answering."}
                         </p>
                     ) : status.players.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">Nobody is playing right now.</p>
+                        <p className="text-sm text-muted-foreground">
+                            Nobody is playing right now.
+                        </p>
                     ) : (
                         <div className="flex flex-wrap gap-1">
                             {status.players.map((player) => (
@@ -670,7 +714,11 @@ function OverviewTab({ status, settings }: { status: ArkStatus | null; settings:
                         <dl className="flex flex-col gap-1 text-sm">
                             <div className="flex items-baseline justify-between gap-3">
                                 <dt className="text-muted-foreground">Processor</dt>
-                                <dd>{status.cpuPercent === null ? "-" : `${status.cpuPercent.toFixed(1)}%`}</dd>
+                                <dd>
+                                    {status.cpuPercent === null
+                                        ? "-"
+                                        : `${status.cpuPercent.toFixed(1)}%`}
+                                </dd>
                             </div>
                             <div className="flex items-baseline justify-between gap-3">
                                 <dt className="text-muted-foreground">Memory</dt>
@@ -691,11 +739,15 @@ function OverviewTab({ status, settings }: { status: ArkStatus | null; settings:
                     <dl className="flex flex-col gap-1 text-sm">
                         {shown.map((setting) => {
                             const value =
-                                setting.options?.find((option) => option.value === setting.value)?.label ??
+                                setting.options?.find((option) => option.value === setting.value)
+                                    ?.label ??
                                 setting.value ??
                                 "-";
                             return (
-                                <div key={setting.key} className="flex items-baseline justify-between gap-3">
+                                <div
+                                    key={setting.key}
+                                    className="flex items-baseline justify-between gap-3"
+                                >
                                     <dt className="text-muted-foreground">{setting.label}</dt>
                                     <dd className="truncate text-right" title={value}>
                                         {value || "-"}
@@ -750,7 +802,10 @@ function PlayersTab({
     const [confirm, confirmElement] = useConfirm();
     /** The form that is open, and who it is about. Null for the add form, which is
      *  about nobody yet. */
-    const [acting, setActing] = useState<{ entry: ArkPlayerEntry | null; dialog: "player" | "message"; } | null>(null);
+    const [acting, setActing] = useState<{
+        entry: ArkPlayerEntry | null;
+        dialog: "player" | "message";
+    } | null>(null);
     /** A refusal belongs in the dialog that asked for it, not behind it on a page
      *  the reader has stopped looking at. */
     const [dialogError, setDialogError] = useState<string | null>(null);
@@ -773,7 +828,10 @@ function PlayersTab({
         [players, query, filter]
     );
 
-    function run(work: () => Promise<{ error?: string; access?: ArkAccessView; }>, done?: string): void {
+    function run(
+        work: () => Promise<{ error?: string; access?: ArkAccessView }>,
+        done?: string
+    ): void {
         setError(null);
         setNote(null);
         startTransition(async () => {
@@ -789,7 +847,10 @@ function PlayersTab({
 
     /** The same for the forms: what failed is shown inside the dialog, and the
      *  dialog only closes once the server has agreed. */
-    function runInDialog(work: () => Promise<{ error?: string; access?: ArkAccessView; }>, done?: string): void {
+    function runInDialog(
+        work: () => Promise<{ error?: string; access?: ArkAccessView }>,
+        done?: string
+    ): void {
         setDialogError(null);
         startTransition(async () => {
             const result = await work();
@@ -831,120 +892,144 @@ function PlayersTab({
                             Nobody can join yet
                         </p>
                         <p className="text-sm text-muted-foreground">
-                            This server only lets in players it has been told about, and the list is empty. Add
-                            yourself first: your Steam id is the number at the end of your Steam profile URL.
+                            This server only lets in players it has been told about, and the list is
+                            empty. Add yourself first: your Steam id is the number at the end of
+                            your Steam profile URL.
                         </p>
                     </CardBody>
                 </Card>
             )}
 
-            <Card>
-                <CardBody className="flex flex-col gap-3">
-                    {canModerate && <Broadcast installedAppId={installedAppId} answering={answering} />}
+            {canModerate && <Broadcast installedAppId={installedAppId} answering={answering} />}
 
-                    <PlayersTable
-                        columns={[
-                            { label: "Player" },
-                            { label: "Steam id", className: "hidden md:table-cell" },
-                            { label: "Status" },
-                            { label: "May join" }
-                        ]}
-                        search={query}
-                        onSearch={setQuery}
-                        searchPlaceholder="Search by name or Steam id"
-                        filter={filter}
-                        onFilter={setFilter}
-                        filters={[
-                            { value: "everyone", label: "Everyone" },
-                            { value: "online", label: "Playing now" },
-                            { value: "allowed", label: "On the list" }
-                        ]}
-                        toolbar={
-                            canModerate ? (
-                                <Button onClick={() => open("player", null)} disabled={pending}>
-                                    <UserPlus className="size-4" /> Add player
-                                </Button>
-                            ) : null
+            {/* Bare, like the Minecraft table it is the same component as. The
+                table draws its own surface, and the card around it was a second
+                border inside the first. */}
+            <PlayersTable
+                columns={[
+                    { label: "Player" },
+                    { label: "Steam id", className: "hidden md:table-cell" },
+                    { label: "Status" },
+                    { label: "May join" }
+                ]}
+                search={query}
+                onSearch={setQuery}
+                searchPlaceholder="Search by name or Steam id"
+                filter={filter}
+                onFilter={setFilter}
+                filters={[
+                    { value: "everyone", label: "Everyone" },
+                    { value: "online", label: "Playing now" },
+                    { value: "allowed", label: "On the list" }
+                ]}
+                toolbar={
+                    canModerate ? (
+                        <Button onClick={() => open("player", null)} disabled={pending}>
+                            <UserPlus className="size-4" /> Add player
+                        </Button>
+                    ) : null
+                }
+                isEmpty={shown.length === 0}
+                empty={
+                    players.length === 0
+                        ? (status?.message ?? "Nobody is on the list and nobody is playing.")
+                        : "Nobody matches that."
+                }
+                rows={shown.map((entry) => (
+                    <ArkPlayerRow
+                        key={entry.steamId}
+                        entry={entry}
+                        live={status !== null}
+                        canModerate={canModerate}
+                        answering={answering}
+                        pending={pending}
+                        onAllow={() =>
+                            run(() =>
+                                actions.addArkPlayerAction(
+                                    installedAppId,
+                                    entry.steamId,
+                                    entry.name
+                                )
+                            )
                         }
-                        isEmpty={shown.length === 0}
-                        empty={
-                            players.length === 0
-                                ? (status?.message ?? "Nobody is on the list and nobody is playing.")
-                                : "Nobody matches that."
+                        onRemove={() =>
+                            void confirm({
+                                title: `Take ${entry.name} off the list?`,
+                                description:
+                                    "The running server is told at once. On a closed server they cannot join again until they are added back.",
+                                confirmLabel: "Remove",
+                                danger: true
+                            }).then((agreed) => {
+                                if (agreed)
+                                    run(() =>
+                                        actions.removeArkPlayerAction(installedAppId, entry.steamId)
+                                    );
+                            })
                         }
-                        rows={shown.map((entry) => (
-                            <ArkPlayerRow
-                                key={entry.steamId}
-                                entry={entry}
-                                live={status !== null}
-                                canModerate={canModerate}
-                                answering={answering}
-                                pending={pending}
-                                onAllow={() =>
-                                    run(() => actions.addArkPlayerAction(installedAppId, entry.steamId, entry.name))
-                                }
-                                onRemove={() =>
-                                    void confirm({
-                                        title: `Take ${entry.name} off the list?`,
-                                        description:
-                                            "The running server is told at once. On a closed server they cannot join again until they are added back.",
-                                        confirmLabel: "Remove",
-                                        danger: true
-                                    }).then((agreed) => {
-                                        if (agreed) run(() => actions.removeArkPlayerAction(installedAppId, entry.steamId));
-                                    })
-                                }
-                                onEdit={() => open("player", entry)}
-                                onMessage={() => open("message", entry)}
-                                onKick={() =>
-                                    void confirm({
-                                        title: `Throw ${entry.name} off?`,
-                                        description: "They are disconnected and can come straight back.",
-                                        confirmLabel: "Kick",
-                                        danger: true
-                                    }).then((agreed) => {
-                                        if (agreed) {
-                                            run(
-                                                () => actions.moderateArkPlayerAction(installedAppId, entry.steamId, "kick"),
-                                                `${entry.name} was thrown off.`
-                                            );
-                                        }
-                                    })
-                                }
-                                onBan={() =>
-                                    void confirm({
-                                        title: `Ban ${entry.name}?`,
-                                        description:
-                                            "They are disconnected and refused from now on, whatever the join list says.",
-                                        confirmLabel: "Ban",
-                                        danger: true
-                                    }).then((agreed) => {
-                                        if (agreed) {
-                                            run(
-                                                () => actions.moderateArkPlayerAction(installedAppId, entry.steamId, "ban"),
-                                                `${entry.name} is banned.`
-                                            );
-                                        }
-                                    })
-                                }
-                                onUnban={() =>
+                        onEdit={() => open("player", entry)}
+                        onMessage={() => open("message", entry)}
+                        onKick={() =>
+                            void confirm({
+                                title: `Throw ${entry.name} off?`,
+                                description: "They are disconnected and can come straight back.",
+                                confirmLabel: "Kick",
+                                danger: true
+                            }).then((agreed) => {
+                                if (agreed) {
                                     run(
-                                        () => actions.moderateArkPlayerAction(installedAppId, entry.steamId, "unban"),
-                                        `The ban on ${entry.name} is lifted.`
-                                    )
+                                        () =>
+                                            actions.moderateArkPlayerAction(
+                                                installedAppId,
+                                                entry.steamId,
+                                                "kick"
+                                            ),
+                                        `${entry.name} was thrown off.`
+                                    );
                                 }
-                            />
-                        ))}
+                            })
+                        }
+                        onBan={() =>
+                            void confirm({
+                                title: `Ban ${entry.name}?`,
+                                description:
+                                    "They are disconnected and refused from now on, whatever the join list says.",
+                                confirmLabel: "Ban",
+                                danger: true
+                            }).then((agreed) => {
+                                if (agreed) {
+                                    run(
+                                        () =>
+                                            actions.moderateArkPlayerAction(
+                                                installedAppId,
+                                                entry.steamId,
+                                                "ban"
+                                            ),
+                                        `${entry.name} is banned.`
+                                    );
+                                }
+                            })
+                        }
+                        onUnban={() =>
+                            run(
+                                () =>
+                                    actions.moderateArkPlayerAction(
+                                        installedAppId,
+                                        entry.steamId,
+                                        "unban"
+                                    ),
+                                `The ban on ${entry.name} is lifted.`
+                            )
+                        }
                     />
+                ))}
+            />
 
-                    <p className="text-xs text-muted-foreground">
-                        Teleporting to a player is not possible from here: ARK moves players relative to an admin&apos;s
-                        own character, and Polaris talks to the server without one. In game, press Tab and use{" "}
-                        <code className="font-mono">enablecheats</code>, then{" "}
-                        <code className="font-mono">cheat TeleportToPlayer</code>.
-                    </p>
-                </CardBody>
-            </Card>
+            <p className="text-xs text-muted-foreground">
+                Teleporting to a player is not possible from here: ARK moves players relative to an
+                admin&apos;s own character, and Polaris talks to the server without one. In game,
+                press Tab and use <code className="font-mono">enablecheats</code>, then{" "}
+                <code className="font-mono">cheat TeleportToPlayer</code>.
+            </p>
 
             {acting?.dialog === "player" && (
                 <ArkPlayerDialog
@@ -955,7 +1040,12 @@ function PlayersTab({
                     onLookUp={(query) => actions.findArkPlayerByUserAction(installedAppId, query)}
                     onSave={(input) =>
                         runInDialog(
-                            () => actions.addArkPlayerAction(installedAppId, input.steamId, input.label),
+                            () =>
+                                actions.addArkPlayerAction(
+                                    installedAppId,
+                                    input.steamId,
+                                    input.label
+                                ),
                             target ? undefined : "Added. The server is told as soon as it answers."
                         )
                     }
@@ -969,7 +1059,12 @@ function PlayersTab({
                     onClose={() => setActing(null)}
                     onSend={(message) =>
                         runInDialog(
-                            () => actions.messageArkPlayerAction(installedAppId, target.steamId, message),
+                            () =>
+                                actions.messageArkPlayerAction(
+                                    installedAppId,
+                                    target.steamId,
+                                    message
+                                ),
                             `Sent to ${target.name}.`
                         )
                     }
@@ -989,7 +1084,7 @@ function PlayersTab({
  * everyone was carrying. It sits above the table because the people it reaches are
  * the rows underneath it.
  */
-function Broadcast({ installedAppId, answering }: { installedAppId: string; answering: boolean; }) {
+function Broadcast({ installedAppId, answering }: { installedAppId: string; answering: boolean }) {
     const [message, setMessage] = useState("");
     const [note, setNote] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -1025,13 +1120,22 @@ function Broadcast({ installedAppId, answering }: { installedAppId: string; answ
                     aria-label="Say something to everyone playing"
                     disabled={!answering}
                 />
-                <Button onClick={send} disabled={pending || !answering || message.trim().length === 0}>
-                    {pending ? <Loader2 className="size-4 animate-spin" /> : <Megaphone className="size-4" />}
+                <Button
+                    onClick={send}
+                    disabled={pending || !answering || message.trim().length === 0}
+                >
+                    {pending ? (
+                        <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                        <Megaphone className="size-4" />
+                    )}
                     Send
                 </Button>
             </div>
             <span className={cn("text-xs", error ? "text-danger" : "text-muted-foreground")}>
-                {error ?? note ?? (answering ? "Appears in everyone's chat." : "The server is not answering.")}
+                {error ??
+                    note ??
+                    (answering ? "Appears in everyone's chat." : "The server is not answering.")}
             </span>
         </div>
     );
@@ -1092,12 +1196,9 @@ function ArkPlayerRow({
                 <p className="truncate font-medium" title={entry.name}>
                     {entry.name}
                 </p>
-                <span className="block truncate text-xs text-muted-foreground md:hidden">{entry.steamId}</span>
-                {entry.addedAt && (
-                    <span className="hidden text-xs text-muted-foreground md:block">
-                        Added {new Date(entry.addedAt).toLocaleDateString()}
-                    </span>
-                )}
+                <span className="block truncate text-xs text-muted-foreground md:hidden">
+                    {entry.steamId}
+                </span>
             </td>
             <td className="hidden px-3 py-2 md:table-cell">
                 <div className="flex items-center gap-1">
@@ -1105,14 +1206,26 @@ function ArkPlayerRow({
                     <CopyButton value={entry.steamId} label={`the Steam id of ${entry.name}`} />
                 </div>
             </td>
+            {/* Badge and a smaller line under it, the shape the Minecraft table
+                uses. What the line says is what ARK actually knows: it reports who
+                is on right now and nothing about a minute ago, so there is no
+                "last seen" to show and the honest second line is when this row
+                joined the list. */}
             <td className="px-3 py-2">
-                {!read ? (
-                    <Skeleton className="h-5 w-16" />
-                ) : entry.online ? (
-                    <Badge variant="success">Playing</Badge>
-                ) : (
-                    <Badge>Offline</Badge>
-                )}
+                <div className="flex flex-col items-start gap-0.5">
+                    {!read ? (
+                        <Skeleton className="h-5 w-16" />
+                    ) : entry.online ? (
+                        <Badge variant="success">Playing</Badge>
+                    ) : (
+                        <Badge>Offline</Badge>
+                    )}
+                    {entry.addedAt && (
+                        <span className="text-xs text-muted-foreground">
+                            Added <RelativeTime iso={entry.addedAt} />
+                        </span>
+                    )}
+                </div>
             </td>
             <td className="px-3 py-2">
                 <div className="flex flex-wrap items-center gap-1">
@@ -1122,7 +1235,9 @@ function ArkPlayerRow({
                             <Clock className="size-3" /> waiting
                         </Badge>
                     )}
-                    {entry.standing === "not-allowed" && <Badge variant="warning">not on the list</Badge>}
+                    {entry.standing === "not-allowed" && (
+                        <Badge variant="warning">not on the list</Badge>
+                    )}
                 </div>
             </td>
             <td className="px-3 py-2">
@@ -1163,7 +1278,12 @@ function ArkPlayerRow({
                     {canModerate && (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button size="icon" variant="ghost" aria-label={`More for ${entry.name}`} title="More">
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    aria-label={`More for ${entry.name}`}
+                                    title="More"
+                                >
                                     <MoreHorizontal className="size-4" />
                                 </Button>
                             </DropdownMenuTrigger>
@@ -1173,7 +1293,23 @@ function ArkPlayerRow({
                                 <DropdownMenuItem disabled={pending} onSelect={onEdit}>
                                     <Pencil className="size-4" /> Edit name
                                 </DropdownMenuItem>
-                                <DropdownMenuItem disabled={!live || !entry.online} onSelect={onMessage}>
+                                {/* The id is a number, and the question behind it
+                                    is always "who is this" - which only Steam can
+                                    answer. Opening it here is the difference
+                                    between a moderator deciding and guessing. */}
+                                <DropdownMenuItem asChild>
+                                    <a
+                                        href={`https://steamcommunity.com/profiles/${entry.steamId}`}
+                                        target="_blank"
+                                        rel="noreferrer noopener"
+                                    >
+                                        <Eye className="size-4" /> Open their Steam profile
+                                    </a>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    disabled={!live || !entry.online}
+                                    onSelect={onMessage}
+                                >
                                     <MessageSquare className="size-4" /> Message them
                                 </DropdownMenuItem>
                                 {/* Offered to anybody, because ARK does not say who
@@ -1233,8 +1369,9 @@ function ClosedServerCard({
                     <span className="flex flex-col gap-0.5 text-sm">
                         <span className="font-medium">Only players on the list can join</span>
                         <span className="text-xs text-muted-foreground">
-                            On top of the join password. Off leaves the password as the only lock, and takes effect the
-                            next time the server starts. The list itself is on the Players screen.
+                            On top of the join password. Off leaves the password as the only lock,
+                            and takes effect the next time the server starts. The list itself is on
+                            the Players screen.
                         </span>
                     </span>
                     <Switch
@@ -1248,14 +1385,16 @@ function ClosedServerCard({
                     <span className="flex flex-col gap-0.5 text-sm">
                         <span className="font-medium">Record what happens in the game</span>
                         <span className="text-xs text-muted-foreground">
-                            The chat, and the admin commands somebody ran. ARK keeps none of it otherwise, so a command
-                            the server declined leaves nothing to read. Under Files, in
-                            server/ShooterGame/Saved/Logs.
+                            The chat, and the admin commands somebody ran. ARK keeps none of it
+                            otherwise, so a command the server declined leaves nothing to read.
+                            Under Files, in server/ShooterGame/Saved/Logs.
                         </span>
                     </span>
                     <Switch
                         checked={access?.logging ?? false}
-                        onChange={(on) => run(() => actions.setArkGameLogAction(installedAppId, on))}
+                        onChange={(on) =>
+                            run(() => actions.setArkGameLogAction(installedAppId, on))
+                        }
                         disabled={!canManage || pending || access === null}
                         aria-label="Record what happens in the game"
                     />
@@ -1265,8 +1404,17 @@ function ClosedServerCard({
     );
 }
 
-function PasswordCard({ installedAppId, canManage }: { installedAppId: string; canManage: boolean }) {
-    const [shown, setShown] = useState<{ joinPassword: string | null; adminPassword: string | null } | null>(null);
+function PasswordCard({
+    installedAppId,
+    canManage
+}: {
+    installedAppId: string;
+    canManage: boolean;
+}) {
+    const [shown, setShown] = useState<{
+        joinPassword: string | null;
+        adminPassword: string | null;
+    } | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
@@ -1278,7 +1426,10 @@ function PasswordCard({ installedAppId, canManage }: { installedAppId: string; c
                 setError(result.error);
                 return;
             }
-            setShown({ joinPassword: result.joinPassword ?? null, adminPassword: result.adminPassword ?? null });
+            setShown({
+                joinPassword: result.joinPassword ?? null,
+                adminPassword: result.adminPassword ?? null
+            });
         });
     }
 
@@ -1287,9 +1438,10 @@ function PasswordCard({ installedAppId, canManage }: { installedAppId: string; c
             <CardBody className="flex flex-col gap-3">
                 <p className="text-sm font-medium">Passwords</p>
                 <p className="text-sm text-muted-foreground">
-                    The join password is what players type to get in. The admin password is what you type after
-                    enablecheats in game, and Polaris minted it when the server was created - it is not a default
-                    anybody else knows. ARK takes neither of them longer than 32 characters.
+                    The join password is what players type to get in. The admin password is what you
+                    type after enablecheats in game, and Polaris minted it when the server was
+                    created - it is not a default anybody else knows. ARK takes neither of them
+                    longer than 32 characters.
                 </p>
 
                 {error && <p className="text-sm text-danger">{error}</p>}
@@ -1301,7 +1453,10 @@ function PasswordCard({ installedAppId, canManage }: { installedAppId: string; c
                             <dd className="flex items-center gap-1">
                                 <code className="font-mono">{shown.joinPassword ?? "-"}</code>
                                 {shown.joinPassword && (
-                                    <CopyButton value={shown.joinPassword} label="the join password" />
+                                    <CopyButton
+                                        value={shown.joinPassword}
+                                        label="the join password"
+                                    />
                                 )}
                             </dd>
                         </div>
@@ -1310,14 +1465,27 @@ function PasswordCard({ installedAppId, canManage }: { installedAppId: string; c
                             <dd className="flex items-center gap-1">
                                 <code className="font-mono">{shown.adminPassword ?? "-"}</code>
                                 {shown.adminPassword && (
-                                    <CopyButton value={shown.adminPassword} label="the admin password" />
+                                    <CopyButton
+                                        value={shown.adminPassword}
+                                        label="the admin password"
+                                    />
                                 )}
                             </dd>
                         </div>
                     </dl>
                 ) : (
-                    <Button size="sm" variant="secondary" onClick={reveal} disabled={pending} className="w-fit">
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Eye className="size-4" />}
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={reveal}
+                        disabled={pending}
+                        className="w-fit"
+                    >
+                        {pending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Eye className="size-4" />
+                        )}
                         Show the passwords
                     </Button>
                 )}
@@ -1327,13 +1495,17 @@ function PasswordCard({ installedAppId, canManage }: { installedAppId: string; c
                         <ChangePassword
                             label="New join password"
                             help="Players type this. Applied the next time the server starts."
-                            save={(value) => actions.setArkJoinPasswordAction(installedAppId, value)}
+                            save={(value) =>
+                                actions.setArkJoinPasswordAction(installedAppId, value)
+                            }
                             onSaved={() => setShown(null)}
                         />
                         <ChangePassword
                             label="New admin password"
                             help="Typed after enablecheats in game. Applied the next time the server starts."
-                            save={(value) => actions.setArkAdminPasswordAction(installedAppId, value)}
+                            save={(value) =>
+                                actions.setArkAdminPasswordAction(installedAppId, value)
+                            }
                             onSaved={() => setShown(null)}
                         />
                     </>
@@ -1398,7 +1570,11 @@ function ChangePassword({
                         size="icon"
                         variant="ghost"
                         onClick={() =>
-                            setValue(generateJoinPassword((size) => crypto.getRandomValues(new Uint8Array(size))))
+                            setValue(
+                                generateJoinPassword((size) =>
+                                    crypto.getRandomValues(new Uint8Array(size))
+                                )
+                            )
                         }
                         aria-label={`Generate a password for ${label.toLowerCase()}`}
                         title="Generate one"
@@ -1411,7 +1587,12 @@ function ChangePassword({
                     Change
                 </Button>
             </div>
-            <span className={cn("text-xs", error || invalid ? "text-danger" : "text-muted-foreground")}>
+            <span
+                className={cn(
+                    "text-xs",
+                    error || invalid ? "text-danger" : "text-muted-foreground"
+                )}
+            >
                 {error ?? (invalid ? JOIN_PASSWORD_HINT : (message ?? help))}
             </span>
         </div>

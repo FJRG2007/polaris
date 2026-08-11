@@ -36,6 +36,22 @@ export interface AccountInputProps {
     /** Set these two together to drive the field from state instead. */
     value?: string;
     onValueChange?: (value: string) => void;
+    /**
+     * The account behind a row somebody chose from the list.
+     *
+     * For a field that does something with the person rather than only storing
+     * what they are called - looking up the game account they linked, offering
+     * the addresses they sign in from. A name that was typed rather than chosen
+     * never fires this, because nothing has said which account it is.
+     */
+    onPick?: (account: AccountCandidate) => void;
+    /**
+     * Enter pressed with no list open.
+     *
+     * The field sits in a form, so Enter would submit it. A caller that acts on
+     * what was typed - the name nobody picked off the list - is told here instead.
+     */
+    onEnter?: () => void;
     placeholder?: string;
     /** Several accounts in one field, separated by commas. */
     multiple?: boolean;
@@ -72,6 +88,8 @@ export function AccountInput({
     defaultValue,
     value,
     onValueChange,
+    onPick,
+    onEnter,
     placeholder,
     multiple = false,
     autoFocus = false,
@@ -162,6 +180,8 @@ export function AccountInput({
         // A controlled field has not been given the new value yet, so moving the
         // caret is left until React has written it.
         if (!onValueChange) node.setSelectionRange(caret, caret);
+        // Last, so whatever this starts sees the field already holding the name.
+        onPick?.(account);
     }
 
     function onKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
@@ -170,7 +190,15 @@ export function AccountInput({
             setOpen(false);
             return;
         }
-        if (!open || results.length === 0) return;
+        if (!open || results.length === 0) {
+            // Nothing to take off a list that is not there, so Enter belongs to
+            // whoever is listening for it - and to the form otherwise.
+            if (event.key === "Enter" && onEnter) {
+                event.preventDefault();
+                onEnter();
+            }
+            return;
+        }
         if (event.key === "ArrowDown") {
             event.preventDefault();
             setActive((current) => (current + 1) % results.length);

@@ -15,9 +15,10 @@
  */
 
 import { Button, Input } from "@polaris/ui";
-import { Loader2, UserSearch } from "lucide-react";
 import { useState, useTransition } from "react";
 import { isSteamId } from "@/lib/apps/ark/access";
+import { Loader2, UserSearch } from "lucide-react";
+import { AccountInput } from "@/components/account-input";
 import type { ArkAllowedPlayer } from "@/lib/apps/ark/access";
 import { PlayerFormDialog, PlayerFormField } from "@/components/player-form-dialog";
 
@@ -39,8 +40,11 @@ export function ArkPlayerDialog({
     onClose: () => void;
     onSave: (input: { steamId: string; label: string }) => void;
     /** Find somebody by their Polaris name and hand back the Steam account they
-     *  linked. Absent on a screen where nobody may look people up. */
-    onLookUp?: (query: string) => Promise<{ steamId?: string; name?: string; error?: string }>;
+     *  linked - its id, and the name they play under on it. Absent on a screen
+     *  where nobody may look people up. */
+    onLookUp?: (
+        query: string
+    ) => Promise<{ steamId?: string; name?: string; label?: string; error?: string }>;
 }) {
     const editing = player !== null;
     const [steamId, setSteamId] = useState(player?.steamId ?? "");
@@ -58,18 +62,21 @@ export function ArkPlayerDialog({
 
     /** Fill both fields in from a Polaris account, so the id is never retyped by
      *  hand from a chat message. */
-    function lookUp(): void {
-        if (!onLookUp || person.trim().length === 0) return;
+    function lookUp(query: string): void {
+        const identifier = query.trim();
+        if (!onLookUp || identifier.length === 0) return;
         setLookUpError(null);
         startLooking(async () => {
-            const found = await onLookUp(person.trim());
+            const found = await onLookUp(identifier);
             if (found.error || !found.steamId) {
                 setLookUpError(found.error ?? "Could not look that up");
                 return;
             }
             setSteamId(found.steamId);
-            if (found.name) setLabel(found.name);
-            setPerson("");
+            // The name on their Steam account, which is what ARK knows them as.
+            // Their Polaris name is somebody else's word for the same person and
+            // would leave the list disagreeing with the server.
+            if (found.label) setLabel(found.label);
         });
     }
 
@@ -92,18 +99,19 @@ export function ArkPlayerDialog({
                 <PlayerFormField
                     label="Somebody with a Polaris account"
                     error={lookUpError}
-                    hint="Their username or email address. If they have linked Steam, their id fills itself in."
+                    hint="If they have linked Steam, their id and the name they play under fill themselves in."
                 >
                     <div className="flex items-center gap-1">
-                        <Input
+                        <AccountInput
                             autoFocus
                             value={person}
-                            onChange={(event) => setPerson(event.target.value)}
-                            onKeyDown={(event) => {
-                                if (event.key !== "Enter") return;
-                                event.preventDefault();
-                                lookUp();
-                            }}
+                            onValueChange={setPerson}
+                            // Choosing somebody off the list is the whole errand,
+                            // so it is not also worth a button press. Typing a name
+                            // nobody picked still is, which is what Enter and the
+                            // button beside it are for.
+                            onPick={(account) => lookUp(account.username || account.email)}
+                            onEnter={() => lookUp(person)}
                             placeholder="pau, or pau@example.com"
                             aria-label="Polaris username or email address"
                         />
@@ -111,7 +119,7 @@ export function ArkPlayerDialog({
                             type="button"
                             size="icon"
                             variant="ghost"
-                            onClick={lookUp}
+                            onClick={() => lookUp(person)}
                             disabled={looking || person.trim().length === 0}
                             aria-label="Find their Steam account"
                             title="Find their Steam account"
@@ -137,12 +145,15 @@ export function ArkPlayerDialog({
                     aria-label="Steam id"
                 />
             </PlayerFormField>
-            <PlayerFormField label="Name" hint="What to call them in the list. Only Polaris sees it.">
+            <PlayerFormField
+                label="Name"
+                hint="The name they play under on Steam. Only Polaris sees it - the server shows whoever is on."
+            >
                 <Input
                     autoFocus={editing}
                     value={label}
                     onChange={(event) => setLabel(event.target.value)}
-                    placeholder="Who this is"
+                    placeholder="Their Steam name"
                     maxLength={48}
                     aria-label="Name"
                 />

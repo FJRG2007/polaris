@@ -221,6 +221,29 @@ export async function listUserSessions(
 }
 
 /**
+ * The addresses an account is signed in from right now, newest session first and
+ * each one only once.
+ *
+ * For the fields that ask which address somebody connects from. The operator
+ * filling one in is not sitting on that person's line, so the alternative is
+ * asking them over chat and retyping it - while the account itself has already
+ * told Polaris where it reaches this dashboard from.
+ *
+ * A suggestion and never more than one: where somebody reads the dashboard is
+ * usually where they play, and the field it fills stays editable for when it is
+ * not.
+ */
+export async function userSessionAddresses(userId: string): Promise<string[]> {
+    const rows = await liveSessionRows(userId);
+    const addresses = new Set<string>();
+    for (const row of rows) {
+        const ip = row.state?.ip ?? row.ipAddress;
+        if (ip) addresses.add(ip);
+    }
+    return [...addresses];
+}
+
+/**
  * How one session proved who it was, for the code that has to hand that on.
  *
  * Arming or dropping an authenticator replaces the session it was done from, and

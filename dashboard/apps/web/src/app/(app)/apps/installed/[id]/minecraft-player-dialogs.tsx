@@ -17,13 +17,14 @@
 
 import * as actions from "./minecraft-actions";
 import { CopyButton } from "@/components/copy-button";
-import { PlayerFormDialog, PlayerFormField } from "@/components/player-form-dialog";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { AccountInput } from "@/components/account-input";
 import { InventoryEditor } from "./minecraft-inventory-editor";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/minecraft/timeout";
-import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
 import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
+import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
+import { PlayerFormDialog, PlayerFormField } from "@/components/player-form-dialog";
 import { Loader2, Locate, MapPin, RefreshCw, TriangleAlert, UserSearch, X } from "lucide-react";
 import { dimensionLabel, formatCoordinates, type PlayerPosition } from "@/lib/apps/minecraft/position";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
@@ -500,8 +501,11 @@ export function PlayerAccessDialog({
     onSave: (input: { username: string; address: string; note: string }) => void;
     onRemoveAddress?: (address: string) => void;
     /** Find somebody by their Polaris name and hand back the Minecraft username
-     *  they linked. Absent on a screen where nobody may look people up. */
-    onLookUp?: (query: string) => Promise<{ username?: string; name?: string; error?: string }>;
+     *  they linked, plus the addresses their account is signed in from. Absent on
+     *  a screen where nobody may look people up. */
+    onLookUp?: (
+        query: string
+    ) => Promise<{ username?: string; name?: string; addresses?: string[]; error?: string }>;
 }) {
     const editing = player !== null;
     const [username, setUsername] = useState(player?.username ?? "");
@@ -512,25 +516,38 @@ export function PlayerAccessDialog({
     const [person, setPerson] = useState("");
     const [lookUpError, setLookUpError] = useState<string | null>(null);
     const [looking, startLooking] = useTransition();
+    /** Where that account signs in from, offered under the address field. */
+    const [suggested, setSuggested] = useState<readonly string[]>([]);
 
     /** Fill the name in from a Polaris account, spelled the way Mojang spells it. */
-    function lookUp(): void {
-        if (!onLookUp || person.trim().length === 0) return;
+    function lookUp(query: string): void {
+        const identifier = query.trim();
+        if (!onLookUp || identifier.length === 0) return;
         setLookUpError(null);
         startLooking(async () => {
-            const found = await onLookUp(person.trim());
+            const found = await onLookUp(identifier);
             if (found.error || !found.username) {
                 setLookUpError(found.error ?? "Could not look that up");
+                setSuggested([]);
                 return;
             }
             setUsername(found.username);
             if (found.name && note.trim().length === 0) setNote(found.name);
-            setPerson("");
+            setSuggested(found.addresses ?? []);
+            // The common case is one address, and making somebody click it when
+            // it is the only answer is a step that decides nothing. More than one
+            // is a real choice, so it is left to them.
+            if (found.addresses?.length === 1 && address.trim().length === 0) {
+                setAddress(found.addresses[0] as string);
+            }
         });
     }
 
     const name = username.trim();
     const rule = address.trim();
+    // Only the addresses that would change something: one already in the field,
+    // or already registered to this player, is not an offer.
+    const offer = suggested.filter((known) => known !== rule && !(player?.addresses ?? []).includes(known));
     const nameInvalid = name.length > 0 && !isPlayerName(edition, name);
     const addressInvalid = rule.length > 0 && !isAddressRule(rule);
     // Editing without touching the address is how a note is changed; the note is
@@ -577,18 +594,18 @@ export function PlayerAccessDialog({
                 <PlayerFormField
                     label="Somebody with a Polaris account"
                     error={lookUpError}
-                    hint="Their username or email address. If they have linked Minecraft, their name fills itself in."
+                    hint="If they have linked Minecraft, their name and the addresses they connect from fill themselves in."
                 >
                     <div className="flex items-center gap-1">
-                        <Input
+                        <AccountInput
                             autoFocus
                             value={person}
-                            onChange={(event) => setPerson(event.target.value)}
-                            onKeyDown={(event) => {
-                                if (event.key !== "Enter") return;
-                                event.preventDefault();
-                                lookUp();
-                            }}
+                            onValueChange={setPerson}
+                            // Choosing somebody off the list is the errand, so it
+                            // is not also worth a button press. A name that was
+                            // typed rather than picked still is.
+                            onPick={(account) => lookUp(account.username || account.email)}
+                            onEnter={() => lookUp(person)}
                             placeholder="pau, or pau@example.com"
                             aria-label="Polaris username or email address"
                         />
@@ -596,7 +613,7 @@ export function PlayerAccessDialog({
                             type="button"
                             size="icon"
                             variant="ghost"
-                            onClick={lookUp}
+                            onClick={() => lookUp(person)}
                             disabled={looking || person.trim().length === 0}
                             aria-label="Find their Minecraft account"
                             title="Find their Minecraft account"
@@ -679,6 +696,24 @@ export function PlayerAccessDialog({
                         {detecting ? <Loader2 className="size-4 animate-spin" /> : <Locate className="size-4" />}
                     </Button>
                 </div>
+                {/* Where that account signs in to Polaris from. The operator doing
+                    this is on their own line, so the detect button beside the
+                    field is the wrong address for everybody but themselves. */}
+                {offer.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1 pt-1">
+                        <span className="text-xs text-muted-foreground">They sign in from</span>
+                        {offer.map((known) => (
+                            <button
+                                key={known}
+                                type="button"
+                                className="rounded-md border border-border px-2 py-0.5 font-mono text-xs hover:bg-muted"
+                                onClick={() => setAddress(known)}
+                            >
+                                {known}
+                            </button>
+                        ))}
+                    </div>
+                )}
             </PlayerFormField>
 
             <PlayerFormField label="Note" hint="Who this is, for whoever reads the list next. Only Polaris sees it.">

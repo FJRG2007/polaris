@@ -15,6 +15,7 @@
 
 import { requireUser } from "@/lib/session";
 import { resourceAccess } from "@/lib/resource-access";
+import { gameOfServer } from "@/lib/apps/games-catalog";
 import { getInstalledApp } from "@/lib/apps/install-service";
 import { gamePermissionsFor, installRef } from "@/lib/apps/install-access";
 import { GAME_TABS, visibleGameTabs } from "@/app/(app)/apps/installed/[id]/tabs";
@@ -35,9 +36,14 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     if (!app) return Response.json({ error: "Not found" }, { status: 404 });
 
     // Only a game server has screens of its own. Everything else is its shell.
-    const isGame = app.catalogId.startsWith("minecraft") && app.catalogId !== "minecraft-manager";
-    const held = isGame ? await gamePermissionsFor(user, id) : [];
-    const tabs = isGame ? visibleGameTabs(held).map((tab) => tab.slug) : [];
+    // Asked of the catalog rather than of the id's spelling: every game after the
+    // first one has its own prefix, and a rail that matched on "minecraft" left an
+    // ARK server showing the Apps rail while its own screens existed.
+    const game = gameOfServer(app.catalogId);
+    const held = game ? await gamePermissionsFor(user, id) : [];
+    // Narrowed to the game as well as to the reader. A screen this game has
+    // nothing behind opens on an error, which is worse than not being offered.
+    const tabs = game ? visibleGameTabs(held, game.id).map((tab) => tab.slug) : [];
     return Response.json({
         name: app.name,
         // Ordered as the tab bar has them, whatever order the grants came back in.

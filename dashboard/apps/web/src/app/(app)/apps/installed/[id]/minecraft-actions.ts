@@ -13,7 +13,6 @@ import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { clientIp } from "@/lib/request-context";
 import { recordAudit } from "@/lib/audit-service";
-import { findGameIdentity } from "@/lib/apps/game-identity";
 import { setEnvVars } from "@/lib/env-var-service";
 import { requirePermissionAny } from "@/lib/session";
 import { runArkCommand } from "@/lib/apps/ark/service";
@@ -21,9 +20,12 @@ import { gameOfServer } from "@/lib/apps/games-catalog";
 import { deployApplication } from "@/lib/deploy-service";
 import { applyWorldSchedule } from "@/lib/backups/manage";
 import { DIFFICULTIES } from "@/lib/apps/minecraft/rules";
+import { findGameIdentity } from "@/lib/apps/game-identity";
+import { isAddressRule } from "@/lib/apps/minecraft/access";
 import { ITEM_ID_PATTERN } from "@/lib/apps/minecraft/items";
 import { stripFormatting } from "@/lib/apps/minecraft/parse";
 import { requireGameServer } from "@/lib/apps/install-access";
+import { userSessionAddresses } from "@/lib/session-directory";
 import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import { setGameHostname } from "@/lib/apps/minecraft/address";
 import { patchInstallConfig } from "@/lib/apps/install-config";
@@ -593,11 +595,15 @@ export async function grantPlayerAccessAction(input: PlayerAccessInput): Promise
  *
  * Three answers, because the screen has three things to say: a name ready to add,
  * a person here who has linked nothing, and a name that is nobody.
+ *
+ * The addresses they are signed in from come back with it. The list needs one and
+ * the operator filling it in is not on that person's line, so the choice is
+ * between offering what the account already says and asking them over chat.
  */
 export async function findMinecraftPlayerByUserAction(
     installedAppId: string,
     query: string
-): Promise<{ username?: string; name?: string; error?: string }> {
+): Promise<{ username?: string; name?: string; addresses?: string[]; error?: string }> {
     const parsed = z.string().trim().min(1).max(120).safeParse(query);
     if (!parsed.success) return { error: "Type a Polaris username or email address" };
     try {
@@ -609,7 +615,10 @@ export async function findMinecraftPlayerByUserAction(
                 error: `${found.name} has not linked a Minecraft account yet. They can do it under Connected accounts.`
             };
         }
-        return { username: found.identity.label, name: found.name };
+        // Only the ones a rule can be written against. A session that arrived
+        // over something this build cannot parse is not an address to offer.
+        const addresses = (await userSessionAddresses(found.userId)).filter(isAddressRule);
+        return { username: found.identity.label, name: found.name, addresses };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not look that up" };
     }
