@@ -29,21 +29,23 @@ import { auth } from "@/lib/auth";
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/session";
+import { markConnectionProven } from "./proven";
 import { clientIp } from "@/lib/request-context";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { requestOrigin } from "@/lib/domain-service";
 import { findConnectionProvider } from "@polaris/core";
 import { signInWithConnection, type ConnectionSignInResult } from "@polaris/auth";
 import { readSteamPersona, steamAuthorizeUrl, STEAM_PROVIDER, verifySteamReturn } from "./steam";
-import { ConnectionClaimedError, ConnectionLimitError, connectionSignInAllowed, saveConnection, signInConnection } from "./store";
+import { ConnectionClaimedError, ConnectionLimitError, saveConnection, signInConnection } from "./store";
 import {
     connectionAuthorizeUrl,
     connectionCallbackUrl,
     connectionFlowOrigin,
     connectionIdentity,
+    connectionLinkAvailable,
     connectionOAuthClient,
-    exchangeConnectionCode,
-    supportsOAuth
+    connectionSignInOffered,
+    exchangeConnectionCode
 } from "./oauth";
 
 const STATE_COOKIE = "polaris_connection_state";
@@ -225,9 +227,12 @@ function beginSteam(origin: string, mode: ConnectionMode, target?: string): Resp
  * calendar is never shown a consent screen asking to reach their files.
  */
 export async function startConnectionLink(request: Request, provider: string): Promise<Response> {
-    await requireUser();
+    const user = await requireUser();
     const url = new URL(request.url);
-    if (!findConnectionProvider(provider)) {
+    // Refused here and not only on the card that offers it: the card is a link, and
+    // a link is something anybody can type. Administrators pass while the service is
+    // unproven because somebody has to be the first one through it.
+    if (!findConnectionProvider(provider) || !(await connectionLinkAvailable(provider, { admin: user.isAdmin }))) {
         return NextResponse.redirect(backToConnections(await connectionFlowOrigin(), provider, "unavailable"));
     }
     return begin(request, provider, url.searchParams.get("scope") === "storage" ? "storage" : "link");
@@ -243,7 +248,7 @@ export async function startConnectionLink(request: Request, provider: string): P
  */
 export async function startConnectionSignIn(request: Request, provider: string): Promise<Response> {
     const url = new URL(request.url);
-    if (!supportsOAuth(provider) || !(await connectionSignInAllowed(provider))) {
+    if (!(await connectionSignInOffered(provider))) {
         return NextResponse.redirect(backToLogin(await connectionFlowOrigin(), provider, "unavailable"));
     }
     const throttle = await rateLimit(`connection-signin:${(await clientIp()) ?? "unknown"}`, SIGN_IN_LIMIT, SIGN_IN_WINDOW_MS);
@@ -347,6 +352,10 @@ async function finishLink(origin: string, provider: string, code: string): Promi
             email: authorized.email,
             credential: authorized.credential
         });
+        // The one thing that settles whether this application works, and the only
+        // moment it can be observed: the provider took somebody all the way through
+        // and handed back an account. From here the service is offered to everybody.
+        await markConnectionProven(provider);
         return endLink(origin, provider, "linked");
     } catch (caught) {
         // The two refusals somebody can actually do something about are named;
@@ -374,7 +383,7 @@ async function finishSignIn(
     code: string,
     target: string | undefined
 ): Promise<Response> {
-    if (!(await connectionSignInAllowed(provider))) return endSignIn(origin, provider, "unavailable");
+    if (!(await connectionSignInOffered(provider))) return endSignIn(origin, provider, "unavailable");
 
     const client = await connectionOAuthClient(provider);
     if (!client) return endSignIn(origin, provider, "unavailable");

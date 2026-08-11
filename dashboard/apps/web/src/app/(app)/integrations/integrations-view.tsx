@@ -99,6 +99,10 @@ export interface IntegrationCard {
     oauthCallbackUrl?: string;
     /** GitHub and the OAuth apps: how many accounts one person may connect. */
     accountLimit?: number;
+    /** The services somebody links an account of: whether one authorization has
+     *  completed here. Until it has, only administrators are offered the service.
+     *  Undefined where there is no application to prove. */
+    proven?: boolean;
     /** Where the vendor makes the credential this dialog is asking for. */
     setupLinks?: readonly IntegrationSetupLink[];
     /** The gateway's endpoint settings. Set for that card only. */
@@ -196,6 +200,54 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
                 <ConfigureDialog card={configuring} onClose={closeDialog} />
             ) : null}
         </>
+    );
+}
+
+/**
+ * Whether this application has ever taken somebody through, and the way to find
+ * out when it has not.
+ *
+ * Credentials that save are not a service that works, and the two are
+ * indistinguishable from this screen: the client id and secret can be a genuine
+ * pair, the redirect URI registered exactly right, and the provider still refuse
+ * everybody - a Google client left in Testing blocks every account that is not on
+ * its test-user list, and says so on its own error page, in a console the person
+ * who hit it cannot open.
+ *
+ * So nobody else is offered the service until one authorization has completed
+ * here. The button is the check: it is the ordinary Connect flow, run by the one
+ * person who can fix what it hits.
+ */
+function ProvenState({ slug, name, proven }: { slug: string; name: string; proven: boolean }) {
+    if (proven) {
+        return (
+            <p className="flex items-start gap-2 rounded-md border border-border p-3 text-xs text-muted-foreground">
+                <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" />
+                An account has been connected through this application, so everybody here is offered it.
+            </p>
+        );
+    }
+    return (
+        <div className="flex flex-col gap-2 rounded-md border border-warning/40 bg-warning/5 p-3 text-sm">
+            <span className="flex items-start gap-2">
+                <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+                <span>
+                    <span className="font-medium">Not proven yet</span>
+                    <span className="block text-xs text-muted-foreground">
+                        Nobody else can connect {name} or sign in with it until one authorization has gone through
+                        here. Connect your own account to check it - whatever {name} refuses, you are the one who can
+                        change it.
+                    </span>
+                </span>
+            </span>
+            <a
+                href={`/api/connections/${slug}/link`}
+                className="inline-flex w-fit items-center gap-1 text-sm font-medium text-primary hover:underline"
+            >
+                Connect my {name} account
+                <ExternalLink className="size-3 shrink-0" />
+            </a>
+        </div>
     );
 }
 
@@ -815,6 +867,10 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
                     </label>
 
                     <AccountLimitField slug={card.slug} current={card.accountLimit ?? 1} />
+
+                    {card.hasSecret && card.proven !== undefined ? (
+                        <ProvenState slug={card.slug} name={app.name} proven={card.proven} />
+                    ) : null}
 
                     {card.signInAllowed === undefined ? null : (
                         <SignInSwitch
@@ -1559,6 +1615,12 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                     <RunnerAccessNote card={card} />
 
                     <AccountLimitField slug="github" current={card.accountLimit ?? 1} />
+
+                    {/* Only the App method can authorize a person at all; a token
+                        connection has nobody to take through. */}
+                    {isApp && card.proven !== undefined ? (
+                        <ProvenState slug="github" name="GitHub" proven={card.proven} />
+                    ) : null}
 
                     {card.signInAllowed === undefined ? null : (
                         <SignInSwitch

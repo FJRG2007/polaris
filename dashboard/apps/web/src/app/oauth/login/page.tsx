@@ -2,15 +2,17 @@ import { redirect } from "next/navigation";
 import { hasAnyUser } from "@polaris/auth";
 import { CONNECTION_PROVIDERS } from "@polaris/core";
 import { LoginForm, type SignInProvider } from "./login-form";
-import { connectionSignInAllowed } from "@/lib/connections/store";
+import { connectionSignInOffered } from "@/lib/connections/oauth";
 import { pendingTwoFactorUserId } from "@/lib/two-factor-challenge";
-import { connectionOAuthClient, supportsOAuth } from "@/lib/connections/oauth";
 
 export const dynamic = "force-dynamic";
 
 /**
- * The outside services this deployment can sign somebody in with right now:
- * the operator allows them, and there is an application to authorize against.
+ * The outside services this deployment can sign somebody in with right now: the
+ * operator allows them, there is an application to authorize against, and that
+ * application has taken somebody through at least once - a button that leads to a
+ * consent screen refusing everybody reads as "your account is not welcome here"
+ * rather than as a setup nobody finished.
  *
  * Says nothing about any account. A button appears for a service the deployment
  * supports whether or not the person at the screen has one - a list that shrank
@@ -18,14 +20,9 @@ export const dynamic = "force-dynamic";
  */
 async function signInProviders(): Promise<SignInProvider[]> {
     const offered = await Promise.all(
-        CONNECTION_PROVIDERS.map(async (provider): Promise<SignInProvider | null> => {
-            if (!supportsOAuth(provider.slug)) return null;
-            const [allowed, client] = await Promise.all([
-                connectionSignInAllowed(provider.slug),
-                connectionOAuthClient(provider.slug)
-            ]);
-            return allowed && client ? { slug: provider.slug, name: provider.name } : null;
-        })
+        CONNECTION_PROVIDERS.map(async (provider): Promise<SignInProvider | null> =>
+            (await connectionSignInOffered(provider.slug)) ? { slug: provider.slug, name: provider.name } : null
+        )
     );
     return offered.filter((provider): provider is SignInProvider => provider !== null);
 }

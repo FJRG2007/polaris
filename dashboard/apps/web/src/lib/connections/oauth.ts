@@ -15,7 +15,9 @@
  */
 
 import { STEAM_PROVIDER } from "./steam";
+import { connectionProven } from "./proven";
 import { appBaseUrl } from "@/lib/domain-service";
+import { connectionSignInAllowed } from "./store";
 import type { ConnectionCredential } from "./store";
 import { findConnectionProvider } from "@polaris/core";
 import { getIntegrationState } from "@/lib/integration-service";
@@ -209,15 +211,33 @@ export function supportsOAuth(provider: string): boolean {
 /**
  * Whether somebody can be sent to this provider right now.
  *
- * Two different answers, because two different things are missing. An OAuth
+ * Three different answers, because three different things are missing. An OAuth
  * provider needs the application the operator registered - without it there is
- * nowhere to send anybody. Steam needs no application at all: it proves an
- * account over OpenID, so all that decides it is whether the operator has
- * switched the service on.
+ * nowhere to send anybody. It also needs one authorization to have completed here,
+ * because credentials that parse are not a service that works and the provider is
+ * the only thing that can say which it is; until then the trip is open to
+ * administrators alone, who are the ones able to fix what it hits. Steam needs
+ * neither: it proves an account over OpenID, so all that decides it is whether the
+ * operator has switched the service on.
  */
-export async function connectionLinkAvailable(provider: string): Promise<boolean> {
+export async function connectionLinkAvailable(provider: string, options?: { admin?: boolean }): Promise<boolean> {
     if (provider === STEAM_PROVIDER) return (await getIntegrationState(STEAM_PROVIDER))?.enabled === true;
-    return supportsOAuth(provider) && (await connectionOAuthClient(provider)) !== null;
+    if (!supportsOAuth(provider) || (await connectionOAuthClient(provider)) === null) return false;
+    return options?.admin === true || (await connectionProven(provider));
+}
+
+/**
+ * Whether this service may be offered as a way in, right now.
+ *
+ * Both halves: the operator allows it, and it has an application that has been
+ * shown to work. A button that sends somebody to a consent screen refusing
+ * everybody is worse than no button - they cannot tell a broken deployment from
+ * an account of theirs that is not welcome here.
+ */
+export async function connectionSignInOffered(provider: string): Promise<boolean> {
+    if (!supportsOAuth(provider)) return false;
+    const [allowed, client] = await Promise.all([connectionSignInAllowed(provider), connectionOAuthClient(provider)]);
+    return allowed && client !== null && (await connectionProven(provider));
 }
 
 /** Steam is not in the adapter table - it has no code to exchange - so the one

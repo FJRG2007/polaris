@@ -7,6 +7,7 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/session";
 import { getGithubStatus } from "@/lib/github-service";
 import { getRunnerAccess } from "@/lib/github-runners";
+import { connectionProven } from "@/lib/connections/proven";
 import { listIntegrationStates } from "@/lib/integration-service";
 import { readCriminalIpConfig } from "@/lib/integrations/criminalip";
 import { getDomainConfig, publicAppUrl } from "@/lib/domain-service";
@@ -28,6 +29,15 @@ async function signInAllowances(): Promise<Map<string, boolean>> {
     return new Map(entries);
 }
 
+/** Whether each service has ever taken somebody all the way through here. Until it
+ *  has, it is offered to nobody but an administrator, and the dialog says so. */
+async function provenApplications(): Promise<Map<string, boolean>> {
+    const entries = await Promise.all(
+        CONNECTION_PROVIDERS.map(async (provider) => [provider.slug, await connectionProven(provider.slug)] as const)
+    );
+    return new Map(entries);
+}
+
 /** The services whose card configures an OAuth application the operator
  *  registers. Kept beside the page because it decides which cards get a client
  *  id, a redirect URI and an account limit. */
@@ -38,7 +48,7 @@ export default async function IntegrationsPage() {
     // Three of these reach outside the box (GitHub twice, Cloudflare once), so
     // they are awaited together rather than one after another - in sequence the
     // page took as long as all of them added up.
-    const [states, github, domains, cloudflare, baseUrl, publicUrl, githubLimit, oauthLimits, signIn] = await Promise.all([
+    const [states, github, domains, cloudflare, baseUrl, publicUrl, githubLimit, oauthLimits, signIn, proven] = await Promise.all([
         listIntegrationStates(),
         getGithubStatus(),
         // DuckDNS config lives with the domain settings (Setting keys), not an Integration row.
@@ -61,7 +71,8 @@ export default async function IntegrationsPage() {
         Promise.all(OAUTH_APP_SLUGS.map(async (slug) => [slug, await connectionLimit(slug)] as const)),
         // Whether each of those services may sign anybody in here. Resolved for
         // every provider at once so the card mapping below stays synchronous.
-        signInAllowances()
+        signInAllowances(),
+        provenApplications()
     ]);
     const accountLimits = new Map(oauthLimits);
     // Whether that connection can also register self-hosted runners. Neither
@@ -119,6 +130,10 @@ export default async function IntegrationsPage() {
             oauthCallbackUrl: OAUTH_APP_SLUGS.includes(entry.slug)
                 ? connectionCallbackUrl(entry.slug, baseUrl)
                 : undefined,
+            // Whether anybody has been taken through this application yet. Set for
+            // the services somebody links an account of, and only where there is
+            // an application to prove - Steam has none.
+            proven: connection && entry.slug !== "steam" ? proven.get(entry.slug) ?? false : undefined,
             accountLimit:
                 entry.slug === "github"
                     ? githubLimit

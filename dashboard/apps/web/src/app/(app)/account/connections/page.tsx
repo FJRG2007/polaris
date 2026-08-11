@@ -33,9 +33,11 @@ export default async function ConnectionsPage() {
             requires: provider.requires,
             limit: await connectionLimit(provider.slug),
             // Whether the operator has connected the application this authorizes
-            // against. Without one there is no screen to send anybody to, so the
-            // card says what to ask for instead of offering a button that fails.
-            canAuthorize: await connectionLinkAvailable(provider.slug),
+            // against, and whether it has been shown to work. Without either there
+            // is no screen worth sending anybody to, so the card says what to ask
+            // for instead of offering a button that fails. An administrator is
+            // offered it anyway: theirs is the authorization that proves it.
+            canAuthorize: await connectionLinkAvailable(provider.slug, { admin: user.isAdmin }),
             // Whether the operator allows this service as a way in. Without it,
             // the card says nothing about signing in rather than pointing at a
             // switch that would do nothing.

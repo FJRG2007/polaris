@@ -27,7 +27,8 @@ const BIND = "https://0.0.0.0:3000";
 const sent = { redirectUri: "", state: "" };
 
 vi.mock("@/lib/auth", () => ({ auth: {} }));
-vi.mock("@/lib/session", () => ({ requireUser: async () => ({ id: "user-1" }) }));
+vi.mock("@/lib/session", () => ({ requireUser: async () => ({ id: "user-1", isAdmin: true }) }));
+vi.mock("@/lib/connections/proven", () => ({ markConnectionProven: async () => undefined }));
 vi.mock("@/lib/request-context", () => ({ clientIp: async () => "203.0.113.7" }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true }) }));
 vi.mock("@polaris/auth", () => ({ signInWithConnection: async () => ({ challenged: false, cookies: [] }) }));
@@ -57,7 +58,8 @@ vi.mock("@/lib/connections/oauth", () => ({
     connectionFlowOrigin: async () => REGISTERED,
     connectionCallbackUrl: (provider: string, baseUrl: string) => `${baseUrl}/api/connections/${provider}/callback`,
     connectionOAuthClient: async () => ({ clientId: "client-id", clientSecret: "client-secret" }),
-    supportsOAuth: () => true,
+    connectionLinkAvailable: async () => true,
+    connectionSignInOffered: async () => true,
     connectionAuthorizeUrl: (_provider: string, _client: unknown, redirectUri: string, state: string) => {
         sent.redirectUri = redirectUri;
         sent.state = state;
