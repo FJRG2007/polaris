@@ -175,6 +175,18 @@ export interface ArkStatus extends ArkLive {
     /** Slots, from the setting rather than the running server, so a stopped one
      *  can still say what size it is. */
     readonly max: number | null;
+    /**
+     * The port a client connects on, and the port the server browser asks on.
+     *
+     * Both, because ARK is joined two ways and they take different numbers: the
+     * console's `open` wants the game port and Steam's server list wants the query
+     * port, and pasting one where the other belongs is answered with "server not
+     * found" rather than with anything that names the mistake. Read from what the
+     * server was actually launched with, not derived - a server whose ports were
+     * changed by hand would otherwise be described wrongly by arithmetic.
+     */
+    readonly gamePort: number | null;
+    readonly queryPort: number | null;
     readonly cpuPercent: number | null;
     readonly memUsedBytes: number | null;
     readonly memTotalBytes: number | null;
@@ -186,24 +198,33 @@ export async function getArkStatus(ownerId: string, installedAppId: string): Pro
         select: { applicationId: true }
     });
     const applicationId = install?.applicationId ?? null;
-    const [live, usage, app, slots] = await Promise.all([
+    const [live, usage, app, vars] = await Promise.all([
         getArkPlayers(ownerId, installedAppId),
         applicationId ? readAppContainerMetricsOrNull(applicationId, ownerId) : null,
         applicationId
             ? prisma.application.findFirst({ where: { id: applicationId }, select: { desiredState: true } })
             : null,
         applicationId
-            ? prisma.envVar.findFirst({
-                  where: { scopeType: "application", scopeId: applicationId, key: "MAX_PLAYERS" },
-                  select: { value: true }
+            ? prisma.envVar.findMany({
+                  where: {
+                      scopeType: "application",
+                      scopeId: applicationId,
+                      key: { in: ["MAX_PLAYERS", "GAME_CLIENT_PORT", "SERVER_LIST_PORT"] }
+                  },
+                  select: { key: true, value: true }
               })
-            : null
+            : []
     ]);
-    const max = Number.parseInt(slots?.value ?? "", 10);
+    const number = (key: string): number | null => {
+        const parsed = Number.parseInt(vars.find((row) => row.key === key)?.value ?? "", 10);
+        return Number.isFinite(parsed) ? parsed : null;
+    };
     return {
         ...live,
         running: app?.desiredState === "running",
-        max: Number.isFinite(max) ? max : null,
+        max: number("MAX_PLAYERS"),
+        gamePort: number("GAME_CLIENT_PORT"),
+        queryPort: number("SERVER_LIST_PORT"),
         cpuPercent: usage?.cpuPercent ?? null,
         memUsedBytes: usage?.memUsedBytes ?? null,
         memTotalBytes: usage?.memTotalBytes ?? null

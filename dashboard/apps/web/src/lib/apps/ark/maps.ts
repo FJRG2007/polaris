@@ -12,29 +12,49 @@
  * different setting (`SERVER_MAP_MOD_ID`), not another entry here.
  */
 
+/**
+ * What a player needs before they can join a server on this map.
+ *
+ * Three states rather than two, because "free" and "already installed" are not
+ * the same thing and treating them as one is worth an evening. Only The Island
+ * comes with the game. The rest are separate downloads, and a player who joins a
+ * server on one they have not installed is bounced back to the main menu while
+ * Steam opens on the store page - no message, nothing naming the map, and from
+ * the operator's side it looks exactly like a server that refuses connections.
+ */
+export type ArkMapRequirement = "base" | "free" | "paid";
+
 export interface ArkMap {
     /** The level name the server is launched with. Case sensitive. */
     readonly value: string;
     readonly label: string;
-    /** Whether it needs the DLC that ships it. A player without it cannot join,
-     *  which is worth saying before the world is generated rather than after. */
-    readonly dlc: boolean;
+    readonly requires: ArkMapRequirement;
 }
 
 export const ARK_MAPS: readonly ArkMap[] = [
-    { value: "TheIsland", label: "The Island", dlc: false },
-    { value: "TheCenter", label: "The Center", dlc: false },
-    { value: "Ragnarok", label: "Ragnarok", dlc: false },
-    { value: "Valguero_P", label: "Valguero", dlc: false },
-    { value: "CrystalIsles", label: "Crystal Isles", dlc: false },
-    { value: "LostIsland", label: "Lost Island", dlc: false },
-    { value: "Fjordur", label: "Fjordur", dlc: false },
-    { value: "ScorchedEarth_P", label: "Scorched Earth", dlc: true },
-    { value: "Aberration_P", label: "Aberration", dlc: true },
-    { value: "Extinction", label: "Extinction", dlc: true },
-    { value: "Genesis", label: "Genesis: Part 1", dlc: true },
-    { value: "Gen2", label: "Genesis: Part 2", dlc: true }
+    { value: "TheIsland", label: "The Island", requires: "base" },
+    { value: "TheCenter", label: "The Center", requires: "free" },
+    { value: "Ragnarok", label: "Ragnarok", requires: "free" },
+    { value: "Valguero_P", label: "Valguero", requires: "free" },
+    { value: "CrystalIsles", label: "Crystal Isles", requires: "free" },
+    { value: "LostIsland", label: "Lost Island", requires: "free" },
+    { value: "Fjordur", label: "Fjordur", requires: "free" },
+    { value: "ScorchedEarth_P", label: "Scorched Earth", requires: "paid" },
+    { value: "Aberration_P", label: "Aberration", requires: "paid" },
+    { value: "Extinction", label: "Extinction", requires: "paid" },
+    { value: "Genesis", label: "Genesis: Part 1", requires: "paid" },
+    { value: "Gen2", label: "Genesis: Part 2", requires: "paid" }
 ];
+
+/** What to tell somebody choosing this map, in the terms the player will meet it. */
+export function mapRequirementHint(map: ArkMap | undefined): string {
+    if (!map) return "";
+    if (map.requires === "paid") return "Only players who own that DLC can join.";
+    if (map.requires === "free") {
+        return "Free, but every player has to install it in Steam first - ARK sends them back to the menu otherwise.";
+    }
+    return "Comes with the game, so anybody can join.";
+}
 
 export const DEFAULT_ARK_MAP = "TheIsland";
 

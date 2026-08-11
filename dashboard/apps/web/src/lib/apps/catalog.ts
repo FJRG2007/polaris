@@ -649,7 +649,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     default: DEFAULT_ARK_MAP,
                     options: ARK_MAPS.map((map) => ({
                         value: map.value,
-                        label: map.dlc ? `${map.label} (needs the DLC)` : map.label
+                        label: map.requires === "base" ? map.label : `${map.label} (${map.requires === "paid" ? "needs the DLC" : "a separate free download"})`
                     })),
                     tunable: true,
                     group: "World"

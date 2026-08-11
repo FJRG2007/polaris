@@ -21,7 +21,7 @@
 import Link from "next/link";
 import { GameConsole } from "./game-console";
 import type { Permission } from "@polaris/core";
-import { findArkMap } from "@/lib/apps/ark/maps";
+import { findArkMap, mapRequirementHint } from "@/lib/apps/ark/maps";
 import type { GameContext } from "./game-context";
 import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
@@ -34,8 +34,8 @@ import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
-import { generateJoinPassword, isJoinPassword, isSteamId, JOIN_PASSWORD_HINT } from "@/lib/apps/ark/access";
 import { Badge, Button, Card, CardBody, Input, Skeleton, Switch, cn } from "@polaris/ui";
+import { generateJoinPassword, isJoinPassword, isSteamId, JOIN_PASSWORD_HINT } from "@/lib/apps/ark/access";
 import { Clock, Eye, FolderOpen, Loader2, RefreshCw, Save, ShieldAlert, Trash2, UserPlus } from "lucide-react";
 import {
     addArkPlayerAction,
@@ -301,25 +301,43 @@ function ConnectCard({
     return (
         <Card>
             <CardBody className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex min-w-0 flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">Server address</span>
+                <div className="flex min-w-0 flex-col gap-2">
                     {status === null ? (
-                        <Skeleton className="h-7 w-48" />
-                    ) : address ? (
-                        <div className="flex items-center gap-2">
-                            <code className="truncate font-mono text-lg" title={address}>
-                                {address}
-                            </code>
-                            <CopyButton value={address} label="Copy the server address" />
-                        </div>
-                    ) : (
+                        <Skeleton className="h-7 w-56" />
+                    ) : address === null ? (
                         <span className="text-sm text-muted-foreground">
                             Not published yet - the address appears once the server has deployed.
                         </span>
+                    ) : (
+                        <>
+                            {/* Two addresses, because ARK is joined two ways and each
+                                takes a different port. Showing only one was worth an
+                                evening: pasted into Steam, the connect address is
+                                answered with "server not found", which names neither
+                                the port nor the mistake. */}
+                            <JoinAddress
+                                title="Add in Steam, or the in-game browser"
+                                value={withPort(address, status.queryPort)}
+                                detail="Steam, View, Servers, Favourites, +. It appears in ARK under Favourites."
+                            />
+                            <JoinAddress
+                                title="Or connect straight to it"
+                                value={`open ${withPort(address, status.gamePort)}`}
+                                detail="In a loaded single-player world, press Tab and type this. ARK has no console on its menu."
+                            />
+                        </>
                     )}
                     <span className="text-xs text-muted-foreground">
                         {[findArkMap(map)?.label ?? map, session].filter(Boolean).join(" - ")}
                     </span>
+                    {/* The map is half of whether anybody can join, and it fails
+                        silently: a player without it is bounced to ARK's main menu
+                        while Steam opens on the store page, with nothing on either
+                        screen naming the map. From here it looks like a server
+                        refusing connections. */}
+                    {findArkMap(map)?.requires !== "base" && (
+                        <span className="text-xs text-warning">{mapRequirementHint(findArkMap(map))}</span>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -389,6 +407,31 @@ function ConnectCard({
                 )}
             </CardBody>
         </Card>
+    );
+}
+
+/** The same host on another port. The address a server is published at carries the
+ *  port a client connects on; the browser wants a different one, and the host is
+ *  the only part they share. */
+function withPort(address: string, port: number | null): string {
+    const host = address.replace(/:\d+$/, "");
+    return port === null ? address : `${host}:${port}`;
+}
+
+/** One address, what it is for, and a button that copies it - which is the only
+ *  thing anybody actually does with it. */
+function JoinAddress({ title, value, detail }: { title: string; value: string; detail: string }) {
+    return (
+        <div className="flex min-w-0 flex-col">
+            <span className="text-xs text-muted-foreground">{title}</span>
+            <div className="flex items-center gap-2">
+                <code className="truncate font-mono text-base" title={value}>
+                    {value}
+                </code>
+                <CopyButton value={value} label={`Copy: ${title}`} />
+            </div>
+            <span className="text-xs text-muted-foreground">{detail}</span>
+        </div>
     );
 }
 

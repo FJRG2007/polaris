@@ -21,7 +21,7 @@
  */
 
 import { useRouter } from "next/navigation";
-import { ARK_MAPS } from "@/lib/apps/ark/maps";
+import { ARK_MAPS, mapRequirementHint } from "@/lib/apps/ark/maps";
 import * as arkAccess from "@/lib/apps/ark/access";
 import * as world from "@/lib/apps/minecraft/world";
 import { CopyButton } from "@/components/copy-button";
@@ -398,9 +398,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                         }))}
                                     />
                                     <span className="text-xs text-muted-foreground">
-                                        {ARK_MAPS.find((entry) => entry.value === map)?.dlc
-                                            ? "Only players who own that DLC can join."
-                                            : "Everyone with the base game can join."}
+                                        {mapRequirementHint(ARK_MAPS.find((entry) => entry.value === map))}
                                     </span>
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
