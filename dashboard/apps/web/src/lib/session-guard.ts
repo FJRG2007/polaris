@@ -25,6 +25,7 @@ import { notify } from "@/lib/notifications/dispatch";
 import type { ViewAsRow } from "@/lib/view-as-service";
 import { describeOrigin } from "@/lib/session-directory";
 import { evaluateAccountAccess } from "@/lib/network-rules";
+import { getInstanceSecurity } from "@/lib/instance-security";
 import { notifySessionOpened, notifySessionsClosed } from "@/lib/notifications/session-events";
 import { clientHost, clientIp, clientUserAgent, clientUserAgentBrands } from "@/lib/request-context";
 import { consumeSessionRotation, rememberAccountDevice, resolveSignInRules, takeSignInRecord } from "@polaris/auth";
@@ -102,11 +103,34 @@ export async function revokeSessionsRefusedByRules(userId: string): Promise<numb
     return count;
 }
 
+/** Where an account with no second factor is sent to arm one. */
+export const ENROLL_PATH = "/oauth/enroll";
+
+/**
+ * The instance's own demand, as a verdict: an account carrying no second factor
+ * on a deployment that requires one goes to the step that arms one, and nowhere
+ * else.
+ *
+ * Read from the record the guard already has rather than from a second query, and
+ * only consulted for an account that has no factor - so a deployment that requires
+ * one costs nothing extra for everybody who already complies, which after the
+ * first week is everybody.
+ *
+ * Retroactive by construction: it asks what the account carries now, not when the
+ * account was made, so an instance that turns the requirement on meets every
+ * existing account at its next request.
+ */
+async function secondFactorVerdict(hasFactor: boolean): Promise<SessionVerdict | null> {
+    if (hasFactor) return null;
+    const { requireSecondFactor } = await getInstanceSecurity();
+    return requireSecondFactor ? { ok: false, redirect: ENROLL_PATH } : null;
+}
+
 /**
  * Decide whether a session may serve this request, creating its Polaris-side
  * state on first sight. Callers redirect on a refusal; the pages that handle a
- * refusal (the lock and approval screens) must not call this, or they would
- * bounce forever.
+ * refusal (the lock, approval and enrollment screens) must not call this, or they
+ * would bounce forever.
  */
 export async function guardSession({
     userId,
@@ -179,7 +203,10 @@ export async function guardSession({
                     settings?.requireLoginApproval === true && record.twoFactorEnabled !== true
             });
             if (created.approval === "pending") return { ok: false, redirect: "/oauth/pending" };
-            return ALLOWED;
+            // The session is real from here, so it faces the same demand every
+            // later request faces. Returning early without asking would let one
+            // request through per sign-in, which is one more than none.
+            return (await secondFactorVerdict(record.twoFactorEnabled === true)) ?? ALLOWED;
         }
         await prisma.sessionState.update({
             where: { sessionId },
@@ -202,7 +229,13 @@ export async function guardSession({
         return { ok: false, redirect: "/oauth/lock" };
     }
 
-    // 5. Keep the activity stamp fresh, but not on every single request. A
+    // 5. The instance's demand for a second factor. After the lock, because a
+    //    locked screen is the same person needing to prove themselves and asking
+    //    them to arm a factor through it would be asking the wrong question first.
+    const owed = await secondFactorVerdict(record.twoFactorEnabled === true);
+    if (owed) return owed;
+
+    // 6. Keep the activity stamp fresh, but not on every single request. A
     //    session opened before the host was recorded adopts it here, which is the
     //    only way an already-open one ever gets a name against it.
     const host = state.host ?? (await clientHost()) ?? null;

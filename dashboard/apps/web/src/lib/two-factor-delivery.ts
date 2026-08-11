@@ -121,12 +121,22 @@ export async function describeTwoFactorMethods(userId: string): Promise<TwoFacto
     const resolutions = await Promise.all(
         TWO_FACTOR_DELIVERY_METHODS.map((method) => resolveDestination(userId, method))
     );
+    // An account that met the instance's requirement with an email code has the
+    // factor on and no authenticator behind it - better-auth minted the secret and
+    // nobody was ever shown it. Offering it here would put a code field in front of
+    // somebody with no app to read one from, on the screen they are trying to sign
+    // in with.
+    const claimed = hasAuthenticator && !settings.totpUnclaimed;
     const authenticator: TwoFactorMethodStatus = {
         method: "totp",
         enabled: true,
-        available: hasAuthenticator,
+        available: claimed,
         target: null,
-        blocker: hasAuthenticator ? null : "Two-step verification is off."
+        blocker: hasAuthenticator
+            ? settings.totpUnclaimed
+                ? "No authenticator is set up on this account."
+                : null
+            : "Two-step verification is off."
     };
     const delivery = TWO_FACTOR_DELIVERY_METHODS.map((method, index) => {
         const { destination, blocker } = resolutions[index] ?? { destination: null, blocker: null };

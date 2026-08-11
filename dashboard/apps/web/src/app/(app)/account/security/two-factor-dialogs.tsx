@@ -25,6 +25,7 @@ import { authClient } from "@/lib/auth-client";
 import { useState, type FormEvent } from "react";
 import { beginSessionRotationAction } from "./actions";
 import { BackupCodesPanel } from "./backup-codes-panel";
+import { noteAuthenticatorArmedAction } from "@/app/oauth/enroll/actions";
 import {
     Button,
     Dialog,
@@ -99,11 +100,16 @@ export function EnableTwoFactorDialog({
         // Arming the factor replaces this session; claim the continuation first.
         await beginSessionRotationAction();
         const { error: verifyError } = await authClient.twoFactor.verifyTotp({ code });
-        setBusy(false);
         if (verifyError) {
+            setBusy(false);
             setError("That code did not match. Check the clock on your device and try again.");
             return;
         }
+        // An account that had met the requirement with an emailed code was carrying
+        // a TOTP secret nobody held; it now holds a real one, so the note comes off
+        // and the authenticator is offered again.
+        await noteAuthenticatorArmedAction();
+        setBusy(false);
         onOpenChange(false);
         reset();
         onDone();

@@ -33,6 +33,10 @@ export interface UserSecuritySettings {
     twoFactorMethods: TwoFactorDeliveryMethod[];
     /** The method the challenge offers first. */
     twoFactorPreferred: TwoFactorMethod;
+    /** The factor is armed, but with a TOTP secret the owner was never shown -
+     *  they met the requirement with an email code. Nothing may offer them an
+     *  authenticator while this is true. */
+    totpUnclaimed: boolean;
     /** Days a device newly seen on the account waits before it may change any
      *  of this. 0 when the account asks for no wait. */
     newDeviceGraceDays: number;
@@ -49,6 +53,9 @@ const DEFAULTS: UserSecuritySettings = {
     requireLoginApproval: false,
     twoFactorMethods: [],
     twoFactorPreferred: "totp",
+    // An account with no row of its own armed its factor through better-auth
+    // directly, which is to say by scanning a QR code. Its authenticator is real.
+    totpUnclaimed: false,
     newDeviceGraceDays: 0,
     allowedCidrs: [],
     allowedCountries: [],
@@ -107,6 +114,7 @@ export async function getUserSecurity(userId: string): Promise<UserSecuritySetti
         requireLoginApproval: row.requireLoginApproval,
         twoFactorMethods: parseDeliveryMethods(row.twoFactorMethods),
         twoFactorPreferred: parsePreferredMethod(row.twoFactorPreferred),
+        totpUnclaimed: row.totpUnclaimed,
         newDeviceGraceDays: row.newDeviceGraceDays,
         allowedCidrs: parseStringList(row.allowedCidrs),
         allowedCountries: parseStringList(row.allowedCountries),
@@ -182,6 +190,22 @@ export async function setTwoFactorPreferences(
         twoFactorPreferred: input.preferred
     });
     return {};
+}
+
+/**
+ * Record whether the armed factor's authenticator secret belongs to anybody.
+ *
+ * Set when the factor is armed to satisfy the instance's requirement by email,
+ * and cleared the moment a real authenticator is verified - including on an
+ * account that started out email-only and added one later, which is the whole
+ * point of clearing it rather than only ever setting it.
+ *
+ * Deliberately not password-gated. It widens nothing: it is a note about what the
+ * account already did, written by the code that watched it happen, and the two
+ * ceremonies it is written from have each just proved identity in their own way.
+ */
+export async function setTotpUnclaimed(userId: string, unclaimed: boolean): Promise<void> {
+    await upsertSecurity(userId, { totpUnclaimed: unclaimed });
 }
 
 /**

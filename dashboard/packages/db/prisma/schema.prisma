@@ -590,6 +590,20 @@ model UserSecurity {
     twoFactorMethods     String    @default("[]")
     // Which method the challenge offers first. Null means the authenticator.
     twoFactorPreferred   String?
+    // The factor is armed but its authenticator secret belongs to nobody.
+    //
+    // An account can meet the instance's second-factor requirement with an email
+    // code instead of an authenticator. better-auth has one factor and arms it
+    // with a TOTP secret either way, so that path mints a secret the owner is
+    // never shown. Recorded here because everything that offers the authenticator
+    // reads "the factor is on" as "there is an app to open", and would otherwise
+    // put a code field in front of somebody who has no way to fill it. Cleared the
+    // moment a real authenticator is verified.
+    //
+    // False by default and never backfilled: every factor armed before this
+    // existed was armed by scanning a QR, and an account with no row at all is one
+    // that armed its factor through better-auth directly - both are real.
+    totpUnclaimed        Boolean   @default(false)
     // A short-lived, single-use pass for the approval gate above. Arming or
     // disabling an authenticator replaces the session it was done from, and the
     // replacement is the same person on the same device - not a new sign-in.

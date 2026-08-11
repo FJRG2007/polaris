@@ -64,6 +64,7 @@ export * from "./schemas/enrollment.js";
 export * from "./schemas/runners.js";
 export * from "./schemas/agents.js";
 export * from "./schemas/account-security.js";
+export * from "./schemas/instance-security.js";
 export * from "./schemas/mail.js";
 export * from "./schemas/two-factor.js";
 export * from "./schemas/display.js";
