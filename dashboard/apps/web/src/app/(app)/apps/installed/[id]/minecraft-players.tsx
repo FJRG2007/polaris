@@ -19,8 +19,6 @@
 
 import * as actions from "./minecraft-actions";
 import { useConfirm } from "@/components/confirm-dialog";
-import { GameAccessForm } from "@/components/game-access-form";
-import { PlayerIconAction, PlayersTable } from "@/components/game-players-table";
 import type { MinecraftModeration } from "./minecraft-actions";
 import { ACCESS_REACH_NOTE } from "@/lib/apps/minecraft/access";
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -28,12 +26,14 @@ import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import { foldPlayers, type PlayerEntry } from "@/lib/apps/minecraft/players";
 import { timeoutFor, type PlayerTimeout } from "@/lib/apps/minecraft/timeout";
+import { PlayerIconAction, PlayersTable } from "@/components/game-players-table";
 import { describeQueued, waitingOn, type QueuedAction } from "@/lib/apps/minecraft/queue";
 import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
 import {
     HistoryDialog,
     InventoryDialog,
     LocationDialog,
+    PlayerAccessDialog,
     TeleportDialog,
     TimeoutDialog,
     type PlayerDialog
@@ -49,6 +49,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
+    Skeleton,
     Switch,
     cn
 } from "@polaris/ui";
@@ -62,6 +63,7 @@ import {
     LocateFixed,
     MapPin,
     MoreHorizontal,
+    Pencil,
     ShieldBan,
     ShieldMinus,
     ShieldPlus,
@@ -118,10 +120,17 @@ export function MinecraftPlayers({
     // What the operator has just changed, shown until the server's own answer
     // catches up. Keyed by the same lowercase name the lists are folded on.
     const [applied, setApplied] = useState<Map<string, Partial<PlayerEntry>>>(new Map());
-    // The player a form is open about, and which form.
-    const [acting, setActing] = useState<{ player: PlayerEntry; dialog: PlayerDialog } | null>(null);
+    // The player a form is open about, and which form. A null player with the
+    // access form open is somebody being registered for the first time.
+    const [acting, setActing] = useState<{ player: PlayerEntry | null; dialog: PlayerDialog } | null>(null);
+    /** What the server refused the open form with, shown inside it rather than
+     *  behind it on a page the reader has stopped looking at. */
+    const [formError, setFormError] = useState<string | null>(null);
 
     const answering = status?.answering ?? false;
+    // The row a form is about, as a value rather than a field, so the callbacks
+    // inside a dialog still know it cannot be null.
+    const target = acting?.player ?? null;
     const bedrock = status?.edition === "bedrock";
     const edition = access?.edition ?? status?.edition ?? "java";
     const known = useMemo(
@@ -247,6 +256,26 @@ export function MinecraftPlayers({
         return true;
     }
 
+    /** Register somebody, or save a change to somebody already registered. Both are
+     *  one upsert on the pair the server is closed by, so they are one call. */
+    function savePlayer(input: { username: string; address: string; note: string }): void {
+        setFormError(null);
+        startTransition(async () => {
+            const result = await actions.grantPlayerAccessAction({
+                installedAppId,
+                username: input.username,
+                address: input.address,
+                ...(input.note ? { note: input.note } : {})
+            });
+            if (result.error) {
+                setFormError(result.error);
+                return;
+            }
+            setActing(null);
+            onChanged();
+        });
+    }
+
     return (
         <div className="flex flex-col gap-4">
             {error && <p className="text-sm text-danger">{error}</p>}
@@ -274,7 +303,7 @@ export function MinecraftPlayers({
                 <CardBody className="flex flex-col gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
-                            <p className="text-sm font-medium">Add a player</p>
+                            <p className="text-sm font-medium">Who can join</p>
                             <p className="text-xs text-muted-foreground">
                                 A player is let in when the username is on this list and they arrive from the address
                                 registered to it. {ACCESS_REACH_NOTE}
@@ -292,7 +321,6 @@ export function MinecraftPlayers({
                             />
                         </div>
                     </div>
-                    <GameAccessForm edition={edition} disabled={pending} onAdd={addPlayer} />
                     {access && !access.addressesAvailable && (
                         <p className="text-xs text-muted-foreground">
                             Bedrock does not record where a player connected from, so only the names here are enforced.
@@ -366,15 +394,26 @@ export function MinecraftPlayers({
                 onFilter={(value) => setFilter(value as Filter)}
                 filters={FILTERS.map((entry) => ({ value: entry.value, label: entry.label }))}
                 toolbar={
-                    bedrock ? null : (
-                        <WhitelistSwitch
-                            installedAppId={installedAppId}
-                            enforced={roster?.whitelistEnforced ?? false}
-                            disabled={roster === null || !answering}
-                            onError={setError}
-                            onChanged={onChanged}
-                        />
-                    )
+                    <>
+                        {!bedrock && (
+                            <WhitelistSwitch
+                                installedAppId={installedAppId}
+                                enforced={roster?.whitelistEnforced ?? false}
+                                disabled={roster === null || !answering}
+                                onError={setError}
+                                onChanged={onChanged}
+                            />
+                        )}
+                        <Button
+                            onClick={() => {
+                                setFormError(null);
+                                setActing({ player: null, dialog: "access" });
+                            }}
+                            disabled={pending}
+                        >
+                            <UserPlus className="size-4" /> Add player
+                        </Button>
+                    </>
                 }
                 isEmpty={shown.length === 0}
                 empty={
@@ -388,6 +427,7 @@ export function MinecraftPlayers({
                     <PlayerRow
                         key={player.name.toLowerCase()}
                         player={player}
+                        read={status !== null}
                         bedrock={bedrock}
                         answering={answering}
                         pending={pending}
@@ -404,10 +444,28 @@ export function MinecraftPlayers({
                 ))}
             />
 
-            {acting?.dialog === "teleport" && (
+            {acting?.dialog === "access" && (
+                <PlayerAccessDialog
+                    edition={edition}
+                    player={
+                        target ? { username: target.name, addresses: target.addresses, note: target.note } : null
+                    }
+                    pending={pending}
+                    error={formError}
+                    onClose={() => setActing(null)}
+                    onSave={savePlayer}
+                    onRemoveAddress={(address) => {
+                        if (!target) return;
+                        const name = target.name;
+                        setActing(null);
+                        run(() => actions.revokePlayerAddressAction(installedAppId, name, address));
+                    }}
+                />
+            )}
+            {acting?.dialog === "teleport" && target && (
                 <TeleportDialog
-                    player={acting.player.name}
-                    others={onlineNames.filter((name) => name !== acting.player.name)}
+                    player={target.name}
+                    others={onlineNames.filter((name) => name !== target.name)}
                     pending={pending}
                     onClose={() => setActing(null)}
                     onTeleport={(destination) => {
@@ -415,20 +473,20 @@ export function MinecraftPlayers({
                         run(() =>
                             actions.teleportPlayerAction({
                                 installedAppId,
-                                player: acting.player.name,
+                                player: target.name,
                                 destination
                             })
                         );
                     }}
                 />
             )}
-            {acting?.dialog === "timeout" && (
+            {acting?.dialog === "timeout" && target && (
                 <TimeoutDialog
-                    player={acting.player.name}
+                    player={target.name}
                     pending={pending}
                     onClose={() => setActing(null)}
                     onTimeout={(minutes, reason) => {
-                        const player = acting.player.name;
+                        const player = target.name;
                         setActing(null);
                         const rollback = expect(player, { banned: true, online: false, presence: "offline" });
                         run(
@@ -438,10 +496,10 @@ export function MinecraftPlayers({
                     }}
                 />
             )}
-            {acting?.dialog === "inventory" && (
+            {acting?.dialog === "inventory" && target && (
                 <InventoryDialog
                     installedAppId={installedAppId}
-                    player={acting.player.name}
+                    player={target.name}
                     // Bedrock answers no `data get` at all, so there is nothing to
                     // read live and nothing to write back. Being offline is not the
                     // same case: the editor says so itself, refuses to move what it
@@ -452,21 +510,21 @@ export function MinecraftPlayers({
                     onChanged={onChanged}
                 />
             )}
-            {acting?.dialog === "location" && (
+            {acting?.dialog === "location" && target && (
                 <LocationDialog
                     installedAppId={installedAppId}
-                    player={acting.player.name}
+                    player={target.name}
                     onClose={() => setActing(null)}
                 />
             )}
-            {acting?.dialog === "history" && (
+            {acting?.dialog === "history" && target && (
                 <HistoryDialog
-                    player={acting.player.name}
-                    sessions={acting.player.sessions}
-                    registered={acting.player.addresses}
+                    player={target.name}
+                    sessions={target.sessions}
+                    registered={target.addresses}
                     onClose={() => setActing(null)}
                     onRegister={(address) => {
-                        const name = acting.player.name;
+                        const name = target.name;
                         void addPlayer({ username: name, address });
                     }}
                 />
@@ -479,6 +537,7 @@ export function MinecraftPlayers({
 
 function PlayerRow({
     player,
+    read,
     bedrock,
     answering,
     pending,
@@ -490,6 +549,10 @@ function PlayerRow({
     onRevoke
 }: {
     player: PlayerEntry;
+    /** Whether the server has been asked yet who is on it. Before that nobody is
+     *  offline - they are simply not known about, and a grey "Offline" against a
+     *  name that is playing is worse than saying nothing. */
+    read: boolean;
     bedrock: boolean;
     answering: boolean;
     pending: boolean;
@@ -528,7 +591,7 @@ function PlayerRow({
                 )}
             </td>
             <td className="px-3 py-2">
-                <StatusCell player={player} onOpen={onOpen} />
+                {read ? <StatusCell player={player} onOpen={onOpen} /> : <Skeleton className="h-5 w-16" />}
             </td>
             <td className="px-3 py-2">
                 <div className="flex flex-wrap items-center gap-1">
@@ -760,10 +823,6 @@ function MoreActions({
         description: string
     ) => Promise<void>;
 }) {
-    // Bedrock answers none of these: it has no RCON, so the console is written to
-    // and only the log answers back - there is nothing to read an inventory from.
-    if (bedrock) return null;
-
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -774,6 +833,12 @@ function MoreActions({
             <DropdownMenuContent align="end">
                 <DropdownMenuLabel>{player.name}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                {/* Polaris' own record of them - the addresses they may arrive from
+                    and the note beside the name - so it does not need the server to
+                    be answering, and Bedrock reaches it too. */}
+                <DropdownMenuItem onSelect={() => onOpen("access")}>
+                    <Pencil className="size-4" /> Edit player
+                </DropdownMenuItem>
                 {/* One door for looking at the bag and for changing what is in it:
                     somebody who opens it to see what is missing is the same person
                     who then hands it over, and they were two forms drawing the
@@ -783,13 +848,13 @@ function MoreActions({
                     carrying - is nearly always asked about somebody who logged
                     off, which is what the snapshots are for, and what cannot happen
                     now is written down and happens when they next join. */}
-                <DropdownMenuItem disabled={!live} onSelect={() => onOpen("inventory")}>
+                <DropdownMenuItem disabled={!live || bedrock} onSelect={() => onOpen("inventory")}>
                     <Backpack className="size-4" /> Inventory and items
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled={!live || !player.online} onSelect={() => onOpen("location")}>
+                <DropdownMenuItem disabled={!live || bedrock || !player.online} onSelect={() => onOpen("location")}>
                     <LocateFixed className="size-4" /> Where they are
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled={!live || !player.online} onSelect={() => onOpen("teleport")}>
+                <DropdownMenuItem disabled={!live || bedrock || !player.online} onSelect={() => onOpen("teleport")}>
                     <MapPin className="size-4" /> Teleport
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={player.sessions.length === 0} onSelect={() => onOpen("history")}>
@@ -798,7 +863,7 @@ function MoreActions({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                     className="text-danger"
-                    disabled={!live || !player.online}
+                    disabled={!live || bedrock || !player.online}
                     onSelect={() =>
                         void onModerateWithConfirm(
                             { action: "kill", player: player.name },
@@ -809,7 +874,11 @@ function MoreActions({
                 >
                     <Skull className="size-4" /> Kill
                 </DropdownMenuItem>
-                <DropdownMenuItem className="text-danger" disabled={!live || player.banned} onSelect={() => onOpen("timeout")}>
+                <DropdownMenuItem
+                    className="text-danger"
+                    disabled={!live || bedrock || player.banned}
+                    onSelect={() => onOpen("timeout")}
+                >
                     <Timer className="size-4" /> Time out
                 </DropdownMenuItem>
             </DropdownMenuContent>
@@ -929,4 +998,3 @@ export function FirewallSection({
         </Card>
     );
 }
-

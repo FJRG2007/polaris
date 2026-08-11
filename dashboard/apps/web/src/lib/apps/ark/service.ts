@@ -19,6 +19,7 @@
 
 import { prisma } from "@polaris/db";
 import { randomBytes } from "node:crypto";
+import { withTimeout } from "@polaris/core";
 import { findApp } from "@/lib/apps/catalog";
 import { setEnvVars } from "@/lib/env-var-service";
 import * as arkAccess from "@/lib/apps/ark/access";
@@ -50,6 +51,17 @@ function rconArgv(command: string): string[] {
     return ["gosu", "steam", "arkmanager", "rconcmd", command];
 }
 
+/**
+ * How long the server gets to answer one command.
+ *
+ * A command that fails comes back; a container whose connection has wedged does
+ * not come back at all, and every caller here is something a person or a sweep is
+ * waiting on. Generous, because arkmanager shells out to its own tooling and a
+ * loaded server answers in a second or two - this is a bound on hanging, not a
+ * performance budget.
+ */
+const COMMAND_TIMEOUT_MS = 15_000;
+
 /** The output of a command that could not even be started, which is a different
  *  failure from one the server refused - and the only case worth retrying. */
 function couldNotStart(result: { code: number; output: string }): boolean {
@@ -66,9 +78,11 @@ function couldNotStart(result: { code: number; output: string }): boolean {
 export async function runArkCommand(ownerId: string, installedAppId: string, command: string): Promise<string> {
     assertSafeCommand(command);
     return withServerContainer(ownerId, installedAppId, async (server) => {
-        let result = await server.run(rconArgv(command));
+        const bounded = (argv: string[]): Promise<{ code: number; output: string }> =>
+            withTimeout(server.run(argv), COMMAND_TIMEOUT_MS, "The server did not answer in time");
+        let result = await bounded(rconArgv(command));
         if (result.code !== 0 && couldNotStart(result)) {
-            result = await server.run(["arkmanager", "rconcmd", command]);
+            result = await bounded(["arkmanager", "rconcmd", command]);
         }
         if (result.code !== 0 || isRconRefusal(result.output)) {
             const said = result.output.trim();
@@ -192,39 +206,56 @@ export interface ArkStatus extends ArkLive {
     readonly memTotalBytes: number | null;
 }
 
+/**
+ * The numbers a server was launched with: how many it holds, and the two ports it
+ * is joined on.
+ *
+ * Read from what the deploy actually pinned rather than derived from each other -
+ * a server whose ports were changed by hand would otherwise be described wrongly
+ * by arithmetic. Its own function because the page renders these before anything
+ * has been asked of the server: they are settings, not live state, and a client
+ * that waited for the container to answer before printing the address it should
+ * connect to had the order exactly backwards.
+ */
+export async function readArkPorts(
+    applicationId: string | null
+): Promise<{ max: number | null; gamePort: number | null; queryPort: number | null }> {
+    if (!applicationId) return { max: null, gamePort: null, queryPort: null };
+    const vars = await prisma.envVar.findMany({
+        where: {
+            scopeType: "application",
+            scopeId: applicationId,
+            key: { in: ["MAX_PLAYERS", "GAME_CLIENT_PORT", "SERVER_LIST_PORT"] }
+        },
+        select: { key: true, value: true }
+    });
+    const number = (key: string): number | null => {
+        const parsed = Number.parseInt(vars.find((row) => row.key === key)?.value ?? "", 10);
+        return Number.isFinite(parsed) ? parsed : null;
+    };
+    return { max: number("MAX_PLAYERS"), gamePort: number("GAME_CLIENT_PORT"), queryPort: number("SERVER_LIST_PORT") };
+}
+
 export async function getArkStatus(ownerId: string, installedAppId: string): Promise<ArkStatus> {
     const install = await prisma.installedApp.findFirst({
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
         select: { applicationId: true }
     });
     const applicationId = install?.applicationId ?? null;
-    const [live, usage, app, vars] = await Promise.all([
+    const [live, usage, app, ports] = await Promise.all([
         getArkPlayers(ownerId, installedAppId),
         applicationId ? readAppContainerMetricsOrNull(applicationId, ownerId) : null,
         applicationId
             ? prisma.application.findFirst({ where: { id: applicationId }, select: { desiredState: true } })
             : null,
-        applicationId
-            ? prisma.envVar.findMany({
-                  where: {
-                      scopeType: "application",
-                      scopeId: applicationId,
-                      key: { in: ["MAX_PLAYERS", "GAME_CLIENT_PORT", "SERVER_LIST_PORT"] }
-                  },
-                  select: { key: true, value: true }
-              })
-            : []
+        readArkPorts(applicationId)
     ]);
-    const number = (key: string): number | null => {
-        const parsed = Number.parseInt(vars.find((row) => row.key === key)?.value ?? "", 10);
-        return Number.isFinite(parsed) ? parsed : null;
-    };
     return {
         ...live,
         running: app?.desiredState === "running",
-        max: number("MAX_PLAYERS"),
-        gamePort: number("GAME_CLIENT_PORT"),
-        queryPort: number("SERVER_LIST_PORT"),
+        max: ports.max,
+        gamePort: ports.gamePort,
+        queryPort: ports.queryPort,
         cpuPercent: usage?.cpuPercent ?? null,
         memUsedBytes: usage?.memUsedBytes ?? null,
         memTotalBytes: usage?.memTotalBytes ?? null

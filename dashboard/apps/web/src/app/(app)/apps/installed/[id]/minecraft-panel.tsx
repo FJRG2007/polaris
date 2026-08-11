@@ -19,6 +19,7 @@
  */
 
 import Link from "next/link";
+import { GameConsole } from "./game-console";
 import type { Permission } from "@polaris/core";
 import { MinecraftMods } from "./minecraft-mods";
 import type { GameContext } from "./game-context";
@@ -28,18 +29,17 @@ import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
 import { CopyButton } from "@/components/copy-button";
 import { saveWorldAction } from "./minecraft-actions";
-import { GameConsole } from "./game-console";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
 import { MinecraftAppearance } from "./minecraft-appearance";
 import type { QueuedAction } from "@/lib/apps/minecraft/queue";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PlayerTimeout } from "@/lib/apps/minecraft/timeout";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import { FirewallSection, MinecraftPlayers } from "./minecraft-players";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import { FolderOpen, Loader2, Save, ShieldAlert, UserPlus } from "lucide-react";
@@ -130,18 +130,24 @@ export function MinecraftPanel({
         },
         [installedAppId, tab]
     );
+    // Seeded with what the page already knew, so the list of who may join is on
+    // screen before a request goes out. Only what the server itself has to answer -
+    // who is playing, the roster, the log - waits on the poll.
     const [reading, setReading] = useState<ServerReading>({
         status: null,
         reach: null,
         roster: null,
         firewall: null,
-        access: null,
+        access: game?.playerAccess ?? null,
         sessions: [],
         now: Date.now(),
         timeouts: [],
         pending: []
     });
     const [error, setError] = useState<string | null>(null);
+    /** What Polaris last said it intends the server to do, so the page can re-read
+     *  itself when that changes underneath it. */
+    const intended = useRef(running);
 
     // The roster costs three reads inside the container, so it is only gathered
     // for the screen that shows it.
@@ -200,22 +206,47 @@ export function MinecraftPanel({
                       : [],
                 now: data.now ? Date.parse(data.now) : current.now
             }));
+            // The header's Start and Stop, and everything else the page rendered on
+            // the server, come from the install row. A poll that finds the server in
+            // the other state is that row having gone stale - after a start, a stop,
+            // or a schedule that fired while somebody was looking at the screen -
+            // and without this the only way back was reloading by hand.
+            if (data.status.running !== intended.current) {
+                intended.current = data.status.running;
+                router.refresh();
+            }
         } catch {
             // Transient; the next poll retries.
         }
-    }, [installedAppId, wantsRoster]);
+    }, [installedAppId, wantsRoster, router]);
 
+    // Scheduled from the end of a read rather than on a fixed interval: a read runs
+    // a command inside the container, and a slow one would otherwise have polls
+    // stacking up behind each other.
     useEffect(() => {
-        void load();
-        const timer = setInterval(() => void load(), POLL_MS);
-        return () => clearInterval(timer);
+        let live = true;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const cycle = async (): Promise<void> => {
+            await load();
+            if (live) timer = setTimeout(() => void cycle(), POLL_MS);
+        };
+        void cycle();
+        return () => {
+            live = false;
+            if (timer) clearTimeout(timer);
+        };
     }, [load]);
+
+    // What the poll knows beats what the page was rendered with: the second is a
+    // snapshot from whenever it was opened, and reading them together is how a
+    // server that had just been started kept saying it was stopped.
+    const isRunning = reading.status?.running ?? running;
 
     // The shell draws the badge in the header; only this component polls, so it is
     // the one that knows.
     useEffect(() => {
-        onStatus?.(statusLabel(reading.status, running));
-    }, [onStatus, reading.status, running]);
+        onStatus?.(statusLabel(reading.status, isRunning));
+    }, [onStatus, reading.status, isRunning]);
 
     /** Settings come from the page, so applying them has to re-render it -
      *  otherwise the form keeps showing the old values as the current ones. */
@@ -230,11 +261,11 @@ export function MinecraftPanel({
         <div className="flex flex-col gap-4">
             <ConnectCard
                 status={status}
-                running={running}
+                running={isRunning}
                 settings={settings}
                 installedAppId={installedAppId}
                 applicationId={applicationId}
-                reach={reading.reach ?? game?.reach ?? null}
+                reach={reading.reach}
                 access={reading.access}
                 canSaveWorld={held.includes("games.moderate")}
                 onOpenPlayers={() => openTab("players")}
@@ -270,7 +301,7 @@ export function MinecraftPanel({
 
             {tab === "" && <OverviewTab status={status} settings={settings} onOpenPlayers={() => openTab("players")} />}
             {tab === "console" && (
-                <GameConsole installedAppId={installedAppId} applicationId={applicationId} running={running} />
+                <GameConsole installedAppId={installedAppId} applicationId={applicationId} running={isRunning} />
             )}
             {tab === "players" && (
                 <MinecraftPlayers
@@ -349,6 +380,7 @@ export function MinecraftPanel({
                     />
                     <MinecraftSchedule
                         installedAppId={installedAppId}
+                        state={game?.scheduleState ?? null}
                         schedule={game?.schedule ?? NO_SCHEDULE}
                     />
                     <MinecraftDomain

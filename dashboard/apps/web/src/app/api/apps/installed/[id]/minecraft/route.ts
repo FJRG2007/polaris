@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireGameServer } from "@/lib/apps/install-access";
 import { reachAdviceFor } from "@/lib/apps/minecraft/reach";
+import { requireGameServer } from "@/lib/apps/install-access";
+import { sweepGameSchedules } from "@/lib/apps/minecraft/schedule-service";
 import { drainQueue, pendingFor } from "@/lib/apps/minecraft/queue-service";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
 import { readPlayerTimeouts, sweepTimeouts } from "@/lib/apps/minecraft/timeout-service";
@@ -32,22 +33,29 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const { access: server } = await requireGameServer("games.read", id);
     const wantsRoster = new URL(request.url).searchParams.get("roster") === "1";
     try {
-        const status = await getServerStatus(server.ownerId, id);
+        // The read that reaches the container runs beside the ones that do not,
+        // rather than in front of them: asking a server that is generating its
+        // world takes as long as the timeout, and everything behind it - the
+        // address, the list of who may join, the port advice - is a database row
+        // that was ready immediately.
+        const [status, reach, access] = await Promise.all([
+            getServerStatus(server.ownerId, id),
+            reachAdviceFor(id, true).catch(() => null),
+            // One indexed query, and unlike the roster it does not go near the
+            // container - so it rides on every poll rather than only the moderation
+            // screen's. The overview needs it too: a server nobody is registered on
+            // is one nobody can join, and that has to be said where the address is,
+            // not on a tab somebody has to think to open.
+            listPlayerAccess(server.ownerId, id).catch(() => null)
+        ]);
         // A server that is not answering has no roster to report, and asking for one
         // would only stack up failing execs behind a poll.
         // Named rather than destructured by position: this list has grown twice,
         // and a name that silently slid onto its neighbour's result is what shipped
         // the enforcement report to the screen as if it were the session history.
         const gathered = await Promise.all([
-            reachAdviceFor(id, true).catch(() => null),
             wantsRoster && status.answering ? getServerRoster(server.ownerId, id) : null,
             wantsRoster ? getServerFirewall(server.ownerId, id).catch(() => null) : null,
-            // One indexed query, and unlike the roster it does not go near the
-            // container - so it rides on every poll rather than only the moderation
-            // screen's. The overview needs it too: a server nobody is registered on
-            // is one nobody can join, and that has to be said where the address is,
-            // not on a tab somebody has to think to open.
-            listPlayerAccess(server.ownerId, id).catch(() => null),
             // Opening the moderation screen is also when the list gets applied to
             // whoever is already on. The cron does this on its own schedule; a
             // deployment without cron configured would otherwise have rules that
@@ -64,8 +72,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             // that grants them is also when the due ones are lifted.
             wantsRoster && status.answering ? sweepTimeouts(server.ownerId, id).catch(() => 0) : 0
         ] as const);
-        const [reach, roster, firewall, access] = gathered;
-        const sessions = gathered[5];
+        const [roster, firewall] = gathered;
+        const sessions = gathered[3];
         const timeouts = wantsRoster ? await readPlayerTimeouts(id).catch(() => []) : [];
 
         // Two passes that only cost anything when there is something to do, so
@@ -84,6 +92,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             await sweepInventorySnapshots(server.ownerId, id, online).catch(() => 0);
         }
         const pending = wantsRoster ? await pendingFor(id).catch(() => []) : [];
+        // The schedule, on the server it belongs to and with the player count this
+        // poll has already paid for. The cron sweeps every server on its own
+        // schedule and the Game servers page sweeps the ones it lists; neither
+        // covers somebody sitting on this page with no cron configured, which is
+        // exactly where "I set a schedule and nothing happened" comes from.
+        await sweepGameSchedules(server.ownerId, new Date(), {
+            only: id,
+            // What this poll already found out, silence included, so the sweep
+            // never asks the same container the same question twice.
+            known: new Map([[id, status.answering ? status.players.online : null]])
+        }).catch(() => undefined);
         // The log's timestamps are the server's, so the clock they are read
         // against has to be too - a browser minutes out would otherwise report
         // somebody as still arriving long after they left.

@@ -17,16 +17,19 @@
 
 import * as actions from "./minecraft-actions";
 import { CopyButton } from "@/components/copy-button";
-import { useCallback, useEffect, useState } from "react";
+import { PlayerFormDialog, PlayerFormField } from "@/components/player-form-dialog";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { InventoryEditor } from "./minecraft-inventory-editor";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/minecraft/timeout";
+import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
+import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
-import { Loader2, MapPin, RefreshCw, TriangleAlert } from "lucide-react";
+import { Loader2, Locate, MapPin, RefreshCw, TriangleAlert, X } from "lucide-react";
 import { dimensionLabel, formatCoordinates, type PlayerPosition } from "@/lib/apps/minecraft/position";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
 
 /** Which of the forms is open, or none. */
-export type PlayerDialog = "teleport" | "timeout" | "inventory" | "location" | "history";
+export type PlayerDialog = "teleport" | "timeout" | "inventory" | "location" | "history" | "access";
 
 /** Three coordinates, absolute or `~` relative. */
 const COORDINATES = /^~?-?\d{1,7}(?:\.\d{1,3})?\s+~?-?\d{1,7}(?:\.\d{1,3})?\s+~?-?\d{1,7}(?:\.\d{1,3})?$/;
@@ -65,7 +68,7 @@ export function TeleportDialog({
     const error = value.length > 0 && !valid ? "A player's name, or three coordinates like 100 64 -220" : null;
 
     return (
-        <Shell
+        <PlayerFormDialog
             title={`Teleport ${player}`}
             description="To another player who is on, or to a place."
             onClose={onClose}
@@ -83,7 +86,7 @@ export function TeleportDialog({
                     ))}
                 </div>
             )}
-            <Field label="Player or coordinates" error={error}>
+            <PlayerFormField label="Player or coordinates" error={error}>
                 <Input
                     autoFocus
                     value={destination}
@@ -91,8 +94,8 @@ export function TeleportDialog({
                     placeholder="Alice, or 100 64 -220"
                     onChange={(event) => setDestination(event.target.value)}
                 />
-            </Field>
-        </Shell>
+            </PlayerFormField>
+        </PlayerFormDialog>
     );
 }
 
@@ -117,7 +120,7 @@ export function TimeoutDialog({
             : null;
 
     return (
-        <Shell
+        <PlayerFormDialog
             title={`Time ${player} out`}
             description="They are banned now and let back in when it runs out, without anybody having to remember."
             onClose={onClose}
@@ -127,16 +130,16 @@ export function TimeoutDialog({
             danger
             onConfirm={() => onTimeout(minutes, reason.trim())}
         >
-            <Field label="How long">
+            <PlayerFormField label="How long">
                 <Select
                     value={preset}
                     onValueChange={setPreset}
                     options={TIMEOUT_PRESETS}
                     aria-label="How long the timeout lasts"
                 />
-            </Field>
+            </PlayerFormField>
             {preset === "custom" && (
-                <Field label="Minutes" error={error}>
+                <PlayerFormField label="Minutes" error={error}>
                     <Input
                         autoFocus
                         type="number"
@@ -145,17 +148,17 @@ export function TimeoutDialog({
                         value={custom}
                         onChange={(event) => setCustom(event.target.value)}
                     />
-                </Field>
+                </PlayerFormField>
             )}
-            <Field label="Reason (shown to them)">
+            <PlayerFormField label="Reason (shown to them)">
                 <Input
                     value={reason}
                     maxLength={200}
                     placeholder="Optional"
                     onChange={(event) => setReason(event.target.value)}
                 />
-            </Field>
-        </Shell>
+            </PlayerFormField>
+        </PlayerFormDialog>
     );
 }
 
@@ -465,72 +468,172 @@ export function HistoryDialog({
     );
 }
 
-/** The frame the two forms share, so they agree about where the buttons are. */
-function Shell({
-    title,
-    description,
-    children,
-    onClose,
-    onConfirm,
-    confirmLabel,
-    ready,
+/**
+ * Who may connect, and from where - as a form rather than a row of fields parked
+ * under the table.
+ *
+ * The same form adds somebody and edits them, which is what makes a note or a
+ * second address fixable at all: before this the only way to change anything about
+ * a registered player was to remove them and put them back, and on a closed server
+ * that is a window where nobody can get in.
+ *
+ * The username is the identity the server checks, so it is not editable - a
+ * different name is a different person, and renaming one silently would leave the
+ * old one registered.
+ */
+export function PlayerAccessDialog({
+    edition,
+    player,
     pending,
-    danger
-}: {
-    title: string;
-    description: string;
-    children: React.ReactNode;
-    onClose: () => void;
-    onConfirm: () => void;
-    confirmLabel: string;
-    ready: boolean;
-    pending: boolean;
-    danger?: boolean;
-}) {
-    return (
-        <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
-            <DialogContent className="max-w-sm">
-                <DialogHeader>
-                    <DialogTitle>{title}</DialogTitle>
-                    <DialogDescription>{description}</DialogDescription>
-                </DialogHeader>
-                <form
-                    className="flex flex-col gap-3"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        if (ready) onConfirm();
-                    }}
-                >
-                    {children}
-                    <div className="flex justify-end gap-2">
-                        <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>
-                            Cancel
-                        </Button>
-                        <Button type="submit" variant={danger ? "danger" : "primary"} disabled={!ready}>
-                            {pending && <Loader2 className="size-4 animate-spin" />}
-                            {confirmLabel}
-                        </Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function Field({
-    label,
     error,
-    children
+    onClose,
+    onSave,
+    onRemoveAddress
 }: {
-    label: string;
-    error?: string | null;
-    children: React.ReactNode;
+    edition: MinecraftEdition;
+    /** The player being edited, or null to register somebody new. */
+    player: { username: string; addresses: readonly string[]; note: string | null } | null;
+    pending: boolean;
+    error: string | null;
+    onClose: () => void;
+    onSave: (input: { username: string; address: string; note: string }) => void;
+    onRemoveAddress?: (address: string) => void;
 }) {
+    const editing = player !== null;
+    const [username, setUsername] = useState(player?.username ?? "");
+    const [address, setAddress] = useState("");
+    const [note, setNote] = useState(player?.note ?? "");
+    const [detecting, startDetecting] = useTransition();
+    const [detectFailed, setDetectFailed] = useState(false);
+
+    const name = username.trim();
+    const rule = address.trim();
+    const nameInvalid = name.length > 0 && !isPlayerName(edition, name);
+    const addressInvalid = rule.length > 0 && !isAddressRule(rule);
+    // Editing without touching the address is how a note is changed; the note is
+    // stored against a rule, so the one they already have carries it.
+    const noteChanged = editing && note.trim() !== (player.note ?? "");
+    const ready = editing
+        ? (isAddressRule(rule) || (rule.length === 0 && noteChanged && player.addresses.length > 0))
+        : isPlayerName(edition, name) && isAddressRule(rule);
+
+    function detect(): void {
+        setDetectFailed(false);
+        startDetecting(async () => {
+            const result = await actions.myAddressAction();
+            if (!result.address) {
+                setDetectFailed(true);
+                return;
+            }
+            setAddress(result.address);
+        });
+    }
+
     return (
-        <label className="flex flex-col gap-1.5 text-sm">
-            <span className="text-xs text-muted-foreground">{label}</span>
-            {children}
-            {error && <span className="text-xs text-danger">{error}</span>}
-        </label>
+        <PlayerFormDialog
+            title={editing ? `Edit ${player.username}` : "Add a player"}
+            description={
+                editing
+                    ? "Add another address they play from, or change the note. The name itself is what the server checks."
+                    : "A player is let in when the name is on this list and they arrive from an address registered to it."
+            }
+            confirmLabel={editing ? "Save" : "Add player"}
+            ready={ready}
+            pending={pending}
+            error={error}
+            onClose={onClose}
+            onConfirm={() =>
+                onSave({
+                    username: editing ? player.username : name,
+                    address: rule.length > 0 ? rule : (player?.addresses[0] ?? ""),
+                    note: note.trim()
+                })
+            }
+        >
+            <PlayerFormField
+                label={edition === "bedrock" ? "Gamertag" : "Username"}
+                error={nameInvalid ? "That is not a username this edition accepts" : null}
+            >
+                <Input
+                    autoFocus={!editing}
+                    value={username}
+                    onChange={(event) => setUsername(event.target.value)}
+                    placeholder={edition === "bedrock" ? "Gamertag" : "Username"}
+                    disabled={editing}
+                    aria-label="Player"
+                />
+            </PlayerFormField>
+
+            {editing && player.addresses.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                    <span className="text-xs text-muted-foreground">Addresses they play from</span>
+                    <div className="flex flex-wrap gap-1">
+                        {player.addresses.map((held) => (
+                            <span
+                                key={held}
+                                className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs"
+                            >
+                                {held}
+                                {onRemoveAddress && (
+                                    <button
+                                        type="button"
+                                        disabled={pending}
+                                        aria-label={`Remove ${held} from ${player.username}`}
+                                        title={`Remove ${held}`}
+                                        className="text-muted-foreground hover:text-danger disabled:opacity-50"
+                                        onClick={() => onRemoveAddress(held)}
+                                    >
+                                        <X className="size-3" />
+                                    </button>
+                                )}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <PlayerFormField
+                label={editing ? "Another address" : "Address they connect from"}
+                error={addressInvalid ? "That is not an address or a range" : null}
+                hint={
+                    detectFailed
+                        ? "Polaris could not read the address this request came from. Type it in instead."
+                        : editing
+                          ? "Leave it empty to change only the note."
+                          : undefined
+                }
+            >
+                <div className="flex items-center gap-1">
+                    <Input
+                        autoFocus={editing}
+                        value={address}
+                        onChange={(event) => setAddress(event.target.value)}
+                        placeholder="203.0.113.9, 203.0.113.0/24 or any"
+                        aria-label="Address they connect from"
+                    />
+                    <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={detect}
+                        disabled={pending || detecting}
+                        aria-label="Use the address you are on now"
+                        title="Use the address you are on now"
+                    >
+                        {detecting ? <Loader2 className="size-4 animate-spin" /> : <Locate className="size-4" />}
+                    </Button>
+                </div>
+            </PlayerFormField>
+
+            <PlayerFormField label="Note" hint="Who this is, for whoever reads the list next. Only Polaris sees it.">
+                <Input
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                    placeholder="Who this is"
+                    maxLength={120}
+                    aria-label="Note"
+                />
+            </PlayerFormField>
+        </PlayerFormDialog>
     );
 }

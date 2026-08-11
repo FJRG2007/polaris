@@ -19,40 +19,66 @@
  */
 
 import Link from "next/link";
+import * as actions from "./ark-actions";
 import { GameConsole } from "./game-console";
 import type { Permission } from "@polaris/core";
-import { findArkMap, mapRequirementHint } from "@/lib/apps/ark/maps";
 import type { GameContext } from "./game-context";
 import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
-import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import { CopyButton } from "@/components/copy-button";
-import { foldArkPlayers, matchesArkPlayer, type ArkPlayerEntry } from "@/lib/apps/ark/players";
-import { PlayerIconAction, PlayersTable } from "@/components/game-players-table";
+import { useConfirm } from "@/components/confirm-dialog";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
+import { findArkMap, mapRequirementHint } from "@/lib/apps/ark/maps";
+import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import type { ArkAccessView, ArkStatus } from "@/lib/apps/ark/service";
+import { ArkMessageDialog, ArkPlayerDialog } from "./ark-player-dialogs";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { PlayerIconAction, PlayersTable } from "@/components/game-players-table";
 import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
-import { Badge, Button, Card, CardBody, Input, Skeleton, Switch, cn } from "@polaris/ui";
-import { generateJoinPassword, isJoinPassword, isSteamId, JOIN_PASSWORD_HINT } from "@/lib/apps/ark/access";
-import { Ban, Clock, DoorOpen, Eye, FolderOpen, Loader2, Megaphone, RefreshCw, Save, ShieldAlert, UserMinus, UserPlus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { foldArkPlayers, matchesArkPlayer, type ArkPlayerEntry } from "@/lib/apps/ark/players";
+import { generateJoinPassword, isJoinPassword, JOIN_PASSWORD_HINT } from "@/lib/apps/ark/access";
 import {
-    addArkPlayerAction,
-    broadcastArkAction,
-    moderateArkPlayerAction,
-    removeArkPlayerAction,
-    revealArkPasswordsAction,
-    saveArkWorldAction,
-    setArkAdminPasswordAction,
-    setArkExclusiveJoinAction,
-    setArkGameLogAction,
-    setArkJoinPasswordAction
-} from "./ark-actions";
+    Ban,
+    Clock,
+    DoorOpen,
+    Eye,
+    FolderOpen,
+    Loader2,
+    Megaphone,
+    MessageSquare,
+    MoreHorizontal,
+    Pencil,
+    RefreshCw,
+    Save,
+    ShieldAlert,
+    UserMinus,
+    UserPlus,
+    Users
+} from "lucide-react";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    Input,
+    Skeleton,
+    Switch,
+    cn
+} from "@polaris/ui";
 
+/** How long after one read finishes before the next one starts. Measured from the
+ *  end rather than on a fixed interval: a read runs a command inside the container
+ *  and a slow one would otherwise have every tick queue behind the last. */
 const POLL_MS = 5000;
 
 /** Managed by the Access screen's own controls rather than offered twice as raw
@@ -105,13 +131,21 @@ export function ArkPanel({
         [installedAppId, tab]
     );
 
+    // Everything the page already knew is on screen before a single request goes
+    // out: where to connect, and who is on the list. Only what nobody can answer
+    // without asking the server itself - who is playing, what it is costing, and
+    // whether its ports answer from outside - waits on the poll.
     const [reading, setReading] = useState<ServerReading>({
         status: null,
-        address: null,
+        address: game?.address ?? null,
         reach: null,
-        access: null
+        access: game?.arkAccess ?? null
     });
     const [error, setError] = useState<string | null>(null);
+    /** What Polaris last said it intends the server to do. Kept so the page can
+     *  re-read itself when that changes underneath it - a start, a stop, or a
+     *  schedule that fired while somebody was looking at the screen. */
+    const intended = useRef(running);
 
     const load = useCallback(async () => {
         try {
@@ -136,38 +170,62 @@ export function ArkPanel({
                 reach: data.reach ?? current.reach,
                 access: data.access ?? current.access
             }));
+            // The header's Start and Stop, and everything else the page rendered
+            // on the server, come from the install row. A poll that finds the
+            // server in the other state is that row having gone stale, and
+            // without this the only way back was reloading by hand.
+            if (data.status.running !== intended.current) {
+                intended.current = data.status.running;
+                router.refresh();
+            }
         } catch {
             // Transient; the next poll retries.
         }
-    }, [installedAppId]);
+    }, [installedAppId, router]);
 
+    // Scheduled from the end of a read rather than on a fixed interval: asking an
+    // ARK server anything is a command inside its container, and a slow one would
+    // otherwise have polls stacking up behind each other.
     useEffect(() => {
-        void load();
-        const timer = setInterval(() => void load(), POLL_MS);
-        return () => clearInterval(timer);
+        let live = true;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const cycle = async (): Promise<void> => {
+            await load();
+            if (live) timer = setTimeout(() => void cycle(), POLL_MS);
+        };
+        void cycle();
+        return () => {
+            live = false;
+            if (timer) clearTimeout(timer);
+        };
     }, [load]);
 
+    const status = reading.status;
+    // What the poll knows beats what the page was rendered with: the second is a
+    // snapshot from whenever it was opened, and reading them together is how a
+    // server that had just been started kept saying it was stopped.
+    const isRunning = status?.running ?? running;
+
     useEffect(() => {
-        onStatus?.(statusLabel(reading.status, running));
-    }, [onStatus, reading.status, running]);
+        onStatus?.(statusLabel(reading.status, isRunning));
+    }, [onStatus, reading.status, isRunning]);
 
     const reloadSettings = useCallback(() => {
         router.refresh();
         void load();
     }, [router, load]);
 
-    const status = reading.status;
-
     return (
         <div className="flex flex-col gap-4">
             <ConnectCard
                 status={status}
                 address={reading.address}
-                running={running}
+                ports={{ game: game?.gamePort ?? null, query: game?.queryPort ?? null }}
+                running={isRunning}
                 settings={settings}
                 installedAppId={installedAppId}
                 applicationId={applicationId}
-                reach={reading.reach ?? game?.reach ?? null}
+                reach={reading.reach}
                 access={reading.access}
                 canSaveWorld={held.includes("games.moderate")}
                 onOpenAccess={() => openTab("players")}
@@ -203,7 +261,7 @@ export function ArkPanel({
                 <GameConsole
                     installedAppId={installedAppId}
                     applicationId={applicationId}
-                    running={running}
+                    running={isRunning}
                     logName="ark"
                     hint="ListPlayers, or Broadcast Server restarting in 5"
                 />
@@ -253,7 +311,11 @@ export function ArkPanel({
             {tab === "access" && <MinecraftAccess installedAppId={installedAppId} />}
             {tab === "settings" && (
                 <div className="flex flex-col gap-4">
-                    <MinecraftSchedule installedAppId={installedAppId} schedule={game?.schedule ?? NO_SCHEDULE} />
+                    <MinecraftSchedule
+                        installedAppId={installedAppId}
+                        schedule={game?.schedule ?? NO_SCHEDULE}
+                        state={game?.scheduleState ?? null}
+                    />
                     <MinecraftDomain
                         installedAppId={installedAppId}
                         hostname={game?.hostname ?? null}
@@ -275,6 +337,7 @@ export function ArkPanel({
 function ConnectCard({
     status,
     address,
+    ports,
     running,
     settings,
     installedAppId,
@@ -286,6 +349,10 @@ function ConnectCard({
 }: {
     status: ArkStatus | null;
     address: string | null;
+    /** The ports the deploy pinned, from the page's own read. What the live status
+     *  reports is the same pair; this is what lets the card print them before the
+     *  server has said anything. */
+    ports: { game: number | null; query: number | null };
     running: boolean;
     settings: InstalledAppSetting[];
     installedAppId: string;
@@ -302,7 +369,7 @@ function ConnectCard({
 
     async function saveWorld(): Promise<void> {
         setSaving(true);
-        const result = await saveArkWorldAction(installedAppId);
+        const result = await actions.saveArkWorldAction(installedAppId);
         setSaving(false);
         setSaved(result.error ?? "World saved");
     }
@@ -311,12 +378,14 @@ function ConnectCard({
         <Card>
             <CardBody className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex min-w-0 flex-col gap-2">
-                    {status === null ? (
-                        <Skeleton className="h-7 w-56" />
-                    ) : address === null ? (
-                        <span className="text-sm text-muted-foreground">
-                            Not published yet - the address appears once the server has deployed.
-                        </span>
+                    {address === null ? (
+                        status === null ? (
+                            <Skeleton className="h-7 w-56" />
+                        ) : (
+                            <span className="text-sm text-muted-foreground">
+                                Not published yet - the address appears once the server has deployed.
+                            </span>
+                        )
                     ) : (
                         <>
                             {/* Two addresses, because ARK is joined two ways and each
@@ -326,12 +395,12 @@ function ConnectCard({
                                 the port nor the mistake. */}
                             <JoinAddress
                                 title="Add in Steam, or the in-game browser"
-                                value={withPort(address, status.queryPort)}
+                                value={withPort(address, status?.queryPort ?? ports.query)}
                                 detail="Steam, View, Servers, Favourites, +. It appears in ARK under Favourites."
                             />
                             <JoinAddress
                                 title="Or connect straight to it"
-                                value={`open ${withPort(address, status.gamePort)}`}
+                                value={`open ${withPort(address, status?.gamePort ?? ports.game)}`}
                                 detail="In a loaded single-player world, press Tab and type this. ARK has no console on its menu."
                             />
                         </>
@@ -577,6 +646,11 @@ function OverviewTab({ status, settings }: { status: ArkStatus | null; settings:
  * allowed on are folded into one row, because they are two halves of one question
  * and a card each meant reading both to work out what is going on with somebody.
  *
+ * Adding somebody is a button and a form, like every other screen here. It used to
+ * be two fields parked under the table, which read as part of the table, offered no
+ * way to correct a name once it was saved, and put a seventeen-digit number in a
+ * box the width of whatever space was left.
+ *
  * Teleport is not here, and that is not an omission. ARK's teleport commands move
  * a player relative to the admin's own character, and there is no character behind
  * an RCON session - the server takes the command and does nothing, silently. It
@@ -598,11 +672,16 @@ function PlayersTab({
 }) {
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState("everyone");
-    const [steamId, setSteamId] = useState("");
-    const [label, setLabel] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [note, setNote] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+    const [confirm, confirmElement] = useConfirm();
+    /** The form that is open, and who it is about. Null for the add form, which is
+     *  about nobody yet. */
+    const [acting, setActing] = useState<{ entry: ArkPlayerEntry | null; dialog: "player" | "message"; } | null>(null);
+    /** A refusal belongs in the dialog that asked for it, not behind it on a page
+     *  the reader has stopped looking at. */
+    const [dialogError, setDialogError] = useState<string | null>(null);
 
     const players = useMemo(
         () => foldArkPlayers(status?.players ?? [], access?.players ?? []),
@@ -622,7 +701,7 @@ function PlayersTab({
         [players, query, filter]
     );
 
-    function run(work: () => Promise<{ error?: string; access?: ArkAccessView }>, done?: string): void {
+    function run(work: () => Promise<{ error?: string; access?: ArkAccessView; }>, done?: string): void {
         setError(null);
         setNote(null);
         startTransition(async () => {
@@ -636,114 +715,196 @@ function PlayersTab({
         });
     }
 
-    function add(): void {
-        run(async () => {
-            const result = await addArkPlayerAction(installedAppId, steamId.trim(), label.trim());
-            if (!result.error) {
-                setSteamId("");
-                setLabel("");
+    /** The same for the forms: what failed is shown inside the dialog, and the
+     *  dialog only closes once the server has agreed. */
+    function runInDialog(work: () => Promise<{ error?: string; access?: ArkAccessView; }>, done?: string): void {
+        setDialogError(null);
+        startTransition(async () => {
+            const result = await work();
+            if (result.error) {
+                setDialogError(result.error);
+                return;
             }
-            return result;
+            setActing(null);
+            if (done) setNote(done);
+            onChanged(result.access);
         });
     }
 
+    function open(dialog: "player" | "message", entry: ArkPlayerEntry | null): void {
+        setDialogError(null);
+        setActing({ entry, dialog });
+    }
+
     const answering = status?.answering ?? false;
+    const listed = access?.players.length ?? 0;
+    // The row a form is about, as a value rather than a field, so the callbacks
+    // inside a dialog still know it cannot be null.
+    const target = acting?.entry ?? null;
 
     return (
-        <Card>
-            <CardBody className="flex flex-col gap-3">
-                {error && <p className="text-sm text-danger">{error}</p>}
-                {note && <p className="text-sm text-muted-foreground">{note}</p>}
+        <div className="flex flex-col gap-4">
+            {error && <p className="text-sm text-danger">{error}</p>}
+            {note && <p className="text-sm text-muted-foreground">{note}</p>}
 
-                {canModerate && <Broadcast installedAppId={installedAppId} answering={answering} />}
+            {/* A server that lets in only the players it was told about, and was
+                told about nobody, is a server nobody on earth can join - and
+                nothing in the game says why. It is also the state a server lands
+                in when the last person on the list is removed. */}
+            {access !== null && access.closed && listed === 0 && (
+                <Card className="border-warning/40 bg-warning/5">
+                    <CardBody className="flex flex-col gap-1">
+                        <p className="flex items-center gap-2 text-sm font-medium">
+                            <Users className="size-4 text-warning" />
+                            Nobody can join yet
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                            This server only lets in players it has been told about, and the list is empty. Add
+                            yourself first: your Steam id is the number at the end of your Steam profile URL.
+                        </p>
+                    </CardBody>
+                </Card>
+            )}
 
-                <PlayersTable
-                    columns={[
-                        { label: "Player" },
-                        { label: "Steam id", className: "hidden md:table-cell" },
-                        { label: "Status" },
-                        { label: "May join" }
-                    ]}
-                    search={query}
-                    onSearch={setQuery}
-                    searchPlaceholder="Search by name or Steam id"
-                    filter={filter}
-                    onFilter={setFilter}
-                    filters={[
-                        { value: "everyone", label: "Everyone" },
-                        { value: "online", label: "Playing now" },
-                        { value: "allowed", label: "On the list" }
-                    ]}
-                    isEmpty={shown.length === 0}
-                    empty={
-                        players.length === 0
-                            ? (status?.message ?? "Nobody is on the list and nobody is playing.")
-                            : "Nobody matches that."
+            <Card>
+                <CardBody className="flex flex-col gap-3">
+                    {canModerate && <Broadcast installedAppId={installedAppId} answering={answering} />}
+
+                    <PlayersTable
+                        columns={[
+                            { label: "Player" },
+                            { label: "Steam id", className: "hidden md:table-cell" },
+                            { label: "Status" },
+                            { label: "May join" }
+                        ]}
+                        search={query}
+                        onSearch={setQuery}
+                        searchPlaceholder="Search by name or Steam id"
+                        filter={filter}
+                        onFilter={setFilter}
+                        filters={[
+                            { value: "everyone", label: "Everyone" },
+                            { value: "online", label: "Playing now" },
+                            { value: "allowed", label: "On the list" }
+                        ]}
+                        toolbar={
+                            canModerate ? (
+                                <Button onClick={() => open("player", null)} disabled={pending}>
+                                    <UserPlus className="size-4" /> Add player
+                                </Button>
+                            ) : null
+                        }
+                        isEmpty={shown.length === 0}
+                        empty={
+                            players.length === 0
+                                ? (status?.message ?? "Nobody is on the list and nobody is playing.")
+                                : "Nobody matches that."
+                        }
+                        rows={shown.map((entry) => (
+                            <ArkPlayerRow
+                                key={entry.steamId}
+                                entry={entry}
+                                live={status !== null}
+                                canModerate={canModerate}
+                                answering={answering}
+                                pending={pending}
+                                onAllow={() =>
+                                    run(() => actions.addArkPlayerAction(installedAppId, entry.steamId, entry.name))
+                                }
+                                onRemove={() =>
+                                    void confirm({
+                                        title: `Take ${entry.name} off the list?`,
+                                        description:
+                                            "The running server is told at once. On a closed server they cannot join again until they are added back.",
+                                        confirmLabel: "Remove",
+                                        danger: true
+                                    }).then((agreed) => {
+                                        if (agreed) run(() => actions.removeArkPlayerAction(installedAppId, entry.steamId));
+                                    })
+                                }
+                                onEdit={() => open("player", entry)}
+                                onMessage={() => open("message", entry)}
+                                onKick={() =>
+                                    void confirm({
+                                        title: `Throw ${entry.name} off?`,
+                                        description: "They are disconnected and can come straight back.",
+                                        confirmLabel: "Kick",
+                                        danger: true
+                                    }).then((agreed) => {
+                                        if (agreed) {
+                                            run(
+                                                () => actions.moderateArkPlayerAction(installedAppId, entry.steamId, "kick"),
+                                                `${entry.name} was thrown off.`
+                                            );
+                                        }
+                                    })
+                                }
+                                onBan={() =>
+                                    void confirm({
+                                        title: `Ban ${entry.name}?`,
+                                        description:
+                                            "They are disconnected and refused from now on, whatever the join list says.",
+                                        confirmLabel: "Ban",
+                                        danger: true
+                                    }).then((agreed) => {
+                                        if (agreed) {
+                                            run(
+                                                () => actions.moderateArkPlayerAction(installedAppId, entry.steamId, "ban"),
+                                                `${entry.name} is banned.`
+                                            );
+                                        }
+                                    })
+                                }
+                                onUnban={() =>
+                                    run(
+                                        () => actions.moderateArkPlayerAction(installedAppId, entry.steamId, "unban"),
+                                        `The ban on ${entry.name} is lifted.`
+                                    )
+                                }
+                            />
+                        ))}
+                    />
+
+                    <p className="text-xs text-muted-foreground">
+                        Teleporting to a player is not possible from here: ARK moves players relative to an admin&apos;s
+                        own character, and Polaris talks to the server without one. In game, press Tab and use{" "}
+                        <code className="font-mono">enablecheats</code>, then{" "}
+                        <code className="font-mono">cheat TeleportToPlayer</code>.
+                    </p>
+                </CardBody>
+            </Card>
+
+            {acting?.dialog === "player" && (
+                <ArkPlayerDialog
+                    player={target ? { steamId: target.steamId, label: target.name } : null}
+                    pending={pending}
+                    error={dialogError}
+                    onClose={() => setActing(null)}
+                    onSave={(input) =>
+                        runInDialog(
+                            () => actions.addArkPlayerAction(installedAppId, input.steamId, input.label),
+                            target ? undefined : "Added. The server is told as soon as it answers."
+                        )
                     }
-                    rows={shown.map((entry) => (
-                        <ArkPlayerRow
-                            key={entry.steamId}
-                            entry={entry}
-                            canModerate={canModerate}
-                            answering={answering}
-                            pending={pending}
-                            onAllow={() =>
-                                run(() => addArkPlayerAction(installedAppId, entry.steamId, entry.name))
-                            }
-                            onRemove={() => run(() => removeArkPlayerAction(installedAppId, entry.steamId))}
-                            onKick={() =>
-                                run(
-                                    () => moderateArkPlayerAction(installedAppId, entry.steamId, "kick"),
-                                    `${entry.name} was thrown off.`
-                                )
-                            }
-                            onBan={() =>
-                                run(
-                                    () => moderateArkPlayerAction(installedAppId, entry.steamId, "ban"),
-                                    `${entry.name} is banned.`
-                                )
-                            }
-                        />
-                    ))}
                 />
+            )}
+            {acting?.dialog === "message" && target && (
+                <ArkMessageDialog
+                    name={target.name}
+                    pending={pending}
+                    error={dialogError}
+                    onClose={() => setActing(null)}
+                    onSend={(message) =>
+                        runInDialog(
+                            () => actions.messageArkPlayerAction(installedAppId, target.steamId, message),
+                            `Sent to ${target.name}.`
+                        )
+                    }
+                />
+            )}
 
-                {canModerate && (
-                    <div className="flex flex-wrap items-end gap-2">
-                        <label className="flex min-w-48 flex-1 flex-col gap-1 text-sm">
-                            <span className="text-muted-foreground">Steam id</span>
-                            <Input
-                                value={steamId}
-                                onChange={(event) => setSteamId(event.target.value)}
-                                placeholder="76561198000000000"
-                                inputMode="numeric"
-                            />
-                            {steamId.trim().length > 0 && !isSteamId(steamId) && (
-                                <span className="text-xs text-danger">17 digits, starting 7656119</span>
-                            )}
-                        </label>
-                        <label className="flex min-w-40 flex-1 flex-col gap-1 text-sm">
-                            <span className="text-muted-foreground">Name</span>
-                            <Input
-                                value={label}
-                                onChange={(event) => setLabel(event.target.value)}
-                                placeholder="Who this is"
-                            />
-                        </label>
-                        <Button onClick={add} disabled={pending || !isSteamId(steamId)}>
-                            {pending && <Loader2 className="size-4 animate-spin" />}
-                            <UserPlus className="size-4" /> Let them in
-                        </Button>
-                    </div>
-                )}
-
-                <p className="text-xs text-muted-foreground">
-                    Teleporting to a player is not possible from here: ARK moves players relative to an admin&apos;s own
-                    character, and Polaris talks to the server without one. In game, press Tab and use{" "}
-                    <code className="font-mono">enablecheats</code>, then{" "}
-                    <code className="font-mono">cheat TeleportToPlayer</code>.
-                </p>
-            </CardBody>
-        </Card>
+            {confirmElement}
+        </div>
     );
 }
 
@@ -755,7 +916,7 @@ function PlayersTab({
  * everyone was carrying. It sits above the table because the people it reaches are
  * the rows underneath it.
  */
-function Broadcast({ installedAppId, answering }: { installedAppId: string; answering: boolean }) {
+function Broadcast({ installedAppId, answering }: { installedAppId: string; answering: boolean; }) {
     const [message, setMessage] = useState("");
     const [note, setNote] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -765,7 +926,7 @@ function Broadcast({ installedAppId, answering }: { installedAppId: string; answ
         setError(null);
         setNote(null);
         startTransition(async () => {
-            const result = await broadcastArkAction(installedAppId, message.trim());
+            const result = await actions.broadcastArkAction(installedAppId, message.trim());
             if (result.error) {
                 setError(result.error);
                 return;
@@ -776,10 +937,10 @@ function Broadcast({ installedAppId, answering }: { installedAppId: string; answ
     }
 
     return (
-        <div className="flex flex-wrap items-end gap-2">
-            <label className="flex min-w-56 flex-1 flex-col gap-1 text-sm">
-                <span className="text-muted-foreground">Say something to everyone</span>
+        <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-2">
                 <Input
+                    className="min-w-56 flex-1"
                     value={message}
                     onChange={(event) => setMessage(event.target.value)}
                     onKeyDown={(event) => {
@@ -787,17 +948,18 @@ function Broadcast({ installedAppId, answering }: { installedAppId: string; answ
                         event.preventDefault();
                         if (message.trim().length > 0 && answering) send();
                     }}
-                    placeholder="Restarting in 5 minutes"
+                    placeholder="Say something to everyone: restarting in 5 minutes"
+                    aria-label="Say something to everyone playing"
                     disabled={!answering}
                 />
-                <span className={cn("text-xs", error ? "text-danger" : "text-muted-foreground")}>
-                    {error ?? note ?? (answering ? "Appears in everyone's chat." : "The server is not answering.")}
-                </span>
-            </label>
-            <Button onClick={send} disabled={pending || !answering || message.trim().length === 0}>
-                {pending && <Loader2 className="size-4 animate-spin" />}
-                <Megaphone className="size-4" /> Send
-            </Button>
+                <Button onClick={send} disabled={pending || !answering || message.trim().length === 0}>
+                    {pending ? <Loader2 className="size-4 animate-spin" /> : <Megaphone className="size-4" />}
+                    Send
+                </Button>
+            </div>
+            <span className={cn("text-xs", error ? "text-danger" : "text-muted-foreground")}>
+                {error ?? note ?? (answering ? "Appears in everyone's chat." : "The server is not answering.")}
+            </span>
         </div>
     );
 }
@@ -807,28 +969,43 @@ function Broadcast({ installedAppId, answering }: { installedAppId: string; answ
  *
  * Drawn in the same language as the Minecraft rows, because they are the same
  * table: the name and its second line, a badge for what they are doing, a wrap of
- * badges for where they stand, and the verbs as icons at the end. What a state is
- * called differs; how it reads should not.
+ * badges for where they stand, the verbs an operator reaches for as icons, and the
+ * rest behind a menu. What a state is called differs; how it reads should not.
  */
 function ArkPlayerRow({
     entry,
+    live: read,
     canModerate,
     answering,
     pending,
     onAllow,
     onRemove,
+    onEdit,
+    onMessage,
     onKick,
-    onBan
+    onBan,
+    onUnban
 }: {
     entry: ArkPlayerEntry;
+    /** Whether the server has been asked yet who is on it. Before that nobody is
+     *  offline - they are simply not known about, and a grey "Offline" against a
+     *  name that is playing is worse than saying nothing. */
+    live: boolean;
     canModerate: boolean;
     answering: boolean;
     pending: boolean;
     onAllow: () => void;
     onRemove: () => void;
+    onEdit: () => void;
+    onMessage: () => void;
     onKick: () => void;
     onBan: () => void;
+    onUnban: () => void;
 }) {
+    // Every verb that reaches the game needs a server that is answering. Editing
+    // the list is Polaris' own and does not.
+    const live = answering && !pending;
+
     return (
         <tr
             className={cn(
@@ -856,7 +1033,13 @@ function ArkPlayerRow({
                 </div>
             </td>
             <td className="px-3 py-2">
-                {entry.online ? <Badge variant="success">Playing</Badge> : <Badge>Offline</Badge>}
+                {!read ? (
+                    <Skeleton className="h-5 w-16" />
+                ) : entry.online ? (
+                    <Badge variant="success">Playing</Badge>
+                ) : (
+                    <Badge>Offline</Badge>
+                )}
             </td>
             <td className="px-3 py-2">
                 <div className="flex flex-wrap items-center gap-1">
@@ -891,7 +1074,7 @@ function ArkPlayerRow({
                         <PlayerIconAction
                             label={`Throw ${entry.name} off`}
                             icon={<DoorOpen className="size-4" />}
-                            disabled={pending || !answering}
+                            disabled={!live}
                             onClick={onKick}
                         />
                     )}
@@ -899,10 +1082,36 @@ function ArkPlayerRow({
                         <PlayerIconAction
                             label={`Ban ${entry.name}`}
                             icon={<Ban className="size-4" />}
-                            disabled={pending || !answering}
+                            disabled={!live}
                             danger
                             onClick={onBan}
                         />
+                    )}
+                    {canModerate && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="icon" variant="ghost" aria-label={`More for ${entry.name}`} title="More">
+                                    <MoreHorizontal className="size-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>{entry.name}</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem disabled={pending} onSelect={onEdit}>
+                                    <Pencil className="size-4" /> Edit name
+                                </DropdownMenuItem>
+                                <DropdownMenuItem disabled={!live || !entry.online} onSelect={onMessage}>
+                                    <MessageSquare className="size-4" /> Message them
+                                </DropdownMenuItem>
+                                {/* Offered to anybody, because ARK does not say who
+                                    is banned: the ban list is the server's own and
+                                    nothing reads it back, so the only honest thing
+                                    is to let it be lifted for whoever it was. */}
+                                <DropdownMenuItem disabled={!live} onSelect={onUnban}>
+                                    <UserPlus className="size-4" /> Lift their ban
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     )}
                 </div>
             </td>
@@ -939,7 +1148,7 @@ function ClosedServerCard({
     }
 
     function setClosed(closed: boolean): void {
-        run(() => setArkExclusiveJoinAction(installedAppId, closed));
+        run(() => actions.setArkExclusiveJoinAction(installedAppId, closed));
     }
 
     return (
@@ -973,7 +1182,7 @@ function ClosedServerCard({
                     </span>
                     <Switch
                         checked={access?.logging ?? false}
-                        onChange={(on) => run(() => setArkGameLogAction(installedAppId, on))}
+                        onChange={(on) => run(() => actions.setArkGameLogAction(installedAppId, on))}
                         disabled={!canManage || pending || access === null}
                         aria-label="Record what happens in the game"
                     />
@@ -991,7 +1200,7 @@ function PasswordCard({ installedAppId, canManage }: { installedAppId: string; c
     function reveal(): void {
         setError(null);
         startTransition(async () => {
-            const result = await revealArkPasswordsAction(installedAppId);
+            const result = await actions.revealArkPasswordsAction(installedAppId);
             if (result.error) {
                 setError(result.error);
                 return;
@@ -1045,13 +1254,13 @@ function PasswordCard({ installedAppId, canManage }: { installedAppId: string; c
                         <ChangePassword
                             label="New join password"
                             help="Players type this. Applied the next time the server starts."
-                            save={(value) => setArkJoinPasswordAction(installedAppId, value)}
+                            save={(value) => actions.setArkJoinPasswordAction(installedAppId, value)}
                             onSaved={() => setShown(null)}
                         />
                         <ChangePassword
                             label="New admin password"
                             help="Typed after enablecheats in game. Applied the next time the server starts."
-                            save={(value) => setArkAdminPasswordAction(installedAppId, value)}
+                            save={(value) => actions.setArkAdminPasswordAction(installedAppId, value)}
                             onSaved={() => setShown(null)}
                         />
                     </>
@@ -1098,15 +1307,19 @@ function ChangePassword({
     }
 
     return (
-        <div className="flex flex-wrap items-end gap-2">
-            <label className="flex min-w-56 flex-1 flex-col gap-1 text-sm">
-                <span className="text-muted-foreground">{label}</span>
-                <div className="flex items-center gap-1">
+        // The button sits in the same row as the field it saves, not at the bottom
+        // of the whole block: the hint underneath is a third line, and aligning to
+        // the end of that left the button floating below the input it belongs to.
+        <div className="flex flex-col gap-1 text-sm">
+            <span className="text-xs text-muted-foreground">{label}</span>
+            <div className="flex flex-wrap items-center gap-2">
+                <div className="flex min-w-56 flex-1 items-center gap-1">
                     <Input
                         value={value}
                         onChange={(event) => setValue(event.target.value)}
                         className="font-mono"
                         placeholder="8 to 32 letters and digits"
+                        aria-label={label}
                     />
                     <Button
                         size="icon"
@@ -1120,14 +1333,14 @@ function ChangePassword({
                         <RefreshCw className="size-4" />
                     </Button>
                 </div>
-                <span className={cn("text-xs", error || invalid ? "text-danger" : "text-muted-foreground")}>
-                    {error ?? (invalid ? JOIN_PASSWORD_HINT : (message ?? help))}
-                </span>
-            </label>
-            <Button onClick={submit} disabled={pending || !isJoinPassword(value)}>
-                {pending && <Loader2 className="size-4 animate-spin" />}
-                Change
-            </Button>
+                <Button onClick={submit} disabled={pending || !isJoinPassword(value)}>
+                    {pending && <Loader2 className="size-4 animate-spin" />}
+                    Change
+                </Button>
+            </div>
+            <span className={cn("text-xs", error || invalid ? "text-danger" : "text-muted-foreground")}>
+                {error ?? (invalid ? JOIN_PASSWORD_HINT : (message ?? help))}
+            </span>
         </div>
     );
 }
