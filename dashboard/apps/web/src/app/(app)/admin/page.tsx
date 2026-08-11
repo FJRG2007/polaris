@@ -4,13 +4,18 @@ import { requireAdmin } from "@/lib/session";
 import {
     Activity,
     Blocks,
+    Bot,
+    Building2,
     ChevronRight,
     Globe,
     HardDrive,
     IdCard,
     Mail,
+    MessagesSquare,
+    Scale,
     Settings,
     ShieldCheck,
+    SlidersHorizontal,
     Sparkles,
     Users,
     UsersRound
@@ -32,17 +37,47 @@ const SECTIONS = [
     },
     {
         href: "/admin/policies",
-        icon: ShieldCheck,
+        icon: Scale,
         title: "Policies",
         description: "Fine-grained permission policies for users and groups."
     },
+    {
+        href: "/admin/security",
+        icon: ShieldCheck,
+        title: "Security",
+        description: "Whether an account has to carry a second factor, and which ones count."
+    },
     { href: "/admin/activity", icon: Activity, title: "Activity", description: "Audit log of actions across Polaris." },
-    { href: "/admin/domains", icon: Globe, title: "Domains", description: "App and sharing domains, DuckDNS sync." },
+    {
+        href: "/inbox",
+        icon: MessagesSquare,
+        title: "Inbox",
+        description: "Conversations, the channels they arrive on, and who they are with."
+    },
     {
         href: "/admin/email",
         icon: Mail,
-        title: "Account mail",
-        description: "The email channel that carries verification and sign-in messages."
+        title: "Email",
+        description: "Who Polaris sends mail as, and the channel that carries sign-in messages."
+    },
+    { href: "/admin/domains", icon: Globe, title: "Domains", description: "App and sharing domains, DuckDNS sync." },
+    {
+        href: "/admin/organizations",
+        icon: Building2,
+        title: "Organizations",
+        description: "Which organizations exist, what they may run, and their limits."
+    },
+    {
+        href: "/admin/display",
+        icon: SlidersHorizontal,
+        title: "Display defaults",
+        description: "The units, dates and number formats new accounts start on."
+    },
+    {
+        href: "/admin/agents",
+        icon: Bot,
+        title: "Agent defaults",
+        description: "Where coding agents may run, and what they may open on their own."
     },
     {
         href: "/admin/uploads",

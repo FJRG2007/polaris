@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { Permission } from "@polaris/core";
-import { ACCOUNT_HOME, homePathFor, reachableAppIds } from "@/lib/app-access";
+import { ACCOUNT_HOME, homePathFor, reachableAppIds, reachableAppNav, reachableApps } from "@/lib/app-access";
 
 /** A person who holds exactly these permissions and is not an administrator. */
 function holding(...permissions: Permission[]) {
@@ -23,7 +23,7 @@ const ADMIN = { isAdmin: true, can: async () => true };
 describe("reachableAppIds", () => {
     it("offers only the apps the permissions open", async () => {
         expect(await reachableAppIds(holding("drive.read"))).toEqual(["drive"]);
-        expect(await reachableAppIds(holding("tasks.read", "inbox.read"))).toEqual(["tasks", "inbox"]);
+        expect(await reachableAppIds(holding("tasks.read"))).toEqual(["tasks"]);
     });
 
     it("gives an administrator Management, and withholds it from everyone else", async () => {
@@ -41,6 +41,41 @@ describe("reachableAppIds", () => {
 
     it("never offers the account section as an app - it is reached from the menu", async () => {
         expect(await reachableAppIds(ADMIN)).not.toContain("account");
+    });
+});
+
+/**
+ * Inbox stopped being an app of its own and became a subject of Management, which
+ * only administrators can open - and `member` and `viewer` both hold `inbox.read`.
+ * Without a door of their own they would keep the permission and lose every way to
+ * use it, which is the regression these cover.
+ */
+describe("the Inbox door inside Management", () => {
+    it("offers Management to a member, under Inbox's name and landing on it", async () => {
+        const [app, ...rest] = await reachableApps(holding("inbox.read"));
+        expect(rest).toEqual([]);
+        expect(app?.id).toBe("admin");
+        expect(app?.label).toBe("Inbox");
+        expect(app?.href).toBe("/inbox");
+    });
+
+    it("lands a member on Inbox rather than on a page that turns them away", async () => {
+        expect(await homePathFor(holding("inbox.read"))).toBe("/inbox");
+    });
+
+    it("keeps Management itself for an administrator", async () => {
+        const app = (await reachableApps(ADMIN)).find((entry) => entry.id === "admin");
+        expect(app?.label).toBe("Management");
+        expect(app?.href).toBe("/admin");
+    });
+
+    it("marks the guest entry for the switcher, and only the guest one", async () => {
+        expect(await reachableAppNav(holding("inbox.read"))).toEqual({ ids: ["admin"], guestIds: ["admin"] });
+        expect((await reachableAppNav(ADMIN)).guestIds).toEqual([]);
+    });
+
+    it("gives nothing to somebody who holds neither", async () => {
+        expect(await reachableAppIds(holding("drive.read"))).not.toContain("admin");
     });
 });
 

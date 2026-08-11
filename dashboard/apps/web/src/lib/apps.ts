@@ -77,6 +77,18 @@ export interface AppEntry {
     permission?: Permission;
     /** Only visible to administrators (filtered out of the switcher otherwise). */
     adminOnly?: boolean;
+    /**
+     * A subject an admin-only app carries that is not administration, for the
+     * people whose work it is.
+     *
+     * Management owns Inbox: the channels conversations arrive on are instance
+     * configuration, but the conversations themselves are a member's daily work,
+     * and `member` and `viewer` both hold `inbox.read`. Without this they would
+     * lose the door to it the moment Inbox stopped being an app of its own. So an
+     * account holding the permission sees the app under this name and lands here;
+     * every administration screen behind it stays shut by its own guard.
+     */
+    guest?: { permission: Permission; href: string; label: string; description: string };
     /** Kept out of the switcher list: a personal section reached from the account
      *  menu, which still owns its paths so the rail and the header follow it. */
     hidden?: boolean;
@@ -117,14 +129,6 @@ export const POLARIS_APPS: AppEntry[] = [
         permission: "tasks.read"
     },
     {
-        id: "inbox",
-        label: "Inbox",
-        description: "Customer conversations across every channel",
-        icon: MessagesSquare,
-        href: "/inbox",
-        permission: "inbox.read"
-    },
-    {
         id: "watch",
         label: "Watch",
         description: "Alarms on app health, spikes and outages",
@@ -140,8 +144,15 @@ export const POLARIS_APPS: AppEntry[] = [
         href: "/admin",
         adminOnly: true,
         // Admin pages that historically live at the top level, so they still
-        // resolve to the Management app in the switcher and sidebar.
-        match: ["/integrations", "/settings"]
+        // resolve to the Management app in the switcher and sidebar, plus Inbox,
+        // which is a subject of Management rather than an app beside it.
+        match: ["/inbox", "/integrations", "/settings"],
+        guest: {
+            permission: "inbox.read",
+            href: "/inbox",
+            label: "Inbox",
+            description: "Customer conversations across every channel"
+        }
     },
     {
         id: "account",
@@ -193,6 +204,20 @@ export interface AppSection {
  */
 const MACHINES_GROUP = "Machines";
 const OPERATIONS_GROUP = "Operations";
+
+/**
+ * The headings the Management rail is read under.
+ *
+ * Fifteen entries in one list is a wall, and an operator arrives at it with one
+ * of four questions: who is here, what they may do, how Polaris reaches people,
+ * and how the deployment itself is set up. Overview and Activity stay ungrouped
+ * at the top, because they are where you look before you know which of the four
+ * you want.
+ */
+const ADMIN_PEOPLE_GROUP = "People";
+const ADMIN_ACCESS_GROUP = "Access";
+const ADMIN_COMMUNICATION_GROUP = "Communication";
+const ADMIN_PLATFORM_GROUP = "Platform";
 
 export const APP_SECTIONS: Record<string, AppSection[]> = {
     drive: [
@@ -278,12 +303,6 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         { label: "Docs", href: "/tasks/docs", icon: FileText, keywords: ["wiki", "notes", "knowledge"] },
         { label: "Timesheet", href: "/tasks/time", icon: Timer, keywords: ["time tracking", "hours", "billable"] },
         { label: "Reporting", href: "/tasks/reports", icon: ChartColumn, keywords: ["dashboard", "workload", "metrics"] }
-    ],
-    inbox: [
-        { label: "Conversations", href: "/inbox", icon: MessagesSquare, keywords: ["chats", "messages"] },
-        { label: "Contacts", href: "/inbox/contacts", icon: Contact, keywords: ["people"] },
-        { label: "Channels", href: "/inbox/channels", icon: Radio, keywords: ["whatsapp", "telegram", "slack", "discord"] },
-        { label: "Logs", href: "/inbox/logs", icon: ScrollText }
     ],
     account: [
         { label: "Profile", href: "/account", icon: UserCog, keywords: ["name", "email", "avatar"] },
@@ -377,38 +396,96 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
     ],
     admin: [
         { label: "Overview", href: "/admin", icon: LayoutDashboard },
-        { label: "Users", href: "/admin/users", icon: Users, keywords: ["accounts", "invites"] },
-        { label: "Groups", href: "/admin/groups", icon: UsersRound, keywords: ["teams"] },
+        { label: "Activity", href: "/admin/activity", icon: Activity, keywords: ["audit", "logs"] },
+        { label: "Users", href: "/admin/users", icon: Users, keywords: ["accounts", "invites"], group: ADMIN_PEOPLE_GROUP },
+        { label: "Groups", href: "/admin/groups", icon: UsersRound, keywords: ["teams"], group: ADMIN_PEOPLE_GROUP },
         {
             label: "Organizations",
             href: "/admin/organizations",
             icon: Building2,
-            keywords: ["org", "orgs", "teams", "company", "limits", "turn off"]
+            keywords: ["org", "orgs", "teams", "company", "limits", "turn off"],
+            group: ADMIN_PEOPLE_GROUP
         },
         {
             label: "Roles",
             href: "/admin/roles",
             icon: IdCard,
-            keywords: ["permissions", "member", "viewer", "guest", "what they can do", "capabilities", "view as"]
+            keywords: ["permissions", "member", "viewer", "guest", "what they can do", "capabilities", "view as"],
+            group: ADMIN_ACCESS_GROUP
         },
-        { label: "Policies", href: "/admin/policies", icon: ShieldCheck, keywords: ["permissions", "access"] },
-        { label: "Activity", href: "/admin/activity", icon: Activity, keywords: ["audit", "logs"] },
-        { label: "Domains", href: "/admin/domains", icon: Globe, keywords: ["dns", "tunnels", "certificates"] },
-        { label: "Email delivery", href: "/admin/email", icon: Mail, keywords: ["smtp", "sender"], hidden: true },
-        { label: "Display defaults", href: "/admin/display", icon: SlidersHorizontal, keywords: ["units", "formats"] },
+        {
+            label: "Policies",
+            href: "/admin/policies",
+            icon: Scale,
+            keywords: ["permissions", "access"],
+            group: ADMIN_ACCESS_GROUP
+        },
+        {
+            label: "Security",
+            href: "/admin/security",
+            icon: ShieldCheck,
+            keywords: [
+                "2fa",
+                "two-factor",
+                "two-step",
+                "authenticator",
+                "require",
+                "mandatory",
+                "sign-in",
+                "enrolment",
+                "enrollment"
+            ],
+            group: ADMIN_ACCESS_GROUP
+        },
+        {
+            label: "Inbox",
+            href: "/inbox",
+            icon: MessagesSquare,
+            keywords: ["conversations", "chats", "messages", "whatsapp", "telegram", "slack", "contacts"],
+            group: ADMIN_COMMUNICATION_GROUP
+        },
+        {
+            label: "Email",
+            href: "/admin/email",
+            icon: Mail,
+            keywords: ["smtp", "sender", "resend", "brevo", "mailjet", "ses", "outgoing", "account mail"],
+            group: ADMIN_COMMUNICATION_GROUP
+        },
+        {
+            label: "Domains",
+            href: "/admin/domains",
+            icon: Globe,
+            keywords: ["dns", "tunnels", "certificates"],
+            group: ADMIN_PLATFORM_GROUP
+        },
+        {
+            label: "Display defaults",
+            href: "/admin/display",
+            icon: SlidersHorizontal,
+            keywords: ["units", "formats"],
+            group: ADMIN_PLATFORM_GROUP
+        },
         {
             label: "Agent defaults",
             href: "/admin/agents",
             icon: Bot,
-            keywords: ["agents", "quality gate", "enigma", "public", "private", "pull requests", "issues"]
+            keywords: ["agents", "quality gate", "enigma", "public", "private", "pull requests", "issues"],
+            group: ADMIN_PLATFORM_GROUP
         },
         {
             label: "Uploads",
             href: "/admin/uploads",
             icon: HardDrive,
-            keywords: ["attachments", "files", "storage", "nas", "size limit", "avatars", "profile photos", "gravatar"]
+            keywords: ["attachments", "files", "storage", "nas", "size limit", "avatars", "profile photos", "gravatar"],
+            group: ADMIN_PLATFORM_GROUP
         },
-        { label: "Integrations", href: "/integrations", icon: Blocks, keywords: ["github", "cloudflare", "connect"] },
+        {
+            label: "Integrations",
+            href: "/integrations",
+            icon: Blocks,
+            keywords: ["github", "cloudflare", "connect"],
+            group: ADMIN_PLATFORM_GROUP
+        },
         {
             label: "AI providers",
             href: "/integrations/models",
@@ -427,9 +504,16 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "openrouter",
                 "api key",
                 "agents"
-            ]
+            ],
+            group: ADMIN_PLATFORM_GROUP
         },
-        { label: "Updates & settings", href: "/settings", icon: Settings, keywords: ["version", "upgrade"] }
+        {
+            label: "Updates & settings",
+            href: "/settings",
+            icon: Settings,
+            keywords: ["version", "upgrade"],
+            group: ADMIN_PLATFORM_GROUP
+        }
     ]
 };
 
@@ -456,10 +540,34 @@ export interface AppSubapp {
     /** The path it owns, and where "back" comes back to. */
     base: string;
     parent: { label: string; href: string };
+    /** The app "back" returns to, when not everybody who reaches this subject can
+     *  open it. Inbox is Management's, and a member holds `inbox.read` without
+     *  holding anything else in Management - so for them the way back is a door
+     *  that refuses them, and the rail leaves it out rather than drawing it. */
+    parentAppId?: string;
     sections: AppSection[];
 }
 
 export const APP_SUBAPPS: AppSubapp[] = [
+    {
+        id: "inbox",
+        label: "Inbox",
+        icon: MessagesSquare,
+        base: "/inbox",
+        parent: { label: "Management", href: "/admin" },
+        parentAppId: "admin",
+        sections: [
+            { label: "Conversations", href: "/inbox", icon: MessagesSquare, keywords: ["chats", "messages"] },
+            { label: "Contacts", href: "/inbox/contacts", icon: Contact, keywords: ["people"] },
+            {
+                label: "Channels",
+                href: "/inbox/channels",
+                icon: Radio,
+                keywords: ["whatsapp", "telegram", "slack", "discord"]
+            },
+            { label: "Logs", href: "/inbox/logs", icon: ScrollText }
+        ]
+    },
     {
         id: "agents",
         label: "Agents",

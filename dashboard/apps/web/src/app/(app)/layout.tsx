@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { AppNav } from "@/components/app-nav";
 import { appBaseUrl } from "@/lib/domain-service";
 import { getCapabilities } from "@polaris/config";
-import { reachableAppIds } from "@/lib/app-access";
+import { reachableAppNav } from "@/lib/app-access";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppUrlProvider } from "@/components/app-url";
 import { accessFor, requireUser } from "@/lib/session";
@@ -42,7 +42,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         listNotifications(user.id),
         resolveDisplayPreferencesFor(user.id),
         appBaseUrl(),
-        reachableAppIds(accessFor(user)),
+        reachableAppNav(accessFor(user)),
         resolveScope(user.id),
         scopeChoices(user.id)
     ]);
@@ -58,7 +58,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                             <AppShell
                                 switcher={
                                     <>
-                                        <AppNav appIds={apps} />
+                                        <AppNav appIds={apps.ids} guestAppIds={apps.guestIds} />
                                         <ScopeSwitcher
                                             personalName={user.name}
                                             organizations={organizations}
@@ -66,9 +66,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                                         />
                                     </>
                                 }
-                                navButton={<AppNavDrawer />}
-                                search={<CommandPalette isAdmin={user.isAdmin} appIds={apps} />}
-                                sidebar={<AppSidebar />}
+                                navButton={<AppNavDrawer appIds={apps.ids} />}
+                                search={<CommandPalette isAdmin={user.isAdmin} appIds={apps.ids} />}
+                                sidebar={<AppSidebar appIds={apps.ids} />}
                                 account={
                                     <>
                                         {user.isAdmin ? <UpdateIndicator /> : null}

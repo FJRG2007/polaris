@@ -25,17 +25,42 @@ export interface AppAccessInput {
 }
 
 /** The apps this person may open, in registry order. Hidden apps (the account
- *  section) are not included: they are reached from the account menu. */
+ *  section) are not included: they are reached from the account menu.
+ *
+ *  An admin-only app that carries a guest subject (Management carries Inbox) is
+ *  returned under that subject's name and landing page for somebody who holds the
+ *  permission without being an administrator, so the switcher offers them the one
+ *  door they have rather than the app's own. */
 export async function reachableApps({ isAdmin, can }: AppAccessInput): Promise<AppEntry[]> {
     const decided = await Promise.all(
         POLARIS_APPS.map(async (app) => {
             if (app.hidden) return null;
-            if (app.adminOnly && !isAdmin) return null;
+            if (app.adminOnly && !isAdmin) {
+                if (!app.guest || !(await can(app.guest.permission))) return null;
+                return { ...app, label: app.guest.label, description: app.guest.description, href: app.guest.href };
+            }
             if (app.permission && !(await can(app.permission))) return null;
             return app;
         })
     );
     return decided.filter((app): app is AppEntry => app !== null);
+}
+
+/**
+ * What the switcher needs: the ids this account may open, and which of those it
+ * is only reaching through a guest subject.
+ *
+ * The second list exists because the switcher is a client component that holds
+ * the registry itself - the icons are components and do not cross the boundary -
+ * so it is told which entries to draw under their guest name rather than being
+ * handed the resolved entry.
+ */
+export async function reachableAppNav(input: AppAccessInput): Promise<{ ids: string[]; guestIds: string[] }> {
+    const apps = await reachableApps(input);
+    return {
+        ids: apps.map((app) => app.id),
+        guestIds: apps.filter((app) => app.guest && app.href === app.guest.href).map((app) => app.id)
+    };
 }
 
 /** The ids of the apps this person may open, for the client components that only

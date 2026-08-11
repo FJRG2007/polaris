@@ -10,7 +10,10 @@
  * A few sections are subjects of their own with several screens each - Runners is
  * pools, repositories, runs and secrets. Inside one of those the rail shows that
  * subject instead of the app's list, with a way back at the top: a rail that
- * changes what it contains and offers no way out is a place people get stuck.
+ * changes what it contains and offers no way out is a place people get stuck. The
+ * exception is a subject somebody reaches without reaching the app around it - a
+ * member in Inbox, which Management owns - where "back" would be a page that
+ * turns them away, and no link at all is the better of the two.
  *
  * Within one list, screens that belong to the same subject sit under a heading of
  * their own (Account's five security screens). A list where nothing names a group
@@ -35,7 +38,7 @@ import {
     type AppSection
 } from "@/lib/apps";
 
-export function AppSidebar() {
+export function AppSidebar({ appIds = [] }: { appIds?: string[] }) {
     const pathname = usePathname();
     const app = resolveActiveApp(pathname);
     // Null everywhere except inside an organization, where it says what this
@@ -79,9 +82,12 @@ export function AppSidebar() {
         else groups.push({ label, items: [item] });
     }
 
+    // Drawn unless the way back leads somewhere this account cannot go.
+    const showParent = subapp !== null && (!subapp.parentAppId || appIds.includes(subapp.parentAppId));
+
     return (
         <nav className="flex flex-col gap-1">
-            {subapp ? (
+            {subapp && showParent ? (
                 <Link
                     href={subapp.parent.href}
                     className="mb-1 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

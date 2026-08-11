@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import { APP_SECTIONS, resolveActiveApp, resolveSubapp } from "@/lib/apps";
 
-export function AppNavDrawer() {
+export function AppNavDrawer({ appIds = [] }: { appIds?: string[] }) {
     const pathname = usePathname();
     const subapp = resolveSubapp(pathname);
     const app = resolveActiveApp(pathname);
@@ -17,7 +17,7 @@ export function AppNavDrawer() {
     if (!hasSections) return null;
     return (
         <MobileNav>
-            <AppSidebar />
+            <AppSidebar appIds={appIds} />
         </MobileNav>
     );
 }
