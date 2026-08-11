@@ -68,6 +68,23 @@ describe("findGameIdentity", () => {
         expect((await findGameIdentity("pau", "steam"))?.identity).toBeNull();
     });
 
+    it("keeps one person's services apart", async () => {
+        // The same human is three different identities to three different games,
+        // and none of them substitutes for another: ARK's door takes the Steam id,
+        // a Minecraft server takes the name Mojang holds.
+        links = [
+            { userId: PAU, provider: "steam", accountId: "76561198000000001", label: "paulinho" },
+            { userId: PAU, provider: "minecraft", accountId: "069a79f4-44e9-4726-a5be-fca90e38aaf5", label: "Notch" },
+            { userId: PAU, provider: "epic", accountId: "0123456789abcdef0123456789abcdef", label: "pau_epic" }
+        ];
+
+        expect((await findGameIdentity("pau", "steam"))?.identity?.accountId).toBe("76561198000000001");
+        expect((await findGameIdentity("pau", "minecraft"))?.identity?.label).toBe("Notch");
+        expect((await findGameIdentity("pau", "epic"))?.identity?.accountId).toBe(
+            "0123456789abcdef0123456789abcdef"
+        );
+    });
+
     it("is nobody for a name that is not here", async () => {
         expect(await findGameIdentity("nobody", "steam")).toBeNull();
     });

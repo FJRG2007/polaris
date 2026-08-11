@@ -118,7 +118,7 @@ export async function saveOAuthAppAction(input: {
 }): Promise<{ error?: string }> {
     const user = await requireAdmin();
     const slug = input.slug;
-    if (!["google", "microsoft", "dropbox"].includes(slug)) {
+    if (!["google", "microsoft", "dropbox", "epic", "minecraft"].includes(slug)) {
         return { error: "That integration does not take an OAuth application" };
     }
     const clientId = input.clientId.trim();

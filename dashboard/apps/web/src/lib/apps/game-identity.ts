@@ -18,9 +18,15 @@
 
 import { prisma } from "@polaris/db";
 
-/** The services a game identity can come from. Steam today; the same shape holds
- *  an Epic id the day that link exists. */
-export type GameIdentityProvider = "steam";
+/**
+ * The services a game identity can come from.
+ *
+ * Three, because a player is a different thing on each: ARK's door takes a Steam
+ * id, a game bought on the Epic Store has no Steam id at all, and a Minecraft
+ * server is keyed by the username Mojang holds. Which one a screen asks for is
+ * the screen's business - none of them substitutes for another.
+ */
+export type GameIdentityProvider = "steam" | "epic" | "minecraft";
 
 export interface GameIdentity {
     /** The Polaris account it belongs to. */

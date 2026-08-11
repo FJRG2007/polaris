@@ -24,7 +24,7 @@ import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/minecraft/timeout";
 import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
 import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
-import { Loader2, Locate, MapPin, RefreshCw, TriangleAlert, X } from "lucide-react";
+import { Loader2, Locate, MapPin, RefreshCw, TriangleAlert, UserSearch, X } from "lucide-react";
 import { dimensionLabel, formatCoordinates, type PlayerPosition } from "@/lib/apps/minecraft/position";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
 
@@ -488,7 +488,8 @@ export function PlayerAccessDialog({
     error,
     onClose,
     onSave,
-    onRemoveAddress
+    onRemoveAddress,
+    onLookUp
 }: {
     edition: MinecraftEdition;
     /** The player being edited, or null to register somebody new. */
@@ -498,6 +499,9 @@ export function PlayerAccessDialog({
     onClose: () => void;
     onSave: (input: { username: string; address: string; note: string }) => void;
     onRemoveAddress?: (address: string) => void;
+    /** Find somebody by their Polaris name and hand back the Minecraft username
+     *  they linked. Absent on a screen where nobody may look people up. */
+    onLookUp?: (query: string) => Promise<{ username?: string; name?: string; error?: string }>;
 }) {
     const editing = player !== null;
     const [username, setUsername] = useState(player?.username ?? "");
@@ -505,6 +509,25 @@ export function PlayerAccessDialog({
     const [note, setNote] = useState(player?.note ?? "");
     const [detecting, startDetecting] = useTransition();
     const [detectFailed, setDetectFailed] = useState(false);
+    const [person, setPerson] = useState("");
+    const [lookUpError, setLookUpError] = useState<string | null>(null);
+    const [looking, startLooking] = useTransition();
+
+    /** Fill the name in from a Polaris account, spelled the way Mojang spells it. */
+    function lookUp(): void {
+        if (!onLookUp || person.trim().length === 0) return;
+        setLookUpError(null);
+        startLooking(async () => {
+            const found = await onLookUp(person.trim());
+            if (found.error || !found.username) {
+                setLookUpError(found.error ?? "Could not look that up");
+                return;
+            }
+            setUsername(found.username);
+            if (found.name && note.trim().length === 0) setNote(found.name);
+            setPerson("");
+        });
+    }
 
     const name = username.trim();
     const rule = address.trim();
@@ -550,12 +573,45 @@ export function PlayerAccessDialog({
                 })
             }
         >
+            {!editing && onLookUp && (
+                <PlayerFormField
+                    label="Somebody with a Polaris account"
+                    error={lookUpError}
+                    hint="Their username or email address. If they have linked Minecraft, their name fills itself in."
+                >
+                    <div className="flex items-center gap-1">
+                        <Input
+                            autoFocus
+                            value={person}
+                            onChange={(event) => setPerson(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key !== "Enter") return;
+                                event.preventDefault();
+                                lookUp();
+                            }}
+                            placeholder="pau, or pau@example.com"
+                            aria-label="Polaris username or email address"
+                        />
+                        <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={lookUp}
+                            disabled={looking || person.trim().length === 0}
+                            aria-label="Find their Minecraft account"
+                            title="Find their Minecraft account"
+                        >
+                            {looking ? <Loader2 className="size-4 animate-spin" /> : <UserSearch className="size-4" />}
+                        </Button>
+                    </div>
+                </PlayerFormField>
+            )}
+
             <PlayerFormField
                 label={edition === "bedrock" ? "Gamertag" : "Username"}
                 error={nameInvalid ? "That is not a username this edition accepts" : null}
             >
                 <Input
-                    autoFocus={!editing}
                     value={username}
                     onChange={(event) => setUsername(event.target.value)}
                     placeholder={edition === "bedrock" ? "Gamertag" : "Username"}

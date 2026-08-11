@@ -454,6 +454,7 @@ export function MinecraftPlayers({
                     error={formError}
                     onClose={() => setActing(null)}
                     onSave={savePlayer}
+                    onLookUp={(query) => actions.findMinecraftPlayerByUserAction(installedAppId, query)}
                     onRemoveAddress={(address) => {
                         if (!target) return;
                         const name = target.name;

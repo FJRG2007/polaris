@@ -299,6 +299,49 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         apiKeyHelp: "Optional. Without it a linked account shows its Steam id rather than its name."
     },
     {
+        slug: "epic",
+        name: "Epic Games",
+        category: "Automation",
+        summary: "Let people link their Epic account, so game servers can recognise them.",
+        description:
+            "Register a product in Epic's developer portal and everyone here gets a Connect button for their own Epic account. Polaris reads the account id and the display name, which is what a server needs to tell one player from another. Games bought on the Epic Store carry no Steam id at all, so for those players this is the only id there is.",
+        docsUrl: "https://dev.epicgames.com/docs/web-api-ref/authentication",
+        setupLinks: [
+            {
+                label: "Create a product and client",
+                url: "https://dev.epicgames.com/portal",
+                help: "Epic Account Services, then a client with the basic_profile scope. Paste the redirect URI below into its redirect URLs."
+            }
+        ],
+        requiresApiKey: true,
+        apiKeyLabel: "Client secret",
+        apiKeyHelp: "Shown once when the client is created, next to its id."
+    },
+    {
+        slug: "minecraft",
+        name: "Minecraft",
+        category: "Automation",
+        summary: "Let people link their Minecraft account, so a server can be opened to them by name.",
+        description:
+            "A separate Entra application from the Microsoft one: this asks only for Xbox sign-in, and Microsoft gates the Minecraft API behind an application it has approved. Once it is connected, linking an account hands Polaris the username as Mojang spells it - which is exactly what a server's player list is keyed by.",
+        docsUrl: "https://learn.microsoft.com/entra/identity-platform/quickstart-register-app",
+        setupLinks: [
+            {
+                label: "Register an application",
+                url: "https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/CreateApplicationBlade",
+                help: "Personal Microsoft accounts only. Paste the redirect URI below into the Web platform."
+            },
+            {
+                label: "Apply for the Minecraft API",
+                url: "https://help.minecraft.net/hc/en-us/articles/16254801392141",
+                help: "Microsoft approves each application before it may read a Minecraft profile. Without it, linking gets as far as Xbox and stops."
+            }
+        ],
+        requiresApiKey: true,
+        apiKeyLabel: "Client secret",
+        apiKeyHelp: "The secret's value, not its id. Shown once when it is created."
+    },
+    {
         slug: "cloudflare",
         name: "Cloudflare",
         category: "Automation",

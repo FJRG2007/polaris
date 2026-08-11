@@ -718,7 +718,13 @@ const OAUTH_APPS: Record<string, { name: string; idLabel: string; idPlaceholder:
         idLabel: "Application (client) ID",
         idPlaceholder: "00000000-0000-0000-0000-000000000000"
     },
-    dropbox: { name: "Dropbox", idLabel: "App key", idPlaceholder: "abcdefghijklmno" }
+    dropbox: { name: "Dropbox", idLabel: "App key", idPlaceholder: "abcdefghijklmno" },
+    epic: { name: "Epic Games", idLabel: "Client ID", idPlaceholder: "xyza7891..." },
+    minecraft: {
+        name: "Minecraft",
+        idLabel: "Application (client) ID",
+        idPlaceholder: "00000000-0000-0000-0000-000000000000"
+    }
 };
 
 function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {

@@ -17,6 +17,13 @@
 import type { ConnectionCredential } from "./store";
 import { findConnectionProvider } from "@polaris/core";
 import { STEAM_PROVIDER } from "./steam";
+import { epicAuthorizeUrl, exchangeEpicCode, getEpicOAuthClient, identifyEpicAccount } from "./epic";
+import {
+    exchangeMinecraftCode,
+    getMinecraftOAuthClient,
+    identifyMinecraftAccount,
+    minecraftAuthorizeUrl
+} from "./minecraft";
 import { getIntegrationState } from "@/lib/integration-service";
 import { authorizeGithubUser, getGithubUserAuth, githubLinkCallbackUrl } from "@/lib/github-service";
 import {
@@ -149,6 +156,30 @@ const ADAPTERS: Record<string, ProviderOAuth> = {
             return { ...granted, avatarUrl: null };
         },
         identify: identifyMicrosoftAccount
+    },
+    epic: {
+        callbackUrl: (baseUrl) => `${baseUrl}/api/connections/epic/callback`,
+        client: getEpicOAuthClient,
+        authorizeUrl: (client, redirectUri, state) => epicAuthorizeUrl(client, redirectUri, state),
+        exchange: async (client, code, redirectUri) => {
+            const granted = await exchangeEpicCode(client, code, redirectUri);
+            // Epic vouches for no address, so nothing here becomes one of this
+            // person's own.
+            return { ...granted, avatarUrl: null, email: null };
+        },
+        identify: identifyEpicAccount
+    },
+    minecraft: {
+        callbackUrl: (baseUrl) => `${baseUrl}/api/connections/minecraft/callback`,
+        client: getMinecraftOAuthClient,
+        authorizeUrl: (client, redirectUri, state) => minecraftAuthorizeUrl(client, redirectUri, state),
+        exchange: async (client, code, redirectUri) => {
+            const granted = await exchangeMinecraftCode(client, code, redirectUri);
+            // Nothing is kept: the username was the errand, and Polaris never acts
+            // as somebody's Minecraft account afterwards.
+            return { ...granted, avatarUrl: null, email: null, credential: {} };
+        },
+        identify: identifyMinecraftAccount
     },
     dropbox: {
         callbackUrl: (baseUrl) => `${baseUrl}/api/connections/dropbox/callback`,

@@ -315,6 +315,15 @@ export async function findArkPlayerByUserAction(
         const found = await findGameIdentity(parsed.data, "steam");
         if (!found) return { error: "Nobody here goes by that. Check the username or the email address." };
         if (!found.identity) {
+            // Somebody who plays through Epic has no Steam id at all, and ARK's
+            // own list refuses anything else - so the answer is about the server
+            // rather than about them, and it says which.
+            const epic = await findGameIdentity(parsed.data, "epic").catch(() => null);
+            if (epic?.identity) {
+                return {
+                    error: `${found.name} has linked Epic Games rather than Steam. An ARK server's list only takes Steam ids, so they have to be let in another way.`
+                };
+            }
             return { error: `${found.name} has not linked a Steam account yet. They can do it under Connected accounts.` };
         }
         return { steamId: found.identity.accountId, name: found.name, label: found.identity.label };

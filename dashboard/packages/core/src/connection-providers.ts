@@ -13,7 +13,7 @@
  * will one day be half added.
  */
 
-export type ConnectionProviderSlug = "github" | "google" | "microsoft" | "dropbox" | "steam";
+export type ConnectionProviderSlug = "github" | "google" | "microsoft" | "dropbox" | "steam" | "epic" | "minecraft";
 
 export interface ConnectionProvider {
     slug: ConnectionProviderSlug;
@@ -112,6 +112,36 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
         signInDefault: false,
         signInWarning:
             "Steam accounts are traded and phished more than most. This one is linked to be recognised on a game server; letting it sign in makes it a way into Polaris as well."
+    },
+    {
+        slug: "epic",
+        name: "Epic Games",
+        summary: "Be recognised on a game server you own the game on through Epic.",
+        description:
+            "Games bought on the Epic Store identify a player by an Epic account id rather than a Steam one. Linking yours is what lets whoever runs a server know which of those you are. Polaris reads your account id and display name and nothing else.",
+        acceptsToken: false,
+        defaultLimit: 1,
+        requires: "an Epic product",
+        // Another gaming account, and worth no more as a way into Polaris than
+        // the Steam one beside it.
+        signInDefault: false,
+        signInWarning:
+            "This account is linked to be recognised on a game server. Letting it sign in makes it a way into Polaris as well."
+    },
+    {
+        slug: "minecraft",
+        name: "Minecraft",
+        summary: "Be added to a Minecraft server by name, spelled the way Mojang spells it.",
+        description:
+            "A Minecraft server lets people in by username, and one wrong letter is a player who cannot join with nothing saying why. Linking your account hands over the name and the account id it belongs to, so whoever runs a server can add you by your Polaris name instead. Polaris reads your profile once and keeps nothing it could act with.",
+        acceptsToken: false,
+        defaultLimit: 1,
+        requires: "a Microsoft application approved for the Minecraft API",
+        // The account behind it is a Microsoft one, with everything that reaches -
+        // and it is linked here to name a Minecraft profile.
+        signInDefault: false,
+        signInWarning:
+            "The account behind a Minecraft profile is a Microsoft account, which often reaches an inbox as well. It is linked here to name a player on a server."
     },
     {
         slug: "dropbox",

@@ -13,6 +13,7 @@ import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { clientIp } from "@/lib/request-context";
 import { recordAudit } from "@/lib/audit-service";
+import { findGameIdentity } from "@/lib/apps/game-identity";
 import { setEnvVars } from "@/lib/env-var-service";
 import { requirePermissionAny } from "@/lib/session";
 import { runArkCommand } from "@/lib/apps/ark/service";
@@ -578,6 +579,39 @@ export async function grantPlayerAccessAction(input: PlayerAccessInput): Promise
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not add that player" };
+    }
+}
+
+/**
+ * Who a Polaris name or address belongs to, and the Minecraft username they
+ * linked.
+ *
+ * A server's player list is keyed by the username, and one wrong letter is
+ * somebody who cannot join with nothing anywhere saying why - so the name is
+ * taken from the account Mojang vouched for rather than retyped from a chat
+ * message.
+ *
+ * Three answers, because the screen has three things to say: a name ready to add,
+ * a person here who has linked nothing, and a name that is nobody.
+ */
+export async function findMinecraftPlayerByUserAction(
+    installedAppId: string,
+    query: string
+): Promise<{ username?: string; name?: string; error?: string }> {
+    const parsed = z.string().trim().min(1).max(120).safeParse(query);
+    if (!parsed.success) return { error: "Type a Polaris username or email address" };
+    try {
+        await requireGameServer("games.manage", installedAppId);
+        const found = await findGameIdentity(parsed.data, "minecraft");
+        if (!found) return { error: "Nobody here goes by that. Check the username or the email address." };
+        if (!found.identity) {
+            return {
+                error: `${found.name} has not linked a Minecraft account yet. They can do it under Connected accounts.`
+            };
+        }
+        return { username: found.identity.label, name: found.name };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not look that up" };
     }
 }
 
