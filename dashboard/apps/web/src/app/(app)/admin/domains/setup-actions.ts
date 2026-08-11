@@ -20,6 +20,7 @@ import { requireAdmin } from "@/lib/session";
 import { getHostLanIp } from "@/lib/host-address";
 import { recordAudit } from "@/lib/audit-service";
 import { syncDashboardRoute } from "@/lib/domain-edge";
+import { installedGames } from "@/lib/apps/game-zones";
 import { serverEnvironmentSchema } from "@polaris/core";
 import { listGamePorts } from "@/lib/apps/games-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
@@ -32,14 +33,6 @@ import { EXPOSURE_STRATEGIES, STRATEGY_META, type ExposureStrategy } from "@/lib
 import { getDomainConfig, setDomainConfig, syncDuckDns, type DomainConfig } from "@/lib/domain-service";
 import { checkZoneDns, provisionZoneDns, type ZoneDnsProvisionResult, type ZoneDnsReport } from "@/lib/domain-dns";
 import {
-    getDomainZones,
-    saveDomainZones,
-    setDashboardZoneIntent,
-    zoneDnsVerified,
-    zoneRecords,
-    type DomainZoneConfig
-} from "@/lib/domain-zones";
-import {
     getLocalEnvironment,
     getNetworkStatus,
     setLocalEnvironment,
@@ -47,6 +40,15 @@ import {
     type LocalEnvironment,
     type NetworkStatus
 } from "@/lib/network-service";
+import {
+    gameZoneRecords,
+    getDomainZones,
+    saveDomainZones,
+    setDashboardZoneIntent,
+    zoneDnsVerified,
+    zoneRecords,
+    type DomainZoneConfig
+} from "@/lib/domain-zones";
 
 /** The strategy the setup last saved. Its own key because nothing else records it. */
 const STRATEGY_KEY = "domain.setup.strategy";
@@ -76,6 +78,13 @@ export interface DomainSetupState {
     /** The DNS records the current layout needs. */
     records: Array<{ host: string; wildcard: string; scope: string }>;
     /**
+     * One wildcard per installed game, listed apart from the zones because it is not
+     * one: it needs no host record, and a missing one does not make the layout
+     * unverified. What it costs to skip is a DNS record per game server, which is what
+     * fills a zone up on a deployment that runs a lot of them.
+     */
+    gameRecords: Array<{ game: string; wildcard: string }>;
+    /**
      * Game servers and the ports they answer on. Part of this screen because it is
      * the screen that asks an operator to open ports at all: 80 and 443 carry every
      * website and no game client, so a deployment running game servers needs rules
@@ -102,7 +111,7 @@ async function domainSetupState(): Promise<DomainSetupState> {
     // operator to guess that a button on the last step is what unblocks their domain.
     const saved = await getDomainZones();
     if (saved.baseDomain && !(await zoneDnsVerified())) await checkZoneDns().catch(() => undefined);
-    const [environment, network, zones, domains, cloudflare, strategy, lanIp, gameServers, portPolicy, portBlocks] =
+    const [environment, network, zones, domains, cloudflare, strategy, lanIp, gameServers, portPolicy, portBlocks, games] =
         await Promise.all([
             getLocalEnvironment(),
             getNetworkStatus(),
@@ -115,7 +124,8 @@ async function domainSetupState(): Promise<DomainSetupState> {
             // and a deployment that has none is the common case.
             listGamePorts().catch(() => []),
             getPortPolicy(),
-            getPortBlocks()
+            getPortBlocks(),
+            installedGames().catch(() => [])
         ]);
     return {
         environment,
@@ -142,6 +152,10 @@ async function domainSetupState(): Promise<DomainSetupState> {
             host: record.host,
             wildcard: record.wildcard,
             scope: record.zone.scope
+        })),
+        gameRecords: gameZoneRecords(zones, games).map((record) => ({
+            game: record.game,
+            wildcard: record.wildcard
         }))
     };
 }

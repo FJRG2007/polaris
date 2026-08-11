@@ -9,8 +9,10 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { store, resolve4, setDomainConfig } = vi.hoisted(() => ({
+const { store, installs, resolve4, setDomainConfig } = vi.hoisted(() => ({
     store: new Map<string, string>(),
+    /** Installed apps, so a test can turn a game on and get its wildcard checked. */
+    installs: [] as Array<{ catalogId: string }>,
     resolve4: vi.fn(),
     setDomainConfig: vi.fn()
 }));
@@ -28,6 +30,9 @@ vi.mock("@polaris/db", () => ({
             deleteMany: async ({ where }: { where: { key: string } }) => {
                 store.delete(where.key);
             }
+        },
+        installedApp: {
+            findMany: async () => installs
         }
     }
 }));
@@ -64,6 +69,7 @@ const LAYOUT = {
 describe("checkZoneDns", () => {
     beforeEach(async () => {
         store.clear();
+        installs.length = 0;
         resolve4.mockReset();
         setDomainConfig.mockReset();
         serving(true);
@@ -89,6 +95,35 @@ describe("checkZoneDns", () => {
         await checkZoneDns();
         expect(await zoneDnsVerified()).toBe(false);
         expect(setDomainConfig).not.toHaveBeenCalled();
+    });
+
+    /**
+     * A game's wildcard saves a DNS record per server; it is not part of what makes the
+     * domain work. Counting it towards the verification gate would mean installing a
+     * game silently stopped a working instance from minting deploy hostnames - the
+     * exact regression this guards.
+     */
+    it("keeps the layout verified while a game's wildcard is still missing", async () => {
+        installs.push({ catalogId: "minecraft-manager" });
+        resolve4.mockImplementation(async (hostname: string) =>
+            hostname.includes(".mc.") ? Promise.reject(new Error("NXDOMAIN")) : ["51.15.20.30"]
+        );
+        const report = await checkZoneDns();
+        expect(await zoneDnsVerified()).toBe(true);
+        expect(report.gameZones).toHaveLength(1);
+        expect(report.gameZones[0]).toMatchObject({ game: "Minecraft", wildcard: "*.mc.example.com", ok: false });
+    });
+
+    it("reports a game's wildcard as done once it answers here", async () => {
+        installs.push({ catalogId: "minecraft-manager" });
+        resolve4.mockResolvedValue(["51.15.20.30"]);
+        const report = await checkZoneDns();
+        expect(report.gameZones[0]).toMatchObject({ wildcard: "*.mc.example.com", ok: true });
+    });
+
+    it("asks for no game wildcard on an instance with no game installed", async () => {
+        resolve4.mockResolvedValue(["51.15.20.30"]);
+        expect((await checkZoneDns()).gameZones).toEqual([]);
     });
 
     it("does not move it onto a wildcard answering for another machine", async () => {

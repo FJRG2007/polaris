@@ -13,14 +13,16 @@
 import { useState, useTransition } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { Globe, Loader2, PencilLine } from "lucide-react";
-import { setGameHostnameAction } from "./minecraft-actions";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
+import { setGameHostnameAction, setGameRoutedAction } from "./minecraft-actions";
 
 export function MinecraftDomain({
     installedAppId,
     hostname,
     suffix,
-    address
+    address,
+    routed = false,
+    canRoute = false
 }: {
     installedAppId: string;
     /** The name it answers to today, when it has one. */
@@ -30,11 +32,23 @@ export function MinecraftDomain({
     suffix: string | null;
     /** What a player actually types, port included where the name does not carry it. */
     address: string | null;
+    /** Whether it answers on the shared port rather than one of its own. */
+    routed?: boolean;
+    /** Whether it could - only a client that names the address in its handshake. */
+    canRoute?: boolean;
 }) {
     const [editing, setEditing] = useState(false);
     const [label, setLabel] = useState(() => (hostname && suffix ? hostname.slice(0, -suffix.length) : ""));
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+
+    function toggleRouted(): void {
+        setError(null);
+        startTransition(async () => {
+            const result = await setGameRoutedAction(installedAppId, !routed);
+            if (result.error) setError(result.error);
+        });
+    }
 
     const normalized = label
         .trim()
@@ -122,19 +136,39 @@ export function MinecraftDomain({
                         {error && <p className="text-xs text-danger">{error}</p>}
                     </div>
                 ) : (
-                    <div className="flex items-center gap-2">
-                        {address ? (
-                            <>
-                                <code className="truncate font-mono text-sm" title={address}>
-                                    {address}
-                                </code>
-                                <CopyButton value={address} label="Copy the server address" />
-                            </>
-                        ) : (
-                            <span className="text-xs text-muted-foreground">
-                                No name yet. Give it one and Polaris writes the records.
-                            </span>
+                    <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                            {address ? (
+                                <>
+                                    <code className="truncate font-mono text-sm" title={address}>
+                                        {address}
+                                    </code>
+                                    <CopyButton value={address} label="Copy the server address" />
+                                </>
+                            ) : (
+                                <span className="text-xs text-muted-foreground">
+                                    No name yet. Give it one and Polaris writes the records.
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Offered only where it can work, and only once there is a name
+                            to route: the router matches on the address a player typed,
+                            so a server without one has nothing for it to match. */}
+                        {canRoute && hostname && (
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2">
+                                <p className="text-xs text-muted-foreground">
+                                    {routed
+                                        ? "Shares port 25565 with the other Java servers, so the address needs no port and no DNS record of its own. Players connect from the router's address, so the player list cannot be bound to addresses."
+                                        : "Give it its own port, or put it behind the shared one: an address with no port, and no DNS record per server. Its player list can then only be closed by username."}
+                                </p>
+                                <Button size="sm" variant="secondary" onClick={toggleRouted} disabled={pending}>
+                                    {pending && <Loader2 className="size-4 animate-spin" />}
+                                    {routed ? "Give it its own port" : "Use the shared port"}
+                                </Button>
+                            </div>
                         )}
+                        {error && <p className="text-xs text-danger">{error}</p>}
                     </div>
                 )}
             </CardBody>

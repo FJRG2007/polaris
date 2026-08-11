@@ -14,9 +14,15 @@ const deleteMany = vi.fn();
 
 vi.mock("@polaris/db", () => ({ prisma: { setting: { findUnique, upsert, deleteMany } } }));
 
-const { deployHostname, deployZoneBase, getDomainZones, listDeployZones, saveDomainZones, zoneRecords } = await import(
-    "../../src/lib/domain-zones"
-);
+const {
+    deployHostname,
+    deployZoneBase,
+    gameZoneRecords,
+    getDomainZones,
+    listDeployZones,
+    saveDomainZones,
+    zoneRecords
+} = await import("../../src/lib/domain-zones");
 
 /** What the Setting rows hold after a save, so a read sees what was written. Zones
  *  only mint hostnames once their DNS has been proven, so the flag is part of the
@@ -215,6 +221,46 @@ describe("zoneRecords", () => {
 
     it("asks for nothing when there is no domain", () => {
         expect(zoneRecords({ baseDomain: "", zones: [] })).toEqual([]);
+    });
+});
+
+/**
+ * One wildcard per game is what keeps a zone from filling up: without it every game
+ * server writes a record of its own, and an operator running Polaris as hosting hits
+ * the provider's record cap long before they run out of machine.
+ */
+describe("gameZoneRecords", () => {
+    const config = { baseDomain: "example.com", zones: [{ label: "plr", scope: "deploy" as const, primary: true }] };
+
+    it("asks for one wildcard per game, and no host record", () => {
+        const records = gameZoneRecords(config, [
+            { name: "Minecraft", domainLabel: "mc" },
+            { name: "ARK: Survival Evolved", domainLabel: "ark" }
+        ]);
+        expect(records).toEqual([
+            { game: "Minecraft", label: "mc", wildcard: "*.mc.example.com" },
+            { game: "ARK: Survival Evolved", label: "ark", wildcard: "*.ark.example.com" }
+        ]);
+    });
+
+    it("asks for nothing when no game is installed", () => {
+        expect(gameZoneRecords(config, [])).toEqual([]);
+    });
+
+    it("asks for nothing when there is no domain", () => {
+        expect(gameZoneRecords({ baseDomain: "", zones: [] }, [{ name: "Minecraft", domainLabel: "mc" }])).toEqual([]);
+    });
+
+    it("asks for a label once, however many games share it", () => {
+        const records = gameZoneRecords(config, [
+            { name: "Minecraft", domainLabel: "mc" },
+            { name: "Minecraft Legacy", domainLabel: "MC" }
+        ]);
+        expect(records).toEqual([{ game: "Minecraft", label: "mc", wildcard: "*.mc.example.com" }]);
+    });
+
+    it("drops a label no DNS record could ever carry", () => {
+        expect(gameZoneRecords(config, [{ name: "Broken", domainLabel: "not a label" }])).toEqual([]);
     });
 });
 

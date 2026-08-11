@@ -986,8 +986,15 @@ function DnsStep({
     const cloudflarePossible = provider === null || provider.id === "cloudflare";
     // Proven, not assumed: a zone counts as done only once the check has seen both of
     // its names answer with this server's address.
-    const done = new Map(report?.zones.map((zone) => [zone.wildcard, zone.ok]) ?? []);
-    const verified = report !== null && report.zones.length > 0 && report.zones.every((zone) => zone.ok);
+    const done = new Map(
+        [...(report?.zones ?? []), ...(report?.gameZones ?? [])].map((zone) => [zone.wildcard, zone.ok])
+    );
+    // The zones proper decide whether the layout is verified, exactly as before. A
+    // game's wildcard is counted here only so the step keeps offering to create it -
+    // it is not part of what makes the domain work, it is what keeps a zone from
+    // filling up one record per game server.
+    const zonesVerified = report !== null && report.zones.length > 0 && report.zones.every((zone) => zone.ok);
+    const verified = zonesVerified && (report?.gameZones ?? []).every((zone) => zone.ok);
 
     return (
         <div className="flex flex-col gap-3">
@@ -1006,6 +1013,18 @@ function DnsStep({
                     <div key={record.wildcard} className="flex flex-col gap-1 p-2 text-xs">
                         <RecordRow name={record.host} ip={publicIp} done={done.get(record.wildcard) === true} />
                         <RecordRow name={record.wildcard} ip={publicIp} done={done.get(record.wildcard) === true} />
+                    </div>
+                ))}
+                {/* One per game, and said as such: an operator who has never deployed a
+                    game server has no reason to guess what `*.mc` is for. Without it
+                    every server writes a record of its own, which is the thing that
+                    fills a zone up. */}
+                {state.gameRecords.map((record) => (
+                    <div key={record.wildcard} className="flex flex-col gap-1 p-2 text-xs">
+                        <RecordRow name={record.wildcard} ip={publicIp} done={done.get(record.wildcard) === true} />
+                        <span className="text-muted-foreground">
+                            Covers every {record.game} server, so each one costs no DNS record.
+                        </span>
                     </div>
                 ))}
             </div>
@@ -1245,7 +1264,7 @@ function ZoneResults({
 }) {
     return (
         <>
-            {report?.zones.map((zone) => (
+            {[...(report?.zones ?? []), ...(report?.gameZones ?? [])].map((zone) => (
                 <p
                     key={zone.wildcard}
                     className={`flex items-start gap-2 rounded-md border px-3 py-2 text-xs ${

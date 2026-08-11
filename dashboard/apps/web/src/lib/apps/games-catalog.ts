@@ -80,3 +80,27 @@ export function gameOfServer(catalogId: string): GameDefinition | null {
 export function isGameManagerApp(catalogId: string): boolean {
     return GAMES.some((game) => game.managerCatalogId === catalogId);
 }
+
+/**
+ * The edition whose clients speak UDP, and so carry no hostname in the connection.
+ *
+ * It sits inside the Minecraft game rather than beside it, which is exactly why this
+ * has to be named: the game says its clients look a name up, and for this one manifest
+ * that is not true. Read `routesByHostname` rather than this.
+ */
+const BEDROCK_CATALOG_ID = "minecraft-bedrock";
+
+/**
+ * Whether a client of this server tells the server which address it dialled.
+ *
+ * Minecraft: Java puts it in the handshake packet, before login and in the clear,
+ * which is what lets one port serve many servers by name and what lets a SRV record
+ * move the port out of the address. Bedrock and ARK are UDP and do neither, so their
+ * address carries its port.
+ *
+ * One predicate for both, because they are the same fact: whichever way the port is
+ * kept out of what a player types, it needs the client to name the address first.
+ */
+export function routesByHostname(catalogId: string): boolean {
+    return Boolean(gameOfServer(catalogId)?.srv) && catalogId !== BEDROCK_CATALOG_ID;
+}

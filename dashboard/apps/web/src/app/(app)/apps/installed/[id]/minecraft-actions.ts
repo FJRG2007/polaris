@@ -16,7 +16,6 @@ import { recordAudit } from "@/lib/audit-service";
 import { setEnvVars } from "@/lib/env-var-service";
 import { requirePermissionAny } from "@/lib/session";
 import { runArkCommand } from "@/lib/apps/ark/service";
-import { gameOfServer } from "@/lib/apps/games-catalog";
 import { deployApplication } from "@/lib/deploy-service";
 import { applyWorldSchedule } from "@/lib/backups/manage";
 import { DIFFICULTIES } from "@/lib/apps/minecraft/rules";
@@ -27,13 +26,14 @@ import { stripFormatting } from "@/lib/apps/minecraft/parse";
 import { requireGameServer } from "@/lib/apps/install-access";
 import { userSessionAddresses } from "@/lib/session-directory";
 import type { QueuedAction } from "@/lib/apps/minecraft/queue";
-import { setGameHostname } from "@/lib/apps/minecraft/address";
 import { patchInstallConfig } from "@/lib/apps/install-config";
 import { isMissingEntityReply } from "@/lib/apps/minecraft/snbt";
 import { writeContainerFile } from "@/lib/container-files-service";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/minecraft/timeout";
 import type { InventoryItem } from "@/lib/apps/minecraft/inventory";
 import { setGameSchedule } from "@/lib/apps/minecraft/schedule-service";
+import { gameOfServer, routesByHostname } from "@/lib/apps/games-catalog";
+import { setGameHostname, setGameRouted } from "@/lib/apps/minecraft/address";
 import { liftTimeout, timeoutPlayer } from "@/lib/apps/minecraft/timeout-service";
 import { MAX_BACKUP_BYTES, MAX_KEEP_LAST } from "@/lib/apps/minecraft/backup-policy";
 import { cancelAction, pendingFor, queueAction } from "@/lib/apps/minecraft/queue-service";
@@ -742,7 +742,7 @@ export async function setGameHostnameAction(
         const hostname = await setGameHostname(access.ownerId, installedAppId, {
             name: install.name,
             ...(parsed.data ? { subdomain: parsed.data } : {}),
-            srv: (game?.srv ?? true) && install.catalogId !== "minecraft-bedrock",
+            srv: routesByHostname(install.catalogId),
             ...(game ? { gameLabel: game.domainLabel } : {})
         });
         await recordAudit({
@@ -756,6 +756,35 @@ export async function setGameHostnameAction(
         return { hostname };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not set that address" };
+    }
+}
+
+/**
+ * Put a Java server behind the shared port, or take it back off.
+ *
+ * The manage grant for the same reason as the name itself: it decides what a player
+ * types and what the world can reach. The refusals - a game that carries no hostname
+ * to route on, a player list bound to addresses - live with the change rather than
+ * here, so the same rules apply however this is called.
+ */
+export async function setGameRoutedAction(
+    installedAppId: string,
+    routed: boolean
+): Promise<{ ok?: true; error?: string }> {
+    try {
+        const { user, access } = await requireGameServer("games.manage", installedAppId);
+        await setGameRouted(access.ownerId, installedAppId, routed);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.routed",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { routed }
+        });
+        revalidatePath(`/apps/installed/${installedAppId}`);
+        return { ok: true };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not change that" };
     }
 }
 

@@ -60,6 +60,11 @@ services:
       # through the same `host-gateway` entry they are given below - they are
       # configured from this file, so the name and the resolver ship together.
       POLARIS_APP_DIAL_HOST: ${POLARIS_APP_DIAL_HOST:-host.docker.internal}
+      # Where the Minecraft routing table is written for mc-router to watch, and the
+      # port it answers on - the dashboard checks that something is listening there
+      # before it takes a server's own port away, so the two have to agree.
+      POLARIS_MC_ROUTES_DIR: /mc-routes
+      POLARIS_MC_ROUTER_PORT: ${POLARIS_MC_ROUTER_PORT:-25565}
     # Traefik routes the dashboard by these labels (discovered on the default
     # network). The dashboard answers only on its own names - the local names, an
     # optional public domain, and any address of the machine itself - so an unknown
@@ -133,6 +138,10 @@ services:
       # the dashboard writes and the edge guard reads. Its own volume rather than the
       # dynamic dir: Traefik parses every .json it finds there as a route config.
       - polaris-edge-intel:/edge-intel
+      # Minecraft hostname routes, written here and watched by mc-router. Its own
+      # volume for the same reason as the one above: Traefik reads every .json in
+      # the dynamic dir, and this is not one of its routes.
+      - polaris-mc-routes:/mc-routes
       # Dedicated SSH key + pinned known_hosts for the Docker connector, mounted
       # read-only. Populated by `install.sh --ssh`; empty (and ignored) otherwise.
       # Absolute host path so the mount is correct even when compose runs inside the
@@ -370,6 +379,54 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  # --- Minecraft hostname routing -------------------------------------------
+  # One port for every Java server. A Java client puts the address it was given
+  # into the handshake, before login and before anything is encrypted, so a router
+  # reading that field can send each connection to the right server: every world
+  # answers on 25565 under its own name, with no port for a player to remember and
+  # no SRV record for Polaris to write. That last part is why this exists - a SRV
+  # record is the one thing a wildcard cannot replace (a wildcard may only be the
+  # leftmost label), so it was the last per-server DNS record left.
+  #
+  # Behind a profile, and off unless the operator asks for it, because it binds
+  # 25565 on the host: an existing install whose first Minecraft server was pinned
+  # to that port would otherwise fail to start the whole stack on the next `up`.
+  # Turn it on by adding `mcrouter` to COMPOSE_PROFILES in .env.
+  #
+  # The table is a file the dashboard writes and this watches. No API, no token,
+  # no port between them, and it survives a restart of either side - the same seam
+  # the edge already uses for deployed-app routes.
+  #
+  # Two deliberate omissions:
+  #  - No DEFAULT/default-server. A connection naming a hostname nothing claims is
+  #    dropped rather than sent somewhere, so a port scanner - which connects by
+  #    address and names no hostname - never lands on somebody's world.
+  #  - No USE_PROXY_PROTOCOL. Vanilla servers do not speak it and would break on
+  #    the header, and turning it on while the backends keep their own published
+  #    ports would let a client that dials one directly forge its source address.
+  #    The cost is that a routed server sees connections from this container, which
+  #    is why routing is opted into per server rather than switched on for all.
+  mc-router:
+    profiles: ["mcrouter"]
+    image: itzg/mc-router:1.46.2
+    restart: unless-stopped
+    environment:
+      # The table, reloaded whenever the dashboard rewrites it.
+      ROUTES_CONFIG: /mc-routes/mc-routes.json
+      ROUTES_CONFIG_WATCH: "true"
+      # New connections per second. The upstream default is 1, which a server with
+      # a queue of players rejoining after a restart would trip over immediately.
+      CONNECTION_RATE_LIMIT: ${POLARIS_MC_ROUTER_RATE_LIMIT:-20}
+    ports:
+      - "${POLARIS_MC_ROUTER_PORT:-25565}:25565"
+    volumes:
+      - polaris-mc-routes:/mc-routes:ro
+    # Backends are dialled on the host by their published port, exactly as the edge
+    # dials a deployed app - so nothing about how a game server is deployed has to
+    # change for it to be routable.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 networks:
   # Shared network deployed apps and the edge join for name-based routing. hostd
   # creates it at startup, so it is external here - compose uses the existing
@@ -396,3 +453,4 @@ volumes:
   polaris-traefik-dynamic:
   polaris-traefik-log:
   polaris-edge-intel:
+  polaris-mc-routes:

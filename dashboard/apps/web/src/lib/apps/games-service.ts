@@ -24,6 +24,7 @@ import type { PortBlocks, PortPolicy } from "@/lib/apps/port-block";
 import { gameOfServer, type GameId } from "@/lib/apps/games-catalog";
 import { sweepTimeouts } from "@/lib/apps/minecraft/timeout-service";
 import { applyAllowList, getArkPlayers } from "@/lib/apps/ark/service";
+import { syncMinecraftRoutes } from "@/lib/apps/minecraft/router-service";
 import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
 import { enforcePlayerAddresses } from "@/lib/apps/minecraft/player-access";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
@@ -499,6 +500,10 @@ export async function syncFirewallBans(
             await sweepInventorySnapshots(ownerId, install.id, online).catch(() => 0);
         }
     }
+    // The routing table, rebuilt from what exists right now. A server that was removed
+    // or repointed leaves a route behind otherwise, and a route to a port nothing holds
+    // is a name that fails for a player with nothing anywhere saying why.
+    await syncMinecraftRoutes().catch(() => undefined);
     return { servers, banned, kicked, allowed };
 }
 

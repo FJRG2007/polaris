@@ -13,14 +13,14 @@
  */
 
 import { prisma } from "@polaris/db";
-import { readArkAccess, readArkPorts } from "@/lib/apps/ark/service";
-import { gameOfServer } from "@/lib/apps/games-catalog";
 import { gameServerFacts } from "@/lib/apps/games-service";
-import { listPlayerAccess } from "@/lib/apps/minecraft/player-access";
-import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import type { ArkAccessView } from "@/lib/apps/ark/service";
 import { readInstallConfig } from "@/lib/apps/install-config";
 import { gameDomainSuffix } from "@/lib/apps/minecraft/address";
+import { readArkAccess, readArkPorts } from "@/lib/apps/ark/service";
+import { listPlayerAccess } from "@/lib/apps/minecraft/player-access";
+import { gameOfServer, routesByHostname } from "@/lib/apps/games-catalog";
+import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import { readSchedule, readScheduleState, type GameSchedule, type ScheduleState } from "@/lib/apps/minecraft/schedule";
 
 export interface GameContext {
@@ -30,6 +30,12 @@ export interface GameContext {
     readonly suffix: string | null;
     /** What a player types to connect, as far as Polaris' own records go. */
     readonly address: string | null;
+    /** Whether it answers on the shared port, behind the hostname router, rather
+     *  than on a port of its own. */
+    readonly routed: boolean;
+    /** Whether it could be: only a client that puts the address in its handshake
+     *  can be routed by it, which is Minecraft: Java and nothing else here. */
+    readonly canRoute: boolean;
     /** When an icon was last uploaded, so the panel can say there is one without
      *  reaching into the container to look. */
     readonly iconSetAt: string | null;
@@ -91,6 +97,8 @@ export async function gameContextFor(app: {
         hostname: typeof config.hostname === "string" ? config.hostname : null,
         suffix,
         address: facts?.address ?? null,
+        routed: config.routed === true,
+        canRoute: routesByHostname(app.catalogId),
         iconSetAt: typeof config.iconSetAt === "string" ? config.iconSetAt : null,
         schedule: readSchedule(config),
         scheduleState: readScheduleState(config),

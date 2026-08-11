@@ -180,6 +180,54 @@ export interface ZoneRecords {
     wildcard: string;
 }
 
+/**
+ * The one record a game's servers need, so their names cost no DNS between them.
+ *
+ * A game server takes a name under its game's label (`survival.mc.example.com`), and
+ * until a wildcard covers that label each server has to have a record written for it -
+ * which is a zone that fills up at one or two records per server and an operator who
+ * cannot run a hundred of them. One wildcard per game replaces all of it.
+ *
+ * Only the wildcard, unlike a deploy zone: nothing serves `mc.example.com` itself, so
+ * asking for a record there would be asking for one nothing would ever answer on.
+ */
+export interface GameZoneRecords {
+    /** The game whose servers take names here, so the checklist can say why. */
+    readonly game: string;
+    /** The label under the base domain (`mc`). */
+    readonly label: string;
+    /** The record that covers every server name of this game, present and future. */
+    readonly wildcard: string;
+}
+
+/** A game as this needs to know it: what it is called, and the label it mints under. */
+export interface GameZone {
+    readonly name: string;
+    readonly domainLabel: string;
+}
+
+/**
+ * One wildcard per installed game. Pure - the caller supplies the games, so this stays
+ * testable and the DB read lives with the code that knows what "installed" means
+ * (`lib/apps/game-zones`).
+ *
+ * Deduplicated by label: two games sharing one would otherwise ask for the same record
+ * twice and check it twice.
+ */
+export function gameZoneRecords(config: DomainZoneConfig, games: readonly GameZone[]): GameZoneRecords[] {
+    if (!config.baseDomain) return [];
+    const seen = new Set<string>();
+    return games.flatMap((game) => {
+        const label = game.domainLabel.trim().toLowerCase();
+        // A game whose label is not a usable DNS label would produce a record nobody
+        // could create. Dropped rather than shown: the catalog is ours, so this is a
+        // catalog bug, and the checklist is not where to report it.
+        if (!isZoneLabel(label) || label === "" || seen.has(label)) return [];
+        seen.add(label);
+        return [{ game: game.name, label, wildcard: `*.${label}.${config.baseDomain}` }];
+    });
+}
+
 export function zoneRecords(config: DomainZoneConfig): ZoneRecords[] {
     if (!config.baseDomain) return [];
     // One pair per hostname, not per zone: zones of different scopes may sit on the

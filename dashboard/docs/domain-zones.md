@@ -57,6 +57,60 @@ A record already pointing somewhere else is never repointed - the name may be a 
 site - and the domain is added either way, since DNS that is not there yet only
 delays the certificate.
 
+## Game servers
+
+A game server's name lives under its game's own label - `survival.mc.example.com`,
+`island.ark.example.com` - so two games' servers can never collide on one subdomain.
+Each of those labels needs **one** wildcard record, and without it every server writes
+an A record of its own: a zone that grows at one or two records per server, against a
+provider cap that is usually 200. An operator running Polaris as hosting hits it long
+before they run out of machine.
+
+The labels are not stored in `domain.zones`. They are derived from the games whose
+manager app is installed (`lib/apps/game-zones`), so a game turned on later adds its
+record to the checklist and one removed stops asking for it, with nothing to migrate
+and no zone left behind pointing at a game that is gone. `gameZoneRecords` names them,
+the guided setup lists and creates them beside the zones proper, and
+`provisionHostnameDns` then finds each new server's name already resolving here and
+writes nothing.
+
+They are checked but never counted towards `domain.zones.verified`. That flag gates
+deploy hostname minting, and a game wildcard is not part of what makes the domain work
+- folding it in would mean installing a game silently stopped a working instance from
+minting hostnames.
+
+### One port for every Java server
+
+A wildcard cannot replace the SRV record that keeps the port out of a Minecraft: Java
+address, because a wildcard may only be the leftmost label - `_minecraft._tcp.*.mc` is
+not one. So the SRV record was the last thing that still grew per server.
+
+A Java client puts the address it dialled into its handshake packet, before login and
+in the clear, so a router reading that field can serve every world from one port.
+`mc-router` does that, watching a table Polaris writes (`lib/apps/minecraft/router-service`)
+in the same shape as the edge's own dynamic config - a file in a shared volume, no API
+and no token between them. A routed server costs no DNS record at all.
+
+It is opt-in per server, from the server's Address card, for three reasons worth
+keeping in view:
+
+- The router binds 25565 on the host, so it ships behind the `mcrouter` compose profile
+  and is off unless asked for. An existing install whose first Minecraft server was
+  pinned to that port would otherwise fail to start the whole stack.
+- Connections reach the server from the router, so the address half of the player list
+  (`player-access`, which reads the address off the join line) cannot be enforced
+  through it. Turning routing on is refused while that is in use rather than quietly
+  weakening it.
+- Turning it on removes the SRV record, so it is also refused when nothing is listening
+  on the router's port - otherwise it would take a working address away and leave
+  nothing in its place.
+
+PROXY protocol is deliberately not enabled: vanilla servers do not speak it, and
+turning it on while backends keep their own published ports would let a client that
+dials one directly forge its source address. Bedrock and ARK are UDP and name no
+address in the connection, so they keep a port in theirs - they just no longer cost a
+DNS record each.
+
 ## Per-server wildcards
 
 Each registered server carries an optional `wildcardDomain` (`Host.wildcardDomain`,

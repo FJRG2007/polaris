@@ -21,7 +21,14 @@
 
 import { resolve4 } from "node:dns/promises";
 import { randomLabel } from "@polaris/deploy";
+import { installedGames } from "./apps/game-zones";
+import { setDomainConfig } from "./domain-service";
+import { detectPublicIp, getLocalEnvironment } from "./network-service";
+import { reportRouterAdvice, type RouterAdvice } from "./network-advice";
+import { loadCloudflareToken } from "./integrations/cloudflare-account-service";
+import { findDnsRecords, pruneDnsRecords, resolveZoneForHostname, upsertARecord } from "./integrations/cloudflare-api";
 import {
+    gameZoneRecords,
     getDashboardZoneIntent,
     getDomainZones,
     polarisZoneHost,
@@ -30,11 +37,6 @@ import {
     setZoneReachable,
     zoneRecords
 } from "./domain-zones";
-import { setDomainConfig } from "./domain-service";
-import { detectPublicIp, getLocalEnvironment } from "./network-service";
-import { reportRouterAdvice, type RouterAdvice } from "./network-advice";
-import { loadCloudflareToken } from "./integrations/cloudflare-account-service";
-import { findDnsRecords, pruneDnsRecords, resolveZoneForHostname, upsertARecord } from "./integrations/cloudflare-api";
 
 export interface ZoneDnsCheck {
     /** The zone's own hostname (`plr.example.com`). */
@@ -51,10 +53,29 @@ export interface ZoneDnsCheck {
     detail: string;
 }
 
+/**
+ * The same for a game's wildcard, which is checked apart from the zones for one
+ * reason: it must never decide whether the layout counts as verified. `zoneDnsVerified`
+ * gates deploy hostname minting, so folding an uncreated `*.mc` into it would stop a
+ * working instance minting deploy hostnames the moment somebody installed a game.
+ */
+export interface GameZoneDnsCheck {
+    /** The game whose servers take names here, so a row can say what it is for. */
+    game: string;
+    /** The one record it needs. There is no zone host to check: nothing serves
+     *  `mc.example.com` itself, only the names under it. */
+    wildcard: string;
+    addresses: string[];
+    ok: boolean;
+    detail: string;
+}
+
 export interface ZoneDnsReport {
     /** The address the records should point at, when one is known. */
     expectedIp: string | null;
     zones: ZoneDnsCheck[];
+    /** One per installed game, reported but never counted towards `verified`. */
+    gameZones: GameZoneDnsCheck[];
     /** What is left to do outside Polaris - a router forward, a firewall rule - for
      *  the domain to work. Null when there is no Polaris zone to diagnose. */
     router: RouterAdvice | null;
@@ -74,6 +95,7 @@ async function resolveOrEmpty(hostname: string): Promise<string[]> {
 export async function checkZoneDns(): Promise<ZoneDnsReport> {
     const [config, expectedIp] = await Promise.all([getDomainZones(), detectPublicIp()]);
     const records = zoneRecords(config);
+    const gameZones = await checkGameZoneDns(config, expectedIp);
     const zones = await Promise.all(
         records.map(async (record) => {
             const [wildcardAddresses, hostAddresses] = await Promise.all([
@@ -145,7 +167,57 @@ export async function checkZoneDns(): Promise<ZoneDnsReport> {
     // name resolves nowhere, so nothing could answer on it - and the operator would be
     // sent to their router over what is actually a missing DNS record.
     const resolves = zones.length > 0 && zones.every((zone) => zone.ok);
-    return { expectedIp, zones, router: resolves ? await checkRouter() : null };
+    return { expectedIp, zones, gameZones, router: resolves ? await checkRouter() : null };
+}
+
+/**
+ * Resolve each installed game's wildcard. Reported, never recorded: nothing here
+ * touches `setZoneDnsVerified`, so an instance that installs a game keeps minting
+ * deploy hostnames exactly as it did before the record was ever asked for.
+ *
+ * Best effort - a game whose wildcard cannot be looked up must not fail the check the
+ * operator actually pressed the button for.
+ */
+async function checkGameZoneDns(
+    config: Awaited<ReturnType<typeof getDomainZones>>,
+    expectedIp: string | null
+): Promise<GameZoneDnsCheck[]> {
+    if (!config.baseDomain) return [];
+    const games = await installedGames().catch(() => []);
+    const records = gameZoneRecords(config, games);
+    return Promise.all(
+        records.map(async (record) => {
+            // A random label is the whole test: nothing but the wildcard could answer
+            // for a name that was never created.
+            const addresses = await resolveOrEmpty(`${randomLabel(3)}.${record.label}.${config.baseDomain}`);
+            if (addresses.length === 0) {
+                return {
+                    game: record.game,
+                    wildcard: record.wildcard,
+                    addresses,
+                    ok: false,
+                    detail: `No DNS answer yet. Without it every ${record.game} server needs a DNS record of its own.`
+                };
+            }
+            const elsewhere = expectedIp ? addresses.filter((address) => address !== expectedIp) : [];
+            if (elsewhere.length > 0) {
+                return {
+                    game: record.game,
+                    wildcard: record.wildcard,
+                    addresses,
+                    ok: false,
+                    detail: `Resolves to ${addresses.join(", ")}, but this server is at ${expectedIp}.`
+                };
+            }
+            return {
+                game: record.game,
+                wildcard: record.wildcard,
+                addresses,
+                ok: true,
+                detail: `Resolves to ${addresses.join(", ")}, so ${record.game} servers need no DNS record each.`
+            };
+        })
+    );
 }
 
 /**
@@ -239,6 +311,10 @@ export interface ZoneDnsProvisionResult {
  * with an empty label puts the operator's apex (`example.com`) on this list, and
  * repointing that would take their existing website offline. They are reported back
  * so the caller can name them and ask.
+ *
+ * Each installed game's wildcard is created here as well. It is the same kind of
+ * record and the same button should produce it: without it every game server writes a
+ * record of its own, which is what fills a zone up.
  */
 export async function provisionZoneDns(options: { overwrite?: boolean } = {}): Promise<ZoneDnsProvisionResult> {
     const [config, token, ip] = await Promise.all([getDomainZones(), loadCloudflareToken(), detectPublicIp()]);
@@ -248,33 +324,36 @@ export async function provisionZoneDns(options: { overwrite?: boolean } = {}): P
 
     const zone = await resolveZoneForHostname(token, config.baseDomain);
     const result: ZoneDnsProvisionResult = { created: [], replaced: [], unchanged: [], conflicts: [], failed: [] };
+    const games = await installedGames().catch(() => []);
+    const names = [
+        ...zoneRecords(config).flatMap((record) => [record.host, record.wildcard]),
+        ...gameZoneRecords(config, games).map((record) => record.wildcard)
+    ];
     // Sequential on purpose: Cloudflare rate-limits per account, and a handful of
     // records is not worth risking a 429 that leaves the layout half-created.
-    for (const record of zoneRecords(config)) {
-        for (const name of [record.host, record.wildcard]) {
-            try {
-                const existing = await findDnsRecords(token, zone.id, "A", name);
-                // Every address the name answers with has to be this server: one stray
-                // record left in place keeps the name round-robining onto a machine
-                // that does not serve the app.
-                const elsewhere = existing.filter((entry) => entry.content !== ip);
-                if (existing.length > 0 && elsewhere.length === 0) {
-                    result.unchanged.push(name);
-                    continue;
-                }
-                if (elsewhere.length > 0 && !options.overwrite) {
-                    result.conflicts.push({ name, content: elsewhere.map((entry) => entry.content).join(", ") });
-                    continue;
-                }
-                const recordId = await upsertARecord(token, zone.id, name, ip);
-                await pruneDnsRecords(token, zone.id, recordId, existing);
-                (existing.length > 0 ? result.replaced : result.created).push(name);
-            } catch (caught) {
-                result.failed.push({
-                    name,
-                    detail: caught instanceof Error ? caught.message : "Cloudflare rejected the record"
-                });
+    for (const name of names) {
+        try {
+            const existing = await findDnsRecords(token, zone.id, "A", name);
+            // Every address the name answers with has to be this server: one stray
+            // record left in place keeps the name round-robining onto a machine
+            // that does not serve the app.
+            const elsewhere = existing.filter((entry) => entry.content !== ip);
+            if (existing.length > 0 && elsewhere.length === 0) {
+                result.unchanged.push(name);
+                continue;
             }
+            if (elsewhere.length > 0 && !options.overwrite) {
+                result.conflicts.push({ name, content: elsewhere.map((entry) => entry.content).join(", ") });
+                continue;
+            }
+            const recordId = await upsertARecord(token, zone.id, name, ip);
+            await pruneDnsRecords(token, zone.id, recordId, existing);
+            (existing.length > 0 ? result.replaced : result.created).push(name);
+        } catch (caught) {
+            result.failed.push({
+                name,
+                detail: caught instanceof Error ? caught.message : "Cloudflare rejected the record"
+            });
         }
     }
     return result;
