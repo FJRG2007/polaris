@@ -14,6 +14,8 @@
 
 import { prisma } from "@polaris/db";
 import { getServerPlayers } from "./service";
+import { getArkPlayers } from "@/lib/apps/ark/service";
+import { gameOfServer } from "@/lib/apps/games-catalog";
 import { flushGameWorld } from "@/lib/apps/games-flush";
 import { setApplicationRunning } from "@/lib/deploy-service";
 import { readSchedule, scheduleAction, type GameSchedule } from "./schedule";
@@ -56,7 +58,7 @@ export async function sweepGameSchedules(
 ): Promise<ScheduleSweep> {
     const installs = await prisma.installedApp.findMany({
         where: { ownerId, status: { not: "removed" }, applicationId: { not: null } },
-        select: { id: true, applicationId: true, config: true }
+        select: { id: true, applicationId: true, config: true, catalogId: true }
     });
     let started = 0;
     let stopped = 0;
@@ -72,11 +74,11 @@ export async function sweepGameSchedules(
 
         // Only a running server can be asked who is on it, and only a running
         // server's emptiness is worth timing.
-        const playersOnline = !running
-            ? 0
-            : (known?.get(install.id) ??
-              (await getServerPlayers(ownerId, install.id).catch(() => null))?.players.online ??
-              0);
+        // "Nobody is playing" is the whole basis for stopping a server, so it is
+        // asked in the language of the game it belongs to - ARK answers over
+        // arkmanager and Minecraft over rcon-cli, and reading one with the other's
+        // client is a server that looks empty and gets stopped underneath people.
+        const playersOnline = !running ? 0 : (known?.get(install.id) ?? (await countOnline(ownerId, install)));
         const emptySince = await trackEmptiness(install.id, config, running, playersOnline, at);
 
         const action = scheduleAction(schedule, at, { running, playersOnline, emptySince });
@@ -95,6 +97,17 @@ export async function sweepGameSchedules(
         await patchInstallConfig(install.id, { [EMPTY_SINCE_KEY]: null }).catch(() => undefined);
     }
     return { started, stopped };
+}
+
+/** How many people are on one server, whatever game it runs. Nought when it
+ *  cannot be asked - a server that is not answering is not one to stop, and the
+ *  emptiness clock is what decides that. */
+async function countOnline(ownerId: string, install: { id: string; catalogId: string }): Promise<number> {
+    if (gameOfServer(install.catalogId)?.id === "ark") {
+        const live = await getArkPlayers(ownerId, install.id).catch(() => null);
+        return live?.answering ? live.players.length : 0;
+    }
+    return (await getServerPlayers(ownerId, install.id).catch(() => null))?.players.online ?? 0;
 }
 
 /**

@@ -25,6 +25,7 @@ import { findArkMap, mapRequirementHint } from "@/lib/apps/ark/maps";
 import type { GameContext } from "./game-context";
 import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
+import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import { CopyButton } from "@/components/copy-button";
 import { foldArkPlayers, matchesArkPlayer, type ArkPlayerEntry } from "@/lib/apps/ark/players";
 import { PlayerIconAction, PlayersTable } from "@/components/game-players-table";
@@ -38,7 +39,7 @@ import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs"
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
 import { Badge, Button, Card, CardBody, Input, Skeleton, Switch, cn } from "@polaris/ui";
 import { generateJoinPassword, isJoinPassword, isSteamId, JOIN_PASSWORD_HINT } from "@/lib/apps/ark/access";
-import { Ban, Clock, Eye, FolderOpen, LogOut, Loader2, Megaphone, RefreshCw, Save, ShieldAlert, UserMinus, UserPlus } from "lucide-react";
+import { Ban, Clock, DoorOpen, Eye, FolderOpen, Loader2, Megaphone, RefreshCw, Save, ShieldAlert, UserMinus, UserPlus } from "lucide-react";
 import {
     addArkPlayerAction,
     broadcastArkAction,
@@ -252,6 +253,7 @@ export function ArkPanel({
             {tab === "access" && <MinecraftAccess installedAppId={installedAppId} />}
             {tab === "settings" && (
                 <div className="flex flex-col gap-4">
+                    <MinecraftSchedule installedAppId={installedAppId} schedule={game?.schedule ?? NO_SCHEDULE} />
                     <MinecraftDomain
                         installedAppId={installedAppId}
                         hostname={game?.hostname ?? null}
@@ -800,7 +802,14 @@ function Broadcast({ installedAppId, answering }: { installedAppId: string; answ
     );
 }
 
-/** One person, in whatever states they are in, with the verbs that apply to them. */
+/**
+ * One person, in whatever states they are in, with the verbs that apply to them.
+ *
+ * Drawn in the same language as the Minecraft rows, because they are the same
+ * table: the name and its second line, a badge for what they are doing, a wrap of
+ * badges for where they stand, and the verbs as icons at the end. What a state is
+ * called differs; how it reads should not.
+ */
 function ArkPlayerRow({
     entry,
     canModerate,
@@ -821,62 +830,67 @@ function ArkPlayerRow({
     onBan: () => void;
 }) {
     return (
-        <tr className="border-t border-border">
+        <tr
+            className={cn(
+                "border-t border-border hover:bg-card-hover",
+                // Somebody the server will not let in is still worth showing and is
+                // not what anybody is scanning for.
+                entry.standing === "not-allowed" && !entry.online && "opacity-60"
+            )}
+        >
             <td className="px-3 py-2">
-                <span className="block max-w-56 truncate font-medium" title={entry.name}>
+                <p className="truncate font-medium" title={entry.name}>
                     {entry.name}
-                </span>
+                </p>
                 <span className="block truncate text-xs text-muted-foreground md:hidden">{entry.steamId}</span>
+                {entry.addedAt && (
+                    <span className="hidden text-xs text-muted-foreground md:block">
+                        Added {new Date(entry.addedAt).toLocaleDateString()}
+                    </span>
+                )}
             </td>
             <td className="hidden px-3 py-2 md:table-cell">
                 <div className="flex items-center gap-1">
-                    <code className="font-mono text-xs">{entry.steamId}</code>
+                    <code className="font-mono text-xs text-muted-foreground">{entry.steamId}</code>
                     <CopyButton value={entry.steamId} label={`the Steam id of ${entry.name}`} />
                 </div>
             </td>
             <td className="px-3 py-2">
-                {entry.online ? (
-                    <Badge className="border-success/40 text-success">Playing</Badge>
-                ) : (
-                    <span className="text-xs text-muted-foreground">Not on</span>
-                )}
+                {entry.online ? <Badge variant="success">Playing</Badge> : <Badge>Offline</Badge>}
             </td>
             <td className="px-3 py-2">
-                {entry.standing === "allowed" ? (
-                    <Badge>Yes</Badge>
-                ) : entry.standing === "waiting" ? (
-                    <span
-                        className="flex items-center gap-1 text-xs text-muted-foreground"
-                        title="Recorded here. The server is told as soon as it answers."
-                    >
-                        <Clock className="size-3.5" /> Waiting for the server
-                    </span>
-                ) : (
-                    <span className="text-xs text-muted-foreground">No</span>
-                )}
+                <div className="flex flex-wrap items-center gap-1">
+                    {entry.standing === "allowed" && <Badge variant="primary">allowed</Badge>}
+                    {entry.standing === "waiting" && (
+                        <Badge title="Recorded here. The server is told as soon as it answers.">
+                            <Clock className="size-3" /> waiting
+                        </Badge>
+                    )}
+                    {entry.standing === "not-allowed" && <Badge variant="warning">not on the list</Badge>}
+                </div>
             </td>
             <td className="px-3 py-2">
                 <div className="flex justify-end gap-1">
-                    {canModerate && entry.standing === "not-allowed" && (
-                        <PlayerIconAction
-                            label={`Let ${entry.name} in`}
-                            icon={<UserPlus className="size-4" />}
-                            disabled={pending}
-                            onClick={onAllow}
-                        />
-                    )}
-                    {canModerate && entry.standing !== "not-allowed" && (
-                        <PlayerIconAction
-                            label={`Take ${entry.name} off the list`}
-                            icon={<UserMinus className="size-4" />}
-                            disabled={pending}
-                            onClick={onRemove}
-                        />
-                    )}
+                    {canModerate &&
+                        (entry.standing === "not-allowed" ? (
+                            <PlayerIconAction
+                                label={`Let ${entry.name} in`}
+                                icon={<UserPlus className="size-4" />}
+                                disabled={pending}
+                                onClick={onAllow}
+                            />
+                        ) : (
+                            <PlayerIconAction
+                                label={`Take ${entry.name} off the list`}
+                                icon={<UserMinus className="size-4" />}
+                                disabled={pending}
+                                onClick={onRemove}
+                            />
+                        ))}
                     {canModerate && entry.online && (
                         <PlayerIconAction
                             label={`Throw ${entry.name} off`}
-                            icon={<LogOut className="size-4" />}
+                            icon={<DoorOpen className="size-4" />}
                             disabled={pending || !answering}
                             onClick={onKick}
                         />
