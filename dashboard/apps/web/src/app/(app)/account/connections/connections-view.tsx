@@ -71,7 +71,13 @@ const OUTCOMES: Record<string, { text: string; bad: boolean }> = {
     taken: { text: "That account is already linked to another Polaris account.", bad: true },
     limit: { text: "You have already linked as many accounts of that service as you are allowed.", bad: true },
     unavailable: { text: "This Polaris cannot connect that service yet.", bad: true },
-    error: { text: "The service did not complete the authorization.", bad: true }
+    // Nothing here is this person's to fix, and the reason lives in a console
+    // they cannot open - so the one useful thing to tell them is that the people
+    // who can open it now know.
+    error: {
+        text: "The service did not complete the authorization. Nothing was wrong on your side: this Polaris has told its administrators.",
+        bad: true
+    }
 };
 
 export function ConnectionsView({ providers }: { providers: ConnectionProviderCard[] }) {

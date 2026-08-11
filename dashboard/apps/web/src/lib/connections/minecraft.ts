@@ -23,6 +23,7 @@
  */
 
 import { z } from "zod";
+import { refusalMessage } from "./refusal";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
 export const MINECRAFT_PROVIDER = "minecraft";
@@ -119,7 +120,7 @@ async function microsoftToken(
         }),
         signal: AbortSignal.timeout(TIMEOUT_MS)
     });
-    if (!response.ok) throw new Error(`Microsoft refused the token request (${response.status})`);
+    if (!response.ok) throw new Error(await refusalMessage(response, "Microsoft refused the token request"));
     return msTokenSchema.parse(await response.json()).access_token;
 }
 
@@ -164,7 +165,7 @@ async function xstsToken(xboxLiveToken: string): Promise<string> {
 /** The Minecraft token, and then the profile it names. */
 async function minecraftProfile(xsts: string, userHash: string): Promise<z.infer<typeof profileSchema>> {
     const login = await postJson(LOGIN_WITH_XBOX, { identityToken: `XBL3.0 x=${userHash};${xsts}` });
-    if (!login.ok) throw new Error(`Minecraft refused the sign-in (${login.status})`);
+    if (!login.ok) throw new Error(await refusalMessage(login, "Minecraft refused the sign-in"));
     const token = minecraftTokenSchema.parse(await login.json()).access_token;
 
     const profile = await fetch(PROFILE, {
@@ -178,7 +179,7 @@ async function minecraftProfile(xsts: string, userHash: string): Promise<z.infer
             "This account has no Minecraft profile. Somebody on Game Pass has to open the launcher once first."
         );
     }
-    if (!profile.ok) throw new Error(`Minecraft refused the profile request (${profile.status})`);
+    if (!profile.ok) throw new Error(await refusalMessage(profile, "Minecraft refused the profile request"));
     return profileSchema.parse(await profile.json());
 }
 

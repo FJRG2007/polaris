@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import { refusalMessage } from "./refusal";
 import type { ConnectionCredential } from "./store";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
@@ -104,7 +105,7 @@ async function postToken(
         },
         body: new URLSearchParams(body)
     });
-    if (!response.ok) throw new Error(`Dropbox refused the token request (${response.status})`);
+    if (!response.ok) throw new Error(await refusalMessage(response, "Dropbox refused the token request"));
     return tokenSchema.parse(await response.json());
 }
 
@@ -159,7 +160,7 @@ async function identify(accessToken: string): Promise<z.infer<typeof accountSche
         method: "POST",
         headers: { authorization: `Bearer ${accessToken}` }
     });
-    if (!response.ok) throw new Error(`Dropbox would not say who authorized (${response.status})`);
+    if (!response.ok) throw new Error(await refusalMessage(response, "Dropbox would not say who authorized"));
     return accountSchema.parse(await response.json());
 }
 

@@ -12,6 +12,7 @@
  */
 
 import { z } from "zod";
+import { refusalMessage } from "./refusal";
 import type { ConnectionCredential } from "./store";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
@@ -98,7 +99,7 @@ async function postToken(
         })
     });
     if (!response.ok) {
-        throw new Error(`Microsoft refused the token request (${response.status})`);
+        throw new Error(await refusalMessage(response, "Microsoft refused the token request"));
     }
     return tokenSchema.parse(await response.json());
 }
@@ -154,7 +155,7 @@ export async function identifyMicrosoftAccount(
 
 async function identify(accessToken: string): Promise<z.infer<typeof meSchema>> {
     const response = await fetch(GRAPH_ME, { headers: { authorization: `Bearer ${accessToken}` } });
-    if (!response.ok) throw new Error(`Microsoft would not say who authorized (${response.status})`);
+    if (!response.ok) throw new Error(await refusalMessage(response, "Microsoft would not say who authorized"));
     return meSchema.parse(await response.json());
 }
 

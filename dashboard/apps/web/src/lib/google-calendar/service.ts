@@ -18,6 +18,7 @@
  */
 
 import { z } from "zod";
+import { refusalMessage, refusalReason } from "@/lib/connections/refusal";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
 export const CALENDAR_PROVIDER = "google";
@@ -271,10 +272,14 @@ export function forgetGoogleAccessToken(refreshToken: string): void {
 
 /** Raised when Google has stopped accepting the stored refresh token - the
  *  person revoked access, or changed their password. The caller turns this into
- *  "link again" rather than into an error nobody can act on. */
+ *  "link again" rather than into an error nobody can act on.
+ *
+ *  It is also what a brand new authorization gets when the client itself is the
+ *  problem, which is a different thing entirely and only Google's own reason
+ *  tells them apart - so the reason rides along when there is one. */
 export class GoogleAuthExpiredError extends Error {
-    constructor() {
-        super("Google no longer accepts this authorization.");
+    constructor(reason?: string) {
+        super(reason ? `Google no longer accepts this authorization: ${reason}` : "Google no longer accepts this authorization.");
         this.name = "GoogleAuthExpiredError";
     }
 }
@@ -363,8 +368,8 @@ async function postToken(
         }),
         cache: "no-store"
     });
-    if (response.status === 400 || response.status === 401) throw new GoogleAuthExpiredError();
-    if (!response.ok) throw new Error(`Google returned ${response.status} for the token request`);
+    if (response.status === 400 || response.status === 401) throw new GoogleAuthExpiredError(await refusalReason(response));
+    if (!response.ok) throw new Error(await refusalMessage(response, "Google refused the token request"));
     const parsed = tokenSchema.safeParse(await response.json());
     if (!parsed.success) throw new Error("Google returned a token response Polaris could not read");
     return parsed.data;

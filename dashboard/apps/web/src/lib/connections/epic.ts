@@ -16,6 +16,7 @@
  */
 
 import { z } from "zod";
+import { refusalMessage } from "./refusal";
 import type { ConnectionCredential } from "./store";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
@@ -94,7 +95,10 @@ async function postToken(
         body: new URLSearchParams(body),
         signal: AbortSignal.timeout(TIMEOUT_MS)
     });
-    if (!response.ok) throw new Error(`Epic refused the token request (${response.status})`);
+    // Epic's reason is the whole value of this failing: a client whose policy
+    // forbids the grant, one not linked to the application, and a secret from a
+    // different client are three different switches and one status code.
+    if (!response.ok) throw new Error(await refusalMessage(response, "Epic refused the token request"));
     return tokenSchema.parse(await response.json());
 }
 
@@ -123,7 +127,11 @@ export async function exchangeEpicCode(
     const token = await postToken(client, {
         grant_type: "authorization_code",
         code,
-        redirect_uri: redirectUri
+        redirect_uri: redirectUri,
+        // Sent again here, as Epic's own example does. The scopes granted are
+        // fixed at the consent screen, so this asks for nothing new - it is the
+        // shape Epic documents for this grant.
+        scope: SCOPES.join(" ")
     });
     const profile = await readDisplayName(token.access_token);
     const accountId = token.account_id ?? profile.id;

@@ -35,6 +35,7 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import { requestOrigin } from "@/lib/domain-service";
 import { findConnectionProvider } from "@polaris/core";
 import { signInWithConnection, type ConnectionSignInResult } from "@polaris/auth";
+import { clearConnectionFailure, describeFailure, recordConnectionFailure } from "./attention";
 import { readSteamPersona, steamAuthorizeUrl, STEAM_PROVIDER, verifySteamReturn } from "./steam";
 import { ConnectionClaimedError, ConnectionLimitError, saveConnection, signInConnection } from "./store";
 import {
@@ -356,12 +357,17 @@ async function finishLink(origin: string, provider: string, code: string): Promi
         // moment it can be observed: the provider took somebody all the way through
         // and handed back an account. From here the service is offered to everybody.
         await markConnectionProven(provider);
+        // Whatever it last refused, it does not refuse now.
+        await clearConnectionFailure(provider);
         return endLink(origin, provider, "linked");
     } catch (caught) {
         // The two refusals somebody can actually do something about are named;
         // everything else is a provider that did not complete the authorization.
         if (caught instanceof ConnectionClaimedError) return endLink(origin, provider, "taken");
         if (caught instanceof ConnectionLimitError) return endLink(origin, provider, "limit");
+        // Those two are this person's to resolve. This one is the operator's, and
+        // they are not the person standing at the redirect - so they are told.
+        await recordConnectionFailure(provider, describeFailure(caught));
         return endLink(origin, provider, "error");
     }
 }
@@ -391,7 +397,11 @@ async function finishSignIn(
     let accountId: string;
     try {
         accountId = (await connectionIdentity(provider, client, code, connectionCallbackUrl(provider, origin))).accountId;
-    } catch {
+    } catch (caught) {
+        // An application that refuses a sign-in is as broken as one that refuses
+        // a link, and the person it refused is signed out - so they have no way
+        // to report it even if they knew who to report it to.
+        await recordConnectionFailure(provider, describeFailure(caught));
         return endSignIn(origin, provider, "error");
     }
 

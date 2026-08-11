@@ -262,6 +262,16 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "integration.attention",
+        group: "system",
+        label: "An integration needs attention",
+        description: "A service somebody tried to connect an account of refused the authorization.",
+        level: "warning",
+        // Mail on by default: the person who hit this cannot fix it and the
+        // operator is not watching the bell of a service nobody could connect.
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "system.update",
         group: "system",
         label: "Update available",
