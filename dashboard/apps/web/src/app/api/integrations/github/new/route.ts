@@ -17,6 +17,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/session";
 import { probeEdge } from "@/lib/network-advice";
 import { publicHostname } from "@/lib/domain-edge";
+import { connectionFlowOrigin } from "@/lib/connections/oauth";
 import { browserOrigin, publicAppUrl } from "@/lib/domain-service";
 import { GITHUB_APP_NEW_URL, buildAppManifest } from "@/lib/github-service";
 
@@ -77,7 +78,11 @@ export async function GET(request: Request): Promise<Response> {
     // GitHub calls the webhook from its own network and validates it before it creates
     // anything, so it is declared only when this address is one the internet can reach.
     const publicUrl = publicHostname(origin) ? origin : null;
-    const manifest = JSON.stringify(buildAppManifest({ name, origin, publicUrl }));
+    // And the address account linking runs on, which is this deployment's own and
+    // need not be either of those: an app created from a LAN name would otherwise
+    // register a callback that linking never uses, and GitHub would refuse it.
+    const linkOrigin = await connectionFlowOrigin();
+    const manifest = JSON.stringify(buildAppManifest({ name, origin, publicUrl, linkOrigin }));
 
     const html = `<!doctype html>
 <html>

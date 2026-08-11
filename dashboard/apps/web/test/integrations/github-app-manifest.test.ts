@@ -52,6 +52,30 @@ describe("buildAppManifest", () => {
         expect(manifest.setup_url).toBe(`${LAN}/api/integrations/github/callback`);
     });
 
+    it("registers the address account linking actually runs on", () => {
+        // Which is this deployment's own, and need not be either of the other two:
+        // an app created from a LAN name would otherwise carry callbacks that
+        // linking never uses, and GitHub refuses the one it was not told about.
+        const manifest = buildAppManifest({
+            name: "Polaris abcd",
+            origin: LAN,
+            publicUrl: null,
+            linkOrigin: "http://polaris.local"
+        });
+
+        expect(manifest.callback_urls).toEqual([
+            `${LAN}/api/integrations/github/link/callback`,
+            "http://polaris.local/api/integrations/github/link/callback"
+        ]);
+    });
+
+    it("registers each address once, however many of them are the same", () => {
+        expect(
+            buildAppManifest({ name: "Polaris abcd", origin: PUBLIC, publicUrl: PUBLIC, linkOrigin: PUBLIC })
+                .callback_urls
+        ).toEqual([`${PUBLIC}/api/integrations/github/link/callback`]);
+    });
+
     it("registers the account-linking callback on both addresses when they differ", () => {
         expect(buildAppManifest({ name: "Polaris abcd", origin: LAN, publicUrl: PUBLIC }).callback_urls).toEqual([
             `${LAN}/api/integrations/github/link/callback`,

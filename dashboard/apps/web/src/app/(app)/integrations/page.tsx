@@ -7,13 +7,13 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/session";
 import { getGithubStatus } from "@/lib/github-service";
 import { getRunnerAccess } from "@/lib/github-runners";
-import { connectionCallbackUrl } from "@/lib/connections/oauth";
-import { readCriminalIpConfig } from "@/lib/integrations/criminalip";
 import { listIntegrationStates } from "@/lib/integration-service";
+import { readCriminalIpConfig } from "@/lib/integrations/criminalip";
+import { getDomainConfig, publicAppUrl } from "@/lib/domain-service";
 import { CONNECTION_PROVIDERS, findConnectionProvider } from "@polaris/core";
 import { IntegrationsView, type IntegrationCard } from "./integrations-view";
-import { appBaseUrl, getDomainConfig, publicAppUrl } from "@/lib/domain-service";
 import { connectionLimit, connectionSignInAllowed } from "@/lib/connections/store";
+import { connectionCallbackUrl, connectionFlowOrigin } from "@/lib/connections/oauth";
 import { getCloudflareAccountStatus } from "@/lib/integrations/cloudflare-account-service";
 import { SERVICE_INTEGRATIONS, readDymoConfig, readVirusTotalConfig } from "@/lib/integrations/registry";
 
@@ -46,9 +46,11 @@ export default async function IntegrationsPage() {
         // Cloudflare's API tokens (DNS records and named tunnels) are separate from the
         // marketplace connector token that runs the server-wide tunnel.
         getCloudflareAccountStatus(),
-        // The address the deployment is reachable at, which is what decides the
-        // redirect URI an operator has to register on their OAuth client.
-        appBaseUrl(),
+        // The address every connection round trip runs on, which is what decides
+        // the redirect URI an operator has to register on their OAuth client. The
+        // same function the flow itself calls, so what is copied from here is the
+        // string that will be sent.
+        connectionFlowOrigin(),
         // The same address, but only when GitHub's own servers could reach it: a
         // new App is created without a webhook when they cannot, and the dialog
         // says so before somebody creates one and waits for events.

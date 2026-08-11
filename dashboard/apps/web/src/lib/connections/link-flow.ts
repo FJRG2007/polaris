@@ -15,6 +15,12 @@
  * editing it - which is why one callback serves both and reads the cookie to
  * find out which it is.
  *
+ * So is the address underneath it. Every URL here comes from `connectionFlowOrigin`
+ * rather than from the request, because the request arrives from the proxy on the
+ * socket the server binds and a redirect URI built from that is one no provider
+ * accepts - and because the whole round trip has to happen on one host: the state
+ * cookie set at the start only exists on the host the provider returns to.
+ *
  * Every outcome ends on the screen the person started from, with a flag saying
  * what happened, rather than on a bare error page.
  */
@@ -25,13 +31,15 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/session";
 import { clientIp } from "@/lib/request-context";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { requestOrigin } from "@/lib/domain-service";
 import { findConnectionProvider } from "@polaris/core";
 import { signInWithConnection, type ConnectionSignInResult } from "@polaris/auth";
-import { ConnectionClaimedError, ConnectionLimitError, connectionSignInAllowed, saveConnection, signInConnection } from "./store";
 import { readSteamPersona, steamAuthorizeUrl, STEAM_PROVIDER, verifySteamReturn } from "./steam";
+import { ConnectionClaimedError, ConnectionLimitError, connectionSignInAllowed, saveConnection, signInConnection } from "./store";
 import {
     connectionAuthorizeUrl,
     connectionCallbackUrl,
+    connectionFlowOrigin,
     connectionIdentity,
     connectionOAuthClient,
     exchangeConnectionCode,
@@ -122,7 +130,9 @@ async function begin(
     mode: ConnectionMode,
     target?: string
 ): Promise<Response> {
-    const origin = new URL(request.url).origin;
+    const origin = await connectionFlowOrigin();
+    const moved = moveOnto(request, origin);
+    if (moved) return moved;
     // Steam has no application to look up: it proves an account over OpenID, so
     // the trip can start on an instance where nothing has been connected.
     if (provider === STEAM_PROVIDER) return beginSteam(origin, mode, target);
@@ -152,6 +162,33 @@ async function begin(
         maxAge: STATE_TTL_SECONDS
     });
     return response;
+}
+
+/** Marks the pass that has already been moved, so it happens at most once. */
+const MOVED = "moved";
+
+/**
+ * Start the trip over on the address it has to finish on, when the browser is
+ * somewhere else.
+ *
+ * Somebody can reach this dashboard by several names - polaris.local on the LAN,
+ * its domain from outside - but the provider returns to exactly one, the one
+ * registered on the operator's application. The state cookie set a few lines
+ * below, and the session that authorized this, belong to whichever host the
+ * browser is on, so the trip has to move before either is written rather than
+ * after, or the callback arrives with neither.
+ *
+ * The marker is what stops a second move: this route sees the proxy's internal
+ * address however it was reached, so an address it could not compare would send
+ * it round again.
+ */
+function moveOnto(request: Request, origin: string): Response | null {
+    const requested = new URL(request.url);
+    if (requestOrigin(request) === origin || requested.searchParams.get(MOVED) === "1") return null;
+    const target = new URL(requested.pathname, origin);
+    for (const [key, value] of requested.searchParams) target.searchParams.set(key, value);
+    target.searchParams.set(MOVED, "1");
+    return NextResponse.redirect(target);
 }
 
 /**
@@ -190,9 +227,8 @@ function beginSteam(origin: string, mode: ConnectionMode, target?: string): Resp
 export async function startConnectionLink(request: Request, provider: string): Promise<Response> {
     await requireUser();
     const url = new URL(request.url);
-    const origin = url.origin;
     if (!findConnectionProvider(provider)) {
-        return NextResponse.redirect(backToConnections(origin, provider, "unavailable"));
+        return NextResponse.redirect(backToConnections(await connectionFlowOrigin(), provider, "unavailable"));
     }
     return begin(request, provider, url.searchParams.get("scope") === "storage" ? "storage" : "link");
 }
@@ -207,12 +243,11 @@ export async function startConnectionLink(request: Request, provider: string): P
  */
 export async function startConnectionSignIn(request: Request, provider: string): Promise<Response> {
     const url = new URL(request.url);
-    const origin = url.origin;
     if (!supportsOAuth(provider) || !(await connectionSignInAllowed(provider))) {
-        return NextResponse.redirect(backToLogin(origin, provider, "unavailable"));
+        return NextResponse.redirect(backToLogin(await connectionFlowOrigin(), provider, "unavailable"));
     }
     const throttle = await rateLimit(`connection-signin:${(await clientIp()) ?? "unknown"}`, SIGN_IN_LIMIT, SIGN_IN_WINDOW_MS);
-    if (!throttle.ok) return NextResponse.redirect(backToLogin(origin, provider, "error"));
+    if (!throttle.ok) return NextResponse.redirect(backToLogin(await connectionFlowOrigin(), provider, "error"));
 
     return begin(request, provider, "signin", safeTarget(url.searchParams.get("redirect")));
 }
@@ -226,9 +261,9 @@ export async function startConnectionSignIn(request: Request, provider: string):
  */
 export async function finishConnectionCallback(request: Request, provider: string): Promise<Response> {
     const url = new URL(request.url);
-    const origin = url.origin;
+    const origin = await connectionFlowOrigin();
     const held = readState(request);
-    if (provider === STEAM_PROVIDER) return finishSteam(url, held);
+    if (provider === STEAM_PROVIDER) return finishSteam(url, origin, held);
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
     const valid = held?.provider === provider && held.state === state && Boolean(state);
@@ -236,7 +271,7 @@ export async function finishConnectionCallback(request: Request, provider: strin
     if (held?.mode === "signin") {
         if (!code) return endSignIn(origin, provider, "cancelled");
         if (!valid) return endSignIn(origin, provider, "state_error");
-        return finishSignIn(request, provider, code, held.target);
+        return finishSignIn(request, origin, provider, code, held.target);
     }
 
     // Anything that is not a sign-in is a link, including a callback that
@@ -244,7 +279,7 @@ export async function finishConnectionCallback(request: Request, provider: strin
     // which for a link is the one that says what went wrong.
     if (!code) return endLink(origin, provider, "cancelled");
     if (!valid) return endLink(origin, provider, "state_error");
-    return finishLink(request, provider, code);
+    return finishLink(origin, provider, code);
 }
 
 /**
@@ -258,8 +293,7 @@ export async function finishConnectionCallback(request: Request, provider: strin
  * Linking only. Signing in with Steam is not offered, and a callback that says it
  * is gets the same refusal as one with no cookie at all.
  */
-async function finishSteam(url: URL, held: FlowState | null): Promise<Response> {
-    const origin = url.origin;
+async function finishSteam(url: URL, origin: string, held: FlowState | null): Promise<Response> {
     if (url.searchParams.get("openid.mode") === "cancel") return endLink(origin, STEAM_PROVIDER, "cancelled");
     const state = url.searchParams.get("state");
     if (!held || held.provider !== STEAM_PROVIDER || held.mode === "signin" || !state || held.state !== state) {
@@ -293,9 +327,8 @@ async function finishSteam(url: URL, held: FlowState | null): Promise<Response> 
 }
 
 /** Record the account the provider vouched for against the signed-in user. */
-async function finishLink(request: Request, provider: string, code: string): Promise<Response> {
+async function finishLink(origin: string, provider: string, code: string): Promise<Response> {
     const user = await requireUser();
-    const origin = new URL(request.url).origin;
 
     const client = await connectionOAuthClient(provider);
     if (!client) return endLink(origin, provider, "unavailable");
@@ -336,11 +369,11 @@ async function finishLink(request: Request, provider: string, code: string): Pro
  */
 async function finishSignIn(
     request: Request,
+    origin: string,
     provider: string,
     code: string,
     target: string | undefined
 ): Promise<Response> {
-    const origin = new URL(request.url).origin;
     if (!(await connectionSignInAllowed(provider))) return endSignIn(origin, provider, "unavailable");
 
     const client = await connectionOAuthClient(provider);

@@ -43,7 +43,7 @@ vi.mock("../../src/lib/domain-zones", () => ({
 
 vi.mock("../../src/lib/polaris-tunnel-service", () => ({ getPolarisPublicUrl: async () => state.tunnel }));
 
-const { browserOrigin, publicAppUrl } = await import("../../src/lib/domain-service");
+const { browserOrigin, publicAppUrl, requestOrigin } = await import("../../src/lib/domain-service");
 
 describe("browserOrigin", () => {
     it("never hands back the bind address, which no browser can return to", () => {
@@ -54,6 +54,36 @@ describe("browserOrigin", () => {
     it("leaves an address the browser is demonstrably using alone", () => {
         expect(browserOrigin("http://192.168.1.40:3000")).toBe("http://192.168.1.40:3000");
         expect(browserOrigin("https://polaris.example.com")).toBe("https://polaris.example.com");
+    });
+});
+
+describe("requestOrigin", () => {
+    // The proxy forwards to the socket the server binds, so the request URL names
+    // that socket however the browser got here. The headers are where the address
+    // somebody actually typed survives.
+    const bind = "https://0.0.0.0:3000/api/connections/google/link";
+
+    it("is the address the browser is on, not the one the server was reached on", () => {
+        const request = new Request(bind, {
+            headers: { host: "0.0.0.0:3000", "x-forwarded-host": "polaris.example.com", "x-forwarded-proto": "https" }
+        });
+        expect(requestOrigin(request)).toBe("https://polaris.example.com");
+    });
+
+    it("falls back to the Host header when nothing forwarded one", () => {
+        expect(requestOrigin(new Request(bind, { headers: { host: "polaris.local" } }))).toBe("https://polaris.local");
+    });
+
+    it("keeps the port, which is part of the address a browser returns to", () => {
+        const request = new Request("http://0.0.0.0:3000/x", { headers: { host: "192.168.1.40:3000" } });
+        expect(requestOrigin(request)).toBe("http://192.168.1.40:3000");
+    });
+
+    it("never hands back the bind address, whichever header carried it", () => {
+        expect(requestOrigin(new Request(bind, { headers: { host: "0.0.0.0:3000" } }))).toBe("https://localhost:3000");
+        expect(requestOrigin(new Request(bind, { headers: { "x-forwarded-host": "not a host" } }))).toBe(
+            "https://localhost:3000"
+        );
     });
 });
 

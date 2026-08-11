@@ -285,6 +285,32 @@ export function browserOrigin(requestOrigin: string): string {
 }
 
 /**
+ * The address the browser is actually on, as the proxy reported it.
+ *
+ * `request.url` is not that address. The bundled proxy forwards to the Next server
+ * on the socket it binds, and Next builds the request URL from that socket rather
+ * than from the name that was typed - so every absolute URL made from it points at
+ * `0.0.0.0:3000`, which is the whole reason this file has a `browserOrigin` at all.
+ * The forwarded headers are where the typed name survives.
+ *
+ * A label, and never an input to a decision: those headers are the caller's to
+ * write. The only thing this is used for is comparing where somebody is against an
+ * address Polaris chose for itself, so the worst a forged one can buy is a redirect
+ * to Polaris's own domain.
+ */
+export function requestOrigin(request: Request): string {
+    const fallback = browserOrigin(new URL(request.url).origin);
+    const host = (request.headers.get("x-forwarded-host") ?? request.headers.get("host"))?.split(",")[0]?.trim();
+    if (!host) return fallback;
+    const proto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+    try {
+        return browserOrigin(`${proto || new URL(fallback).protocol.slice(0, -1)}://${host}`);
+    } catch {
+        return fallback;
+    }
+}
+
+/**
  * Base URL for share links and drop points. Same chain as the app URL, except an
  * explicitly configured sharing domain wins and the app domain is consulted only
  * after the reachable addresses - sharing is where a throwaway or free hostname

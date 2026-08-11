@@ -14,17 +14,12 @@
  * that already connected.
  */
 
+import { STEAM_PROVIDER } from "./steam";
+import { appBaseUrl } from "@/lib/domain-service";
 import type { ConnectionCredential } from "./store";
 import { findConnectionProvider } from "@polaris/core";
-import { STEAM_PROVIDER } from "./steam";
-import { epicAuthorizeUrl, exchangeEpicCode, getEpicOAuthClient, identifyEpicAccount } from "./epic";
-import {
-    exchangeMinecraftCode,
-    getMinecraftOAuthClient,
-    identifyMinecraftAccount,
-    minecraftAuthorizeUrl
-} from "./minecraft";
 import { getIntegrationState } from "@/lib/integration-service";
+import { epicAuthorizeUrl, exchangeEpicCode, getEpicOAuthClient, identifyEpicAccount } from "./epic";
 import { authorizeGithubUser, getGithubUserAuth, githubLinkCallbackUrl } from "@/lib/github-service";
 import {
     dropboxAuthorizeUrl,
@@ -32,6 +27,12 @@ import {
     getDropboxOAuthClient,
     identifyDropboxAccount
 } from "./dropbox";
+import {
+    exchangeMinecraftCode,
+    getMinecraftOAuthClient,
+    identifyMinecraftAccount,
+    minecraftAuthorizeUrl
+} from "./minecraft";
 import {
     exchangeMicrosoftCode,
     getMicrosoftOAuthClient,
@@ -227,6 +228,26 @@ function adapter(provider: string): ProviderOAuth {
 export function connectionCallbackUrl(provider: string, baseUrl: string): string {
     if (provider === STEAM_PROVIDER) return STEAM_CALLBACK(baseUrl);
     return adapter(provider).callbackUrl(baseUrl);
+}
+
+/**
+ * The one address every round trip runs on.
+ *
+ * Deliberately not the address the request arrived on. Behind the bundled proxy
+ * that is the socket the server binds, and a provider does not merely fail to
+ * match a redirect URI on it - Google refuses a raw IP address as a policy
+ * violation, whatever is registered. It is also the address the Integrations
+ * screen tells the operator to register, and a redirect URI that is not the
+ * registered one is refused however it was arrived at. One function, so the URI
+ * shown to be pasted and the URI actually sent cannot drift apart.
+ */
+export async function connectionFlowOrigin(): Promise<string> {
+    return (await appBaseUrl()).replace(/\/+$/, "");
+}
+
+/** Where this provider returns somebody, on that address. */
+export async function connectionRedirectUri(provider: string): Promise<string> {
+    return connectionCallbackUrl(provider, await connectionFlowOrigin());
 }
 
 /** The operator's application for this provider, or null when there is none. */

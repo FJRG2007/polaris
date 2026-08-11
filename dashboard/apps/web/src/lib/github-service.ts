@@ -186,15 +186,25 @@ export function githubWebhookUrl(baseUrl: string): string {
  * and the runner pools already poll, and the URL can be filled in on GitHub once the
  * instance has a domain.
  */
-export function buildAppManifest(input: { name: string; origin: string; publicUrl: string | null }): Record<string, unknown> {
-    const { name, origin, publicUrl } = input;
+export function buildAppManifest(input: {
+    name: string;
+    origin: string;
+    publicUrl: string | null;
+    linkOrigin?: string | null;
+}): Record<string, unknown> {
+    const { name, origin, publicUrl, linkOrigin } = input;
     // Where a person is returned to after linking their own GitHub account to their
     // Polaris one, which is what lets a runner pool serve "these people's
-    // repositories" without anybody typing a login for them. Both addresses are
-    // registered when they differ: that round trip returns to whichever host the
-    // person started it on.
-    const callbacks = [githubLinkCallbackUrl(origin)];
-    if (publicUrl && publicUrl !== origin) callbacks.push(githubLinkCallbackUrl(publicUrl));
+    // repositories" without anybody typing a login for them. Every address that
+    // round trip can run on is registered, because GitHub refuses a callback it was
+    // not told about: the one this app is being created from, the one the internet
+    // reaches this instance at, and the one linking actually uses - which is the
+    // deployment's own address rather than whichever name this browser is on.
+    const callbacks: string[] = [];
+    for (const address of [origin, publicUrl, linkOrigin]) {
+        const callback = address ? githubLinkCallbackUrl(address) : null;
+        if (callback && !callbacks.includes(callback)) callbacks.push(callback);
+    }
     return {
         name,
         url: publicUrl ?? origin,
