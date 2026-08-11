@@ -172,6 +172,77 @@ export async function revealArkPasswordsAction(
     }
 }
 
+/**
+ * The moderation verbs that work from here.
+ *
+ * Deliberately not teleport. ARK's teleport commands are relative to the admin's
+ * own character - "to me" - and an RCON session has no character in the world, so
+ * the server takes the command and does nothing, with no error either. A button
+ * for it would be a button that lies; it stays an in-game command.
+ */
+const moderateSchema = z.object({
+    installedAppId: z.string().trim().min(1),
+    steamId: z.string().trim().refine(isSteamId, "That is not a Steam id"),
+    verb: z.enum(["kick", "ban", "unban"])
+});
+
+export async function moderateArkPlayerAction(
+    installedAppId: string,
+    steamId: string,
+    verb: "kick" | "ban" | "unban"
+): Promise<{ error?: string }> {
+    const parsed = moderateSchema.safeParse({ installedAppId, steamId, verb });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        const run = {
+            kick: ark.kickArkPlayer,
+            ban: ark.banArkPlayer,
+            unban: ark.unbanArkPlayer
+        }[parsed.data.verb];
+        await run(access.ownerId, parsed.data.installedAppId, parsed.data.steamId);
+        await recordAudit({
+            actorId: user.id,
+            action: `games.ark.${parsed.data.verb}`,
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { steamId: parsed.data.steamId }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+    }
+}
+
+/** Send one player a line of text, by id rather than by name - the by-name form
+ *  breaks on a space and fails silently. */
+export async function messageArkPlayerAction(
+    installedAppId: string,
+    steamId: string,
+    message: string
+): Promise<{ error?: string }> {
+    const parsed = z
+        .object({
+            installedAppId: z.string().trim().min(1),
+            steamId: z.string().trim().refine(isSteamId, "That is not a Steam id"),
+            message: z.string().trim().min(1, "Say something").max(200)
+        })
+        .safeParse({ installedAppId, steamId, message });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        const { access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        await ark.messageArkPlayer(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.steamId,
+            parsed.data.message
+        );
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not send that message" };
+    }
+}
+
 /** Write the world to disk now. */
 export async function saveArkWorldAction(installedAppId: string): Promise<{ error?: string }> {
     try {

@@ -20,6 +20,7 @@
 import * as actions from "./minecraft-actions";
 import { useConfirm } from "@/components/confirm-dialog";
 import { GameAccessForm } from "@/components/game-access-form";
+import { PlayerIconAction, PlayersTable } from "@/components/game-players-table";
 import type { MinecraftModeration } from "./minecraft-actions";
 import { ACCESS_REACH_NOTE } from "@/lib/apps/minecraft/access";
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -48,8 +49,6 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-    Input,
-    Select,
     Switch,
     cn
 } from "@polaris/ui";
@@ -63,7 +62,6 @@ import {
     LocateFixed,
     MapPin,
     MoreHorizontal,
-    Search,
     ShieldBan,
     ShieldMinus,
     ShieldPlus,
@@ -354,87 +352,57 @@ export function MinecraftPlayers({
                 </Card>
             )}
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="relative flex-1">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        className="pl-9"
-                        placeholder="Search by name, address or note"
-                        aria-label="Search players"
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
+            <PlayersTable
+                columns={[
+                    { label: "Player" },
+                    { label: "Status" },
+                    { label: "Standing" },
+                    { label: "Address", className: "hidden md:table-cell" }
+                ]}
+                search={query}
+                onSearch={setQuery}
+                searchPlaceholder="Search by name, address or note"
+                filter={filter}
+                onFilter={(value) => setFilter(value as Filter)}
+                filters={FILTERS.map((entry) => ({ value: entry.value, label: entry.label }))}
+                toolbar={
+                    bedrock ? null : (
+                        <WhitelistSwitch
+                            installedAppId={installedAppId}
+                            enforced={roster?.whitelistEnforced ?? false}
+                            disabled={roster === null || !answering}
+                            onError={setError}
+                            onChanged={onChanged}
+                        />
+                    )
+                }
+                isEmpty={shown.length === 0}
+                empty={
+                    !answering && players.length === 0
+                        ? (status?.message ?? "Connecting to the server...")
+                        : players.length === 0
+                          ? "Nobody is registered and nobody is playing."
+                          : "Nobody matches that."
+                }
+                rows={shown.map((player) => (
+                    <PlayerRow
+                        key={player.name.toLowerCase()}
+                        player={player}
+                        bedrock={bedrock}
+                        answering={answering}
+                        pending={pending}
+                        onModerate={moderate}
+                        onModerateWithConfirm={moderateWithConfirm}
+                        timeout={timeoutFor(timeouts, player.name)}
+                        waiting={
+                            waiting.filter((entry) => entry.username.toLowerCase() === player.name.toLowerCase())
+                                .length
+                        }
+                        onOpen={(dialog) => setActing({ player, dialog })}
+                        onRevoke={() => run(() => actions.revokePlayerAccessAction(installedAppId, player.name))}
                     />
-                </div>
-                <Select
-                    className="sm:w-44"
-                    aria-label="Filter players"
-                    value={filter}
-                    onValueChange={(value) => setFilter(value as Filter)}
-                    options={FILTERS.map((entry) => ({ value: entry.value, label: entry.label }))}
-                />
-                {!bedrock && (
-                    <WhitelistSwitch
-                        installedAppId={installedAppId}
-                        enforced={roster?.whitelistEnforced ?? false}
-                        disabled={roster === null || !answering}
-                        onError={setError}
-                        onChanged={onChanged}
-                    />
-                )}
-            </div>
-
-            <div className="overflow-x-auto rounded-lg border border-border">
-                <table className="w-full min-w-[40rem] text-sm">
-                    <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
-                        <tr>
-                            <th className="px-3 py-2 font-medium">Player</th>
-                            <th className="px-3 py-2 font-medium">Status</th>
-                            <th className="px-3 py-2 font-medium">Standing</th>
-                            <th className="hidden px-3 py-2 font-medium md:table-cell">Address</th>
-                            <th className="px-3 py-2" />
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {!answering && players.length === 0 ? (
-                            <tr>
-                                <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
-                                    {status?.message ?? "Connecting to the server..."}
-                                </td>
-                            </tr>
-                        ) : shown.length === 0 ? (
-                            <tr>
-                                <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
-                                    {players.length === 0
-                                        ? "Nobody is registered and nobody is playing."
-                                        : "Nobody matches that."}
-                                </td>
-                            </tr>
-                        ) : (
-                            shown.map((player) => (
-                                <PlayerRow
-                                    key={player.name.toLowerCase()}
-                                    player={player}
-                                    bedrock={bedrock}
-                                    answering={answering}
-                                    pending={pending}
-                                    onModerate={moderate}
-                                    onModerateWithConfirm={moderateWithConfirm}
-                                    timeout={timeoutFor(timeouts, player.name)}
-                                    waiting={
-                                        waiting.filter(
-                                            (entry) => entry.username.toLowerCase() === player.name.toLowerCase()
-                                        ).length
-                                    }
-                                    onOpen={(dialog) => setActing({ player, dialog })}
-                                    onRevoke={() =>
-                                        run(() => actions.revokePlayerAccessAction(installedAppId, player.name))
-                                    }
-                                />
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                ))}
+            />
 
             {acting?.dialog === "teleport" && (
                 <TeleportDialog
@@ -613,7 +581,7 @@ function PlayerRow({
             <td className="px-3 py-2">
                 <div className="flex justify-end gap-1">
                     {!bedrock && (
-                        <IconAction
+                        <PlayerIconAction
                             label={player.operator ? `Remove ${name} as operator` : `Make ${name} an operator`}
                             icon={
                                 player.operator ? (
@@ -627,7 +595,7 @@ function PlayerRow({
                         />
                     )}
                     {!bedrock && (
-                        <IconAction
+                        <PlayerIconAction
                             label={
                                 player.whitelisted
                                     ? `Take ${name} off the whitelist`
@@ -650,7 +618,7 @@ function PlayerRow({
                         />
                     )}
                     {player.online && (
-                        <IconAction
+                        <PlayerIconAction
                             label={`Kick ${name}`}
                             icon={<DoorOpen className="size-4" />}
                             disabled={!live}
@@ -665,14 +633,14 @@ function PlayerRow({
                     )}
                     {!bedrock &&
                         (player.banned ? (
-                            <IconAction
+                            <PlayerIconAction
                                 label={`Lift the ban on ${name}`}
                                 icon={<UserPlus className="size-4" />}
                                 disabled={!live}
                                 onClick={() => onModerate({ action: "pardon", player: name })}
                             />
                         ) : (
-                            <IconAction
+                            <PlayerIconAction
                                 label={`Ban ${name}`}
                                 icon={<Ban className="size-4" />}
                                 danger
@@ -687,7 +655,7 @@ function PlayerRow({
                             />
                         ))}
                     {player.addresses.length > 0 && (
-                        <IconAction
+                        <PlayerIconAction
                             label={`Remove ${name} from the player list`}
                             icon={<UserMinus className="size-4" />}
                             danger
@@ -962,30 +930,3 @@ export function FirewallSection({
     );
 }
 
-function IconAction({
-    label,
-    icon,
-    onClick,
-    disabled,
-    danger
-}: {
-    label: string;
-    icon: React.ReactNode;
-    onClick: () => void;
-    disabled?: boolean;
-    danger?: boolean;
-}) {
-    return (
-        <Button
-            size="icon"
-            variant="ghost"
-            onClick={onClick}
-            disabled={disabled}
-            aria-label={label}
-            title={label}
-            className={danger ? "text-danger hover:text-danger" : undefined}
-        >
-            {icon}
-        </Button>
-    );
-}

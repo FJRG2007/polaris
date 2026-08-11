@@ -26,6 +26,8 @@ import type { GameContext } from "./game-context";
 import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
 import { CopyButton } from "@/components/copy-button";
+import { foldArkPlayers, matchesArkPlayer, type ArkPlayerEntry } from "@/lib/apps/ark/players";
+import { PlayerIconAction, PlayersTable } from "@/components/game-players-table";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
@@ -36,9 +38,10 @@ import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs"
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
 import { Badge, Button, Card, CardBody, Input, Skeleton, Switch, cn } from "@polaris/ui";
 import { generateJoinPassword, isJoinPassword, isSteamId, JOIN_PASSWORD_HINT } from "@/lib/apps/ark/access";
-import { Clock, Eye, FolderOpen, Loader2, RefreshCw, Save, ShieldAlert, Trash2, UserPlus } from "lucide-react";
+import { Ban, Clock, Eye, FolderOpen, LogOut, Loader2, RefreshCw, Save, ShieldAlert, UserMinus, UserPlus } from "lucide-react";
 import {
     addArkPlayerAction,
+    moderateArkPlayerAction,
     removeArkPlayerAction,
     revealArkPasswordsAction,
     saveArkWorldAction,
@@ -164,7 +167,7 @@ export function ArkPanel({
                 reach={reading.reach ?? game?.reach ?? null}
                 access={reading.access}
                 canSaveWorld={held.includes("games.moderate")}
-                onOpenAccess={() => openTab("security")}
+                onOpenAccess={() => openTab("players")}
             />
 
             {error && <p className="text-sm text-danger">{error}</p>}
@@ -204,10 +207,14 @@ export function ArkPanel({
             )}
             {tab === "players" && (
                 <PlayersTab
+                    installedAppId={installedAppId}
                     status={status}
                     access={reading.access}
                     canModerate={held.includes("games.moderate")}
-                    onOpenAccess={() => openTab("security")}
+                    onChanged={(next) => {
+                        if (next) setReading((current) => ({ ...current, access: next }));
+                        void load();
+                    }}
                 />
             )}
             {tab === "usage" &&
@@ -225,13 +232,11 @@ export function ArkPanel({
                 ))}
             {tab === "security" && (
                 <div className="flex flex-col gap-4">
-                    <AllowListCard
+                    <ClosedServerCard
                         installedAppId={installedAppId}
                         access={reading.access}
-                        canModerate={held.includes("games.moderate")}
                         canManage={held.includes("games.manage")}
-                        onChanged={(next) => setReading((current) => ({ ...current, access: next }))}
-                        onReload={() => void load()}
+                        onChanged={() => void load()}
                     />
                     <PasswordCard installedAppId={installedAppId} canManage={held.includes("games.manage")} />
                     <MinecraftSettings
@@ -560,202 +565,141 @@ function OverviewTab({ status, settings }: { status: ArkStatus | null; settings:
     );
 }
 
+/**
+ * Everyone the server knows about, as one row per person.
+ *
+ * The same table the Minecraft screen is drawn in - see `game-players-table` -
+ * with the columns and the verbs ARK actually has. Who is playing and who is
+ * allowed on are folded into one row, because they are two halves of one question
+ * and a card each meant reading both to work out what is going on with somebody.
+ *
+ * Teleport is not here, and that is not an omission. ARK's teleport commands move
+ * a player relative to the admin's own character, and there is no character behind
+ * an RCON session - the server takes the command and does nothing, silently. It
+ * stays an in-game command, and the screen says so rather than offering a button
+ * that would do nothing.
+ */
 function PlayersTab({
+    installedAppId,
     status,
     access,
     canModerate,
-    onOpenAccess
+    onChanged
 }: {
+    installedAppId: string;
     status: ArkStatus | null;
     access: ArkAccessView | null;
     canModerate: boolean;
-    onOpenAccess: () => void;
+    onChanged: (access?: ArkAccessView) => void;
 }) {
-    return (
-        <Card>
-            <CardBody className="flex flex-col gap-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-medium">Playing now</p>
-                    {canModerate && (
-                        <Button size="sm" variant="secondary" onClick={onOpenAccess}>
-                            <UserPlus className="size-4" /> Who may join
-                        </Button>
-                    )}
-                </div>
-                {status === null ? (
-                    <Skeleton className="h-16 w-full" />
-                ) : !status.answering ? (
-                    <p className="text-sm text-muted-foreground">{status.message ?? "The server is not answering."}</p>
-                ) : status.players.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nobody is playing right now.</p>
-                ) : (
-                    <table className="w-full text-sm">
-                        <thead className="text-left text-xs text-muted-foreground">
-                            <tr>
-                                <th className="py-1 font-medium">Player</th>
-                                <th className="py-1 font-medium">Steam id</th>
-                                <th className="py-1 font-medium">On the list</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {status.players.map((player) => {
-                                const allowed = access?.players.some((entry) => entry.steamId === player.steamId);
-                                return (
-                                    <tr key={player.steamId} className="border-t border-border">
-                                        <td className="py-1.5">{player.name}</td>
-                                        <td className="py-1.5">
-                                            <div className="flex items-center gap-1">
-                                                <code className="font-mono text-xs">{player.steamId}</code>
-                                                <CopyButton
-                                                    value={player.steamId}
-                                                    label={`the Steam id of ${player.name}`}
-                                                />
-                                            </div>
-                                        </td>
-                                        <td className="py-1.5 text-xs text-muted-foreground">
-                                            {allowed ? "Yes" : "No"}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                )}
-            </CardBody>
-        </Card>
-    );
-}
-
-/** Who the server lets in, and whether it has been told. */
-function AllowListCard({
-    installedAppId,
-    access,
-    canModerate,
-    canManage,
-    onChanged,
-    onReload
-}: {
-    installedAppId: string;
-    access: ArkAccessView | null;
-    canModerate: boolean;
-    canManage: boolean;
-    onChanged: (access: ArkAccessView) => void;
-    onReload: () => void;
-}) {
+    const [query, setQuery] = useState("");
+    const [filter, setFilter] = useState("everyone");
     const [steamId, setSteamId] = useState("");
     const [label, setLabel] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const [note, setNote] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
-    const [closing, setClosing] = useState(false);
 
-    const steamIdError = steamId.trim().length === 0 || isSteamId(steamId) ? null : "17 digits, starting 7656119";
+    const players = useMemo(
+        () => foldArkPlayers(status?.players ?? [], access?.players ?? []),
+        [status?.players, access?.players]
+    );
+    const shown = useMemo(
+        () =>
+            players
+                .filter((entry) => matchesArkPlayer(entry, query))
+                .filter((entry) =>
+                    filter === "online"
+                        ? entry.online
+                        : filter === "allowed"
+                          ? entry.standing !== "not-allowed"
+                          : true
+                ),
+        [players, query, filter]
+    );
 
-    function add(): void {
+    function run(work: () => Promise<{ error?: string; access?: ArkAccessView }>, done?: string): void {
         setError(null);
+        setNote(null);
         startTransition(async () => {
-            const result = await addArkPlayerAction(installedAppId, steamId.trim(), label.trim());
-            if (result.error || !result.access) {
-                setError(result.error ?? "Could not add that player");
-                return;
-            }
-            setSteamId("");
-            setLabel("");
-            onChanged(result.access);
-        });
-    }
-
-    function remove(id: string): void {
-        setError(null);
-        startTransition(async () => {
-            const result = await removeArkPlayerAction(installedAppId, id);
-            if (result.error || !result.access) {
-                setError(result.error ?? "Could not remove that player");
-                return;
-            }
-            onChanged(result.access);
-        });
-    }
-
-    function setClosed(closed: boolean): void {
-        setError(null);
-        setClosing(true);
-        startTransition(async () => {
-            const result = await setArkExclusiveJoinAction(installedAppId, closed);
-            setClosing(false);
+            const result = await work();
             if (result.error) {
                 setError(result.error);
                 return;
             }
-            onReload();
+            if (done) setNote(done);
+            onChanged(result.access);
         });
     }
+
+    function add(): void {
+        run(async () => {
+            const result = await addArkPlayerAction(installedAppId, steamId.trim(), label.trim());
+            if (!result.error) {
+                setSteamId("");
+                setLabel("");
+            }
+            return result;
+        });
+    }
+
+    const answering = status?.answering ?? false;
 
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-sm font-medium">Who may join</p>
-
-                <label className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
-                    <span className="flex flex-col gap-0.5 text-sm">
-                        <span className="font-medium">Only players on this list can join</span>
-                        <span className="text-xs text-muted-foreground">
-                            On top of the join password. Off leaves the password as the only lock, and takes effect the
-                            next time the server starts.
-                        </span>
-                    </span>
-                    <Switch
-                        checked={access?.closed ?? false}
-                        onChange={setClosed}
-                        disabled={!canManage || pending || closing || access === null}
-                        aria-label="Only players on this list can join"
-                    />
-                </label>
-
                 {error && <p className="text-sm text-danger">{error}</p>}
+                {note && <p className="text-sm text-muted-foreground">{note}</p>}
 
-                {access === null ? (
-                    <Skeleton className="h-16 w-full" />
-                ) : access.players.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nobody is on the list.</p>
-                ) : (
-                    <ul className="flex flex-col gap-1">
-                        {access.players.map((player) => (
-                            <li
-                                key={player.steamId}
-                                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2"
-                            >
-                                <div className="flex min-w-0 flex-col">
-                                    <span className="truncate text-sm" title={player.label}>{player.label}</span>
-                                    <code className="font-mono text-xs text-muted-foreground">{player.steamId}</code>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    {player.appliedAt === null ? (
-                                        <span
-                                            className="flex items-center gap-1 text-xs text-muted-foreground"
-                                            title="Recorded here. The server is told as soon as it answers."
-                                        >
-                                            <Clock className="size-3.5" /> Waiting for the server
-                                        </span>
-                                    ) : (
-                                        <Badge className="border-success/40 text-success">On the server</Badge>
-                                    )}
-                                    {canModerate && (
-                                        <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            disabled={pending}
-                                            onClick={() => remove(player.steamId)}
-                                            aria-label={`Remove ${player.label}`}
-                                            title={`Remove ${player.label}`}
-                                        >
-                                            <Trash2 className="size-4" />
-                                        </Button>
-                                    )}
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                )}
+                <PlayersTable
+                    columns={[
+                        { label: "Player" },
+                        { label: "Steam id", className: "hidden md:table-cell" },
+                        { label: "Status" },
+                        { label: "May join" }
+                    ]}
+                    search={query}
+                    onSearch={setQuery}
+                    searchPlaceholder="Search by name or Steam id"
+                    filter={filter}
+                    onFilter={setFilter}
+                    filters={[
+                        { value: "everyone", label: "Everyone" },
+                        { value: "online", label: "Playing now" },
+                        { value: "allowed", label: "On the list" }
+                    ]}
+                    isEmpty={shown.length === 0}
+                    empty={
+                        players.length === 0
+                            ? (status?.message ?? "Nobody is on the list and nobody is playing.")
+                            : "Nobody matches that."
+                    }
+                    rows={shown.map((entry) => (
+                        <ArkPlayerRow
+                            key={entry.steamId}
+                            entry={entry}
+                            canModerate={canModerate}
+                            answering={answering}
+                            pending={pending}
+                            onAllow={() =>
+                                run(() => addArkPlayerAction(installedAppId, entry.steamId, entry.name))
+                            }
+                            onRemove={() => run(() => removeArkPlayerAction(installedAppId, entry.steamId))}
+                            onKick={() =>
+                                run(
+                                    () => moderateArkPlayerAction(installedAppId, entry.steamId, "kick"),
+                                    `${entry.name} was thrown off.`
+                                )
+                            }
+                            onBan={() =>
+                                run(
+                                    () => moderateArkPlayerAction(installedAppId, entry.steamId, "ban"),
+                                    `${entry.name} is banned.`
+                                )
+                            }
+                        />
+                    ))}
+                />
 
                 {canModerate && (
                     <div className="flex flex-wrap items-end gap-2">
@@ -767,7 +711,9 @@ function AllowListCard({
                                 placeholder="76561198000000000"
                                 inputMode="numeric"
                             />
-                            {steamIdError && <span className="text-xs text-danger">{steamIdError}</span>}
+                            {steamId.trim().length > 0 && !isSteamId(steamId) && (
+                                <span className="text-xs text-danger">17 digits, starting 7656119</span>
+                            )}
                         </label>
                         <label className="flex min-w-40 flex-1 flex-col gap-1 text-sm">
                             <span className="text-muted-foreground">Name</span>
@@ -779,18 +725,171 @@ function AllowListCard({
                         </label>
                         <Button onClick={add} disabled={pending || !isSteamId(steamId)}>
                             {pending && <Loader2 className="size-4 animate-spin" />}
-                            <UserPlus className="size-4" /> Add
+                            <UserPlus className="size-4" /> Let them in
                         </Button>
                     </div>
                 )}
+
+                <p className="text-xs text-muted-foreground">
+                    Teleporting to a player is not possible from here: ARK moves players relative to an admin&apos;s own
+                    character, and Polaris talks to the server without one. In game, press Tab and use{" "}
+                    <code className="font-mono">enablecheats</code>, then{" "}
+                    <code className="font-mono">cheat TeleportToPlayer</code>.
+                </p>
             </CardBody>
         </Card>
     );
 }
 
-/** The two passwords the server runs on: the one players type, and the one the
- *  owner types into the game. Neither rides on the poll - they are fetched when
- *  somebody asks for them, and only the owner may. */
+/** One person, in whatever states they are in, with the verbs that apply to them. */
+function ArkPlayerRow({
+    entry,
+    canModerate,
+    answering,
+    pending,
+    onAllow,
+    onRemove,
+    onKick,
+    onBan
+}: {
+    entry: ArkPlayerEntry;
+    canModerate: boolean;
+    answering: boolean;
+    pending: boolean;
+    onAllow: () => void;
+    onRemove: () => void;
+    onKick: () => void;
+    onBan: () => void;
+}) {
+    return (
+        <tr className="border-t border-border">
+            <td className="px-3 py-2">
+                <span className="block max-w-56 truncate font-medium" title={entry.name}>
+                    {entry.name}
+                </span>
+                <span className="block truncate text-xs text-muted-foreground md:hidden">{entry.steamId}</span>
+            </td>
+            <td className="hidden px-3 py-2 md:table-cell">
+                <div className="flex items-center gap-1">
+                    <code className="font-mono text-xs">{entry.steamId}</code>
+                    <CopyButton value={entry.steamId} label={`the Steam id of ${entry.name}`} />
+                </div>
+            </td>
+            <td className="px-3 py-2">
+                {entry.online ? (
+                    <Badge className="border-success/40 text-success">Playing</Badge>
+                ) : (
+                    <span className="text-xs text-muted-foreground">Not on</span>
+                )}
+            </td>
+            <td className="px-3 py-2">
+                {entry.standing === "allowed" ? (
+                    <Badge>Yes</Badge>
+                ) : entry.standing === "waiting" ? (
+                    <span
+                        className="flex items-center gap-1 text-xs text-muted-foreground"
+                        title="Recorded here. The server is told as soon as it answers."
+                    >
+                        <Clock className="size-3.5" /> Waiting for the server
+                    </span>
+                ) : (
+                    <span className="text-xs text-muted-foreground">No</span>
+                )}
+            </td>
+            <td className="px-3 py-2">
+                <div className="flex justify-end gap-1">
+                    {canModerate && entry.standing === "not-allowed" && (
+                        <PlayerIconAction
+                            label={`Let ${entry.name} in`}
+                            icon={<UserPlus className="size-4" />}
+                            disabled={pending}
+                            onClick={onAllow}
+                        />
+                    )}
+                    {canModerate && entry.standing !== "not-allowed" && (
+                        <PlayerIconAction
+                            label={`Take ${entry.name} off the list`}
+                            icon={<UserMinus className="size-4" />}
+                            disabled={pending}
+                            onClick={onRemove}
+                        />
+                    )}
+                    {canModerate && entry.online && (
+                        <PlayerIconAction
+                            label={`Throw ${entry.name} off`}
+                            icon={<LogOut className="size-4" />}
+                            disabled={pending || !answering}
+                            onClick={onKick}
+                        />
+                    )}
+                    {canModerate && (
+                        <PlayerIconAction
+                            label={`Ban ${entry.name}`}
+                            icon={<Ban className="size-4" />}
+                            disabled={pending || !answering}
+                            danger
+                            onClick={onBan}
+                        />
+                    )}
+                </div>
+            </td>
+        </tr>
+    );
+}
+
+/** Whether the server lets in anybody it was not told about. The list itself is on
+ *  the Players screen, where the people are. */
+function ClosedServerCard({
+    installedAppId,
+    access,
+    canManage,
+    onChanged
+}: {
+    installedAppId: string;
+    access: ArkAccessView | null;
+    canManage: boolean;
+    onChanged: () => void;
+}) {
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    function setClosed(closed: boolean): void {
+        setError(null);
+        startTransition(async () => {
+            const result = await setArkExclusiveJoinAction(installedAppId, closed);
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            onChanged();
+        });
+    }
+
+    return (
+        <Card>
+            <CardBody className="flex flex-col gap-3">
+                <p className="text-sm font-medium">Who may join</p>
+                {error && <p className="text-sm text-danger">{error}</p>}
+                <label className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+                    <span className="flex flex-col gap-0.5 text-sm">
+                        <span className="font-medium">Only players on the list can join</span>
+                        <span className="text-xs text-muted-foreground">
+                            On top of the join password. Off leaves the password as the only lock, and takes effect the
+                            next time the server starts. The list itself is on the Players screen.
+                        </span>
+                    </span>
+                    <Switch
+                        checked={access?.closed ?? false}
+                        onChange={setClosed}
+                        disabled={!canManage || pending || access === null}
+                        aria-label="Only players on the list can join"
+                    />
+                </label>
+            </CardBody>
+        </Card>
+    );
+}
+
 function PasswordCard({ installedAppId, canManage }: { installedAppId: string; canManage: boolean }) {
     const [shown, setShown] = useState<{ joinPassword: string | null; adminPassword: string | null } | null>(null);
     const [error, setError] = useState<string | null>(null);

@@ -448,6 +448,42 @@ export async function broadcastToArk(ownerId: string, installedAppId: string, me
     await runArkCommand(ownerId, installedAppId, `Broadcast ${message}`);
 }
 
+/**
+ * Say something to one player.
+ *
+ * By Steam id rather than by name, deliberately: the by-name form breaks on a
+ * name with a space in it, and a moderation message that silently went nowhere is
+ * worse than none. The id also cannot be two people.
+ */
+export async function messageArkPlayer(
+    ownerId: string,
+    installedAppId: string,
+    steamId: string,
+    message: string
+): Promise<void> {
+    if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
+    await runArkCommand(ownerId, installedAppId, `ServerChatTo ${steamId.trim()} ${message}`);
+}
+
+/** Throw somebody off. They can come straight back unless the allow list or a ban
+ *  says otherwise, which is what makes it the mild one of the two. */
+export async function kickArkPlayer(ownerId: string, installedAppId: string, steamId: string): Promise<void> {
+    if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
+    await runArkCommand(ownerId, installedAppId, `KickPlayer ${steamId.trim()}`);
+}
+
+/** Refuse them from now on. Separate from the allow list: a ban holds even on a
+ *  server that was opened to everybody. */
+export async function banArkPlayer(ownerId: string, installedAppId: string, steamId: string): Promise<void> {
+    if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
+    await runArkCommand(ownerId, installedAppId, `BanPlayer ${steamId.trim()}`);
+}
+
+export async function unbanArkPlayer(ownerId: string, installedAppId: string, steamId: string): Promise<void> {
+    if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
+    await runArkCommand(ownerId, installedAppId, `UnbanPlayer ${steamId.trim()}`);
+}
+
 /** Whether an install is an ARK server, for the callers that dispatch on it. */
 export function isArkServer(catalogId: string): boolean {
     return catalogId === ARK_CATALOG_ID && findApp(catalogId) !== undefined;
