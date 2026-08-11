@@ -217,14 +217,24 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         docsUrl: "https://developers.google.com/identity/protocols/oauth2",
         setupLinks: [
             {
+                label: "Set up the consent screen",
+                url: "https://console.cloud.google.com/auth/branding",
+                help: "Google refuses to create a client until this exists. Audience: External, unless everybody here is in the same Workspace."
+            },
+            {
                 label: "Create an OAuth client",
                 url: "https://console.cloud.google.com/auth/clients/create",
-                help: "Application type: Web application. Google has no way to pre-fill the form, so paste the redirect URI below into it."
+                help: "Application type: Web application. Google has no way to pre-fill the form, so paste the redirect URI below into Authorized redirect URIs - it has to be a domain name, since Google rejects an IP address outright."
             },
             {
                 label: "Enable the Calendar API",
                 url: "https://console.cloud.google.com/apis/library/calendar-json.googleapis.com",
                 help: "On the same project. Without it the client authorizes fine and every calendar comes back empty."
+            },
+            {
+                label: "Add the people who may connect",
+                url: "https://console.cloud.google.com/auth/audience",
+                help: "A new client is in Testing, where only the accounts listed as test users can authorize - everybody else is blocked. Add them, or publish the app."
             }
         ],
         requiresApiKey: true,
