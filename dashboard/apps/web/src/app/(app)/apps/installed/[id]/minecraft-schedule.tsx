@@ -26,7 +26,8 @@ import {
     NO_SCHEDULE,
     type GameSchedule,
     type GameScheduleMode,
-    type GameScheduleWindow
+    type GameScheduleWindow,
+    type ScheduleState
 } from "@/lib/apps/minecraft/schedule";
 
 /** What each mode does, in the words the operator has to choose between. */
@@ -43,10 +44,14 @@ const OVERNIGHT: GameScheduleWindow = { days: [], from: "00:00", to: "10:00", mo
 
 export function MinecraftSchedule({
     installedAppId,
-    schedule: saved
+    schedule: saved,
+    state = null
 }: {
     installedAppId: string;
     schedule: GameSchedule;
+    /** What the last sweep of this schedule saw. Null on a screen that did not
+     *  read it. */
+    state?: ScheduleState | null;
 }) {
     const [schedule, setSchedule] = useState<GameSchedule>(saved);
     const [error, setError] = useState<string | null>(null);
@@ -57,6 +62,11 @@ export function MinecraftSchedule({
     // somebody has touched it: a window opened and closed again is no change.
     const changed = useMemo(() => JSON.stringify(schedule) !== JSON.stringify(saved), [schedule, saved]);
     const summary = useMemo(() => describeSchedule(schedule, new Date()), [schedule]);
+    // Whether anything in this schedule actually waits for the server to empty.
+    const sleeps = useMemo(
+        () => schedule.otherwise === "sleep" || schedule.windows.some((window) => window.mode === "sleep"),
+        [schedule]
+    );
 
     function update(patch: Partial<GameSchedule>): void {
         setSavedNote(false);
@@ -120,6 +130,11 @@ export function MinecraftSchedule({
                                     options={MODES.map((mode) => ({ value: mode.value, label: mode.label }))}
                                 />
                             </Field>
+                            {/* Only a rule that says "sleep when empty" ever reads
+                                this, so on a schedule where none does it is a
+                                number somebody sets and then waits for nothing to
+                                happen. Shown greyed with the reason rather than
+                                hidden: disappearing fields are their own puzzle. */}
                             <Field label="Empty for">
                                 <div className="flex items-center gap-2">
                                     <Input
@@ -127,6 +142,7 @@ export function MinecraftSchedule({
                                         min={MIN_IDLE_MINUTES}
                                         max={MAX_IDLE_MINUTES}
                                         value={String(schedule.idleMinutes)}
+                                        disabled={!sleeps}
                                         aria-label="Minutes with nobody playing before a sleeping window stops it"
                                         onChange={(event) =>
                                             update({ idleMinutes: Number.parseInt(event.target.value, 10) || 0 })
@@ -134,6 +150,11 @@ export function MinecraftSchedule({
                                     />
                                     <span className="shrink-0 text-xs text-muted-foreground">minutes</span>
                                 </div>
+                                {!sleeps && (
+                                    <span className="text-xs text-muted-foreground">
+                                        Used only by a rule set to Sleep when empty.
+                                    </span>
+                                )}
                             </Field>
                         </div>
 
@@ -164,14 +185,24 @@ export function MinecraftSchedule({
                             </Button>
                         </div>
 
-                        <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                            {schedule.enabled && summary.includes("nobody") ? (
-                                <Moon className="size-3.5" />
-                            ) : (
-                                <Power className="size-3.5" />
+                        <div className="flex flex-col gap-1">
+                            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                                {schedule.enabled && summary.includes("nobody") ? (
+                                    <Moon className="size-3.5" />
+                                ) : (
+                                    <Power className="size-3.5" />
+                                )}
+                                {summary}
+                            </p>
+                            {/* Whether anything is following this at all. A schedule
+                                that fires and one that is never looked at read the
+                                same on a screen - both just sit there - and the
+                                second is what somebody reports as "I set it and it
+                                did nothing". */}
+                            {state !== null && !changed && (
+                                <p className="text-xs text-muted-foreground">{describeLastCheck(state)}</p>
                             )}
-                            {summary}
-                        </p>
+                        </div>
                     </>
                 )}
 
@@ -301,6 +332,24 @@ function timezoneOptions(current: string): { value: string; label: string }[] {
         value: zone,
         label: zone === here ? `${zone} (yours)` : zone
     }));
+}
+
+/**
+ * When the schedule was last acted on, and what it found.
+ *
+ * Said in minutes rather than as a timestamp because the only question being
+ * asked is "is this thing running": a check from a minute ago answers yes, and one
+ * from yesterday answers no in a way a clock time does not.
+ */
+function describeLastCheck(state: ScheduleState): string {
+    const checked = state.checkedAt ? Date.parse(state.checkedAt) : Number.NaN;
+    if (Number.isNaN(checked)) return "Not checked yet. The first pass runs within a minute of saving.";
+    const ago = Math.max(0, Math.round((Date.now() - checked) / 60_000));
+    const when = ago < 1 ? "just now" : ago < 60 ? `${ago} minutes ago` : new Date(checked).toLocaleString();
+    const empty = state.emptySince ? Math.max(0, Math.round((Date.now() - Date.parse(state.emptySince)) / 60_000)) : null;
+    return empty === null
+        ? `Last checked ${when}.`
+        : `Last checked ${when}. Nobody has been on it for ${empty} ${empty === 1 ? "minute" : "minutes"}.`;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

@@ -32,9 +32,24 @@ let started = false;
 /** When each job last finished, so a long one does not immediately go again. */
 const lastRunAt = new Map<string, number>();
 
-/** Jobs in flight in this process. The lease covers the other processes; this
- *  covers a pass that takes longer than its own cadence. */
-const running = new Set<string>();
+/**
+ * Jobs in flight in this process, and when each one started. The lease covers the
+ * other processes; this covers a pass that takes longer than its own cadence.
+ *
+ * The time is what makes it recoverable. A pass reaches containers and remote
+ * hosts, and those do not always fail - a wedged connection leaves a promise
+ * pending for the life of the process. Held as a plain "is it running" flag, one
+ * of those retired that job permanently: every later tick saw it in flight and
+ * skipped it, so schedules stopped firing until somebody restarted Polaris, with
+ * nothing anywhere saying so. Each caller bounds its own work; this is the
+ * backstop for the one that does not.
+ */
+const startedAt = new Map<string, number>();
+
+/** How long a pass may be in flight before another one is allowed to start. Far
+ *  above the slowest real job - a backup sweep bounds itself at twenty minutes -
+ *  so this only ever fires for work that is not coming back. */
+const STUCK_AFTER_MS = 30 * 60 * 1000;
 
 function due(job: ScheduledJob, now: number): boolean {
     const last = lastRunAt.get(job.key);
@@ -58,8 +73,13 @@ export async function runScheduledJob(key: string): Promise<unknown> {
 }
 
 async function run(job: ScheduledJob): Promise<unknown> {
-    if (running.has(job.key)) return null;
-    running.add(job.key);
+    const since = startedAt.get(job.key);
+    const now = Date.now();
+    if (since !== undefined && now - since < STUCK_AFTER_MS) return null;
+    if (since !== undefined) {
+        console.error(`polaris: the ${job.key} pass has been running for ${Math.round((now - since) / 60_000)}m; starting another`);
+    }
+    startedAt.set(job.key, now);
     try {
         return await runJobBody(job);
     } finally {
@@ -67,7 +87,10 @@ async function run(job: ScheduledJob): Promise<unknown> {
         // longer than its own cadence would otherwise be due again the instant it
         // returned, and would run back to back forever.
         lastRunAt.set(job.key, Date.now());
-        running.delete(job.key);
+        // Only if this run is still the one being tracked. A pass the watchdog
+        // gave up on may return hours later, and it must not clear the flag for
+        // the run that replaced it.
+        if (startedAt.get(job.key) === now) startedAt.delete(job.key);
     }
 }
 

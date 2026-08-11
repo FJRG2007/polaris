@@ -15,6 +15,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { withTimeout } from "@polaris/core";
 import { gameServerAddress } from "./address";
 import { resolveWaf } from "@/lib/waf-service";
 import { getHostLanIp } from "@/lib/host-address";
@@ -52,6 +53,16 @@ export function editionOf(catalogId: string): MinecraftEdition {
 
 /** How long to give the Bedrock console to print an answer we then read back. */
 const CONSOLE_ANSWER_MS = 700;
+
+/**
+ * How long the server gets to answer one command.
+ *
+ * A refused command comes back with an error; a container whose connection has
+ * wedged never comes back at all, and every caller of this is a screen or a sweep
+ * waiting on it. A bound turns that into a failure somebody can read instead of a
+ * page that loads forever.
+ */
+const COMMAND_TIMEOUT_MS = 15_000;
 
 /** Long enough for a ban reason, short enough that no single field can carry a
  *  script into the console. */
@@ -229,7 +240,11 @@ async function sendGameCommand(
     argv: readonly string[]
 ): Promise<string> {
     const command = install.edition === "bedrock" ? ["send-command", ...argv] : ["rcon-cli", ...argv];
-    const result = await ports.runIn(install.container, command);
+    const result = await withTimeout(
+        ports.runIn(install.container, command),
+        COMMAND_TIMEOUT_MS,
+        "The server did not answer in time"
+    );
     if (result.code !== 0) {
         // rcon-cli fails the same way for a server that is still generating its
         // world and for one that has crashed; say what an operator can act on.

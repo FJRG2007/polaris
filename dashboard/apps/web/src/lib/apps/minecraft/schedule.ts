@@ -55,6 +55,31 @@ export const NO_SCHEDULE: GameSchedule = {
 /** Where the schedule lives inside the install's config. */
 export const SCHEDULE_KEY = "schedule";
 
+/** Where the sweep leaves what it saw, beside the schedule it was following. */
+export const EMPTY_SINCE_KEY = "emptySince";
+export const CHECKED_AT_KEY = "scheduleCheckedAt";
+
+/**
+ * What the last sweep saw, so a screen can say whether the schedule is being
+ * followed at all.
+ *
+ * Worth showing for one reason: a schedule that never fires and a schedule with
+ * nothing to do look identical from the outside, and the first is what somebody
+ * reports as "I set it and it did nothing". A time here is the sweep saying it
+ * ran; no time is the sweep never having reached this server.
+ */
+export interface ScheduleState {
+    /** When a sweep last looked at this server. */
+    readonly checkedAt: string | null;
+    /** Since when it has had nobody on it, as the sweep last recorded. */
+    readonly emptySince: string | null;
+}
+
+export function readScheduleState(config: Record<string, unknown>): ScheduleState {
+    const read = (key: string): string | null => (typeof config[key] === "string" ? (config[key] as string) : null);
+    return { checkedAt: read(CHECKED_AT_KEY), emptySince: read(EMPTY_SINCE_KEY) };
+}
+
 /** How long a server may sit empty before a sleeping window stops it, at the
  *  extremes. Under five minutes it would stop between two people arriving; past a
  *  day it is not a sleep, it is being on. */
@@ -164,7 +189,11 @@ export function scheduleModeAt(schedule: GameSchedule, at: Date): GameScheduleMo
 export interface ServerCondition {
     /** Whether it is meant to be up. */
     readonly running: boolean;
-    readonly playersOnline: number;
+    /** How many people are on it, and null when the server could not be asked.
+     *  Not the same as nought: a server still unpacking its first thirty gigabytes
+     *  answers nothing, and reading that as "empty" stops an install halfway
+     *  through the one start that takes an hour. */
+    readonly playersOnline: number | null;
     /** When it was last seen with nobody on it, ISO 8601. Null when it has never
      *  been seen empty, which is not the same as having just emptied. */
     readonly emptySince: string | null;
@@ -177,6 +206,11 @@ export interface ServerCondition {
  * an instruction to come back - coming back is a window that says "on", or
  * somebody pressing start. Saying otherwise would have a server wake at three in
  * the morning to notice it was empty and stop again.
+ *
+ * A server that could not be asked who is on it is never slept either. "Keep
+ * stopped" still stops it - that decision does not depend on anybody - but
+ * "sleep when empty" is a claim about the people playing, and silence is not that
+ * claim.
  */
 export function scheduleAction(
     schedule: GameSchedule,
@@ -187,7 +221,7 @@ export function scheduleAction(
     const mode = scheduleModeAt(schedule, at);
     if (mode === "on") return condition.running ? null : "start";
     if (mode === "off") return condition.running ? "stop" : null;
-    if (!condition.running || condition.playersOnline > 0) return null;
+    if (!condition.running || condition.playersOnline === null || condition.playersOnline > 0) return null;
     if (!condition.emptySince) return null;
     const emptyFor = at.getTime() - Date.parse(condition.emptySince);
     return Number.isNaN(emptyFor) || emptyFor < schedule.idleMinutes * 60_000 ? null : "stop";

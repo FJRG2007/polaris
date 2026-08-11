@@ -13,21 +13,60 @@
  */
 
 import { prisma } from "@polaris/db";
+import { withTimeout } from "@polaris/core";
 import { getServerPlayers } from "./service";
 import { getArkPlayers } from "@/lib/apps/ark/service";
 import { gameOfServer } from "@/lib/apps/games-catalog";
 import { flushGameWorld } from "@/lib/apps/games-flush";
 import { setApplicationRunning } from "@/lib/deploy-service";
-import { readSchedule, scheduleAction, type GameSchedule } from "./schedule";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
+import { CHECKED_AT_KEY, EMPTY_SINCE_KEY, readSchedule, scheduleAction, type GameSchedule } from "./schedule";
 
-/** Where the emptiness clock lives inside the install's config. */
-const EMPTY_SINCE_KEY = "emptySince";
+/**
+ * How long a server gets to say who is on it before the sweep stops waiting.
+ *
+ * Asking costs a command inside the container, and a container that has wedged -
+ * a stale SSH channel, a daemon that stopped answering - does not refuse it, it
+ * simply never replies. Without a bound here that one server holds the whole
+ * pass open, and since the runner will not start a pass while the last one is
+ * still going, every schedule on the instance stops firing until the process is
+ * restarted. That is what "I set a schedule and nothing ever happened" looks
+ * like from the outside.
+ */
+const COUNT_TIMEOUT_MS = 15_000;
+
+/** How often the note saying a sweep ran is worth rewriting. Well under the
+ *  minute the cron runs on, so a schedule that is being followed always says so. */
+const CHECK_NOTE_EVERY_MS = 30_000;
+
+/** Whether the note is old enough to be worth writing again. */
+function staleCheck(config: Record<string, unknown>, at: Date): boolean {
+    const held = typeof config[CHECKED_AT_KEY] === "string" ? Date.parse(config[CHECKED_AT_KEY] as string) : Number.NaN;
+    return Number.isNaN(held) || at.getTime() - held >= CHECK_NOTE_EVERY_MS;
+}
 
 /** What one sweep did, so the caller can log it and the screen can say it. */
 export interface ScheduleSweep {
     readonly started: number;
     readonly stopped: number;
+}
+
+/** Narrowings the callers that already know something can hand in. */
+export interface SweepOptions {
+    /**
+     * Player counts the caller has already paid for, by installed-app id. The
+     * Game servers page has just asked every server who is on; asking again for
+     * the sweep would double the slowest read on the page.
+     *
+     * Null for a server the caller asked and could not tell - which is not nought.
+     * An entry either way means the server is not asked again here, so a caller
+     * that has already had silence from it does not pay for that silence twice.
+     */
+    readonly known?: ReadonlyMap<string, number | null>;
+    /** Sweep this one install rather than everything the owner has, for a server's
+     *  own page - which polls anyway, and is the screen somebody is watching when
+     *  they wonder why their schedule has not fired. */
+    readonly only?: string;
 }
 
 /** The schedule on one server. */
@@ -51,13 +90,16 @@ export async function setGameSchedule(installedAppId: string, schedule: GameSche
 export async function sweepGameSchedules(
     ownerId: string,
     at: Date = new Date(),
-    /** Player counts the caller has already paid for, by installed-app id. The
-     *  Game servers page has just asked every server who is on; asking again for
-     *  the sweep would double the slowest read on the page. */
-    known?: ReadonlyMap<string, number>
+    options: SweepOptions = {}
 ): Promise<ScheduleSweep> {
+    const { known, only } = options;
     const installs = await prisma.installedApp.findMany({
-        where: { ownerId, status: { not: "removed" }, applicationId: { not: null } },
+        where: {
+            ownerId,
+            status: { not: "removed" },
+            applicationId: { not: null },
+            ...(only ? { id: only } : {})
+        },
         select: { id: true, applicationId: true, config: true, catalogId: true }
     });
     let started = 0;
@@ -78,8 +120,20 @@ export async function sweepGameSchedules(
         // asked in the language of the game it belongs to - ARK answers over
         // arkmanager and Minecraft over rcon-cli, and reading one with the other's
         // client is a server that looks empty and gets stopped underneath people.
-        const playersOnline = !running ? 0 : (known?.get(install.id) ?? (await countOnline(ownerId, install)));
+        const playersOnline = !running
+            ? 0
+            : known?.has(install.id)
+              ? (known.get(install.id) ?? null)
+              : await countOnline(ownerId, install);
         const emptySince = await trackEmptiness(install.id, config, running, playersOnline, at);
+        // Written whether or not anything is due, because "the sweep reached this
+        // server" is exactly what somebody whose schedule appears to do nothing
+        // cannot otherwise find out. Not on every pass though: a server's own page
+        // sweeps on its poll, and a row rewritten every five seconds to say the
+        // same thing is a write nobody reads.
+        if (staleCheck(config, at)) {
+            await patchInstallConfig(install.id, { [CHECKED_AT_KEY]: at.toISOString() }).catch(() => undefined);
+        }
 
         const action = scheduleAction(schedule, at, { running, playersOnline, emptySince });
         if (!action) continue;
@@ -99,15 +153,24 @@ export async function sweepGameSchedules(
     return { started, stopped };
 }
 
-/** How many people are on one server, whatever game it runs. Nought when it
- *  cannot be asked - a server that is not answering is not one to stop, and the
- *  emptiness clock is what decides that. */
-async function countOnline(ownerId: string, install: { id: string; catalogId: string }): Promise<number> {
-    if (gameOfServer(install.catalogId)?.id === "ark") {
-        const live = await getArkPlayers(ownerId, install.id).catch(() => null);
-        return live?.answering ? live.players.length : 0;
-    }
-    return (await getServerPlayers(ownerId, install.id).catch(() => null))?.players.online ?? 0;
+/**
+ * How many people are on one server, whatever game it runs.
+ *
+ * Null when it could not be asked - a server that is not answering is not one to
+ * stop. Nought and null were the same value here once, which meant a server that
+ * had gone quiet because it was busy unpacking its first install read as empty and
+ * was stopped in the middle of it.
+ *
+ * Bounded, because the failure that matters is not an error: a container that has
+ * wedged never answers at all, and an unbounded wait there is a sweep that never
+ * finishes and a schedule that never fires again.
+ */
+async function countOnline(ownerId: string, install: { id: string; catalogId: string }): Promise<number | null> {
+    const ask =
+        gameOfServer(install.catalogId)?.id === "ark"
+            ? getArkPlayers(ownerId, install.id).then((live) => (live.answering ? live.players.length : null))
+            : getServerPlayers(ownerId, install.id).then((live) => (live.answering ? live.players.online : null));
+    return withTimeout(ask, COUNT_TIMEOUT_MS, "the server did not say who was on it").catch(() => null);
 }
 
 /**
@@ -123,10 +186,14 @@ async function trackEmptiness(
     installedAppId: string,
     config: Record<string, unknown>,
     running: boolean,
-    playersOnline: number,
+    playersOnline: number | null,
     at: Date
 ): Promise<string | null> {
     const held = typeof config[EMPTY_SINCE_KEY] === "string" ? (config[EMPTY_SINCE_KEY] as string) : null;
+    // A server that could not be asked changes nothing: the clock it had is kept,
+    // so a minute of silence in the middle of an empty evening does not restart
+    // the count, and a server that has never answered never starts one.
+    if (playersOnline === null) return held;
     if (!running || playersOnline > 0) {
         if (held !== null) await patchInstallConfig(installedAppId, { [EMPTY_SINCE_KEY]: null }).catch(() => undefined);
         return null;
