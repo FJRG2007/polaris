@@ -31,19 +31,18 @@ import { ARK_MAPS, mapRequirementHint } from "@/lib/apps/ark/maps";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
 import { createGameServerSchema, isModIdList } from "@/lib/apps/games-schema";
+import { createGameServerAction, gameSetupAction, type GameSetup } from "./actions";
 import { Gamepad2, Loader2, MemoryStick, RefreshCw, ShieldCheck, Users } from "lucide-react";
-import { blueprintsFor, formatMemory, recommendedMemoryMb } from "@/lib/apps/minecraft/blueprints";
-import { blueprintVersionAction, createGameServerAction, gameSetupAction, type GameSetup } from "./actions";
+import { findBlueprint, formatMemory, recommendedMemoryMb } from "@/lib/apps/minecraft/blueprints";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
-
-const SOFTWARE = [
-    { value: "PAPER", label: "Paper - plugins, fastest" },
-    { value: "PURPUR", label: "Purpur - Paper with more settings" },
-    { value: "FABRIC", label: "Fabric - mods" },
-    { value: "NEOFORGE", label: "NeoForge - mods" },
-    { value: "FORGE", label: "Forge - mods" },
-    { value: "VANILLA", label: "Vanilla - nothing added" }
-];
+import {
+    BlueprintFields,
+    Choice,
+    DEFAULT_SHAPE,
+    LATEST,
+    shapeError,
+    type BlueprintShape
+} from "@/components/game-blueprint-fields";
 
 /** A password the operator did not have to invent, from the browser's own
  *  randomness rather than a round trip - it is a field they may still overwrite. */
@@ -66,15 +65,9 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
 
     const [edition, setEdition] = useState<"java" | "bedrock">("java");
     const [crossplay, setCrossplay] = useState(false);
-    const [blueprintId, setBlueprintId] = useState("survival");
-    const [software, setSoftware] = useState("PAPER");
-    const [version, setVersion] = useState("LATEST");
-    const [seed, setSeed] = useState("");
-    const [levelType, setLevelType] = useState(world.DEFAULT_LEVEL_TYPE);
-    const [biome, setBiome] = useState(world.DEFAULT_BIOME);
-    /** The release the chosen blueprint's plugins can run on. Null until it is
-     *  known, and for a blueprint that installs nothing and pins nothing. */
-    const [pinned, setPinned] = useState<string | null>(null);
+    /** The game this server plays and the map it plays it on, as one value: the
+     *  same one the reset dialog holds, from the same fields. */
+    const [shape, setShape] = useState<BlueprintShape>(DEFAULT_SHAPE);
     const [ownerPlayer, setOwnerPlayer] = useState("");
     const [ownerAddress, setOwnerAddress] = useState("");
 
@@ -107,24 +100,8 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
         };
     }, []);
 
-    const blueprints = useMemo(() => blueprintsFor(edition), [edition]);
-    const blueprint = blueprints.find((entry) => entry.id === blueprintId);
-    const isLatest = version.trim().length === 0 || version.trim().toUpperCase() === "LATEST";
+    const blueprint = findBlueprint(shape.blueprintId);
     const offered = useMemo(() => GAMES.filter((entry) => setup?.games.includes(entry.id) ?? false), [setup]);
-
-    // Asked as the blueprint is chosen rather than at submit, so the release it
-    // pins is on screen while the decision is still being made.
-    useEffect(() => {
-        if (game !== "minecraft") return;
-        let active = true;
-        setPinned(null);
-        void blueprintVersionAction(blueprintId)
-            .then((answer) => active && setPinned(answer.version))
-            .catch(() => undefined);
-        return () => {
-            active = false;
-        };
-    }, [blueprintId, game]);
 
     const memory =
         game === "ark"
@@ -132,12 +109,11 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
             : formatMemory(recommendedMemoryMb(concurrentPlayers, blueprint?.weight ?? "normal"));
     const machine = setup?.machines.find((entry) => entry.id === serverId) ?? null;
 
-    // A blueprint belongs to an edition; switching away from one that does not
-    // have it leaves the picker on something that cannot be created.
+    // Crossplay is a Java server Bedrock can also join, so it cannot survive a
+    // switch to a Bedrock one.
     useEffect(() => {
-        if (!blueprints.some((entry) => entry.id === blueprintId)) setBlueprintId(blueprints[0]?.id ?? "survival");
         if (edition === "bedrock") setCrossplay(false);
-    }, [edition, blueprints, blueprintId]);
+    }, [edition]);
 
     // Checked as it is typed, against the same rules the action re-checks: a name
     // the server would refuse is worth saying before a container is built for it.
@@ -149,8 +125,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
               : "3 to 16 letters, digits or underscores";
     const addressError =
         ownerAddress.trim().length === 0 || isAddressRule(ownerAddress) ? null : "That is not an address or a range";
-    const seedError =
-        seed.trim().length === 0 || world.isSeed(seed.trim()) ? null : "A seed is up to 64 characters of ordinary text";
+    const seedError = shapeError(shape);
     const steamIdError =
         ownerSteamId.trim().length === 0 || arkAccess.isSteamId(ownerSteamId)
             ? null
@@ -199,12 +174,12 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                       ownerAddress: ownerAddress.trim(),
                       edition,
                       crossplay,
-                      blueprintId,
-                      software: edition === "java" ? software : undefined,
-                      version: version.trim() || "LATEST",
-                      seed: seed.trim() || undefined,
-                      levelType: edition === "java" ? levelType : undefined,
-                      biome: edition === "java" && world.usesBiome(levelType) ? biome : undefined
+                      blueprintId: shape.blueprintId,
+                      software: edition === "java" ? shape.software : undefined,
+                      version: shape.version.trim() || LATEST,
+                      seed: shape.seed.trim() || undefined,
+                      levelType: edition === "java" ? shape.levelType : undefined,
+                      biome: edition === "java" && world.usesBiome(shape.levelType) ? shape.biome : undefined
                   }
         );
         if (!parsed.success) {
@@ -285,96 +260,12 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                 </div>
                             </div>
 
-                            <div className="flex flex-col gap-2">
-                                <span className="text-sm font-medium">Blueprint</span>
-                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                    {blueprints.map((entry) => (
-                                        <Choice
-                                            key={entry.id}
-                                            selected={blueprintId === entry.id}
-                                            onSelect={() => setBlueprintId(entry.id)}
-                                            title={entry.name}
-                                            detail={entry.summary}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                {edition === "java" && (
-                                    <label className="flex flex-col gap-1 text-sm">
-                                        <span className="font-medium">Software</span>
-                                        <Select
-                                            value={blueprint?.software ?? software}
-                                            onValueChange={setSoftware}
-                                            options={SOFTWARE}
-                                            disabled={Boolean(blueprint?.software)}
-                                        />
-                                        {blueprint?.software && (
-                                            <span className="text-xs text-muted-foreground">
-                                                {blueprint.name} runs on {blueprint.software.toLowerCase()}.
-                                            </span>
-                                        )}
-                                    </label>
-                                )}
-                                <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">Version</span>
-                                    <Input value={version} onChange={(event) => setVersion(event.target.value)} />
-                                    <span className="text-xs text-muted-foreground">
-                                        {pinned && isLatest
-                                            ? `${blueprint?.name} runs on ${pinned}, so the server is created on it.`
-                                            : "LATEST, or pin one like 1.21.4."}
-                                    </span>
-                                </label>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">World seed</span>
-                                    <Input
-                                        value={seed}
-                                        onChange={(event) => setSeed(event.target.value)}
-                                        placeholder="Leave blank for a random world"
-                                    />
-                                    <span className={cn("text-xs", seedError ? "text-danger" : "text-muted-foreground")}>
-                                        {seedError ??
-                                            "A number or any words. The same seed always generates the same map."}
-                                    </span>
-                                </label>
-                                {edition === "java" && (
-                                    <label className="flex flex-col gap-1 text-sm">
-                                        <span className="font-medium">World type</span>
-                                        <Select
-                                            value={levelType}
-                                            onValueChange={setLevelType}
-                                            options={world.LEVEL_TYPES.map((entry) => ({
-                                                value: entry.value,
-                                                label: entry.label
-                                            }))}
-                                        />
-                                        <span className="text-xs text-muted-foreground">
-                                            {world.LEVEL_TYPES.find((entry) => entry.value === levelType)?.detail}
-                                        </span>
-                                    </label>
-                                )}
-                            </div>
-
-                            {edition === "java" && world.usesBiome(levelType) && (
-                                <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">Biome</span>
-                                    <Select
-                                        value={biome}
-                                        onValueChange={setBiome}
-                                        options={world.BIOMES.map((entry) => ({
-                                            value: entry.value,
-                                            label: entry.label
-                                        }))}
-                                    />
-                                    <span className="text-xs text-muted-foreground">
-                                        The whole overworld is this one biome. The Nether and the End are unchanged.
-                                    </span>
-                                </label>
-                            )}
+                            <BlueprintFields
+                                edition={edition}
+                                crossplay={crossplay}
+                                value={shape}
+                                onChange={setShape}
+                            />
                         </>
                     ) : (
                         <>
@@ -632,30 +523,4 @@ function machineLabel(machine: { name: string; memoryFreeBytes: number | null; m
     const free = Math.round(machine.memoryFreeBytes / (1024 * 1024 * 1024));
     const total = Math.round(machine.memoryTotalBytes / (1024 * 1024 * 1024));
     return `${machine.name} - ${free} of ${total} GB free`;
-}
-
-function Choice({
-    selected,
-    onSelect,
-    title,
-    detail
-}: {
-    selected: boolean;
-    onSelect: () => void;
-    title: string;
-    detail: string;
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onSelect}
-            className={cn(
-                "rounded-md border p-3 text-left transition-colors",
-                selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
-            )}
-        >
-            <p className="text-sm font-medium">{title}</p>
-            <p className="text-xs text-muted-foreground">{detail}</p>
-        </button>
-    );
 }

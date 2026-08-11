@@ -30,7 +30,8 @@ import { grantPlayerAccess } from "@/lib/apps/minecraft/player-access";
 import { findGame, type GameDefinition } from "@/lib/apps/games-catalog";
 import { arkServerEnv, expectedArkMemoryMb } from "@/lib/apps/ark/config";
 import { applyAllowList, ARK_CATALOG_ID, mintJoinPassword } from "@/lib/apps/ark/service";
-import { newestCommonVersion, wantsLatest } from "@/lib/apps/minecraft/blueprint-version";
+import { formatProjectList, parseProjectList, projectSlug } from "@/lib/apps/minecraft/modrinth";
+import { commonVersions, knownUnsupported, wantsLatest } from "@/lib/apps/minecraft/blueprint-version";
 import { DEFAULT_BIOME, DEFAULT_LEVEL_TYPE, levelTypeEnv, seedEnvKey } from "@/lib/apps/minecraft/world";
 import type {
     CreateArkServerInput,
@@ -41,7 +42,9 @@ import {
     CROSSPLAY_PROJECTS,
     findBlueprint,
     formatMemory,
+    GAME_BLUEPRINTS,
     recommendedMemoryMb,
+    requiredProjects,
     type GameBlueprint
 } from "@/lib/apps/minecraft/blueprints";
 
@@ -56,6 +59,96 @@ export interface CreatedGameServer {
     readonly installedAppId: string;
     /** The address it will answer on, when a name could be written for it. */
     readonly hostname: string | null;
+}
+
+/** The key the install's config records which blueprint a server was built from
+ *  under, so the server's own page can say what its game still needs and the
+ *  reset dialog can open on what it is now. */
+export const BLUEPRINT_KEY = "blueprintId";
+
+/** What decides the game a Minecraft server plays and the map it plays it on.
+ *  The same answers whether the server is being created or being reset to them. */
+export interface MinecraftShape {
+    readonly blueprintId: string;
+    /** Java only: PAPER, FABRIC, ... The blueprint may pin it. */
+    readonly software?: string;
+    /** A release, or LATEST for the newest the blueprint can run on. */
+    readonly version?: string;
+    /** Blank generates a random world. */
+    readonly seed?: string;
+    readonly levelType?: string;
+    readonly biome?: string;
+    /** How many are realistically on at once, which is what memory follows. */
+    readonly concurrentPlayers: number;
+    /** Whether Bedrock clients are meant to be able to join a Java server. */
+    readonly crossplay: boolean;
+}
+
+/**
+ * The environment a Minecraft server of a given shape runs on, merged over what
+ * it already has.
+ *
+ * One function for creating a server and for resetting one, because they are the
+ * same decision made twice: which plugins, which release, what the world is
+ * generated from and how much heap it needs. Two copies of it is how a blueprint
+ * ends up meaning one thing on a new server and something else on a reset one.
+ *
+ * A blueprint is a promise about the game this server plays and its plugins keep
+ * it, so the release is not left to chance. Left on LATEST, the newest release
+ * every one of them has a build for is pinned; asked for a release they cannot
+ * run on, this refuses rather than installing nothing and handing back an
+ * ordinary world. Only what Modrinth positively answered counts - an index that
+ * could not be reached leaves the operator's own choice alone.
+ */
+export async function minecraftShapeEnv(
+    edition: "java" | "bedrock",
+    blueprint: GameBlueprint,
+    shape: MinecraftShape,
+    current: ReadonlyMap<string, string>
+): Promise<Map<string, string>> {
+    const env = new Map(current);
+    const versions = await commonVersions(requiredProjects(blueprint, shape.crossplay)).catch(() => []);
+    const asked = (shape.version ?? "").trim();
+    if (!wantsLatest(asked) && knownUnsupported(versions, asked)) {
+        throw new Error(
+            `${blueprint.name} has nothing built for Minecraft ${asked}. The newest it runs on is ${versions[0]}.`
+        );
+    }
+    env.set("VERSION", wantsLatest(asked) ? (versions[0] ?? "LATEST") : asked);
+
+    // The seed and the shape of the world only ever apply to one that does not
+    // exist yet, which is what both callers are about to generate. Both are
+    // written every time, blank included: a value left over from the last world
+    // would quietly generate the previous one under the new one's name.
+    env.set(seedEnvKey(edition), shape.seed?.trim() ?? "");
+    for (const [key, value] of Object.entries(
+        levelTypeEnv(
+            edition,
+            shape.levelType ?? blueprint.levelType ?? DEFAULT_LEVEL_TYPE,
+            shape.biome ?? DEFAULT_BIOME
+        )
+    )) {
+        env.set(key, value);
+    }
+
+    // Only the Java image runs a JVM to give a heap to.
+    if (edition === "java") {
+        env.set("MEMORY", formatMemory(recommendedMemoryMb(shape.concurrentPlayers, blueprint.weight)));
+        // What the operator chose, then what the blueprint insists on: a blueprint
+        // that needs Paper is not a suggestion, it is what its plugins load into.
+        env.set("TYPE", blueprint.software ?? shape.software ?? "PAPER");
+        env.set("MODRINTH_PROJECTS", projectList(blueprint, env.get("MODRINTH_PROJECTS"), shape.crossplay));
+    }
+    for (const [key, value] of Object.entries(blueprint.env ?? {})) env.set(key, value);
+    return env;
+}
+
+/** The blueprint a shape names, refusing one this edition cannot be built from. */
+export function blueprintFor(edition: "java" | "bedrock", blueprintId: string): GameBlueprint {
+    const blueprint = findBlueprint(blueprintId);
+    if (!blueprint) throw new Error("Unknown blueprint");
+    if (!blueprint.editions.includes(edition)) throw new Error("That blueprint is not available for this edition");
+    return blueprint;
 }
 
 export async function createGameServer(
@@ -76,52 +169,31 @@ async function createMinecraftServer(
     const catalogId = TEMPLATE_BY_EDITION[input.edition];
     const manifest = findApp(catalogId);
     if (!manifest) throw new Error("That edition is not available");
-    const blueprint = findBlueprint(input.blueprintId);
-    if (!blueprint) throw new Error("Unknown blueprint");
-    if (!blueprint.editions.includes(input.edition)) throw new Error("That blueprint is not available for this edition");
+    const blueprint = blueprintFor(input.edition, input.blueprintId);
 
-    const memoryMb = recommendedMemoryMb(input.concurrentPlayers, blueprint.weight);
     const base = defaultInstallInput(manifest, input.serverId);
-    const env = new Map(base.env.map((entry) => [entry.key, entry.value]));
-
-    // What the operator chose, then what the blueprint insists on: a blueprint
-    // that needs Paper is not a suggestion, it is what its plugins load into.
-    // A blueprint is a promise about the game this server plays, and its plugins
-    // keep it. Left on LATEST, one whose plugin has no build for the newest
-    // release installs nothing, warns into a log nobody reads, and hands back an
-    // ordinary survival server - so the version the blueprint can actually run on
-    // is pinned before anything is created. Only when the operator asked for
-    // whatever is newest: a version they typed is their decision.
-    const pinned = wantsLatest(input.version) ? await blueprintVersion(blueprint) : null;
-    env.set("VERSION", pinned ?? input.version ?? "LATEST");
+    const env = await minecraftShapeEnv(
+        input.edition,
+        blueprint,
+        {
+            blueprintId: input.blueprintId,
+            ...(input.software ? { software: input.software } : {}),
+            version: input.version,
+            ...(input.seed ? { seed: input.seed } : {}),
+            ...(input.levelType ? { levelType: input.levelType } : {}),
+            ...(input.biome ? { biome: input.biome } : {}),
+            concurrentPlayers: input.concurrentPlayers,
+            crossplay: input.crossplay
+        },
+        new Map(base.env.map((entry) => [entry.key, entry.value]))
+    );
     env.set("MAX_PLAYERS", String(input.maxPlayers));
-    // The seed only ever applies to a world that does not exist yet, which is
-    // exactly what this is creating. Left unset it is a random world, and the
-    // manager can start another one from a seed later without losing this map.
-    if (input.seed) env.set(seedEnvKey(input.edition), input.seed);
-    // The shape of the world, which like the seed only ever applies to one that
-    // does not exist yet.
-    for (const [key, value] of Object.entries(
-        levelTypeEnv(input.edition, input.levelType ?? DEFAULT_LEVEL_TYPE, input.biome ?? DEFAULT_BIOME)
-    )) {
-        env.set(key, value);
-    }
-    // Only the Java image runs a JVM to give a heap to.
-    if (input.edition === "java") {
-        env.set("MEMORY", formatMemory(memoryMb));
-        env.set("TYPE", blueprint.software ?? input.software ?? "PAPER");
-    }
-    for (const [key, value] of Object.entries(blueprint.env ?? {})) env.set(key, value);
 
     // Who the server lets in, decided before it boots rather than left to a list
     // that starts enforced and empty. Last over the blueprint, because no blueprint
     // is allowed to produce a server nobody can join.
     for (const [key, value] of Object.entries(joinAccess(input.edition, input.ownerPlayer).env)) {
         env.set(key, value);
-    }
-
-    if (input.edition === "java") {
-        env.set("MODRINTH_PROJECTS", projectList(blueprint, env.get("MODRINTH_PROJECTS"), input.crossplay));
     }
 
     // Crossplay is Geyser listening on the Bedrock port inside the same container,
@@ -143,6 +215,10 @@ async function createMinecraftServer(
         { ...base, name: input.name, env: [...env.entries()].map(([key, value]) => ({ key, value })) },
         extra ? { extra } : undefined
     );
+
+    // Which game this server was built to play, so its own page can say what that
+    // game still needs of it and a reset can start from what it is now.
+    await patchInstallConfig(install.installedAppId, { [BLUEPRINT_KEY]: blueprint.id });
 
     // The address half of the pair, which the game has nowhere to keep. The image
     // was already handed the username; this is what makes the name mean one line
@@ -228,29 +304,60 @@ async function createArkServer(
 }
 
 /**
- * The newest Minecraft release a blueprint's own plugins all support.
+ * The releases a server of this shape could be built on, newest first.
  *
- * Only the blueprint's projects decide it. The protection every server gets is
- * deliberately not counted: those carry "?" too, and letting an anticheat that
- * has not been rebuilt yet hold every new server back a release would be a worse
- * failure than the one this exists to fix.
+ * Only what it has to install decides it - the blueprint's own plugins, and the
+ * crossplay pair when Bedrock players are meant to get in. The protection every
+ * server gets is deliberately not counted: those are optional entries, and
+ * letting an anticheat that has not been rebuilt yet hold every new server back a
+ * release would be a worse failure than the one this exists to prevent.
+ *
+ * Empty means unconstrained, not unsupported: a blueprint that installs nothing,
+ * or a Modrinth nobody could reach.
  */
-export async function blueprintVersion(blueprint: GameBlueprint): Promise<string | null> {
-    return blueprint.projects.length === 0 ? null : newestCommonVersion(blueprint.projects);
+export async function blueprintVersions(blueprint: GameBlueprint, crossplay = false): Promise<string[]> {
+    return commonVersions(requiredProjects(blueprint, crossplay));
+}
+
+/** The newest release a blueprint can run on, or null when nothing constrains it. */
+export async function blueprintVersion(blueprint: GameBlueprint, crossplay = false): Promise<string | null> {
+    return (await blueprintVersions(blueprint, crossplay))[0] ?? null;
 }
 
 /** The blueprint's plugins on top of the protection every server gets, plus the
  *  crossplay pair when Bedrock players are meant to be able to join. */
 function projectList(blueprint: GameBlueprint, current: string | undefined, crossplay: boolean): string {
-    const projects = new Set(
-        (current ?? "")
-            .split(",")
-            .map((entry) => entry.trim())
-            .filter((entry) => entry.length > 0)
-    );
+    const projects = new Set(parseProjectList(current ?? ""));
     for (const project of blueprint.projects) projects.add(project);
     if (crossplay) for (const project of CROSSPLAY_PROJECTS) projects.add(project);
-    return [...projects].join(",");
+    return formatProjectList([...projects]);
+}
+
+/**
+ * A plugin list with every blueprint's own plugins taken back out of it.
+ *
+ * What a reset needs, and only a reset: rebuilding the list around the new
+ * blueprint has to drop the old one's plugin, or a server reset from Bed wars to
+ * Survival is a survival server still running BedWars1058. Every blueprint's
+ * projects go, not just the one recorded against the server - the record is a
+ * convenience and the list on the container is the truth.
+ *
+ * Anything else on the list stays. Somebody who installed a map plugin from the
+ * Mods screen is not asking for it to be uninstalled by a change of game.
+ */
+export function withoutBlueprintProjects(current: string | undefined): string {
+    const owned = new Set(
+        [...GAME_BLUEPRINTS.flatMap((blueprint) => blueprint.projects), ...CROSSPLAY_PROJECTS]
+            .map(projectSlug)
+            .filter((slug): slug is string => slug !== null)
+            .map((slug) => slug.toLowerCase())
+    );
+    return formatProjectList(
+        parseProjectList(current ?? "").filter((entry) => {
+            const slug = projectSlug(entry);
+            return slug === null || !owned.has(slug.toLowerCase());
+        })
+    );
 }
 
 /**

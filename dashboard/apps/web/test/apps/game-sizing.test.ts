@@ -73,9 +73,16 @@ describe("blueprints", () => {
         expect(findBlueprint("skyblock")?.software).toBe("PAPER");
     });
 
-    it("marks every plugin optional, so a new Minecraft release cannot stop the server booting", () => {
+    it("requires every plugin, so a blueprint cannot boot as an ordinary server", () => {
+        // These used to be optional, on the reasoning that a release the plugin had
+        // not been rebuilt for should not stop the server starting. What it did
+        // instead was start it as vanilla, silently - which is the whole of what a
+        // Bed wars server looks like when BedWars1058 is not on it. The version is
+        // pinned to one the plugins can run on before anything is created, so the
+        // case this guarded against is handled where it belongs. Asserted again,
+        // with the rest of that reasoning, in game-blueprint.test.ts.
         for (const blueprint of blueprintsFor("java")) {
-            for (const project of blueprint.projects) expect(project.endsWith("?")).toBe(true);
+            for (const project of blueprint.projects) expect(project.endsWith("?")).toBe(false);
         }
     });
 });

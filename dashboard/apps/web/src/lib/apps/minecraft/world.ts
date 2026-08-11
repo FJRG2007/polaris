@@ -174,12 +174,17 @@ export interface LevelTypeOption {
  * Java's own `level-type` values, and only those - Bedrock's set is a different
  * one, so this is not offered there rather than offered wrongly.
  */
+/** Named because a blueprint asks for it: a minigame's spawn is a lobby, and a
+ *  lobby generated as ordinary terrain is the whole reason one looks like an
+ *  ordinary server. */
+export const FLAT_LEVEL_TYPE = "minecraft:flat";
+
 export const LEVEL_TYPES: readonly LevelTypeOption[] = [
     { value: "minecraft:normal", label: "Normal", detail: "The ordinary world, with every biome in it." },
     { value: "minecraft:large_biomes", label: "Large biomes", detail: "The same world, with each biome several times wider." },
     { value: "minecraft:amplified", label: "Amplified", detail: "Enormous terrain. Hard on the machine, and worth seeing." },
     { value: "minecraft:single_biome_surface", label: "One biome", detail: "The whole overworld is the biome you pick." },
-    { value: "minecraft:flat", label: "Flat", detail: "A featureless plane, for building on." }
+    { value: FLAT_LEVEL_TYPE, label: "Flat", detail: "A featureless plane, for building on." }
 ];
 
 export const DEFAULT_LEVEL_TYPE = "minecraft:normal";

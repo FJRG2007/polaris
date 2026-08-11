@@ -24,6 +24,7 @@ import { isAddressRule } from "@/lib/apps/minecraft/access";
 import { ITEM_ID_PATTERN } from "@/lib/apps/minecraft/items";
 import { stripFormatting } from "@/lib/apps/minecraft/parse";
 import { requireGameServer } from "@/lib/apps/install-access";
+import { resetMinecraftServer } from "@/lib/apps/games-reset";
 import { userSessionAddresses } from "@/lib/session-directory";
 import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import { patchInstallConfig } from "@/lib/apps/install-config";
@@ -39,6 +40,7 @@ import { MAX_BACKUP_BYTES, MAX_KEEP_LAST } from "@/lib/apps/minecraft/backup-pol
 import { cancelAction, pendingFor, queueAction } from "@/lib/apps/minecraft/queue-service";
 import { isBackupName, isBiome, isLevelName, isLevelType } from "@/lib/apps/minecraft/world";
 import { parseDimension, parsePosition, type PlayerPosition } from "@/lib/apps/minecraft/position";
+import { resetMinecraftServerSchema, type ResetMinecraftServerInput } from "@/lib/apps/games-schema";
 import { MAX_IDLE_MINUTES, MIN_IDLE_MINUTES, type GameSchedule } from "@/lib/apps/minecraft/schedule";
 import { readLiveInventory, readSnapshot, writeSnapshot } from "@/lib/apps/minecraft/inventory-service";
 import { envFormatHint, findApp, isAllowedEnvValue, normalizeEnvValue, tunableEnvVars } from "@/lib/apps/catalog";
@@ -1098,6 +1100,43 @@ export async function newWorldAction(input: NewWorldInput): Promise<{ level?: st
         return { level: created.level, carried: created.carried };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not start a new world" };
+    }
+}
+
+/**
+ * Rebuild this server as a blueprint, on a fresh map.
+ *
+ * The heaviest thing on the Settings screen and the one that most looks like a
+ * delete, so it is recorded with what it was turned into. It is not a delete: the
+ * address, the player list, the grants other people hold on it and the map it was
+ * on are all still there afterwards - see games-reset for why each of those is
+ * deliberately untouched.
+ */
+export async function resetGameServerAction(
+    input: ResetMinecraftServerInput
+): Promise<{ level?: string; version?: string; carried?: boolean; error?: string }> {
+    const parsed = resetMinecraftServerSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { installedAppId, ...shape } = parsed.data;
+        const done = await resetMinecraftServer(access.ownerId, installedAppId, user.id, shape);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.reset",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: {
+                blueprint: shape.blueprintId,
+                version: done.version,
+                level: done.level,
+                keptPlayers: done.carried
+            }
+        });
+        revalidatePath(`/apps/installed/${installedAppId}`);
+        return { level: done.level, version: done.version, carried: done.carried };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not reset the server" };
     }
 }
 

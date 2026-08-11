@@ -143,6 +143,41 @@ export const createGameServerSchema = z
         }
     });
 
+/**
+ * Rebuilding a server that already exists, as a blueprint or as nothing in
+ * particular.
+ *
+ * Only the shape of the game and the map it starts on. Everything that makes it
+ * this server rather than another one - its address, its players, who else may
+ * administer it, its name and its port - is deliberately absent: a reset is not
+ * allowed to change any of it, and a field for it here would be the first step
+ * towards one that quietly does.
+ */
+export const resetMinecraftServerSchema = z
+    .object({
+        installedAppId: z.string().uuid(),
+        blueprintId: z.string().trim().min(1).max(48).default("survival"),
+        software: z.string().trim().max(32).optional(),
+        version: z.string().trim().max(32).default("LATEST"),
+        seed: z.string().trim().max(64).optional(),
+        levelType: z.string().trim().max(64).refine(isLevelType, "That is not a world type").optional(),
+        biome: z.string().trim().max(64).refine(isBiome, "That is not a biome").optional(),
+        concurrentPlayers: z.number().int().min(1).max(1000).default(8),
+        /** Java only, and the server has to be running for the copy to be made. */
+        keepPlayers: z.boolean().default(false)
+    })
+    .superRefine((value, ctx) => {
+        if (value.seed !== undefined && value.seed.length > 0 && !isSeed(value.seed)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["seed"],
+                message: "A seed is up to 64 characters of ordinary text"
+            });
+        }
+    });
+
+export type ResetMinecraftServerInput = z.infer<typeof resetMinecraftServerSchema>;
+
 /** Workshop ids as the image wants them: numbers separated by commas, and
  *  nothing else - the value is passed to steamcmd, so a stray word in it is a
  *  mod install that fails on every start. */

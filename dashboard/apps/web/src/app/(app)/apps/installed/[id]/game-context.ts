@@ -13,6 +13,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { BLUEPRINT_KEY } from "@/lib/apps/games-create";
 import { gameServerFacts } from "@/lib/apps/games-service";
 import type { ArkAccessView } from "@/lib/apps/ark/service";
 import { readInstallConfig } from "@/lib/apps/install-config";
@@ -21,6 +22,7 @@ import { readArkAccess, readArkPorts } from "@/lib/apps/ark/service";
 import { listPlayerAccess } from "@/lib/apps/minecraft/player-access";
 import { gameOfServer, routesByHostname } from "@/lib/apps/games-catalog";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
+import { editionOf, type MinecraftEdition } from "@/lib/apps/minecraft/service";
 import { readSchedule, readScheduleState, type GameSchedule, type ScheduleState } from "@/lib/apps/minecraft/schedule";
 
 export interface GameContext {
@@ -39,6 +41,14 @@ export interface GameContext {
     /** When an icon was last uploaded, so the panel can say there is one without
      *  reaching into the container to look. */
     readonly iconSetAt: string | null;
+    /** Which Minecraft this is, and null for a game that has no editions. The
+     *  screens that offer a world type or carry player data need it, and asking
+     *  the container for it would make them wait on a server that may be off. */
+    readonly edition: MinecraftEdition | null;
+    /** The blueprint it was built from, when it was built from one. Null for a
+     *  server created before blueprints were recorded, which is the same thing
+     *  the screens say about one built as plain survival. */
+    readonly blueprintId: string | null;
     /** The hours it is kept up, and the hours it may go quiet. */
     readonly schedule: GameSchedule;
     /** What the last sweep of that schedule saw. */
@@ -100,6 +110,8 @@ export async function gameContextFor(app: {
         routed: config.routed === true,
         canRoute: routesByHostname(app.catalogId),
         iconSetAt: typeof config.iconSetAt === "string" ? config.iconSetAt : null,
+        edition: game.id === "minecraft" ? editionOf(app.catalogId) : null,
+        blueprintId: typeof config[BLUEPRINT_KEY] === "string" ? (config[BLUEPRINT_KEY] as string) : null,
         schedule: readSchedule(config),
         scheduleState: readScheduleState(config),
         arkAccess,

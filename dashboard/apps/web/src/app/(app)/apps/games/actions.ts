@@ -13,15 +13,16 @@ import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { clearResourceGrants } from "@polaris/auth";
 import { flushGameWorld } from "@/lib/apps/games-flush";
-import { gameDomainSuffix } from "@/lib/apps/minecraft/address";
-import { clearQueue } from "@/lib/apps/minecraft/queue-service";
 import { uninstallApp } from "@/lib/apps/install-service";
 import { GAMES, type GameId } from "@/lib/apps/games-catalog";
-import { adoptGameServersApp, installGameServersApp } from "@/lib/apps/game-install";
+import { gameDomainSuffix } from "@/lib/apps/minecraft/address";
+import { clearQueue } from "@/lib/apps/minecraft/queue-service";
 import { clearSnapshots } from "@/lib/apps/minecraft/inventory-service";
-import { blueprintVersion, createGameServer } from "@/lib/apps/games-create";
+import { releaseVersions } from "@/lib/apps/minecraft/blueprint-version";
+import { blueprintVersions, createGameServer } from "@/lib/apps/games-create";
 import { listGameMachines, type GameMachine } from "@/lib/apps/games-service";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
+import { adoptGameServersApp, installGameServersApp } from "@/lib/apps/game-install";
 import { createGameServerSchema, type CreateGameServerInput } from "@/lib/apps/games-schema";
 import { installRef, requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
 import { GAME_BLUEPRINTS, recommendedMemoryMb, formatMemory } from "@/lib/apps/minecraft/blueprints";
@@ -82,20 +83,42 @@ export async function suggestedMemoryAction(concurrentPlayers: number, blueprint
     return formatMemory(recommendedMemoryMb(concurrentPlayers, blueprint?.weight ?? "normal"));
 }
 
+/** The releases a blueprint can be built on, and the newest of them. */
+export interface BlueprintVersions {
+    /** Newest first. Empty means nothing constrains the choice - a blueprint that
+     *  installs nothing, or a Modrinth that could not be reached. */
+    readonly versions: readonly string[];
+    /** The newest of them, which is what LATEST resolves to. */
+    readonly latest: string | null;
+    /** Whether it is the blueprint's own plugins that limit the list, rather than
+     *  it simply being every release Minecraft has. */
+    readonly pinned: boolean;
+}
+
 /**
- * The Minecraft release a blueprint's plugins can run on, for the dialog to say
- * before anything is created.
+ * The Minecraft releases a blueprint's plugins can run on, for the dialog to
+ * offer before anything is created.
  *
- * Worth showing rather than doing quietly: a blueprint pinning an older release
- * is a real consequence - the clients that join have to match it - and finding
- * out afterwards, from the version field on a server that is already built, is
- * how somebody ends up deleting it and trying again.
+ * Worth showing rather than deciding quietly: a blueprint pinning an older
+ * release is a real consequence - the clients that join have to match it - and
+ * finding out afterwards, from the version field on a server that is already
+ * built, is how somebody ends up deleting it and trying again. The whole list is
+ * sent because the field is a picker: the operator's players may be on a release
+ * that is not the newest one, and every entry here is one the game will actually
+ * be installed on.
  */
-export async function blueprintVersionAction(blueprintId: string): Promise<{ version: string | null }> {
+export async function blueprintVersionsAction(
+    blueprintId: string,
+    crossplay = false
+): Promise<BlueprintVersions> {
     await requirePermission("games.read");
     const blueprint = GAME_BLUEPRINTS.find((entry) => entry.id === blueprintId);
-    if (!blueprint) return { version: null };
-    return { version: await blueprintVersion(blueprint).catch(() => null) };
+    if (!blueprint) return { versions: [], latest: null, pinned: false };
+    const versions = await blueprintVersions(blueprint, crossplay).catch(() => []);
+    // A blueprint that constrains nothing still needs a list to pick from, so it
+    // gets Minecraft's own releases.
+    const offered = versions.length > 0 ? versions : await releaseVersions().catch(() => []);
+    return { versions: offered, latest: offered[0] ?? null, pinned: versions.length > 0 };
 }
 
 /** Create a server. Returns its installed-app id so the page can open it. */

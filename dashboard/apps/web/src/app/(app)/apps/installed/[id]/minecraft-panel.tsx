@@ -24,6 +24,7 @@ import type { Permission } from "@polaris/core";
 import { MinecraftMods } from "./minecraft-mods";
 import type { GameContext } from "./game-context";
 import { MinecraftRules } from "./minecraft-rules";
+import { MinecraftReset } from "./minecraft-reset";
 import { MinecraftWorld } from "./minecraft-world";
 import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
@@ -44,6 +45,7 @@ import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
+import { findBlueprint, hasCrossplay } from "@/lib/apps/minecraft/blueprints";
 import { FolderOpen, Loader2, Save, ShieldAlert, UserPlus } from "lucide-react";
 import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
@@ -52,6 +54,10 @@ import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/
 /** Mods are managed on their own screen, so their variables are not repeated as
  *  raw fields on Settings. */
 const MODS_GROUP = "Mods";
+
+/** The setting that lists what the image installs, which is also where the answer
+ *  to "do Bedrock clients join this one" is written. */
+const PROJECTS_KEY = "MODRINTH_PROJECTS";
 
 /** The description has an editor of its own - a preview, a colour toolbar and the
  *  centring - so it is not also offered as a raw text field two cards below, where
@@ -327,7 +333,14 @@ export function MinecraftPanel({
                 ))}
             </nav>
 
-            {tab === "" && <OverviewTab status={status} settings={settings} onOpenPlayers={() => openTab("players")} />}
+            {tab === "" && (
+                <OverviewTab
+                    status={status}
+                    settings={settings}
+                    blueprintId={game?.blueprintId ?? null}
+                    onOpenPlayers={() => openTab("players")}
+                />
+            )}
             {tab === "console" && (
                 <GameConsole installedAppId={installedAppId} applicationId={applicationId} running={isRunning} />
             )}
@@ -429,6 +442,16 @@ export function MinecraftPanel({
                         )}
                         playersOnline={status?.players.online ?? 0}
                         onSaved={reloadSettings}
+                    />
+                    <MinecraftReset
+                        installedAppId={installedAppId}
+                        edition={game?.edition ?? "java"}
+                        blueprintId={game?.blueprintId ?? null}
+                        crossplay={hasCrossplay(
+                            settings.find((setting) => setting.key === PROJECTS_KEY)?.value
+                        )}
+                        playersOnline={status?.players.online ?? 0}
+                        onDone={reloadSettings}
                     />
                 </div>
             )}
@@ -645,19 +668,47 @@ function formatBytes(bytes: number): string {
 function OverviewTab({
     status,
     settings,
+    blueprintId,
     onOpenPlayers
 }: {
     status: MinecraftStatus | null;
     settings: InstalledAppSetting[];
+    /** What it was built from, so the screen can say what that game still needs. */
+    blueprintId: string | null;
     onOpenPlayers: () => void;
 }) {
     const shown = useMemo(
         () => settings.filter((setting) => ["DIFFICULTY", "MODE", "MAX_PLAYERS", "MEMORY", "MOTD"].includes(setting.key)),
         [settings]
     );
+    const blueprint = findBlueprint(blueprintId ?? "");
 
     return (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {/* The honest half of a blueprint. Polaris installs the plugin and
+                shapes the world for it; a minigame with no map of its own is still
+                a lobby until somebody makes one, and a server that looks like an
+                empty world with no explanation reads as a broken install rather
+                than as the next step. Full width, because it is the answer to the
+                question anybody who just created this is about to ask. */}
+            {blueprint?.setup && (
+                <Card className="lg:col-span-2">
+                    <CardBody className="flex flex-col gap-2">
+                        <p className="text-sm font-medium">{blueprint.name}: what is left to do</p>
+                        <p className="text-sm text-muted-foreground">{blueprint.setup}</p>
+                        {blueprint.docs && (
+                            <a
+                                href={blueprint.docs}
+                                target="_blank"
+                                rel="noreferrer noopener"
+                                className="self-start text-sm text-primary underline-offset-2 hover:underline"
+                            >
+                                The plugin&apos;s own instructions
+                            </a>
+                        )}
+                    </CardBody>
+                </Card>
+            )}
             <Card>
                 <CardBody className="flex flex-col gap-3">
                     <p className="text-sm font-medium">Playing now</p>

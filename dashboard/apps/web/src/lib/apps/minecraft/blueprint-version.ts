@@ -63,27 +63,55 @@ async function releases(): Promise<string[]> {
 }
 
 /**
- * The newest release every one of these projects supports, or null.
+ * Every release all of these projects support, newest first.
  *
- * Null covers three cases the caller treats the same way - there are no projects
+ * Empty covers three cases the caller treats the same way - there are no projects
  * to constrain the version, Modrinth could not be reached, or the projects share
  * no release at all - because in each of them the honest thing is to leave the
  * operator's own choice alone rather than pin a version on a guess.
+ *
+ * The whole list rather than only its head, because the operator picks from it:
+ * a blueprint that can run on six releases should let somebody choose the one
+ * their players are on, and a picker built from anything wider would offer the
+ * releases that produce the silent nothing this module exists to prevent.
  */
-export async function newestCommonVersion(projects: readonly string[]): Promise<string | null> {
+export async function commonVersions(projects: readonly string[]): Promise<string[]> {
     const slugs = projects.map(projectSlug).filter((slug): slug is string => slug !== null);
-    if (slugs.length === 0) return null;
+    if (slugs.length === 0) return [];
 
     const [ordered, supported] = await Promise.all([
         releases(),
         Promise.all(slugs.map((slug) => projectVersions(slug)))
     ]);
-    if (ordered.length === 0 || supported.some((versions) => versions.length === 0)) return null;
+    if (ordered.length === 0 || supported.some((versions) => versions.length === 0)) return [];
 
     const sets = supported.map((versions) => new Set(versions));
-    // The tag list is newest first, so the first release all of them carry is the
-    // newest one they agree on.
-    return ordered.find((version) => sets.every((set) => set.has(version))) ?? null;
+    // The tag list is newest first, so the releases all of them carry come out in
+    // the same order.
+    return ordered.filter((version) => sets.every((set) => set.has(version)));
+}
+
+/** Minecraft's own releases, newest first, for a server whose plugins put no
+ *  constraint on which one it runs. */
+export async function releaseVersions(): Promise<string[]> {
+    return releases();
+}
+
+/** The newest release every one of these projects supports, or null. */
+export async function newestCommonVersion(projects: readonly string[]): Promise<string | null> {
+    return (await commonVersions(projects))[0] ?? null;
+}
+
+/**
+ * Whether a release is one these projects positively cannot run on.
+ *
+ * Positively: an empty list means nothing is known - no projects, or Modrinth out
+ * of reach - and "nothing is known" must never be reported as "this will not
+ * work". The caller refuses a create on the strength of this, and refusing one
+ * because an index was down would be the worse failure.
+ */
+export function knownUnsupported(versions: readonly string[], version: string): boolean {
+    return versions.length > 0 && !versions.includes(version.trim());
 }
 
 /** Whether the operator asked for whatever is newest, which is the only case a
