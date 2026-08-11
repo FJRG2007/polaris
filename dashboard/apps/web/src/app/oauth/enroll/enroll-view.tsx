@@ -18,13 +18,21 @@
  * account whose phone is gone or whose mail has stopped, and this is the only time
  * anybody sees them - so the screen does not leave until they have been
  * acknowledged.
+ *
+ * Both paths need the account's password, because arming a factor is a change to
+ * how the account is signed into and better-auth asks to see it again before
+ * making one. That is right for somebody who has been signed in since yesterday
+ * and wrong for somebody who typed it four seconds ago to register - so when
+ * registering renders this itself it hands the password over, and neither path
+ * asks for it. Nothing is stored anywhere to make that work: it is the same value
+ * still sitting in the form's own state, on the page that never navigated away.
  */
 
 import { QRCodeSVG } from "qrcode.react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
-import { useState, type FormEvent } from "react";
 import { KeyRound, Mail, ShieldCheck } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Button, Card, CardBody, Input, PolarisMark } from "@polaris/ui";
 import { SECOND_FACTOR_ENROLLMENT_INFO, type SecondFactorEnrollment } from "@polaris/core";
 import { armByEmailAction, noteAuthenticatorArmedAction, sendEnrollmentCodeAction } from "./actions";
@@ -50,11 +58,20 @@ const FACTOR_ICON = { totp: KeyRound, email: Mail } as const;
 export function EnrollView({
     account,
     name,
-    options
+    options,
+    password,
+    onDone
 }: {
     account: string;
     name: string;
     options: EnrollmentChoice[];
+    /** The account's password, when whoever rendered this already has it because
+     *  it was typed a moment ago. Absent on the enrollment page, which is reached
+     *  by a session that may be a day old. */
+    password?: string;
+    /** Where the flow goes once the backup codes have been acknowledged. Defaults
+     *  to the dashboard. */
+    onDone?: () => void;
 }) {
     const router = useRouter();
     // Only one way in means there is nothing to choose, so the screen starts on it
@@ -64,7 +81,15 @@ export function EnrollView({
     );
     const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
 
-    if (backupCodes) return <BackupCodes codes={backupCodes} account={account} onDone={() => router.replace("/")} />;
+    if (backupCodes) {
+        return (
+            <BackupCodes
+                codes={backupCodes}
+                account={account}
+                onDone={onDone ?? (() => router.replace("/"))}
+            />
+        );
+    }
 
     return (
         <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center gap-6 p-6">
@@ -106,11 +131,13 @@ export function EnrollView({
             ) : factor === "email" ? (
                 <EmailFactor
                     target={options.find((option) => option.factor === "email")?.target ?? account}
+                    {...(password === undefined ? {} : { password })}
                     onArmed={setBackupCodes}
                     onBack={options.length > 1 ? () => setFactor(null) : null}
                 />
             ) : (
                 <AuthenticatorFactor
+                    {...(password === undefined ? {} : { password })}
                     onArmed={setBackupCodes}
                     onBack={options.length > 1 ? () => setFactor(null) : null}
                 />
@@ -124,10 +151,14 @@ export function EnrollView({
  *  to click a verification link afterwards. */
 function EmailFactor({
     target,
+    password,
     onArmed,
     onBack
 }: {
     target: string;
+    /** Known already when this is rendered by registering, so the form does not
+     *  ask for it a second time. */
+    password?: string;
     onArmed: (codes: string[]) => void;
     onBack: (() => void) | null;
 }) {
@@ -153,7 +184,7 @@ function EmailFactor({
         setBusy(true);
         setError(null);
         const result = await armByEmailAction(
-            String(form.get("password") ?? ""),
+            password ?? String(form.get("password") ?? ""),
             String(form.get("code") ?? "")
         );
         setBusy(false);
@@ -184,10 +215,12 @@ function EmailFactor({
                             Code from the email
                             <Input name="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required />
                         </label>
-                        <label className="flex flex-col gap-1 text-sm">
-                            Your password
-                            <Input name="password" type="password" autoComplete="current-password" required />
-                        </label>
+                        {password === undefined ? (
+                            <label className="flex flex-col gap-1 text-sm">
+                                Your password
+                                <Input name="password" type="password" autoComplete="current-password" required />
+                            </label>
+                        ) : null}
                         <div className="flex items-center gap-2">
                             <Button type="submit" disabled={busy}>
                                 {busy ? "Turning on..." : "Turn on"}
@@ -213,9 +246,13 @@ function EmailFactor({
 /** The authenticator, armed through better-auth exactly as Account > Security
  *  arms it: password, then the secret, then a code that proves the app works. */
 function AuthenticatorFactor({
+    password,
     onArmed,
     onBack
 }: {
+    /** Known already when this is rendered by registering, in which case the
+     *  secret is fetched on sight and nothing asks for a password. */
+    password?: string;
     onArmed: (codes: string[]) => void;
     onBack: (() => void) | null;
 }) {
@@ -224,12 +261,10 @@ function AuthenticatorFactor({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    async function start(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault();
-        const password = String(new FormData(event.currentTarget).get("password") ?? "");
+    async function start(given: string): Promise<void> {
         setBusy(true);
         setError(null);
-        const { data, error: enableError } = await authClient.twoFactor.enable({ password });
+        const { data, error: enableError } = await authClient.twoFactor.enable({ password: given });
         setBusy(false);
         if (enableError || !data) {
             setError(enableError?.message ?? "Could not start setup. Check your password.");
@@ -238,6 +273,18 @@ function AuthenticatorFactor({
         setTotpUri(data.totpURI);
         setCodes(data.backupCodes);
     }
+
+    // Nothing to ask for, so nothing is asked: the secret is fetched as the step
+    // opens and the person lands straight on the QR code. Guarded on the secret
+    // rather than on a ref, so a second run cannot mint a second one over the
+    // first - which would leave the app holding a secret the account no longer has.
+    useEffect(() => {
+        if (password === undefined || totpUri.length > 0 || busy) return;
+        void start(password);
+        // Only the password decides whether this runs, and it does not change
+        // while the step is open.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [password]);
 
     async function verify(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -270,15 +317,27 @@ function AuthenticatorFactor({
                 </div>
 
                 {!totpUri ? (
-                    <form className="flex flex-col gap-3" onSubmit={(event) => void start(event)}>
-                        <label className="flex flex-col gap-1 text-sm">
-                            Your password
-                            <Input name="password" type="password" autoComplete="current-password" required />
-                        </label>
-                        <Button type="submit" disabled={busy}>
-                            {busy ? "Starting..." : "Continue"}
-                        </Button>
-                    </form>
+                    password !== undefined ? (
+                        <p className="text-xs text-muted-foreground">
+                            {busy || error === null ? "Setting up..." : "Setup did not start."}
+                        </p>
+                    ) : (
+                        <form
+                            className="flex flex-col gap-3"
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                void start(String(new FormData(event.currentTarget).get("password") ?? ""));
+                            }}
+                        >
+                            <label className="flex flex-col gap-1 text-sm">
+                                Your password
+                                <Input name="password" type="password" autoComplete="current-password" required />
+                            </label>
+                            <Button type="submit" disabled={busy}>
+                                {busy ? "Starting..." : "Continue"}
+                            </Button>
+                        </form>
+                    )
                 ) : (
                     <form className="flex flex-col gap-3" onSubmit={(event) => void verify(event)}>
                         <div className="self-center rounded-md bg-white p-3">

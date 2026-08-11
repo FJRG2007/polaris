@@ -7,11 +7,12 @@
  * is made an administrator and the built-in roles are seeded.
  */
 
-import { loadEnv } from "@polaris/config";
-import { hashToken, tokenMatchesHash } from "@polaris/core/tokens";
-import { setupSchema } from "@polaris/core";
-import { assignRole, hasAnyUser, provisionUser, seedDefaultRoles, setUserAdmin } from "@polaris/auth";
 import { auth } from "@/lib/auth";
+import { loadEnv } from "@polaris/config";
+import { passwordIsBreached } from "@/lib/pwned-passwords";
+import { hashToken, tokenMatchesHash } from "@polaris/core/tokens";
+import { BREACHED_PASSWORD_MESSAGE, setupSchema } from "@polaris/core";
+import { assignRole, hasAnyUser, provisionUser, seedDefaultRoles, setUserAdmin } from "@polaris/auth";
 
 export async function completeSetupAction(input: unknown): Promise<{ error?: string }> {
     const parsed = setupSchema.safeParse(input);
@@ -24,6 +25,11 @@ export async function completeSetupAction(input: unknown): Promise<{ error?: str
     if (!tokenMatchesHash(parsed.data.token, hashToken(expected))) {
         return { error: "Invalid setup token" };
     }
+
+    // The client asks the same corpus as the password is typed; this is the copy
+    // that decides. Fails open, so an outage at somebody else's API cannot be the
+    // reason nobody can set this Polaris up at all.
+    if (await passwordIsBreached(parsed.data.password)) return { error: BREACHED_PASSWORD_MESSAGE };
 
     try {
         const user = await provisionUser(auth, {

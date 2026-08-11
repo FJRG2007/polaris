@@ -5,12 +5,32 @@
  */
 
 import { z } from "zod";
+import { normalizePersonName } from "../names.js";
 import { pendingGrantSchema } from "./sharing.js";
 import { accessRulesSchema } from "./account-security.js";
 import { MAX_ROLE_NAME_LENGTH, PERMISSIONS } from "../permissions.js";
+import { IDENTITY_PASSWORD_MESSAGE, passwordMatchesIdentity } from "../password-safety.js";
 
 export const emailField = z.string().trim().min(1, "Email is required").email("Enter a valid email");
 export const nameField = z.string().trim().min(1, "Name is required").max(120);
+/** A person's name as it is stored: what they typed, written the same way it
+ *  would have been from any other keyboard. A phone capitalizes sentences rather
+ *  than words, so a name typed on one arrives as "juan perez" and a name typed on
+ *  a laptop arrives however it was typed - one normalizer settles both, here
+ *  rather than in each form, so the server is the copy that decides. */
+export const personNameField = nameField.transform(normalizePersonName);
+
+/** Refuse a password built out of the account it protects. Declared on the object
+ *  because a password field cannot see the name and address beside it, and the
+ *  same rule runs on the client and again here. */
+function refuseIdentityPassword(
+    value: { password: string; name: string; username: string; email?: string },
+    ctx: z.RefinementCtx
+): void {
+    if (passwordMatchesIdentity(value.password, [value.name, value.username, value.email])) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["password"], message: IDENTITY_PASSWORD_MESSAGE });
+    }
+}
 export const usernameField = z
     .string()
     .trim()
@@ -32,16 +52,18 @@ export const loginSchema = z.object({
     password: z.string().min(1, "Password is required")
 });
 
-export const setupSchema = z.object({
-    name: nameField,
-    username: usernameField,
-    email: emailField,
-    password: passwordField,
-    token: z.string().trim().min(1, "Setup token is required")
-});
+export const setupSchema = z
+    .object({
+        name: personNameField,
+        username: usernameField,
+        email: emailField,
+        password: passwordField,
+        token: z.string().trim().min(1, "Setup token is required")
+    })
+    .superRefine(refuseIdentityPassword);
 
 export const acceptInviteSchema = z.object({
-    name: nameField,
+    name: personNameField,
     username: usernameField,
     password: passwordField
 });
@@ -146,11 +168,15 @@ export const INVITE_REFUSALS = {
 export type InviteRefusal = keyof typeof INVITE_REFUSALS;
 
 /** Claiming an invite: who is joining, and what proves they may. */
-export const claimInviteSchema = acceptInviteSchema.extend({
-    token: z.string().trim().default(""),
-    code: z.string().trim().default(""),
-    oneTimePassword: z.string().trim().default("")
-});
+export const claimInviteSchema = acceptInviteSchema
+    .extend({
+        token: z.string().trim().default(""),
+        code: z.string().trim().default(""),
+        oneTimePassword: z.string().trim().default("")
+    })
+    // The invite decides the address, so the identity to compare against here is
+    // the name and username the person is choosing right now.
+    .superRefine(refuseIdentityPassword);
 
 export type LoginInput = z.infer<typeof loginSchema>;
 export type SetupInput = z.infer<typeof setupSchema>;

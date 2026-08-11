@@ -19,11 +19,38 @@
 import { headers } from "next/headers";
 import { resolveSession } from "@/lib/session";
 import { setTotpUnclaimed } from "@polaris/auth";
+import type { EnrollmentChoice } from "./enroll-view";
+import { enrollmentOptions, owesSecondFactor } from "@/lib/instance-security";
 import { armFactorByEmail, sendEnrollmentCode } from "@/lib/second-factor-enrollment";
 
 interface ActionResult {
     error?: string;
     ok?: string;
+}
+
+/** What the enrollment step would ask of the account that has just signed in, or
+ *  null when it would ask nothing. */
+export interface PendingEnrollment {
+    readonly account: string;
+    readonly name: string;
+    readonly options: EnrollmentChoice[];
+}
+
+/**
+ * Whether the account that just registered still owes a second factor, and what
+ * it may arm one with.
+ *
+ * The same two questions the enrollment page asks on the server, asked from the
+ * browser instead. It exists so registering can finish the enrollment on the page
+ * it is already on, while the password the person typed a second ago is still in
+ * the form they typed it into - navigating to the enrollment screen would leave
+ * that behind and have to ask for it again, which is asking somebody to confirm
+ * they are themselves moments after proving it.
+ */
+export async function pendingEnrollmentAction(): Promise<PendingEnrollment | null> {
+    const user = await resolveSession();
+    if (!user || !(await owesSecondFactor(user.id))) return null;
+    return { account: user.email, name: user.name, options: await enrollmentOptions(user.id) };
 }
 
 export async function sendEnrollmentCodeAction(): Promise<ActionResult & { sentTo?: string }> {

@@ -9,9 +9,10 @@
  * client: it is half of what decides whether the invite may be claimed at all.
  */
 
-import { claimInviteSchema, inviteCodeField, INVITE_REFUSALS } from "@polaris/core";
-import { claimInvite, resolveInvite } from "@/lib/invite-service";
 import { clientIp } from "@/lib/request-context";
+import { passwordIsBreached } from "@/lib/pwned-passwords";
+import { claimInvite, resolveInvite } from "@/lib/invite-service";
+import { BREACHED_PASSWORD_MESSAGE, claimInviteSchema, inviteCodeField, INVITE_REFUSALS } from "@polaris/core";
 
 /**
  * Check an invitation code before asking its holder for anything else. Answers
@@ -33,6 +34,10 @@ export async function acceptInviteAction(input: unknown): Promise<{ email?: stri
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
     const { token, code, oneTimePassword, name, username, password } = parsed.data;
     if (!token && !code) return { error: "Missing invite token" };
+    // Checked here as well as in the browser, because the browser is not the
+    // enforcement point. Unknown answers pass: an outage at somebody else's API
+    // must never be the reason an invited person cannot join.
+    if (await passwordIsBreached(password)) return { error: BREACHED_PASSWORD_MESSAGE };
 
     const result = await claimInvite({
         token: token || undefined,
