@@ -25,10 +25,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CopyButton } from "@/components/copy-button";
+import { useGamePresence } from "@/components/use-game-presence";
 import { NewServerDialog } from "./new-server-dialog";
 import type { GameServerFacts, GameServerLive } from "@/lib/apps/games-service";
 import { GAMES, type GameDefinition, type GameId } from "@/lib/apps/games-catalog";
-import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import {
     deleteGameServerAction,
     installManagerAction,
@@ -65,7 +66,11 @@ import {
     Skeleton
 } from "@polaris/ui";
 
-const POLL_MS = 6000;
+/** How often the table re-reads what Polaris knows by itself - a server added,
+ *  renamed or deleted somewhere else. Who is playing does not come from here: it
+ *  arrives on the live stream, which pushes it as it changes. This is also the
+ *  backstop if that stream cannot be held open at all. */
+const POLL_MS = 20000;
 
 /** What the page knows before anything is polled. */
 export interface GameServerSeed {
@@ -112,6 +117,10 @@ export function GamesView({
     const router = useRouter();
     const [facts, setFacts] = useState<Map<string, GameServerFacts>>(new Map());
     const [live, setLive] = useState<Map<string, GameServerLive>>(new Map());
+    // Who is on each server, pushed as it changes rather than polled for. Shared
+    // with every other tab on this device, and with the panels of the servers
+    // themselves, so all of them agree at the same moment.
+    const presence = useGamePresence();
     const [creating, setCreating] = useState(false);
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
@@ -153,15 +162,39 @@ export function GamesView({
         await Promise.all([loadFacts(), loadLive()]);
     }, [loadFacts, loadLive]);
 
+    // Whether the stream is feeding this screen, read inside the interval below
+    // without making it restart every time a frame arrives.
+    const streaming = useRef(false);
+    streaming.current = presence.at > 0;
+
     useEffect(() => {
         void loadFacts();
         void loadLive();
         const timer = setInterval(() => {
             void loadFacts();
-            void loadLive();
+            // Who is playing comes off the stream once it is connected, and asking
+            // for it again would be a command inside every container for an answer
+            // already on screen. This is what keeps the table live for a browser
+            // that cannot hold a stream open at all.
+            if (!streaming.current) void loadLive();
         }, POLL_MS);
         return () => clearInterval(timer);
     }, [loadFacts, loadLive]);
+
+    // A frame is newer than anything the backstop poll fetched, so it wins.
+    useEffect(() => {
+        if (presence.at === 0) return;
+        setLive(
+            new Map(
+                [...presence.servers].map(([id, server]) => [
+                    id,
+                    // The row prints names; the ids beside them are for the screens
+                    // that offer a verb against one person.
+                    { ...server, players: server.players.map((player) => player.name) }
+                ])
+            )
+        );
+    }, [presence]);
 
     const rows = useMemo<ServerView[]>(
         () =>

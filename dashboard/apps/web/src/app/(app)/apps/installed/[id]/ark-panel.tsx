@@ -33,7 +33,9 @@ import { findArkMap, mapRequirementHint } from "@/lib/apps/ark/maps";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import type { ArkAccessView, ArkStatus } from "@/lib/apps/ark/service";
+import type { ServerPresence } from "@/lib/apps/games-service";
 import { ArkMessageDialog, ArkPlayerDialog } from "./ark-player-dialogs";
+import { useGamePresence } from "@/components/use-game-presence";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { PlayerIconAction, PlayersTable } from "@/components/game-players-table";
 import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs";
@@ -76,10 +78,24 @@ import {
     cn
 } from "@polaris/ui";
 
-/** How long after one read finishes before the next one starts. Measured from the
- *  end rather than on a fixed interval: a read runs a command inside the container
- *  and a slow one would otherwise have every tick queue behind the last. */
-const POLL_MS = 5000;
+/**
+ * How long after one read finishes before the next one starts. Measured from the
+ * end rather than on a fixed interval: a read runs a command inside the container
+ * and a slow one would otherwise have every tick queue behind the last.
+ *
+ * Unhurried, because the thing that changes by itself is not read here any more.
+ * Who is playing arrives on the live stream within a couple of seconds of it
+ * happening; what this poll is for - what the machine is costing, whether the port
+ * answers from outside, what the server was launched with - moves slowly enough
+ * that asking every few seconds was only ever noise.
+ */
+const POLL_MS = 12000;
+
+/** How old a streamed reading may be before the screen stops preferring it to what
+ *  the poll last returned. Several times the stream's own cadence, so a frame that
+ *  is merely between beats is still trusted, and a connection that has silently
+ *  died is not. */
+const PRESENCE_STALE_MS = 25000;
 
 /** Managed by the Access screen's own controls rather than offered twice as raw
  *  fields - the two would quietly disagree about what the server is running on. */
@@ -200,7 +216,21 @@ export function ArkPanel({
         };
     }, [load]);
 
-    const status = reading.status;
+    // Who is on it, pushed as it changes rather than waited for. The poll above
+    // still reports it, but a poll's worth late; whichever of the two is more
+    // recent is what the screen shows.
+    const presence = useGamePresence([installedAppId]);
+    const streamed = presence.servers.get(installedAppId) ?? null;
+    const status = useMemo(
+        () =>
+            withPresence(
+                reading.status,
+                streamed && Date.now() - presence.at < PRESENCE_STALE_MS ? streamed : null,
+                { game: game?.gamePort ?? null, query: game?.queryPort ?? null },
+                running
+            ),
+        [reading.status, streamed, presence.at, game?.gamePort, game?.queryPort, running]
+    );
     // What the poll knows beats what the page was rendered with: the second is a
     // snapshot from whenever it was opened, and reading them together is how a
     // server that had just been started kept saying it was stopped.
@@ -511,6 +541,48 @@ function JoinAddress({ title, value, detail }: { title: string; value: string; d
             <span className="text-xs text-muted-foreground">{detail}</span>
         </div>
     );
+}
+
+/**
+ * The reading the screen shows: what the poll last returned, with the streamed
+ * presence laid over it.
+ *
+ * A frame carries who is on and nothing else - not what the machine is costing,
+ * not which ports it was launched with - so it is laid over the fuller reading
+ * rather than replacing it. Before the first poll has answered there is nothing to
+ * lay it over, and the parts a frame does not carry are the ones the page already
+ * knew: a table of who is playing appears in the second or so the stream takes,
+ * rather than waiting on a command inside a container.
+ */
+function withPresence(
+    status: ArkStatus | null,
+    presence: ServerPresence | null,
+    ports: { game: number | null; query: number | null },
+    running: boolean
+): ArkStatus | null {
+    if (!presence) return status;
+    // A player with no id is not one this screen can act on - every verb ARK has
+    // is written against the Steam id - and ARK always reports one.
+    const players = presence.players.flatMap((player) =>
+        player.id ? [{ name: player.name, steamId: player.id }] : []
+    );
+    const live = {
+        answering: presence.answering,
+        containerRunning: presence.containerRunning,
+        players,
+        message: presence.message
+    };
+    if (status) return { ...status, ...live };
+    return {
+        ...live,
+        running,
+        max: presence.max || null,
+        gamePort: ports.game,
+        queryPort: ports.query,
+        cpuPercent: null,
+        memUsedBytes: null,
+        memTotalBytes: null
+    };
 }
 
 /** What the server is doing, in one word. "Meant to be running" and "running" are

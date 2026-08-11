@@ -85,8 +85,22 @@ export interface GameServerFacts {
     readonly message: string | null;
 }
 
-/** What only the server itself can answer: who is on it right now. */
-export interface GameServerLive {
+/**
+ * One person on a server right now.
+ *
+ * The id is what a rule can be written against and it is not the name: ARK has
+ * no username to moderate - a character can be renamed at will - so its rows are
+ * keyed by the Steam id, while a Minecraft name is the identity and there is
+ * nothing else to carry. A screen that only lists people uses the name; one that
+ * offers a verb needs the id.
+ */
+export interface PresencePlayer {
+    readonly name: string;
+    readonly id: string | null;
+}
+
+/** Who is on one server, in the one shape every screen that shows it reads. */
+export interface ServerPresence {
     readonly id: string;
     readonly answering: boolean;
     /** Whether the container is actually up, when that can be seen from here.
@@ -95,9 +109,14 @@ export interface GameServerLive {
     readonly containerRunning: boolean | null;
     readonly online: number;
     readonly max: number;
-    readonly players: readonly string[];
+    readonly players: readonly PresencePlayer[];
     /** Why it is not answering, when it is not. */
     readonly message: string | null;
+}
+
+/** The same reading with the names alone, for the list that only prints them. */
+export interface GameServerLive extends Omit<ServerPresence, "players"> {
+    readonly players: readonly string[];
 }
 
 /**
@@ -243,64 +262,86 @@ function publishedSubject(
  * the facts: it is what the list waits on, and nothing else should. A server that
  * is stopped is not asked at all, and one that refuses is a row that says so
  * rather than a list that fails.
+ *
+ * Every screen that shows who is playing reads this one function - the list, both
+ * game panels, and the watcher behind the live stream - so none of them can be
+ * showing a different answer to the same question at the same moment.
  */
+export async function listGameServerPresence(
+    ownerId: string,
+    alsoIds: readonly string[] = [],
+    /** Only these servers, for a screen that is about one of them. Reading a
+     *  server costs a command inside its container, so a page watching one must
+     *  not be the reason the other five are asked every few seconds. */
+    only?: readonly string[]
+): Promise<ServerPresence[]> {
+    const servers = await listGameServerFacts(ownerId, alsoIds);
+    const wanted = only ? servers.filter((server) => only.includes(server.id)) : servers;
+    return Promise.all(wanted.map((server) => readPresence(ownerId, server)));
+}
+
+async function readPresence(ownerId: string, server: GameServerFacts): Promise<ServerPresence> {
+    if (!server.running || !server.applicationId) {
+        return {
+            id: server.id,
+            answering: false,
+            containerRunning: null,
+            online: 0,
+            max: 0,
+            players: [],
+            message: server.message
+        };
+    }
+    // Each game is asked in its own language - Minecraft over rcon-cli, ARK
+    // through arkmanager - and both answer the same shape, because the row that
+    // renders it is one row.
+    if (server.game === "ark") {
+        const ark = await getArkPlayers(ownerId, server.id).catch((caught: unknown) => ({
+            answering: false,
+            containerRunning: null,
+            players: [],
+            message: caught instanceof Error ? caught.message : "The server is not answering"
+        }));
+        return {
+            id: server.id,
+            answering: ark.answering,
+            containerRunning: ark.containerRunning,
+            online: ark.players.length,
+            // ARK does not report its own cap over RCON, so the setting is the
+            // only number there is - and the list already reads it.
+            max: server.slots ?? 0,
+            players: ark.players.map((player) => ({ name: player.name, id: player.steamId })),
+            message: ark.message
+        };
+    }
+    const live = await getServerPlayers(ownerId, server.id).catch((caught: unknown) => ({
+        answering: false,
+        containerRunning: null,
+        players: { online: 0, max: 0, players: [] },
+        message: caught instanceof Error ? caught.message : "The server is not answering"
+    }));
+    return {
+        id: server.id,
+        answering: live.answering,
+        containerRunning: live.containerRunning,
+        online: live.players.online,
+        max: live.players.max,
+        // A Minecraft name is the identity, so there is no second id to carry.
+        players: live.players.players.map((name) => ({ name, id: null })),
+        message: live.message
+    };
+}
+
+/** The same reading for the callers that only print names. */
 export async function listGameServerLive(
     ownerId: string,
     alsoIds: readonly string[] = []
 ): Promise<GameServerLive[]> {
-    const servers = await listGameServerFacts(ownerId, alsoIds);
-    return Promise.all(
-        servers.map(async (server) => {
-            if (!server.running || !server.applicationId) {
-                return {
-                    id: server.id,
-                    answering: false,
-                    containerRunning: null,
-                    online: 0,
-                    max: 0,
-                    players: [],
-                    message: server.message
-                };
-            }
-            // Each game is asked in its own language - Minecraft over rcon-cli, ARK
-            // through arkmanager - and both answer the same shape, because the row
-            // that renders it is one row.
-            if (server.game === "ark") {
-                const ark = await getArkPlayers(ownerId, server.id).catch((caught: unknown) => ({
-                    answering: false,
-                    containerRunning: null,
-                    players: [],
-                    message: caught instanceof Error ? caught.message : "The server is not answering"
-                }));
-                return {
-                    id: server.id,
-                    answering: ark.answering,
-                    containerRunning: ark.containerRunning,
-                    online: ark.players.length,
-                    // ARK does not report its own cap over RCON, so the setting is
-                    // the only number there is - and the list already reads it.
-                    max: server.slots ?? 0,
-                    players: ark.players.map((player) => player.name),
-                    message: ark.message
-                };
-            }
-            const live = await getServerPlayers(ownerId, server.id).catch((caught: unknown) => ({
-                answering: false,
-                containerRunning: null,
-                players: { online: 0, max: 0, players: [] },
-                message: caught instanceof Error ? caught.message : "The server is not answering"
-            }));
-            return {
-                id: server.id,
-                answering: live.answering,
-                containerRunning: live.containerRunning,
-                online: live.players.online,
-                max: live.players.max,
-                players: live.players.players,
-                message: live.message
-            };
-        })
-    );
+    return (await listGameServerPresence(ownerId, alsoIds)).map(withNamesOnly);
+}
+
+export function withNamesOnly(presence: ServerPresence): GameServerLive {
+    return { ...presence, players: presence.players.map((player) => player.name) };
 }
 
 /**

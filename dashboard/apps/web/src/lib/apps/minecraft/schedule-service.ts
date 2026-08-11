@@ -63,10 +63,12 @@ export interface SweepOptions {
      * that has already had silence from it does not pay for that silence twice.
      */
     readonly known?: ReadonlyMap<string, number | null>;
-    /** Sweep this one install rather than everything the owner has, for a server's
+    /** Sweep these installs rather than everything the owner has, for a server's
      *  own page - which polls anyway, and is the screen somebody is watching when
-     *  they wonder why their schedule has not fired. */
-    readonly only?: string;
+     *  they wonder why their schedule has not fired. Everything the caller left
+     *  out is left alone, so a screen about one server does not reach into every
+     *  other one to decide whether it is empty. */
+    readonly only?: string | readonly string[];
 }
 
 /** The schedule on one server. */
@@ -98,7 +100,7 @@ export async function sweepGameSchedules(
             ownerId,
             status: { not: "removed" },
             applicationId: { not: null },
-            ...(only ? { id: only } : {})
+            ...(only ? { id: typeof only === "string" ? only : { in: [...only] } } : {})
         },
         select: { id: true, applicationId: true, config: true, catalogId: true }
     });

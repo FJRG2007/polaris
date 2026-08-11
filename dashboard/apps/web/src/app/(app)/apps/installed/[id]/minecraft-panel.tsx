@@ -28,6 +28,7 @@ import { MinecraftWorld } from "./minecraft-world";
 import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
 import { CopyButton } from "@/components/copy-button";
+import { useGamePresence } from "@/components/use-game-presence";
 import { saveWorldAction } from "./minecraft-actions";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
@@ -41,6 +42,7 @@ import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
+import type { ServerPresence } from "@/lib/apps/games-service";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import { FolderOpen, Loader2, Save, ShieldAlert, UserPlus } from "lucide-react";
 import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs";
@@ -60,7 +62,22 @@ const MOTD_KEY = "MOTD";
  *  keeps griefers out should not have to scroll past the render distance. */
 const SECURITY_GROUP = "Security";
 
-const POLL_MS = 5000;
+/**
+ * How long after one read finishes before the next one starts.
+ *
+ * Unhurried, because the thing that changes by itself is not read here any more.
+ * Who is playing arrives on the live stream within a couple of seconds of it
+ * happening; what this poll is for - the roster, the machine, whether the port
+ * answers from outside - moves slowly, and every one of those reads is a command
+ * inside the container.
+ */
+const POLL_MS = 12000;
+
+/** How old a streamed reading may be before the screen stops preferring it to what
+ *  the poll last returned. Several times the stream's own cadence, so a frame that
+ *  is merely between beats is still trusted, and a connection that has silently
+ *  died is not. */
+const PRESENCE_STALE_MS = 25000;
 
 interface ServerReading {
     status: MinecraftStatus | null;
@@ -237,16 +254,29 @@ export function MinecraftPanel({
         };
     }, [load]);
 
+    // Who is on it, pushed as it changes rather than waited for. The poll above
+    // still reports it, but a poll's worth late; whichever of the two is more
+    // recent is what the screen shows.
+    const presence = useGamePresence([installedAppId]);
+    const streamed = presence.servers.get(installedAppId) ?? null;
+    const status = useMemo(
+        () =>
+            withPresence(
+                reading.status,
+                streamed && Date.now() - presence.at < PRESENCE_STALE_MS ? streamed : null
+            ),
+        [reading.status, streamed, presence.at]
+    );
     // What the poll knows beats what the page was rendered with: the second is a
     // snapshot from whenever it was opened, and reading them together is how a
     // server that had just been started kept saying it was stopped.
-    const isRunning = reading.status?.running ?? running;
+    const isRunning = status?.running ?? running;
 
     // The shell draws the badge in the header; only this component polls, so it is
     // the one that knows.
     useEffect(() => {
-        onStatus?.(statusLabel(reading.status, isRunning));
-    }, [onStatus, reading.status, isRunning]);
+        onStatus?.(statusLabel(status, isRunning));
+    }, [onStatus, status, isRunning]);
 
     /** Settings come from the page, so applying them has to re-render it -
      *  otherwise the form keeps showing the old values as the current ones. */
@@ -254,8 +284,6 @@ export function MinecraftPanel({
         router.refresh();
         void load();
     }, [router, load]);
-
-    const status = reading.status;
 
     return (
         <div className="flex flex-col gap-4">
@@ -545,6 +573,31 @@ function ConnectCard({
             </CardBody>
         </Card>
     );
+}
+
+/**
+ * The reading the screen shows: what the poll last returned, with the streamed
+ * presence laid over it.
+ *
+ * A frame carries who is on and nothing else - not the roster, not what the
+ * machine is costing - so it is laid over the fuller reading rather than replacing
+ * it. Before the first poll has answered there is nothing to lay it over: unlike
+ * ARK, a Minecraft reading names which edition it is, and that is not something to
+ * guess at from a frame.
+ */
+function withPresence(status: MinecraftStatus | null, presence: ServerPresence | null): MinecraftStatus | null {
+    if (!status || !presence) return status;
+    return {
+        ...status,
+        answering: presence.answering,
+        containerRunning: presence.containerRunning,
+        message: presence.message,
+        players: {
+            online: presence.online,
+            max: presence.max || status.players.max,
+            players: presence.players.map((player) => player.name)
+        }
+    };
 }
 
 /**
