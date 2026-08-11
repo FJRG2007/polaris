@@ -20,6 +20,8 @@
  */
 
 import { LogViewer } from "@/components/log-viewer";
+import type { PublicUrls } from "@/lib/legal/service";
+import { normalizeLegalContact } from "@polaris/core";
 import { AddressList } from "@/components/address-list";
 import type { UpdateStatus } from "@/lib/update-service";
 import type { CheckedAddress } from "@/lib/address-health";
@@ -32,6 +34,7 @@ import { Bug, CheckCircle2, CircleDashed, DownloadCloud, Hammer, RefreshCw, Tria
 import {
     checkUpdatesAction,
     saveAutoUpdateAction,
+    saveLegalContactAction,
     saveUpdateSourceAction,
     triggerHostUpdateAction,
     updateReportAction
@@ -146,11 +149,15 @@ export function SettingsView({
     initialStatus,
     initialPolicy,
     initialSource,
+    initialContact,
+    publicPages,
     deployment
 }: {
     initialStatus: UpdateStatus;
     initialPolicy: AutoUpdatePolicy;
     initialSource: UpdateSource;
+    initialContact: string;
+    publicPages: PublicUrls;
     deployment: Deployment;
 }) {
     const format = useDisplayFormat();
@@ -699,7 +706,87 @@ export function SettingsView({
                     </dl>
                 </CardBody>
             </Card>
+
+            <PublicPagesCard initialContact={initialContact} pages={publicPages} />
         </div>
+    );
+}
+
+/**
+ * The three pages that exist outside the login, and the one line on them this
+ * deployment gets to write.
+ *
+ * Here rather than buried in the Integrations screen because they are not about
+ * one provider: Google's verification reads all three, Epic's brand review reads
+ * two, and an operator who has just been refused by either needs to find them by
+ * name. The URLs are shown ready to copy for exactly that - they are what those
+ * forms ask for, and typing them from memory is how a review fails on a
+ * mistyped path.
+ */
+function PublicPagesCard({ initialContact, pages }: { initialContact: string; pages: PublicUrls }) {
+    const [contact, setContact] = useState(initialContact);
+    const [saved, setSaved] = useState(initialContact);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    // Nothing to save when it comes back to what is stored: a value edited and
+    // put back is not a change.
+    const dirty = normalizeLegalContact(contact) !== saved;
+
+    function onSave() {
+        const next = normalizeLegalContact(contact);
+        setError(null);
+        startTransition(async () => {
+            const result = await saveLegalContactAction(next);
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            setSaved(result.contact ?? "");
+            setContact(result.contact ?? "");
+        });
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Public pages</CardTitle>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-4">
+                <p className="text-sm text-muted-foreground">
+                    Everything else here is behind the login. These three are not, because a service you register an
+                    OAuth client with will not verify one it cannot read - Google refuses a home page behind a sign-in,
+                    and asks for the privacy policy and terms on the same domain.
+                </p>
+
+                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                    <Row label="Home page" value={pages.home} href={pages.home} />
+                    <Row label="Privacy policy" value={pages.privacy} href={pages.privacy} />
+                    <Row label="Terms of service" value={pages.terms} href={pages.terms} />
+                </dl>
+
+                <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium">Contact</span>
+                    <div className="flex items-center gap-2">
+                        <Input
+                            value={contact}
+                            onChange={(event) => setContact(event.target.value)}
+                            placeholder="you@example.com"
+                            autoComplete="off"
+                            aria-label="Public contact"
+                        />
+                        <Button size="sm" onClick={onSave} disabled={pending || !dirty}>
+                            {pending ? "Saving..." : "Save"}
+                        </Button>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                        An address or a link, shown on the privacy and terms pages as the way to reach whoever runs this
+                        deployment. Left empty, those pages carry no contact at all.
+                    </span>
+                    {error ? <span className="text-xs text-danger">{error}</span> : null}
+                </label>
+            </CardBody>
+        </Card>
     );
 }
 

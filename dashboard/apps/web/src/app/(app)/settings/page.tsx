@@ -7,6 +7,7 @@ import { getUpdateStatus } from "@/lib/update-service";
 import { checkedAddresses } from "@/lib/address-health";
 import { getNetworkStatus } from "@/lib/network-service";
 import { getAutoUpdatePolicy } from "@/lib/update-watcher";
+import { getLegalContact, publicUrls } from "@/lib/legal/service";
 
 export const dynamic = "force-dynamic";
 
@@ -18,12 +19,16 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
     await requireAdmin();
     const env = loadEnv();
-    const [status, policy, source, addresses, network] = await Promise.all([
+    const [status, policy, source, addresses, network, contact, publicPages] = await Promise.all([
         getUpdateStatus(),
         getAutoUpdatePolicy(),
         getUpdateSource(),
         checkedAddresses(),
-        getNetworkStatus()
+        getNetworkStatus(),
+        // The public pages, which are the only part of this deployment an outside
+        // review desk can read - and the one line on them an operator writes.
+        getLegalContact(),
+        publicUrls()
     ]);
 
     return (
@@ -35,6 +40,8 @@ export default async function SettingsPage() {
                 initialStatus={status}
                 initialPolicy={policy}
                 initialSource={source}
+                initialContact={contact ?? ""}
+                publicPages={publicPages}
                 deployment={{
                     addresses,
                     hostname: env.POLARIS_LOCAL_HOSTNAME,

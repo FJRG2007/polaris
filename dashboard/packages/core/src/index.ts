@@ -69,6 +69,7 @@ export * from "./schemas/mail.js";
 export * from "./schemas/two-factor.js";
 export * from "./schemas/display.js";
 export * from "./schemas/notifications.js";
+export * from "./schemas/legal.js";
 export * from "./schemas/sms.js";
 export * from "./schemas/updates.js";
 export * from "./schemas/analytics.js";

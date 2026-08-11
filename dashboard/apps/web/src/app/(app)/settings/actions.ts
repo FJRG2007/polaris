@@ -7,6 +7,8 @@
 
 import { loadEnv } from "@polaris/config";
 import { requireAdmin } from "@/lib/session";
+import { legalContactSchema } from "@polaris/core";
+import { setLegalContact } from "@/lib/legal/service";
 import { saveUpdateSource } from "@/lib/update-source";
 import { type UpdateTrigger } from "@/lib/update-runner";
 import { collectUpdateReport, issueUrl } from "@/lib/update-report";
@@ -60,6 +62,21 @@ export async function saveAutoUpdateAction(input: unknown): Promise<{ policy?: A
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That schedule is not valid." };
     await saveAutoUpdatePolicy(parsed.data);
     return { policy: parsed.data };
+}
+
+/**
+ * Change the address shown on the public pages.
+ *
+ * Its own action rather than part of anything else: those pages are what an
+ * outside review desk reads, and this is the one line on them a deployment gets
+ * to write. Empty clears it, which publishes no contact at all.
+ */
+export async function saveLegalContactAction(input: unknown): Promise<{ contact?: string; error?: string; }> {
+    await requireAdmin();
+    const parsed = legalContactSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a contact." };
+    await setLegalContact(parsed.data || null);
+    return { contact: parsed.data };
 }
 
 /**
