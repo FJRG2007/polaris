@@ -14,22 +14,37 @@
  * server again. And whatever was thrown is shown rather than only logged: nobody
  * reports a crash they were never told the shape of, and the digest alone is a
  * reference to a line in a log the person looking at the screen may not have.
+ *
+ * One failure never reaches any of that. A tab left open across a deploy holds
+ * ids from a build that is gone, and the server answers the next click with
+ * `Server Action "..." was not found on the server` - which is not a fault in the
+ * page, cannot be retried away, and is cured by fetching the new build. So it is
+ * recognised and reloaded from, once, before anybody is shown an error at all.
  */
 
 import { useRouter } from "next/navigation";
 import { Button, Card, CardBody } from "@polaris/ui";
 import { RotateCcw, TriangleAlert } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
+import { isStaleBuildError, reloadForNewBuild } from "@/lib/stale-build";
 
 export default function AppError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
     const router = useRouter();
     const [retrying, startRetry] = useTransition();
     const [attempts, setAttempts] = useState(1);
+    const staleBuild = isStaleBuildError(error);
 
     useEffect(() => {
         console.error(error);
         setAttempts(countFailure(error));
     }, [error]);
+
+    // Before anything is drawn: an old tab is a reload, not a message. It returns
+    // false when the tab has already reloaded for this, and then the card below
+    // says so rather than reloading again.
+    useEffect(() => {
+        if (staleBuild) reloadForNewBuild();
+    }, [staleBuild]);
 
     /** Ask the server for this route again, then re-render the subtree against the
      *  answer. Only `reset()` and the same payload comes back. */
@@ -47,30 +62,45 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
                     <div className="flex items-start gap-3">
                         <TriangleAlert className="mt-0.5 size-5 shrink-0 text-danger" />
                         <div className="flex flex-col gap-1">
-                            <h1 className="text-sm font-medium">This page stopped working</h1>
+                            <h1 className="text-sm font-medium">
+                                {staleBuild ? "Polaris was updated while this page was open" : "This page stopped working"}
+                            </h1>
                             <p className="text-sm text-muted-foreground">
-                                {attempts > 1
-                                    ? "It failed the same way again, so trying once more will not clear it. Reload to pick up a new build, or send what is below to whoever is looking at it."
-                                    : "The rest of Polaris is still running. Try again, and if Polaris was just updated, reload the page to pick up the new build."}
+                                {staleBuild
+                                    ? "This tab is still running the old build, and the server no longer answers it. Reloading picks up the new one; anything typed into the page is lost."
+                                    : attempts > 1
+                                      ? "It failed the same way again, so trying once more will not clear it. Reload to pick up a new build, or send what is below to whoever is looking at it."
+                                      : "The rest of Polaris is still running. Try again, and if Polaris was just updated, reload the page to pick up the new build."}
                             </p>
                         </div>
                     </div>
-                    {error.message ? (
+                    {/* Not for the stale build: its message is an id nobody can do
+                        anything with, under a heading that already says what
+                        happened. */}
+                    {error.message && !staleBuild ? (
                         <p className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-3 font-mono text-xs text-muted-foreground">
                             {error.message}
                         </p>
                     ) : null}
-                    {error.digest ? (
+                    {error.digest && !staleBuild ? (
                         <p className="font-mono text-xs text-muted-foreground">Reference: {error.digest}</p>
                     ) : null}
                     <div className="flex justify-end gap-2">
-                        <Button variant="ghost" onClick={() => window.location.reload()}>
-                            Reload
-                        </Button>
-                        <Button onClick={retry} disabled={retrying}>
-                            <RotateCcw className="size-4" />
-                            {retrying ? "Trying" : "Try again"}
-                        </Button>
+                        {staleBuild ? (
+                            <Button onClick={() => window.location.reload()}>
+                                <RotateCcw className="size-4" /> Reload
+                            </Button>
+                        ) : (
+                            <>
+                                <Button variant="ghost" onClick={() => window.location.reload()}>
+                                    Reload
+                                </Button>
+                                <Button onClick={retry} disabled={retrying}>
+                                    <RotateCcw className="size-4" />
+                                    {retrying ? "Trying" : "Try again"}
+                                </Button>
+                            </>
+                        )}
                     </div>
                 </CardBody>
             </Card>
