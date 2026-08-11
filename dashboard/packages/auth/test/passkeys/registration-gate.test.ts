@@ -16,7 +16,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const userSecurity = { findUnique: vi.fn(), upsert: vi.fn() };
-const accountDevice = { findUnique: vi.fn() };
+const accountDevice = { findFirst: vi.fn(), findUnique: vi.fn() };
 const session = { findFirst: vi.fn() };
 
 vi.mock("@polaris/db", () => ({
@@ -121,6 +121,9 @@ describe("refuseProtectedEndpoint", () => {
     it("holds a device still serving the account's wait, before asking for anything else", async () => {
         userSecurity.findUnique.mockResolvedValue({ newDeviceGraceDays: 7 });
         accountDevice.findUnique.mockResolvedValue({ firstSeenAt: new Date() });
+        // Some other browser opened the account, so this one is genuinely new to it
+        // rather than the founding device the wait never applies to.
+        accountDevice.findFirst.mockResolvedValue({ userAgent: "Some other browser" });
         for (const path of [
             "/passkey/generate-register-options",
             "/passkey/delete-passkey",

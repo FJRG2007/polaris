@@ -13,12 +13,29 @@
  * for as long as the account asks. The owner's existing devices are untouched -
  * which is the point, since the owner is the one who still has one.
  *
+ * The device the account was opened from is exempt outright, however new the
+ * account is. Turning the wait on from the browser that just created the account
+ * and being locked out of Security by your own first act is not a protection
+ * anyone asked for, and there is nothing for it to protect against: a password
+ * cannot have been stolen from an account that has never been signed in to from
+ * anywhere else. It is derived rather than flagged - the first device the account
+ * ever recorded is the one it was opened from - because nothing ever deletes one
+ * of these rows or moves its first sighting, so the earliest is the earliest
+ * forever.
+ *
  * Off unless the account turns it on. Making a genuine new laptop wait a week is
  * a real cost, and whether it is worth paying depends on what the account holds.
  *
  * A device is identified by what its browser says it is. Two identical machines
- * count as one, and anyone able to set a header can claim to be a device that has
- * been here for months. That is worth knowing and not worth fixing here: the
+ * count as one, a browser that updates itself reads as a device the account has
+ * never seen, and anyone able to set a header can claim to be a device that has
+ * been here for months. The middle one is the one that costs the owner something,
+ * and it cannot be fixed by reading the claim more loosely: the coarsest reading
+ * that survives an update - the browser and the operating system - is exactly the
+ * reading under which somebody else's Chrome on Windows is the owner's. Telling
+ * one machine from another needs something the machine keeps, not something it
+ * says, and that is a larger change than this. The rest is worth knowing and not
+ * worth fixing here: the
  * claim is read from the session's recorded description rather than from the
  * request in hand, so it is fixed when the session is created and cannot be
  * varied per call, and the worst a forged one does is let somebody who already
@@ -79,6 +96,28 @@ export async function rememberAccountDevice(userId: string, origin: DeviceOrigin
 }
 
 /**
+ * The browser the account was opened from: the first one it ever recorded.
+ *
+ * Ordered by the sighting rather than by the row's own id, because the id says
+ * when the row was written and the sighting is what the account is being dated
+ * by; the id only settles a tie, so two devices recorded in the same instant
+ * still resolve to one answer instead of drifting between calls.
+ *
+ * Null for an account whose register is empty, which is every account that
+ * predates it. That reads as "no device is exempt", which is the safe direction:
+ * those accounts are already let through by the rule below that a device with no
+ * row is not a new device.
+ */
+async function foundingDevice(userId: string): Promise<string | null> {
+    const first = await prisma.accountDevice.findFirst({
+        where: { userId },
+        orderBy: [{ firstSeenAt: "asc" }, { id: "asc" }],
+        select: { userAgent: true }
+    });
+    return first?.userAgent ?? null;
+}
+
+/**
  * Whether the browser behind a session may change what protects the account.
  *
  * @param userAgent The description recorded against the session, not the one on
@@ -102,14 +141,23 @@ export async function accountDeviceStanding(
     const known = userAgent?.slice(0, MAX_USER_AGENT);
     if (!known) return { settled: false, graceDays, settlesAt: null, firstSeenAt: null };
 
-    const device = await prisma.accountDevice.findUnique({
-        where: { userId_userAgent: { userId, userAgent: known } },
-        select: { firstSeenAt: true }
-    });
+    const [device, founding] = await Promise.all([
+        prisma.accountDevice.findUnique({
+            where: { userId_userAgent: { userId, userAgent: known } },
+            select: { firstSeenAt: true }
+        }),
+        foundingDevice(userId)
+    ]);
     // No row means the session predates the account keeping this register, and
     // every sign-in since has written one. An older session than the feature is
     // not a new device.
     if (!device) return { ...SETTLED, graceDays };
+
+    // The browser the account was opened from serves no wait, whatever it is set
+    // to. It has nothing to settle at, because it was never unsettled.
+    if (founding === known) {
+        return { settled: true, graceDays, settlesAt: null, firstSeenAt: device.firstSeenAt };
+    }
 
     const settlesAt = new Date(device.firstSeenAt.getTime() + graceDays * 24 * 60 * 60 * 1000);
     return {

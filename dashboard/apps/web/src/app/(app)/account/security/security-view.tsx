@@ -284,7 +284,8 @@ export function SecurityView({
                             </label>
                             <p className="text-xs text-muted-foreground">
                                 A waiting device can still read this page and sign itself out.
-                                Devices you already use are not affected.
+                                Devices you already use are not affected, and neither is the one
+                                you opened this account from.
                             </p>
                             <Feedback error={graceResult?.error} ok={graceResult?.ok} />
                         </CardBody>
