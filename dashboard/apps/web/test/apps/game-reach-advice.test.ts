@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { gameReachAdvice, gameStoppedAdvice, type GamePort } from "@/lib/apps/minecraft/reach-advice";
+import { describePorts, gameReachAdvice, gameStoppedAdvice, type GamePort } from "@/lib/apps/minecraft/reach-advice";
 
 const TCP: readonly GamePort[] = [{ port: 25566, protocol: "tcp" }];
 const BLOCKS = { tcp: { start: 25565, end: 25664 }, udp: { start: 19132, end: 19231 } };
@@ -92,5 +92,44 @@ describe("when nothing was measured", () => {
 
         expect(advice.forward).toBe(false);
         expect(advice.title).toContain("cannot receive");
+    });
+});
+
+/**
+ * How the ports themselves read, which is what an operator retypes into a router.
+ *
+ * ARK publishes three consecutive UDP ports, and naming each of them in every
+ * sentence produced "UDP 19133, UDP 19134 and UDP 19135 is not confirmed" - a
+ * sentence that is both unreadable and ungrammatical, on the one screen whose whole
+ * job is to be trusted about a number.
+ */
+describe("naming the ports", () => {
+    const ARK: readonly GamePort[] = [
+        { port: 19133, protocol: "udp" },
+        { port: 19134, protocol: "udp" },
+        { port: 19135, protocol: "udp" }
+    ];
+
+    it("collapses a consecutive run into a range", () => {
+        expect(describePorts(ARK)).toBe("UDP 19133-19135");
+    });
+
+    it("keeps ports that are not consecutive apart, and groups by protocol", () => {
+        expect(
+            describePorts([
+                { port: 25565, protocol: "tcp" },
+                { port: 19132, protocol: "udp" },
+                { port: 19140, protocol: "udp" }
+            ])
+        ).toBe("TCP 25565, UDP 19132 and UDP 19140");
+    });
+
+    it("agrees with itself about one port and about several", () => {
+        const one = gameReachAdvice("home-nat", TCP, false, "192.168.1.142", "range", BLOCKS, null);
+        const many = gameReachAdvice("home-nat", ARK, false, "192.168.1.142", "range", BLOCKS, null);
+
+        expect(one.title).toContain("is not confirmed");
+        expect(many.title).toContain("are not confirmed");
+        expect(many.title).not.toContain("is not confirmed");
     });
 });

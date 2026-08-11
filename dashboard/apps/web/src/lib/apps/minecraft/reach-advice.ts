@@ -36,11 +36,41 @@ export interface GameReachAdvice {
     readonly forward: boolean;
 }
 
-/** How the ports read in a sentence: "TCP 25565" or "TCP 25565 and UDP 19132". */
+/**
+ * How the ports read in a sentence: "TCP 25565", "TCP 25565 and UDP 19132", or
+ * "UDP 19133-19135" for a game that publishes a run of them.
+ *
+ * Collapsed because ARK publishes three consecutive ports and naming each one
+ * three times over made every sentence about them unreadable - and a router asks
+ * for the range anyway.
+ */
 export function describePorts(ports: readonly GamePort[]): string {
-    const parts = ports.map((entry) => `${entry.protocol.toUpperCase()} ${entry.port}`);
+    const parts = (["tcp", "udp"] as const).flatMap((protocol) => {
+        const numbers = [...new Set(ports.filter((entry) => entry.protocol === protocol).map((entry) => entry.port))];
+        return runsOf(numbers).map((run) => `${protocol.toUpperCase()} ${run}`);
+    });
     if (parts.length <= 1) return parts[0] ?? "its port";
     return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
+}
+
+/** Consecutive numbers as ranges, everything else as itself. */
+function runsOf(numbers: readonly number[]): string[] {
+    const sorted = [...numbers].sort((left, right) => left - right);
+    const runs: string[] = [];
+    for (let index = 0; index < sorted.length; ) {
+        let end = index;
+        while (end + 1 < sorted.length && (sorted[end + 1] as number) === (sorted[end] as number) + 1) end += 1;
+        runs.push(end === index ? `${sorted[index]}` : `${sorted[index]}-${sorted[end]}`);
+        index = end + 1;
+    }
+    return runs;
+}
+
+/** Whether the sentence about these ports is about more than one of them, so the
+ *  verb beside it agrees. "UDP 19133-19135 is not confirmed" reads as a mistake,
+ *  because it is one. */
+function plural(ports: readonly GamePort[]): boolean {
+    return new Set(ports.map((entry) => entry.port)).size > 1;
 }
 
 /** The same sentence for the blocks these ports come from, which is what the
@@ -82,7 +112,7 @@ export function gameStoppedAdvice(ports: readonly GamePort[]): GameReachAdvice {
     return {
         ok: false,
         actionable: false,
-        title: "Stopped, so its port cannot be checked",
+        title: plural(ports) ? "Stopped, so its ports cannot be checked" : "Stopped, so its port cannot be checked",
         detail: `Nothing answers on ${named} while this server is down, and from here that looks exactly like a port nobody has opened. Start it and Polaris checks this by itself.`,
         steps: [],
         forward: false
@@ -113,6 +143,7 @@ export function gameReachAdvice(
 ): GameReachAdvice {
     if (ports.length === 0) return NO_PORTS;
     const named = describePorts(ports);
+    const many = plural(ports);
     if (confirmed) {
         return {
             ok: true,
@@ -161,12 +192,12 @@ export function gameReachAdvice(
             // that does not look identical - most routers will not loop their own
             // public address back inward - so the only honest claim is that nothing
             // has proved it yet.
-            title: `${named} is not confirmed from outside yet`,
-            detail: `The domain setup opens 80 and 443 for websites; ${named} is this server's own port and rides on none of that. Polaris cannot prove a forward from inside the network, so if you have already opened it, this clears itself the first time somebody joins from outside.`,
+            title: `${named} ${many ? "are" : "is"} not confirmed from outside yet`,
+            detail: `The domain setup opens 80 and 443 for websites; ${named} ${many ? "are this server's own ports and ride" : "is this server's own port and rides"} on none of that. Polaris cannot prove a forward from inside the network, so if you have already opened ${many ? "them" : "it"}, this clears itself the first time somebody joins from outside.`,
             steps: [
                 ranged
-                    ? `If it is not open yet, forward ${describeBlocksFor(ports, blocks)} to ${lanIp ?? "this server"} on your router. Polaris keeps every game server inside that range, so this is the last time it has to be opened.`
-                    : `If it is not open yet, forward ${named} to ${lanIp ?? "this server"} on your router.`,
+                    ? `If ${many ? "they are" : "it is"} not open yet, forward ${describeBlocksFor(ports, blocks)} to ${lanIp ?? "this server"} on your router. Polaris keeps every game server inside that range, so this is the last time it has to be opened.`
+                    : `If ${many ? "they are" : "it is"} not open yet, forward ${named} to ${lanIp ?? "this server"} on your router.`,
                 "Polaris marks this done by itself the moment the port answers from outside, or the first time somebody joins on it."
             ],
             forward: true
@@ -176,10 +207,10 @@ export function gameReachAdvice(
         return {
             ok: false,
             actionable: true,
-            title: `${named} is not confirmed from outside yet`,
+            title: `${named} ${many ? "are" : "is"} not confirmed from outside yet`,
             detail: `This server holds its own public address, so nothing has to be forwarded - but the provider's firewall or security group has to let ${named} in, and from in here an allowed port and a blocked one look the same until something arrives.`,
             steps: [
-                `If it is not allowed yet, allow inbound ${named} in your provider's firewall or security group.`,
+                `If ${many ? "they are" : "it is"} not allowed yet, allow inbound ${named} in your provider's firewall or security group.`,
                 "Polaris marks this done by itself the moment the port answers from outside, or the first time somebody joins on it."
             ],
             forward: false

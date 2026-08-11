@@ -15,6 +15,7 @@
 
 import { connect } from "node:net";
 import { prisma } from "@polaris/db";
+import { pingSteamQuery } from "@/lib/apps/ark/a2s";
 import { pingBedrock } from "@/lib/apps/minecraft/raknet";
 import { isCarrierGradeNat, isPublicIpv4 } from "@polaris/core";
 import { getHostLanIp, isLanAddress } from "@/lib/host-address";
@@ -120,6 +121,26 @@ export function probeGamePort(host: string, port: number, timeoutMs = PROBE_TIME
     });
 }
 
+/**
+ * Whether anything answers on one UDP port, asked in every language a game server
+ * here might reply in.
+ *
+ * A UDP port cannot be knocked on the way a TCP one can: nothing acknowledges a
+ * datagram, so the only proof is the game itself replying. Each game speaks its
+ * own - Bedrock answers a RakNet ping, ARK answers Steam's query on the port
+ * beside its game port - and both are asked at once rather than in turn, so a
+ * server that speaks neither costs one timeout instead of one per protocol.
+ *
+ * Which game this install runs is deliberately not consulted. The question is
+ * whether the port answers, not who is behind it, and asking both is cheaper than
+ * threading a catalog id through every caller of this.
+ */
+function answersOnUdp(host: string, port: number, timeoutMs: number): Promise<boolean> {
+    return Promise.all([pingBedrock(host, port, timeoutMs), pingSteamQuery(host, port, timeoutMs)]).then(
+        (answers) => answers.some(Boolean)
+    );
+}
+
 /** A local connect crosses no router, so it either answers at once or there is
  *  nothing there. Short enough that a page can wait for it. */
 const LOCAL_PROBE_TIMEOUT_MS = 700;
@@ -133,15 +154,21 @@ const LOCAL_PROBE_TIMEOUT_MS = 700;
  * already opened - and then ticked it by itself once the server finished booting.
  *
  * Null when there is no address to try, so the advice can say nothing about it
- * rather than infer. A UDP port can only ever answer yes here: a Bedrock server
- * replies to a RakNet ping, but a UDP game that speaks anything else is silent
- * whether it is up or down, and reading that silence as "down" would be the same
- * mistake in the other direction.
+ * rather than infer. A UDP port can only ever answer yes here: the games that
+ * reply to a ping do, but one that speaks something else is silent whether it is
+ * up or down, and reading that silence as "down" would be the same mistake in the
+ * other direction.
  */
 export async function probeListening(ports: readonly GamePort[], lanIp: string | null): Promise<boolean | null> {
     const host = lanIp ?? "127.0.0.1";
-    for (const port of ports.filter((entry) => entry.protocol === "udp")) {
-        if (await pingBedrock(host, port.port, LOCAL_PROBE_TIMEOUT_MS)) return true;
+    const udp = ports.filter((entry) => entry.protocol === "udp");
+    // Every port at once: a game publishes several and only one of them answers,
+    // so asking in turn is a page waiting out the ones that never will.
+    if (udp.length > 0) {
+        const answers = await Promise.all(
+            udp.map((port) => answersOnUdp(host, port.port, LOCAL_PROBE_TIMEOUT_MS))
+        );
+        if (answers.some(Boolean)) return true;
     }
     const tcp = ports.filter((entry) => entry.protocol === "tcp");
     if (tcp.length === 0) return null;
@@ -189,17 +216,19 @@ export async function probeReach(pending: readonly PendingReach[]): Promise<stri
         const last = probedAt.get(entry.installedAppId) ?? 0;
         if (Date.now() - last < PROBE_EVERY_MS) continue;
         probedAt.set(entry.installedAppId, Date.now());
-        for (const port of entry.ports) {
-            // A UDP port is asked in RakNet, which is the one thing a Bedrock
-            // server will answer - without it a Bedrock server could never be
-            // proven at all, since its log prints no player address either.
-            const answered =
+        // Every port of one server at once. Only one of them tends to answer - a
+        // game's own port says nothing to a stranger, while the query port beside
+        // it does - so asking in turn costs a full timeout for each port that was
+        // never going to reply, on a path a screen is waiting on.
+        const answers = await Promise.all(
+            entry.ports.map((port) =>
                 port.protocol === "tcp"
-                    ? await probeGamePort(host, port.port)
-                    : await pingBedrock(host, port.port, PROBE_TIMEOUT_MS);
-            if (!answered) continue;
-            if (await noteReachedFrom(entry.installedAppId, host)) reached.push(entry.installedAppId);
-            break;
+                    ? probeGamePort(host, port.port)
+                    : answersOnUdp(host, port.port, PROBE_TIMEOUT_MS)
+            )
+        );
+        if (answers.some(Boolean) && (await noteReachedFrom(entry.installedAppId, host))) {
+            reached.push(entry.installedAppId);
         }
     }
     return reached;
