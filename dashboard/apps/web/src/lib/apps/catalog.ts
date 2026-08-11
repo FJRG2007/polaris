@@ -137,9 +137,19 @@ export interface AppManifest {
     /** Declared but not yet installable - shown locked in the marketplace. */
     comingSoon?: boolean;
     /** Not offered in the marketplace: it is created from inside another app that
-     *  owns it (a Minecraft server is created by the Minecraft manager). Still a
+     *  owns it (a Minecraft server is created by the Game servers app). Still a
      *  real manifest - it is what the install is made from. */
     internal?: boolean;
+    /**
+     * Superseded, and kept only so installs that already exist still resolve.
+     *
+     * An app that shipped, was installed by people, and has since been folded into
+     * another one cannot simply be deleted from here: `findApp` would stop finding
+     * it, and every screen that names an install would fall back to printing a
+     * catalog id. So the manifest stays, is never offered again, and the install
+     * is migrated to its successor the next time its owner opens the app.
+     */
+    legacy?: boolean;
 }
 
 export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
@@ -167,13 +177,34 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         }
     },
     {
+        // One app for every game rather than one per game. Installing it turns the
+        // Game servers page on and runs nothing; a game's own runtime arrives the
+        // first time somebody creates a server of it, so a Polaris nobody plays ARK
+        // on never downloads thirty gigabytes of it.
+        id: "game-servers",
+        name: "Game servers",
+        category: "Game servers",
+        icon: Gamepad2,
+        summary: "Create and run Minecraft and ARK servers on your own machines.",
+        description:
+            "Install it once and create as many servers as you want, of any game Polaris knows: Minecraft for PC, phones and consoles, or ARK: Survival Evolved. Each server gets an address on your domain, a console, player moderation, its own schedule, and the memory it needs for the players you expect. Nothing is downloaded until you create a server, and only for the game that server plays.",
+        installMethod: "builtin",
+        capabilities: ["game-manager"],
+        dashboard: "builtin",
+        singleton: true,
+        consent: { label: "Minecraft EULA", url: "https://www.minecraft.net/eula" }
+    },
+    {
+        // Superseded by `game-servers`, and kept so the installs people already
+        // have still resolve to a name. Migrated on sight - see `game-install`.
         id: "minecraft-manager",
         name: "Minecraft",
+        legacy: true,
         category: "Game servers",
         icon: Gamepad2,
         summary: "Create and run as many Minecraft servers as you want.",
         description:
-            "The Minecraft server manager. Install it once, then create servers from one page: Java for PC players, Bedrock for phones and consoles, or one server both can join. Each gets an address on your domain, a console, player moderation, mods and plugins, and the memory it needs for the players you expect.",
+            "The Minecraft server manager. Superseded by Game servers, which creates servers of every game Polaris knows from one page.",
         installMethod: "builtin",
         capabilities: ["game-manager"],
         dashboard: "builtin",
@@ -577,13 +608,15 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         }
     },
     {
+        // Superseded by `game-servers`, on the same terms as the Minecraft one.
         id: "ark-manager",
         name: "ARK: Survival Evolved",
+        legacy: true,
         category: "Game servers",
         icon: Gamepad2,
         summary: "Create and run as many ARK servers as you want.",
         description:
-            "The ARK: Survival Evolved server manager. Install it once, then create servers from the Game servers page: pick a map, say how many people play, and Polaris gives each one its ports, a join password nobody else has and an admin password it keeps for you. The game itself is about 30 GB and is downloaded on the first start, so a new server takes a while before anyone can join it.",
+            "The ARK: Survival Evolved server manager. Superseded by Game servers, which creates servers of every game Polaris knows from one page.",
         installMethod: "builtin",
         capabilities: ["game-manager"],
         dashboard: "builtin",
@@ -824,9 +857,16 @@ export function findApp(id: string): AppManifest | undefined {
     return POLARIS_APP_CATALOG.find((app) => app.id === id);
 }
 
+/** Whether an app is one the marketplace still offers at all. Everything else
+ *  here - what it is called, how its dashboard is drawn - stays true of an app
+ *  that is only offered from inside another one, or is no longer offered. */
+export function isOffered(app: AppManifest): boolean {
+    return !app.internal && !app.legacy;
+}
+
 /** Apps that are installable now (declared, not coming soon). */
 export function installableApps(): readonly AppManifest[] {
-    return POLARIS_APP_CATALOG.filter((app) => !app.comingSoon && !app.internal);
+    return POLARIS_APP_CATALOG.filter((app) => !app.comingSoon && isOffered(app));
 }
 
 /** Whether an app provides a given capability. */
@@ -838,7 +878,7 @@ export function appHasCapability(app: AppManifest, capability: AppCapability): b
  *  image (build-only apps need their image published first) and not coming soon.
  *  Pure and client-safe, so the marketplace UI and the install service agree. */
 export function isInstallable(app: AppManifest): boolean {
-    if (app.comingSoon) return false;
+    if (app.comingSoon || app.legacy) return false;
     // A builtin app has nothing to run: installing it records that this Polaris
     // has it, and the app itself is the dashboard.
     if (app.installMethod === "builtin") return true;
@@ -906,6 +946,6 @@ const CATEGORY_ORDER: readonly AppCategory[] = ["Messaging", "AI", "Game servers
 export function appsByCategory(): ReadonlyArray<{ category: AppCategory; apps: AppManifest[] }> {
     return CATEGORY_ORDER.map((category) => ({
         category,
-        apps: POLARIS_APP_CATALOG.filter((app) => app.category === category && !app.internal)
+        apps: POLARIS_APP_CATALOG.filter((app) => app.category === category && isOffered(app))
     })).filter((group) => group.apps.length > 0);
 }

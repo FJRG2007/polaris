@@ -21,12 +21,13 @@
  */
 
 import { useRouter } from "next/navigation";
-import { ARK_MAPS, mapRequirementHint } from "@/lib/apps/ark/maps";
 import * as arkAccess from "@/lib/apps/ark/access";
 import * as world from "@/lib/apps/minecraft/world";
 import { CopyButton } from "@/components/copy-button";
+import { GamePicker } from "@/components/game-picker";
 import { expectedArkMemoryMb } from "@/lib/apps/ark/config";
 import { GAMES, type GameId } from "@/lib/apps/games-catalog";
+import { ARK_MAPS, mapRequirementHint } from "@/lib/apps/ark/maps";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
 import { createGameServerSchema, isModIdList } from "@/lib/apps/games-schema";
@@ -230,27 +231,18 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
-                    {/* Only when there is a choice to make. One game installed is not
-                        a decision, it is a row of one taking up the top of the form. */}
-                    {offered.length > 1 && (
-                        <div className="flex flex-col gap-2">
-                            <span className="text-sm font-medium">Game</span>
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                {offered.map((entry) => (
-                                    <Choice
-                                        key={entry.id}
-                                        selected={game === entry.id}
-                                        onSelect={() => setGame(entry.id)}
-                                        title={entry.name}
-                                        detail={entry.summary}
-                                    />
-                                ))}
-                            </div>
-                            <span className="text-xs text-muted-foreground">
-                                {GAMES.find((entry) => entry.id === game)?.demands}
-                            </span>
-                        </div>
-                    )}
+                    {/* First, and always: it changes every question under it, and a
+                        form whose shape depends on an answer buried further down is
+                        a form people fill in twice. Asked as a picker rather than a
+                        row of cards because the list of games only grows. */}
+                    <div className="flex flex-col gap-2">
+                        <span className="text-sm font-medium">Game</span>
+                        {setup === null ? (
+                            <Skeleton className="h-14 w-full" />
+                        ) : (
+                            <GamePicker games={offered} value={game} onChange={setGame} />
+                        )}
+                    </div>
 
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Name</span>

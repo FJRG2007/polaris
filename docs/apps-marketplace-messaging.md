@@ -252,11 +252,23 @@ does: Polaris components, Polaris navigation, no embedded foreign UI. The
 Minecraft app is the reference for that, and the shape any later game server
 follows.
 
-**The marketplace installs a manager, not a server.** `minecraft-manager` is a
-builtin app: installing it runs nothing and turns `/apps/games` into a real page.
-Servers are created there, from two internal manifests (`minecraft`,
-`minecraft-bedrock`) the marketplace never offers - which is why the catalog has
-an `internal` flag at all. Each server is still an ordinary install underneath.
+**The marketplace installs one app for every game, not a server and not one app
+per game.** `game-servers` is a builtin app: installing it runs nothing and turns
+`/apps/games` into a real page for every game Polaris knows. Servers are created
+there, from internal manifests (`minecraft`, `minecraft-bedrock`, `ark`) the
+marketplace never offers - which is why the catalog has an `internal` flag at all.
+Each server is still an ordinary install underneath, and a game's own runtime is
+only ever installed by creating a server of it: an instance nobody plays ARK on
+never downloads it.
+
+Polaris used to install a manager per game (`minecraft-manager`, `ark-manager`).
+Those manifests remain, flagged `legacy`, so installs that already carry one still
+resolve to a name; `adoptGameServersApp` turns the oldest of them into
+`game-servers` - keeping its id, and therefore its grants - and retires the rest,
+the next time their owner opens either `/apps/games` or the marketplace. Which
+games need a DNS wildcard is derived from the servers that exist rather than from
+what is installed (`game-zones`), so turning the app on does not ask an operator
+for a record they will never use.
 
 **What creating a server asks, and what it works out.** Who plays on it (Java,
 Bedrock, or a Java world Bedrock joins through Geyser), what it plays (a

@@ -24,15 +24,16 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { GameLogo } from "@/components/game-picker";
 import { CopyButton } from "@/components/copy-button";
-import { useGamePresence } from "@/components/use-game-presence";
 import { NewServerDialog } from "./new-server-dialog";
+import { GAMES, type GameId } from "@/lib/apps/games-catalog";
+import { useGamePresence } from "@/components/use-game-presence";
 import type { GameServerFacts, GameServerLive } from "@/lib/apps/games-service";
-import { GAMES, type GameDefinition, type GameId } from "@/lib/apps/games-catalog";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import {
     deleteGameServerAction,
-    installManagerAction,
+    installGameServersAction,
     redeployGameServerAction,
     setGameServerRunningAction
 } from "./actions";
@@ -101,19 +102,19 @@ interface ServerView extends GameServerSeed {
 
 export function GamesView({
     servers,
-    installedGames,
+    installed,
     canCreate
 }: {
     servers: GameServerSeed[];
-    /** The games this Polaris can create a server of. Empty means no game has been
-     *  added yet, and the page is an offer to add one. */
-    installedGames: readonly GameId[];
+    /** Whether the Game servers app is on for this owner. False means the page is
+     *  an offer to turn it on rather than a list of nothing. */
+    installed: boolean;
     /** Whether this viewer may make a new server. Instance-wide, unlike what they
      *  may do to the ones already in the table - being invited to help run one is
      *  not an offer to start more. */
     canCreate: boolean;
 }) {
-    const managerInstalled = installedGames.length > 0;
+    const managerInstalled = installed;
     const router = useRouter();
     const [facts, setFacts] = useState<Map<string, GameServerFacts>>(new Map());
     const [live, setLive] = useState<Map<string, GameServerLive>>(new Map());
@@ -239,9 +240,7 @@ export function GamesView({
         });
     }
 
-    const missing = GAMES.filter((game) => !installedGames.includes(game.id));
-
-    if (!managerInstalled) return <AddGames games={GAMES} canAdd={canCreate} />;
+    if (!managerInstalled) return <TurnOnGameServers canAdd={canCreate} />;
 
     return (
         <div className="flex flex-col gap-4">
@@ -312,11 +311,6 @@ export function GamesView({
                 </div>
             )}
 
-            {/* A game somebody has not added yet is one they cannot create a server
-                of, and the create dialog only offers what is on. Saying so here is
-                cheaper than a trip to the marketplace to find out what is missing. */}
-            {canCreate && missing.length > 0 && <AddGames games={missing} canAdd compact />}
-
             {creating && <NewServerDialog onClose={() => setCreating(false)} />}
             <ConfirmDeleteDialog
                 open={deleting !== null}
@@ -333,37 +327,23 @@ export function GamesView({
 }
 
 /**
- * The games that can be added, and the button that adds one.
+ * The page before anybody has turned game servers on.
  *
- * A game is an app: it is installed, and until one is there is nothing on this
- * page to manage. Adding it runs nothing - it is what makes this Polaris able to
- * create servers of that game - so the card says what a server of it will actually
- * cost, which is the one thing that differs by an order of magnitude between them
- * and the one thing nobody finds out until the disk is full.
- *
- * `compact` is the same list under a table that already has servers in it, for
- * adding the second game.
+ * One app for every game rather than one per game: turning it on runs nothing,
+ * and each game's own runtime arrives with the first server of it - which is why
+ * what a server actually costs is said per game here rather than as one number.
+ * The difference between them is an order of magnitude, and it is the one thing
+ * nobody finds out until the disk is full.
  */
-function AddGames({
-    games,
-    canAdd,
-    compact = false
-}: {
-    games: readonly GameDefinition[];
-    canAdd: boolean;
-    compact?: boolean;
-}) {
+function TurnOnGameServers({ canAdd }: { canAdd: boolean }) {
     const router = useRouter();
     const [pending, startTransition] = useTransition();
-    const [adding, setAdding] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    function add(gameId: string): void {
+    function turnOn(): void {
         setError(null);
-        setAdding(gameId);
         startTransition(async () => {
-            const result = await installManagerAction(gameId);
-            setAdding(null);
+            const result = await installGameServersAction();
             if (result.error) {
                 setError(result.error);
                 return;
@@ -372,56 +352,45 @@ function AddGames({
         });
     }
 
-    const list = (
-        <div className="flex flex-col gap-2">
-            {games.map((game) => (
-                <div
-                    key={game.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-left"
-                >
-                    <div className="flex min-w-0 items-start gap-2">
-                        <Gamepad2 className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                        <div className="min-w-0">
-                            <p className="text-sm font-medium">{game.name}</p>
-                            <p className="text-xs text-muted-foreground">{game.summary}</p>
-                            <p className="text-xs text-muted-foreground/80">{game.demands}</p>
-                        </div>
-                    </div>
-                    {canAdd && (
-                        <Button size="sm" onClick={() => add(game.id)} disabled={pending}>
-                            {pending && adding === game.id && <Loader2 className="size-4 animate-spin" />}
-                            Add
-                        </Button>
-                    )}
-                </div>
-            ))}
-        </div>
-    );
-
-    if (compact) {
-        return (
-            <Card>
-                <CardBody className="flex flex-col gap-3">
-                    <p className="text-sm font-medium">Add another game</p>
-                    {error && <p className="text-sm text-danger">{error}</p>}
-                    {list}
-                </CardBody>
-            </Card>
-        );
-    }
-
     return (
         <div className="flex flex-col gap-6">
             <PageHeader title="Game servers" description="Run game servers on your own machines." />
             <Card>
-                <CardBody className="flex flex-col gap-3 py-8">
-                    <p className="text-sm font-medium">Add a game</p>
-                    <p className="max-w-xl text-sm text-muted-foreground">
-                        Adding one turns this page on for it: create as many servers as you want, each with its own
-                        address, console, players and settings. Nothing runs until you create a server.
-                    </p>
+                <CardBody className="flex flex-col gap-4 py-8">
+                    <div className="flex flex-col gap-1">
+                        <p className="text-sm font-medium">Run game servers</p>
+                        <p className="max-w-xl text-sm text-muted-foreground">
+                            Create as many as you want, of any game below, each with its own address, console,
+                            players and settings. Nothing is downloaded until you create a server, and only for the
+                            game that server plays.
+                        </p>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                        {GAMES.map((game) => (
+                            <div
+                                key={game.id}
+                                className="flex min-w-0 items-start gap-3 rounded-md border border-border px-3 py-2"
+                            >
+                                <GameLogo game={game} className="mt-0.5 size-8" />
+                                <div className="min-w-0">
+                                    <p className="text-sm font-medium">{game.name}</p>
+                                    <p className="text-xs text-muted-foreground">{game.summary}</p>
+                                    <p className="text-xs text-muted-foreground/80">{game.demands}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
                     {error && <p className="text-sm text-danger">{error}</p>}
-                    {list}
+
+                    {canAdd && (
+                        <Button className="w-fit" onClick={turnOn} disabled={pending}>
+                            {pending && <Loader2 className="size-4 animate-spin" />}
+                            Turn on game servers
+                        </Button>
+                    )}
+
                     <p className="text-xs text-muted-foreground">
                         Creating a Minecraft server accepts the{" "}
                         <a
@@ -464,6 +433,7 @@ function ServerRow({
     onDelete: () => void;
 }) {
     const { facts, live } = server;
+    const definition = GAMES.find((game) => game.id === server.game) ?? null;
     const href = `/apps/installed/${server.id}`;
     const files = filesHref(server.applicationId, server.game);
     const running = facts?.running ?? false;
@@ -478,15 +448,28 @@ function ServerRow({
             <ContextMenuTrigger asChild>
                 <tr className="border-t border-border hover:bg-card-hover">
                     <td className="px-3 py-2">
-                        <Link
-                            href={href}
-                            className="block max-w-full truncate font-medium hover:underline"
-                            title={server.name}
-                        >
-                            {server.name}
-                        </Link>
-                        {/* Not the machine: that has a column of its own. */}
-                        <span className="block truncate text-xs text-muted-foreground" title={server.catalogName}>{server.catalogName}</span>
+                        {/* The game's own mark beside the name, because a table of
+                            servers of several games is scanned for "the ARK one"
+                            long before it is read. */}
+                        <div className="flex min-w-0 items-center gap-2">
+                            {definition && <GameLogo game={definition} className="size-6" />}
+                            <div className="min-w-0">
+                                <Link
+                                    href={href}
+                                    className="block max-w-full truncate font-medium hover:underline"
+                                    title={server.name}
+                                >
+                                    {server.name}
+                                </Link>
+                                {/* Not the machine: that has a column of its own. */}
+                                <span
+                                    className="block truncate text-xs text-muted-foreground"
+                                    title={server.catalogName}
+                                >
+                                    {server.catalogName}
+                                </span>
+                            </div>
+                        </div>
                     </td>
                     <td className="px-3 py-2">
                         <StatusBadge facts={facts} live={live} status={server.status} />

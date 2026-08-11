@@ -2,15 +2,23 @@
  * The games Polaris knows how to run a server of.
  *
  * The marketplace already describes each app; what it cannot say is which apps
- * belong to the same game. A game is a manager somebody installs once and the
- * manifests its servers are actually created from - Minecraft is three ids, ARK
- * is two - and every screen that has to reason about "which game is this" was
- * reading a catalog id and guessing. This is that answer in one place.
+ * belong to the same game. A game is the manifests its servers are actually
+ * created from - Minecraft is two, ARK is one - and every screen that has to
+ * reason about "which game is this" was reading a catalog id and guessing. This
+ * is that answer in one place.
+ *
+ * There is one app for all of them, not one per game: `game-servers` turns the
+ * page on, and a game's own runtime is installed the first time a server of it is
+ * created. Each game still names the app it used to have, because instances that
+ * installed one still have that row until it is migrated.
  *
  * Pure, and deliberately free of anything a browser cannot run: the create dialog
  * offers these, the server side dispatches on them, and the two must not be able
  * to disagree about what games exist.
  */
+
+/** The one marketplace app every game is created from. */
+export const GAME_SERVERS_APP_ID = "game-servers";
 
 /** The games a server can be created for. */
 export type GameId = "minecraft" | "ark";
@@ -23,9 +31,21 @@ export interface GameDefinition {
     /** What it takes to run one, since these differ by an order of magnitude and
      *  the difference is the whole reason a create fails an hour later. */
     readonly demands: string;
-    /** The marketplace app that turns this game on. Installing it runs nothing;
-     *  it records that this Polaris can create servers of this game. */
-    readonly managerCatalogId: string;
+    /**
+     * The game's own mark, served from `public/logos`. A name in a list is read;
+     * a logo is recognised.
+     *
+     * Each is the publisher's own artwork rather than something drawn here:
+     * Minecraft's is the grass block out of the vendored texture set
+     * (`resources/mcicons`), ARK's is the emblem from its Steam store logo with
+     * the wordmark cropped off - the words under it are pale grey and vanish on a
+     * light background at this size.
+     */
+    readonly logo: string;
+    /** The per-game manager app this game used to be installed as, before there
+     *  was one app for all of them. Only for recognising the installs that still
+     *  carry it; nothing new is ever created under it. */
+    readonly legacyManagerCatalogId: string;
     /** Every manifest a server of this game is created from. */
     readonly serverCatalogIds: readonly string[];
     /** The label its servers' names live under, so two games' servers can never
@@ -43,7 +63,8 @@ export const GAMES: readonly GameDefinition[] = [
         name: "Minecraft",
         summary: "Java for PC, Bedrock for phones and consoles, or one world both can join.",
         demands: "About 2 GB of memory and a gigabyte of disk.",
-        managerCatalogId: "minecraft-manager",
+        logo: "/logos/minecraft.webp",
+        legacyManagerCatalogId: "minecraft-manager",
         serverCatalogIds: ["minecraft", "minecraft-bedrock"],
         domainLabel: "mc",
         srv: true
@@ -53,7 +74,8 @@ export const GAMES: readonly GameDefinition[] = [
         name: "ARK: Survival Evolved",
         summary: "A dinosaur survival island for PC players, on the map you choose.",
         demands: "About 8 GB of memory and 30 GB of disk, downloaded on the first start.",
-        managerCatalogId: "ark-manager",
+        logo: "/logos/ark.webp",
+        legacyManagerCatalogId: "ark-manager",
         serverCatalogIds: ["ark"],
         domainLabel: "ark",
         srv: false
@@ -64,10 +86,14 @@ export function findGame(id: string): GameDefinition | undefined {
     return GAMES.find((game) => game.id === id);
 }
 
-/** Which game a catalog id belongs to - a server's or its manager's - and null for
- *  an app that is not part of one. */
+/** Which game a catalog id belongs to - a server's, or the per-game manager it may
+ *  still be installed as - and null for an app that is not part of one. The one
+ *  app all of them are created from belongs to no single game; ask
+ *  `isGameServersApp` for that. */
 export function gameForCatalogId(catalogId: string): GameDefinition | undefined {
-    return GAMES.find((game) => game.managerCatalogId === catalogId || game.serverCatalogIds.includes(catalogId));
+    return GAMES.find(
+        (game) => game.legacyManagerCatalogId === catalogId || game.serverCatalogIds.includes(catalogId)
+    );
 }
 
 /** Which game a server runs. Null for an install that is not a game server, so a
@@ -76,9 +102,15 @@ export function gameOfServer(catalogId: string): GameDefinition | null {
     return GAMES.find((game) => game.serverCatalogIds.includes(catalogId)) ?? null;
 }
 
-/** Whether a catalog id is the app that turns a game on. */
+/** Whether a catalog id is the one app every game is created from. */
+export function isGameServersApp(catalogId: string): boolean {
+    return catalogId === GAME_SERVERS_APP_ID;
+}
+
+/** Whether a catalog id turns the Game servers page on - the one app, or one of
+ *  the per-game managers that used to. */
 export function isGameManagerApp(catalogId: string): boolean {
-    return GAMES.some((game) => game.managerCatalogId === catalogId);
+    return isGameServersApp(catalogId) || GAMES.some((game) => game.legacyManagerCatalogId === catalogId);
 }
 
 /**

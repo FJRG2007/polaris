@@ -1,23 +1,23 @@
 "use server";
 
 /**
- * What the Minecraft manager does. Creating a server is the one action with any
+ * What the Game servers app does. Creating a server is the one action with any
  * weight to it, and it is deliberately the only place that decides what a server
  * is made of - the dialog asks, this authorizes and records, and games-create
  * turns the answers into an install.
  */
 
-import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { clientIp } from "@/lib/request-context";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { clearResourceGrants } from "@polaris/auth";
+import { flushGameWorld } from "@/lib/apps/games-flush";
 import { gameDomainSuffix } from "@/lib/apps/minecraft/address";
 import { clearQueue } from "@/lib/apps/minecraft/queue-service";
-import { installApp, uninstallApp } from "@/lib/apps/install-service";
-import { flushGameWorld } from "@/lib/apps/games-flush";
-import { findGame, GAMES, type GameId } from "@/lib/apps/games-catalog";
+import { uninstallApp } from "@/lib/apps/install-service";
+import { GAMES, type GameId } from "@/lib/apps/games-catalog";
+import { adoptGameServersApp, installGameServersApp } from "@/lib/apps/game-install";
 import { clearSnapshots } from "@/lib/apps/minecraft/inventory-service";
 import { blueprintVersion, createGameServer } from "@/lib/apps/games-create";
 import { listGameMachines, type GameMachine } from "@/lib/apps/games-service";
@@ -61,15 +61,17 @@ export async function gameSetupAction(): Promise<GameSetup> {
     };
 }
 
-/** The games whose manager this person has installed. */
+/**
+ * The games this person may create a server of right now.
+ *
+ * Every game Polaris knows, once game servers are on for them - there is one app
+ * for all of them, and a game's runtime is installed with its first server rather
+ * than in advance. An owner who has never turned it on gets nothing, so the dialog
+ * cannot offer a create the action behind it would refuse.
+ */
 async function installedGameIds(ownerId: string): Promise<GameId[]> {
-    const installs = await prisma.installedApp.findMany({
-        where: { ownerId, status: { not: "removed" } },
-        select: { catalogId: true }
-    });
-    return GAMES.filter((game) => installs.some((install) => install.catalogId === game.managerCatalogId)).map(
-        (game) => game.id
-    );
+    const installedAppId = await adoptGameServersApp(ownerId);
+    return installedAppId === null ? [] : GAMES.map((game) => game.id);
 }
 
 /** What memory a server for this many players would be given, so the dialog can
@@ -195,30 +197,23 @@ export async function deleteGameServerAction(installedAppId: string): Promise<{ 
     }
 }
 
-/** Add a game, from the page that needs it. The manager runs nothing: installing
- *  it is what makes this Polaris able to create servers of that game. */
-export async function installManagerAction(gameId: string): Promise<{ error?: string }> {
+/** Turn game servers on, from the page that needs them. It runs nothing:
+ *  installing it is what makes this Polaris able to create servers at all, and
+ *  each game's own runtime arrives with the first server of it. */
+export async function installGameServersAction(): Promise<{ error?: string }> {
     const user = await requirePermission("games.manage");
-    const game = findGame(gameId);
-    if (!game) return { error: "That game is not one Polaris knows" };
     try {
-        const result = await installApp(user.id, user.id, {
-            catalogId: game.managerCatalogId,
-            name: game.name,
-            serverId: "local",
-            storage: [],
-            env: []
-        });
+        const installedAppId = await installGameServersApp(user.id, user.id);
         await recordAudit({
             actorId: user.id,
             action: "apps.install",
             targetType: "installedApp",
-            targetId: result.installedAppId
+            targetId: installedAppId
         });
         revalidatePath("/apps/games");
         revalidatePath("/apps/marketplace");
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not install the manager" };
+        return { error: caught instanceof Error ? caught.message : "Could not turn game servers on" };
     }
 }

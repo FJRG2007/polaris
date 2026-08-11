@@ -121,7 +121,21 @@ describe("checkZoneDns", () => {
         expect(report.gameZones[0]).toMatchObject({ wildcard: "*.mc.example.com", ok: true });
     });
 
-    it("asks for no game wildcard on an instance with no game installed", async () => {
+    it("asks for a game's wildcard once there is a server of it", async () => {
+        // One app turns every game on, so having it installed says nothing about
+        // which games are played. A server does, and it is also the moment the
+        // record starts mattering.
+        installs.push({ catalogId: "ark" });
+        resolve4.mockResolvedValue(["51.15.20.30"]);
+        const report = await checkZoneDns();
+        expect(report.gameZones).toHaveLength(1);
+        expect(report.gameZones[0]).toMatchObject({ game: "ARK: Survival Evolved", wildcard: "*.ark.example.com" });
+    });
+
+    it("asks for no game wildcard on an instance with no game server", async () => {
+        // Including one that has only turned the app on: a record for a game
+        // nobody plays is a checklist item that can only ever be red.
+        installs.push({ catalogId: "game-servers" });
         resolve4.mockResolvedValue(["51.15.20.30"]);
         expect((await checkZoneDns()).gameZones).toEqual([]);
     });

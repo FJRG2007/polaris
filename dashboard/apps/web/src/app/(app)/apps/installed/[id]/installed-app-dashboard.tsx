@@ -17,8 +17,8 @@ import type { GameContext } from "./game-context";
 import { useRuntimeLog } from "./use-runtime-log";
 import { MinecraftPanel } from "./minecraft-panel";
 import { LogViewer } from "@/components/log-viewer";
-import { gameForCatalogId } from "@/lib/apps/games-catalog";
 import { MessagingBridgePanel } from "./messaging-bridge-panel";
+import { gameForCatalogId, isGameServersApp } from "@/lib/apps/games-catalog";
 import type { InstalledAppDetail, InstalledAppSetting } from "@/lib/apps/install-service";
 import { Badge, Button, Card, CardBody, ConfirmDeleteDialog, PageHeader, cn } from "@polaris/ui";
 import { ArrowLeft, ChevronDown, ChevronRight, Play, RefreshCw, Square, Trash2 } from "lucide-react";
@@ -55,8 +55,11 @@ function adaptedPanelFor(
     switch (app.catalogId) {
         case "messaging-bridge":
             return <MessagingBridgePanel />;
-        // A manager runs nothing itself - its dashboard is the Game servers page,
-        // and this is the door to it rather than a second copy of the list.
+        // The app runs nothing itself - its dashboard is the Game servers page, and
+        // this is the door to it rather than a second copy of the list. The two
+        // per-game ids are the apps it replaced, kept until their owner opens
+        // either page and they are adopted.
+        case "game-servers":
         case "minecraft-manager":
         case "ark-manager":
             return (
@@ -64,8 +67,8 @@ function adaptedPanelFor(
                     <CardBody className="flex flex-col items-center gap-3 py-10 text-center">
                         <p className="text-sm font-medium">Your servers live on the Game servers page</p>
                         <p className="max-w-md text-sm text-muted-foreground">
-                            Create as many as you want, each with its own address, console, players and settings. The
-                            manager itself runs nothing.
+                            Create as many as you want, of any game Polaris knows, each with its own address, console,
+                            players and settings. The app itself runs nothing.
                         </p>
                         <Link href="/apps/games">
                             <Button size="sm">Open Game servers</Button>
@@ -149,7 +152,7 @@ export function InstalledAppDashboard({
     // Back goes where this app is listed, which for anything belonging to a game -
     // a server or the manager that creates them - is the Game servers page rather
     // than the marketplace it was installed from.
-    const isGame = gameForCatalogId(app.catalogId) !== undefined;
+    const isGame = gameForCatalogId(app.catalogId) !== undefined || isGameServersApp(app.catalogId);
     const backHref = isGame ? "/apps/games" : "/apps/marketplace";
     const backLabel = isGame ? "Game servers" : "Marketplace";
 

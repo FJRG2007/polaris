@@ -13,19 +13,59 @@
  * difference between a private server and a public one.
  */
 
+import { join } from "node:path";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { appHasCapability, findApp, isInstallable, tunableEnvVars } from "@/lib/apps/catalog";
-import { GAMES, findGame, gameForCatalogId, gameOfServer, isGameManagerApp } from "@/lib/apps/games-catalog";
+import {
+    appHasCapability,
+    findApp,
+    isInstallable,
+    isOffered,
+    POLARIS_APP_CATALOG,
+    tunableEnvVars
+} from "@/lib/apps/catalog";
+import {
+    GAMES,
+    GAME_SERVERS_APP_ID,
+    findGame,
+    gameForCatalogId,
+    gameOfServer,
+    isGameManagerApp
+} from "@/lib/apps/games-catalog";
 
-describe("every game", () => {
-    it("names a manager the marketplace can actually install", () => {
+describe("the app every game is created from", () => {
+    const app = findApp(GAME_SERVERS_APP_ID);
+
+    it("is one the marketplace can actually install", () => {
+        expect(app).toBeDefined();
+        expect(appHasCapability(app!, "game-manager")).toBe(true);
+        expect(isInstallable(app!)).toBe(true);
+        expect(isOffered(app!)).toBe(true);
+    });
+
+    it("keeps the app each game used to be, so existing installs still resolve", () => {
+        // Deleting these would leave somebody who installed one with a row that
+        // renders as a catalog id. They are never offered again - the adoption
+        // pass turns them into the app above - but they still have to have a name.
         for (const game of GAMES) {
-            const manifest = findApp(game.managerCatalogId);
-            expect(manifest, `${game.id} manager`).toBeDefined();
-            expect(appHasCapability(manifest!, "game-manager")).toBe(true);
-            expect(isInstallable(manifest!)).toBe(true);
+            const legacy = findApp(game.legacyManagerCatalogId);
+            expect(legacy, `${game.id} manager`).toBeDefined();
+            expect(legacy!.legacy).toBe(true);
+            expect(isOffered(legacy!)).toBe(false);
+            expect(isInstallable(legacy!)).toBe(false);
         }
     });
+
+    it("is the only game app the marketplace offers", () => {
+        const offered = POLARIS_APP_CATALOG.filter(
+            (entry) => entry.category === "Game servers" && isOffered(entry)
+        );
+        expect(offered.map((entry) => entry.id)).toEqual([GAME_SERVERS_APP_ID]);
+    });
+});
+
+describe("every game", () => {
 
     it("names server manifests that declare themselves game servers", () => {
         for (const game of GAMES) {
@@ -40,6 +80,16 @@ describe("every game", () => {
         }
     });
 
+    it("has a logo, and one that is actually there", () => {
+        // The picker draws these. A path with no file behind it is a broken image
+        // in the first question of the create form, and nothing anywhere says so.
+        for (const game of GAMES) {
+            expect(game.logo, game.id).toMatch(/^\/logos\/[a-z0-9-]+\.(webp|svg|png)$/);
+            const file = join(fileURLToPath(new URL("../../public", import.meta.url)), game.logo);
+            expect(existsSync(file), `${game.id} logo at ${game.logo}`).toBe(true);
+        }
+    });
+
     it("keeps its servers on a subdomain of its own", () => {
         const labels = GAMES.map((game) => game.domainLabel);
         expect(new Set(labels).size).toBe(labels.length);
@@ -49,10 +99,15 @@ describe("every game", () => {
         expect(gameForCatalogId("minecraft-bedrock")?.id).toBe("minecraft");
         expect(gameForCatalogId("ark-manager")?.id).toBe("ark");
         expect(gameForCatalogId("messaging-bridge")).toBeUndefined();
+        // The one app belongs to no single game, so it must not answer as one:
+        // every screen that asks this is asking which game to dispatch on.
+        expect(gameForCatalogId(GAME_SERVERS_APP_ID)).toBeUndefined();
         // A manager is not a server: dispatching a live read onto one would ask a
         // container that does not exist.
         expect(gameOfServer("ark-manager")).toBeNull();
+        expect(gameOfServer(GAME_SERVERS_APP_ID)).toBeNull();
         expect(gameOfServer("ark")?.id).toBe("ark");
+        expect(isGameManagerApp(GAME_SERVERS_APP_ID)).toBe(true);
         expect(isGameManagerApp("minecraft-manager")).toBe(true);
         expect(isGameManagerApp("minecraft")).toBe(false);
     });

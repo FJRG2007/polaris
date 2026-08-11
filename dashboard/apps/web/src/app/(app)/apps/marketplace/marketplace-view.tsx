@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { isGameServersApp } from "@/lib/apps/games-catalog";
 import { appInstallInputSchema } from "@/lib/apps/install-schema";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import type { InstalledAppView } from "@/lib/apps/install-service";
@@ -124,11 +125,7 @@ export function MarketplaceView({ installed }: { installed: InstalledAppView[] }
                                 key={app.id}
                                 app={app}
                                 installedCount={installedByCatalog.get(app.id) ?? 0}
-                                openHref={
-                                    app.singleton && singletonInstall.has(app.id)
-                                        ? `/apps/installed/${singletonInstall.get(app.id)}`
-                                        : null
-                                }
+                                openHref={openHrefFor(app, singletonInstall)}
                                 installing={installingId === app.id}
                                 disabled={installingId !== null}
                                 onInstall={() => install(app)}
@@ -144,6 +141,19 @@ export function MarketplaceView({ installed }: { installed: InstalledAppView[] }
     );
 }
 
+/**
+ * Where Open goes for an app that is already installed.
+ *
+ * Usually the app's own page. Game servers is the exception: its page is a door
+ * to the Game servers screen and nothing else, so Open going there first is a
+ * click that exists only to be clicked through.
+ */
+function openHrefFor(app: AppManifest, singletonInstall: Map<string, string>): string | null {
+    if (!app.singleton || !singletonInstall.has(app.id)) return null;
+    if (isGameServersApp(app.id)) return "/apps/games";
+    return `/apps/installed/${singletonInstall.get(app.id)}`;
+}
+
 function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
     return (
         <section className="flex flex-col gap-3">
@@ -153,7 +163,12 @@ function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
                     const manifest = findApp(item.catalogId);
                     const Icon = manifest?.icon;
                     return (
-                        <Link key={item.id} href={`/apps/installed/${item.id}`}>
+                        <Link
+                            key={item.id}
+                            href={
+                                isGameServersApp(item.catalogId) ? "/apps/games" : `/apps/installed/${item.id}`
+                            }
+                        >
                             <Card className="transition-colors hover:border-border">
                                 <CardBody className="flex items-center gap-3 py-3">
                                     <div className="grid size-9 shrink-0 place-items-center rounded-md border border-border bg-surface">

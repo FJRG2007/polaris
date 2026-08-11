@@ -236,7 +236,18 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Game servers",
             href: "/apps/games",
             icon: Gamepad2,
-            keywords: ["minecraft", "java", "bedrock", "players", "console", "rcon", "mods", "plugins"]
+            keywords: [
+                "minecraft",
+                "java",
+                "bedrock",
+                "ark",
+                "survival evolved",
+                "players",
+                "console",
+                "rcon",
+                "mods",
+                "plugins"
+            ]
         },
         {
             label: "Servers",

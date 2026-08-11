@@ -12,10 +12,11 @@
 
 import { GamesView } from "./games-view";
 import { findApp } from "@/lib/apps/catalog";
+import { gameOfServer } from "@/lib/apps/games-catalog";
 import { isGameServerApp } from "@/lib/apps/games-service";
+import { adoptGameServersApp } from "@/lib/apps/game-install";
 import { listInstalledApps } from "@/lib/apps/install-service";
 import { requirePermissionAny, userHasManage } from "@/lib/session";
-import { GAMES, gameOfServer, type GameId } from "@/lib/apps/games-catalog";
 import { gamePermissionsFor, reachableInstallIds } from "@/lib/apps/install-access";
 
 export const dynamic = "force-dynamic";
@@ -31,13 +32,11 @@ export default async function GameServersPage() {
         // an offer to start more.
         userHasManage(user, "games.manage")
     ]);
+    // One app turns this page on, whatever games end up being played on it. An
+    // instance that still has the per-game managers it was built with is adopted
+    // here, which is the first place its owner would notice either way.
+    const installed = await adoptGameServersApp(user.id);
     const installs = await listInstalledApps(user.id, granted);
-    // Each game is an installed app of its own; without one of them there is
-    // nothing to manage, and the page offers to add a game instead of pretending
-    // otherwise. Which games are on decides what the create dialog may offer.
-    const installedGames: GameId[] = GAMES.filter((game) =>
-        installs.some((install) => install.catalogId === game.managerCatalogId)
-    ).map((game) => game.id);
     const servers = await Promise.all(
         installs
             .filter((install) => isGameServerApp(install.catalogId))
@@ -58,5 +57,5 @@ export default async function GameServersPage() {
                 };
             })
     );
-    return <GamesView servers={servers} installedGames={installedGames} canCreate={canCreate} />;
+    return <GamesView servers={servers} installed={installed !== null} canCreate={canCreate} />;
 }
