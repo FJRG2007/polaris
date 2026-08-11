@@ -9,22 +9,23 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
-import { STEAM_PROVIDER } from "@/lib/connections/steam";
 import { setSetting } from "@/lib/setting-store";
 import { recordAudit } from "@/lib/audit-service";
 import { verifyIp } from "@/lib/integrations/dymo";
 import { applyTunnel } from "@/lib/tunnel-service";
+import { STEAM_PROVIDER } from "@/lib/connections/steam";
 import { verifyKey } from "@/lib/integrations/virustotal";
 import { GATEWAY_SLUG } from "@/lib/agents/agent-providers";
 import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip";
 import type { CfAccount } from "@/lib/integrations/cloudflare-api";
 import { setDomainConfig, syncDuckDns } from "@/lib/domain-service";
 import { isTunnelToken, tunnelTokenHint } from "@/lib/integrations/tunnel-token";
-import { getIntegrationState, upsertIntegration } from "@/lib/integration-service";
 import type { CloudflareTokenScope } from "@/lib/integrations/cloudflare-token-link";
+import { connectionRedirectUri, verifyConnectionOAuthApp } from "@/lib/connections/oauth";
 import { DYMO_IP_RULES, findIntegration, type ScanAction } from "@/lib/integrations/registry";
 import { connectionLimitKey, connectionSignInKey, findConnectionProvider } from "@polaris/core";
 import { connectGithubApp, disconnectGithub, refreshInstallations } from "@/lib/github-service";
+import { getIntegrationSecret, getIntegrationState, upsertIntegration } from "@/lib/integration-service";
 import {
     connectCloudflareToken,
     disconnectCloudflareToken
@@ -109,6 +110,12 @@ export async function saveConnectionSignInAction(provider: string, allowed: bool
  * secret, and whether it is on. The slug is checked against the catalog rather
  * than trusted, so this cannot be used to write an Integration row for something
  * that is not an OAuth app.
+ *
+ * Switching one on is what puts a Connect button in front of everybody here, so
+ * the provider is asked first whether it would accept the application at all.
+ * Half a setup - a secret from another client, a redirect URI never pasted into
+ * the console - looks exactly like a working one from this screen, and the person
+ * who finds out is somebody who cannot fix it.
  */
 export async function saveOAuthAppAction(input: {
     slug: string;
@@ -130,6 +137,19 @@ export async function saveOAuthAppAction(input: {
         if (input.enabled && !clientSecret && !existing?.hasSecret) {
             return { error: "Add the client secret before enabling it" };
         }
+        if (input.enabled) {
+            // The stored one when the field was left blank, which is how an
+            // operator flips the switch without re-typing a secret.
+            const secret = clientSecret ?? (await getIntegrationSecret(slug));
+            const refused = secret
+                ? await verifyConnectionOAuthApp(
+                      slug,
+                      { clientId, clientSecret: secret },
+                      await connectionRedirectUri(slug)
+                  )
+                : null;
+            if (refused) return { error: refused };
+        }
         await upsertIntegration(slug, {
             enabled: input.enabled,
             config: { ...existing?.config, clientId },
@@ -144,10 +164,11 @@ export async function saveOAuthAppAction(input: {
             metadata: { enabled: input.enabled }
         });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The Google settings could not be saved" };
+        return { error: caught instanceof Error ? caught.message : "The application could not be saved" };
     }
 
     revalidatePath("/integrations");
+    revalidatePath("/account/connections");
     return {};
 }
 

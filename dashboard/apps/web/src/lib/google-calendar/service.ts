@@ -100,6 +100,66 @@ export function googleAuthorizeUrl(
     return url.toString();
 }
 
+/**
+ * Whether Google will accept this client, and this redirect URI on it - asked
+ * before an operator switches Google on, rather than found out by the first
+ * person who presses Connect.
+ *
+ * Two questions, because they fail apart and are fixed in different places. The
+ * token endpoint answers the first: an id and a secret that are not a pair come
+ * back as `invalid_client`, which is the OAuth error for exactly that. The
+ * authorization endpoint answers the second by being asked the same question a
+ * browser is about to ask - a redirect URI the client does not carry is refused
+ * there and nowhere else, and Google refuses more than a mismatch: an address
+ * that is a bare IP breaks its rules whatever is registered, which is what a
+ * deployment behind a proxy hits first.
+ *
+ * Only an explicit refusal counts. A request that never arrived says nothing
+ * about the credentials, and an operator cannot argue with a check that failed
+ * because this server was briefly offline.
+ */
+export async function verifyGoogleOAuthClient(client: GoogleOAuthClient, redirectUri: string): Promise<string | null> {
+    return (await refusedCredentials(client, redirectUri)) ?? (await refusedRedirectUri(client, redirectUri));
+}
+
+/** A code that cannot be valid, so the only thing the answer can be about is who
+ *  is asking. Google reads the credentials before it reads the code. */
+const NOT_A_CODE = "polaris-setup-check";
+
+async function refusedCredentials(client: GoogleOAuthClient, redirectUri: string): Promise<string | null> {
+    const response = await fetch(OAUTH_TOKEN, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            client_id: client.clientId,
+            client_secret: client.clientSecret,
+            grant_type: "authorization_code",
+            code: NOT_A_CODE,
+            redirect_uri: redirectUri
+        }),
+        cache: "no-store"
+    }).catch(() => null);
+    if (!response) return null;
+
+    const body = await response.json().catch(() => null);
+    const said = z.object({ error: z.string() }).safeParse(body);
+    if (said.success && said.data.error === "invalid_client") {
+        return "Google does not recognize this client ID and secret together. Check both on the client you created - a secret belongs to one client only.";
+    }
+    return null;
+}
+
+async function refusedRedirectUri(client: GoogleOAuthClient, redirectUri: string): Promise<string | null> {
+    const probe = await fetch(googleAuthorizeUrl(client, redirectUri, NOT_A_CODE), {
+        redirect: "manual",
+        cache: "no-store"
+    }).catch(() => null);
+    // 4xx is Google declining to show a consent screen at all, which is what
+    // everybody pressing Connect would get. Anything else means it would.
+    if (!probe || probe.status < 400 || probe.status >= 500) return null;
+    return `Google refuses to authorize anybody with this redirect URI. Add ${redirectUri} to the client's authorized redirect URIs, and give this deployment a domain - Google rejects an IP address outright.`;
+}
+
 const tokenSchema = z.object({
     access_token: z.string().min(1),
     refresh_token: z.string().min(1).optional(),

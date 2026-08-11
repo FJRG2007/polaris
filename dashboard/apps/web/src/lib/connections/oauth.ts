@@ -43,7 +43,8 @@ import {
     exchangeGoogleCode,
     getGoogleOAuthClient,
     googleAuthorizeUrl,
-    identifyGoogleAccount
+    identifyGoogleAccount,
+    verifyGoogleOAuthClient
 } from "@/lib/google-calendar/service";
 
 /** The operator's application, as a provider needs it to speak. */
@@ -90,6 +91,11 @@ interface ProviderOAuth {
     exchange(client: OAuthClient, code: string, redirectUri: string): Promise<ConnectionAuthorization>;
     /** Spend a sign-in's code and report whose account it was. */
     identify(client: OAuthClient, code: string, redirectUri: string): Promise<ConnectionIdentity>;
+    /** Ask the provider whether it would accept this application and this redirect
+     *  URI, before an operator switches it on. What an operator would otherwise
+     *  find out from somebody else's failed Connect button. Absent where the
+     *  provider gives no answer that can be read without guessing. */
+    verify?(client: OAuthClient, redirectUri: string): Promise<string | null>;
 }
 
 const ADAPTERS: Record<string, ProviderOAuth> = {
@@ -146,7 +152,8 @@ const ADAPTERS: Record<string, ProviderOAuth> = {
                 credential: { refreshToken: granted.refreshToken }
             };
         },
-        identify: identifyGoogleAccount
+        identify: identifyGoogleAccount,
+        verify: verifyGoogleOAuthClient
     },
     microsoft: {
         callbackUrl: (baseUrl) => `${baseUrl}/api/connections/microsoft/callback`,
@@ -248,6 +255,23 @@ export async function connectionFlowOrigin(): Promise<string> {
 /** Where this provider returns somebody, on that address. */
 export async function connectionRedirectUri(provider: string): Promise<string> {
     return connectionCallbackUrl(provider, await connectionFlowOrigin());
+}
+
+/**
+ * Whether the provider will accept this application, before anybody is sent to it.
+ *
+ * Only the services that can answer the question have an answer: the rest return
+ * null, which reads as "nothing said no". A verifier that guessed at another
+ * provider's refusals would refuse working credentials, and an operator cannot
+ * argue with a check that is wrong.
+ */
+export async function verifyConnectionOAuthApp(
+    provider: string,
+    client: OAuthClient,
+    redirectUri: string
+): Promise<string | null> {
+    const verify = ADAPTERS[provider]?.verify;
+    return verify ? verify(client, redirectUri) : null;
 }
 
 /** The operator's application for this provider, or null when there is none. */
