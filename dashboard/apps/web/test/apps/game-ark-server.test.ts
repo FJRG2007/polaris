@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { CreateArkServerInput } from "@/lib/apps/games-schema";
-import { isJoinPassword } from "@/lib/apps/ark/access";
+import { EXCLUSIVE_JOIN, GAME_LOG, hasLaunchFlag, isJoinPassword } from "@/lib/apps/ark/access";
 import { parseArkPlayers, isRconRefusal } from "@/lib/apps/ark/parse";
 import { arkPortsFrom, arkServerEnv, expectedArkMemoryMb, normalizeModIds } from "@/lib/apps/ark/config";
 
@@ -66,11 +66,20 @@ describe("the environment a server is created with", () => {
     });
 
     it("closes the server to everyone who was not added", () => {
-        expect(arkServerEnv(input(), arkPortsFrom(7777), ADMIN).ARK_EXTRA_OPTS).toBe("-exclusivejoin");
+        const options = arkServerEnv(input(), arkPortsFrom(7777), ADMIN).ARK_EXTRA_OPTS ?? "";
+        expect(hasLaunchFlag(options, EXCLUSIVE_JOIN)).toBe(true);
     });
 
     it("leaves it open when the operator deliberately said so", () => {
-        expect(arkServerEnv(input({ exclusiveJoin: false }), arkPortsFrom(7777), ADMIN).ARK_EXTRA_OPTS).toBe("");
+        const options = arkServerEnv(input({ exclusiveJoin: false }), arkPortsFrom(7777), ADMIN).ARK_EXTRA_OPTS ?? "";
+        expect(hasLaunchFlag(options, EXCLUSIVE_JOIN)).toBe(false);
+    });
+
+    it("records what happens in the game from the first start", () => {
+        // ARK keeps no log of chat or admin commands unless it is asked to, and
+        // the moment that is wanted is always after something went unrecorded.
+        const options = arkServerEnv(input(), arkPortsFrom(7777), ADMIN).ARK_EXTRA_OPTS ?? "";
+        expect(hasLaunchFlag(options, GAME_LOG)).toBe(true);
     });
 
     it("carries the admin password it was handed, and never one of its own", () => {
