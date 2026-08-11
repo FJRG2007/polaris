@@ -9,6 +9,8 @@ import { getGithubStatus } from "@/lib/github-service";
 import { getRunnerAccess } from "@/lib/github-runners";
 import { connectionProven } from "@/lib/connections/proven";
 import { listIntegrationStates } from "@/lib/integration-service";
+import { readConnectionFailure } from "@/lib/connections/attention";
+import { commonSetupValues, setupValuesFor } from "@/lib/integrations/setup-values";
 import { readCriminalIpConfig } from "@/lib/integrations/criminalip";
 import { getDomainConfig, publicAppUrl } from "@/lib/domain-service";
 import { CONNECTION_PROVIDERS, findConnectionProvider } from "@polaris/core";
@@ -75,6 +77,11 @@ export default async function IntegrationsPage() {
         provenApplications()
     ]);
     const accountLimits = new Map(oauthLimits);
+    // What a step can ask the operator to paste in: the public pages a review desk
+    // reads, the domain under them, and the logo Epic wants uploaded. Built from
+    // the address the round trips run on, so what is copied is what is sent.
+    const common = commonSetupValues(baseUrl);
+
     // Whether that connection can also register self-hosted runners. Neither
     // method asks for the permission by default, so this is where the operator
     // finds out - before provisioning a machine, not after. It needs the status
@@ -101,6 +108,14 @@ export default async function IntegrationsPage() {
             description: entry.description,
             docsUrl: entry.docsUrl,
             setupLinks: entry.setupLinks,
+            // Per provider, because each one returns to its own path.
+            setupValues: setupValuesFor(entry.slug, common, {
+                oauthApp: OAUTH_APP_SLUGS.includes(entry.slug),
+                baseUrl
+            }),
+            // Only where an authorization can fail: a card with no round trip has
+            // nothing to have been refused.
+            failure: connection ? readConnectionFailure(state?.config) ?? undefined : undefined,
             signInAllowed: connection ? signIn.get(entry.slug) ?? connection.signInDefault : undefined,
             signInWarning: connection?.signInWarning,
             requiresApiKey: entry.requiresApiKey,

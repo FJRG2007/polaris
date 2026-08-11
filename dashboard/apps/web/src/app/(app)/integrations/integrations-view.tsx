@@ -15,8 +15,9 @@ import { IntegrationLogo } from "@/components/logos";
 import { CopyButton } from "@/components/copy-button";
 import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip";
 import { useState, useTransition, type ComponentType } from "react";
+import type { ConnectionFailure } from "@/lib/connections/attention";
 import { isTunnelToken, tunnelTokenHint, type TunnelProviderSlug } from "@/lib/integrations/tunnel-token";
-import { CheckCircle2, Circle, ExternalLink, Loader2, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Circle, Download, ExternalLink, Loader2, RefreshCw, ShieldAlert, ShieldCheck, TriangleAlert } from "lucide-react";
 import {
     CLOUDFLARE_TOKEN_LINKS,
     CLOUDFLARE_TOKEN_PERMISSIONS,
@@ -27,6 +28,7 @@ import {
     SCAN_ACTIONS,
     type GatewayConfig,
     type IntegrationSetupLink,
+    type IntegrationSetupValue,
     type ScanAction
 } from "@/lib/integrations/registry";
 import {
@@ -105,6 +107,10 @@ export interface IntegrationCard {
     proven?: boolean;
     /** Where the vendor makes the credential this dialog is asking for. */
     setupLinks?: readonly IntegrationSetupLink[];
+    /** What this deployment knows that those steps ask to be pasted in. */
+    setupValues?: Partial<Record<IntegrationSetupValue, string>>;
+    /** What the last authorization was refused with, when one was. */
+    failure?: ConnectionFailure;
     /** The gateway's endpoint settings. Set for that card only. */
     gateway?: GatewayConfig;
     /** Whether a linked account of this service may sign anybody in here, for the
@@ -171,7 +177,12 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
                                     </div>
                                     <p className="mt-0.5 text-xs text-muted-foreground">{card.summary}</p>
                                 </div>
-                                {card.enabled ? (
+                                {/* A service that refused the last person to try it is
+                                    the one thing on this grid worth reading before
+                                    "On": it is on, and it is not working. */}
+                                {card.failure ? (
+                                    <Badge variant="warning">Needs attention</Badge>
+                                ) : card.enabled ? (
                                     <Badge variant="success">On</Badge>
                                 ) : card.hasSecret ? (
                                     <Badge variant="neutral">Off</Badge>
@@ -316,24 +327,114 @@ function AccountLimitField({ slug, current }: { slug: string; current: number })
  * lets a URL carry it carries; the rest of the values stay on this screen to be
  * copied, because none of these consoles accept them from a link.
  */
-function SetupSteps({ links }: { links?: readonly IntegrationSetupLink[] }) {
+/** What each value is called on the vendor's own form, so the label here matches
+ *  the field it is meant to be pasted into. */
+const SETUP_VALUE_LABEL: Record<IntegrationSetupValue, string> = {
+    redirectUri: "Redirect URI",
+    homeUrl: "Home page URL",
+    privacyUrl: "Privacy policy URL",
+    termsUrl: "Terms of service URL",
+    logoUrl: "Logo, 128x128",
+    domain: "Domain"
+};
+
+/** One value the step is asking for, ready to be taken across. The logo is a file
+ *  rather than a string, so it is offered as a download instead of a copy. */
+function SetupValue({ kind, value }: { kind: IntegrationSetupValue; value: string }) {
+    return (
+        <div className="flex items-center gap-2 rounded border border-border bg-background px-2 py-1">
+            <span className="shrink-0 text-xs text-muted-foreground">{SETUP_VALUE_LABEL[kind]}</span>
+            <code className="min-w-0 flex-1 truncate text-xs" title={value}>
+                {value}
+            </code>
+            {kind === "logoUrl" ? (
+                <a
+                    href={value}
+                    download
+                    className="inline-flex shrink-0 items-center gap-1 text-xs text-primary hover:underline"
+                >
+                    <Download className="size-3" />
+                    Download
+                </a>
+            ) : (
+                <CopyButton value={value} label={`Copy the ${SETUP_VALUE_LABEL[kind].toLowerCase()}`} />
+            )}
+        </div>
+    );
+}
+
+/**
+ * The setup, in the order it happens, with what each step asks for beside it.
+ *
+ * Numbered because these are steps and not a pile of links: several of these
+ * setups refuse everybody until the last one is done, and an operator who does
+ * them out of order finds out from somebody else's failed Connect button. The
+ * values are here rather than in one block at the bottom for the same reason -
+ * the redirect URI belongs to the step that registers it.
+ */
+function SetupSteps({
+    links,
+    values
+}: {
+    links?: readonly IntegrationSetupLink[];
+    values?: Partial<Record<IntegrationSetupValue, string>>;
+}) {
     if (!links || links.length === 0) return null;
     return (
-        <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-3">
-            {links.map((step) => (
-                <div key={step.url} className="flex flex-col gap-0.5">
-                    <a
-                        href={step.url}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="inline-flex w-fit items-center gap-1 text-sm font-medium text-primary hover:underline"
-                    >
-                        {step.label}
-                        <ExternalLink className="size-3 shrink-0" />
-                    </a>
-                    {step.help ? <span className="text-xs text-muted-foreground">{step.help}</span> : null}
-                </div>
+        <ol className="flex flex-col gap-3 rounded-md border border-border bg-muted/30 p-3">
+            {links.map((step, index) => (
+                <li key={`${step.url}-${step.label}`} className="flex gap-2">
+                    <span className="mt-0.5 shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
+                        {index + 1}.
+                    </span>
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                        <a
+                            href={step.url}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="inline-flex w-fit items-center gap-1 text-sm font-medium text-primary hover:underline"
+                        >
+                            {step.label}
+                            <ExternalLink className="size-3 shrink-0" />
+                        </a>
+                        {step.help ? <span className="text-xs text-muted-foreground">{step.help}</span> : null}
+                        {step.values
+                            ?.map((kind) => ({ kind, value: values?.[kind] }))
+                            // A value this deployment does not know is left out rather
+                            // than shown empty: an operator pasting a blank field in
+                            // is worse off than one who was never offered it.
+                            .filter((entry): entry is { kind: IntegrationSetupValue; value: string } =>
+                                Boolean(entry.value)
+                            )
+                            .map((entry) => <SetupValue key={entry.kind} kind={entry.kind} value={entry.value} />)}
+                    </div>
+                </li>
             ))}
+        </ol>
+    );
+}
+
+/**
+ * What the last authorization failed with.
+ *
+ * The operator is the only person who can act on it and the only one who never
+ * sees it happen: it fails in somebody else's browser, against a console only
+ * this account can open. The alert says the same thing - this is here for
+ * whoever arrives at the screen afterwards.
+ */
+function AttentionNotice({ failure, name }: { failure: ConnectionFailure; name: string }) {
+    return (
+        <div className="flex gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+            <div className="flex min-w-0 flex-col gap-1">
+                <span className="text-sm font-medium">Somebody could not connect their account</span>
+                <span className="text-muted-foreground">
+                    The last attempt was refused. {name} said: {failure.reason}
+                </span>
+                <span className="text-muted-foreground">
+                    It clears itself as soon as one authorization completes.
+                </span>
+            </div>
         </div>
     );
 }
@@ -452,7 +553,7 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
-                    <SetupSteps links={card.setupLinks} />
+                    <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{card.apiKeyLabel ?? "API key"}</span>
@@ -567,7 +668,7 @@ function ModelProviderDialog({ card, onClose }: { card: IntegrationCard; onClose
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
-                    <SetupSteps links={card.setupLinks} />
+                    <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{card.apiKeyLabel ?? "API key"}</span>
@@ -835,7 +936,9 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
-                    <SetupSteps links={card.setupLinks} />
+                    {card.failure ? <AttentionNotice failure={card.failure} name={app.name} /> : null}
+
+                    <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span>Enabled</span>
@@ -949,7 +1052,7 @@ function SteamDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
-                    <SetupSteps links={card.setupLinks} />
+                    <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span className="flex flex-col gap-0.5">
@@ -1040,7 +1143,7 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
                     <DialogDescription>{card.description}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-4">
-                    <SetupSteps links={card.setupLinks} />
+                    <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span>Enabled</span>
@@ -1354,7 +1457,7 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
-                    <SetupSteps links={card.setupLinks} />
+                    <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Subdomain</span>
@@ -1470,7 +1573,7 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
-                    <SetupSteps links={card.setupLinks} />
+                    <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{card.apiKeyLabel ?? "API key"}</span>
@@ -1606,6 +1709,10 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
+                    {/* Connected and refusing people are not exclusive: the App is
+                        installed, and the last person through it was turned away. */}
+                    {card.failure ? <AttentionNotice failure={card.failure} name={card.name} /> : null}
+
                     <div className="flex items-center gap-2 rounded-md border border-border bg-surface/40 p-3 text-sm">
                         <CheckCircle2 className="size-4 text-success" />
                         Connected via {isApp ? "GitHub App" : "token"} as{" "}
@@ -1908,7 +2015,7 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
-                    <SetupSteps links={card.setupLinks} />
+                    <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{card.apiKeyLabel ?? "API key"}</span>

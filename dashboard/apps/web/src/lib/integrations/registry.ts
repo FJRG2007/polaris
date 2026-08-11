@@ -14,6 +14,17 @@ export type IntegrationCategory =
     | "Models";
 
 /**
+ * Something this deployment knows that a vendor's form is asking for.
+ *
+ * None of these can be guessed from the other side: the redirect URI is decided
+ * by the address Polaris answers on, and the three public pages are the ones a
+ * review desk will open. Naming them per step is what puts each value beside the
+ * form that wants it, instead of in one list at the bottom that an operator has
+ * to match up by eye.
+ */
+export type IntegrationSetupValue = "redirectUri" | "homeUrl" | "privacyUrl" | "termsUrl" | "logoUrl" | "domain";
+
+/**
  * A page on the vendor's own site that produces what the dialog is asking for.
  *
  * The point is to land the operator where the only thing left is to press the
@@ -27,6 +38,8 @@ export interface IntegrationSetupLink {
     url: string;
     /** One line, when the step needs a word about why it exists. */
     help?: string;
+    /** What this step asks to be pasted in, shown beside it ready to copy. */
+    values?: readonly IntegrationSetupValue[];
 }
 
 export interface IntegrationCatalogEntry {
@@ -217,14 +230,28 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         docsUrl: "https://developers.google.com/identity/protocols/oauth2",
         setupLinks: [
             {
-                label: "Set up the consent screen",
+                label: "Fill in the consent screen",
                 url: "https://console.cloud.google.com/auth/branding",
-                help: "Google refuses to create a client until this exists. Audience: External, unless everybody here is in the same Workspace."
+                help: "Google refuses to create a client until this exists. Audience: External, unless everybody here is in the same Workspace. Name the app exactly Polaris - verification compares it against the name on the home page - and give it these three URLs and the logo.",
+                values: ["homeUrl", "privacyUrl", "termsUrl", "logoUrl"]
+            },
+            {
+                label: "Add the authorized domain",
+                url: "https://console.cloud.google.com/auth/branding",
+                help: "Same page, under Authorized domains. Every URL above has to sit on it, and Google rejects an IP address outright - this needs a domain name.",
+                values: ["domain"]
+            },
+            {
+                label: "Prove you own the domain",
+                url: "https://search.google.com/search-console",
+                help: "Verification refuses a home page that is 'not registered to you'. Add the domain in Search Console, signed in as the account that owns this Cloud project, and complete the DNS check it gives you.",
+                values: ["domain"]
             },
             {
                 label: "Create an OAuth client",
                 url: "https://console.cloud.google.com/auth/clients/create",
-                help: "Application type: Web application. Google has no way to pre-fill the form, so paste the redirect URI below into Authorized redirect URIs - it has to be a domain name, since Google rejects an IP address outright."
+                help: "Application type: Web application. Google has no way to pre-fill the form, so paste this into Authorized redirect URIs.",
+                values: ["redirectUri"]
             },
             {
                 label: "Enable the Calendar API",
@@ -232,9 +259,14 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
                 help: "On the same project. Without it the client authorizes fine and every calendar comes back empty."
             },
             {
-                label: "Add the people who may connect",
+                label: "Publish the app",
                 url: "https://console.cloud.google.com/auth/audience",
-                help: "A new client is in Testing, where only the accounts listed as test users can authorize - everybody else is blocked. Add them, or publish the app."
+                help: "A new client is in Testing, where only the accounts listed as test users may authorize and everybody else is refused with access_denied. Publishing lifts that. Until you are ready to, add each person as a test user instead."
+            },
+            {
+                label: "Submit it for verification",
+                url: "https://console.cloud.google.com/auth/verification",
+                help: "The last step, and the only one that removes the 'Google hasn't verified this app' warning. Reading a calendar is a sensitive scope, so Google wants the pages above, the domain proved, a reason for the scope, and a video of somebody connecting an account. Published but unverified works - everyone just has to click through the warning first."
             }
         ],
         requiresApiKey: true,
@@ -314,13 +346,41 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Automation",
         summary: "Let people link their Epic account, so game servers can recognise them.",
         description:
-            "Register a product in Epic's developer portal and everyone here gets a Connect button for their own Epic account. Polaris reads the account id and the display name, which is what a server needs to tell one player from another. Games bought on the Epic Store carry no Steam id at all, so for those players this is the only id there is.",
-        docsUrl: "https://dev.epicgames.com/docs/web-api-ref/authentication",
+            "Register a product in Epic's developer portal and everyone here gets a Connect button for their own Epic account. Polaris reads the account id and the display name, which is what a server needs to tell one player from another. Games bought on the Epic Store carry no Steam id at all, so for those players this is the only id there is. The longest setup on this screen: Epic wants an application, a verified domain and a brand review before it will let anybody outside your own organisation authorize.",
+        docsUrl: "https://dev.epicgames.com/docs/epic-account-services/getting-started",
         setupLinks: [
             {
-                label: "Create a product and client",
+                label: "Create a product",
                 url: "https://dev.epicgames.com/portal",
-                help: "Epic Account Services, then a client with the basic_profile scope. Paste the redirect URI below into its redirect URLs."
+                help: "Everything else hangs off a product, so it is the first thing to make. The organisation it belongs to is created with your account."
+            },
+            {
+                label: "Create a client, and register the redirect URI on it",
+                url: "https://dev.epicgames.com/portal",
+                help: "Product settings -> Clients -> New client. Policy type Custom with 'User required' ticked, which is what a client that signs a person in needs; leave every feature disabled, since Polaris only reads who authorized. Paste this into its redirect URLs.",
+                values: ["redirectUri"]
+            },
+            {
+                label: "Create the application and link the client to it",
+                url: "https://dev.epicgames.com/portal",
+                help: "Product settings -> Epic Account Services. Brand settings take the name, the 128x128 logo and these URLs; Permissions needs only Basic Profile, which is always on; Linked clients has to name the client you just made, or the two never meet.",
+                values: ["homeUrl", "privacyUrl", "logoUrl"]
+            },
+            {
+                label: "Verify your domain",
+                url: "https://dev.epicgames.com/docs/epic-online-services/accounts-and-social/eos-epic-account-services/brand-review/domain-verification",
+                help: "Organization settings -> the domain, then the TXT record Epic gives you at your DNS host. Despite the name, the value is public once it is in DNS - it proves the domain is yours and nothing else. The site it points at has to be reachable without signing in and name your organisation and product; the home page above does.",
+                values: ["domain"]
+            },
+            {
+                label: "Save the draft, then submit it for review",
+                url: "https://dev.epicgames.com/docs/epic-account-services/brand-review/brand-review-process",
+                help: "Until it passes, only accounts in your own organisation can authorize - everybody else is turned away, and your own sees an unverified warning it can click through. That is enough to finish this setup and prove it works; the review is what opens it to everyone else."
+            },
+            {
+                label: "Copy the client id and secret",
+                url: "https://dev.epicgames.com/portal",
+                help: "Product settings -> SDK download and credentials, which lists every client. The secret is shown when the client is created; if it was not kept, make a new client rather than guessing."
             }
         ],
         requiresApiKey: true,
