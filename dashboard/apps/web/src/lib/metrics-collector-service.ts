@@ -27,6 +27,7 @@ import {
 } from "./docker-service";
 import {
     COLLECT_TICK_MS,
+    counterAdvance,
     LOCAL_HOST_SUBJECT,
     MAINTENANCE_EVERY_TICKS,
     RAW_RETENTION_MS,
@@ -93,7 +94,12 @@ async function collectApps(ts: Date): Promise<SampleRow[]> {
                     ts,
                     cpuPercent: round2(stats.cpuPercent),
                     memUsedBytes: bigBytes(stats.memUsage),
-                    memTotalBytes: bigBytes(stats.memLimit)
+                    memTotalBytes: bigBytes(stats.memLimit),
+                    // The counters as the container reports them. Turning them
+                    // into a rate needs two of these and the gap between them,
+                    // which is the reader's job - see `metrics-history-service`.
+                    netRxBytes: bigBytes(stats.netRx),
+                    netTxBytes: bigBytes(stats.netTx)
                 });
             }
         } catch {
@@ -358,7 +364,18 @@ function avgBig(values: (bigint | null)[]): bigint | null {
     return total / BigInt(present.length);
 }
 
-function aggregate(list: { cpuPercent: number | null; cpuTempC: number | null; memUsedBytes: bigint | null; memTotalBytes: bigint | null; diskUsedBytes: bigint | null; diskTotalBytes: bigint | null }[]) {
+interface AggregatedSample {
+    cpuPercent: number | null;
+    cpuTempC: number | null;
+    memUsedBytes: bigint | null;
+    memTotalBytes: bigint | null;
+    diskUsedBytes: bigint | null;
+    diskTotalBytes: bigint | null;
+    netRxBytes: bigint | null;
+    netTxBytes: bigint | null;
+}
+
+function aggregate(list: AggregatedSample[]) {
     return {
         cpuPercentAvg: avgNum(list.map((row) => row.cpuPercent)),
         cpuPercentMax: maxNum(list.map((row) => row.cpuPercent)),
@@ -367,6 +384,8 @@ function aggregate(list: { cpuPercent: number | null; cpuTempC: number | null; m
         memTotalBytesAvg: avgBig(list.map((row) => row.memTotalBytes)),
         diskUsedBytesAvg: avgBig(list.map((row) => row.diskUsedBytes)),
         diskTotalBytesAvg: avgBig(list.map((row) => row.diskTotalBytes)),
+        netRxBytesSum: counterAdvance(list.map((row) => row.netRxBytes)),
+        netTxBytesSum: counterAdvance(list.map((row) => row.netTxBytes)),
         samples: list.length
     };
 }
@@ -383,18 +402,21 @@ async function rollupRecentHours(now: Date, hours = 3): Promise<void> {
         const start = currentHourStart - index * 3_600_000;
         const bucket = new Date(start);
         const samples = await prisma.metricSample.findMany({
-            where: { ts: { gte: bucket, lt: new Date(start + 3_600_000) } }
+            where: { ts: { gte: bucket, lt: new Date(start + 3_600_000) } },
+            // In the order they were taken: the network columns are counters, and
+            // how far one advanced across an hour is only readable in sequence.
+            orderBy: { ts: "asc" }
         });
         if (samples.length === 0) continue;
         const groups = new Map<string, typeof samples>();
         for (const sample of samples) {
-            const key = `${sample.subjectType} ${sample.subjectId}`;
+            const key = `${sample.subjectType}\u0000${sample.subjectId}`;
             const group = groups.get(key);
             if (group) group.push(sample);
             else groups.set(key, [sample]);
         }
         for (const [key, list] of groups) {
-            const separator = key.indexOf(" ");
+            const separator = key.indexOf("\u0000");
             const subjectType = key.slice(0, separator);
             const subjectId = key.slice(separator + 1);
             const agg = aggregate(list);

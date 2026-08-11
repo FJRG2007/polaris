@@ -2913,6 +2913,12 @@ model MetricSample {
     memTotalBytes  BigInt?
     diskUsedBytes  BigInt?
     diskTotalBytes BigInt?
+    // Bytes over the container's interfaces since it started, in each direction.
+    // Counters, not rates: a rate needs two readings and the gap between them,
+    // and only the reader knows which two it is drawing. A restart resets them,
+    // which the reader sees as a fall and treats as a gap rather than as traffic.
+    netRxBytes     BigInt?
+    netTxBytes     BigInt?
 
     @@id([subjectType, subjectId, ts])
     @@index([ts])
@@ -2934,6 +2940,11 @@ model MetricRollup {
     memTotalBytesAvg  BigInt?
     diskUsedBytesAvg  BigInt?
     diskTotalBytesAvg BigInt?
+    // Bytes actually moved during this hour, which is a total rather than an
+    // average: the raw columns behind it are counters, so what an hour is worth
+    // is how far they advanced inside it.
+    netRxBytesSum     BigInt?
+    netTxBytesSum     BigInt?
     samples           Int      @default(0)
 
     @@id([subjectType, subjectId, bucket])

@@ -24,6 +24,8 @@ interface Point {
     memTotalBytes: number | null;
     diskUsedBytes: number | null;
     diskTotalBytes: number | null;
+    netRxBytesPerSecond: number | null;
+    netTxBytesPerSecond: number | null;
 }
 
 /** A chart to draw: how to pull a value from a point and how to label it. The
@@ -320,15 +322,29 @@ export function ratioPercent(used: number | null, total: number | null): number 
     return (used / total) * 100;
 }
 
+/** Bytes per second, as somebody reading a bandwidth chart says it. */
+export function formatRate(value: number): string {
+    return `${formatBytes(value)}/s`;
+}
+
 /**
- * CPU and memory, as every screen that charts consumption shows them.
+ * What something costs, as every screen that charts consumption shows it.
  *
- * Memory is charted in bytes rather than as a share, with the share on hover:
- * against a host's total, a container using a few hundred megabytes is a flat zero
- * line, which reads as "nothing running" instead of "not much". A server and a
- * service are measured differently but presented identically on purpose - the
- * question is the same one, and two shapes for it would only invite comparing a
- * percentage against a byte count.
+ * Four questions, because the first two never answered the ones people actually
+ * arrive with. A game server is CPU and memory while it is running, and disk and
+ * bandwidth for as long as it exists: a world grows until a volume is full, and a
+ * server full of players is the largest thing on a home connection. CPU alone said
+ * none of that.
+ *
+ * Memory and disk are charted in bytes rather than as a share, with the share on
+ * hover: against a host's total, a container using a few hundred megabytes is a
+ * flat zero line, which reads as "nothing running" instead of "not much". A server
+ * and a service are measured differently but presented identically on purpose -
+ * the question is the same one, and two shapes for it would only invite comparing
+ * a percentage against a byte count.
+ *
+ * Disk and bandwidth chart nothing at all where nothing is measured, rather than
+ * a zero: a service with no volume is not a service storing nothing.
  */
 export const CONSUMPTION_METRICS: MetricSpec[] = [
     { key: "cpu", label: "CPU", value: (point) => point.cpuPercent, format: percent, tone: "primary", max: 100 },
@@ -344,5 +360,31 @@ export const CONSUMPTION_METRICS: MetricSpec[] = [
         },
         format: formatBytes,
         tone: "success"
+    },
+    {
+        key: "disk",
+        label: "Storage",
+        value: (point) => point.diskUsedBytes,
+        describe: (point) => {
+            const share = ratioPercent(point.diskUsedBytes, point.diskTotalBytes);
+            return share === null || point.diskTotalBytes === null
+                ? null
+                : `${percent(share)} of ${formatBytes(point.diskTotalBytes)}`;
+        },
+        format: formatBytes,
+        tone: "warning"
+    },
+    {
+        // One chart for both directions would need two lines; the number people
+        // are actually watching for is how much is going out, because that is the
+        // half a home connection runs out of first. In is on hover beside it.
+        key: "net",
+        label: "Bandwidth out",
+        value: (point) => point.netTxBytesPerSecond,
+        describe: (point) =>
+            point.netRxBytesPerSecond === null ? null : `${formatRate(point.netRxBytesPerSecond)} in`,
+        format: formatRate,
+        tone: "primary",
+        summary: "max"
     }
 ];

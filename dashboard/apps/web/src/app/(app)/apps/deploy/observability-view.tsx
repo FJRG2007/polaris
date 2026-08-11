@@ -20,7 +20,7 @@ import { dbEngineLabel } from "@polaris/core";
 import { dbTone, StatusPill } from "./deploy-view";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { Activity, ChevronDown, Layers } from "lucide-react";
-import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/components/metrics-history";
+import { CONSUMPTION_METRICS, MetricsHistory, percent, type MetricSpec } from "@/components/metrics-history";
 
 interface ServiceRef {
     id: string;
@@ -35,17 +35,6 @@ interface DatabaseRef {
     status: string;
 }
 
-function formatBytes(bytes: number): string {
-    const units = ["B", "KB", "MB", "GB", "TB"];
-    let value = bytes;
-    let unit = 0;
-    while (value >= 1024 && unit < units.length - 1) {
-        value /= 1024;
-        unit += 1;
-    }
-    return `${unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
-}
-
 function formatRate(bytesPerSec: number): string {
     const units = ["B", "KB", "MB", "GB", "TB"];
     let value = bytesPerSec;
@@ -56,23 +45,6 @@ function formatRate(bytesPerSec: number): string {
     }
     return `${unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}/s`;
 }
-
-const CONSUMPTION: MetricSpec[] = [
-    { key: "cpu", label: "CPU", value: (point) => point.cpuPercent, format: percent, tone: "primary", max: 100 },
-    {
-        key: "mem",
-        label: "Memory",
-        value: (point) => point.memUsedBytes,
-        describe: (point) => {
-            const share = ratioPercent(point.memUsedBytes, point.memTotalBytes);
-            return share === null || point.memTotalBytes === null
-                ? null
-                : `${percent(share)} of ${formatBytes(point.memTotalBytes)}`;
-        },
-        format: formatBytes,
-        tone: "success"
-    }
-];
 
 interface HttpPoint {
     t: number;
@@ -230,7 +202,7 @@ function ServicePanel({
                         </h3>
                         <MetricsHistory
                             endpoint={`/api/deploy/apps/${service.id}/metrics/history`}
-                            metrics={CONSUMPTION}
+                            metrics={CONSUMPTION_METRICS}
                         />
                     </div>
                     <div>

@@ -50,6 +50,41 @@ export interface MetricPoint {
     memTotalBytes: number | null;
     diskUsedBytes: number | null;
     diskTotalBytes: number | null;
+    /**
+     * Bytes per second in each direction, over the gap this point covers.
+     *
+     * A rate, not the counter the database holds: what is stored only ever goes
+     * up, so a chart of it is a line that climbs forever whatever the traffic is
+     * doing. Null on the first point of a window and wherever the gap before it
+     * cannot be measured - there is nothing to compare against, and a zero would
+     * read as silence.
+     */
+    netRxBytesPerSecond: number | null;
+    netTxBytesPerSecond: number | null;
+}
+
+/**
+ * How far a counter advanced across a run of readings.
+ *
+ * The only aggregate of a counter that means anything: averaging one produces a
+ * number that climbs forever, and a maximum is just the last reading. What an
+ * hour of bandwidth is worth is the ground the counter covered inside it.
+ *
+ * A fall means whatever was counting restarted and began again, so that step
+ * contributes what it has counted since rather than a negative number - the total
+ * can never go backwards, which is the one thing a total of a counter must not do.
+ *
+ * Null under two readings: one reading is a position, not a distance.
+ */
+export function counterAdvance(values: (bigint | null)[]): bigint | null {
+    const present = values.filter((value): value is bigint => value != null);
+    if (present.length < 2) return null;
+    let total = 0n;
+    for (let index = 1; index < present.length; index += 1) {
+        const step = present[index]! - present[index - 1]!;
+        total += step >= 0n ? step : present[index]!;
+    }
+    return total;
 }
 
 const HOUR_MS = 3_600_000;
