@@ -9,6 +9,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
+import { STEAM_PROVIDER } from "@/lib/connections/steam";
 import { setSetting } from "@/lib/setting-store";
 import { recordAudit } from "@/lib/audit-service";
 import { verifyIp } from "@/lib/integrations/dymo";
@@ -144,6 +145,44 @@ export async function saveOAuthAppAction(input: {
         });
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "The Google settings could not be saved" };
+    }
+
+    revalidatePath("/integrations");
+    return {};
+}
+
+/**
+ * Switch Steam on, and hold the optional Web API key.
+ *
+ * Its own action because Steam is the one service here with nothing to register:
+ * it proves an account over OpenID, so there is no client id and no secret to
+ * refuse to enable without. The key buys the name and avatar beside a linked
+ * account and nothing else, which is why enabling with none is a valid state
+ * rather than a half-configured one.
+ *
+ * Tri-state on the key, like every other secret on this screen: a value replaces
+ * it, blank keeps what is stored.
+ */
+export async function saveSteamAction(input: { enabled: boolean; apiKey?: string }): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    const apiKey = input.apiKey?.trim() ? input.apiKey.trim() : undefined;
+    try {
+        const existing = await getIntegrationState(STEAM_PROVIDER);
+        await upsertIntegration(STEAM_PROVIDER, {
+            enabled: input.enabled,
+            config: { ...existing?.config },
+            secret: apiKey,
+            installedById: user.id
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "integration.configure",
+            targetType: "integration",
+            targetId: STEAM_PROVIDER,
+            metadata: { enabled: input.enabled }
+        });
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The Steam settings could not be saved" };
     }
 
     revalidatePath("/integrations");

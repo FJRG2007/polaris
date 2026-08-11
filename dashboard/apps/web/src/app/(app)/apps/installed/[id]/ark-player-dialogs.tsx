@@ -14,8 +14,9 @@
  * id can be given a better label but never changed into another person.
  */
 
-import { useState } from "react";
-import { Input } from "@polaris/ui";
+import { Button, Input } from "@polaris/ui";
+import { Loader2, UserSearch } from "lucide-react";
+import { useState, useTransition } from "react";
 import { isSteamId } from "@/lib/apps/ark/access";
 import type { ArkAllowedPlayer } from "@/lib/apps/ark/access";
 import { PlayerFormDialog, PlayerFormField } from "@/components/player-form-dialog";
@@ -28,7 +29,8 @@ export function ArkPlayerDialog({
     pending,
     error,
     onClose,
-    onSave
+    onSave,
+    onLookUp
 }: {
     /** The row being edited, or null to add somebody. */
     player: Pick<ArkAllowedPlayer, "steamId" | "label"> | null;
@@ -36,6 +38,9 @@ export function ArkPlayerDialog({
     error: string | null;
     onClose: () => void;
     onSave: (input: { steamId: string; label: string }) => void;
+    /** Find somebody by their Polaris name and hand back the Steam account they
+     *  linked. Absent on a screen where nobody may look people up. */
+    onLookUp?: (query: string) => Promise<{ steamId?: string; name?: string; error?: string }>;
 }) {
     const editing = player !== null;
     const [steamId, setSteamId] = useState(player?.steamId ?? "");
@@ -44,8 +49,29 @@ export function ArkPlayerDialog({
     // number they already are.
     const [label, setLabel] = useState(player && player.label !== player.steamId ? player.label : "");
 
+    const [person, setPerson] = useState("");
+    const [lookUpError, setLookUpError] = useState<string | null>(null);
+    const [looking, startLooking] = useTransition();
+
     const trimmed = steamId.trim();
     const invalid = trimmed.length > 0 && !isSteamId(trimmed);
+
+    /** Fill both fields in from a Polaris account, so the id is never retyped by
+     *  hand from a chat message. */
+    function lookUp(): void {
+        if (!onLookUp || person.trim().length === 0) return;
+        setLookUpError(null);
+        startLooking(async () => {
+            const found = await onLookUp(person.trim());
+            if (found.error || !found.steamId) {
+                setLookUpError(found.error ?? "Could not look that up");
+                return;
+            }
+            setSteamId(found.steamId);
+            if (found.name) setLabel(found.name);
+            setPerson("");
+        });
+    }
 
     return (
         <PlayerFormDialog
@@ -62,13 +88,46 @@ export function ArkPlayerDialog({
             onClose={onClose}
             onConfirm={() => onSave({ steamId: trimmed, label: label.trim() })}
         >
+            {!editing && onLookUp && (
+                <PlayerFormField
+                    label="Somebody with a Polaris account"
+                    error={lookUpError}
+                    hint="Their username or email address. If they have linked Steam, their id fills itself in."
+                >
+                    <div className="flex items-center gap-1">
+                        <Input
+                            autoFocus
+                            value={person}
+                            onChange={(event) => setPerson(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key !== "Enter") return;
+                                event.preventDefault();
+                                lookUp();
+                            }}
+                            placeholder="pau, or pau@example.com"
+                            aria-label="Polaris username or email address"
+                        />
+                        <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={lookUp}
+                            disabled={looking || person.trim().length === 0}
+                            aria-label="Find their Steam account"
+                            title="Find their Steam account"
+                        >
+                            {looking ? <Loader2 className="size-4 animate-spin" /> : <UserSearch className="size-4" />}
+                        </Button>
+                    </div>
+                </PlayerFormField>
+            )}
+
             <PlayerFormField
                 label="Steam id"
                 error={invalid ? STEAM_ID_HINT : null}
                 hint={editing ? undefined : STEAM_ID_HINT}
             >
                 <Input
-                    autoFocus={!editing}
                     value={steamId}
                     onChange={(event) => setSteamId(event.target.value)}
                     placeholder="76561198000000000"

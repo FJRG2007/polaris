@@ -13,7 +13,7 @@
  * will one day be half added.
  */
 
-export type ConnectionProviderSlug = "github" | "google" | "microsoft" | "dropbox";
+export type ConnectionProviderSlug = "github" | "google" | "microsoft" | "dropbox" | "steam";
 
 export interface ConnectionProvider {
     slug: ConnectionProviderSlug;
@@ -93,6 +93,25 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
         signInDefault: false,
         signInWarning:
             "This account often reaches a work mailbox and a company tenant. It is linked here to store files, and allowing it to sign in makes it a way into Polaris too."
+    },
+    {
+        slug: "steam",
+        name: "Steam",
+        summary: "Be let onto a game server without anybody asking for your Steam id.",
+        description:
+            "ARK closes its door by Steam id, not by name. Linking your account is what lets whoever runs a server add you by your Polaris name and have the right id arrive with it. Polaris reads nothing else from Steam and can do nothing with your account.",
+        acceptsToken: false,
+        defaultLimit: 1,
+        // Reads as "connects Steam under Integrations" on the card that cannot
+        // offer a link yet. Steam speaks OpenID rather than OAuth, so there is no
+        // application to register - switching it on is the whole of it.
+        requires: "Steam",
+        // A gaming account, phished at scale and shared between friends far more
+        // often than an email one. It is linked here to be recognised on a game
+        // server, and that is all it should ever unlock.
+        signInDefault: false,
+        signInWarning:
+            "Steam accounts are traded and phished more than most. This one is linked to be recognised on a game server; letting it sign in makes it a way into Polaris as well."
     },
     {
         slug: "dropbox",

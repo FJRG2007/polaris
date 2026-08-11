@@ -119,6 +119,7 @@ export function dialogFor(card: IntegrationCard): ComponentType<IntegrationDialo
     if (card.slug === "github") return GitHubDialog;
     if (card.slug === "cloudflare" || card.slug === "ngrok") return TunnelDialog;
     if (card.slug === "duckdns") return DuckDnsDialog;
+    if (card.slug === "steam") return SteamDialog;
     if (OAUTH_APPS[card.slug]) return OAuthAppDialog;
     // The gateway asks for an endpoint rather than a provider key, so it is told
     // apart by carrying those settings and not by its slug.
@@ -823,6 +824,97 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
                             Cancel
                         </Button>
                         <Button onClick={onSave} disabled={pending || !canSave}>
+                            {pending ? "Saving..." : "Save"}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/**
+ * Steam, which is the one service on this screen with nothing to register.
+ *
+ * No client id, no redirect URI, no secret to refuse to switch on without: Steam
+ * proves an account over OpenID, so turning this on is the whole setup and
+ * everybody's Connect button starts working. The Web API key is optional and only
+ * decides whether a linked account shows a name or a seventeen-digit number.
+ */
+function SteamDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const [enabled, setEnabled] = useState(card.enabled || !card.hasSecret);
+    const [apiKey, setApiKey] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    function onSave() {
+        setError(null);
+        startTransition(async () => {
+            const result = await runAction(
+                () => integrationActions.saveSteamAction({ enabled, apiKey: apiKey.trim() || undefined }),
+                setError
+            );
+            if (!result) return;
+            if (result.error) setError(result.error);
+            else onClose();
+        });
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <IntegrationLogo slug={card.slug} className="size-5" />
+                        {card.name}
+                    </DialogTitle>
+                    <DialogDescription>{card.description}</DialogDescription>
+                </DialogHeader>
+
+                <div className="flex flex-col gap-4">
+                    <SetupSteps links={card.setupLinks} />
+
+                    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                        <span className="flex flex-col gap-0.5">
+                            <span>Enabled</span>
+                            <span className="text-xs text-muted-foreground">
+                                Everybody gets a Connect button for their own Steam account.
+                            </span>
+                        </span>
+                        <Switch checked={enabled} onChange={setEnabled} aria-label="Enabled" />
+                    </div>
+
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">{card.apiKeyLabel ?? "Web API key"}</span>
+                        <Input
+                            type="password"
+                            value={apiKey}
+                            onChange={(event) => setApiKey(event.target.value)}
+                            placeholder={card.hasSecret ? "Saved - enter a new key to replace it" : "Optional"}
+                            autoComplete="off"
+                        />
+                        {card.apiKeyHelp ? (
+                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                        ) : null}
+                    </label>
+
+                    <AccountLimitField slug={card.slug} current={card.accountLimit ?? 1} />
+
+                    {card.signInAllowed === undefined ? null : (
+                        <SignInSwitch
+                            slug={card.slug}
+                            name={card.name}
+                            allowed={card.signInAllowed}
+                            warning={card.signInWarning}
+                        />
+                    )}
+
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    <div className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button onClick={onSave} disabled={pending}>
                             {pending ? "Saving..." : "Save"}
                         </Button>
                     </div>

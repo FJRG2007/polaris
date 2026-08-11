@@ -7,8 +7,8 @@
 import { cn } from "@polaris/ui";
 import { Blocks } from "lucide-react";
 import { DymoMark } from "./dymo-mark";
+import * as brand from "./brand-icons";
 import type { ComponentType } from "react";
-import { CloudflareMark, GitHubMark, GoogleMark, NgrokMark } from "./brand-icons";
 import {
     AnthropicMark,
     CerebrasMark,
@@ -56,17 +56,31 @@ export function VirusTotalLogo({ className = "size-6", brand }: LogoProps) {
     );
 }
 
+/**
+ * Every service that has a mark, by the slug the integration is registered under.
+ *
+ * A map rather than a run of comparisons: the ones that were missing from that run
+ * - Microsoft and Dropbox among them - drew the generic block instead, on cards
+ * whose whole job is to be recognised at a glance.
+ */
+const SERVICE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
+    github: brand.GitHubMark,
+    google: brand.GoogleMark,
+    microsoft: brand.MicrosoftMark,
+    dropbox: brand.DropboxMark,
+    steam: brand.SteamMark,
+    epic: brand.EpicGamesMark,
+    cloudflare: brand.CloudflareMark,
+    ngrok: brand.NgrokMark,
+    dymo: DymoMark
+};
+
 /** The logo for a marketplace integration slug (a neutral fallback otherwise). */
 export function IntegrationLogo({ slug, className }: { slug: string; className?: string }) {
     if (slug === "virustotal") return <VirusTotalLogo className={className} brand />;
-    if (slug === "github") return <GitHubMark className={className} />;
-    if (slug === "google") return <GoogleMark className={className} />;
-    if (slug === "cloudflare") return <CloudflareMark className={className} />;
-    if (slug === "ngrok") return <NgrokMark className={className} />;
-    if (slug === "dymo") return <DymoMark className={className} />;
     // DuckDNS ships only an official raster mark; served from public/ as a static asset.
     if (slug === "duckdns") return <img src="/logos/duckdns.webp" alt="" className={cn("shrink-0", className)} />;
-    const ModelMark = MODEL_MARKS[slug];
-    if (ModelMark) return <ModelMark className={className} />;
+    const Mark = SERVICE_MARKS[slug] ?? MODEL_MARKS[slug];
+    if (Mark) return <Mark className={className} />;
     return <Blocks className={className} />;
 }

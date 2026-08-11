@@ -28,6 +28,7 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import { findConnectionProvider } from "@polaris/core";
 import { signInWithConnection, type ConnectionSignInResult } from "@polaris/auth";
 import { ConnectionClaimedError, ConnectionLimitError, connectionSignInAllowed, saveConnection, signInConnection } from "./store";
+import { readSteamPersona, steamAuthorizeUrl, STEAM_PROVIDER, verifySteamReturn } from "./steam";
 import {
     connectionAuthorizeUrl,
     connectionCallbackUrl,
@@ -122,6 +123,9 @@ async function begin(
     target?: string
 ): Promise<Response> {
     const origin = new URL(request.url).origin;
+    // Steam has no application to look up: it proves an account over OpenID, so
+    // the trip can start on an instance where nothing has been connected.
+    if (provider === STEAM_PROVIDER) return beginSteam(origin, mode, target);
     const client = await connectionOAuthClient(provider);
     if (!client) {
         return mode === "signin"
@@ -140,6 +144,31 @@ async function begin(
     );
 
     const response = NextResponse.redirect(authorize);
+    response.cookies.set(STATE_COOKIE, JSON.stringify(payload), {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: origin.startsWith("https:"),
+        path: "/",
+        maxAge: STATE_TTL_SECONDS
+    });
+    return response;
+}
+
+/**
+ * The same trip for Steam, whose assertion comes back in the URL rather than as a
+ * code to spend.
+ *
+ * The state rides in `return_to` because that is a parameter Steam signs and
+ * returns unchanged, so it comes back beside the assertion and can be matched
+ * against the cookie exactly as every other provider's is.
+ */
+function beginSteam(origin: string, mode: ConnectionMode, target?: string): Response {
+    const state = randomBytes(16).toString("hex");
+    const payload: FlowState = { provider: STEAM_PROVIDER, mode, state, ...(target ? { target } : {}) };
+    const returnTo = new URL(connectionCallbackUrl(STEAM_PROVIDER, origin));
+    returnTo.searchParams.set("state", state);
+
+    const response = NextResponse.redirect(steamAuthorizeUrl(returnTo.toString(), `${origin}/`));
     response.cookies.set(STATE_COOKIE, JSON.stringify(payload), {
         httpOnly: true,
         sameSite: "lax",
@@ -199,6 +228,7 @@ export async function finishConnectionCallback(request: Request, provider: strin
     const url = new URL(request.url);
     const origin = url.origin;
     const held = readState(request);
+    if (provider === STEAM_PROVIDER) return finishSteam(url, held);
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
     const valid = held?.provider === provider && held.state === state && Boolean(state);
@@ -215,6 +245,51 @@ export async function finishConnectionCallback(request: Request, provider: strin
     if (!code) return endLink(origin, provider, "cancelled");
     if (!valid) return endLink(origin, provider, "state_error");
     return finishLink(request, provider, code);
+}
+
+/**
+ * Record the Steam account somebody came back with.
+ *
+ * Two things have to hold and neither is enough alone: the state has to match the
+ * cookie this deployment set, so the trip was started here and by this person,
+ * and Steam has to say the assertion is its own, so the id is not one somebody
+ * typed into the URL.
+ *
+ * Linking only. Signing in with Steam is not offered, and a callback that says it
+ * is gets the same refusal as one with no cookie at all.
+ */
+async function finishSteam(url: URL, held: FlowState | null): Promise<Response> {
+    const origin = url.origin;
+    if (url.searchParams.get("openid.mode") === "cancel") return endLink(origin, STEAM_PROVIDER, "cancelled");
+    const state = url.searchParams.get("state");
+    if (!held || held.provider !== STEAM_PROVIDER || held.mode === "signin" || !state || held.state !== state) {
+        return endLink(origin, STEAM_PROVIDER, "state_error");
+    }
+    const user = await requireUser();
+    const steamId = await verifySteamReturn(url.searchParams).catch(() => null);
+    if (!steamId) return endLink(origin, STEAM_PROVIDER, "error");
+
+    try {
+        // The name is a nicety and Steam may not be willing to give it - no key,
+        // or a private profile - so a link is never held up by it.
+        const persona = await readSteamPersona(steamId).catch(() => null);
+        await saveConnection(user.id, {
+            provider: STEAM_PROVIDER,
+            accountId: steamId,
+            label: persona?.name ?? steamId,
+            avatarUrl: persona?.avatarUrl ?? null,
+            method: "oauth",
+            email: null,
+            // Nothing to act with: proving who somebody is was the whole point,
+            // and Polaris asks Steam for nothing else on their behalf.
+            credential: null
+        });
+        return endLink(origin, STEAM_PROVIDER, "linked");
+    } catch (caught) {
+        if (caught instanceof ConnectionClaimedError) return endLink(origin, STEAM_PROVIDER, "taken");
+        if (caught instanceof ConnectionLimitError) return endLink(origin, STEAM_PROVIDER, "limit");
+        return endLink(origin, STEAM_PROVIDER, "error");
+    }
 }
 
 /** Record the account the provider vouched for against the signed-in user. */

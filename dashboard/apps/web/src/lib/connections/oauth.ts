@@ -16,6 +16,8 @@
 
 import type { ConnectionCredential } from "./store";
 import { findConnectionProvider } from "@polaris/core";
+import { STEAM_PROVIDER } from "./steam";
+import { getIntegrationState } from "@/lib/integration-service";
 import { authorizeGithubUser, getGithubUserAuth, githubLinkCallbackUrl } from "@/lib/github-service";
 import {
     dropboxAuthorizeUrl,
@@ -165,6 +167,24 @@ export function supportsOAuth(provider: string): boolean {
     return findConnectionProvider(provider) !== undefined && provider in ADAPTERS;
 }
 
+/**
+ * Whether somebody can be sent to this provider right now.
+ *
+ * Two different answers, because two different things are missing. An OAuth
+ * provider needs the application the operator registered - without it there is
+ * nowhere to send anybody. Steam needs no application at all: it proves an
+ * account over OpenID, so all that decides it is whether the operator has
+ * switched the service on.
+ */
+export async function connectionLinkAvailable(provider: string): Promise<boolean> {
+    if (provider === STEAM_PROVIDER) return (await getIntegrationState(STEAM_PROVIDER))?.enabled === true;
+    return supportsOAuth(provider) && (await connectionOAuthClient(provider)) !== null;
+}
+
+/** Steam is not in the adapter table - it has no code to exchange - so the one
+ *  thing it shares with the others is named here. */
+const STEAM_CALLBACK = (baseUrl: string): string => `${baseUrl}/api/connections/steam/callback`;
+
 function adapter(provider: string): ProviderOAuth {
     const found = ADAPTERS[provider];
     if (!found) throw new Error(`Unknown connection provider: ${provider}`);
@@ -174,6 +194,7 @@ function adapter(provider: string): ProviderOAuth {
 /** Where the provider returns somebody, for the link route and for the operator
  *  to copy into the provider's console. */
 export function connectionCallbackUrl(provider: string, baseUrl: string): string {
+    if (provider === STEAM_PROVIDER) return STEAM_CALLBACK(baseUrl);
     return adapter(provider).callbackUrl(baseUrl);
 }
 

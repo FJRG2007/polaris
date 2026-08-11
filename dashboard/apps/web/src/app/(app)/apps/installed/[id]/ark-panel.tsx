@@ -952,6 +952,7 @@ function PlayersTab({
                     pending={pending}
                     error={dialogError}
                     onClose={() => setActing(null)}
+                    onLookUp={(query) => actions.findArkPlayerByUserAction(installedAppId, query)}
                     onSave={(input) =>
                         runInDialog(
                             () => actions.addArkPlayerAction(installedAppId, input.steamId, input.label),

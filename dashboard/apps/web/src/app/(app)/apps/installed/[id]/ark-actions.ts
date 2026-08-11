@@ -18,6 +18,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import * as ark from "@/lib/apps/ark/service";
 import { recordAudit } from "@/lib/audit-service";
+import { findGameIdentity } from "@/lib/apps/game-identity";
 import { GAME_LOG, isJoinPassword, isSteamId } from "@/lib/apps/ark/access";
 import { requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
 
@@ -288,5 +289,36 @@ export async function broadcastArkAction(installedAppId: string, message: string
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not send that message" };
+    }
+}
+
+/**
+ * Who a Polaris name or address belongs to, and the Steam id they linked.
+ *
+ * The point of the whole linking flow: an operator adds a friend by the name they
+ * already know them by here, and the seventeen-digit number arrives with it
+ * rather than over a chat app with a digit missing.
+ *
+ * Three answers, because the screen has three things to say. Somebody with a
+ * linked account is ready to be added; somebody with none has to link one, and
+ * saying so names the person rather than leaving the operator guessing at a
+ * spelling; nobody at all is a name that is not on this Polaris.
+ */
+export async function findArkPlayerByUserAction(
+    installedAppId: string,
+    query: string
+): Promise<{ steamId?: string; name?: string; label?: string; error?: string }> {
+    const parsed = z.string().trim().min(1).max(120).safeParse(query);
+    if (!parsed.success) return { error: "Type a Polaris username or email address" };
+    try {
+        await requireGameServer("games.moderate", installedAppId);
+        const found = await findGameIdentity(parsed.data, "steam");
+        if (!found) return { error: "Nobody here goes by that. Check the username or the email address." };
+        if (!found.identity) {
+            return { error: `${found.name} has not linked a Steam account yet. They can do it under Connected accounts.` };
+        }
+        return { steamId: found.identity.accountId, name: found.name, label: found.identity.label };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not look that up" };
     }
 }

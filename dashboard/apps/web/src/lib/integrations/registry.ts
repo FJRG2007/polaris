@@ -280,6 +280,25 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         apiKeyHelp: "Shown on the app's Settings tab, next to the app key."
     },
     {
+        slug: "steam",
+        name: "Steam",
+        category: "Automation",
+        summary: "Let people link their Steam account, so game servers can recognise them.",
+        description:
+            "Steam needs nothing registered: it signs people in over OpenID, so the Connect button on everybody's account works the moment this is switched on. A Web API key is optional and buys one thing - the name and avatar beside a linked account, instead of a seventeen-digit number. An ARK server closed by Steam id can then be opened to somebody by their Polaris name.",
+        docsUrl: "https://partner.steamgames.com/doc/features/auth",
+        setupLinks: [
+            {
+                label: "Get a Web API key",
+                url: "https://steamcommunity.com/dev/apikey",
+                help: "Optional. Only used to read the display name and avatar of an account somebody has linked."
+            }
+        ],
+        requiresApiKey: false,
+        apiKeyLabel: "Web API key",
+        apiKeyHelp: "Optional. Without it a linked account shows its Steam id rather than its name."
+    },
+    {
         slug: "cloudflare",
         name: "Cloudflare",
         category: "Automation",
