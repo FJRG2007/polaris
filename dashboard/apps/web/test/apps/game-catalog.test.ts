@@ -75,8 +75,13 @@ describe("the ARK server manifest", () => {
         expect(field("ADMIN_PASSWORD")?.default).toBeUndefined();
     });
 
-    it("mints the admin password rather than asking for one", () => {
-        expect(field("ADMIN_PASSWORD")?.generated).toBe(true);
+    it("does not mint the admin password the generic way", () => {
+        // The generic path produces 48 hex characters, which ARK refuses at its own
+        // enablecheats prompt - so the server's admin could not get in. The create
+        // flow mints this one to the shape the game takes.
+        expect(field("ADMIN_PASSWORD")?.generated).toBeFalsy();
+        expect(field("ADMIN_PASSWORD")?.required).toBe(true);
+        expect(field("ADMIN_PASSWORD")?.secret).toBe(true);
     });
 
     it("refuses an empty join password rather than falling back to the image's", () => {

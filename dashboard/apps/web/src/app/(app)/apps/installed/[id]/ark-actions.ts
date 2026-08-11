@@ -124,6 +124,29 @@ export async function setArkJoinPasswordAction(
     }
 }
 
+/** Change the password that opens the in-game admin console. */
+export async function setArkAdminPasswordAction(
+    installedAppId: string,
+    password: string
+): Promise<{ error?: string }> {
+    const parsed = z.string().trim().refine(isJoinPassword).safeParse(password);
+    if (!parsed.success) return { error: "8 to 32 letters and digits, and nothing else" };
+    try {
+        const { user, access } = await requireGameServer("games.manage", installedAppId);
+        await ark.setAdminPassword(access.ownerId, installedAppId, parsed.data);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.ark.admin-password",
+            targetType: "installedApp",
+            targetId: installedAppId
+        });
+        revalidatePath(`/apps/installed/${installedAppId}`);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not change the password" };
+    }
+}
+
 /**
  * Read the two passwords back.
  *

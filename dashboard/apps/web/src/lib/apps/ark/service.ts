@@ -82,6 +82,17 @@ export async function runArkCommand(ownerId: string, installedAppId: string, com
     });
 }
 
+/** The first line that says anything, short enough to put in a sentence on a
+ *  screen. What a command actually printed is the only thing an operator can act
+ *  on when Polaris could not make sense of it. */
+function firstLine(output: string): string {
+    const line = output
+        .split(/\r?\n/)
+        .map((entry) => entry.trim())
+        .find((entry) => entry.length > 0);
+    return (line ?? "").slice(0, 200);
+}
+
 /** Who is on an ARK server, and whether it is answering at all. */
 export interface ArkLive {
     readonly answering: boolean;
@@ -127,15 +138,23 @@ export async function getArkPlayers(ownerId: string, installedAppId: string): Pr
     }
     const containerRunning = state === null ? null : true;
     try {
-        const players = parseArkPlayers(await runArkCommand(ownerId, installedAppId, "ListPlayers"));
+        const said = await runArkCommand(ownerId, installedAppId, "ListPlayers");
+        const players = parseArkPlayers(said);
         if (players === null) {
             return {
                 answering: false,
                 containerRunning,
                 players: [],
-                // The first start downloads the whole game, so this is the state a
-                // new server sits in for a long while and it must not read as a fault.
-                message: "The server is starting. A new one installs about 30 GB first, which takes a while."
+                // Silence and an answer nobody can read are different faults, and
+                // reading both as "still starting" is what hides the second one
+                // forever: a server that has been up for an hour keeps reporting
+                // that it is booting, and nobody has anything to go on. The first
+                // start does take a long while - about thirty gigabytes - so that
+                // is what silence means, and anything else is quoted back.
+                message:
+                    said.trim().length === 0
+                        ? "The server is starting. A new one installs about 30 GB first, which takes a while."
+                        : `The server answered something Polaris could not read: ${firstLine(said)}`
             };
         }
         return { answering: true, containerRunning, players, message: null };
@@ -343,7 +362,24 @@ export async function setJoinPassword(ownerId: string, installedAppId: string, p
     ]);
 }
 
-/** A join password nobody had to invent, for the button that offers one. */
+/**
+ * Change the password that opens the in-game admin console, and RCON with it.
+ *
+ * The same rules as the join password, and for a sharper reason: this one is typed
+ * at ARK's own `enablecheats` prompt, which refuses a long value outright. A
+ * server whose admin password it will not take is one nobody can administer from
+ * inside the game, and the only way back was to delete it.
+ */
+export async function setAdminPassword(ownerId: string, installedAppId: string, password: string): Promise<void> {
+    if (!arkAccess.isJoinPassword(password)) throw new Error("That password is not one ARK will carry");
+    const applicationId = await requireApplication(ownerId, installedAppId);
+    await setEnvVars("application", applicationId, ownerId, [
+        { key: "ADMIN_PASSWORD", value: password, isSecret: true }
+    ]);
+}
+
+/** A password nobody had to invent, for the button that offers one and for the
+ *  admin password the create flow mints. */
 export function mintJoinPassword(): string {
     return arkAccess.generateJoinPassword((size) => new Uint8Array(randomBytes(size)));
 }

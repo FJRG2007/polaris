@@ -18,8 +18,14 @@
 
 import { describe, expect, it } from "vitest";
 import type { CreateArkServerInput } from "@/lib/apps/games-schema";
+import { isJoinPassword } from "@/lib/apps/ark/access";
 import { parseArkPlayers, isRconRefusal } from "@/lib/apps/ark/parse";
 import { arkPortsFrom, arkServerEnv, expectedArkMemoryMb, normalizeModIds } from "@/lib/apps/ark/config";
+
+/** The admin password the install mints. Short enough that ARK takes it at the
+ *  enablecheats prompt, which is the whole reason it is not the 48-hex value the
+ *  generic generated-secret path produces. */
+const ADMIN = "Nb7QkPr2Vt9Zc4Hm";
 
 function input(overrides: Partial<CreateArkServerInput> = {}): CreateArkServerInput {
     return {
@@ -44,7 +50,7 @@ describe("the ports a server binds", () => {
     });
 
     it("hands the server the same numbers it was published on", () => {
-        const env = arkServerEnv(input(), arkPortsFrom(19140));
+        const env = arkServerEnv(input(), arkPortsFrom(19140), ADMIN);
         expect(env.GAME_CLIENT_PORT).toBe("19140");
         expect(env.UDP_SOCKET_PORT).toBe("19141");
         expect(env.SERVER_LIST_PORT).toBe("19142");
@@ -53,34 +59,36 @@ describe("the ports a server binds", () => {
 
 describe("the environment a server is created with", () => {
     it("never leaves the image's own join password in place", () => {
-        const env = arkServerEnv(input(), arkPortsFrom(7777));
+        const env = arkServerEnv(input(), arkPortsFrom(7777), ADMIN);
         expect(env.SERVER_PASSWORD).toBe("Correct9Horse");
         // The image's documented default, which is the one thing this must never be.
         expect(env.SERVER_PASSWORD).not.toBe("YouShallNotPass");
     });
 
     it("closes the server to everyone who was not added", () => {
-        expect(arkServerEnv(input(), arkPortsFrom(7777)).ARK_EXTRA_OPTS).toBe("-exclusivejoin");
+        expect(arkServerEnv(input(), arkPortsFrom(7777), ADMIN).ARK_EXTRA_OPTS).toBe("-exclusivejoin");
     });
 
     it("leaves it open when the operator deliberately said so", () => {
-        expect(arkServerEnv(input({ exclusiveJoin: false }), arkPortsFrom(7777)).ARK_EXTRA_OPTS).toBe("");
+        expect(arkServerEnv(input({ exclusiveJoin: false }), arkPortsFrom(7777), ADMIN).ARK_EXTRA_OPTS).toBe("");
     });
 
-    it("mints no admin password of its own - the install does that", () => {
-        // Naming one here would put it in the source. It is generated per install.
-        expect(arkServerEnv(input(), arkPortsFrom(7777)).ADMIN_PASSWORD).toBeUndefined();
+    it("carries the admin password it was handed, and never one of its own", () => {
+        // Naming one here would put it in the source. It is minted per install and
+        // passed in, which is also what keeps it short enough for ARK to take.
+        expect(arkServerEnv(input(), arkPortsFrom(7777), ADMIN).ADMIN_PASSWORD).toBe(ADMIN);
+        expect(isJoinPassword(ADMIN)).toBe(true);
     });
 
     it("carries the map and the size the operator chose", () => {
-        const env = arkServerEnv(input({ map: "Aberration_P", maxPlayers: 40 }), arkPortsFrom(7777));
+        const env = arkServerEnv(input({ map: "Aberration_P", maxPlayers: 40 }), arkPortsFrom(7777), ADMIN);
         expect(env.SERVER_MAP).toBe("Aberration_P");
         expect(env.MAX_PLAYERS).toBe("40");
     });
 
     it("passes mods only when there are any, and without the spacing somebody typed", () => {
-        expect(arkServerEnv(input(), arkPortsFrom(7777)).GAME_MOD_IDS).toBeUndefined();
-        expect(arkServerEnv(input({ mods: "111, 222 ,333" }), arkPortsFrom(7777)).GAME_MOD_IDS).toBe("111,222,333");
+        expect(arkServerEnv(input(), arkPortsFrom(7777), ADMIN).GAME_MOD_IDS).toBeUndefined();
+        expect(arkServerEnv(input({ mods: "111, 222 ,333" }), arkPortsFrom(7777), ADMIN).GAME_MOD_IDS).toBe("111,222,333");
     });
 });
 

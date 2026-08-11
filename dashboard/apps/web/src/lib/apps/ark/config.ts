@@ -58,11 +58,18 @@ export function expectedArkMemoryMb(concurrentPlayers: number): number {
  * server binds. The launch options are built rather than typed, because the flag
  * that closes the server lives in the same string as everything else.
  */
-export function arkServerEnv(input: CreateArkServerInput, ports: ArkPorts): Record<string, string> {
+export function arkServerEnv(
+    input: CreateArkServerInput,
+    ports: ArkPorts,
+    /** The admin password the install minted. Passed in rather than named here:
+     *  a password in the source is a password everybody running Polaris shares. */
+    adminPassword: string
+): Record<string, string> {
     return {
         SESSION_NAME: input.sessionName,
         SERVER_MAP: input.map,
         SERVER_PASSWORD: input.joinPassword,
+        ADMIN_PASSWORD: adminPassword,
         MAX_PLAYERS: String(input.maxPlayers),
         ...(input.mods && input.mods.length > 0 ? { GAME_MOD_IDS: normalizeModIds(input.mods) } : {}),
         ARK_EXTRA_OPTS: withExclusiveJoin("", input.exclusiveJoin),

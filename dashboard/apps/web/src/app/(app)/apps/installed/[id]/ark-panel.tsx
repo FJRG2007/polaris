@@ -34,14 +34,15 @@ import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
-import { isJoinPassword, isSteamId, JOIN_PASSWORD_HINT } from "@/lib/apps/ark/access";
+import { generateJoinPassword, isJoinPassword, isSteamId, JOIN_PASSWORD_HINT } from "@/lib/apps/ark/access";
 import { Badge, Button, Card, CardBody, Input, Skeleton, Switch, cn } from "@polaris/ui";
-import { Clock, Eye, FolderOpen, Loader2, Save, ShieldAlert, Trash2, UserPlus } from "lucide-react";
+import { Clock, Eye, FolderOpen, Loader2, RefreshCw, Save, ShieldAlert, Trash2, UserPlus } from "lucide-react";
 import {
     addArkPlayerAction,
     removeArkPlayerAction,
     revealArkPasswordsAction,
     saveArkWorldAction,
+    setArkAdminPasswordAction,
     setArkExclusiveJoinAction,
     setArkJoinPasswordAction
 } from "./ark-actions";
@@ -749,8 +750,6 @@ function AllowListCard({
  *  somebody asks for them, and only the owner may. */
 function PasswordCard({ installedAppId, canManage }: { installedAppId: string; canManage: boolean }) {
     const [shown, setShown] = useState<{ joinPassword: string | null; adminPassword: string | null } | null>(null);
-    const [next, setNext] = useState("");
-    const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
@@ -766,32 +765,17 @@ function PasswordCard({ installedAppId, canManage }: { installedAppId: string; c
         });
     }
 
-    function change(): void {
-        setError(null);
-        setMessage(null);
-        startTransition(async () => {
-            const result = await setArkJoinPasswordAction(installedAppId, next.trim());
-            if (result.error) {
-                setError(result.error);
-                return;
-            }
-            setNext("");
-            setShown(null);
-            setMessage("Saved. Players use it the next time the server starts.");
-        });
-    }
-
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-sm font-medium">Passwords</p>
                 <p className="text-sm text-muted-foreground">
-                    The join password is what players type to get in. The admin password is what you type in game to run
-                    commands, and Polaris minted it when the server was created - it is not a default anybody else knows.
+                    The join password is what players type to get in. The admin password is what you type after
+                    enablecheats in game, and Polaris minted it when the server was created - it is not a default
+                    anybody else knows. ARK takes neither of them longer than 32 characters.
                 </p>
 
                 {error && <p className="text-sm text-danger">{error}</p>}
-                {message && <p className="text-sm text-muted-foreground">{message}</p>}
 
                 {shown ? (
                     <dl className="flex flex-col gap-2 text-sm">
@@ -822,33 +806,93 @@ function PasswordCard({ installedAppId, canManage }: { installedAppId: string; c
                 )}
 
                 {canManage && (
-                    <div className="flex flex-wrap items-end gap-2">
-                        <label className="flex min-w-56 flex-1 flex-col gap-1 text-sm">
-                            <span className="text-muted-foreground">New join password</span>
-                            <Input
-                                value={next}
-                                onChange={(event) => setNext(event.target.value)}
-                                className="font-mono"
-                                placeholder="8 to 32 letters and digits"
-                            />
-                            <span
-                                className={cn(
-                                    "text-xs",
-                                    next.length > 0 && !isJoinPassword(next) ? "text-danger" : "text-muted-foreground"
-                                )}
-                            >
-                                {next.length > 0 && !isJoinPassword(next)
-                                    ? JOIN_PASSWORD_HINT
-                                    : "Applied the next time the server starts."}
-                            </span>
-                        </label>
-                        <Button onClick={change} disabled={pending || !isJoinPassword(next)}>
-                            {pending && <Loader2 className="size-4 animate-spin" />}
-                            Change
-                        </Button>
-                    </div>
+                    <>
+                        <ChangePassword
+                            label="New join password"
+                            help="Players type this. Applied the next time the server starts."
+                            save={(value) => setArkJoinPasswordAction(installedAppId, value)}
+                            onSaved={() => setShown(null)}
+                        />
+                        <ChangePassword
+                            label="New admin password"
+                            help="Typed after enablecheats in game. Applied the next time the server starts."
+                            save={(value) => setArkAdminPasswordAction(installedAppId, value)}
+                            onSaved={() => setShown(null)}
+                        />
+                    </>
                 )}
             </CardBody>
         </Card>
+    );
+}
+
+/** One password field and the button that saves it. Both of a server's passwords
+ *  are changed the same way and refused on the same rule, so they are one control
+ *  used twice rather than two that could drift apart. */
+function ChangePassword({
+    label,
+    help,
+    save,
+    onSaved
+}: {
+    label: string;
+    help: string;
+    save: (value: string) => Promise<{ error?: string }>;
+    onSaved: () => void;
+}) {
+    const [value, setValue] = useState("");
+    const [message, setMessage] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    const invalid = value.length > 0 && !isJoinPassword(value);
+
+    function submit(): void {
+        setError(null);
+        setMessage(null);
+        startTransition(async () => {
+            const result = await save(value.trim());
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            setValue("");
+            onSaved();
+            setMessage("Saved. It takes effect the next time the server starts.");
+        });
+    }
+
+    return (
+        <div className="flex flex-wrap items-end gap-2">
+            <label className="flex min-w-56 flex-1 flex-col gap-1 text-sm">
+                <span className="text-muted-foreground">{label}</span>
+                <div className="flex items-center gap-1">
+                    <Input
+                        value={value}
+                        onChange={(event) => setValue(event.target.value)}
+                        className="font-mono"
+                        placeholder="8 to 32 letters and digits"
+                    />
+                    <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() =>
+                            setValue(generateJoinPassword((size) => crypto.getRandomValues(new Uint8Array(size))))
+                        }
+                        aria-label={`Generate a password for ${label.toLowerCase()}`}
+                        title="Generate one"
+                    >
+                        <RefreshCw className="size-4" />
+                    </Button>
+                </div>
+                <span className={cn("text-xs", error || invalid ? "text-danger" : "text-muted-foreground")}>
+                    {error ?? (invalid ? JOIN_PASSWORD_HINT : (message ?? help))}
+                </span>
+            </label>
+            <Button onClick={submit} disabled={pending || !isJoinPassword(value)}>
+                {pending && <Loader2 className="size-4 animate-spin" />}
+                Change
+            </Button>
+        </div>
     );
 }

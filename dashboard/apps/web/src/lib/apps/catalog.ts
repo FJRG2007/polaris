@@ -608,11 +608,19 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                 {
                     // The in-game admin console and RCON share this one password,
                     // and the image ships a default that is printed in its README.
-                    // Minted per server, never asked for, and shown only to whoever
+                    // Minted per server by the create flow and shown only to whoever
                     // can already read the server's secrets.
+                    //
+                    // Deliberately not `generated`: that mints 48 hex characters,
+                    // which is right for a password nothing human ever types and
+                    // wrong for this one - ARK refuses it at the `enablecheats`
+                    // prompt as too long, so the server's own admin cannot get in.
+                    // It is minted to the same shape as the join password instead.
                     key: "ADMIN_PASSWORD",
                     label: "Admin password",
-                    generated: true
+                    help: "What you type after enablecheats in game. Change it from the server's Access screen.",
+                    secret: true,
+                    required: true
                 },
                 {
                     // The other half of the same problem: the image's own default

@@ -27,9 +27,9 @@ import { patchInstallConfig } from "@/lib/apps/install-config";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import { ALLOW_LIST_KEY, withPlayer } from "@/lib/apps/ark/access";
 import { grantPlayerAccess } from "@/lib/apps/minecraft/player-access";
-import { applyAllowList, ARK_CATALOG_ID } from "@/lib/apps/ark/service";
 import { findGame, type GameDefinition } from "@/lib/apps/games-catalog";
 import { arkServerEnv, expectedArkMemoryMb } from "@/lib/apps/ark/config";
+import { applyAllowList, ARK_CATALOG_ID, mintJoinPassword } from "@/lib/apps/ark/service";
 import { newestCommonVersion, wantsLatest } from "@/lib/apps/minecraft/blueprint-version";
 import { DEFAULT_BIOME, DEFAULT_LEVEL_TYPE, levelTypeEnv, seedEnvKey } from "@/lib/apps/minecraft/world";
 import type {
@@ -184,8 +184,15 @@ async function createArkServer(
 
     const ports = await allocateArkPorts();
     const base = defaultInstallInput(manifest, input.serverId);
-    const env = new Map(base.env.map((entry) => [entry.key, entry.value]));
-    for (const [key, value] of Object.entries(arkServerEnv(input, ports))) env.set(key, value);
+    // Only the values the operator actually chose. An empty string here is not the
+    // same as an unset variable: the image writes each one it holds onto the
+    // server's command line, and an empty mod list arrives as a bare `?GameModIds`.
+    const env = new Map(base.env.filter((entry) => entry.value.length > 0).map((entry) => [entry.key, entry.value]));
+    // Minted here rather than by the install's `generated` path, which produces 48
+    // hex characters - a length ARK refuses at the enablecheats prompt, leaving the
+    // server's own admin locked out of it. Same shape as the join password, which
+    // is a shape the game demonstrably takes.
+    for (const [key, value] of Object.entries(arkServerEnv(input, ports, mintJoinPassword()))) env.set(key, value);
 
     const install = await installApp(
         ownerId,
