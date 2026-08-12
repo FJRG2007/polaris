@@ -23,14 +23,11 @@
 
 import { prisma } from "@polaris/db";
 import { editionOf } from "@/lib/apps/minecraft/service";
-import { readAppRuntimeLog } from "@/lib/deploy-service";
 import { hasCrossplay } from "@/lib/apps/minecraft/blueprints";
-import { parseServerVersion } from "@/lib/apps/minecraft/parse";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import { DEFAULT_LEVEL_TYPE } from "@/lib/apps/minecraft/world";
-import { wantsLatest } from "@/lib/apps/minecraft/blueprint-version";
+import { patchInstallConfig } from "@/lib/apps/install-config";
 import type { ResetMinecraftServerInput } from "@/lib/apps/games-schema";
-import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import { newWorld, setAsideVersionedConfig } from "@/lib/apps/minecraft/world-service";
 import {
     BLUEPRINT_KEY,
@@ -117,10 +114,19 @@ export async function resetMinecraftServer(
     // Before anything is written, because starting the server is what applies the
     // environment: a set-aside that ran after this would boot the new release
     // against the old release's config, which is the crash it exists to prevent.
-    const aside = await setAsideVersionedConfig(ownerId, installedAppId, {
-        from: await currentRelease(ownerId, install.applicationId, install.config, current),
-        to: resolvedRelease(env.get("VERSION"))
-    });
+    //
+    // Every reset, not only the ones that change the release. That was the clever
+    // version and it was wrong in the one case that mattered: a server already
+    // crash-looping on the release it was being reset onto compared equal to
+    // itself, so the settings that were breaking it were left exactly where they
+    // were. The comparison could never see them, because what is on disk is not
+    // what the server is running - it is what some earlier release wrote.
+    //
+    // The cost of doing it always is an operator's tuned paper.yml regenerated on
+    // a reset that did not need it, in a folder beside the world where they can
+    // take it back. A reset already replaces the world; this is the smaller half
+    // of the same sentence.
+    const aside = await setAsideVersionedConfig(ownerId, installedAppId);
 
     // Only what actually moved. Writing the whole environment back would rewrite
     // every value this server holds on every reset, which is how a variable
@@ -168,40 +174,3 @@ export async function resetMinecraftServer(
         configReset: aside !== null
     };
 }
-
-/**
- * The release this server is running now, as well as it can be known.
- *
- * Three sources, weakest last. What Polaris wrote down when it built the server is
- * exact when it is there at all; what the server announced in its own log is the
- * only answer for one built on `LATEST`, and it is ground truth until the log
- * scrolls past the banner; the variable itself counts only when somebody pinned a
- * release into it. Null means nobody knows - which the caller reads as "assume it
- * changed", because that is the mistake that is cheap to make.
- */
-async function currentRelease(
-    ownerId: string,
-    applicationId: string,
-    config: string | null,
-    env: ReadonlyMap<string, string>
-): Promise<string | null> {
-    const recorded = readInstallConfig(config)[RELEASE_KEY];
-    const known = resolvedRelease(typeof recorded === "string" ? recorded : undefined);
-    if (known) return known;
-
-    const announced = await readAppRuntimeLog(applicationId, ownerId, RELEASE_LOG_TAIL)
-        .then(parseServerVersion)
-        .catch(() => null);
-    return announced ?? resolvedRelease(env.get("VERSION"));
-}
-
-/** A release somebody could compare, or null for one nobody has resolved yet.
- *  `LATEST` is not a release, it is a question. */
-function resolvedRelease(value: string | undefined): string | null {
-    const trimmed = (value ?? "").trim();
-    return trimmed.length > 0 && !wantsLatest(trimmed) ? trimmed : null;
-}
-
-/** Enough log to reach the version banner on a server that has just restarted,
- *  and not enough to be worth reading on anything that runs often. */
-const RELEASE_LOG_TAIL = 400;

@@ -570,22 +570,19 @@ export async function newWorld(
  * operator who had tuned something has it, in a folder beside the world, and can
  * take it back. Nothing here deletes anything.
  *
- * The rule is not "when the release changed", it is "unless the release provably
- * did not". `VERSION` is very often the literal `LATEST`, so on most servers the
- * question cannot be answered at all - and the two mistakes are not the same size.
- * Setting config aside that did not need it costs a regenerated file that is still
- * on disk. Leaving it costs a server that never starts again.
+ * Unconditional, and that is the correction rather than the shortcut. Comparing
+ * the release the server is on against the one it is moving to looked precise and
+ * was blind to the case it existed for: a server already crash-looping on the
+ * release it was being reset onto compared equal to itself, and the settings
+ * breaking it stayed exactly where they were. What is on disk is not what the
+ * server is running - it is what some earlier release wrote - so no comparison of
+ * releases can decide this.
  *
  * Never throws. A server this could not reach is a server that may be about to
  * crash-loop, and the health sweep is what says so - failing the reset here would
  * only mean it never got the new release either.
  */
-export async function setAsideVersionedConfig(
-    ownerId: string,
-    installedAppId: string,
-    release: { from: string | null; to: string | null }
-): Promise<string | null> {
-    if (release.from !== null && release.to !== null && release.from === release.to) return null;
+export async function setAsideVersionedConfig(ownerId: string, installedAppId: string): Promise<string | null> {
     try {
         // The container has to be up for an exec to reach the volume, and a server
         // being reset is quite often one somebody had already stopped.

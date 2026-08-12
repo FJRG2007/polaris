@@ -154,7 +154,7 @@ function shorten(line: string): string {
  * already far better than the panel saying "starting".
  */
 export function crashAdvice(cause: string): string | null {
-    if (/NumberFormatException/.test(cause) && /"default"/.test(cause)) {
+    if (isConfigCrash(cause)) {
         return "The settings on disk were written by a newer Minecraft than this server now runs, and it cannot read them. Setting them aside lets the server write its own again.";
     }
     if (/AccessDenied/i.test(cause) && /session\.lock/i.test(cause)) {
@@ -167,6 +167,19 @@ export function crashAdvice(cause: string): string | null {
         return "The server ran out of memory for what it has been asked to load. Give it a larger heap or install less.";
     }
     return null;
+}
+
+/**
+ * Whether this is the crash a folder move fixes.
+ *
+ * The one failure Polaris can undo on its own, so it is a rule of its own rather
+ * than a string match inside the advice: the screen offers the button on exactly
+ * the crashes the advice claims it helps with, and neither can drift from the
+ * other. A newer release wrote a sentinel where an older one wants a number, and
+ * the older one throws while loading its own configuration.
+ */
+export function isConfigCrash(cause: string | null): boolean {
+    return cause !== null && /NumberFormatException/.test(cause) && /"default"/.test(cause);
 }
 
 /** The whole reading, for a container that has been judged to be looping. */

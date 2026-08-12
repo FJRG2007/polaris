@@ -16,7 +16,8 @@ import { recordAudit } from "@/lib/audit-service";
 import { setEnvVars } from "@/lib/env-var-service";
 import { requirePermissionAny } from "@/lib/session";
 import { runArkCommand } from "@/lib/apps/ark/service";
-import { deployApplication } from "@/lib/deploy-service";
+import { clearCrashLoop } from "@/lib/apps/games-health";
+import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import { applyWorldSchedule } from "@/lib/backups/manage";
 import { DIFFICULTIES } from "@/lib/apps/minecraft/rules";
 import { findGameIdentity } from "@/lib/apps/game-identity";
@@ -61,15 +62,6 @@ import {
     withServerContainer
 } from "@/lib/apps/minecraft/service";
 import {
-    createWorldBackup,
-    deleteLevel,
-    deleteWorldBackup,
-    newWorld,
-    restoreWorldBackup,
-    setBackupPolicy,
-    switchLevel
-} from "@/lib/apps/minecraft/world-service";
-import {
     grantPlayerAccess,
     listPlayerAccess,
     revokePlayerAccess,
@@ -77,6 +69,16 @@ import {
     setAddressBinding,
     type PlayerAccessView
 } from "@/lib/apps/minecraft/player-access";
+import {
+    createWorldBackup,
+    deleteLevel,
+    deleteWorldBackup,
+    newWorld,
+    restoreWorldBackup,
+    setAsideVersionedConfig,
+    setBackupPolicy,
+    switchLevel
+} from "@/lib/apps/minecraft/world-service";
 
 /** A Minecraft (Java Edition) account name. */
 const playerNameSchema = z
@@ -1069,6 +1071,43 @@ export async function restoreWorldBackupAction(
         return { level: restored.level };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not restore that backup" };
+    }
+}
+
+/**
+ * Put the settings on disk out of the way and start the server again.
+ *
+ * The way out of the one crash Polaris can name. Settings written by a newer
+ * Minecraft than the server now runs cannot be read by it, and it dies while
+ * loading them - so there is nothing to fix in the game, only a folder to move,
+ * and the server writes its own again on the next boot. Offered on the banner
+ * that names the crash rather than buried under settings, because the person
+ * reading that banner is the person who needs it.
+ *
+ * Nothing is deleted. What moves lands in a folder beside the world, so an
+ * operator who had tuned something has it.
+ */
+export async function resetServerConfigAction(installedAppId: string): Promise<{ moved?: boolean; error?: string }> {
+    try {
+        const { user, access } = await requireGameServer("games.manage", installedAppId);
+        if (!access.install.applicationId) throw new Error("This server has not been deployed yet");
+        const aside = await setAsideVersionedConfig(access.ownerId, installedAppId);
+        // Cleared before the start, or the server comes up under a banner saying
+        // it is stopped for a crash it is currently being given a chance to avoid.
+        // If it crashes anyway the health sweep writes it back within the minute.
+        await clearCrashLoop(installedAppId);
+        await setApplicationRunning(access.install.applicationId, access.ownerId, true);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.config-reset",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { movedTo: aside }
+        });
+        revalidatePath(`/apps/installed/${installedAppId}`);
+        return { moved: aside !== null };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not reset the server's settings" };
     }
 }
 

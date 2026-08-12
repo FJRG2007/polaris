@@ -2,11 +2,16 @@
  * A reset that moves a server to another Minecraft release, and the settings the
  * last one wrote.
  *
- * The bug this file pins happened exactly once and cost a server: a reset onto a
- * map that pins 1.19.4 left `config/` written by a modern Paper on the volume, the
- * older jar threw while reading its own configuration, and the container restarted
- * forever. The regression test is the last one here - the release was not known,
- * and "not known" has to mean "move it".
+ * The bug this file pins cost a server twice. First because a reset onto a map
+ * that pins 1.19.4 left `config/` written by a modern Paper on the volume, and the
+ * older jar threw while reading its own configuration. Then again because the fix
+ * only moved the config when the release changed - and by then the server was
+ * already looping on 1.19.4, so it was being reset onto the release it was on, and
+ * the comparison said nothing had changed.
+ *
+ * What is on disk is not what the server runs. It is what some earlier release
+ * wrote, and no comparison of releases can see that, which is why the set-aside is
+ * unconditional now.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -92,7 +97,7 @@ describe("what counts as a release's own config", () => {
 
 describe("setting the old release's config aside", () => {
     it("moves what is there, in one command, into a stamped folder", async () => {
-        const aside = await setAsideVersionedConfig("owner", "install", { from: "26.2", to: "1.19.4" });
+        const aside = await setAsideVersionedConfig("owner", "install");
         expect(aside).toMatch(new RegExp(`^${CONFIG_ASIDE_DIR}/\\d{8}-\\d{6}$`));
 
         const move = ran.find((argv) => argv[0] === "mv");
@@ -108,29 +113,27 @@ describe("setting the old release's config aside", () => {
         expect(ran.filter((argv) => argv[0] === "mv")).toHaveLength(1);
     });
 
-    it("does nothing when the release provably did not change", async () => {
-        expect(await setAsideVersionedConfig("owner", "install", { from: "1.21.4", to: "1.21.4" })).toBeNull();
-        expect(ran).toHaveLength(0);
-    });
-
-    it("moves when nobody knows what the release was, which is the usual case", async () => {
-        // This is the bug as it happened. VERSION was LATEST, so the old release
-        // could not be named, and treating unknown as unchanged is what left the
-        // config in place. Setting it aside needlessly costs a regenerated file
-        // that is still on disk; leaving it costs a server that never starts.
-        expect(await setAsideVersionedConfig("owner", "install", { from: null, to: "1.19.4" })).not.toBeNull();
+    it("moves even when the server is being reset onto the release it is already on", async () => {
+        // The regression test, and the bug as it actually happened the second
+        // time. The first version of this compared the release the server was on
+        // against the one it was moving to, which on a server already crash
+        // looping on 1.19.4 compared equal to itself - so the settings breaking it
+        // were left exactly where they were. What is on disk is not what the
+        // server runs; it is what some earlier release wrote, and no comparison of
+        // releases can see that.
+        expect(await setAsideVersionedConfig("owner", "install")).not.toBeNull();
         expect(ran.some((argv) => argv[0] === "mv")).toBe(true);
     });
 
     it("does nothing on Bedrock, which has no config to spoil", async () => {
         edition = "bedrock";
-        expect(await setAsideVersionedConfig("owner", "install", { from: null, to: "1.21.4" })).toBeNull();
+        expect(await setAsideVersionedConfig("owner", "install")).toBeNull();
         expect(ran.some((argv) => argv[0] === "mv")).toBe(false);
     });
 
     it("does nothing when the volume holds none of it", async () => {
         present = ["world", "logs", "server.properties"];
-        expect(await setAsideVersionedConfig("owner", "install", { from: null, to: "1.19.4" })).toBeNull();
+        expect(await setAsideVersionedConfig("owner", "install")).toBeNull();
         expect(ran.some((argv) => argv[0] === "mkdir")).toBe(false);
     });
 });

@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { crashAdvice, crashCause, crashLoopOf, isCrashLooping } from "@/lib/apps/crash-loop";
+import { crashAdvice, crashCause, crashLoopOf, isConfigCrash, isCrashLooping } from "@/lib/apps/crash-loop";
 
 const NOW = new Date("2026-08-12T21:05:30.000Z");
 
@@ -123,5 +123,19 @@ describe("what to do about it", () => {
         expect(loop.restarts).toBe(4);
         expect(loop.cause).toContain("NumberFormatException");
         expect(loop.advice).toContain("newer Minecraft");
+    });
+});
+
+describe("the crash a folder move fixes", () => {
+    it("recognises the settings written by a newer release", () => {
+        // The screen offers its recovery button on exactly this, so the rule lives
+        // in one place rather than being spelled twice and drifting apart.
+        expect(isConfigCrash('NumberFormatException: For input string: "default"')).toBe(true);
+    });
+
+    it("does not claim to fix anything else", () => {
+        expect(isConfigCrash("OutOfMemoryError: Java heap space")).toBe(false);
+        expect(isConfigCrash('NumberFormatException: For input string: "seven"')).toBe(false);
+        expect(isConfigCrash(null)).toBe(false);
     });
 });

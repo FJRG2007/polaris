@@ -27,10 +27,11 @@ import { MinecraftRules } from "./minecraft-rules";
 import { MinecraftReset } from "./minecraft-reset";
 import { MinecraftWorld } from "./minecraft-world";
 import { findMap } from "@/lib/apps/minecraft/maps";
+import { isConfigCrash } from "@/lib/apps/crash-loop";
 import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
 import { CopyButton } from "@/components/copy-button";
-import { saveWorldAction } from "./minecraft-actions";
+import { resetServerConfigAction, saveWorldAction } from "./minecraft-actions";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
 import { MinecraftAppearance } from "./minecraft-appearance";
@@ -493,9 +494,31 @@ function ConnectCard({
 }) {
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState<string | null>(null);
+    const [fixing, setFixing] = useState(false);
+    const [fixed, setFixed] = useState<string | null>(null);
     const software = settings.find((setting) => setting.key === "TYPE");
     const version = settings.find((setting) => setting.key === "VERSION");
     const softwareLabel = software?.options?.find((option) => option.value === software.value)?.label ?? software?.value;
+
+    /**
+     * Move the settings the server cannot read out of the way, and start it.
+     *
+     * The whole of the fix for this one crash: there is nothing to repair in the
+     * game, only a folder written by a release this server no longer runs, and it
+     * writes its own again on the next boot. Nothing is deleted.
+     */
+    async function resetConfig(): Promise<void> {
+        setFixing(true);
+        setFixed(null);
+        const result = await resetServerConfigAction(installedAppId);
+        setFixing(false);
+        setFixed(
+            result.error ??
+                (result.moved
+                    ? "The old settings were moved beside the world and the server is starting."
+                    : "There was nothing left to move. The server is starting.")
+        );
+    }
 
     async function saveWorld(): Promise<void> {
         setSaving(true);
@@ -572,9 +595,26 @@ function ConnectCard({
                             {status.crashLoop.advice && (
                                 <p className="text-muted-foreground">{status.crashLoop.advice}</p>
                             )}
-                            <button type="button" onClick={onOpenConsole} className="text-primary hover:underline">
-                                Read the console
-                            </button>
+                            <div className="flex items-center gap-3">
+                                {/* Only offered for the crash where it is the
+                                    answer. On any other one it would be a button
+                                    that throws away settings and changes nothing. */}
+                                {isConfigCrash(status.crashLoop.cause) && (
+                                    <button
+                                        type="button"
+                                        onClick={() => void resetConfig()}
+                                        disabled={fixing}
+                                        className="inline-flex items-center gap-1 text-primary hover:underline disabled:opacity-60"
+                                    >
+                                        {fixing && <Loader2 className="size-3 animate-spin" />}
+                                        Reset the settings and start it
+                                    </button>
+                                )}
+                                <button type="button" onClick={onOpenConsole} className="text-primary hover:underline">
+                                    Read the console
+                                </button>
+                            </div>
+                            {fixed && <p className="text-muted-foreground">{fixed}</p>}
                         </div>
                     </div>
                 )}
