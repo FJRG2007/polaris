@@ -5,10 +5,16 @@
  * every change immediately - including one made on the notifications page - and
  * new alerts appear without a reload. The dropdown lists the most recent few and
  * links to the full history.
+ *
+ * Each unread alert can be cleared on its own here, not only all of them at once.
+ * Opening one already marks it read, so without this the only way to put down an
+ * alert you have read the whole of in the badge - most of them are one line - was
+ * to follow it somewhere you did not want to go, or to clear the ones you had not
+ * read with it.
  */
 
 import Link from "next/link";
-import { Bell } from "lucide-react";
+import { Bell, Check } from "lucide-react";
 import { badgeLabel } from "@/lib/notification-badge";
 import { RelativeTime } from "@/components/relative-time";
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
@@ -68,33 +74,63 @@ export function NotificationBell() {
                             const { Icon, color } = levelStyle(item.level, item.type);
                             const audience = describeAudience(item.audience, item.audienceLabel);
                             return (
-                                <DropdownMenuItem key={item.id} asChild onSelect={() => markRead(item.id)}>
-                                    <Link
-                                        href={
-                                            item.href && item.href.startsWith("/")
-                                                ? item.href
-                                                : "/account/notifications"
-                                        }
+                                <div key={item.id} className="flex items-start">
+                                    <DropdownMenuItem
+                                        asChild
+                                        onSelect={() => markRead(item.id)}
+                                        className="min-w-0 flex-1"
                                     >
-                                        <Icon className={cn("mt-0.5 size-3.5 shrink-0", color)} />
-                                        <span className="min-w-0 flex-1">
-                                            <span className="flex items-center gap-1.5">
-                                                {!item.read ? (
-                                                    <span className="size-1.5 shrink-0 rounded-full bg-primary" />
-                                                ) : null}
-                                                <span className="truncate text-[13px]">{item.title}</span>
+                                        <Link
+                                            href={
+                                                item.href && item.href.startsWith("/")
+                                                    ? item.href
+                                                    : "/account/notifications"
+                                            }
+                                        >
+                                            <Icon className={cn("mt-0.5 size-3.5 shrink-0", color)} />
+                                            <span className="min-w-0 flex-1">
+                                                <span className="flex items-center gap-1.5">
+                                                    {!item.read ? (
+                                                        <span className="size-1.5 shrink-0 rounded-full bg-primary" />
+                                                    ) : null}
+                                                    <span className="truncate text-[13px]" title={item.title}>{item.title}</span>
+                                                </span>
+                                                <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                                    <RelativeTime iso={item.createdAt} />
+                                                    <span aria-hidden="true">-</span>
+                                                    <span className="truncate" title={audience.text}>{audience.text}</span>
+                                                    {item.actionRequired ? (
+                                                        <span className="shrink-0 text-warning">
+                                                            Action needed
+                                                        </span>
+                                                    ) : null}
+                                                </span>
                                             </span>
-                                            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                                                <RelativeTime iso={item.createdAt} />
-                                                <span aria-hidden="true">-</span>
-                                                <span className="truncate">{audience.text}</span>
-                                                {item.actionRequired ? (
-                                                    <span className="shrink-0 text-warning">Action needed</span>
-                                                ) : null}
-                                            </span>
-                                        </span>
-                                    </Link>
-                                </DropdownMenuItem>
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    {!item.read ? (
+                                        <DropdownMenuItem
+                                            aria-label={`Mark "${item.title}" as read`}
+                                            title="Mark as read"
+                                            // The menu stays open: this is a
+                                            // control over the list itself, and
+                                            // closing after each one would make
+                                            // clearing three alerts three trips.
+                                            onSelect={(event) => {
+                                                event.preventDefault();
+                                                markRead(item.id);
+                                            }}
+                                            // Drawn on every unread row rather
+                                            // than revealed on hover: a phone has
+                                            // no hover, and this is the same
+                                            // control the notifications page
+                                            // keeps visible on its own rows.
+                                            className="mt-1 shrink-0 px-1.5 text-muted-foreground/70 hover:text-success"
+                                        >
+                                            <Check className="size-3.5" />
+                                        </DropdownMenuItem>
+                                    ) : null}
+                                </div>
                             );
                         })}
                     </div>
