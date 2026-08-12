@@ -28,6 +28,8 @@ let hosts: HostRow[] = [];
  *  from the `dockerId` on the row, which is only what was recorded last time. */
 let daemons: Record<string, string> = {};
 let localDockerIdValue: string | null = null;
+/** What the mDNS responder published as this machine's own address, if anything. */
+let lanIp: string | null = null;
 const written: Record<string, unknown>[] = [];
 
 vi.mock("@polaris/db", () => ({
@@ -41,7 +43,11 @@ vi.mock("@polaris/db", () => ({
             }
         },
         setting: {
-            findUnique: async () => (localDockerIdValue ? { value: localDockerIdValue } : null),
+            // Keyed, not blanket: the local machine is now identified from more
+            // than one setting, and a mock that answers every key with the daemon
+            // id would let a test pass on a signal it never set.
+            findUnique: async ({ where }: { where: { key: string } }) =>
+                where.key === "metrics.localDockerId" && localDockerIdValue ? { value: localDockerIdValue } : null,
             upsert: async ({ create }: { create: { value: string } }) => {
                 localDockerIdValue = create.value;
                 return create;
@@ -81,6 +87,10 @@ vi.mock("@/lib/docker-service", () => ({
     localDockerDriver: () => engine(SAME),
     hostDockerDriver: async (hostId: string) => engine(daemons[hostId] ?? OTHER)
 }));
+vi.mock("@/lib/host-address", () => ({
+    getHostLanIp: async () => lanIp,
+    isLanAddress: () => true
+}));
 vi.mock("@/lib/storage-service", () => ({
     getDriverForConnection: async () => {
         throw new Error("not used");
@@ -96,6 +106,7 @@ const { getWatchContainers, getWatchServers } = await import("@/lib/watch-overvi
 beforeEach(() => {
     written.length = 0;
     localDockerIdValue = null;
+    lanIp = null;
     hosts = [];
     daemons = {};
 });
@@ -172,13 +183,36 @@ describe("the servers Watch shows", () => {
     });
 
     it("does not merge a server it has not identified yet", async () => {
-        // Nothing sampled since the server was added. Guessing here would hide a
-        // real machine, which is worse than briefly showing one twice.
+        // Nothing sampled since the server was added, and no address to go on.
+        // Guessing here would hide a real machine, which is worse than briefly
+        // showing one twice.
         hosts = [{ id: "h1", name: "lirio-0", ownerId: "u1", address: "192.168.1.138", username: "polaris", dockerId: null }];
         localDockerIdValue = SAME;
 
         const cards = await getWatchServers("u1");
 
         expect(cards.map((card) => card.id)).toEqual([LOCAL_SUBJECT, "h1"]);
+    });
+
+    // The daemon id only ever arrives for a server the collector can reach over
+    // SSH - which is precisely the server that otherwise sits there reporting
+    // nothing. The address is known before anything has been sampled.
+    it("merges a server enrolled at this machine's own address", async () => {
+        hosts = [{ id: "h1", name: "lirio-0", ownerId: "u1", address: "192.168.1.138", username: "polaris", dockerId: null }];
+        lanIp = "192.168.1.138";
+
+        const cards = await getWatchServers("u1");
+
+        expect(cards).toHaveLength(1);
+        expect(cards[0]?.name).toBe("lirio-0");
+    });
+
+    it("leaves a server at another address alone", async () => {
+        hosts = [{ id: "h2", name: "lirio-2", ownerId: "u1", address: "192.168.1.160", username: "polaris", dockerId: null }];
+        lanIp = "192.168.1.138";
+
+        const cards = await getWatchServers("u1");
+
+        expect(cards.map((card) => card.id)).toEqual([LOCAL_SUBJECT, "h2"]);
     });
 });

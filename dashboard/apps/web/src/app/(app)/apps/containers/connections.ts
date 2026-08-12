@@ -20,7 +20,7 @@ import { listHosts } from "@/lib/host-service";
 import type { DockerTransport } from "@polaris/docker";
 import { refreshCapabilities } from "@polaris/hostd-client";
 import { userHasManage, type SessionUser } from "@/lib/session";
-import { isLocalMachine, localDockerId } from "@/lib/local-machine";
+import { isLocalMachine, localMachineIdentity } from "@/lib/local-machine";
 import type { DockerConnectionSummary, LocalHostDiagnostic } from "./types";
 import {
     HOST_DOCKER_PREFIX,
@@ -64,10 +64,10 @@ export async function containerHosts(user: SessionUser): Promise<ContainerHosts>
 
     // Three independent reads, taken together: this runs before the page paints,
     // and they have no reason to queue behind one another.
-    const [connections, hosts, localId] = await Promise.all([
+    const [connections, hosts, identity] = await Promise.all([
         listDockerConnections(user.id),
         listHosts(user.id),
-        localDockerId()
+        localMachineIdentity()
     ]);
 
     const stored: DockerConnectionSummary[] = connections.map((row) => ({
@@ -82,7 +82,7 @@ export async function containerHosts(user: SessionUser): Promise<ContainerHosts>
     // still appears on its own when the local host is not offered, which is what
     // keeps an operator who may not manage the system able to reach it.
     const sameMachine = localAvailable
-        ? (hosts.find((host) => isLocalMachine(host, localId)) ?? null)
+        ? (hosts.find((host) => isLocalMachine(host, identity)) ?? null)
         : null;
 
     const localHost: DockerConnectionSummary[] = localAvailable

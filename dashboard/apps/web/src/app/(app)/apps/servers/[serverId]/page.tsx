@@ -1,7 +1,6 @@
 import { ServerDetail } from "./server-detail";
 import { findServerRow } from "../server-rows";
 import { requirePermission } from "@/lib/session";
-import { getLocalHostId } from "@/lib/local-server";
 import { notFound, redirect } from "next/navigation";
 import { LOCAL_SERVER_ID, serverIdSchema } from "@polaris/core";
 import { peekServerMetrics } from "@/lib/server-metrics-service";
@@ -42,7 +41,8 @@ export default async function ServerPage({ params }: { params: Promise<{ serverI
         // The server somebody enrolled turned out to be this machine, so it is not
         // listed twice - the local row is it. Its own id still has to arrive
         // somewhere, because that is the id every other screen holds it by.
-        if (parsed.data === (await getLocalHostId())) redirect(`/apps/servers/${LOCAL_SERVER_ID}`);
+        const localRow = await findServerRow(user.id, LOCAL_SERVER_ID);
+        if (localRow?.hostId === parsed.data) redirect(`/apps/servers/${LOCAL_SERVER_ID}`);
         notFound();
     }
 

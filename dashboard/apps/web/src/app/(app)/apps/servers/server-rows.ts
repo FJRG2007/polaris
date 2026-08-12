@@ -20,21 +20,25 @@ import type { ServerRow } from "./types";
 import { listHosts } from "@/lib/host-service";
 import { getPublicIp } from "@/lib/domain-service";
 import { getLocalEnvironment } from "@/lib/network-service";
+import { isLocalMachine, localMachineIdentity } from "@/lib/local-machine";
 import { environmentFromAddress, serverEnvironmentSchema } from "@polaris/core";
-import { getLocalHostId, getLocalServerName, LOCAL_SERVER_FALLBACK_NAME, LOCAL_SERVER_ID } from "@/lib/local-server";
+import { getLocalServerName, LOCAL_SERVER_FALLBACK_NAME, LOCAL_SERVER_ID } from "@/lib/local-server";
 
 export async function listServerRows(userId: string): Promise<ServerRow[]> {
-    const [hosts, local, localIp, localName, localHostId] = await Promise.all([
+    const [hosts, local, localIp, localName, identity] = await Promise.all([
         listHosts(userId),
         getLocalEnvironment(),
         getPublicIp(),
         getLocalServerName(),
-        getLocalHostId()
+        localMachineIdentity()
     ]);
 
     // The machine Polaris runs on, once somebody has enrolled it. Until then there
     // is no login to reach it by, and the row is built from detection alone.
-    const localHost = localHostId ? (hosts.find((host) => host.id === localHostId) ?? null) : null;
+    // Enrolled by hand rather than through Polaris's own flow it carries no
+    // pointer back here, so identity is settled the other ways too - otherwise the
+    // box is listed twice, the second time as a server that answers nothing.
+    const localHost = hosts.find((host) => isLocalMachine(host, identity)) ?? null;
 
     return [
         {
@@ -57,7 +61,7 @@ export async function listServerRows(userId: string): Promise<ServerRow[]> {
         },
         // Everything else, minus the one that turned out to be this machine.
         ...hosts
-            .filter((host) => host.id !== localHostId)
+            .filter((host) => host.id !== localHost?.id)
             .map((host) => {
                 // The column is free-form TEXT: an unrecognised value reads as unset
                 // rather than taking the page down on a missing copy entry.

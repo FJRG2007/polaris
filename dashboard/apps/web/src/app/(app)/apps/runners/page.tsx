@@ -8,7 +8,8 @@ import { LOCAL_SERVER_ID } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
 import { getRunnerAccess } from "@/lib/github-runners";
 import { listRunnerPools } from "@/lib/runners/runner-service";
-import { getLocalHostId, getLocalServerName, LOCAL_SERVER_FALLBACK_NAME } from "@/lib/local-server";
+import { isLocalMachine, localMachineIdentity } from "@/lib/local-machine";
+import { getLocalServerName, LOCAL_SERVER_FALLBACK_NAME } from "@/lib/local-server";
 
 export const dynamic = "force-dynamic";
 
@@ -20,11 +21,11 @@ export const dynamic = "force-dynamic";
  */
 export default async function RunnersPage() {
     const user = await requirePermission("system.manage");
-    const [pools, hosts, localName, localHostId] = await Promise.all([
+    const [pools, hosts, localName, identity] = await Promise.all([
         listRunnerPools(user.id),
         listHosts(user.id),
         getLocalServerName(),
-        getLocalHostId()
+        localMachineIdentity()
     ]);
 
     // The box Polaris runs on is always available to run jobs on, the same way it
@@ -32,14 +33,16 @@ export default async function RunnersPage() {
     // can be asked to do: enrolled, it is a Host with a login, so a job can be
     // given a directory on it; unenrolled, Polaris reaches it only through the
     // container engine and it runs contained jobs or none.
-    const localHost = localHostId ? (hosts.find((host) => host.id === localHostId) ?? null) : null;
+    const localHost = hosts.find((host) => isLocalMachine(host, identity)) ?? null;
     const servers = [
         {
             id: localHost?.id ?? LOCAL_SERVER_ID,
             name: localName || localHost?.name || LOCAL_SERVER_FALLBACK_NAME,
             local: true
         },
-        ...hosts.filter((host) => host.id !== localHostId).map((host) => ({ id: host.id, name: host.name, local: false }))
+        ...hosts
+            .filter((host) => host.id !== localHost?.id)
+            .map((host) => ({ id: host.id, name: host.name, local: false }))
     ];
 
     return (

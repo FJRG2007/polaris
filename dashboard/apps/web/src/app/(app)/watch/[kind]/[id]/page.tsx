@@ -5,7 +5,7 @@ import { listAlarms } from "@/lib/watch-service";
 import { requirePermission } from "@/lib/session";
 import { notFound, redirect } from "next/navigation";
 import { LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
-import { isLocalMachine, localDockerId } from "@/lib/local-machine";
+import { isLocalMachine, localMachineIdentity } from "@/lib/local-machine";
 import { WatchSubjectDetail } from "@/app/(app)/watch/watch-subject-detail";
 
 export const dynamic = "force-dynamic";
@@ -31,8 +31,8 @@ export default async function WatchSubjectPage({
     const watching = (targetId: string) => owned.filter((alarm) => alarm.targetId === targetId);
 
     if (kind === "server") {
-        const [hosts, localId] = await Promise.all([listHosts(user.id), localDockerId()]);
-        const localHost = hosts.find((entry) => isLocalMachine(entry, localId)) ?? null;
+        const [hosts, identity] = await Promise.all([listHosts(user.id), localMachineIdentity()]);
+        const localHost = hosts.find((entry) => isLocalMachine(entry, identity)) ?? null;
 
         // The reserved subject id is how the samples are filed, not how the
         // machine is addressed. Links that were made before that was true still
@@ -62,7 +62,7 @@ export default async function WatchSubjectPage({
         // A server that is the machine Polaris runs on is measured directly rather
         // than over SSH to itself, so its history lives under the local subject.
         // Its own id would open a page with nothing on it.
-        if (isLocalMachine(host, localId)) redirect(`/watch/server/${LOCAL_SERVER_ID}`);
+        if (isLocalMachine(host, identity)) redirect(`/watch/server/${LOCAL_SERVER_ID}`);
         return (
             <WatchSubjectDetail
                 kind="server"

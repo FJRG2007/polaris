@@ -15,7 +15,7 @@
 
 import { prisma } from "@polaris/db";
 import type { DockerDriver } from "@polaris/docker";
-import { isLocalMachine, localDockerId } from "./local-machine";
+import { isLocalMachine, localMachineIdentity } from "./local-machine";
 import { hostRouteId, LOCAL_HOST_SUBJECT, type MetricSubjectType } from "./metrics-shared";
 import { cachedSamples, oldestSampleAt, refreshSamples, STATS_TTL_MS } from "./container-stats-cache";
 import {
@@ -140,18 +140,18 @@ const FRESH_MS = 10 * 60 * 1000;
  *  the machine Polaris runs on. Its own projection rather than the general host
  *  reader's, because that identity is nobody else's business. */
 async function watchHosts(ownerId: string) {
-    const [hosts, localId] = await Promise.all([
+    const [hosts, identity] = await Promise.all([
         prisma.host.findMany({
             where: { ownerId },
             select: { id: true, name: true, address: true, username: true, dockerId: true },
             orderBy: { createdAt: "asc" }
         }),
-        localDockerId()
+        localMachineIdentity()
     ]);
     return {
         /** The registered server that turned out to BE the local machine, if any. */
-        local: hosts.find((host) => isLocalMachine(host, localId)) ?? null,
-        remote: hosts.filter((host) => !isLocalMachine(host, localId))
+        local: hosts.find((host) => isLocalMachine(host, identity)) ?? null,
+        remote: hosts.filter((host) => !isLocalMachine(host, identity))
     };
 }
 
