@@ -18,7 +18,11 @@ import { describeClient, type ClientReading } from "@polaris/core";
  *  copy beside them. Structural, so any narrower select satisfies it. */
 export interface DescribableSession {
     readonly userAgent: string | null;
-    readonly state?: { readonly userAgent: string | null; readonly userAgentBrands: string | null } | null;
+    readonly state?: {
+        readonly userAgent: string | null;
+        readonly userAgentBrands: string | null;
+        readonly userAgentPlatform?: string | null;
+    } | null;
 }
 
 /**
@@ -29,7 +33,11 @@ export interface DescribableSession {
  * column once, when the session opens, and never follows it afterwards.
  */
 export function sessionClient(row: DescribableSession): ClientReading {
-    return describeClient(row.state?.userAgent ?? row.userAgent, row.state?.userAgentBrands);
+    return describeClient(
+        row.state?.userAgent ?? row.userAgent,
+        row.state?.userAgentBrands,
+        row.state?.userAgentPlatform
+    );
 }
 
 /** The one-line name, for the screens that show a device as a single string. */
@@ -51,7 +59,7 @@ export async function sessionDeviceLabels(userId: string): Promise<Map<string, s
         select: {
             id: true,
             userAgent: true,
-            state: { select: { userAgent: true, userAgentBrands: true } }
+            state: { select: { userAgent: true, userAgentBrands: true, userAgentPlatform: true } }
         }
     });
     return new Map(rows.map((row) => [row.id, sessionDevice(row)]));

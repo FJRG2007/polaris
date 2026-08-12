@@ -48,6 +48,27 @@ export function originUserAgentBrands(headers: HeaderSource): string | undefined
     return headers.get("sec-ch-ua")?.trim().slice(0, MAX_BRANDS) || undefined;
 }
 
+/** A platform name is one short word. Anything longer is not one. */
+const MAX_PLATFORM = 32;
+
+/**
+ * The operating system the request announced itself on, or undefined.
+ *
+ * The other half of the same pair as the brands above, and recorded for a reason
+ * of the same shape: a browser told to present itself as a phone rewrites its
+ * user-agent and nothing else, so the string says iPhone while the machine is a
+ * Windows laptop. This header keeps saying Windows, which makes it the claim
+ * worth believing when the two disagree.
+ *
+ * Sent by every Chromium without being asked for; browsers that send no hints
+ * leave it empty and are read from the user-agent as before. The quotes the
+ * header wraps the value in are dropped, so what is stored is the bare name.
+ */
+export function originUserAgentPlatform(headers: HeaderSource): string | undefined {
+    const value = headers.get("sec-ch-ua-platform")?.trim().slice(0, MAX_PLATFORM).replace(/^"|"$/g, "");
+    return value?.trim() || undefined;
+}
+
 /** Hostnames are matched, stored and shown as this; anything else is dropped
  *  rather than kept, since a Host header is the caller's to write. */
 const HOSTNAME = /^[a-z0-9.-]+$/;

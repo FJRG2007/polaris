@@ -29,8 +29,8 @@ import { Feedback, SettingCard, type SettingLock } from "./setting-card";
 import { setNewDeviceGraceAction, updateSessionLimitsAction } from "./actions";
 import { ChangePasswordDialog, RecoverPasswordDialog } from "./password-dialogs";
 import { ClearQuestionsDialog, SecurityQuestionsDialog } from "./questions-dialog";
-import { ConnectedSignInCard, type ConnectedSignIn } from "./connected-sign-in-card";
 import { DisableTwoFactorDialog, EnableTwoFactorDialog } from "./two-factor-dialogs";
+import { ConnectedSignInCard, type ConnectedSignIn, type ConnectionChallenge } from "./connected-sign-in-card";
 import {
     IDLE_LOCK_CHOICES,
     NEW_DEVICE_GRACE_CHOICES,
@@ -73,6 +73,7 @@ export function SecurityView({
     twoFactorPreferred,
     trustedDevices,
     connections,
+    connectionChallenge,
     otherSessions,
     successor
 }: {
@@ -100,6 +101,9 @@ export function SecurityView({
     /** The outside accounts this person has connected, each with whether it may
      *  sign them in. */
     connections: ConnectedSignIn[];
+    /** Whether one of those sign-ins still owes the second step, and whether the
+     *  instance has already settled that for everybody. */
+    connectionChallenge: ConnectionChallenge;
     /** Open sessions other than this one, which is what a sign-in is approved from. */
     otherSessions: number;
     /** The account named to close this one's organizations if its owner dies. */
@@ -202,7 +206,12 @@ export function SecurityView({
 
                     {/* Another way the account is proved, so it sits in the left
                         column with the rest of them. */}
-                    <ConnectedSignInCard accounts={connections} lock={lock} />
+                    <ConnectedSignInCard
+                        accounts={connections}
+                        challenge={connectionChallenge}
+                        twoFactorEnabled={twoFactorEnabled}
+                        lock={lock}
+                    />
                 </div>
 
                 <div className="flex flex-col gap-4">

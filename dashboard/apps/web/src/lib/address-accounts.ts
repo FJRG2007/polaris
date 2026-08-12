@@ -128,7 +128,8 @@ async function sessionRowsMatching(
                     secondFactor: true,
                     signInMethod: true,
                     userAgent: true,
-                    userAgentBrands: true
+                    userAgentBrands: true,
+                    userAgentPlatform: true
                 }
             }
         }
@@ -166,7 +167,11 @@ async function sessionRowsAt(ip: string) {
 function toAddressSession(row: SessionRow, now: number): AddressSession {
     return {
         id: row.id,
-        device: describeDevice(sessionUserAgent(row), row.state?.userAgentBrands),
+        device: describeDevice(
+            sessionUserAgent(row),
+            row.state?.userAgentBrands,
+            row.state?.userAgentPlatform
+        ),
         host: row.state?.host ?? null,
         country: row.state?.country ?? null,
         live: row.expiresAt.getTime() > now,

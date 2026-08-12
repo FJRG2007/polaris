@@ -27,8 +27,14 @@ import { describeOrigin } from "@/lib/session-directory";
 import { evaluateAccountAccess } from "@/lib/network-rules";
 import { getInstanceSecurity } from "@/lib/instance-security";
 import { notifySessionOpened, notifySessionsClosed } from "@/lib/notifications/session-events";
-import { clientHost, clientIp, clientUserAgent, clientUserAgentBrands } from "@/lib/request-context";
 import { consumeSessionRotation, rememberAccountDevice, resolveSignInRules, takeSignInRecord } from "@polaris/auth";
+import {
+    clientHost,
+    clientIp,
+    clientUserAgent,
+    clientUserAgentBrands,
+    clientUserAgentPlatform
+} from "@/lib/request-context";
 
 /**
  * Where a refused session is sent, or - when it may proceed - whether it is
@@ -294,9 +300,10 @@ async function createSessionState(input: {
         if (approver) approval = "pending";
     }
 
-    const [userAgent, userAgentBrands, host, signIn] = await Promise.all([
+    const [userAgent, userAgentBrands, userAgentPlatform, host, signIn] = await Promise.all([
         clientUserAgent(),
         clientUserAgentBrands(),
+        clientUserAgentPlatform(),
         clientHost(),
         takeSignInRecord(input.userId)
     ]);
@@ -310,6 +317,7 @@ async function createSessionState(input: {
                 country: input.country,
                 userAgent: userAgent ?? null,
                 userAgentBrands: userAgentBrands ?? null,
+                userAgentPlatform: userAgentPlatform ?? null,
                 host: host ?? null,
                 signInMethod: signIn.method,
                 secondFactor: signIn.secondFactor,
@@ -334,7 +342,13 @@ async function createSessionState(input: {
     // The account's register of the browsers it has ever been signed in from,
     // which is what dates a device for the new-device wait. Written here because
     // this runs exactly once per session, at the sign-in that opened it.
-    await rememberAccountDevice(input.userId, { userAgent, userAgentBrands, ip: input.ip, host });
+    await rememberAccountDevice(input.userId, {
+        userAgent,
+        userAgentBrands,
+        userAgentPlatform,
+        ip: input.ip,
+        host
+    });
 
     // The session carries this too, but a session ends and this does not: it is
     // what lets somebody read back how their account was signed into last month.
@@ -365,7 +379,7 @@ async function createSessionState(input: {
             userId: input.userId,
             event: "account.signin",
             title: "A new sign-in is waiting for your approval",
-            body: describeOrigin(input.ip, input.country, userAgent, userAgentBrands),
+            body: describeOrigin(input.ip, input.country, userAgent, userAgentBrands, userAgentPlatform),
             href: "/account/sessions",
             actionRequired: true
         });
@@ -375,7 +389,7 @@ async function createSessionState(input: {
         // has not happened yet as one that has.
         await notifySessionOpened({
             userId: input.userId,
-            origin: describeOrigin(input.ip, input.country, userAgent, userAgentBrands)
+            origin: describeOrigin(input.ip, input.country, userAgent, userAgentBrands, userAgentPlatform)
         });
     }
     return { approval };

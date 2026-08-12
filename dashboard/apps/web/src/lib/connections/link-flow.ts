@@ -34,6 +34,7 @@ import { clientIp } from "@/lib/request-context";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { requestOrigin } from "@/lib/domain-service";
 import { findConnectionProvider } from "@polaris/core";
+import { connectionSignInChallenged } from "@/lib/instance-security";
 import { signInWithConnection, type ConnectionSignInResult } from "@polaris/auth";
 import { clearConnectionFailure, describeFailure, recordConnectionFailure } from "./attention";
 import { readSteamPersona, steamAuthorizeUrl, STEAM_PROVIDER, verifySteamReturn } from "./steam";
@@ -379,8 +380,14 @@ async function finishLink(origin: string, provider: string, code: string): Promi
  * a minute has passed, and the one that matters is the one in force when the
  * session is issued. The session itself is better-auth's - the challenge, the
  * record of how this sign-in proved itself, and the remembered-device pass all
- * hang off it - so an account with a second factor armed lands on the challenge
+ * hang off it - so an account that is challenged here lands on the challenge
  * screen with no session, exactly as it would after a password.
+ *
+ * Whether it is challenged is asked here rather than assumed, because the answer
+ * is a deployment setting and an account setting and neither belongs in the auth
+ * package. The default is no: the provider has just run its own sign-in, which is
+ * a second step in everything but name, and asking for a code on top of it turns
+ * the shortest way in into the longest one.
  */
 async function finishSignIn(
     request: Request,
@@ -417,7 +424,11 @@ async function finishSignIn(
 
     let issued: ConnectionSignInResult;
     try {
-        issued = await signInWithConnection(auth, { userId: match.userId, provider }, request.headers);
+        issued = await signInWithConnection(
+            auth,
+            { userId: match.userId, provider, challenge: await connectionSignInChallenged(match.userId) },
+            request.headers
+        );
     } catch {
         // The account was there a moment ago, so this is one that has just been
         // deleted, or a session better-auth could not create.

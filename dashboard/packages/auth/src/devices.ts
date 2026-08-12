@@ -85,6 +85,7 @@ export async function rememberAccountDevice(userId: string, origin: DeviceOrigin
                 userId,
                 userAgent,
                 userAgentBrands: origin.userAgentBrands ?? null,
+                userAgentPlatform: origin.userAgentPlatform ?? null,
                 ip: origin.ip ?? null,
                 host: origin.host ?? null
             },

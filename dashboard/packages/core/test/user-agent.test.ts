@@ -167,6 +167,43 @@ describe("describeClient", () => {
         expect(describeClient(FIREFOX_LINUX).os).toBe("Linux");
     });
 
+    it("believes the platform hint over the user-agent", () => {
+        // The reported case: a Windows browser put into device-emulation mode
+        // sends a phone's user-agent and leaves every hint as it was, and the
+        // account's own session list showed the owner an iPhone they do not own.
+        const emulating = describeClient(WEBKIT_IPHONE, '"Brave";v="151"', '"Windows"');
+        expect(emulating.os).toBe("Windows");
+        // "Windows 18.5" would be the reading that is wrong in a way neither
+        // half of it is; the version belongs to the system the hint disowned.
+        expect(emulating.osVersion).toBeNull();
+        expect(emulating.label).toBe("Brave on Windows");
+    });
+
+    it("keeps the user-agent's version when the two name the same system", () => {
+        expect(describeClient(CHROME_ANDROID, undefined, '"Android"')).toMatchObject({
+            os: "Android",
+            osVersion: "14"
+        });
+    });
+
+    it("spells a hinted system the way the rest of the reading does", () => {
+        // One laptop has to read the same way whichever half of the request
+        // described it, so "Chrome OS" and ChromeOS cannot be two devices.
+        expect(describeClient(CHROME_WINDOWS, undefined, '"Chrome OS"').os).toBe("ChromeOS");
+        expect(describeClient(CHROME_WINDOWS, undefined, '"macOS"').os).toBe("macOS");
+    });
+
+    it("falls back to the user-agent for a platform it cannot place", () => {
+        // "Unknown" is a value the header actually sends, and a made-up one is a
+        // header. Neither may invent a system or erase the one that was read.
+        expect(describeClient(CHROME_ANDROID, undefined, '"Unknown"')).toMatchObject({
+            os: "Android",
+            osVersion: "14"
+        });
+        expect(describeClient(CHROME_ANDROID, undefined, '"constructor"').os).toBe("Android");
+        expect(describeClient(CHROME_ANDROID, undefined, "").os).toBe("Android");
+    });
+
     it("says so plainly when nothing was recorded", () => {
         expect(describeDevice(null)).toBe("Unknown device");
         expect(describeDevice(undefined, '"Brave";v="131"')).toBe("Unknown device");

@@ -29,6 +29,9 @@ export interface UserSecuritySettings {
     idleLockMinutes: number;
     sessionMaxMinutes: number;
     requireLoginApproval: boolean;
+    /** Answer the challenge after a sign-in with a connected account as well.
+     *  What this account asks of itself; the instance can ask for it regardless. */
+    challengeConnectionSignIn: boolean;
     /** Second-factor methods that send a code, beyond the authenticator. */
     twoFactorMethods: TwoFactorDeliveryMethod[];
     /** The method the challenge offers first. */
@@ -51,6 +54,7 @@ const DEFAULTS: UserSecuritySettings = {
     idleLockMinutes: 0,
     sessionMaxMinutes: 0,
     requireLoginApproval: false,
+    challengeConnectionSignIn: false,
     twoFactorMethods: [],
     twoFactorPreferred: "totp",
     // An account with no row of its own armed its factor through better-auth
@@ -112,6 +116,7 @@ export async function getUserSecurity(userId: string): Promise<UserSecuritySetti
         idleLockMinutes: row.idleLockMinutes,
         sessionMaxMinutes: row.sessionMaxMinutes,
         requireLoginApproval: row.requireLoginApproval,
+        challengeConnectionSignIn: row.challengeConnectionSignIn,
         twoFactorMethods: parseDeliveryMethods(row.twoFactorMethods),
         twoFactorPreferred: parsePreferredMethod(row.twoFactorPreferred),
         totpUnclaimed: row.totpUnclaimed,
@@ -149,6 +154,19 @@ export async function updateSessionLimits(
 /** Turn the "new sign-ins need approval" gate on or off. */
 export async function setLoginApprovalRequired(userId: string, required: boolean): Promise<void> {
     await upsertSecurity(userId, { requireLoginApproval: required });
+}
+
+/**
+ * Ask for the second-factor challenge after a sign-in with a connected account,
+ * or stop asking.
+ *
+ * No password check, unlike the controls above: this only ever adds a step to
+ * the account's own sign-in. Turning it back off costs nothing an attacker
+ * holding the session could not already do - they are signed in - and the
+ * instance's own demand is read separately, so this cannot drop that.
+ */
+export async function setConnectionSignInChallenge(userId: string, challenge: boolean): Promise<void> {
+    await upsertSecurity(userId, { challengeConnectionSignIn: challenge });
 }
 
 // ---------------------------------------------------------------------------

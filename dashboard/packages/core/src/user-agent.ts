@@ -16,6 +16,15 @@
  * client-hints header is where they say who they are. So the hints are preferred
  * when the request carried them, and the user-agent is the fallback for the
  * browsers that send none.
+ *
+ * The same holds for the operating system, for a blunter reason: a browser put
+ * into its device-emulation mode rewrites the user-agent to a phone's and leaves
+ * every hint alone, so the string says iPhone while the machine on the desk is a
+ * Windows laptop. A device list that repeats that is not merely imprecise - it
+ * shows an account holder a session they have never opened, on a platform they do
+ * not own, which is exactly the shape of the thing these lists exist to catch. So
+ * the platform hint wins where there is one, and the user-agent's version is
+ * dropped rather than transplanted when the two name different systems.
  */
 
 export interface ClientReading {
@@ -148,6 +157,35 @@ const OPERATING_SYSTEMS: readonly { readonly test: RegExp; readonly name: string
     { test: /Linux/, name: "Linux" }
 ];
 
+/**
+ * The systems `sec-ch-ua-platform` can name, against the spelling the rest of
+ * this module uses for them.
+ *
+ * A lookup rather than the header's own text, so one machine reads the same way
+ * whichever half of the request described it - "Chrome OS" and ChromeOS are the
+ * same laptop, and a list that spells it both ways is one nobody can group. The
+ * header may also say "Unknown", and anything not named here - that included -
+ * falls back to the user-agent rather than inventing a platform.
+ *
+ * A Map for the reason the brand lookup is one: the key is header text, and a
+ * plain object would answer `constructor` with something off the prototype.
+ */
+const PLATFORM_HINTS = new Map([
+    ["windows", "Windows"],
+    ["macos", "macOS"],
+    ["android", "Android"],
+    ["ios", "iOS"],
+    ["linux", "Linux"],
+    ["chrome os", "ChromeOS"],
+    ["chromium os", "ChromeOS"]
+]);
+
+/** The system a `sec-ch-ua-platform` value names, or null when it names none. */
+function osFromHint(platform: string | null | undefined): string | null {
+    if (!platform) return null;
+    return PLATFORM_HINTS.get(platform.trim().replace(/^"|"$/g, "").toLowerCase()) ?? null;
+}
+
 function osFromUserAgent(userAgent: string): { name: string; version: string | null } {
     for (const entry of OPERATING_SYSTEMS) {
         if (!entry.test.test(userAgent)) continue;
@@ -163,10 +201,13 @@ function osFromUserAgent(userAgent: string): { name: string; version: string | n
  * @param userAgent The `user-agent` header, as stored against the row.
  * @param brands The `sec-ch-ua` header, when one was recorded. It is what names
  *               a browser the user-agent hides.
+ * @param platform The `sec-ch-ua-platform` header, when one was recorded. It is
+ *                 what names the system a rewritten user-agent hides.
  */
 export function describeClient(
     userAgent: string | null | undefined,
-    brands?: string | null
+    brands?: string | null,
+    platform?: string | null
 ): ClientReading {
     if (!userAgent) {
         return {
@@ -186,23 +227,32 @@ export function describeClient(
     // the one it actually ships, which is the number worth showing.
     const browser = hinted?.name ?? claimed.name;
     const browserVersion = hinted?.version ?? claimed.version;
-    const os = osFromUserAgent(userAgent);
+
+    const claimedOs = osFromUserAgent(userAgent);
+    const hintedOs = osFromHint(platform);
+    // The version only ever comes from the user-agent - no hint carries one
+    // without being asked for - so it is kept only while the user-agent is
+    // describing the same system the hint named. "Windows 18.5" would be the
+    // reading that is wrong in a way neither half of it is.
+    const os = hintedOs ?? claimedOs.name;
+    const osVersion = hintedOs && hintedOs !== claimedOs.name ? null : claimedOs.version;
 
     return {
         browser,
         browserVersion,
-        os: os.name,
-        osVersion: os.version,
-        label: `${browser} on ${os.name}`
+        os,
+        osVersion,
+        label: `${browser} on ${os}`
     };
 }
 
 /** The one-line reading, for the lists that show a device as a single string. */
 export function describeDevice(
     userAgent: string | null | undefined,
-    brands?: string | null
+    brands?: string | null,
+    platform?: string | null
 ): string {
-    return describeClient(userAgent, brands).label;
+    return describeClient(userAgent, brands, platform).label;
 }
 
 // ---------------------------------------------------------------------------

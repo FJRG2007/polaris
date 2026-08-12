@@ -71,6 +71,7 @@ export {
     getUserSecurity,
     updateSessionLimits,
     setLoginApprovalRequired,
+    setConnectionSignInChallenge,
     setTwoFactorPreferences,
     setTotpUnclaimed,
     hashSecret,

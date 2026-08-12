@@ -33,6 +33,7 @@ import {
     originIp,
     originUserAgent,
     originUserAgentBrands,
+    originUserAgentPlatform,
     passkeyNameKey,
     passkeyRelyingPartyId,
     PASSKEY_NAME_MAX,
@@ -54,6 +55,7 @@ function requestOrigin(headers: Headers | undefined): DeviceOrigin {
     return {
         userAgent: originUserAgent(source),
         userAgentBrands: originUserAgentBrands(source),
+        userAgentPlatform: originUserAgentPlatform(source),
         ip: originIp(source),
         host: originHost(source)
     };
@@ -228,10 +230,25 @@ const TWO_FACTOR_VERIFY_PATHS: ReadonlySet<string> = new Set([
     VERIFY_OTP_PATH
 ]);
 
-/** The paths a pass is spent on, which is where better-auth rotates it. Built on
- *  demand because the emailed-link path is declared further down, next to the
- *  hook that widened the challenge to cover it. */
-function spendsTrust(path: string): boolean {
+/**
+ * Whether a sign-in on this path has the challenge standing in front of it -
+ * which is the same thing as whether it spends a remembered browser's pass,
+ * because the pass is what the challenge steps aside for.
+ *
+ * Every path answers on the path alone except the connected-account one, which
+ * carries the answer in its body: whether that way in owes a second step is two
+ * settings and a database read away, so the app decides it and says so here (see
+ * connection-sign-in.ts). Anything other than an explicit yes reads as no
+ * challenge, and the endpoint is unreachable over HTTP, so the only caller that
+ * can say either is Polaris itself.
+ *
+ * Written as a function rather than a set because the emailed-link path is
+ * declared further down, next to the hook that widened the challenge to cover it.
+ */
+function challengedSignIn(path: string, body: unknown): boolean {
+    if (path === CONNECTION_SIGN_IN_PATH) {
+        return (body as { challenge?: unknown } | undefined)?.challenge === true;
+    }
     return path === "/sign-in/email" || CHALLENGED_SIGN_IN_PATHS.has(path);
 }
 
@@ -264,7 +281,8 @@ function describeTrustedDevices(plugin: BetterAuthPlugin): BetterAuthPlugin {
                 ...(plugin.hooks?.after ?? []),
                 {
                     matcher: (context) =>
-                        TWO_FACTOR_VERIFY_PATHS.has(context.path ?? "") || spendsTrust(context.path ?? ""),
+                        TWO_FACTOR_VERIFY_PATHS.has(context.path ?? "") ||
+                        challengedSignIn(context.path ?? "", context.body),
                     handler: createAuthMiddleware(async (ctx) => {
                         // Null while a challenge is still in flight: the sign-in
                         // handler creates a session and the two-factor hook takes
@@ -384,17 +402,16 @@ function sealDeviceFlow(plugin: BetterAuthPlugin): BetterAuthPlugin {
 export const MAGIC_LINK_VERIFY_PATH = "/magic-link/verify";
 
 /**
- * The sign-ins better-auth's own plugin does not watch, and that must raise the
- * second-factor challenge anyway.
+ * The sign-ins better-auth's own plugin does not watch, and that raise the
+ * second-factor challenge regardless of what anybody has configured.
  *
- * Both stand in for the password rather than for the challenge: an emailed link
- * proves a mailbox, a linked account proves somebody else's account. Neither is
- * the second step the account asked for.
+ * One entry, and it is the one that stands in for the password without anything
+ * standing behind it: an emailed link proves a mailbox and nothing else, so an
+ * account whose mail is read is an account that is entered. The connected-account
+ * path is challenged on the same hook but decides per sign-in (see
+ * challengedSignIn), because the account it defers to has gates of its own.
  */
-const CHALLENGED_SIGN_IN_PATHS: ReadonlySet<string> = new Set([
-    MAGIC_LINK_VERIFY_PATH,
-    CONNECTION_SIGN_IN_PATH
-]);
+const CHALLENGED_SIGN_IN_PATHS: ReadonlySet<string> = new Set([MAGIC_LINK_VERIFY_PATH]);
 
 /**
  * Make those sign-ins raise the second-factor challenge too.
@@ -402,12 +419,11 @@ const CHALLENGED_SIGN_IN_PATHS: ReadonlySet<string> = new Set([
  * better-auth's two-factor plugin only watches the credential sign-in paths, so
  * on its own an emailed link hands an account with an armed authenticator a full
  * session - no password and no code - which makes the mailbox a single point of
- * failure for exactly the accounts that asked for it not to be. Signing in with
- * a linked GitHub or Google account is the same hole with somebody else's login
- * screen in front of it. The hook's own handler is path-agnostic (it takes back
- * the session the endpoint just created, then starts the challenge), so covering
- * them is a matter of widening what it matches; reimplementing the challenge
- * here instead would leave two copies of it to drift apart.
+ * failure for exactly the accounts that asked for it not to be. The hook's own
+ * handler is path-agnostic (it takes back the session the endpoint just created,
+ * then starts the challenge), so covering another path is a matter of widening
+ * what it matches; reimplementing the challenge here instead would leave two
+ * copies of it to drift apart.
  *
  * A version of better-auth that moved the hook throws at start-up rather than
  * quietly reopening the path - this is the only thing closing it, and the shape
@@ -429,7 +445,7 @@ function gateOtherSignIns(plugin: BetterAuthPlugin): BetterAuthPlugin {
                     ? {
                           ...hook,
                           matcher: (context) =>
-                              matches(context) || CHALLENGED_SIGN_IN_PATHS.has(context.path ?? "")
+                              matches(context) || challengedSignIn(context.path ?? "", context.body)
                       }
                     : hook
             )
@@ -486,11 +502,12 @@ const recordSignInMethod = createAuthMiddleware(async (ctx) => {
     const method = SIGN_IN_METHOD_BY_PATH.get(ctx.path) ?? connectionSignInMethod(ctx.path, ctx.body);
     if (method) {
         const armed = (user as { twoFactorEnabled?: unknown }).twoFactorEnabled === true;
-        // A passkey and a scanned code are never challenged, so an armed factor
-        // says nothing about how they got in. The paths that are challenged are
-        // exactly the ones that spend a remembered browser's pass, which is the
-        // same question asked from the other side.
-        const challengeable = spendsTrust(ctx.path);
+        // A passkey, a scanned code and a connected account this deployment does
+        // not challenge are never asked for a second step, so an armed factor
+        // says nothing about how they got in. The sign-ins that are challenged
+        // are exactly the ones that spend a remembered browser's pass, which is
+        // the same question asked from the other side.
+        const challengeable = challengedSignIn(ctx.path, ctx.body);
         await noteSignIn(user.id, {
             method,
             secondFactor: challengeable && armed ? "trusted-device" : null
@@ -882,6 +899,7 @@ export async function recordPasskeyOrigin(
                 rpId: passkeyRelyingPartyId(address),
                 userAgent: originUserAgent(request.headers) ?? null,
                 userAgentBrands: originUserAgentBrands(request.headers) ?? null,
+                userAgentPlatform: originUserAgentPlatform(request.headers) ?? null,
                 ip: originIp(request.headers) ?? null,
                 ...(typeof name === "string" && name.trim() ? { name: name.trim() } : {})
             }

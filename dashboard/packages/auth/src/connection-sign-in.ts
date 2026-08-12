@@ -8,10 +8,16 @@
  * and not a session row written by hand.
  *
  * Going through better-auth is what keeps the gates on. The second-factor
- * challenge is a hook on the endpoint that creates a session, so an account with
- * an authenticator armed is challenged here as well; the sign-in is recorded as
- * the service that proved it; the remembered-device pass rotates. A session
- * created beside all that would have quietly skipped every one of them.
+ * challenge is a hook on the endpoint that creates a session, so an account that
+ * asks to be challenged here is; the sign-in is recorded as the service that
+ * proved it; the remembered-device pass rotates. A session created beside all
+ * that would have quietly skipped every one of them.
+ *
+ * Whether the challenge is raised is the caller's to decide and travels in the
+ * request, because it is two settings and a database read away - the instance's
+ * demand and the account's own - and none of that belongs in the auth package.
+ * The endpoint is unreachable over HTTP, so nothing outside Polaris can answer
+ * that question for it.
  *
  * The endpoint is sealed off from the network the same way the device flow is:
  * this is Polaris's own callback talking to Polaris, and the rules that make it
@@ -26,7 +32,7 @@ import type { BetterAuthPlugin } from "better-auth";
 import type { IssuedCookie } from "./device-login.js";
 import { readIssuedCookies } from "./device-login.js";
 import { setSessionCookie } from "better-auth/cookies";
-import { APIError, createAuthEndpoint } from "better-auth/api";
+import { APIError, createAuthEndpoint, createAuthMiddleware } from "better-auth/api";
 
 /** Where the sealed endpoint answers. Exported because the hooks that gate and
  *  describe a sign-in match on it. */
@@ -38,10 +44,27 @@ export const CONNECTION_SIGN_IN_PATH = "/polaris/connection-sign-in";
  * Refuses a request that arrived over HTTP: `ctx.request` is set only then, and
  * left undefined by a server-side `auth.api` call, which is the same line the
  * device flow draws between Polaris's own actions and anything else.
+ *
+ * The refusal is made twice on purpose. The hook runs before the body is
+ * validated, so a caller off the wire is answered the same way whatever it sent -
+ * a 400 for a malformed body would say the endpoint is there, which is the one
+ * thing this is not meant to admit. The check inside the handler is what still
+ * holds if the hook is ever dropped.
  */
 export function connectionSignInPlugin(): BetterAuthPlugin {
     return {
         id: "polaris-connection-sign-in",
+        hooks: {
+            before: [
+                {
+                    matcher: (context) => context.path === CONNECTION_SIGN_IN_PATH,
+                    handler: createAuthMiddleware(async (ctx) => {
+                        if (!ctx.request) return;
+                        throw new APIError("NOT_FOUND", { message: "Not found" });
+                    })
+                }
+            ]
+        },
         endpoints: {
             polarisConnectionSignIn: createAuthEndpoint(
                 CONNECTION_SIGN_IN_PATH,
@@ -50,7 +73,14 @@ export function connectionSignInPlugin(): BetterAuthPlugin {
                     body: z.object({
                         userId: z.string(),
                         /** The service that proved it, for the session's own record. */
-                        provider: z.string()
+                        provider: z.string(),
+                        /**
+                         * Whether this sign-in still owes the second-factor
+                         * challenge. Required rather than defaulted: a caller that
+                         * forgot to decide should fail to compile, not quietly
+                         * pick the answer that skips a gate.
+                         */
+                        challenge: z.boolean()
                     })
                 },
                 async (ctx) => {
@@ -82,7 +112,7 @@ export function connectionSignInPlugin(): BetterAuthPlugin {
  *  which this package cannot name in the declarations it emits. */
 interface ConnectionSignInApi {
     polarisConnectionSignIn(input: {
-        body: { userId: string; provider: string };
+        body: { userId: string; provider: string; challenge: boolean };
         headers: Headers;
         returnHeaders: true;
     }): Promise<{ headers: Headers }>;
@@ -110,11 +140,11 @@ const TWO_FACTOR_COOKIE_SUFFIX = "two_factor";
  */
 export async function signInWithConnection(
     auth: Auth,
-    input: { userId: string; provider: string },
+    input: { userId: string; provider: string; challenge: boolean },
     headers: Headers
 ): Promise<ConnectionSignInResult> {
     const { headers: issued } = await (auth.api as unknown as ConnectionSignInApi).polarisConnectionSignIn({
-        body: { userId: input.userId, provider: input.provider },
+        body: { userId: input.userId, provider: input.provider, challenge: input.challenge },
         headers,
         returnHeaders: true
     });

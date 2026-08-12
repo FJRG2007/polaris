@@ -64,7 +64,15 @@ export const instanceSecuritySchema = z.object({
      */
     acceptedFactors: z
         .array(z.enum(SECOND_FACTOR_ENROLLMENTS))
-        .transform((values) => Array.from(new Set(["totp" as const, ...values])))
+        .transform((values) => Array.from(new Set(["totp" as const, ...values]))),
+    /**
+     * Ask for the second step after a sign-in with a connected account as well.
+     *
+     * Defaulted rather than required, so a policy stored before this existed goes
+     * on parsing instead of falling back to the defaults wholesale - which would
+     * silently undo whatever the operator had chosen above it.
+     */
+    challengeConnectionSignIn: z.boolean().default(false)
 });
 
 export type InstanceSecurityPolicy = z.infer<typeof instanceSecuritySchema>;
@@ -76,8 +84,15 @@ export type InstanceSecurityPolicy = z.infer<typeof instanceSecuritySchema>;
  * deployment that cannot send mail - the enrollment step only ever offers a factor
  * that can actually be armed right now - and on one that can, it means the person
  * signing in does not have to go and install an authenticator app first.
+ *
+ * The connected-account challenge is off. Signing in through GitHub or Google
+ * already means answering that account's own sign-in, which for the people who
+ * use it is a second factor and a hardware key more often than not; asking for a
+ * code on top of it makes the shortest way in the longest one, and the account
+ * that would have to be broken first is not this one.
  */
 export const INSTANCE_SECURITY_DEFAULTS: InstanceSecurityPolicy = {
     requireSecondFactor: true,
-    acceptedFactors: ["totp", "email"]
+    acceptedFactors: ["totp", "email"],
+    challengeConnectionSignIn: false
 };

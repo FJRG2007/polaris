@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Which of the accounts somebody has connected may sign them in.
+ * Which of the accounts somebody has connected may sign them in, and whether
+ * that way in still owes the second step.
  *
  * One switch per connected account rather than one per service: a person with a
  * work GitHub and a personal one has every reason to let one of them in and not
@@ -12,6 +13,12 @@
  * "can this account get in" and waiting on a round trip to redraw it reads as a
  * dead control. It also says when the operator has closed the service anyway, so
  * a switch that is on but does nothing is never left looking like it works.
+ *
+ * The second-step switch below them is the same control the operator has under
+ * Management > Security, from the other side: they can ask it of everybody, and
+ * this asks it of one account. So it is drawn on and fixed when the instance has
+ * already decided - a control that silently does nothing is worse than one that
+ * says who is holding it.
  */
 
 import { ShieldAlert } from "lucide-react";
@@ -19,8 +26,8 @@ import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
 import { IntegrationLogo } from "@/components/logos";
 import { Card, CardBody, Switch } from "@polaris/ui";
-import { setConnectionSignInAction } from "./actions";
 import { Feedback, type SettingLock } from "./setting-card";
+import { setConnectionSignInAction, setConnectionSignInChallengeAction } from "./actions";
 
 export interface ConnectedSignIn {
     id: string;
@@ -35,11 +42,26 @@ export interface ConnectedSignIn {
     warning?: string;
 }
 
+/** What this account has decided about the second step after a connected sign-in,
+ *  and whether the decision is still theirs to make. */
+export interface ConnectionChallenge {
+    enabled: boolean;
+    /** The instance asks for it on every account, so the switch is drawn on and
+     *  cannot be turned off here. */
+    enforced: boolean;
+}
+
 export function ConnectedSignInCard({
     accounts,
+    challenge,
+    twoFactorEnabled,
     lock
 }: {
     accounts: ConnectedSignIn[];
+    challenge: ConnectionChallenge;
+    /** Whether there is a second step to ask for at all. With no factor armed the
+     *  switch would promise something nothing can deliver. */
+    twoFactorEnabled: boolean;
     lock?: SettingLock;
 }) {
     return (
@@ -48,8 +70,7 @@ export function ConnectedSignInCard({
                 <div>
                     <h2 className="text-sm font-medium">Connected accounts</h2>
                     <p className="text-xs text-muted-foreground">
-                        Choose which of the accounts you have connected can sign you in. Signing in with one still
-                        asks for your second factor.
+                        Choose which of the accounts you have connected can sign you in.
                     </p>
                 </div>
                 {accounts.length === 0 ? (
@@ -63,8 +84,56 @@ export function ConnectedSignInCard({
                         ))}
                     </ul>
                 )}
+                {/* Only where it decides something: an account with no second
+                    factor is never challenged, and one with nothing connected has
+                    no sign-in of this kind to challenge. */}
+                {twoFactorEnabled && accounts.length > 0 ? (
+                    <ChallengeRow challenge={challenge} locked={Boolean(lock)} />
+                ) : null}
             </CardBody>
         </Card>
+    );
+}
+
+function ChallengeRow({ challenge, locked }: { challenge: ConnectionChallenge; locked: boolean }) {
+    const [enabled, setEnabled] = useState(challenge.enabled);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    function toggle(next: boolean) {
+        setEnabled(next);
+        setError(null);
+        startTransition(async () => {
+            const result = await runAction(() => setConnectionSignInChallengeAction(next), setError);
+            if (!result || result.error) {
+                setEnabled(!next);
+                if (result?.error) setError(result.error);
+            }
+        });
+    }
+
+    return (
+        <div className="flex flex-col gap-1 border-t border-border pt-3">
+            <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                    <p className="text-sm">Ask for my second step too</p>
+                    <p className="text-xs text-muted-foreground">
+                        Signing in this way answers the other service first, so Polaris does not ask again
+                        unless you want it to.
+                    </p>
+                </div>
+                <Switch
+                    checked={challenge.enforced || enabled}
+                    disabled={locked || pending || challenge.enforced}
+                    onChange={toggle}
+                    aria-label="Ask for my second step after a connected account signs me in"
+                />
+            </div>
+            {challenge.enforced ? (
+                <p className="text-xs text-muted-foreground">This Polaris asks for it on every account.</p>
+            ) : null}
+            <Feedback error={error} />
+        </div>
     );
 }
 

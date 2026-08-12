@@ -21,17 +21,18 @@ import { listUserPasskeys, type PasskeyView } from "@/lib/passkey-directory";
 import { notifySessionOpened, notifySessionsClosed } from "@/lib/notifications/session-events";
 import { describeDevice, isIpv4, isPrivateIp, sessionName, type SignInRecord } from "@polaris/core";
 import {
-    clientHost,
-    clientIp,
-    clientUserAgent,
-    clientUserAgentBrands
-} from "@/lib/request-context";
-import {
     sessionApproval,
     sessionSignIn,
     sessionUserAgent,
     type SessionApproval
 } from "@/lib/session-row";
+import {
+    clientHost,
+    clientIp,
+    clientUserAgent,
+    clientUserAgentBrands,
+    clientUserAgentPlatform
+} from "@/lib/request-context";
 import {
     adoptTrustedDevice,
     currentTrustedDevice,
@@ -101,9 +102,10 @@ export function describeOrigin(
     ip: string | undefined | null,
     country: string | null,
     userAgent: string | undefined | null,
-    brands?: string | null
+    brands?: string | null,
+    platform?: string | null
 ): string {
-    const device = describeDevice(userAgent, brands);
+    const device = describeDevice(userAgent, brands, platform);
     const where = [ip || null, country].filter(Boolean).join(" - ");
     return where ? `${device} - ${where}` : device;
 }
@@ -313,13 +315,20 @@ async function trustedDeviceViews(userId: string): Promise<TrustedDeviceView[]> 
     const held = TRUST_DEVICE_COOKIE_NAMES.map((name) => jar.get(name)?.value).find(Boolean);
     const current = currentTrustedDevice(held, userId);
     if (current) {
-        const [userAgent, userAgentBrands, ip, host] = await Promise.all([
+        const [userAgent, userAgentBrands, userAgentPlatform, ip, host] = await Promise.all([
             clientUserAgent(),
             clientUserAgentBrands(),
+            clientUserAgentPlatform(),
             clientIp(),
             clientHost()
         ]);
-        await adoptTrustedDevice(userId, current, { userAgent, userAgentBrands, ip, host });
+        await adoptTrustedDevice(userId, current, {
+            userAgent,
+            userAgentBrands,
+            userAgentPlatform,
+            ip,
+            host
+        });
     }
     return listTrustedDevices(userId, current);
 }
@@ -328,7 +337,7 @@ function toTrustedDeviceRow(device: TrustedDeviceView, publicIp: string | null):
     return {
         id: device.id,
         current: device.current,
-        device: describeDevice(device.userAgent, device.userAgentBrands),
+        device: describeDevice(device.userAgent, device.userAgentBrands, device.userAgentPlatform),
         ip: device.ip,
         publicIp: device.ip && isLocalAddress(device.ip) ? publicIp : null,
         host: device.host,
@@ -487,7 +496,10 @@ async function approver(
     if (!bySessionId) return {};
     const row = await prisma.session.findFirst({
         where: { id: bySessionId, userId },
-        select: { userAgent: true, state: { select: { userAgent: true, userAgentBrands: true } } }
+        select: {
+            userAgent: true,
+            state: { select: { userAgent: true, userAgentBrands: true, userAgentPlatform: true } }
+        }
     });
     if (!row) return {};
     return {
@@ -516,7 +528,14 @@ export async function decideLoginApproval(
 ): Promise<{ error?: string }> {
     const state = await prisma.sessionState.findFirst({
         where: { sessionId, userId, approval: "pending" },
-        select: { sessionId: true, ip: true, country: true, userAgent: true, userAgentBrands: true }
+        select: {
+            sessionId: true,
+            ip: true,
+            country: true,
+            userAgent: true,
+            userAgentBrands: true,
+            userAgentPlatform: true
+        }
     });
     if (!state) return { error: "That sign-in is no longer waiting." };
 
@@ -540,7 +559,13 @@ export async function decideLoginApproval(
         // is announced - the alert raised when it was created said it was waiting.
         await notifySessionOpened({
             userId,
-            origin: describeOrigin(state.ip, state.country, state.userAgent, state.userAgentBrands)
+            origin: describeOrigin(
+                state.ip,
+                state.country,
+                state.userAgent,
+                state.userAgentBrands,
+                state.userAgentPlatform
+            )
         });
     } else {
         await prisma.session.deleteMany({ where: { id: sessionId, userId } });

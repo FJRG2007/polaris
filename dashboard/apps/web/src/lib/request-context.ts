@@ -10,7 +10,13 @@
 
 import { headers } from "next/headers";
 import { createHash } from "node:crypto";
-import { originHost, originIp, originUserAgent, originUserAgentBrands } from "@polaris/core";
+import {
+    originHost,
+    originIp,
+    originUserAgent,
+    originUserAgentBrands,
+    originUserAgentPlatform
+} from "@polaris/core";
 
 /** Best-effort client IP from the forwarded headers, or undefined. */
 export async function clientIp(): Promise<string | undefined> {
@@ -27,6 +33,12 @@ export async function clientUserAgent(): Promise<string | undefined> {
  *  which one it really is. */
 export async function clientUserAgentBrands(): Promise<string | undefined> {
     return originUserAgentBrands(await headers());
+}
+
+/** The operating system the client announced, or undefined. Believed over the
+ *  user-agent, which a browser emulating a phone rewrites and this outlives. */
+export async function clientUserAgentPlatform(): Promise<string | undefined> {
+    return originUserAgentPlatform(await headers());
 }
 
 /**

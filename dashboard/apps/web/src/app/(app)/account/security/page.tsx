@@ -19,6 +19,7 @@ import { listPasskeys } from "./passkey-actions";
 import { getSuccessor } from "@/lib/successor-service";
 import { currentDeviceStanding } from "@/lib/device-grace";
 import { listUserSessions } from "@/lib/session-directory";
+import { getInstanceSecurity } from "@/lib/instance-security";
 import type { ConnectedSignIn } from "./connected-sign-in-card";
 import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
 import { CONNECTION_PROVIDERS, findConnectionProvider } from "@polaris/core";
@@ -76,6 +77,7 @@ export default async function SecurityPage() {
         backupCodes,
         standing,
         connections,
+        instancePolicy,
         successor
     ] = await Promise.all([
         getUserSecurity(user.id),
@@ -93,6 +95,10 @@ export default async function SecurityPage() {
         // The outside accounts this person has connected, and whether each may
         // sign them in - which is theirs to decide and the operator's to allow.
         connectedSignIns(user.id),
+        // Only for the switch that asks for the second step after one of them:
+        // the instance can have settled it already, and a switch that says
+        // otherwise would be lying about what happens at the next sign-in.
+        getInstanceSecurity(),
         getSuccessor(user.id)
     ]);
     const lock = standing.settled ? undefined : { reason: newDeviceWaitMessage(standing) };
@@ -121,6 +127,10 @@ export default async function SecurityPage() {
                 trustedDevices={trustedDevices}
                 twoFactorPreferred={settings.twoFactorPreferred}
                 connections={connections}
+                connectionChallenge={{
+                    enabled: settings.challengeConnectionSignIn,
+                    enforced: instancePolicy.challengeConnectionSignIn
+                }}
                 otherSessions={sessions.filter((session) => !session.current).length}
                 successor={
                     successor ? { userId: successor.userId, name: successor.name, email: successor.email } : null

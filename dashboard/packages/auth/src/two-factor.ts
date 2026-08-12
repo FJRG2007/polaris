@@ -168,13 +168,15 @@ export function currentTrustedDevice(cookie: string | undefined, userId: string)
 /**
  * What a request said about the browser making it, as recorded against a pass.
  *
- * Every field is the caller's to write and is kept as a label. The brands are
- * carried beside the user-agent because a Chromium browser that rebadges Chrome
- * names itself in one and not the other.
+ * Every field is the caller's to write and is kept as a label. The brands and the
+ * platform are carried beside the user-agent because that string is the one a
+ * browser rewrites: a Chromium that rebadges Chrome names itself only in the
+ * brands, and one emulating a phone keeps its real system only in the platform.
  */
 export interface DeviceOrigin {
     userAgent?: string;
     userAgentBrands?: string;
+    userAgentPlatform?: string;
     ip?: string;
     host?: string;
 }
@@ -186,6 +188,7 @@ function describedBy(origin: DeviceOrigin) {
     return {
         userAgent: origin.userAgent ?? null,
         userAgentBrands: origin.userAgentBrands ?? null,
+        userAgentPlatform: origin.userAgentPlatform ?? null,
         ip: origin.ip ?? null,
         host: origin.host ?? null
     };
@@ -204,6 +207,8 @@ export interface TrustedDeviceView {
     userAgent: string | null;
     /** The brands it announced, read together with the user-agent above. */
     userAgentBrands: string | null;
+    /** The system it announced, which outranks the user-agent's claim. */
+    userAgentPlatform: string | null;
     ip: string | null;
     host: string | null;
     /** Null on a pass granted before Polaris started describing them. */
@@ -246,6 +251,7 @@ export async function listTrustedDevices(
             current: pass.identifier === currentIdentifier,
             userAgent: details?.userAgent ?? null,
             userAgentBrands: details?.userAgentBrands ?? null,
+            userAgentPlatform: details?.userAgentPlatform ?? null,
             ip: details?.ip ?? null,
             host: details?.host ?? null,
             rememberedAt: details?.createdAt.toISOString() ?? null,
@@ -400,6 +406,7 @@ export async function followTrustedDevice(
                     host: origin.host ?? existing.host,
                     userAgent: origin.userAgent ?? existing.userAgent,
                     userAgentBrands: origin.userAgentBrands ?? existing.userAgentBrands,
+                    userAgentPlatform: origin.userAgentPlatform ?? existing.userAgentPlatform,
                     lastSeenAt: new Date()
                 }
             });

@@ -55,6 +55,7 @@ export async function listUserPasskeys(userId: string, userAgent?: string): Prom
             ip: true,
             userAgent: true,
             userAgentBrands: true,
+            userAgentPlatform: true,
             createdAt: true,
             lastUsedAt: true
         }
@@ -63,7 +64,7 @@ export async function listUserPasskeys(userId: string, userAgent?: string): Prom
     // them was issued under the published app URL.
     const published = passkeyRelyingPartyId(loadEnv().POLARIS_APP_URL) ?? "";
     return rows.map((row) => {
-        const client = describeClient(row.userAgent, row.userAgentBrands);
+        const client = describeClient(row.userAgent, row.userAgentBrands, row.userAgentPlatform);
         return {
             id: row.id,
             name: row.name?.trim() || "Unnamed passkey",

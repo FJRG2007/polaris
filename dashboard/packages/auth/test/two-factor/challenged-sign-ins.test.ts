@@ -4,14 +4,16 @@
  *
  * better-auth's two-factor plugin only watches the credential sign-in paths, so
  * Polaris widens that hook to cover the two that arrive by another door: an
- * emailed sign-in link, and a linked GitHub or Google account. Both prove
- * something in place of the password and neither is the second step the account
- * asked for.
+ * emailed sign-in link, and a linked GitHub or Google account. An emailed link
+ * proves a mailbox and nothing else, so it is always challenged. A linked account
+ * has just answered somebody else's sign-in, so it is challenged only when the
+ * instance or the account asked for it - the app resolves that and says so in the
+ * request, and anything short of an explicit yes reads as no.
  *
  * The hole they would open is invisible from the outside - both simply work - so
  * what is pinned here is the shape the widening depends on: an upgrade that
  * moves or renames the hook has to fail here rather than quietly hand an armed
- * account a full session for a click in a mailbox or a press on a button.
+ * account a full session for a click in a mailbox.
  */
 
 import { beforeAll, describe, expect, it } from "vitest";
@@ -26,11 +28,11 @@ let authModule: AuthModule;
 function twoFactorMatchers(instance: { options: { plugins?: unknown[] } }) {
     const plugins = (instance.options.plugins ?? []) as {
         id: string;
-        hooks?: { after?: { matcher: (context: { path: string }) => boolean }[] };
+        hooks?: { after?: { matcher: (context: { path: string; body?: unknown }) => boolean }[] };
     }[];
     const plugin = plugins.find((entry) => entry.id === "two-factor");
     const hooks = plugin?.hooks?.after ?? [];
-    return (path: string) => hooks.some((hook) => hook.matcher({ path }));
+    return (path: string, body?: unknown) => hooks.some((hook) => hook.matcher({ path, body }));
 }
 
 beforeAll(async () => {
@@ -43,18 +45,31 @@ beforeAll(async () => {
 });
 
 describe("the second-factor gate", () => {
-    it("covers the emailed link and a linked account as well as the password", () => {
+    it("covers the emailed link as well as the password", () => {
         const claims = twoFactorMatchers(authModule.createAuth());
         expect(claims("/sign-in/email")).toBe(true);
         expect(claims(authModule.MAGIC_LINK_VERIFY_PATH)).toBe(true);
-        expect(claims(CONNECTION_SIGN_IN_PATH)).toBe(true);
     });
 
     it("covers them on a deployment that can send codes by message", () => {
         const claims = twoFactorMatchers(authModule.createAuth({ sendTwoFactorCode: async () => ({}) }));
         expect(claims("/sign-in/email")).toBe(true);
         expect(claims(authModule.MAGIC_LINK_VERIFY_PATH)).toBe(true);
-        expect(claims(CONNECTION_SIGN_IN_PATH)).toBe(true);
+    });
+
+    it("covers a linked account when the sign-in asked to be challenged", () => {
+        const claims = twoFactorMatchers(authModule.createAuth());
+        expect(claims(CONNECTION_SIGN_IN_PATH, { challenge: true })).toBe(true);
+    });
+
+    it("leaves a linked account alone when it did not", () => {
+        const claims = twoFactorMatchers(authModule.createAuth());
+        expect(claims(CONNECTION_SIGN_IN_PATH, { challenge: false })).toBe(false);
+        // Absent, and anything that is not the boolean, read as no challenge -
+        // the app is the only caller and it always says which.
+        expect(claims(CONNECTION_SIGN_IN_PATH, {})).toBe(false);
+        expect(claims(CONNECTION_SIGN_IN_PATH, { challenge: "true" })).toBe(false);
+        expect(claims(CONNECTION_SIGN_IN_PATH)).toBe(false);
     });
 
     it("leaves paths that issue no session alone", () => {

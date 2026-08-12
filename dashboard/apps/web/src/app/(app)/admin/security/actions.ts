@@ -25,7 +25,8 @@ export async function saveInstanceSecurityAction(input: unknown): Promise<{ erro
         action: "instance.security.updated",
         metadata: {
             requireSecondFactor: parsed.data.requireSecondFactor,
-            acceptedFactors: parsed.data.acceptedFactors
+            acceptedFactors: parsed.data.acceptedFactors,
+            challengeConnectionSignIn: parsed.data.challengeConnectionSignIn
         }
     });
     revalidatePath("/admin/security");

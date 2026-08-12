@@ -9,6 +9,10 @@
  * gate and the screen that clears it from disagreeing - a gate that holds somebody
  * for a factor the screen does not offer is a locked instance.
  *
+ * Where the factor is asked for is part of the first question, so it is settled
+ * here too: a sign-in with a connected account defers to that account's own gates
+ * and is not challenged again unless the instance or the person says otherwise.
+ *
  * Whether a factor can be armed is a fact about the deployment, not about the
  * policy: the authenticator always can, and the email code only where there is a
  * channel to send from. So the accepted list is filtered by what actually works
@@ -18,9 +22,9 @@
 
 import { cache } from "react";
 import { prisma } from "@polaris/db";
-import { twoFactorEnabled } from "@polaris/auth";
 import { getAuthMailStatus } from "@/lib/auth-mail";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { getUserSecurity, twoFactorEnabled } from "@polaris/auth";
 import {
     INSTANCE_SECURITY_DEFAULTS,
     instanceSecuritySchema,
@@ -96,4 +100,26 @@ export async function owesSecondFactor(userId: string): Promise<boolean> {
     const policy = await getInstanceSecurity();
     if (!policy.requireSecondFactor) return false;
     return !(await twoFactorEnabled(userId));
+}
+
+/**
+ * Whether a sign-in with a connected GitHub or Google account still owes the
+ * second-factor challenge.
+ *
+ * Two opinions, and either one is enough: the instance can demand it of every
+ * account, and an account can ask for it when the instance does not. Neither
+ * cancels the other - the same rule the rest of this screen runs on, where a
+ * person may add protection the deployment did not ask for and cannot drop what
+ * it did.
+ *
+ * Off on both is the default, and it is the interesting case: the provider has
+ * just put its own sign-in in front of this one, which for most people is a
+ * second factor already. An account with no factor armed is not challenged
+ * whatever this returns, so the answer only ever matters for the accounts that
+ * have one.
+ */
+export async function connectionSignInChallenged(userId: string): Promise<boolean> {
+    const policy = await getInstanceSecurity();
+    if (policy.challengeConnectionSignIn) return true;
+    return (await getUserSecurity(userId)).challengeConnectionSignIn;
 }

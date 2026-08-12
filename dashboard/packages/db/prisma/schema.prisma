@@ -333,6 +333,9 @@ model TrustedDevice {
     userAgent String?
     // The brands that browser announced, read the same way a session's are.
     userAgentBrands String?
+    // The system it announced, which outranks the user-agent's claim: a browser
+    // emulating a phone rewrites the string and leaves this alone.
+    userAgentPlatform String?
     ip        String?
     host      String?
     createdAt DateTime @default(now())
@@ -371,6 +374,9 @@ model AccountDevice {
     // What it announced and where from when it was first seen. Kept as first
     // seen rather than last: this row is about the device's age on the account.
     userAgentBrands String?
+    // The system it announced, preferred over the user-agent's claim when the
+    // device is described.
+    userAgentPlatform String?
     ip              String?
     host            String?
     firstSeenAt DateTime @default(now())
@@ -464,6 +470,9 @@ model Passkey {
     // Vivaldi and Arc report themselves as Chrome in the user-agent on purpose,
     // and this is the only place they say otherwise.
     userAgentBrands String?
+    // The system it announced, from the same header family. Believed over the
+    // user-agent, which a browser emulating a phone rewrites and this outlives.
+    userAgentPlatform String?
     // Where the registration came from. Nothing decides on it; it is what
     // answers "was this me?" about a credential the owner does not recognise.
     ip           String?
@@ -588,6 +597,11 @@ model UserSecurity {
     sessionMaxMinutes    Int       @default(0)
     // New sign-ins must be approved from an already-active session.
     requireLoginApproval Boolean   @default(false)
+    // Answer the second-factor challenge after signing in with a connected
+    // GitHub or Google account too, rather than letting that account stand for
+    // both steps. Off by default; the instance policy can demand it of everyone,
+    // and this is how one account asks for it when the instance does not.
+    challengeConnectionSignIn Boolean @default(false)
     // Second-factor delivery methods the account accepts, beyond the
     // authenticator, which is always accepted while the factor is on. JSON
     // string array for SQLite portability; empty means authenticator only.
@@ -826,6 +840,9 @@ model SessionState {
     // The brands the browser announced, from the client-hints header, so a
     // session names the same browser its passkeys and its remembered pass do.
     userAgentBrands String?
+    // The system it announced. Read in preference to the user-agent, which says
+    // whatever a browser in device-emulation mode has been told to say.
+    userAgentPlatform String?
     // The hostname the session was opened on. A deployment answers on several
     // names - polaris.local on the LAN, its domain from outside - and the cookie
     // is host-only, so the same person signed in twice holds two sessions that
@@ -902,6 +919,11 @@ model DeviceCode {
     scope           String?
     requestIp        String?
     requestUserAgent String?
+    // What that browser announced about itself beyond the string above, read the
+    // same way every other device record is: the brands name a Chromium that
+    // rebadges Chrome, and the platform outranks a user-agent set to a phone's.
+    requestUserAgentBrands   String?
+    requestUserAgentPlatform String?
     requestHost      String?
     createdAt       DateTime  @default(now())
 

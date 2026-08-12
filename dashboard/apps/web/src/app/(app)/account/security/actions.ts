@@ -39,6 +39,7 @@ import {
     carrySignInRecord,
     changeUserPassword,
     setNewDeviceGrace,
+    setConnectionSignInChallenge,
     clearQuickPin,
     clearSecurityQuestions,
     getUserSecurity,
@@ -73,6 +74,29 @@ export async function setConnectionSignInAction(connectionId: string, enabled: b
 
     const updated = await setConnectionSignIn(user.id, parsed.data, enabled === true);
     if (!updated) return { error: "That account is no longer connected." };
+    revalidatePath("/account/security");
+    return {};
+}
+
+/**
+ * Ask for the second-factor challenge after a connected account signs this
+ * person in, or stop asking.
+ *
+ * Gated like the rest of the page, because turning it off takes a step away. The
+ * instance's own demand is read separately and is not touched here, so an
+ * operator who asks for it everywhere goes on getting it whatever this says.
+ */
+export async function setConnectionSignInChallengeAction(challenge: boolean): Promise<ActionResult> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
+
+    await setConnectionSignInChallenge(user.id, challenge === true);
+    await recordAudit({
+        actorId: user.id,
+        action: "account.connection-sign-in.challenge",
+        metadata: { challenge: challenge === true }
+    });
     revalidatePath("/account/security");
     return {};
 }

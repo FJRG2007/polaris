@@ -34,7 +34,13 @@ import { appBaseUrl } from "@/lib/domain-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { sessionDeviceLabels } from "@/lib/session-device";
 import { describeDevice, QR_SIGN_IN_PATH, type QrSignInDecision } from "@polaris/core";
-import { clientHost, clientIp, clientUserAgent, clientUserAgentBrands } from "@/lib/request-context";
+import {
+    clientHost,
+    clientIp,
+    clientUserAgent,
+    clientUserAgentBrands,
+    clientUserAgentPlatform
+} from "@/lib/request-context";
 import {
     beginSessionRotation,
     claimDeviceCode,
@@ -107,13 +113,24 @@ export async function openSignInCode(): Promise<{ code?: QrSignInCode; error?: s
     await prisma.deviceCode.deleteMany({ where: { expiresAt: { lt: new Date() } } });
 
     const issued = await openDeviceCode(auth);
-    const [userAgent, host] = await Promise.all([clientUserAgent(), clientHost()]);
+    const [userAgent, brands, platform, host] = await Promise.all([
+        clientUserAgent(),
+        clientUserAgentBrands(),
+        clientUserAgentPlatform(),
+        clientHost()
+    ]);
     // Recorded against the code rather than passed through it: what the person
     // approving is shown has to come from the request that opened the code, not
     // from anything the screen could put in the link.
     await prisma.deviceCode.update({
         where: { deviceCode: issued.deviceCode },
-        data: { requestIp: ip ?? null, requestUserAgent: userAgent ?? null, requestHost: host ?? null }
+        data: {
+            requestIp: ip ?? null,
+            requestUserAgent: userAgent ?? null,
+            requestUserAgentBrands: brands ?? null,
+            requestUserAgentPlatform: platform ?? null,
+            requestHost: host ?? null
+        }
     });
 
     const base = await appBaseUrl();
@@ -170,6 +187,8 @@ export async function describeSignInCode(userCode: string, userId: string): Prom
             createdAt: true,
             requestIp: true,
             requestUserAgent: true,
+            requestUserAgentBrands: true,
+            requestUserAgentPlatform: true,
             requestHost: true
         }
     });
@@ -180,7 +199,11 @@ export async function describeSignInCode(userCode: string, userId: string): Prom
     const country = row.requestIp ? (await resolveGeo(row.requestIp)).countryCode : null;
     return {
         userCode: row.userCode,
-        device: describeDevice(row.requestUserAgent),
+        device: describeDevice(
+            row.requestUserAgent,
+            row.requestUserAgentBrands,
+            row.requestUserAgentPlatform
+        ),
         origin: [row.requestIp, country].filter(Boolean).join(" - ") || "Unknown",
         host: row.requestHost,
         requestedAt: row.createdAt.toISOString(),
@@ -307,7 +330,11 @@ export async function decideSignInCode(
     // code is answered rather than after, because the browser waiting on that code
     // is polling: the moment the answer lands it can be handed its session, and a
     // note written after that arrives too late for the session it describes.
-    const scanner = describeDevice(await clientUserAgent(), await clientUserAgentBrands());
+    const scanner = describeDevice(
+        await clientUserAgent(),
+        await clientUserAgentBrands(),
+        await clientUserAgentPlatform()
+    );
     if (decision.approve) await noteSignInAuthorizer(userId, { sessionId: bySessionId, device: scanner });
 
     const result = await decideDeviceCode(auth, decision.userCode, decision.approve, store);

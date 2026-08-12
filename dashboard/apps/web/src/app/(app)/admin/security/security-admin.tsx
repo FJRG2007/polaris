@@ -26,13 +26,17 @@ export function SecurityAdmin({ policy, mailReady }: { policy: InstanceSecurityP
     const router = useRouter();
     const [required, setRequired] = useState(policy.requireSecondFactor);
     const [accepted, setAccepted] = useState<SecondFactorEnrollment[]>(policy.acceptedFactors);
+    const [connectionChallenge, setConnectionChallenge] = useState(policy.challengeConnectionSignIn);
     const [busy, setBusy] = useState(false);
     const [result, setResult] = useState<{ error?: string; ok?: string } | null>(null);
 
     const sameList =
         accepted.length === policy.acceptedFactors.length &&
         accepted.every((factor) => policy.acceptedFactors.includes(factor));
-    const dirty = required !== policy.requireSecondFactor || !sameList;
+    const dirty =
+        required !== policy.requireSecondFactor ||
+        !sameList ||
+        connectionChallenge !== policy.challengeConnectionSignIn;
 
     function toggle(factor: SecondFactorEnrollment, on: boolean) {
         setResult(null);
@@ -46,7 +50,8 @@ export function SecurityAdmin({ policy, mailReady }: { policy: InstanceSecurityP
         setResult(null);
         const response = await saveInstanceSecurityAction({
             requireSecondFactor: required,
-            acceptedFactors: accepted
+            acceptedFactors: accepted,
+            challengeConnectionSignIn: connectionChallenge
         });
         setBusy(false);
         setResult(response);
@@ -123,6 +128,34 @@ export function SecurityAdmin({ policy, mailReady }: { policy: InstanceSecurityP
                             </div>
                         );
                     })}
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardBody className="flex flex-col gap-3">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h2 className="text-sm font-medium">Ask again after a connected account</h2>
+                            <p className="text-xs text-muted-foreground">
+                                Signing in with GitHub or Google answers that service first. With this on,
+                                Polaris asks for the second step afterwards as well.
+                            </p>
+                        </div>
+                        <Switch
+                            checked={connectionChallenge}
+                            onChange={(next) => {
+                                setResult(null);
+                                setConnectionChallenge(next);
+                            }}
+                            aria-label="Ask again after a connected account"
+                        />
+                    </div>
+                    {!connectionChallenge ? (
+                        <p className="text-xs text-muted-foreground">
+                            With this off, the service that signed them in is the whole sign-in. Anyone who
+                            wants the extra step can still turn it on for their own account.
+                        </p>
+                    ) : null}
                 </CardBody>
             </Card>
 
