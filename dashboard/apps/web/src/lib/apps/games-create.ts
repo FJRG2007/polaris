@@ -175,22 +175,23 @@ export async function minecraftShapeEnv(
     // written every time, blank included: a value left over from the last world
     // would quietly generate the previous one under the new one's name.
     //
-    // A map is terrain that already exists, so none of it describes anything -
-    // and writing it anyway is not free. A blueprint's flat lobby setting carried
-    // onto a map server put `level-type=minecraft:flat` with no layers in front of
-    // a world that was never going to be generated, and the server said so twice,
-    // in red, on the console of a server that had just been created and was fine.
-    if (!map) {
-        env.set(seedEnvKey(edition), shape.seed?.trim() ?? "");
-        for (const [key, value] of Object.entries(
-            levelTypeEnv(
-                edition,
-                shape.levelType ?? blueprint.levelType ?? DEFAULT_LEVEL_TYPE,
-                shape.biome ?? DEFAULT_BIOME
-            )
-        )) {
-            env.set(key, value);
-        }
+    // A map is terrain that already exists, so none of this describes anything -
+    // and it is put back to its default rather than left alone, which is not the
+    // same as skipping it. A blueprint's flat lobby setting carried onto a map
+    // server means `level-type=minecraft:flat` with no layers under it, and the
+    // server reports that as an error on every boot of a world it was never going
+    // to generate. Not writing it left whatever the server already had, so the
+    // error outlived the change that was supposed to stop it.
+    const generated = map === undefined;
+    env.set(seedEnvKey(edition), generated ? (shape.seed?.trim() ?? "") : "");
+    for (const [key, value] of Object.entries(
+        levelTypeEnv(
+            edition,
+            generated ? (shape.levelType ?? blueprint.levelType ?? DEFAULT_LEVEL_TYPE) : DEFAULT_LEVEL_TYPE,
+            generated ? (shape.biome ?? DEFAULT_BIOME) : DEFAULT_BIOME
+        )
+    )) {
+        env.set(key, value);
     }
 
     // Only the Java image runs a JVM to give a heap to.

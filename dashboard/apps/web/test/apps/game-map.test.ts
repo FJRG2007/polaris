@@ -193,6 +193,21 @@ describe("building a server on a map", () => {
         await expect(envFor("skyblock", "not-a-map")).rejects.toThrow(/not one this game/);
     });
 
+    it("puts the world shape back to its default, rather than leaving the old one", async () => {
+        // Not the same as not writing it. A blueprint's flat lobby setting already
+        // on the server means `level-type=minecraft:flat` with no layers under it,
+        // which the server reports as an error on every boot of a world it will
+        // never generate - and skipping the write left exactly that in place, so
+        // the error outlived the change meant to stop it.
+        const env = await envFor("bedwars", "bedwars-treasure-island", {
+            LEVEL_TYPE: "minecraft:flat",
+            GENERATOR_SETTINGS: "",
+            SEED: "12345"
+        });
+        expect(env.get("LEVEL_TYPE")).toBe("minecraft:normal");
+        expect(env.get("SEED")).toBe("");
+    });
+
     it("leaves a server with no map generating its own world", async () => {
         const blueprint = findBlueprint("survival");
         expect(mapsFor(blueprint).length).toBe(0);

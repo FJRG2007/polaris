@@ -528,24 +528,22 @@ export async function newWorld(
         }
         await setEnvVars("application", server.applicationId, ownerId, [
             { key: world.levelEnvKey(server.edition), value: target, isSecret: false },
-            // Everything below describes a world being generated, and a map is one
-            // that arrives built - so on that path only the folder is written.
-            ...(generating
-                ? [
-                      // Cleared rather than left behind when no seed was given: the
-                      // stored one would otherwise generate the same map again and
-                      // read as a bug.
-                      { key: world.seedEnvKey(server.edition), value: seed, isSecret: false },
-                      // Written every time, blank included, for the same reason: a
-                      // shape left over from the last world would quietly generate
-                      // the previous one.
-                      ...Object.entries(world.levelTypeEnv(server.edition, levelType, biome)).map(([key, value]) => ({
-                          key,
-                          value,
-                          isSecret: false
-                      }))
-                  ]
-                : [])
+            // Cleared rather than left behind when no seed was given: the stored
+            // one would otherwise generate the same map again and read as a bug.
+            { key: world.seedEnvKey(server.edition), value: generating ? seed : "", isSecret: false },
+            // Written every time, blank included, for the same reason: a shape left
+            // over from the last world would quietly generate the previous one.
+            //
+            // A world that arrives already built is described by none of it, and it
+            // goes back to the default rather than being left alone - a blueprint's
+            // flat lobby setting inherited by a map server is a flat level type
+            // with no layers under it, which the server reports as an error on
+            // every boot of a world it will never generate.
+            ...Object.entries(
+                generating
+                    ? world.levelTypeEnv(server.edition, levelType, biome)
+                    : world.levelTypeEnv(server.edition, world.DEFAULT_LEVEL_TYPE, world.DEFAULT_BIOME)
+            ).map(([key, value]) => ({ key, value, isSecret: false }))
         ]);
         return { target, keep };
     });
