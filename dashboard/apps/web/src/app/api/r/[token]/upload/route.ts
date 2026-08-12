@@ -14,7 +14,6 @@ import { loadEnv } from "@polaris/config";
 import { getSession } from "@/lib/session";
 import { dymoIpAllowed } from "@/lib/dymo-service";
 import { geoAllowedForIp } from "@/lib/geo-service";
-import { claimUploadPath } from "@/lib/upload-naming";
 import { scanDropPointUpload } from "@/lib/scan-service";
 import * as fileRequests from "@/lib/file-request-service";
 import { recordItemCreator } from "@/lib/drive-meta-service";
@@ -22,6 +21,7 @@ import { clientIp, hashForLog } from "@/lib/request-context";
 import { getDriverForConnection } from "@/lib/storage-service";
 import { extensionOf } from "@/app/(app)/drive/file-categories";
 import { invalidateFolderSizes } from "@/lib/drive-folder-size";
+import { claimUploadPath, replaceWithStaged } from "@/lib/upload-naming";
 import { baseName, checkUploadCandidate, normalizeRelPath } from "@polaris/core";
 
 export const runtime = "nodejs";
@@ -133,64 +133,55 @@ export async function PUT(
 
     // The sender's filename is kept as it is: whoever collects these files has to
     // recognize what they were sent, and a document that arrives renamed is a
-    // document somebody has to open to identify. Unless the owner allows replacing
-    // what is already there, the name is claimed first and a collision is numbered,
-    // so one uploader can never overwrite another's file.
+    // document somebody has to open to identify.
     const requested = normalizeRelPath(
         fileRequest.destinationPath ? `${fileRequest.destinationPath}/${safeName}` : safeName
     );
 
     const driver = await getDriverForConnection(fileRequest.destinationConnectionId);
-    let destination = requested;
-    // Only a path this request created may be cleaned up on failure. When the owner
-    // allowed replacing, the destination is somebody's existing file and deleting it
-    // would turn a failed upload into the loss of the document it was replacing.
-    let claimed = false;
+    // The bytes always land on a name of this request's own, never straight onto an
+    // existing file, because both gates below reject by deleting what they were
+    // given - writing over the target first would let a rejected upload destroy the
+    // document it was replacing. Where it finally belongs is settled after they pass.
+    const staged = await claimUploadPath(driver, requested);
+    const destination = fileRequest.allowOverwrite ? requested : staged;
+    const storedName = baseName(destination);
     try {
-        if (!fileRequest.allowOverwrite) {
-            destination = await claimUploadPath(driver, requested);
-            claimed = true;
-        }
-        const storedName = baseName(destination);
         let stat;
         try {
-            stat = await driver.writeStream(destination, limitSize(request.body, maxSizeBytes), {});
+            stat = await driver.writeStream(staged, limitSize(request.body, maxSizeBytes), {});
         } catch (error) {
             // An aborted oversize write leaves a truncated file behind, under a name
             // that reads as a complete document. Take the claim back with it.
-            if (claimed) await driver.delete(destination).catch(() => undefined);
+            await driver.delete(staged).catch(() => undefined);
             throw error;
         }
         // Authoritative minimum-size gate on the bytes actually stored. A file below
         // the floor is removed so nothing is kept or recorded.
         if (minSizeBytes > 0 && Number(stat.size) < minSizeBytes) {
-            if (claimed) await driver.delete(destination).catch(() => undefined);
+            await driver.delete(staged).catch(() => undefined);
             return new Response("too_small", { status: 422 });
         }
+
+        // Recorded against the staged path, because the scan below is what decides
+        // whether the file stays at all: blocking deletes it and quarantining moves
+        // it, and both write that outcome onto this row.
         const submission = await fileRequests.recordSubmission({
             requestId: fileRequest.id,
             submittedByUserId: userId,
             ipHash: hashForLog(ip),
             fileName: storedName,
             size: stat.size,
-            storedPath: destination
+            storedPath: staged
         });
-        // Owner of record: the signed-in uploader, or the drop point's owner who
-        // collected it when the upload was anonymous.
-        await recordItemCreator(
-            fileRequest.destinationConnectionId,
-            destination,
-            userId ?? fileRequest.ownerId
-        );
-        await invalidateFolderSizes(fileRequest.destinationConnectionId, destination);
 
-        // Security scan (VirusTotal, when enabled). Runs before acknowledging the
-        // upload so the configured action - block by default - can be enforced on a
-        // flagged file. The drop point's owner is alerted with the verdict.
+        // Security scan (VirusTotal, when enabled). Runs on the staged file, before
+        // it is in place, so the configured action - block by default - can be
+        // enforced without the flagged bytes ever standing in for the real file.
         const scan = await scanDropPointUpload({
             driver,
             connectionId: fileRequest.destinationConnectionId,
-            storedPath: destination,
+            storedPath: staged,
             fileName: storedName,
             ownerId: fileRequest.ownerId,
             dropPointTitle: fileRequest.title,
@@ -198,6 +189,23 @@ export async function PUT(
             size: Number(stat.size)
         });
         if (scan.blocked) return new Response("file_rejected", { status: 422 });
+
+        // Only a file the scan left where it put it can be moved into place; a
+        // quarantined one has already been taken somewhere else on purpose.
+        if (scan.action !== "quarantined") {
+            await replaceWithStaged(driver, staged, destination);
+            if (destination !== staged) {
+                await fileRequests.setSubmissionPath(submission.id, destination);
+            }
+            // Owner of record: the signed-in uploader, or the drop point's owner who
+            // collected it when the upload was anonymous.
+            await recordItemCreator(
+                fileRequest.destinationConnectionId,
+                destination,
+                userId ?? fileRequest.ownerId
+            );
+            await invalidateFolderSizes(fileRequest.destinationConnectionId, destination);
+        }
 
         // Fold this upload into the browser's visitor session (the "uploaded?"
         // column), and hand back a per-file delete token so the uploader can
@@ -209,9 +217,10 @@ export async function PUT(
         return Response.json({
             ok: true,
             id: submission.id,
-            // The name it was actually stored under, which differs from the one sent
-            // when it collided; the uploader is shown this, not what they picked.
-            name: storedName,
+            // The name the SENDER used, even when the file was stored under a
+            // numbered one. Nobody uploading here can see the folder, so telling them
+            // their name was taken tells them somebody else's file is in it.
+            name: safeName,
             size: stat.size.toString(),
             deleteToken,
             ...(scan.scanned ? { scan: scan.verdict } : {})
@@ -219,7 +228,12 @@ export async function PUT(
     } catch (error) {
         const message = error instanceof Error ? error.message : "upload_failed";
         // A mid-stream size abort surfaces as a 413 so the client can explain it.
-        return new Response(message, { status: message === "too_large" ? 413 : 500 });
+        if (message === "too_large") return new Response("too_large", { status: 413 });
+        // Anything else is the storage backend talking, and the person on the other
+        // end of a drop point is a stranger: its message names hosts, paths and
+        // providers they have no business seeing. It goes to the log instead.
+        console.error("drop point: upload failed", error);
+        return new Response("upload_failed", { status: 500 });
     } finally {
         await driver.dispose();
     }

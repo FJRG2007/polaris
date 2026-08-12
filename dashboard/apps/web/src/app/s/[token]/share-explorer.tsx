@@ -428,6 +428,10 @@ export function ShareExplorer({
         setUploading(true);
         setOpError(null);
         let failed = 0;
+        // Names the folder already held, so the upload was stored beside the existing
+        // file instead of over it. Worth saying: the recipient can see both, and a
+        // second copy appearing unannounced reads as the upload having gone wrong.
+        const renamed: string[] = [];
         for (const { file, relPath } of items) {
             const q = new URLSearchParams({ name: relPath });
             if (path) q.set("p", path);
@@ -436,7 +440,12 @@ export function ShareExplorer({
                     method: "PUT",
                     body: file
                 });
-                if (!res.ok) failed++;
+                if (!res.ok) {
+                    failed++;
+                    continue;
+                }
+                const body = (await res.json().catch(() => ({}))) as { name?: string };
+                if (body.name && body.name !== file.name) renamed.push(body.name);
             } catch {
                 failed++;
             }
@@ -444,6 +453,13 @@ export function ShareExplorer({
         setUploading(false);
         if (fileInput.current) fileInput.current.value = "";
         if (failed > 0) setOpError(`${failed} file${failed === 1 ? "" : "s"} could not be uploaded.`);
+        else if (renamed.length > 0) {
+            setOpError(
+                renamed.length === 1
+                    ? `That name was already here, so your file was saved as ${renamed[0]}.`
+                    : `${renamed.length} names were already here, so those files were saved alongside them.`
+            );
+        }
         reload();
     }
 

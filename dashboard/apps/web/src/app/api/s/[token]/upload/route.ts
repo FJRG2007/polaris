@@ -7,7 +7,7 @@
  * are avoided here because they buffer the body.
  */
 
-import { claimUploadPath } from "@/lib/upload-naming";
+import { claimUploadPath, replaceWithStaged } from "@/lib/upload-naming";
 import { gateShareRequest } from "@/lib/share-access";
 import { baseName, normalizeRelPath } from "@polaris/core";
 import { getDriverForConnection } from "@/lib/storage-service";
@@ -64,23 +64,19 @@ export async function PUT(
         // the folder, so a name that collides is somebody else's file, not a version
         // of their own. The name is claimed before the transfer and a collision is
         // numbered, unless the owner explicitly allowed replacing what is there.
-        let destination = target;
-        let claimed = false;
-        if (!share.allowOverwrite) {
-            destination = await claimUploadPath(driver, target);
-            claimed = true;
-        }
+        const staged = await claimUploadPath(driver, target);
+        const destination = share.allowOverwrite ? target : staged;
         let stat;
         try {
-            stat = await driver.writeStream(destination, request.body);
+            stat = await driver.writeStream(staged, request.body);
         } catch (error) {
-            // Take back a name this request claimed, so a failed transfer leaves no
-            // half-written file under a name that reads as a complete document. A
-            // destination we were allowed to replace is left alone: it is somebody
-            // else's file, and deleting it would lose what the upload replaced.
-            if (claimed) await driver.delete(destination).catch(() => undefined);
+            // A failed transfer leaves no half-written file behind under a name that
+            // reads as a complete document. The file it was going to replace is
+            // untouched: nothing moves onto it until the bytes are all here.
+            await driver.delete(staged).catch(() => undefined);
             throw error;
         }
+        await replaceWithStaged(driver, staged, destination);
         await invalidateFolderSizes(share.connectionId, destination);
         void logShareAccess({ shareId: share.id, action: "upload", ip, ipHash, userAgentHash });
         return Response.json({

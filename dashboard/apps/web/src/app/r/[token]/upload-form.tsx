@@ -22,8 +22,6 @@ interface Item {
     file: File;
     status: ItemStatus;
     message?: string;
-    /** Set when the name it was stored under differs from the one that was sent. */
-    renamedTo?: string;
 }
 
 /** A file this browser uploaded, with the token that authorizes deleting it. */
@@ -139,9 +137,9 @@ export function DropUploader({
                 };
             }
             const body = (await res.json()) as { id?: string; name?: string; deleteToken?: string };
-            // The server answers with the name it stored the file under. It matches
-            // what was sent unless that name was taken, and the uploader is better
-            // off seeing the file that now exists than the one they picked.
+            // Always the name this uploader sent. A drop point shows nobody what else
+            // is in the folder, so reporting a numbered name would tell them their
+            // filename was taken - which is telling them somebody else's file is there.
             const storedName = body.name ?? file.name;
             const record =
                 body.id && body.deleteToken
@@ -152,14 +150,7 @@ export function DropUploader({
                           at: Date.now()
                       }
                     : undefined;
-            return {
-                item: {
-                    file,
-                    status: "done",
-                    ...(storedName === file.name ? {} : { renamedTo: storedName })
-                },
-                mine: record
-            };
+            return { item: { file, status: "done" }, mine: record };
         } catch {
             return { item: { file, status: "error", message: "Upload failed" } };
         }
@@ -243,14 +234,8 @@ export function DropUploader({
                             ) : (
                                 <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
                             )}
-                            <span className="flex min-w-0 flex-1 flex-col">
-                                <span className="truncate" title={item.file.name}>{item.file.name}</span>
-                                {item.renamedTo ? (
-                                    <span className="truncate text-xs text-muted-foreground">
-                                        A file with that name was already here, so yours was
-                                        saved as {item.renamedTo}
-                                    </span>
-                                ) : null}
+                            <span className="min-w-0 flex-1 truncate" title={item.file.name}>
+                                {item.file.name}
                             </span>
                             <span
                                 className={

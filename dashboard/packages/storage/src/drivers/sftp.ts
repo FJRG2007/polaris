@@ -68,6 +68,20 @@ export interface SftpSessionOptions extends SftpDriverBase {
 
 export type SftpDriverOptions = SftpConnectOptions | SftpSessionOptions;
 
+/**
+ * Turn a failed stat into the right error. Only SSH_FX_NO_SUCH_FILE means the
+ * path is not there; a permission failure has to say so, because a caller asking
+ * whether a name is free would otherwise be told a name it cannot see is spare
+ * and would write over the file living under it.
+ */
+function sftpStatError(error: Error & { code?: number }, path: string): StorageError {
+    if (error.code === 3) return new StorageError("permission_denied", `Not permitted: ${path}`);
+    if (error.code !== undefined && error.code !== 2) {
+        return new StorageError("io_error", `Cannot read ${path} (code ${error.code})`);
+    }
+    return new StorageError("not_found", `Not found: ${path}`);
+}
+
 /** Whether these options lend a session rather than describe a connection. */
 function isBorrowed(options: SftpDriverOptions): options is SftpSessionOptions {
     return "session" in options;
@@ -162,7 +176,7 @@ export class SftpDriver implements StorageDriver {
         const sftp = this.channel();
         const attrs = await new Promise<Stats>((resolve, reject) => {
             sftp.stat(this.resolve(rel), (error, stats) =>
-                error ? reject(new StorageError("not_found", `Not found: ${path}`)) : resolve(stats as never)
+                error ? reject(sftpStatError(error, path)) : resolve(stats as never)
             );
         });
         return toEntry(baseName(rel) || rel, rel, attrs);

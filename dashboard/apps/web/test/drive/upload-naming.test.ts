@@ -12,11 +12,14 @@
 
 import { numberedName } from "@polaris/core";
 import { describe, expect, it } from "vitest";
-import { claimUploadPath } from "../../src/lib/upload-naming";
+import { claimUploadPath, replaceWithStaged } from "../../src/lib/upload-naming";
 import { StorageError, type StatEntry, type StorageDriver } from "@polaris/storage";
 
 /** A driver backed by a set of paths, recording every write it is asked for. */
-function fakeDriver(existing: string[] = [], options: { statDelayMs?: number } = {}) {
+function fakeDriver(
+    existing: string[] = [],
+    options: { statDelayMs?: number; moveFromFails?: string } = {}
+) {
     const files = new Set(existing);
     const writes: string[] = [];
     const driver = {
@@ -38,6 +41,19 @@ function fakeDriver(existing: string[] = [], options: { statDelayMs?: number } =
             writes.push(path);
             files.add(path);
             return { name: path, path, kind: "file", size: 0n, modifiedAt: new Date(0) };
+        },
+        async move(from: string, to: string): Promise<void> {
+            if (!files.has(from)) throw new StorageError("not_found", `Not found: ${from}`);
+            // Keyed on the source, so a test can fail the move that puts the new file
+            // in place without also failing the one that puts the old one back.
+            if (options.moveFromFails === from) {
+                throw new StorageError("io_error", `Cannot move ${from}`);
+            }
+            files.delete(from);
+            files.add(to);
+        },
+        async delete(path: string): Promise<void> {
+            files.delete(path);
         }
     } as unknown as StorageDriver;
     return { driver, files, writes };
@@ -109,5 +125,32 @@ describe("claiming a path for an upload", () => {
             }
         } as unknown as StorageDriver;
         await expect(claimUploadPath(driver, "Legal/contrato.pdf")).rejects.toThrow(StorageError);
+    });
+});
+
+describe("putting an accepted upload in place of the file it replaces", () => {
+    it("does nothing when the upload already landed where it belongs", async () => {
+        const { driver, files } = fakeDriver(["Legal/contrato.pdf"]);
+        await replaceWithStaged(driver, "Legal/contrato.pdf", "Legal/contrato.pdf");
+        expect([...files]).toEqual(["Legal/contrato.pdf"]);
+    });
+
+    it("replaces the target and leaves nothing behind", async () => {
+        const { driver, files } = fakeDriver(["Legal/contrato.pdf", "Legal/contrato (2).pdf"]);
+        await replaceWithStaged(driver, "Legal/contrato (2).pdf", "Legal/contrato.pdf");
+        expect([...files]).toEqual(["Legal/contrato.pdf"]);
+    });
+
+    it("puts the original back when the replacement cannot be moved in", async () => {
+        // The window this guards is the one that matters: the old file has already
+        // been moved aside, so a failure here would otherwise leave neither.
+        const { driver, files } = fakeDriver(["Legal/contrato.pdf", "Legal/contrato (2).pdf"], {
+            moveFromFails: "Legal/contrato (2).pdf"
+        });
+        await expect(
+            replaceWithStaged(driver, "Legal/contrato (2).pdf", "Legal/contrato.pdf")
+        ).rejects.toThrow(StorageError);
+        expect(files.has("Legal/contrato.pdf")).toBe(true);
+        expect([...files].some((path) => path.includes("polaris-replaced"))).toBe(false);
     });
 });

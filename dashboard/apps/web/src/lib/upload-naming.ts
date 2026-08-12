@@ -22,6 +22,7 @@
  * offers an atomic create - which the driver contract, deliberately, does not.
  */
 
+import { randomUUID } from "node:crypto";
 import { baseName, numberedName, parentPath } from "@polaris/core";
 import { StorageError, type StorageDriver } from "@polaris/storage";
 
@@ -74,10 +75,41 @@ function emptyBody(): ReadableStream<Uint8Array> {
 }
 
 /**
- * Reserve a path for an upload that must not overwrite anything: the requested
- * name when it is free, otherwise the first numbered variant that is. Returns
- * the claimed path, which now holds an empty file - the caller writes the real
- * bytes over it, and must delete it if the upload fails.
+ * Put an upload that passed every check in place of the file it was allowed to
+ * replace. No-op when the upload already landed on the target.
+ *
+ * Incoming bytes are always written to a name of their own and only moved onto
+ * the target once the size and scan gates have accepted them, because those
+ * gates reject by DELETING what they were given: a rejected upload written
+ * straight over the target would take the replaced document with it, which
+ * hands anyone who can guess a filename a way to destroy it.
+ *
+ * The old file is moved aside rather than deleted, and only dropped once the new
+ * one is in place - a move that fails partway must not leave the folder with
+ * neither. If it does fail, the old file goes back where it was.
+ */
+export async function replaceWithStaged(
+    driver: StorageDriver,
+    staged: string,
+    target: string
+): Promise<void> {
+    if (staged === target) return;
+    const aside = `${target}.polaris-replaced-${randomUUID()}`;
+    await driver.move(target, aside);
+    try {
+        await driver.move(staged, target);
+    } catch (error) {
+        await driver.move(aside, target).catch(() => undefined);
+        throw error;
+    }
+    await driver.delete(aside).catch(() => undefined);
+}
+
+/**
+ * Reserve a path for an upload: the requested name when it is free, otherwise
+ * the first numbered variant that is. Returns the claimed path, which now holds
+ * an empty file - the caller writes the real bytes over it, and must delete it
+ * if the upload fails or is rejected.
  */
 export async function claimUploadPath(driver: StorageDriver, target: string): Promise<string> {
     const parent = parentPath(target);

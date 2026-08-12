@@ -8,19 +8,19 @@
  * hash, so a dump yields no working links.
  */
 
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { prisma } from "@polaris/db";
 import type { CreateFileRequestInput } from "@polaris/core";
+import { getDriverForConnection } from "@/lib/storage-service";
+import { generateToken, hashToken } from "@polaris/core/tokens";
+import { invalidateFolderSizes } from "@/lib/drive-folder-size";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
 import {
     ipAllowed,
     normalizeRelPath,
     randomDropPointName,
     userAllowedForRequest
 } from "@polaris/core";
-import { generateToken, hashToken } from "@polaris/core/tokens";
-import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
-import { prisma } from "@polaris/db";
-import { getDriverForConnection } from "@/lib/storage-service";
-import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 
 /** A file request as needed by the public upload path. */
 export type FileRequestRecord = Awaited<ReturnType<typeof resolveFileRequestByToken>>;
@@ -395,6 +395,19 @@ export async function recordSubmission(entry: {
             status: "stored"
         },
         select: { id: true }
+    });
+}
+
+/**
+ * Point a submission at where its file ended up. An upload is recorded while it
+ * still sits under the name it was received on; only once the scan has cleared
+ * it does it move to the name it was destined for, and the row has to follow or
+ * the owner's list links to a path that is no longer there.
+ */
+export async function setSubmissionPath(submissionId: string, storedPath: string): Promise<void> {
+    await prisma.fileRequestSubmission.updateMany({
+        where: { id: submissionId },
+        data: { storedPath }
     });
 }
 

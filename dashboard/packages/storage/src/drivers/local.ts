@@ -99,7 +99,17 @@ export class LocalDriver implements StorageDriver {
         let info;
         try {
             info = await stat(abs);
-        } catch {
+        } catch (error) {
+            // Only "there is nothing here" is not_found. A directory we are not
+            // allowed to read reports its own code, and a caller asking whether a
+            // name is free has to hear that rather than be told the name is spare.
+            const code = (error as NodeJS.ErrnoException).code;
+            if (code === "EACCES" || code === "EPERM") {
+                throw new StorageError("permission_denied", `Not permitted: ${path}`);
+            }
+            if (code && code !== "ENOENT" && code !== "ENOTDIR") {
+                throw new StorageError("io_error", `Cannot read ${path}: ${code}`);
+            }
             throw new StorageError("not_found", `Not found: ${path}`);
         }
         return {
