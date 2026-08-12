@@ -26,11 +26,24 @@ const nextConfig = {
     outputFileTracingIncludes: {
         "/api/agents/runtime/bundle/**": ["../../packages/agent-runtime/dist/**"]
     },
-    // Pages that moved under the app they belong to; the old top-level paths keep
-    // working for anything already linking to them. A path listed here is claimed
-    // before routing, so it must never name a screen that exists - /overview was
-    // here until the Overview was built on it, and the redirect answered first.
-    redirects: async () => [{ source: "/notifications", destination: "/account/notifications", permanent: true }],
+    // Pages that moved; the old paths keep working for anything already linking to
+    // them. Two rules, and the second is why the first exists:
+    //
+    // A path listed here is claimed before routing, so it must never name a screen
+    // that exists - /overview redirected to Drive's own overview until the landing
+    // screen was built on that path, and the redirect went on answering for it.
+    //
+    // None of them is permanent. A permanent redirect is a 308, which a browser
+    // caches with no expiry and consults before it asks the server anything: the
+    // rule above can be deleted, deployed and still be what a returning session
+    // gets, because that session never re-requests the path to find out it changed.
+    // These are private pages with no search engine to inform, so the only thing
+    // permanence buys here is an unfixable mistake. The landing screen now answers
+    // at /home for the same reason - a path nobody's browser has a stale answer for.
+    redirects: async () => [
+        { source: "/notifications", destination: "/account/notifications", permanent: false },
+        { source: "/overview", destination: "/home", permanent: false }
+    ],
     webpack: (config) => {
         // @polaris/ui is transpiled from TypeScript source and, like the rest of
         // the repo, uses explicit .js import specifiers. Map them back to .ts/.tsx

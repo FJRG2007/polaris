@@ -20,6 +20,7 @@ export function WidgetCard({
     icon: Icon,
     href,
     hint,
+    grip,
     menu,
     children
 }: {
@@ -29,12 +30,17 @@ export function WidgetCard({
     href?: string | null;
     /** A figure or state worth reading in the heading itself. */
     hint?: ReactNode;
+    /** The handle the card is dragged by, drawn at the very start of the header
+     *  where a grid's handles are looked for. Faint until the card is hovered:
+     *  it is an affordance, not information. */
+    grip?: ReactNode;
     menu?: ReactNode;
     children: ReactNode;
 }) {
     return (
-        <Card className="flex h-full min-w-0 flex-col">
+        <Card className="group/card flex h-full min-w-0 flex-col">
             <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+                {grip ? <span className="opacity-0 transition-opacity group-hover/card:opacity-100 focus-within:opacity-100 -ml-1.5">{grip}</span> : null}
                 <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <h2 className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight" title={title}>{title}</h2>
                 {hint}

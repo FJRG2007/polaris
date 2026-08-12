@@ -22,39 +22,39 @@
 
 import Link from "next/link";
 import { cn } from "@polaris/ui";
+import * as nav from "@/lib/apps";
 import { ChevronLeft } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { hasOrgPermission } from "@polaris/core";
 import { useOrgNav } from "@/components/use-org-nav";
 import { useInstalledNav } from "@/components/use-installed-nav";
-import {
-    APP_SECTIONS,
-    installedAppIdForPath,
-    installedAppSubapp,
-    isSectionActive,
-    orgSlugForPath,
-    resolveActiveApp,
-    resolveSubapp,
-    type AppSection
-} from "@/lib/apps";
 
 export function AppSidebar({ appIds = [] }: { appIds?: string[] }) {
     const pathname = usePathname();
-    const app = resolveActiveApp(pathname);
+    const app = nav.resolveActiveApp(pathname);
     // Null everywhere except inside an organization, where it says what this
     // reader may open. Absent until it arrives, which draws the baseline rail.
-    const org = useOrgNav(orgSlugForPath(pathname));
+    const org = useOrgNav(nav.orgSlugForPath(pathname));
     // The same, for an installed app: the path carries an id, and what that id is
     // called and which of its screens this reader may open only the server knows.
     // A bridge or a database answers with no screens and keeps the Apps rail.
-    const installedId = installedAppIdForPath(pathname);
+    const installedId = nav.installedAppIdForPath(pathname);
     const installed = useInstalledNav(installedId);
     const subapp =
-        (installedId && installed ? installedAppSubapp(installedId, installed) : null) ?? resolveSubapp(pathname);
+        (installedId && installed ? nav.installedAppSubapp(installedId, installed) : null) ?? nav.resolveSubapp(pathname);
 
     // Hidden sections still nest under a root, so the whole list decides what is
     // an exact match even though only some of it is drawn.
-    const sections = subapp ? subapp.sections : (APP_SECTIONS[app.id] ?? []);
+    //
+    // The Overview is the exception: it belongs to no app's list of screens
+    // because it is a window onto all of them, which left the rail empty on the
+    // one screen where somebody has not yet decided where they are going. Its
+    // rail is the apps themselves.
+    const sections = subapp
+        ? subapp.sections
+        : app.id === nav.OVERVIEW_APP_ID
+          ? appRail(appIds)
+          : (nav.APP_SECTIONS[app.id] ?? []);
     const items = sections.filter((section) => {
         if (section.hidden) return false;
         // Outside an organization - and inside one before the answer arrives -
@@ -73,8 +73,8 @@ export function AppSidebar({ appIds = [] }: { appIds?: string[] }) {
     // Inside an organization the heading is its name once that is known, and its
     // handle until then - the rail is drawn from the path, and the path only
     // carries the handle.
-    const heading = subapp ? (org?.name ?? subapp.label) : app.label;
-    const groups: { label: string; items: AppSection[] }[] = [];
+    const heading = subapp ? (org?.name ?? subapp.label) : app.id === nav.OVERVIEW_APP_ID ? "Apps" : app.label;
+    const groups: { label: string; items: nav.AppSection[] }[] = [];
     for (const item of items) {
         const label = item.group ?? heading;
         const existing = groups.find((group) => group.label === label);
@@ -110,16 +110,26 @@ export function AppSidebar({ appIds = [] }: { appIds?: string[] }) {
     );
 }
 
+/** The apps this account can open, as rail entries. The Overview itself is left
+ *  out: it is the screen the rail is being drawn on. */
+function appRail(appIds: readonly string[]): nav.AppSection[] {
+    return nav.POLARIS_APPS.filter((app) => app.id !== nav.OVERVIEW_APP_ID && appIds.includes(app.id)).map((app) => ({
+        label: app.label,
+        href: app.href,
+        icon: app.icon
+    }));
+}
+
 function RailLink({
     item,
     pathname,
     sections
 }: {
-    item: AppSection;
+    item: nav.AppSection;
     pathname: string;
-    sections: readonly AppSection[];
+    sections: readonly nav.AppSection[];
 }) {
-    const active = isSectionActive(pathname, item.href, sections);
+    const active = nav.isSectionActive(pathname, item.href, sections);
     const Icon = item.icon;
     return (
         <Link

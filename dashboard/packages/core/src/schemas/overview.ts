@@ -104,11 +104,13 @@ export const EMPTY_OVERVIEW_PREFERENCES: OverviewPreferences = {
  * away. Cards further down are the ones you look at when you have already read
  * the top of the screen.
  *
- * The sizes are mixed rather than uniform so the four-column grid packs: a wide
- * card is followed by something narrow enough to sit beside it. What each account
- * actually sees is narrowed by permissions, so no fixed set of sizes can tile
- * every grid - the grid itself backfills what is left (see its `dense` flow), and
- * these are what make that possible rather than a row of identical halves.
+ * The sizes are mixed rather than uniform so the grid packs: a wide card is
+ * followed by something narrow enough to sit beside it. How many columns there
+ * are to pack is not known here - it follows the width the grid is given - and
+ * what each account sees is narrowed by its permissions, so no fixed set of
+ * sizes can tile every grid. The grid backfills what is left (see its dense
+ * flow); these are what give it something to backfill with, rather than a row of
+ * identical halves.
  *
  * Every card is on. A landing screen that hides half of itself until somebody
  * finds the customize button is a landing screen that teaches nobody what is

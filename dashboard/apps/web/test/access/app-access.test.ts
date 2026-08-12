@@ -69,7 +69,7 @@ describe("the Inbox door inside Management", () => {
         // Their landing screen is the grid like everybody else's; what this
         // protects is that Inbox is still on the switcher behind it, since the
         // permission is the only thing they hold.
-        expect(await homePathFor(holding("inbox.read"))).toBe("/overview");
+        expect(await homePathFor(holding("inbox.read"))).toBe("/home");
         expect(await reachableAppIds(holding("inbox.read"))).toContain("admin");
     });
 
@@ -94,8 +94,8 @@ describe("the Inbox door inside Management", () => {
 
 describe("homePathFor", () => {
     it("lands on the Overview, whichever apps the person holds", async () => {
-        expect(await homePathFor(holding("drive.read", "tasks.read"))).toBe("/overview");
-        expect(await homePathFor(holding("tasks.read"))).toBe("/overview");
+        expect(await homePathFor(holding("drive.read", "tasks.read"))).toBe("/home");
+        expect(await homePathFor(holding("tasks.read"))).toBe("/home");
     });
 
     it("lands an account that opens nothing on its own account page", async () => {

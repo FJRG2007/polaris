@@ -13,7 +13,7 @@ import { describePlace, isRecordablePlace } from "@/lib/overview/place-labels";
 
 describe("isRecordablePlace", () => {
     it("skips the Overview itself, which is where the card is drawn", () => {
-        expect(isRecordablePlace("/overview")).toBe(false);
+        expect(isRecordablePlace("/home")).toBe(false);
         expect(isRecordablePlace("/tasks")).toBe(true);
     });
 

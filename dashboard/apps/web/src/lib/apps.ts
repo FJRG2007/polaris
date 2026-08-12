@@ -98,13 +98,19 @@ export interface AppEntry {
     match?: string[];
 }
 
+/** The landing screen's own app id. It is the one app whose rail is the others. */
+export const OVERVIEW_APP_ID = "overview";
+
 export const POLARIS_APPS: AppEntry[] = [
     {
-        id: "overview",
+        id: OVERVIEW_APP_ID,
         label: "Overview",
         description: "Your services, usage and shortcuts at a glance",
         icon: LayoutDashboard,
-        href: "/overview"
+        // /home rather than /overview: that path spent a release redirecting to
+        // Drive's overview, permanently, and a browser that followed it once keeps
+        // doing so from its own cache however the server is configured afterwards.
+        href: "/home"
         // No permission: it is a view onto whatever the account can already
         // reach, so it shows what that is and nothing more. An account that
         // reaches nothing does not get it either - see reachableApps.

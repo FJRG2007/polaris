@@ -30,4 +30,14 @@ describe("next.config redirects", () => {
         const shadowed = redirects.filter((redirect) => routeFiles(redirect.source).some((file) => existsSync(file)));
         expect(shadowed.map((redirect) => redirect.source)).toEqual([]);
     });
+
+    // The collision above is only recoverable while the redirect is one the
+    // browser asks about. A permanent one is a 308 cached with no expiry, so the
+    // fix ships and the sessions that already followed it keep landing where it
+    // used to point, forever.
+    it("is never permanent", async () => {
+        const redirects = (await config.redirects?.()) ?? [];
+        const permanent = redirects.filter((redirect) => redirect.permanent);
+        expect(permanent.map((redirect) => redirect.source)).toEqual([]);
+    });
 });

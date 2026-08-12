@@ -11,9 +11,10 @@
  */
 
 import Link from "next/link";
-import { Skeleton, cn } from "@polaris/ui";
-import { formatBytes } from "@polaris/core";
+import { cn } from "@polaris/ui";
+import type { TaskPriority } from "@polaris/core";
 import { RelativeTime } from "@/components/relative-time";
+import { formatBytes, TASK_PRIORITY_COLORS, TASK_PRIORITY_LABELS } from "@polaris/core";
 import { StateDot, WidgetEmpty, WidgetList, WidgetRow, WidgetRowsSkeleton, WidgetUnavailable } from "../widget-card";
 import type {
     OverviewAlarms,
@@ -315,38 +316,55 @@ export function GamesWidget({ data }: { data: Loaded<OverviewGames> }) {
     );
 }
 
-/** Assigned work, as the three numbers somebody actually asks about. */
+/** The work assigned to somebody, most pressing first. */
 export function TasksWidget({ data }: { data: Loaded<OverviewTasks> }) {
-    if (data === undefined) {
-        return (
-            <div className="grid grid-cols-3 gap-2" aria-busy="true">
-                {Array.from({ length: 3 }, (_, index) => (
-                    <Skeleton key={index} className="h-16 rounded-md" />
-                ))}
-            </div>
-        );
-    }
+    if (data === undefined) return <WidgetRowsSkeleton />;
     if (data === null) return <WidgetUnavailable>Your work could not be read just now.</WidgetUnavailable>;
     if (data.assigned === 0) return <WidgetEmpty>Nothing is assigned to you.</WidgetEmpty>;
 
-    const tiles = [
-        { label: "Assigned", value: data.assigned, tone: "text-foreground", href: "/tasks" },
-        { label: "Due today", value: data.dueToday, tone: data.dueToday > 0 ? "text-warning" : "text-foreground", href: "/tasks" },
-        { label: "Overdue", value: data.overdue, tone: data.overdue > 0 ? "text-danger" : "text-foreground", href: "/tasks" }
-    ];
-
     return (
-        <div className="grid grid-cols-3 gap-2">
-            {tiles.map((tile) => (
-                <Link
-                    key={tile.label}
-                    href={tile.href}
-                    className="flex flex-col items-center gap-0.5 rounded-md border border-border/60 px-2 py-3 transition-colors hover:border-primary hover:bg-primary/5"
-                >
-                    <span className={cn("text-xl font-semibold tabular-nums", tile.tone)}>{tile.value}</span>
-                    <span className="text-center text-xs text-muted-foreground">{tile.label}</span>
-                </Link>
-            ))}
+        <div className="flex flex-col gap-3">
+            {/* One line, not three tiles: how much work there is says nothing about
+                what it is, and the tasks below are what somebody came to see. */}
+            <p className="text-sm">
+                <span className="text-xl font-semibold tabular-nums">{data.assigned}</span>
+                <span className="text-muted-foreground"> assigned</span>
+                {data.overdue > 0 ? <span className="text-danger"> - {data.overdue} overdue</span> : null}
+                {data.dueToday > 0 ? <span className="text-warning"> - {data.dueToday} due today</span> : null}
+            </p>
+            <WidgetList>
+                {data.rows.map((task) => (
+                    <WidgetRow
+                        key={task.id}
+                        href={task.href}
+                        icon={<PriorityMark priority={task.priority} />}
+                        label={task.name}
+                        detail={`${task.reference} - ${task.list}`}
+                        trailing={
+                            task.dueDate ? (
+                                <span className={cn("shrink-0 text-xs", task.overdue ? "text-danger" : "text-muted-foreground")}>
+                                    <RelativeTime iso={task.dueDate} />
+                                </span>
+                            ) : null
+                        }
+                    />
+                ))}
+            </WidgetList>
         </div>
+    );
+}
+
+/** The task's priority as the colour the Tasks app already uses for it, so the
+ *  card and the board agree at a glance. Unset priority draws nothing rather
+ *  than a grey dot that reads as a state. */
+function PriorityMark({ priority }: { priority: TaskPriority }) {
+    if (priority === "none") return <span className="size-2 shrink-0" aria-hidden="true" />;
+    return (
+        <span
+            className="size-2 shrink-0 rounded-full"
+            style={{ backgroundColor: TASK_PRIORITY_COLORS[priority] }}
+            title={TASK_PRIORITY_LABELS[priority]}
+            aria-label={TASK_PRIORITY_LABELS[priority]}
+        />
     );
 }

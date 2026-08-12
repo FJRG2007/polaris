@@ -27,7 +27,7 @@ export interface PlaceLabel {
 
 /** Screens that are never worth remembering: the Overview is where the card is
  *  drawn, and the account's own pages are one click from the avatar. */
-const NEVER_RECORD = ["/overview"];
+const NEVER_RECORD = ["/home"];
 
 export function isRecordablePlace(pathname: string): boolean {
     return pathname.startsWith("/") && !NEVER_RECORD.includes(pathname);

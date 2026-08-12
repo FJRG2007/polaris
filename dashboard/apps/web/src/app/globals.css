@@ -23,6 +23,73 @@ body {
 }
 
 /*
+ * The Overview grid.
+ *
+ * Written here rather than as utility classes because it has to measure itself.
+ * The shell puts a 15rem sidebar and its own padding between the viewport and
+ * the space the grid actually gets, and a viewport breakpoint can see none of
+ * it: that is how the grid came to stop at four columns on a screen wide enough
+ * for eight, and how a card could be told to span three columns of a grid that
+ * had two. A container query asks the one question that matters - how wide is
+ * this grid - so the columns and the cards spanning them agree by construction.
+ *
+ * A card is never narrower than --overview-card-min, below which the figure and
+ * its label stop fitting on one line, and never wider than the row divided by
+ * --overview-columns-max, past which a dashboard is a wall of slivers. Between
+ * those two the columns are shared out evenly, so the width is used rather than
+ * left as margin.
+ */
+.overview-grid {
+    --overview-card-min: 17rem;
+    --overview-gap: 1rem;
+    --overview-columns-max: 8;
+
+    container-type: inline-size;
+    display: grid;
+    /* Dense, so a narrow card is pulled up into the gap a wide one leaves rather
+       than the row ending early. */
+    grid-auto-flow: row dense;
+    gap: var(--overview-gap);
+    grid-template-columns: repeat(
+        auto-fill,
+        minmax(
+            max(
+                min(100%, var(--overview-card-min)),
+                calc(
+                    (100% - (var(--overview-columns-max) - 1) * var(--overview-gap)) /
+                        var(--overview-columns-max)
+                )
+            ),
+            1fr
+        )
+    );
+}
+
+/*
+ * How wide each stored size is drawn, clamped to the columns that exist here: n
+ * columns need n * card-min + (n - 1) * gap of grid, and a card told to span more
+ * than the grid has pushes an implicit column that overflows the screen
+ * sideways. Where container queries are not supported none of this applies and
+ * every card is one column wide - narrow, never broken.
+ */
+.overview-card {
+    grid-column: span 1;
+}
+
+@container (min-width: 35rem) {
+    .overview-card-md,
+    .overview-card-lg {
+        grid-column: span 2;
+    }
+}
+
+@container (min-width: 53rem) {
+    .overview-card-lg {
+        grid-column: span 3;
+    }
+}
+
+/*
  * Syntax highlighting palette. highlight.js only emits class names, never
  * colors, so the theme lives here instead of in one of its stylesheets: these
  * hues are the Polaris tokens, and they follow the light/dark switch like

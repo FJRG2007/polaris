@@ -52,6 +52,12 @@ export interface OverviewWidgetEntry {
      *  anything, on top of the permission. A card about game servers on an
      *  instance that runs none is an empty card teaching nobody anything. */
     requires?: OverviewFeature;
+    /** Other paths that are this card's subject, beyond `href`. Only used to
+     *  weigh how much the reader actually goes there (see relevance), and only
+     *  needed where the thing lives somewhere other than the screen that lists
+     *  it - a game server's own page is under the installed apps, not under the
+     *  list it is reached from. */
+    paths?: readonly string[];
 }
 
 /** The things a card can depend on being present, answered once on the server. */
@@ -134,6 +140,8 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
         icon: HardDrive,
         permission: "drive.read",
         href: "/drive/overview",
+        // Somebody who lives in their files is in Drive, not on its usage screen.
+        paths: ["/drive"],
         sizes: ALL_SIZES
     },
     {
@@ -152,6 +160,9 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
         icon: Gamepad2,
         permission: "games.read",
         href: "/apps/games",
+        // Each server's own page lives with the installed apps, and that is where
+        // somebody who runs one actually spends their time.
+        paths: ["/apps/installed"],
         sizes: ALL_SIZES,
         // Nobody who has never installed one wants a card about them, and being
         // offered it in the customize panel is being told to go and find out what

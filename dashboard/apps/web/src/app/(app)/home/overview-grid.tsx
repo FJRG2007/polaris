@@ -24,9 +24,10 @@ import { ActivityWidget, SessionsWidget } from "./widgets/account";
 import type { OverviewData } from "@/lib/overview/overview-service";
 import { overviewSize, overviewWidget } from "@/lib/overview/catalog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { emptyCards, relevanceOrder, rememberEmptyCards } from "@/lib/overview/relevance";
 import { AppsWidget, NotificationsWidget, RecentWidget, ShortcutsWidget } from "./widgets/personal";
-import { ArrowDown, ArrowUp, EyeOff, LayoutGrid, MoreVertical, RefreshCw, Settings2, Trash2 } from "lucide-react";
 import { AlarmsWidget, GamesWidget, ServicesWidget, StorageWidget, TasksWidget, UsageWidget } from "./widgets/infrastructure";
+import { ArrowDown, ArrowUp, EyeOff, GripVertical, LayoutGrid, MoreVertical, RefreshCw, Settings2, Trash2 } from "lucide-react";
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, cn } from "@polaris/ui";
 import {
     resolveOverviewLayout,
@@ -59,18 +60,15 @@ const SAVE_DEBOUNCE_MS = 600;
 let dataCache: { at: number; key: string; data: OverviewData } | null = null;
 
 /**
- * How wide each size is drawn, against a grid four columns wide.
- *
- * Four rather than three because three sizes on three columns leaves every wide
- * card owning its whole row: a counter that needs a quarter of the screen sits
- * beside three quarters of nothing. On four, a wide card still leaves a column
- * for a narrow one, and `grid-flow-dense` below pulls one up into whatever gap is
- * left rather than leaving the row half empty.
+ * How wide each stored size is drawn. The columns themselves, and the clamp that
+ * keeps a span inside the columns that exist at this width, are in globals.css:
+ * the grid measures itself with a container query, because the shell's sidebar
+ * sits between the viewport and the width the grid actually has.
  */
 const SPAN: Record<OverviewWidgetSize, string> = {
-    sm: "",
-    md: "sm:col-span-2",
-    lg: "sm:col-span-2 lg:col-span-3"
+    sm: "overview-card",
+    md: "overview-card overview-card-md",
+    lg: "overview-card overview-card-lg"
 };
 
 /** "Good morning" and the rest, by the reader's own clock. */
@@ -107,6 +105,12 @@ export function OverviewGrid({
     const [data, setData] = useState<OverviewData | undefined>(undefined);
     const [customizing, setCustomizing] = useState(false);
     const [picking, setPicking] = useState(false);
+    // The card being dragged, and the one it is currently over. Dragging is the
+    // gesture most people reach for; it is not the only one, because it does not
+    // exist for a keyboard and does not fire on a touch screen - the same moves
+    // are on every card's own menu and in the customize panel.
+    const [dragged, setDragged] = useState<OverviewWidgetId | null>(null);
+    const [over, setOver] = useState<OverviewWidgetId | null>(null);
     const [failure, setFailure] = useState<string | null>(null);
     const [nonce, setNonce] = useState(0);
     // Bumped when the visit history is thrown away, so the card that reads it out
@@ -125,6 +129,26 @@ export function OverviewGrid({
     const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => setHello(greetingFor(new Date())), []);
+
+    /** Cards this reader has arranged themselves. Everything else is ours to
+     *  order, and stops being so the moment they touch it. */
+    const arranged = useMemo(
+        () => new Set(preferences.widgets.map((widget) => widget.id)),
+        [preferences.widgets]
+    );
+
+    // Once, before the figures are asked for, so the grid is in its final order
+    // by the time it is read rather than rearranging itself under the reader.
+    // What it ranks on is what the last visit saw (see relevance).
+    useEffect(() => {
+        setWidgets((held) => relevanceOrder(held, arranged));
+    }, [arranged]);
+
+    // And what THIS visit saw, for the next one.
+    useEffect(() => {
+        if (!data) return;
+        rememberEmptyCards(emptyCards(data, { shortcuts: shortcuts.length, apps: apps.length }));
+    }, [data, shortcuts.length, apps.length]);
 
     /** Cards this account holds but cannot currently see. Carried through every
      *  save untouched, so losing access to an app for a week does not silently
@@ -171,14 +195,28 @@ export function OverviewGrid({
 
     const current = () => ({ widgets, shortcuts, greeting });
 
-    function move(id: OverviewWidgetId, direction: -1 | 1): void {
-        const index = widgets.findIndex((widget) => widget.id === id);
-        const to = index + direction;
-        if (index < 0 || to < 0 || to >= widgets.length) return;
+    function reorder(from: number, to: number): void {
+        if (from < 0 || to < 0 || from === to || from >= widgets.length || to >= widgets.length) return;
         const next = [...widgets];
-        const [held] = next.splice(index, 1);
+        const [held] = next.splice(from, 1);
         next.splice(to, 0, held!);
         persist({ ...current(), widgets: next });
+    }
+
+    function move(id: OverviewWidgetId, direction: -1 | 1): void {
+        const index = widgets.findIndex((widget) => widget.id === id);
+        reorder(index, index + direction);
+    }
+
+    /** Drop one card where another one is. Both are named rather than counted,
+     *  since the grid draws only the cards that are on and their positions in the
+     *  stored list are not the positions on screen. */
+    function moveOnto(id: OverviewWidgetId, target: OverviewWidgetId): void {
+        if (id === target) return;
+        reorder(
+            widgets.findIndex((widget) => widget.id === id),
+            widgets.findIndex((widget) => widget.id === target)
+        );
     }
 
     function toggle(id: OverviewWidgetId, visible: boolean): void {
@@ -298,15 +336,49 @@ export function OverviewGrid({
                     </Button>
                 </div>
             ) : (
-                <div className="grid grid-flow-row-dense grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="overview-grid">
                     {visible.map((widget, index) => {
                         const entry = overviewWidget(widget.id);
                         return (
-                            <div key={widget.id} className={cn("min-w-0", SPAN[overviewSize(widget.id, widget.size)])}>
+                            <div
+                                key={widget.id}
+                                data-widget={widget.id}
+                                className={cn(
+                                    "min-w-0 rounded-lg transition-opacity",
+                                    SPAN[overviewSize(widget.id, widget.size)],
+                                    dragged === widget.id && "opacity-40",
+                                    over === widget.id && dragged !== widget.id && "ring-2 ring-primary"
+                                )}
+                                onDragOver={(event) => {
+                                    if (!dragged) return;
+                                    // Without this the drop never happens: the
+                                    // default for a dragover is "not a target".
+                                    event.preventDefault();
+                                    event.dataTransfer.dropEffect = "move";
+                                    setOver(widget.id);
+                                }}
+                                onDragLeave={() => setOver((held) => (held === widget.id ? null : held))}
+                                onDrop={(event) => {
+                                    event.preventDefault();
+                                    if (dragged) moveOnto(dragged, widget.id);
+                                    setDragged(null);
+                                    setOver(null);
+                                }}
+                            >
                                 <WidgetCard
                                     title={entry.label}
                                     icon={entry.icon}
                                     href={entry.href}
+                                    grip={
+                                        <WidgetGrip
+                                            label={entry.label}
+                                            onStart={() => setDragged(widget.id)}
+                                            onEnd={() => {
+                                                setDragged(null);
+                                                setOver(null);
+                                            }}
+                                        />
+                                    }
                                     menu={
                                         <WidgetMenu
                                             label={entry.label}
@@ -350,6 +422,7 @@ export function OverviewGrid({
                 layout={widgets}
                 greeting={greeting}
                 onMove={move}
+                onMoveOnto={moveOnto}
                 onToggle={toggle}
                 onResize={resize}
                 onGreetingChange={(value) => persist({ ...current(), greeting: value })}
@@ -411,6 +484,38 @@ function WidgetBody({
         case "games":
             return <GamesWidget data={data === undefined ? undefined : (data.games ?? null)} />;
     }
+}
+
+/**
+ * The handle a card is dragged by.
+ *
+ * Deliberately not a button. There is nothing here for a keyboard to press - the
+ * same two moves are on the card's own menu and in the customize panel, which is
+ * where anybody not using a mouse arranges the grid - and a focusable control
+ * that does nothing when it is pressed is worse than no control at all.
+ */
+function WidgetGrip({ label, onStart, onEnd }: { label: string; onStart: () => void; onEnd: () => void }) {
+    return (
+        <span
+            draggable
+            title={`Drag to move ${label}`}
+            aria-hidden="true"
+            onDragStart={(event) => {
+                // Firefox starts no drag at all unless something is on the
+                // transfer, and the drag image defaults to the handle - a 24px
+                // smudge - unless it is told to use the card.
+                event.dataTransfer.setData("text/plain", label);
+                event.dataTransfer.effectAllowed = "move";
+                const card = event.currentTarget.closest("[data-widget]");
+                if (card instanceof HTMLElement) event.dataTransfer.setDragImage(card, 24, 24);
+                onStart();
+            }}
+            onDragEnd={onEnd}
+            className="grid size-6 shrink-0 cursor-grab place-items-center rounded text-muted-foreground/50 transition-colors hover:text-foreground active:cursor-grabbing"
+        >
+            <GripVertical className="size-4" aria-hidden="true" />
+        </span>
+    );
 }
 
 const SIZE_LABELS: Record<OverviewWidgetSize, string> = { sm: "Narrow", md: "Medium", lg: "Wide" };
