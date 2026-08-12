@@ -31,7 +31,7 @@ import { ARK_MAPS, mapRequirementHint } from "@/lib/apps/ark/maps";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
 import { createGameServerSchema, isModIdList } from "@/lib/apps/games-schema";
-import { createGameServerAction, gameSetupAction, type GameSetup } from "./actions";
+import { createGameServerAction, gameMachinesAction, gameSetupAction, type GameSetup } from "./actions";
 import { Gamepad2, Loader2, MemoryStick, RefreshCw, ShieldCheck, Users } from "lucide-react";
 import { findBlueprint, formatMemory, recommendedMemoryMb } from "@/lib/apps/minecraft/blueprints";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
@@ -95,6 +95,21 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                 if (loaded.games.length > 0 && !loaded.games.includes("minecraft")) setGame(loaded.games[0]!);
             })
             .catch(() => active && setError("Could not read your machines"));
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    // What each machine has free, which costs a round trip to every one of them.
+    // Asked for beside the setup rather than inside it, so the form is on screen
+    // and answerable while the figures are still coming back; they land on the
+    // machine already chosen without disturbing the choice. A failure leaves the
+    // list exactly as it was, which is the list with no figures on it.
+    useEffect(() => {
+        let active = true;
+        void gameMachinesAction()
+            .then((machines) => active && setSetup((current) => (current ? { ...current, machines } : current)))
+            .catch(() => undefined);
         return () => {
             active = false;
         };

@@ -28,6 +28,19 @@ import { Input, Select, Skeleton, cn } from "@polaris/ui";
 import { blueprintsFor } from "@/lib/apps/minecraft/blueprints";
 import { blueprintVersionsAction, type BlueprintVersions } from "@/app/(app)/apps/games/actions";
 
+/**
+ * What each blueprint answered last time it was asked, for this tab.
+ *
+ * The answer comes from Modrinth, one request per plugin the blueprint installs,
+ * and it does not change while somebody is filling in a form. Without this,
+ * clicking through the blueprints to read what each one is put the version field
+ * back behind a skeleton every time - including on the way back to the one that
+ * had already answered. Held outside the component so it survives the dialog
+ * being closed and opened again, which is the other way the same wait was paid
+ * twice.
+ */
+const answered = new Map<string, BlueprintVersions>();
+
 /** What the operator picked, which is everything both dialogs need to build a
  *  server: the game it plays and the map it plays it on. */
 export interface BlueprintShape {
@@ -105,9 +118,18 @@ export function BlueprintFields({
     // can run on are on screen while the decision is still being made.
     useEffect(() => {
         let active = true;
-        setOffered(null);
+        const key = `${value.blueprintId}|${crossplay}`;
+        const known = answered.get(key);
+        // Straight to the answer where there is one: a skeleton drawn over a
+        // field that is about to show the same list it showed a second ago is a
+        // wait invented rather than reported.
+        setOffered(known ?? null);
+        if (known) return;
         void blueprintVersionsAction(value.blueprintId, crossplay)
-            .then((answer) => active && setOffered(answer))
+            .then((answer) => {
+                answered.set(key, answer);
+                if (active) setOffered(answer);
+            })
             .catch(() => undefined);
         return () => {
             active = false;

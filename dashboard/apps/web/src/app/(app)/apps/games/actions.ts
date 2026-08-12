@@ -42,11 +42,21 @@ export interface GameSetup {
     readonly yourAddress: string | null;
 }
 
-/** Everything the create dialog needs that only the server knows. */
+/**
+ * Everything the create dialog needs that only the server knows, as fast as the
+ * server can say it.
+ *
+ * The machine list comes back unmeasured on purpose. Measuring what each one has
+ * free costs an SSH session per connected machine, and an unreachable machine
+ * costs the full probe timeout - which the dialog used to spend with its game
+ * picker and its machine list both behind skeletons, for a figure that is a
+ * footnote under one of them. The names are what the choice is made from and
+ * they are a database read away; the figures follow from gameMachinesAction.
+ */
 export async function gameSetupAction(): Promise<GameSetup> {
     const user = await requirePermission("games.manage");
     const [machines, suffixes, games, yourAddress] = await Promise.all([
-        listGameMachines(user.id),
+        listGameMachines(user.id, false),
         Promise.all(GAMES.map((game) => gameDomainSuffix(game.domainLabel).catch(() => null))),
         installedGameIds(user.id),
         clientIp()
@@ -60,6 +70,21 @@ export async function gameSetupAction(): Promise<GameSetup> {
         games,
         yourAddress: yourAddress ?? null
     };
+}
+
+/**
+ * What each machine actually has free, measured.
+ *
+ * The half of the setup above that costs a round trip to every connected
+ * machine, asked for on its own so it can arrive late without holding anything
+ * up. A machine that cannot be reached simply reports nothing, exactly as it did
+ * before, and the dialog goes on offering it - refusing to let somebody pick a
+ * machine because Polaris could not measure it would be a worse answer than a
+ * missing figure.
+ */
+export async function gameMachinesAction(): Promise<GameMachine[]> {
+    const user = await requirePermission("games.manage");
+    return listGameMachines(user.id, true);
 }
 
 /**

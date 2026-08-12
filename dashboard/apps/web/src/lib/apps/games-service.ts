@@ -17,7 +17,6 @@ import { hostPortForApp } from "@/lib/deploy-service";
 import { getLocalEnvironment } from "@/lib/network-service";
 import { readInstallConfig } from "@/lib/apps/install-config";
 import { appHasCapability, findApp } from "@/lib/apps/catalog";
-import { getServerMetrics } from "@/lib/server-metrics-service";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { gameServerAddress } from "@/lib/apps/minecraft/address";
 import { sweepArkTimeouts } from "@/lib/apps/ark/timeout-service";
@@ -29,6 +28,7 @@ import { syncMinecraftRoutes } from "@/lib/apps/minecraft/router-service";
 import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
 import { enforcePlayerAddresses } from "@/lib/apps/minecraft/player-access";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
+import { getServerMetrics, peekServerMetrics } from "@/lib/server-metrics-service";
 import { applyFirewallBans, editionOf, getServerPlayers } from "@/lib/apps/minecraft/service";
 import { gamePorts, probeListening, probeReach, reachConfirmedAt } from "@/lib/apps/minecraft/reach";
 import { gameReachAdvice, gameStoppedAdvice, type GamePort, type GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
@@ -354,8 +354,16 @@ export function withNamesOnly(presence: ServerPresence): GameServerLive {
  * process runs on for the local one) and moves. What its game servers are already
  * promised is Polaris' own bookkeeping and does not: it is the sum of the heaps
  * handed out, which is what actually decides whether the next server fits.
+ *
+ * @param probe Whether to go and ask each connected machine. Measuring costs an
+ *              SSH session per machine, and an unreachable one costs the whole
+ *              probe timeout - which is why the create dialog asks for the list
+ *              without it first. Unprobed, a machine reports whatever was last
+ *              measured recently enough to be worth showing, and nothing when
+ *              there is none: the list of machines is the same either way, so the
+ *              choice can be made while the figures are still arriving.
  */
-export async function listGameMachines(ownerId: string): Promise<GameMachine[]> {
+export async function listGameMachines(ownerId: string, probe = true): Promise<GameMachine[]> {
     const hosts = await listHosts(ownerId);
     const committed = await committedMemoryByTarget(ownerId);
     const local: GameMachine = {
@@ -369,7 +377,9 @@ export async function listGameMachines(ownerId: string): Promise<GameMachine[]> 
     };
     const remote = await Promise.all(
         hosts.map(async (host) => {
-            const metrics = await getServerMetrics(host.id, ownerId).catch(() => null);
+            const metrics = probe
+                ? await getServerMetrics(host.id, ownerId).catch(() => null)
+                : (peekServerMetrics(host.id)?.metrics ?? null);
             return {
                 id: host.id,
                 name: host.name,
