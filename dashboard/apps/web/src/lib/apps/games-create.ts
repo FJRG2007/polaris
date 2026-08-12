@@ -182,14 +182,21 @@ export async function minecraftShapeEnv(
     // server reports that as an error on every boot of a world it was never going
     // to generate. Not writing it left whatever the server already had, so the
     // error outlived the change that was supposed to stop it.
+    //
+    // Except for a world too old to describe itself. Before 1.16 the generator was
+    // not stored in the world at all, and a dedicated server that finds nothing
+    // there falls back to its own `level-type` - so "the default" is not inert on
+    // an old map, it is an instruction to generate ordinary terrain through it.
     const generated = map === undefined;
     env.set(seedEnvKey(edition), generated ? (shape.seed?.trim() ?? "") : "");
     for (const [key, value] of Object.entries(
-        levelTypeEnv(
-            edition,
-            generated ? (shape.levelType ?? blueprint.levelType ?? DEFAULT_LEVEL_TYPE) : DEFAULT_LEVEL_TYPE,
-            generated ? (shape.biome ?? DEFAULT_BIOME) : DEFAULT_BIOME
-        )
+        map?.generator
+            ? levelTypeEnv(edition, map.generator.levelType, DEFAULT_BIOME, map.generator.settings ?? "")
+            : levelTypeEnv(
+                  edition,
+                  generated ? (shape.levelType ?? blueprint.levelType ?? DEFAULT_LEVEL_TYPE) : DEFAULT_LEVEL_TYPE,
+                  generated ? (shape.biome ?? DEFAULT_BIOME) : DEFAULT_BIOME
+              )
     )) {
         env.set(key, value);
     }
@@ -458,13 +465,24 @@ const RETIRED_PROJECTS = ["floodgate"] as const;
  * Anything else on the list stays. Somebody who installed a map plugin from the
  * Mods screen is not asking for it to be uninstalled by a change of game.
  */
-export function withoutBlueprintProjects(current: string | undefined): string {
-    const owned = new Set(
+/**
+ * Every plugin Polaris installs on a server of its own accord.
+ *
+ * The list a reset is allowed to take things off, and - because taking a plugin off
+ * the list has never taken it off the disk - the list a reset is allowed to remove
+ * files for. Anything outside it was installed by somebody, and is theirs.
+ */
+export const OWNED_PROJECTS: readonly string[] = [
+    ...new Set(
         [...GAME_BLUEPRINTS.flatMap((blueprint) => blueprint.projects), ...CROSSPLAY_PROJECTS, ...RETIRED_PROJECTS]
             .map(projectSlug)
             .filter((slug): slug is string => slug !== null)
             .map((slug) => slug.toLowerCase())
-    );
+    )
+];
+
+export function withoutBlueprintProjects(current: string | undefined): string {
+    const owned = new Set(OWNED_PROJECTS);
     return formatProjectList(
         parseProjectList(current ?? "").filter((entry) => {
             const slug = projectSlug(entry);

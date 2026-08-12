@@ -147,6 +147,9 @@ const BOOT_MARKER = /^(?:\[init\]\s|\[mc-image-helper\]\s|Starting org\.bukkit\.
  *  never claims to have started, which is the reading everything already had. */
 const READY_MARKER = /^Done \(\d[\d.]*s\)!/;
 
+/** The server on its way down, however it got there. */
+const SHUTDOWN_MARKER = /^(?:Stopping server|Closing Server)|Minecraft server failed/;
+
 /** The log as a rule can read it: one line per line, without the prefixes it
  *  collected on the way here, and without the two kinds of line that are shape
  *  rather than content - the trace, and Polaris's own questions. */
@@ -158,23 +161,30 @@ function meaningfulLines(log: string): string[] {
 }
 
 /**
- * Whether the server got up on the run it is on now.
+ * Whether the server got up, and is still up.
  *
  * The counters can say "looping" about a container that has just this second
- * recovered, and this is the log's answer to that: the ready line has to come after
- * the last time the container began booting, or it belongs to a run that has since
- * ended. A tail that does not reach back to a boot marker at all still counts, since
- * a server that printed it is one that answered.
+ * recovered, and this is the log's answer to that: the ready line has to be the last
+ * of the three things that can happen to a run. After a boot marker, or it belongs
+ * to a run that has since been replaced - and after any sign of the server going
+ * down, which is the case that matters most here. A server that starts cleanly and
+ * dies eight seconds later loops exactly as forever as one that never starts, and
+ * reading its "Done" as proof of health is what would let it do that in silence.
+ *
+ * A tail that does not reach back to a boot marker at all still counts, since a
+ * server that printed the ready line is one that answered.
  */
 export function reachedReady(log: string): boolean {
     const lines = meaningfulLines(log);
     let boot = -1;
     let ready = -1;
+    let down = -1;
     for (const [index, line] of lines.entries()) {
         if (BOOT_MARKER.test(line)) boot = index;
         if (READY_MARKER.test(line)) ready = index;
+        if (SHUTDOWN_MARKER.test(line)) down = index;
     }
-    return ready > boot;
+    return ready > boot && ready > down;
 }
 
 /**
@@ -242,6 +252,9 @@ function shorten(line: string): string {
 export function crashAdvice(cause: string): string | null {
     if (isConfigCrash(cause)) {
         return "The settings on disk were written by a newer Minecraft than this server now runs, and it cannot read them. Setting them aside lets the server write its own again.";
+    }
+    if (/newer version of minecraft/i.test(cause)) {
+        return "One of the worlds on this server was saved by a newer Minecraft than it now runs, and the server stops rather than damage it. Remove that world, or put the server back on the release it was made with.";
     }
     if (/AccessDenied/i.test(cause) && /session\.lock/i.test(cause)) {
         return "The server is not allowed to write into its own world folder, so it cannot claim the world.";

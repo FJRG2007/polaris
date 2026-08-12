@@ -21,6 +21,7 @@
 import * as world from "./world";
 import { prisma } from "@polaris/db";
 import * as policy from "./backup-policy";
+import { OWNED_PROJECTS } from "@/lib/apps/games-create";
 import { appHasCapability, findApp } from "@/lib/apps/catalog";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import { createNotification } from "@/lib/notification-service";
@@ -480,7 +481,16 @@ export async function restoreWorldBackup(
 export async function newWorld(
     ownerId: string,
     installedAppId: string,
-    input: { seed?: string; levelType?: string; biome?: string; keepPlayers: boolean; fromMap?: boolean },
+    input: {
+        seed?: string;
+        levelType?: string;
+        biome?: string;
+        keepPlayers: boolean;
+        fromMap?: boolean;
+        /** The generator a map brings with it, for one whose world file does not
+         *  carry its own. See `MapGenerator`. */
+        mapGenerator?: { levelType: string; settings?: string };
+    },
     actorId: string
 ): Promise<{ level: string; carried: boolean }> {
     const generating = input.fromMap !== true;
@@ -539,10 +549,22 @@ export async function newWorld(
             // flat lobby setting inherited by a map server is a flat level type
             // with no layers under it, which the server reports as an error on
             // every boot of a world it will never generate.
+            //
+            // Unless the map is older than 1.16, when a world began carrying its own
+            // generator. There is nothing in the file for the server to read, so it
+            // uses this - and the default grows ordinary terrain through a map that
+            // was built in the void.
             ...Object.entries(
                 generating
                     ? world.levelTypeEnv(server.edition, levelType, biome)
-                    : world.levelTypeEnv(server.edition, world.DEFAULT_LEVEL_TYPE, world.DEFAULT_BIOME)
+                    : input.mapGenerator
+                      ? world.levelTypeEnv(
+                            server.edition,
+                            input.mapGenerator.levelType,
+                            world.DEFAULT_BIOME,
+                            input.mapGenerator.settings ?? ""
+                        )
+                      : world.levelTypeEnv(server.edition, world.DEFAULT_LEVEL_TYPE, world.DEFAULT_BIOME)
             ).map(([key, value]) => ({ key, value, isSecret: false }))
         ]);
         return { target, keep };
@@ -605,6 +627,61 @@ export async function setAsideVersionedConfig(ownerId: string, installedAppId: s
                 "mv",
                 "--",
                 ...moving.map((entry) => `${world.DATA_DIR}/${entry}`),
+                aside
+            ]);
+            return moved.code === 0 ? aside : null;
+        });
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Take off the disk the plugins this server is no longer meant to run.
+ *
+ * Taking a plugin off the list is not taking it off the server. The image installs
+ * what the list names and has never removed anything, so a plugin from an earlier
+ * life keeps loading, keeps its settings folder, and keeps doing whatever it was
+ * configured to do - which is how a bed wars map ended up running a bed wars plugin
+ * that still held an arena pointing at a world three resets old. The plugin loaded
+ * the world, the world had been written by a newer Minecraft than the map's pinned
+ * release, and the server refused it and stopped. Every boot, forever.
+ *
+ * Only plugins Polaris puts on servers itself are candidates, and only the ones the
+ * new list does not ask for. Anything installed from the Mods screen is somebody
+ * else's decision and is not touched by a change of game.
+ *
+ * Moved, never deleted, and the settings folder beside it is left alone: whatever
+ * was configured is still there if the plugin comes back.
+ */
+export async function setAsideRetiredPlugins(
+    ownerId: string,
+    installedAppId: string,
+    keep: readonly string[]
+): Promise<string | null> {
+    const wanted = new Set(keep.map((entry) => entry.toLowerCase()));
+    const retired = OWNED_PROJECTS.filter((project) => !wanted.has(project.toLowerCase()));
+    if (retired.length === 0) return null;
+
+    try {
+        await startForFileAccess(ownerId, installedAppId);
+        return await withServerContainer(ownerId, installedAppId, async (server) => {
+            // Bedrock runs no plugins at all.
+            if (server.edition === "bedrock") return null;
+
+            const listing = await server.run(["ls", "-1A", "--", world.PLUGINS_DIR]);
+            if (listing.code !== 0) return null;
+            const moving = world
+                .parseListing(listing.output)
+                .filter((file) => retired.some((project) => world.isPluginOf(file, project)));
+            if (moving.length === 0) return null;
+
+            const aside = `${world.PLUGIN_ASIDE_DIR}/${world.folderStamp(new Date())}`;
+            await makeServerDir(server, aside, "Could not set the old plugins aside");
+            const moved = await server.run([
+                "mv",
+                "--",
+                ...moving.map((file) => `${world.PLUGINS_DIR}/${file}`),
                 aside
             ]);
             return moved.code === 0 ? aside : null;

@@ -212,6 +212,45 @@ export function lastStartupSignal(log: string): string | null {
     );
 }
 
+/**
+ * What a starting server is doing right now, in words.
+ *
+ * "Starting" covers a span of minutes and several genuinely different things -
+ * downloading a server, unpacking a map, installing plugins, building the world -
+ * and while it is one word for all of them nobody can tell a server that is working
+ * from one that is stuck. Especially on a map, where the wait includes a download
+ * that is not the server's own.
+ *
+ * Read backwards for the last line that names a step, because the newest one is the
+ * step it is on. Every phrase here is matched against a line these images actually
+ * print; a log that says nothing recognisable gets null and the caller falls back
+ * to quoting the line itself, which is what it did before any of this.
+ */
+const STARTUP_PHASES: readonly (readonly [RegExp, string])[] = [
+    [/Done \(\d/, "Nearly there."],
+    [/Preparing (?:level|start region|spawn area)/i, "Building the world."],
+    [/Loading server plugin|Enabling [\w-]+ v/i, "Starting the plugins."],
+    [/Starting minecraft server version|Loading libraries/i, "Loading the server."],
+    [/\[init\] Starting the Minecraft server/i, "Handing over to the server."],
+    [/\[init\] Copying any (?:plugins|configs)/i, "Putting the settings in place."],
+    [/\[init\] Resolving type given|Downloading|\[mc-image-helper\]/i, "Downloading what it needs."],
+    [/\[init\] Running as uid=/i, "Getting the container up."]
+];
+
+/** The step the server is on, or null when nothing in the log names one. */
+export function startupPhase(log: string): string | null {
+    const lines = stripFormatting(log)
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0 && !isPollNoise(line));
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+        const line = lines[index] ?? "";
+        const phase = STARTUP_PHASES.find(([pattern]) => pattern.test(line));
+        if (phase) return phase[1];
+    }
+    return null;
+}
+
 /** The version the running server announced, from its startup log. Null when the
  *  log no longer reaches back that far. */
 export function parseServerVersion(log: string): string | null {

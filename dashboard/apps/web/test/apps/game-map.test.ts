@@ -208,6 +208,28 @@ describe("building a server on a map", () => {
         expect(env.get("SEED")).toBe("");
     });
 
+    it("generates the world the map was built on, for one too old to say so itself", async () => {
+        // Minecraft only started storing world generation in the world file in
+        // 1.16. Lucky blocks predates that, so the server reads its own level-type
+        // instead - and the default grew ordinary terrain up through a map built in
+        // the void, leaving the map's own spawn point buried under a hillside. It
+        // looked exactly like the map had never been installed.
+        const env = await envFor("luckyblock", "luckyblock-towers");
+        expect(env.get("LEVEL_TYPE")).toBe("minecraft:flat");
+        expect(JSON.parse(env.get("GENERATOR_SETTINGS") ?? "{}")).toEqual({
+            layers: [{ block: "minecraft:air", height: 1 }],
+            biome: "minecraft:desert"
+        });
+    });
+
+    it("says nothing about generation for a map that carries its own", async () => {
+        // Every map from 1.16 on describes itself, and the server reads it out of
+        // the world. Writing a shape here would be describing terrain that exists.
+        const env = await envFor("bedwars", "bedwars-treasure-island");
+        expect(env.get("LEVEL_TYPE")).toBe("minecraft:normal");
+        expect(env.get("GENERATOR_SETTINGS")).toBe("");
+    });
+
     it("leaves a server with no map generating its own world", async () => {
         const blueprint = findBlueprint("survival");
         expect(mapsFor(blueprint).length).toBe(0);

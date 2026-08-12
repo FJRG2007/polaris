@@ -41,6 +41,26 @@ export const BEDROCK_WORLDS_DIR = `${DATA_DIR}/worlds`;
  *  is: a half-recognised folder must never read as a world. */
 export const CONFIG_ASIDE_DIR = `${DATA_DIR}/.polaris-config`;
 
+/** Where the server keeps what it loads at startup. */
+export const PLUGINS_DIR = `${DATA_DIR}/plugins`;
+
+/** And where a plugin this server is no longer meant to run goes. Same shape as
+ *  the config folder, and nothing here is ever deleted. */
+export const PLUGIN_ASIDE_DIR = `${DATA_DIR}/.polaris-plugins`;
+
+/**
+ * Whether this file is that project's plugin.
+ *
+ * The list of plugins is a list of project names and what is on the disk is a jar
+ * somebody versioned however they liked, so the two are matched on the only thing
+ * they share: the letters and digits of the name, in order, at the front.
+ * `bedwars1058` finds `BedWars1058-25.5-SNAPSHOT.jar` and nothing else.
+ */
+export function isPluginOf(file: string, project: string): boolean {
+    const bare = (value: string): string => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return file.toLowerCase().endsWith(".jar") && bare(file).startsWith(bare(project)) && bare(project).length > 0;
+}
+
 /**
  * The files a server's own release wrote and a different one cannot read.
  *
@@ -280,15 +300,19 @@ export function isBiome(value: string): boolean {
 export function levelTypeEnv(
     edition: MinecraftEdition,
     levelType: string,
-    biome: string
+    biome: string,
+    settings?: string
 ): Record<string, string> {
     // Bedrock names its world shapes differently and this offers Java's, so there
     // is nothing here to set for it.
     if (edition === "bedrock" || !isLevelType(levelType)) return {};
     return {
         [LEVEL_TYPE_KEY]: levelType,
+        // A caller that has the settings from the world itself passes them, and they
+        // win: a chosen biome describes a world about to be generated, where these
+        // describe one that already exists.
         [GENERATOR_SETTINGS_KEY]:
-            usesBiome(levelType) && isBiome(biome) ? JSON.stringify({ biome }) : ""
+            settings ?? (usesBiome(levelType) && isBiome(biome) ? JSON.stringify({ biome }) : "")
     };
 }
 

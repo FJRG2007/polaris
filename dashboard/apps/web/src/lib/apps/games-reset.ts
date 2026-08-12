@@ -22,13 +22,15 @@
  */
 
 import { prisma } from "@polaris/db";
+import { findMap } from "@/lib/apps/minecraft/maps";
 import { editionOf } from "@/lib/apps/minecraft/service";
 import { hasCrossplay } from "@/lib/apps/minecraft/blueprints";
+import { patchInstallConfig } from "@/lib/apps/install-config";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import { DEFAULT_LEVEL_TYPE } from "@/lib/apps/minecraft/world";
-import { patchInstallConfig } from "@/lib/apps/install-config";
 import type { ResetMinecraftServerInput } from "@/lib/apps/games-schema";
-import { newWorld, setAsideVersionedConfig } from "@/lib/apps/minecraft/world-service";
+import { parseProjectList, projectSlug } from "@/lib/apps/minecraft/modrinth";
+import { newWorld, setAsideRetiredPlugins, setAsideVersionedConfig } from "@/lib/apps/minecraft/world-service";
 import {
     BLUEPRINT_KEY,
     blueprintFor,
@@ -84,6 +86,9 @@ export async function resetMinecraftServer(
 
     const edition = editionOf(install.catalogId);
     const blueprint = blueprintFor(edition, input.blueprintId);
+    // Looked up rather than validated here: the shape below refuses a map that is
+    // not this game's, so by the time anything uses this it is one that is.
+    const mapped = findMap(input.mapId);
 
     const vars = await listEnvVars("application", install.applicationId, ownerId);
     const current = new Map(vars.map((entry) => [entry.key, entry.value ?? ""]));
@@ -128,6 +133,18 @@ export async function resetMinecraftServer(
     // of the same sentence.
     const aside = await setAsideVersionedConfig(ownerId, installedAppId);
 
+    // And the plugins the new list no longer asks for, which until now stayed on
+    // the disk and kept loading. A map that carries its own game takes the
+    // blueprint's plugin off the list; leaving the jar there meant the server ran
+    // both, and the old one still held the arenas of a world three resets ago.
+    await setAsideRetiredPlugins(
+        ownerId,
+        installedAppId,
+        parseProjectList(env.get("MODRINTH_PROJECTS") ?? "")
+            .map(projectSlug)
+            .filter((slug): slug is string => slug !== null)
+    );
+
     // Only what actually moved. Writing the whole environment back would rewrite
     // every value this server holds on every reset, which is how a variable
     // somebody set by hand gets quietly restored to what it was.
@@ -163,7 +180,8 @@ export async function resetMinecraftServer(
             levelType,
             ...(input.biome ? { biome: input.biome } : {}),
             keepPlayers: input.keepPlayers,
-            fromMap: Boolean(input.mapId)
+            fromMap: Boolean(input.mapId),
+            ...(mapped?.generator ? { mapGenerator: mapped.generator } : {})
         },
         actorId
     );

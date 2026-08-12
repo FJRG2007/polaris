@@ -50,6 +50,7 @@
  * immutable is what lets each entry carry the hash of what it will actually get.
  */
 
+import { FLAT_LEVEL_TYPE } from "./world";
 import type { GameBlueprint } from "./blueprints";
 
 /** Where the mirrored archives live. One tag, so a map added later is a commit
@@ -80,6 +81,28 @@ export interface MapResourcePack {
     readonly sha1: string;
 }
 
+/**
+ * The generator a world cannot describe for itself.
+ *
+ * Minecraft only started storing world generation inside the world file in 1.16.
+ * A world older than that says nothing about how it was made, and a dedicated
+ * server filling that gap does not guess - it reads `level-type` out of its own
+ * settings and generates accordingly. So a flat map from 1.13 dropped onto a server
+ * set to "normal" keeps the blocks that are in its region files and grows ordinary
+ * terrain through and around them, with the map's own spawn point now well
+ * underground. It looks like the map was never installed.
+ *
+ * Which is why this is not a preference. It is read out of the map's own
+ * `level.dat` - `generatorName` and `generatorOptions` - and written back so the
+ * server generates what the map was built on rather than what it would have chosen.
+ */
+export interface MapGenerator {
+    /** The `level-type` this world was made with. */
+    readonly levelType: string;
+    /** Its `generator-settings`, verbatim, for a type that takes them. */
+    readonly settings?: string;
+}
+
 export interface WorldMap {
     /** Also the level folder it is extracted into, so it has to be a level name. */
     readonly id: string;
@@ -100,6 +123,9 @@ export interface WorldMap {
     /** Server settings the map needs to play the way it was built to. */
     readonly env?: Readonly<Record<string, string>>;
     readonly resourcePack?: MapResourcePack;
+    /** The generator this world needs written into the server's settings, for a
+     *  world old enough not to carry its own. */
+    readonly generator?: MapGenerator;
     /** Modrinth projects the map itself needs. Empty is a map that carries its
      *  own game, and takes the blueprint's plugin back off. */
     readonly projects: readonly string[];
@@ -200,6 +226,15 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         minecraft: { version: "1.13", policy: "from" },
         players: { min: 1, max: 12 },
         env: { ...MAP_BASE_ENV, MODE: "adventure", DIFFICULTY: "normal", PVP: "true" },
+        // Written in 1.13, three releases before a world could say how it was made,
+        // so the server has to be told: a single layer of air, and the towers stand
+        // in the void. Taken from its own level.dat, where `generatorName` is flat
+        // and `generatorOptions` is this. Left to the default it grew ordinary
+        // terrain around the towers and put spawn under it.
+        generator: {
+            levelType: FLAT_LEVEL_TYPE,
+            settings: JSON.stringify({ layers: [{ block: "minecraft:air", height: 1 }], biome: "minecraft:desert" })
+        },
         // The lucky blocks are sponges wearing the pack. Without it the map plays
         // exactly the same and looks like a sponge farm.
         resourcePack: {

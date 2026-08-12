@@ -209,6 +209,43 @@ describe("what to do about it", () => {
     });
 });
 
+/**
+ * A third real one, and the nastiest: the server starts perfectly, announces it is
+ * up, and dies five seconds later when a plugin loads a world from an earlier life
+ * that a newer Minecraft had written. It restarts and does the whole thing again.
+ */
+const UP_THEN_DEAD = [
+    '2026-08-12T23:28:25.041623079Z [23:28:25 INFO]: Done (4.367s)! For help, type "help"',
+    "2026-08-12T23:28:29.934479887Z [23:28:29 INFO]: [BedWars1058] This server is running in MULTIARENA with auto-scale false",
+    "2026-08-12T23:28:30.016095484Z [23:28:30 INFO]: Preparing start region for dimension minecraft:world-20260812-023456",
+    "2026-08-12T23:28:30.024533912Z [23:28:30 WARN]: java.lang.RuntimeException: Server attempted to load chunk saved with newer version of minecraft! 4189 > 3337",
+    "2026-08-12T23:28:30.024562356Z [23:28:30 WARN]:     at net.minecraft.world.level.chunk.storage.ChunkRegionLoader.loadChunk(ChunkRegionLoader.java:154)",
+    "2026-08-12T23:28:30.032931627Z [23:28:30 INFO]: Stopping server",
+    "2026-08-12T23:28:30.033359552Z [23:28:30 INFO]: [BedWars1058] Disabling BedWars1058 v25.5-SNAPSHOT",
+    '2026-08-12T23:28:30.797351845Z [23:28:30 WARN]: Unexpected exception while parsing console command "list"',
+    "2026-08-12T23:28:30.797358262Z java.lang.IllegalStateException: Asynchronous command dispatch!"
+].join("\n");
+
+describe("a server that starts and then dies", () => {
+    it("is not counted as having got up", () => {
+        // The reading that would otherwise call off the whole check. A "Done" line
+        // proves the server started, not that it is still running, and a server
+        // that crashes eight seconds in loops exactly as forever as one that never
+        // starts at all.
+        expect(reachedReady(UP_THEN_DEAD)).toBe(false);
+    });
+
+    it("is explained by what killed it rather than by what it printed last", () => {
+        const cause = crashCause(UP_THEN_DEAD) ?? "";
+        expect(cause).toContain("newer version of minecraft");
+        expect(cause).not.toContain("Asynchronous command dispatch");
+    });
+
+    it("says what a world from a newer release means", () => {
+        expect(crashAdvice(crashCause(UP_THEN_DEAD) ?? "")).toContain("newer Minecraft");
+    });
+});
+
 describe("whether the server got up", () => {
     it("recognises the run that finally worked", () => {
         expect(reachedReady(RECOVERED)).toBe(true);

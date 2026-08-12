@@ -27,17 +27,7 @@ import { readCrashLoop, readRestartWatch } from "@/lib/apps/games-health";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "@/lib/apps/crash-loop";
 import { readAppContainerMetricsOrNull, readAppContainerRuntime } from "@/lib/app-container-metrics";
-import {
-    lastStartupSignal,
-    parseBannedIps,
-    parseBansFile,
-    parseNameFile,
-    parsePlayerList,
-    parsePlayerListFromLog,
-    parseProperties,
-    type BanEntry,
-    type PlayerList
-} from "./parse";
+import * as parse from "./parse";
 
 /** Where the server's data lives inside the container (the image's own /data). */
 const DATA_DIR = "/data";
@@ -85,7 +75,7 @@ export interface MinecraftStatus {
     readonly containerRunning: boolean | null;
     /** The server answered RCON - it is up AND past its startup. */
     readonly answering: boolean;
-    readonly players: PlayerList;
+    readonly players: parse.PlayerList;
     /** host:port a player types into their client, when it can be determined. */
     readonly address: string | null;
     /** Why it is not answering, when it is not. */
@@ -113,7 +103,7 @@ export interface MinecraftFirewall {
 export interface MinecraftRoster {
     readonly ops: readonly string[];
     readonly whitelist: readonly string[];
-    readonly bans: readonly BanEntry[];
+    readonly bans: readonly parse.BanEntry[];
     /** Whether the whitelist is actually being enforced (`white-list` in
      *  server.properties). A list that is not enforced lets everyone in. */
     readonly whitelistEnforced: boolean;
@@ -358,7 +348,7 @@ async function readServerFile(install: MinecraftInstall, ownerId: string, name: 
 /** Who is on and whether the server is answering at all. */
 export interface MinecraftPlayers {
     readonly answering: boolean;
-    readonly players: PlayerList;
+    readonly players: parse.PlayerList;
     /** Why it is not answering, when it is not. */
     readonly message: string | null;
     /** Whether the container was up when it was asked. Null when that cannot be
@@ -415,7 +405,7 @@ export async function getServerPlayers(ownerId: string, installedAppId: string):
  * a container nobody has ever seen and says nothing about what to do.
  */
 async function readLivePlayers(install: MinecraftInstall, ownerId: string): Promise<MinecraftPlayers> {
-    const empty: PlayerList = { online: 0, max: 0, players: [] };
+    const empty: parse.PlayerList = { online: 0, max: 0, players: [] };
     if (!install.running) {
         // A server Polaris stopped because it could not start is stopped for a
         // reason worth carrying: by now the container is not restarting any more,
@@ -516,17 +506,24 @@ function crashLoopMessage(loop: CrashLoop): string {
 }
 
 /**
- * A message with the last thing the container actually said appended to it.
+ * A message with what the container is actually doing appended to it.
  *
- * Best effort in every direction: a log that cannot be read leaves the message
- * as it was, because a sentence about the server's state is still better than an
- * error about fetching a log. What it adds is the difference between "the server
- * is starting" - which was also what a server stuck in a boot loop said, forever
- * - and the line naming the plugin it could not install.
+ * Two answers, and the first one is the one people want. The step it is on -
+ * downloading, unpacking, building the world - is a sentence anybody can read, and
+ * on a server built from a map it is the difference between a long download and a
+ * server that is stuck. Failing that, the last line the container said, which is
+ * where the plugin it could not install gets named.
+ *
+ * Best effort in every direction: a log that cannot be read leaves the message as
+ * it was, because a sentence about the server's state is still better than an error
+ * about fetching a log.
  */
 async function withReason(applicationId: string, ownerId: string, message: string): Promise<string> {
     try {
-        const line = lastStartupSignal(await readAppRuntimeLog(applicationId, ownerId, LOG_TAIL));
+        const log = await readAppRuntimeLog(applicationId, ownerId, LOG_TAIL);
+        const phase = parse.startupPhase(log);
+        if (phase) return `${message} ${phase}`;
+        const line = parse.lastStartupSignal(log);
         return line ? `${message} Last: ${line.slice(0, LOG_LINE_MAX)}` : message;
     } catch {
         return message;
@@ -546,7 +543,7 @@ export async function getServerFirewall(ownerId: string, installedAppId: string)
         resolveWaf(install.applicationId),
         readServerFile(install, ownerId, "banned-ips.json")
     ]);
-    const applied = new Set(parseBannedIps(banned));
+    const applied = new Set(parse.parseBannedIps(banned));
     const blocked = waf.deny.filter((entry) => !entry.includes("/"));
     return {
         blocked,
@@ -578,11 +575,11 @@ export async function applyFirewallBans(ownerId: string, installedAppId: string)
  * own console, so there the command is sent and the log is read back a moment
  * later for the newest answer it printed.
  */
-async function readPlayerList(install: MinecraftInstall, ownerId: string): Promise<PlayerList | null> {
-    if (install.edition !== "bedrock") return parsePlayerList(await execCommand(install, ownerId, ["list"]));
+async function readPlayerList(install: MinecraftInstall, ownerId: string): Promise<parse.PlayerList | null> {
+    if (install.edition !== "bedrock") return parse.parsePlayerList(await execCommand(install, ownerId, ["list"]));
     await execCommand(install, ownerId, ["list"]);
     await new Promise((resolve) => setTimeout(resolve, CONSOLE_ANSWER_MS));
-    return parsePlayerListFromLog(await readAppRuntimeLog(install.applicationId, ownerId, 80));
+    return parse.parsePlayerListFromLog(await readAppRuntimeLog(install.applicationId, ownerId, 80));
 }
 
 /** How far back to read for the arrivals and departures. Enough to cover an
@@ -612,9 +609,9 @@ export async function getServerRoster(ownerId: string, installedAppId: string): 
         ]);
         return {
             ops: [],
-            whitelist: parseNameFile(allowList),
+            whitelist: parse.parseNameFile(allowList),
             bans: [],
-            whitelistEnforced: parseProperties(properties)["allow-list"] === "true"
+            whitelistEnforced: parse.parseProperties(properties)["allow-list"] === "true"
         };
     }
     const [ops, whitelist, bans, properties] = await Promise.all([
@@ -624,10 +621,10 @@ export async function getServerRoster(ownerId: string, installedAppId: string): 
         readServerFile(install, ownerId, "server.properties")
     ]);
     return {
-        ops: parseNameFile(ops),
-        whitelist: parseNameFile(whitelist),
-        bans: parseBansFile(bans),
-        whitelistEnforced: parseProperties(properties)["white-list"] === "true"
+        ops: parse.parseNameFile(ops),
+        whitelist: parse.parseNameFile(whitelist),
+        bans: parse.parseBansFile(bans),
+        whitelistEnforced: parse.parseProperties(properties)["white-list"] === "true"
     };
 }
 
