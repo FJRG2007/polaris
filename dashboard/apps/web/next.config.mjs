@@ -27,11 +27,10 @@ const nextConfig = {
         "/api/agents/runtime/bundle/**": ["../../packages/agent-runtime/dist/**"]
     },
     // Pages that moved under the app they belong to; the old top-level paths keep
-    // working for anything already linking to them.
-    redirects: async () => [
-        { source: "/notifications", destination: "/account/notifications", permanent: true },
-        { source: "/overview", destination: "/drive/overview", permanent: true }
-    ],
+    // working for anything already linking to them. A path listed here is claimed
+    // before routing, so it must never name a screen that exists - /overview was
+    // here until the Overview was built on it, and the redirect answered first.
+    redirects: async () => [{ source: "/notifications", destination: "/account/notifications", permanent: true }],
     webpack: (config) => {
         // @polaris/ui is transpiled from TypeScript source and, like the rest of
         // the repo, uses explicit .js import specifiers. Map them back to .ts/.tsx
