@@ -321,10 +321,12 @@ export async function detectDnsProviderAction(input: unknown): Promise<DnsProvid
     return detectDnsProvider(domain).catch(() => null);
 }
 
-/** Resolve each zone's wildcard and report what it points at. */
+/** Resolve each zone's wildcard and report what it points at. Asked for by hand,
+ *  so this server's own address is re-detected rather than remembered - the
+ *  operator pressing this has usually just changed the thing being compared. */
 export async function checkZoneDnsAction(): Promise<ZoneDnsReport> {
     await requireAdmin();
-    return checkZoneDns();
+    return checkZoneDns({ fresh: true });
 }
 
 const provisionSchema = z.object({ overwrite: z.boolean().default(false) });

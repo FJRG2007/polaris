@@ -92,8 +92,14 @@ async function resolveOrEmpty(hostname: string): Promise<string[]> {
 
 /** Check both names a zone needs - its wildcard and its own host - against this
  *  server's public IP, and whether the hostname actually serves Polaris. */
-export async function checkZoneDns(): Promise<ZoneDnsReport> {
-    const [config, expectedIp] = await Promise.all([getDomainZones(), detectPublicIp()]);
+export async function checkZoneDns(options: { fresh?: boolean } = {}): Promise<ZoneDnsReport> {
+    // Somebody pressing Check DNS has usually just changed something, and half of
+    // what this compares against is this server's own public address - which is
+    // remembered for six hours. An operator who corrected their records by hand
+    // after the ISP moved them was told, for the rest of those six hours, that the
+    // records they had just fixed were wrong. So an explicit check re-detects; the
+    // ones that run as a side effect of something else keep the cheap answer.
+    const [config, expectedIp] = await Promise.all([getDomainZones(), detectPublicIp(options.fresh === true)]);
     const records = zoneRecords(config);
     const gameZones = await checkGameZoneDns(config, expectedIp);
     const zones = await Promise.all(
