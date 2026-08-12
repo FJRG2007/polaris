@@ -88,8 +88,13 @@ async function cloudError(response: Response, provider: string): Promise<Storage
     } catch {
         // Not JSON. The truncated body is still the most useful thing to show.
     }
+    // Dropbox answers 409 for every application-level error, "this path does not
+    // exist" among them, and says which one only in error_summary. Reading it back
+    // matters: a caller asking whether a name is free reads a bare 409 as "taken"
+    // and concludes the opposite of the truth.
+    const missing = response.status === 409 && /(^|\/|\.)not_found/.test(message);
     const code: StorageErrorCode =
-        response.status === 404
+        response.status === 404 || missing
             ? "not_found"
             : response.status === 401 || response.status === 403
               ? "permission_denied"
