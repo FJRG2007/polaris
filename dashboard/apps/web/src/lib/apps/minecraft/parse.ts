@@ -168,6 +168,30 @@ export function parseJoinAddresses(log: string): Map<string, string> {
     return found;
 }
 
+/** Lines worth repeating out of a starting server's log: what the image says it
+ *  is doing, and what it says went wrong. Everything else is the game's own
+ *  chatter, which is what the console screen is for. */
+const LOG_SIGNAL = /^(?:\S+\s+)?(?:\[init\]|\[mc-image-helper\]|.*\bERROR\b|.*\bWARN\b)/;
+
+/**
+ * The last thing the container said that explains what it is doing, or null.
+ *
+ * A server takes real minutes to start the first time - it is fetching its own
+ * jar and every plugin - and one that will never start looks exactly the same
+ * from outside. The difference is in the log, one line of it, and this is that
+ * line: the step the image is on, or the error it stopped at. Enough to tell a
+ * slow boot from a boot loop without opening anything.
+ */
+export function lastStartupSignal(log: string): string | null {
+    return (
+        log
+            .split("\n")
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0 && LOG_SIGNAL.test(line))
+            .at(-1) ?? null
+    );
+}
+
 /** The version the running server announced, from its startup log. Null when the
  *  log no longer reaches back that far. */
 export function parseServerVersion(log: string): string | null {

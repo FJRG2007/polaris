@@ -26,6 +26,7 @@ import { hostPortForApp, readAppRuntimeLog } from "@/lib/deploy-service";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
 import { readAppContainerMetricsOrNull, readAppContainerState } from "@/lib/app-container-metrics";
 import {
+    lastStartupSignal,
     parseBannedIps,
     parseBansFile,
     parseNameFile,
@@ -407,20 +408,51 @@ async function readLivePlayers(install: MinecraftInstall, ownerId: string): Prom
         return { answering: false, players: empty, message: "The server is stopped", containerRunning: null };
     }
     const state = await readAppContainerState(install.applicationId, ownerId);
+    // A container that is being restarted over and over is the one state that
+    // looks exactly like a server that is merely slow to boot, and it is the one
+    // nobody can wait out: it never comes up, and the reason is in a log the
+    // person watching a blank panel has no reason to open. So it is named, and
+    // the reason is fetched and put in front of them.
+    if (state === "restarting") {
+        return {
+            answering: false,
+            players: empty,
+            message: await withReason(
+                install.applicationId,
+                ownerId,
+                "The server keeps failing to start and is being restarted."
+            ),
+            containerRunning: false
+        };
+    }
     if (state !== null && state !== "running") {
         return {
             answering: false,
             players: empty,
             // Polaris is meant to be keeping it up and it is not: something took
             // it down from outside, or it fell over.
-            message: "The container is not running. Redeploy it, or read the logs to see why it stopped.",
+            message: await withReason(
+                install.applicationId,
+                ownerId,
+                "The container is not running. Redeploy it, or read the logs to see why it stopped."
+            ),
             containerRunning: false
         };
     }
     const containerRunning = state === null ? null : true;
     try {
         const players = await readPlayerList(install, ownerId);
-        if (!players) return { answering: false, players: empty, message: "The server is starting", containerRunning };
+        if (!players) {
+            // Starting covers a real span of minutes on a new server - the image
+            // is downloading its jar and its plugins - so what it is doing right
+            // now is worth more than the word "starting".
+            return {
+                answering: false,
+                players: empty,
+                message: await withReason(install.applicationId, ownerId, "The server is starting."),
+                containerRunning
+            };
+        }
         return { answering: true, players, message: null, containerRunning };
     } catch (caught) {
         return {
@@ -429,6 +461,31 @@ async function readLivePlayers(install: MinecraftInstall, ownerId: string): Prom
             message: caught instanceof Error ? caught.message : "The server is not answering",
             containerRunning
         };
+    }
+}
+
+/** Enough of the log to find the last thing worth repeating, and no more: this is
+ *  read on a poll, on every server on the page. */
+const LOG_TAIL = 60;
+
+/** A line on a status card, not a log viewer. The console screen has the rest. */
+const LOG_LINE_MAX = 200;
+
+/**
+ * A message with the last thing the container actually said appended to it.
+ *
+ * Best effort in every direction: a log that cannot be read leaves the message
+ * as it was, because a sentence about the server's state is still better than an
+ * error about fetching a log. What it adds is the difference between "the server
+ * is starting" - which was also what a server stuck in a boot loop said, forever
+ * - and the line naming the plugin it could not install.
+ */
+async function withReason(applicationId: string, ownerId: string, message: string): Promise<string> {
+    try {
+        const line = lastStartupSignal(await readAppRuntimeLog(applicationId, ownerId, LOG_TAIL));
+        return line ? `${message} Last: ${line.slice(0, LOG_LINE_MAX)}` : message;
+    } catch {
+        return message;
     }
 }
 
