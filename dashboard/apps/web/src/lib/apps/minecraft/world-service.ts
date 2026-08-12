@@ -113,6 +113,31 @@ async function applicationOf(ownerId: string, installedAppId: string): Promise<s
 }
 
 /**
+ * Make a folder inside the data volume that the server itself has to write into.
+ *
+ * `docker exec` does not run as the account the game runs as - the image comes up
+ * as root and drops to its own user before it launches Java - so a folder made
+ * from here is a folder the server cannot write a single file into. What that
+ * costs is not a damaged world, it is a server that never boots again: the first
+ * thing Minecraft does with a level is take `session.lock` inside it, and a
+ * folder it may not write is an `AccessDeniedException` and a container that
+ * restarts forever, on a world nobody can switch away from without knowing why.
+ *
+ * So the folder is handed over as soon as it is made - to whoever owns the volume
+ * the game has been writing to all along, and writable by them whatever umask the
+ * exec carried. Both are best effort: an exec that already runs as that user is
+ * giving the folder the owner it has, which changes nothing, and neither call can
+ * leave it worse than `mkdir` left it.
+ */
+async function makeServerDir(server: ServerContainer, path: string, failure: string): Promise<void> {
+    await server.runOk(["mkdir", "-p", "--", path], failure);
+    const stat = await server.run(["stat", "-c", "%u:%g", "--", world.DATA_DIR]);
+    const owner = stat.output.trim();
+    if (stat.code === 0 && /^\d+:\d+$/.test(owner)) await server.run(["chown", owner, "--", path]);
+    await server.run(["chmod", "u+rwx", "--", path]);
+}
+
+/**
  * The maps on disk and the archives beside them.
  *
  * The settings half is a database read and always answers; the disk half needs
@@ -419,7 +444,7 @@ export async function restoreWorldBackup(
             const plan = world.restorePlan(server.edition, unpacked, target);
             if (plan.length === 0) throw new Error("That backup does not hold a world this server can use");
 
-            await server.runOk(["mkdir", "-p", "--", parent], "Could not create the worlds folder");
+            await makeServerDir(server, parent, "Could not create the worlds folder");
             for (const move of plan) {
                 await server.runOk(
                     ["mv", "--", `${staging}/${move.from}`, `${parent}/${move.to}`],
@@ -476,7 +501,7 @@ export async function newWorld(
             // Written out first, or what is copied is the last save rather than
             // what everyone is holding right now.
             await server.say(["save-all", "flush"]).catch(() => undefined);
-            await server.runOk(["mkdir", "-p", "--", `${world.DATA_DIR}/${target}`], "Could not create the new world");
+            await makeServerDir(server, `${world.DATA_DIR}/${target}`, "Could not create the new world");
             for (const folder of world.PLAYER_DATA_DIRS) {
                 // A server that has none of a folder yet is the ordinary case for a
                 // young world, so a copy that finds nothing is not a failure.
