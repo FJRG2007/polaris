@@ -115,7 +115,7 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
         // plainly, because a server that looks like an empty world is exactly what
         // BedWars1058 with no arena is - not a failed install.
         setup: "BedWars1058 ships no arenas, so until you add one the server is a lobby and nothing else. Take a ready-made setup from the wiki or build a map and register it, then players join with /bw join.",
-        docs: "https://wiki.andrei1058.dev/docs/BedWars1058/addons",
+        docs: "https://wiki.andrei1058.com/docs/BedWars1058/addons",
         weight: "heavy"
     },
     {
