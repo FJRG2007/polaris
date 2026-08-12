@@ -1128,6 +1128,7 @@ export async function resetGameServerAction(
             targetId: installedAppId,
             metadata: {
                 blueprint: shape.blueprintId,
+                map: shape.mapId ?? null,
                 version: done.version,
                 level: done.level,
                 keptPlayers: done.carried

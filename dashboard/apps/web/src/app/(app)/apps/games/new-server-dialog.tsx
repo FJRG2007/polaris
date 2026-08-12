@@ -31,9 +31,9 @@ import { ARK_MAPS, mapRequirementHint } from "@/lib/apps/ark/maps";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
 import { createGameServerSchema, isModIdList } from "@/lib/apps/games-schema";
-import { createGameServerAction, gameMachinesAction, gameSetupAction, type GameSetup } from "./actions";
 import { Gamepad2, Loader2, MemoryStick, RefreshCw, ShieldCheck, Users } from "lucide-react";
 import { findBlueprint, formatMemory, recommendedMemoryMb } from "@/lib/apps/minecraft/blueprints";
+import { createGameServerAction, gameMachinesAction, gameSetupAction, type GameSetup } from "./actions";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
 import {
     BlueprintFields,
@@ -190,6 +190,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                       edition,
                       crossplay,
                       blueprintId: shape.blueprintId,
+                      mapId: shape.mapId || undefined,
                       software: edition === "java" ? shape.software : undefined,
                       version: shape.version.trim() || LATEST,
                       seed: shape.seed.trim() || undefined,

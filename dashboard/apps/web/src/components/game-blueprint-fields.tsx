@@ -26,6 +26,7 @@ import * as world from "@/lib/apps/minecraft/world";
 import { useEffect, useMemo, useState } from "react";
 import { Input, Select, Skeleton, cn } from "@polaris/ui";
 import { blueprintsFor } from "@/lib/apps/minecraft/blueprints";
+import { mapsFor, pinnedRelease } from "@/lib/apps/minecraft/maps";
 import { blueprintVersionsAction, type BlueprintVersions } from "@/app/(app)/apps/games/actions";
 
 /**
@@ -45,6 +46,8 @@ const answered = new Map<string, BlueprintVersions>();
  *  server: the game it plays and the map it plays it on. */
 export interface BlueprintShape {
     readonly blueprintId: string;
+    /** A prebuilt map to build on. Blank generates a world instead. */
+    readonly mapId: string;
     /** Java only. Ignored when the blueprint pins its own. */
     readonly software: string;
     /** A release, or LATEST for the newest the blueprint can run on. */
@@ -62,6 +65,7 @@ export const LATEST = "LATEST";
 /** The value both dialogs open on, before a blueprint has been chosen. */
 export const DEFAULT_SHAPE: BlueprintShape = {
     blueprintId: "survival",
+    mapId: "",
     software: "PAPER",
     version: LATEST,
     seed: "",
@@ -100,6 +104,11 @@ export function BlueprintFields({
 
     const blueprints = useMemo(() => blueprintsFor(edition), [edition]);
     const blueprint = blueprints.find((entry) => entry.id === value.blueprintId);
+    const maps = useMemo(() => mapsFor(blueprint), [blueprint]);
+    // Read off this blueprint's own list rather than by id alone, so a map left
+    // over from the blueprint before it is not treated as the current choice.
+    const map = maps.find((entry) => entry.id === value.mapId);
+    const pinned = pinnedRelease(map);
     const seedError = shapeError(value);
 
     function set(patch: Partial<BlueprintShape>): void {
@@ -114,18 +123,27 @@ export function BlueprintFields({
         }
     }, [ready, blueprints, value, onChange]);
 
+    // A map that is not this blueprint's is one the server cannot be built on, and
+    // it arrives that way from the reset dialog, which opens on what the server
+    // already is and then has the blueprint changed under it.
+    useEffect(() => {
+        if (ready && value.mapId.length > 0 && !maps.some((entry) => entry.id === value.mapId)) {
+            onChange({ ...value, mapId: "" });
+        }
+    }, [ready, maps, value, onChange]);
+
     // Asked as the blueprint is chosen rather than at submit, so the releases it
     // can run on are on screen while the decision is still being made.
     useEffect(() => {
         let active = true;
-        const key = `${value.blueprintId}|${crossplay}`;
+        const key = `${value.blueprintId}|${crossplay}|${value.mapId}`;
         const known = answered.get(key);
         // Straight to the answer where there is one: a skeleton drawn over a
         // field that is about to show the same list it showed a second ago is a
         // wait invented rather than reported.
         setOffered(known ?? null);
         if (known) return;
-        void blueprintVersionsAction(value.blueprintId, crossplay)
+        void blueprintVersionsAction(value.blueprintId, crossplay, value.mapId || undefined)
             .then((answer) => {
                 answered.set(key, answer);
                 if (active) setOffered(answer);
@@ -134,10 +152,12 @@ export function BlueprintFields({
         return () => {
             active = false;
         };
-    }, [value.blueprintId, crossplay]);
+    }, [value.blueprintId, crossplay, value.mapId]);
 
     const isLatest = value.version.trim().length === 0 || value.version.trim().toUpperCase() === LATEST;
-    const running = isLatest ? offered?.latest ?? null : value.version.trim();
+    // A pinned map settles the release on its own, without waiting on Modrinth:
+    // it is a property of the map rather than of anything that has to be asked.
+    const running = pinned ?? (isLatest ? offered?.latest ?? null : value.version.trim());
     // Only ever said when the answer is known. A list that came back empty is a
     // Modrinth nobody could reach, not a release nothing supports.
     const unsupported =
@@ -155,6 +175,13 @@ export function BlueprintFields({
                             onSelect={() =>
                                 set({
                                     blueprintId: entry.id,
+                                    // A blueprint that has maps opens on one of
+                                    // them rather than on an empty world: for
+                                    // half of these the map is the game, and a
+                                    // flat lobby is what "it did not work" looks
+                                    // like. Still a choice - the list underneath
+                                    // has "generate a world" on it.
+                                    mapId: mapsFor(entry)[0]?.id ?? "",
                                     // The shape of the world follows the game: a
                                     // minigame's spawn is a lobby, and a lobby
                                     // generated as ordinary terrain is why one of
@@ -174,7 +201,9 @@ export function BlueprintFields({
                     ))}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                    {offered === null ? (
+                    {pinned ? (
+                        `${map?.name} plays on Minecraft ${pinned}, so the server is built on it.`
+                    ) : offered === null ? (
                         <span className="inline-block align-middle">
                             <Skeleton className="h-3 w-56" />
                         </span>
@@ -185,9 +214,50 @@ export function BlueprintFields({
                     ) : (
                         `Minecraft ${running}.`
                     )}
-                    {blueprint?.setup && ` ${blueprint.setup}`}
+                    {/* What is left to do is the map's when there is one: it is
+                        the thing that decides, and the blueprint's note is about
+                        the plugin the map replaced. */}
+                    {(map ? map.setup : blueprint?.setup) && ` ${map ? map.setup : blueprint?.setup}`}
                 </p>
             </div>
+
+            {maps.length > 0 && (
+                <div className="flex flex-col gap-2">
+                    <span className="text-sm font-medium">Map</span>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {maps.map((entry) => (
+                            <Choice
+                                key={entry.id}
+                                selected={value.mapId === entry.id}
+                                // The release is the map's, so a pin the last one
+                                // carried does not follow this one onto the form.
+                                // The seed goes with it: it generates nothing now,
+                                // and one left in a field nobody can see is a
+                                // submit refused for a reason nobody can read.
+                                onSelect={() => set({ mapId: entry.id, version: LATEST, seed: "" })}
+                                title={entry.name}
+                                detail={entry.summary}
+                                note={`${entry.author} - ${entry.players.min === entry.players.max ? entry.players.max : `${entry.players.min} to ${entry.players.max}`} players`}
+                            />
+                        ))}
+                        <Choice
+                            selected={value.mapId.length === 0}
+                            onSelect={() => set({ mapId: "", version: LATEST })}
+                            title="Generate a world"
+                            detail={
+                                blueprint?.projects.length
+                                    ? "A new world for the plugin to run its game in."
+                                    : "A new world and nothing built in it."
+                            }
+                        />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                        {map
+                            ? `Downloaded onto the server while it is being created. Built by ${map.author}.`
+                            : "The server generates its own world on its first start."}
+                    </p>
+                </div>
+            )}
 
             <div className="flex flex-col gap-3">
                 <button
@@ -221,7 +291,14 @@ export function BlueprintFields({
                             )}
                             <label className="flex flex-col gap-1 text-sm">
                                 <span className="font-medium">Minecraft version</span>
-                                {offered === null ? (
+                                {pinned ? (
+                                    <Select
+                                        value={pinned}
+                                        onValueChange={() => undefined}
+                                        options={[{ value: pinned, label: pinned }]}
+                                        disabled
+                                    />
+                                ) : offered === null ? (
                                     <Skeleton className="h-9 w-full" />
                                 ) : (
                                     <Select
@@ -239,15 +316,20 @@ export function BlueprintFields({
                                 <span
                                     className={cn("text-xs", unsupported ? "text-danger" : "text-muted-foreground")}
                                 >
-                                    {unsupported
-                                        ? `${blueprint?.name} has nothing built for ${value.version.trim()}.`
-                                        : offered?.pinned
-                                          ? "Only the releases this blueprint's plugins have a build for."
-                                          : "Players have to be on the same release to join."}
+                                    {pinned
+                                        ? `${map?.name} was built for this release and its game does not run on later ones.`
+                                        : unsupported
+                                          ? `${blueprint?.name} has nothing built for ${value.version.trim()}.`
+                                          : offered?.pinned
+                                            ? "Only the releases this blueprint's plugins have a build for."
+                                            : "Players have to be on the same release to join."}
                                 </span>
                             </label>
                         </div>
 
+                        {/* A map brings its own terrain, so the questions about
+                            generating one have no answer that changes anything. */}
+                        {!map && (
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <label className="flex flex-col gap-1 text-sm">
                                 <span className="font-medium">World seed</span>
@@ -277,8 +359,9 @@ export function BlueprintFields({
                                 </label>
                             )}
                         </div>
+                        )}
 
-                        {edition === "java" && world.usesBiome(value.levelType) && (
+                        {!map && edition === "java" && world.usesBiome(value.levelType) && (
                             <label className="flex flex-col gap-1 text-sm">
                                 <span className="font-medium">Biome</span>
                                 <Select
@@ -312,12 +395,16 @@ export function Choice({
     selected,
     onSelect,
     title,
-    detail
+    detail,
+    /** Who made it and what it takes, for a choice that is somebody's work
+     *  rather than a setting. */
+    note
 }: {
     selected: boolean;
     onSelect: () => void;
     title: string;
     detail: string;
+    note?: string;
 }) {
     return (
         <button
@@ -330,6 +417,7 @@ export function Choice({
         >
             <p className="text-sm font-medium">{title}</p>
             <p className="text-xs text-muted-foreground">{detail}</p>
+            {note && <p className="mt-1 text-xs text-muted-foreground/70">{note}</p>}
         </button>
     );
 }

@@ -26,6 +26,7 @@ import type { GameContext } from "./game-context";
 import { MinecraftRules } from "./minecraft-rules";
 import { MinecraftReset } from "./minecraft-reset";
 import { MinecraftWorld } from "./minecraft-world";
+import { findMap } from "@/lib/apps/minecraft/maps";
 import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
 import { CopyButton } from "@/components/copy-button";
@@ -338,6 +339,7 @@ export function MinecraftPanel({
                     status={status}
                     settings={settings}
                     blueprintId={game?.blueprintId ?? null}
+                    mapId={game?.mapId ?? null}
                     onOpenPlayers={() => openTab("players")}
                 />
             )}
@@ -447,6 +449,7 @@ export function MinecraftPanel({
                         installedAppId={installedAppId}
                         edition={game?.edition ?? "java"}
                         blueprintId={game?.blueprintId ?? null}
+                        mapId={game?.mapId ?? null}
                         crossplay={hasCrossplay(
                             settings.find((setting) => setting.key === PROJECTS_KEY)?.value
                         )}
@@ -669,12 +672,15 @@ function OverviewTab({
     status,
     settings,
     blueprintId,
+    mapId,
     onOpenPlayers
 }: {
     status: MinecraftStatus | null;
     settings: InstalledAppSetting[];
     /** What it was built from, so the screen can say what that game still needs. */
     blueprintId: string | null;
+    /** The map it is standing on, which is somebody's work and is credited. */
+    mapId: string | null;
     onOpenPlayers: () => void;
 }) {
     const shown = useMemo(
@@ -682,6 +688,19 @@ function OverviewTab({
         [settings]
     );
     const blueprint = findBlueprint(blueprintId ?? "");
+    const map = findMap(mapId ?? "");
+    // A map is the game on the servers that have one, so the blueprint's note
+    // about the plugin it replaced would be describing something that is not here.
+    const note = map
+        ? { title: map.name, text: map.setup, docs: map.source, docsLabel: "Where this map came from" }
+        : blueprint?.setup
+          ? {
+                title: `${blueprint.name}: what is left to do`,
+                text: blueprint.setup,
+                docs: blueprint.docs,
+                docsLabel: "The plugin's own instructions"
+            }
+          : null;
 
     return (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -691,19 +710,24 @@ function OverviewTab({
                 empty world with no explanation reads as a broken install rather
                 than as the next step. Full width, because it is the answer to the
                 question anybody who just created this is about to ask. */}
-            {blueprint?.setup && (
+            {note && (note.text || map) && (
                 <Card className="lg:col-span-2">
                     <CardBody className="flex flex-col gap-2">
-                        <p className="text-sm font-medium">{blueprint.name}: what is left to do</p>
-                        <p className="text-sm text-muted-foreground">{blueprint.setup}</p>
-                        {blueprint.docs && (
+                        <p className="text-sm font-medium">{note.title}</p>
+                        {map && (
+                            <p className="text-sm text-muted-foreground">
+                                Built by {map.author}, for Minecraft {map.minecraft.version}.
+                            </p>
+                        )}
+                        {note.text && <p className="text-sm text-muted-foreground">{note.text}</p>}
+                        {note.docs && (
                             <a
-                                href={blueprint.docs}
+                                href={note.docs}
                                 target="_blank"
                                 rel="noreferrer noopener"
                                 className="self-start text-sm text-primary underline-offset-2 hover:underline"
                             >
-                                The plugin&apos;s own instructions
+                                {note.docsLabel}
                             </a>
                         )}
                     </CardBody>

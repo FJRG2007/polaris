@@ -13,11 +13,11 @@
  */
 
 import { prisma } from "@polaris/db";
-import { BLUEPRINT_KEY } from "@/lib/apps/games-create";
 import { gameServerFacts } from "@/lib/apps/games-service";
 import type { ArkAccessView } from "@/lib/apps/ark/service";
 import { readInstallConfig } from "@/lib/apps/install-config";
 import { gameDomainSuffix } from "@/lib/apps/minecraft/address";
+import { BLUEPRINT_KEY, MAP_KEY } from "@/lib/apps/games-create";
 import { readArkAccess, readArkPorts } from "@/lib/apps/ark/service";
 import { listPlayerAccess } from "@/lib/apps/minecraft/player-access";
 import { gameOfServer, routesByHostname } from "@/lib/apps/games-catalog";
@@ -49,6 +49,9 @@ export interface GameContext {
      *  server created before blueprints were recorded, which is the same thing
      *  the screens say about one built as plain survival. */
     readonly blueprintId: string | null;
+    /** The prebuilt map it was built on, when it was built on one. Null is a
+     *  server playing on a world its own generator made. */
+    readonly mapId: string | null;
     /** The hours it is kept up, and the hours it may go quiet. */
     readonly schedule: GameSchedule;
     /** What the last sweep of that schedule saw. */
@@ -112,6 +115,7 @@ export async function gameContextFor(app: {
         iconSetAt: typeof config.iconSetAt === "string" ? config.iconSetAt : null,
         edition: game.id === "minecraft" ? editionOf(app.catalogId) : null,
         blueprintId: typeof config[BLUEPRINT_KEY] === "string" ? (config[BLUEPRINT_KEY] as string) : null,
+        mapId: typeof config[MAP_KEY] === "string" && config[MAP_KEY] ? (config[MAP_KEY] as string) : null,
         schedule: readSchedule(config),
         scheduleState: readScheduleState(config),
         arkAccess,

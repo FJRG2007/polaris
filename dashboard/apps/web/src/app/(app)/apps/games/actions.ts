@@ -12,6 +12,7 @@ import { clientIp } from "@/lib/request-context";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { clearResourceGrants } from "@polaris/auth";
+import { findMap } from "@/lib/apps/minecraft/maps";
 import { flushGameWorld } from "@/lib/apps/games-flush";
 import { uninstallApp } from "@/lib/apps/install-service";
 import { GAMES, type GameId } from "@/lib/apps/games-catalog";
@@ -134,12 +135,18 @@ export interface BlueprintVersions {
  */
 export async function blueprintVersionsAction(
     blueprintId: string,
-    crossplay = false
+    crossplay = false,
+    /** The map it is being built on, whose own plugin list - usually none at all -
+     *  replaces the blueprint's and so decides this list with it. Without this the
+     *  field offered the releases a plugin the server will not be installing has a
+     *  build for, which is a shorter list than the one it will actually run on. */
+    mapId?: string
 ): Promise<BlueprintVersions> {
     await requirePermission("games.read");
     const blueprint = GAME_BLUEPRINTS.find((entry) => entry.id === blueprintId);
     if (!blueprint) return { versions: [], latest: null, pinned: false };
-    const versions = await blueprintVersions(blueprint, crossplay).catch(() => []);
+    const map = findMap(mapId);
+    const versions = await blueprintVersions(blueprint, crossplay, undefined, map).catch(() => []);
     // A blueprint that constrains nothing still needs a list to pick from, so it
     // gets Minecraft's own releases.
     const offered = versions.length > 0 ? versions : await releaseVersions().catch(() => []);
@@ -163,7 +170,12 @@ export async function createGameServerAction(
             metadata:
                 parsed.data.game === "ark"
                     ? { game: "ark", map: parsed.data.map, closed: parsed.data.exclusiveJoin }
-                    : { game: "minecraft", edition: parsed.data.edition, blueprint: parsed.data.blueprintId }
+                    : {
+                          game: "minecraft",
+                          edition: parsed.data.edition,
+                          blueprint: parsed.data.blueprintId,
+                          map: parsed.data.mapId ?? null
+                      }
         });
         revalidatePath("/apps/games");
         return { installedAppId: created.installedAppId, hostname: created.hostname };

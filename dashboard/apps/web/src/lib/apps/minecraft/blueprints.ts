@@ -3,8 +3,13 @@
  *
  * A blueprint is a named preset over the same settings the create dialog holds -
  * the software, the world properties, and the plugins the image installs on its
- * first boot. It is not a world download and not content Polaris ships: every
- * plugin named here is a real Modrinth project the image fetches itself.
+ * first boot. Every plugin named here is a real Modrinth project the image
+ * fetches itself; nothing about a blueprint is content Polaris ships.
+ *
+ * The world a blueprint plays on is a separate decision, and `mapCategory` is
+ * where the two meet: a blueprint that names one can be built on a prebuilt map
+ * of that kind instead of a generated world - see `maps.ts` for what that
+ * changes, which is most of what the blueprint decided.
  *
  * Those entries are deliberately required rather than optional. The image takes a
  * trailing "?" as "warn and carry on", which is right for the protection every
@@ -26,6 +31,7 @@
 
 import { projectSlug } from "./modrinth";
 import { FLAT_LEVEL_TYPE } from "./world";
+import type { MapCategory } from "./maps";
 
 /** The size of world a blueprint expects, which changes what memory it needs. */
 export type BlueprintWeight = "light" | "normal" | "heavy";
@@ -55,6 +61,8 @@ export interface GameBlueprint {
     readonly setup?: string;
     /** The plugin's own instructions, for the part Polaris cannot do. */
     readonly docs?: string;
+    /** The kind of prebuilt map this game can be built on, when there is one. */
+    readonly mapCategory?: MapCategory;
     readonly weight: BlueprintWeight;
 }
 
@@ -88,6 +96,7 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
         levelType: FLAT_LEVEL_TYPE,
         setup: "The island worlds are the plugin's own and it creates them on its first start. The world the server generates is only the lobby people land in.",
         docs: "https://docs.iridiumdevelopment.net/",
+        mapCategory: "skyblock",
         weight: "normal"
     },
     {
@@ -101,6 +110,7 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
         levelType: FLAT_LEVEL_TYPE,
         setup: "Run /parkour in game to start a course. The world the server generates is the lobby; the courses are generated as they are run.",
         docs: "https://efnilite.dev/projects/ip/wiki",
+        mapCategory: "parkour",
         weight: "light"
     },
     {
@@ -119,9 +129,27 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
         // The one blueprint whose game does not exist until somebody makes it. Said
         // plainly, because a server that looks like an empty world is exactly what
         // BedWars1058 with no arena is - not a failed install.
-        setup: "BedWars1058 ships no arenas, so until you add one the server is a lobby and nothing else. Take a ready-made setup from the wiki or build a map and register it, then players join with /bw join.",
+        setup: "BedWars1058 ships no arenas, so until you add one the server is a lobby and nothing else. Take a ready-made map below, or build one and register it, then players join with /bw join.",
         docs: "https://wiki.andrei1058.com/docs/BedWars1058/addons",
+        mapCategory: "bedwars",
         weight: "heavy"
+    },
+    {
+        id: "luckyblock",
+        name: "Lucky blocks",
+        summary: "Break a block, take what it gives you, hope it was not the bad one.",
+        editions: ["java"],
+        software: "PAPER",
+        // The game is the map here. There is no lucky block plugin that works on a
+        // current release without the mod half of it on every client, and asking
+        // for that is a server nobody can join - so this blueprint is the settings
+        // a lucky block map needs and the map itself carries the rest.
+        projects: [],
+        levelType: FLAT_LEVEL_TYPE,
+        env: { MODE: "adventure", PVP: "true" },
+        setup: "The lucky blocks are in the map, so without one this is an empty world in adventure mode.",
+        mapCategory: "luckyblock",
+        weight: "light"
     },
     {
         id: "shrinking-world",
@@ -163,10 +191,20 @@ export function blueprintsFor(edition: "java" | "bedrock"): readonly GameBluepri
  */
 export const CROSSPLAY_PROJECTS = ["geyser:beta"] as const;
 
-/** Everything a server built from this blueprint has to be able to install, which
- *  is what the release it runs on is pinned against. */
-export function requiredProjects(blueprint: GameBlueprint, crossplay: boolean): string[] {
-    return [...blueprint.projects, ...(crossplay ? CROSSPLAY_PROJECTS : [])];
+/**
+ * Everything a server built from this blueprint has to be able to install, which
+ * is what the release it runs on is pinned against.
+ *
+ * `instead` is a map's own plugin list, which replaces the blueprint's rather than
+ * adding to it - a map that carries its own game does not want the plugin that
+ * exists to provide one. The crossplay pair is not a game and stays either way.
+ */
+export function requiredProjects(
+    blueprint: GameBlueprint,
+    crossplay: boolean,
+    instead?: readonly string[]
+): string[] {
+    return [...(instead ?? blueprint.projects), ...(crossplay ? CROSSPLAY_PROJECTS : [])];
 }
 
 /**

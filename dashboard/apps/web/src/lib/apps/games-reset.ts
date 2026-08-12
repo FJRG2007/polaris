@@ -29,7 +29,13 @@ import { patchInstallConfig } from "@/lib/apps/install-config";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import { DEFAULT_LEVEL_TYPE } from "@/lib/apps/minecraft/world";
 import type { ResetMinecraftServerInput } from "@/lib/apps/games-schema";
-import { BLUEPRINT_KEY, blueprintFor, minecraftShapeEnv, withoutBlueprintProjects } from "@/lib/apps/games-create";
+import {
+    BLUEPRINT_KEY,
+    blueprintFor,
+    MAP_KEY,
+    minecraftShapeEnv,
+    withoutBlueprintProjects
+} from "@/lib/apps/games-create";
 
 /** What the reset dialog asks for, minus which server it is asking about. The
  *  shape of the game and the map it starts on; everything else is left alone. */
@@ -89,6 +95,7 @@ export async function resetMinecraftServer(
         blueprint,
         {
             blueprintId: blueprint.id,
+            ...(input.mapId ? { mapId: input.mapId } : {}),
             ...(input.software ? { software: input.software } : {}),
             version: input.version,
             ...(input.seed ? { seed: input.seed } : {}),
@@ -112,7 +119,7 @@ export async function resetMinecraftServer(
             changed.map(([key, value]) => ({ key, value, isSecret: false }))
         );
     }
-    await patchInstallConfig(installedAppId, { [BLUEPRINT_KEY]: blueprint.id });
+    await patchInstallConfig(installedAppId, { [BLUEPRINT_KEY]: blueprint.id, [MAP_KEY]: input.mapId ?? "" });
 
     // The map, and the restart that puts all of this on the server. Generating a
     // new level is the same act as the New world button and it is the same code:

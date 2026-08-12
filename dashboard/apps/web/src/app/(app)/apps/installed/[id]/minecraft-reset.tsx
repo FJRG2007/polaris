@@ -16,6 +16,7 @@
  */
 
 import { useState } from "react";
+import { findMap } from "@/lib/apps/minecraft/maps";
 import { resetGameServerAction } from "./minecraft-actions";
 import { Loader2, RotateCcw, TriangleAlert } from "lucide-react";
 import { formatMemory, recommendedMemoryMb, findBlueprint } from "@/lib/apps/minecraft/blueprints";
@@ -45,6 +46,7 @@ export function MinecraftReset({
     installedAppId,
     edition,
     blueprintId,
+    mapId,
     crossplay,
     playersOnline,
     onDone
@@ -53,6 +55,8 @@ export function MinecraftReset({
     edition: "java" | "bedrock";
     /** What it is built from now, so the dialog opens on it. */
     blueprintId: string | null;
+    /** The map it is on now, for the same reason. */
+    mapId: string | null;
     /** Whether Bedrock clients join this Java server through Geyser. A reset does
      *  not change it - the second published port is part of the deployment - but
      *  Geyser still has to have a build for whatever release is picked, so the
@@ -63,6 +67,7 @@ export function MinecraftReset({
 }) {
     const [open, setOpen] = useState(false);
     const current = findBlueprint(blueprintId ?? "");
+    const currentMap = findMap(mapId ?? "");
 
     return (
         <Card>
@@ -78,9 +83,11 @@ export function MinecraftReset({
                     address, its players, the access other people hold on it and its port - only the game changes.
                 </p>
                 <p className="text-xs text-muted-foreground">
-                    {current
-                        ? `It is built from ${current.name} now.`
-                        : "It was not built from a blueprint, or was created before Polaris recorded which one."}{" "}
+                    {currentMap
+                        ? `It is built from ${current?.name ?? "a blueprint"} on ${currentMap.name} now.`
+                        : current
+                          ? `It is built from ${current.name} now.`
+                          : "It was not built from a blueprint, or was created before Polaris recorded which one."}{" "}
                     The map it is on is kept, so you can switch back to it under World.
                 </p>
                 <div className="flex justify-end">
@@ -95,6 +102,7 @@ export function MinecraftReset({
                     installedAppId={installedAppId}
                     edition={edition}
                     blueprintId={blueprintId}
+                    mapId={mapId}
                     crossplay={crossplay}
                     playersOnline={playersOnline}
                     onClose={() => setOpen(false)}
@@ -109,6 +117,7 @@ function ResetDialog({
     installedAppId,
     edition,
     blueprintId,
+    mapId,
     crossplay,
     playersOnline,
     onClose,
@@ -117,6 +126,7 @@ function ResetDialog({
     installedAppId: string;
     edition: "java" | "bedrock";
     blueprintId: string | null;
+    mapId: string | null;
     crossplay: boolean;
     playersOnline: number;
     onClose: () => void;
@@ -128,6 +138,9 @@ function ResetDialog({
             ? {
                   ...DEFAULT_SHAPE,
                   blueprintId: blueprint.id,
+                  // What it is on now, not what a new server of this game would
+                  // open on: a reset is meant to start from where the server is.
+                  mapId: mapId ?? "",
                   levelType: blueprint.levelType ?? DEFAULT_SHAPE.levelType
               }
             : DEFAULT_SHAPE;
@@ -150,6 +163,7 @@ function ResetDialog({
         const result = await resetGameServerAction({
             installedAppId,
             blueprintId: shape.blueprintId,
+            ...(shape.mapId ? { mapId: shape.mapId } : {}),
             ...(edition === "java" ? { software: shape.software } : {}),
             version: shape.version.trim() || LATEST,
             ...(shape.seed.trim() ? { seed: shape.seed.trim() } : {}),

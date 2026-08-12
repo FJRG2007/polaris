@@ -13,6 +13,7 @@
 
 import { z } from "zod";
 import { isArkMap } from "@/lib/apps/ark/maps";
+import { isWorldMap } from "@/lib/apps/minecraft/maps";
 import { isBiome, isLevelType, isSeed } from "@/lib/apps/minecraft/world";
 import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
 import { isJoinPassword, isSteamId, JOIN_PASSWORD_HINT } from "@/lib/apps/ark/access";
@@ -43,6 +44,9 @@ const minecraftServerSchema = z.object({
     edition: z.enum(["java", "bedrock"]),
     crossplay: z.boolean().default(false),
     blueprintId: z.string().trim().min(1).max(48).default("survival"),
+    /** A prebuilt map of that game to build on, fetched while the server is
+     *  created. Blank generates a world instead. */
+    mapId: z.string().trim().max(64).refine(isWorldMap, "That is not a map this server can be built on").optional(),
     /** Java only: PAPER, FABRIC, ... The blueprint may pin it. */
     software: z.string().trim().max(32).optional(),
     version: z.string().trim().max(32).default("LATEST"),
@@ -157,6 +161,7 @@ export const resetMinecraftServerSchema = z
     .object({
         installedAppId: z.string().uuid(),
         blueprintId: z.string().trim().min(1).max(48).default("survival"),
+        mapId: z.string().trim().max(64).refine(isWorldMap, "That is not a map this server can be built on").optional(),
         software: z.string().trim().max(32).optional(),
         version: z.string().trim().max(32).default("LATEST"),
         seed: z.string().trim().max(64).optional(),

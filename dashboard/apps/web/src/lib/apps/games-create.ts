@@ -30,9 +30,10 @@ import { grantPlayerAccess } from "@/lib/apps/minecraft/player-access";
 import { findGame, type GameDefinition } from "@/lib/apps/games-catalog";
 import { arkServerEnv, expectedArkMemoryMb } from "@/lib/apps/ark/config";
 import { applyAllowList, ARK_CATALOG_ID, mintJoinPassword } from "@/lib/apps/ark/service";
+import { isMapResourcePack, mapFor, pinnedRelease, type WorldMap } from "@/lib/apps/minecraft/maps";
 import { commonVersions, knownUnsupported, wantsLatest } from "@/lib/apps/minecraft/blueprint-version";
-import { DEFAULT_BIOME, DEFAULT_LEVEL_TYPE, levelTypeEnv, seedEnvKey } from "@/lib/apps/minecraft/world";
 import { formatProjectList, loaderForType, parseProjectList, projectSlug } from "@/lib/apps/minecraft/modrinth";
+import { DEFAULT_BIOME, DEFAULT_LEVEL_TYPE, levelEnvKey, levelTypeEnv, seedEnvKey } from "@/lib/apps/minecraft/world";
 import type {
     CreateArkServerInput,
     CreateGameServerInput,
@@ -66,10 +67,29 @@ export interface CreatedGameServer {
  *  reset dialog can open on what it is now. */
 export const BLUEPRINT_KEY = "blueprintId";
 
+/** The key the same config records which prebuilt map the server was built on,
+ *  so its page can credit the map and the reset dialog can open on it. */
+export const MAP_KEY = "mapId";
+
+/**
+ * The variable that carries a world for the container to fetch.
+ *
+ * The image downloads it once, on a start that finds no level of that name, and
+ * extracts the folder holding `level.dat` into the one `LEVEL` names. So it is
+ * both the download and the answer to "when": creating the server, and never
+ * again unless the level is replaced. Written blank rather than left alone when
+ * there is no map, or a server reset from a map to an ordinary world would fetch
+ * the map again on its next restart.
+ */
+const WORLD_KEY = "WORLD";
+
 /** What decides the game a Minecraft server plays and the map it plays it on.
  *  The same answers whether the server is being created or being reset to them. */
 export interface MinecraftShape {
     readonly blueprintId: string;
+    /** A prebuilt map of the blueprint's game to build on. Blank generates a
+     *  world instead. */
+    readonly mapId?: string;
     /** Java only: PAPER, FABRIC, ... The blueprint may pin it. */
     readonly software?: string;
     /** A release, or LATEST for the newest the blueprint can run on. */
@@ -99,6 +119,12 @@ export interface MinecraftShape {
  * run on, this refuses rather than installing nothing and handing back an
  * ordinary world. Only what Modrinth positively answered counts - an index that
  * could not be reached leaves the operator's own choice alone.
+ *
+ * A map, where one was chosen, is the stronger promise of the two and settles
+ * every question the blueprint had already answered: the release it is pinned to,
+ * the world the container fetches, the settings its game needs, and the plugins -
+ * which it takes away rather than adds to, because a map carrying its own game
+ * does not want a plugin providing a second one.
  */
 export async function minecraftShapeEnv(
     edition: "java" | "bedrock",
@@ -107,28 +133,53 @@ export async function minecraftShapeEnv(
     current: ReadonlyMap<string, string>
 ): Promise<Map<string, string>> {
     const env = new Map(current);
-    const versions = await blueprintVersions(blueprint, shape.crossplay, shape.software).catch(() => []);
+    const map = mapFor(blueprint, shape.mapId);
+    const versions = await blueprintVersions(blueprint, shape.crossplay, shape.software, map).catch(() => []);
+    const pinned = pinnedRelease(map);
     const asked = (shape.version ?? "").trim();
-    if (!wantsLatest(asked) && knownUnsupported(versions, asked)) {
+    // A map pinned to a release is not a preference that a picker can override:
+    // its datapack declares the release it was written for and its command blocks
+    // are that release's syntax, so the alternative to refusing here is a server
+    // that boots, loads the world, and silently does none of what the map does.
+    if (pinned && !wantsLatest(asked) && asked !== pinned) {
+        throw new Error(`${map?.name} only plays on Minecraft ${pinned}, so the server has to be built on it.`);
+    }
+    const wanted = pinned ?? (wantsLatest(asked) ? null : asked);
+    if (wanted && knownUnsupported(versions, wanted)) {
         throw new Error(
-            `${blueprint.name} has nothing built for Minecraft ${asked}. The newest it runs on is ${versions[0]}.`
+            pinned
+                ? `${map?.name} needs Minecraft ${pinned}, which this server's plugins have nothing built for.`
+                : `${blueprint.name} has nothing built for Minecraft ${wanted}. The newest it runs on is ${versions[0]}.`
         );
     }
-    env.set("VERSION", wantsLatest(asked) ? (versions[0] ?? "LATEST") : asked);
+    env.set("VERSION", wanted ?? versions[0] ?? "LATEST");
+
+    // The world the container fetches for itself, and the folder it lands in.
+    // Blank for a generated world, so a server reset off a map stops fetching it.
+    env.set(WORLD_KEY, map?.url ?? "");
+    if (map) env.set(levelEnvKey(edition), map.id);
 
     // The seed and the shape of the world only ever apply to one that does not
-    // exist yet, which is what both callers are about to generate. Both are
+    // exist yet, which is what a caller with no map is about to generate. Both are
     // written every time, blank included: a value left over from the last world
     // would quietly generate the previous one under the new one's name.
-    env.set(seedEnvKey(edition), shape.seed?.trim() ?? "");
-    for (const [key, value] of Object.entries(
-        levelTypeEnv(
-            edition,
-            shape.levelType ?? blueprint.levelType ?? DEFAULT_LEVEL_TYPE,
-            shape.biome ?? DEFAULT_BIOME
-        )
-    )) {
-        env.set(key, value);
+    //
+    // A map is terrain that already exists, so none of it describes anything -
+    // and writing it anyway is not free. A blueprint's flat lobby setting carried
+    // onto a map server put `level-type=minecraft:flat` with no layers in front of
+    // a world that was never going to be generated, and the server said so twice,
+    // in red, on the console of a server that had just been created and was fine.
+    if (!map) {
+        env.set(seedEnvKey(edition), shape.seed?.trim() ?? "");
+        for (const [key, value] of Object.entries(
+            levelTypeEnv(
+                edition,
+                shape.levelType ?? blueprint.levelType ?? DEFAULT_LEVEL_TYPE,
+                shape.biome ?? DEFAULT_BIOME
+            )
+        )) {
+            env.set(key, value);
+        }
     }
 
     // Only the Java image runs a JVM to give a heap to.
@@ -137,10 +188,30 @@ export async function minecraftShapeEnv(
         // What the operator chose, then what the blueprint insists on: a blueprint
         // that needs Paper is not a suggestion, it is what its plugins load into.
         env.set("TYPE", blueprint.software ?? shape.software ?? "PAPER");
-        env.set("MODRINTH_PROJECTS", projectList(blueprint, env.get("MODRINTH_PROJECTS"), shape.crossplay));
+        env.set("MODRINTH_PROJECTS", projectList(blueprint, env.get("MODRINTH_PROJECTS"), shape.crossplay, map));
     }
     for (const [key, value] of Object.entries(blueprint.env ?? {})) env.set(key, value);
+    // Last, over the blueprint's own: where the two disagree the map is the one
+    // that has to be right, because it is the thing people will be standing in.
+    for (const [key, value] of Object.entries(map?.env ?? {})) env.set(key, value);
+    for (const [key, value] of Object.entries(resourcePackEnv(map, env.get("RESOURCE_PACK")))) env.set(key, value);
     return env;
+}
+
+/**
+ * The pack a map needs the client to load, and the clearing up after one that no
+ * longer applies.
+ *
+ * Only a pack Polaris put there is ever taken away. An operator who set their own
+ * under Settings did so deliberately, and a change of map is not them asking for
+ * it to be removed - so the blank is written for the map's own packs and nothing
+ * else. The hash is not optional: the game refuses to reuse a downloaded pack it
+ * cannot identify, so leaving it behind is every player fetching it again on
+ * every join.
+ */
+function resourcePackEnv(map: WorldMap | undefined, current: string | undefined): Record<string, string> {
+    if (map?.resourcePack) return { RESOURCE_PACK: map.resourcePack.url, RESOURCE_PACK_SHA1: map.resourcePack.sha1 };
+    return isMapResourcePack(current) ? { RESOURCE_PACK: "", RESOURCE_PACK_SHA1: "" } : {};
 }
 
 /** The blueprint a shape names, refusing one this edition cannot be built from. */
@@ -177,6 +248,7 @@ async function createMinecraftServer(
         blueprint,
         {
             blueprintId: input.blueprintId,
+            ...(input.mapId ? { mapId: input.mapId } : {}),
             ...(input.software ? { software: input.software } : {}),
             version: input.version,
             ...(input.seed ? { seed: input.seed } : {}),
@@ -216,9 +288,13 @@ async function createMinecraftServer(
         extra ? { extra } : undefined
     );
 
-    // Which game this server was built to play, so its own page can say what that
-    // game still needs of it and a reset can start from what it is now.
-    await patchInstallConfig(install.installedAppId, { [BLUEPRINT_KEY]: blueprint.id });
+    // Which game this server was built to play and on what, so its own page can
+    // say what that game still needs of it, credit the map it is standing on, and
+    // a reset can start from what it is now.
+    await patchInstallConfig(install.installedAppId, {
+        [BLUEPRINT_KEY]: blueprint.id,
+        [MAP_KEY]: input.mapId ?? ""
+    });
 
     // The address half of the pair, which the game has nowhere to keep. The image
     // was already handed the username; this is what makes the name mean one line
@@ -318,12 +394,13 @@ async function createArkServer(
 export async function blueprintVersions(
     blueprint: GameBlueprint,
     crossplay = false,
-    software?: string
+    software?: string,
+    map?: WorldMap
 ): Promise<string[]> {
     // Asked about the software the plugins will actually be loaded into, because
     // that is what decides whether a build for a release exists at all.
     const loader = loaderForType(blueprint.software ?? software ?? "PAPER");
-    return commonVersions(requiredProjects(blueprint, crossplay), loader ?? undefined);
+    return commonVersions(requiredProjects(blueprint, crossplay, map?.projects), loader ?? undefined);
 }
 
 /** The newest release a blueprint can run on, or null when nothing constrains it. */
@@ -331,12 +408,17 @@ export async function blueprintVersion(blueprint: GameBlueprint, crossplay = fal
     return (await blueprintVersions(blueprint, crossplay))[0] ?? null;
 }
 
-/** The blueprint's plugins on top of the protection every server gets, plus the
- *  crossplay pair when Bedrock players are meant to be able to join. */
-function projectList(blueprint: GameBlueprint, current: string | undefined, crossplay: boolean): string {
+/** The blueprint's plugins - or the map's instead of them - on top of the
+ *  protection every server gets, plus the crossplay pair when Bedrock players are
+ *  meant to be able to join. */
+function projectList(
+    blueprint: GameBlueprint,
+    current: string | undefined,
+    crossplay: boolean,
+    map?: WorldMap
+): string {
     const projects = new Set(parseProjectList(current ?? ""));
-    for (const project of blueprint.projects) projects.add(project);
-    if (crossplay) for (const project of CROSSPLAY_PROJECTS) projects.add(project);
+    for (const project of requiredProjects(blueprint, crossplay, map?.projects)) projects.add(project);
     return formatProjectList([...projects]);
 }
 

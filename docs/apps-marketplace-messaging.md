@@ -281,8 +281,17 @@ not put where it does not fit.
 
 **Blueprints are presets, not content.** Each names real Modrinth projects the
 image installs itself, with `?` so a Minecraft release they have no build for yet
-warns instead of stopping the server. Polaris ships no worlds and no plugins of
-its own.
+warns instead of stopping the server. Polaris ships no plugins of its own.
+
+**Maps are content, and are fetched rather than shipped.** A blueprint that names
+a `mapCategory` can be built on a prebuilt world instead of a generated one. The
+entry in `minecraft/maps.ts` holds a URL, a hash and the release the map's own
+game was written for; the container downloads it on its first start, once, and
+only for a level it does not already have. Nothing is kept on the machine Polaris
+runs on and a server that is never created downloads nothing. A map settles what
+the blueprint had guessed at - its release, its settings, and its plugins, which
+it removes rather than adds to, since a map carrying its own game does not want a
+plugin providing a second one. Every map credits its author and links its page.
 
 **The address is a name.** `<label>.mc.<baseDomain>`, with an A record and - for
 Java - a `_minecraft._tcp` SRV record, so players type a name and no port at all.
