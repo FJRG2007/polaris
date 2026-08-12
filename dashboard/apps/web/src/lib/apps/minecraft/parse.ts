@@ -174,6 +174,26 @@ export function parseJoinAddresses(log: string): Map<string, string> {
 const LOG_SIGNAL = /^(?:\S+\s+)?(?:\[init\]|\[mc-image-helper\]|.*\bERROR\b|.*\bWARN\b)/;
 
 /**
+ * Lines a server printed because Polaris asked it something, not because anything
+ * went wrong.
+ *
+ * Polaris asks `list` over RCON every few seconds to know who is on. A server that
+ * is still coming up, or on its way down, has no main thread to hand the command to
+ * and runs it on the connection's own instead, and Paper answers that with a stack
+ * trace and two red lines - every few seconds, for as long as the server is in that
+ * state. Which is precisely the state of a server that will not start.
+ *
+ * So the loudest thing in a broken server's log is Polaris talking to itself, and
+ * any rule that reads the last error line reads that: a real server was reported as
+ * having died of "Asynchronous command dispatch", which is the question rather than
+ * the answer. Recognised in one place because two rules quote log lines back to
+ * people, and both have to skip these.
+ */
+export function isPollNoise(line: string): boolean {
+    return /Asynchronous command dispatch|failed main thread check|while parsing console command/i.test(line);
+}
+
+/**
  * The last thing the container said that explains what it is doing, or null.
  *
  * A server takes real minutes to start the first time - it is fetching its own
@@ -187,7 +207,7 @@ export function lastStartupSignal(log: string): string | null {
         log
             .split("\n")
             .map((line) => line.trim())
-            .filter((line) => line.length > 0 && LOG_SIGNAL.test(line))
+            .filter((line) => line.length > 0 && LOG_SIGNAL.test(line) && !isPollNoise(line))
             .at(-1) ?? null
     );
 }

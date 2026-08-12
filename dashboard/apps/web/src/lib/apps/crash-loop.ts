@@ -22,7 +22,7 @@
  * testable against a captured log without a container anywhere near it.
  */
 
-import { stripFormatting } from "@/lib/apps/minecraft/parse";
+import { isPollNoise, stripFormatting } from "@/lib/apps/minecraft/parse";
 
 /** What a server is doing when it will not start, and what to do about it. */
 export interface CrashLoop {
@@ -41,6 +41,13 @@ export interface RestartFacts {
     readonly restartCount: number;
     readonly startedAt?: string | undefined;
     readonly restarting?: boolean | undefined;
+}
+
+/** What the count was the last time anybody looked, and when that was. */
+export interface RestartWatch {
+    readonly restartCount: number;
+    /** ISO, and kept so a reading can be discarded rather than trusted forever. */
+    readonly at: string;
 }
 
 /**
@@ -66,21 +73,55 @@ const MIN_RESTARTS = 3;
 const LOOP_UPTIME_MS = 120_000;
 
 /**
- * Whether this container is restarting in a loop rather than starting slowly.
+ * Restarts that have to arrive *between two readings* before this convicts.
  *
- * The `restarting` flag is a straight yes when it happens to be true, but it is
- * only set while the engine waits out its backoff - a second or two between runs,
- * which a poll almost never lands in. It corroborates; the count and the clock
- * decide.
+ * The count and the clock together are still not enough, and a real server was
+ * stopped mid-boot proving it. A container that looped, was repaired and is now
+ * thirty seconds into a perfectly good run carries the same high count - the
+ * engine never resets it - and the same young start time, because the run that
+ * finally worked started when the last one died. From one sample the two are the
+ * same server.
+ *
+ * What separates them is whether the number is still moving. A loop restarts every
+ * few seconds and adds a dozen between two sweeps a minute apart; a server that got
+ * up adds none, ever. Two is the smallest gap that cannot be one crash, and waiting
+ * for the second costs a minute on a server that has already been broken for
+ * however long nobody noticed.
  */
-export function isCrashLooping(state: RestartFacts, now: Date): boolean {
-    if (state.restarting === true) return true;
+const LOOP_RESTARTS = 2;
+
+/**
+ * Whether this container is worth keeping an eye on: restarting often, on a run too
+ * young to have got anywhere.
+ *
+ * Not a verdict, and nothing acts on it alone - it is the question `isCrashLooping`
+ * answers by watching. The `restarting` flag belongs here for the same reason: it is
+ * only set while the engine waits out its backoff, a second or two between runs that
+ * a poll almost never lands in, so it corroborates rather than decides.
+ */
+export function watchesRestarts(state: RestartFacts, now: Date): boolean {
     if (state.restartCount < MIN_RESTARTS) return false;
+    if (state.restarting === true) return true;
     const started = state.startedAt ? Date.parse(state.startedAt) : Number.NaN;
     // A start time the daemon did not give, or gave as its zero value, is not
     // evidence of a young run - so the count alone never convicts.
     if (Number.isNaN(started) || started <= 0) return false;
     return now.getTime() - started < LOOP_UPTIME_MS;
+}
+
+/**
+ * Whether this container is restarting in a loop rather than starting slowly.
+ *
+ * Two readings, because one cannot tell a loop from a recovery. `since` is what the
+ * count was when Polaris last looked at a container that already looked suspicious;
+ * with nothing to compare against this says no and the reading becomes the
+ * comparison for the next one. Erring towards no is deliberate: the cost of a false
+ * yes is stopping a server people are on, and the cost of a false no is a minute.
+ */
+export function isCrashLooping(state: RestartFacts, since: RestartWatch | null, now: Date): boolean {
+    if (!watchesRestarts(state, now)) return false;
+    if (since === null) return false;
+    return state.restartCount - since.restartCount >= LOOP_RESTARTS;
 }
 
 /** Lines that are the shape of the trace rather than the content of it. */
@@ -96,6 +137,45 @@ const LOG_PREFIX = /^(?:\d{4}-\d{2}-\d{2}T[\d:.]+Z?\s+)?(?:\[[\d:]{5,8}\s+[A-Z]+
 /** As long as a cause is allowed to be on a status card. The rest is the console
  *  screen's job. */
 const CAUSE_MAX = 200;
+
+/** What the container prints when a run begins. Every one of these is the image or
+ *  the launcher rather than the game, which is why they arrive before it. */
+const BOOT_MARKER = /^(?:\[init\]\s|\[mc-image-helper\]\s|Starting org\.bukkit\.craftbukkit\.Main)/;
+
+/** And what the game prints once it is up and answering. Minecraft's, because it
+ *  is the one that can be quoted from a real log; a game with no marker here simply
+ *  never claims to have started, which is the reading everything already had. */
+const READY_MARKER = /^Done \(\d[\d.]*s\)!/;
+
+/** The log as a rule can read it: one line per line, without the prefixes it
+ *  collected on the way here, and without the two kinds of line that are shape
+ *  rather than content - the trace, and Polaris's own questions. */
+function meaningfulLines(log: string): string[] {
+    return stripFormatting(log)
+        .split("\n")
+        .map((line) => line.replace(LOG_PREFIX, "").trim())
+        .filter((line) => line.length > 0 && !STACK_FRAME.test(line) && !isPollNoise(line));
+}
+
+/**
+ * Whether the server got up on the run it is on now.
+ *
+ * The counters can say "looping" about a container that has just this second
+ * recovered, and this is the log's answer to that: the ready line has to come after
+ * the last time the container began booting, or it belongs to a run that has since
+ * ended. A tail that does not reach back to a boot marker at all still counts, since
+ * a server that printed it is one that answered.
+ */
+export function reachedReady(log: string): boolean {
+    const lines = meaningfulLines(log);
+    let boot = -1;
+    let ready = -1;
+    for (const [index, line] of lines.entries()) {
+        if (BOOT_MARKER.test(line)) boot = index;
+        if (READY_MARKER.test(line)) ready = index;
+    }
+    return ready > boot;
+}
 
 /**
  * The line that says why the server died, out of everything it printed dying.
@@ -113,12 +193,18 @@ const CAUSE_MAX = 200;
  * Stack frames are dropped before any of it. That is the step the plain startup
  * signal is missing, and why it answers a crash like this one with a line of
  * somebody else's library.
+ *
+ * Everything up to and including the last time the server announced it was up is
+ * dropped too. A tail long enough to hold a stack trace is long enough to hold the
+ * crash before last, and a run that ended in a working server explains nothing about
+ * one that has not started yet - without this, a server that recovers keeps being
+ * described by the failure it recovered from.
  */
 export function crashCause(log: string): string | null {
-    const lines = stripFormatting(log)
-        .split("\n")
-        .map((line) => line.replace(LOG_PREFIX, "").trim())
-        .filter((line) => line.length > 0 && !STACK_FRAME.test(line));
+    const all = meaningfulLines(log);
+    let ready = -1;
+    for (const [index, line] of all.entries()) if (READY_MARKER.test(line)) ready = index;
+    const lines = ready === -1 ? all : all.slice(ready + 1);
 
     for (let index = lines.length - 1; index >= 0; index -= 1) {
         const line = lines[index] ?? "";

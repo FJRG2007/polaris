@@ -10,7 +10,15 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { crashAdvice, crashCause, crashLoopOf, isConfigCrash, isCrashLooping } from "@/lib/apps/crash-loop";
+import {
+    crashAdvice,
+    crashCause,
+    crashLoopOf,
+    isConfigCrash,
+    isCrashLooping,
+    reachedReady,
+    watchesRestarts
+} from "@/lib/apps/crash-loop";
 
 const NOW = new Date("2026-08-12T21:05:30.000Z");
 
@@ -22,6 +30,11 @@ function looping(over: Partial<Parameters<typeof isCrashLooping>[0]> = {}) {
         startedAt: "2026-08-12T21:05:23.101Z",
         ...over
     };
+}
+
+/** What the sweep saw a minute ago. */
+function seen(restartCount: number) {
+    return { restartCount, at: "2026-08-12T21:04:30.000Z" };
 }
 
 /** Verbatim from the crash, trimmed to the shape rather than the length: the
@@ -42,34 +55,87 @@ const PAPER_DOWNGRADE = [
     "2026-08-12T21:05:12.649407544Z [21:05:12 INFO]: Stopping server"
 ].join("\n");
 
-describe("whether a container is looping", () => {
+/**
+ * The other real one: the same server a few minutes later, after the settings were
+ * set aside. It is the log of a server that recovered - the old run being stopped,
+ * a new one, and a clean start - except that the loudest thing in it is Polaris's
+ * own `list` poll hitting a server with no main thread to run it on. Read naively
+ * it says the server died of "Asynchronous command dispatch", which is a question
+ * Polaris asked rather than anything that went wrong.
+ */
+const RECOVERED = [
+    '2026-08-12T22:44:17.743056344Z [22:44:17 WARN]: Unexpected exception while parsing console command "list"',
+    "2026-08-12T22:44:17.743073104Z java.lang.IllegalStateException: Asynchronous command dispatch!",
+    "2026-08-12T22:44:17.743076622Z     at org.spigotmc.AsyncCatcher.catchOp(AsyncCatcher.java:16) ~[paper-1.19.4.jar:git-Paper-550]",
+    "2026-08-12T22:44:17.743116649Z [22:44:17 INFO]: Thread RCON Client /0:0:0:0:0:0:0:1 shutting down",
+    "2026-08-12T22:44:18.269346032Z [22:44:18 INFO]: Flushing Chunk IO",
+    "2026-08-12T22:44:19.394568977Z 2026-08-12T22:44:19.394Z    WARN    mc-server-runner    Minecraft server failed. Inspect logs above for errors that indicate cause. DO NOT report this line as an error.    {\"exitCode\": 1}",
+    "2026-08-12T22:44:20.277006455Z [init] Running as uid=1000 gid=1000 with /data as 'drwxr-x--- 26 1000 1000 4096 Aug 12 22:40 /data'",
+    "2026-08-12T22:44:24.994008348Z [init] Copying any configs from /config to /data/config",
+    "2026-08-12T22:44:30.117935685Z [init] Starting the Minecraft server...",
+    "2026-08-12T22:44:34.535323238Z [22:44:34 INFO]: Starting minecraft server version 1.19.4",
+    '2026-08-12T22:44:38.720204272Z [22:44:38 INFO]: Done (4.193s)! For help, type "help"',
+    "2026-08-12T22:44:39.114781013Z [22:44:39 INFO]: [BedWars1058] Loading internal Party system. /party"
+].join("\n");
+
+describe("whether a container is worth watching", () => {
     it("says no to a first boot that is simply taking its time", () => {
         // The case this rule exists to not break: the image fetching its own jar
         // and every plugin takes real minutes, and it has restarted nothing.
-        expect(isCrashLooping(looping({ restartCount: 0 }), NOW)).toBe(false);
+        expect(watchesRestarts(looping({ restartCount: 0 }), NOW)).toBe(false);
     });
 
     it("says no to a server that looped a long time ago and settled", () => {
         // The count is cumulative for the container's whole life, so without the
         // clock beside it every server that ever had a bad week reads as broken.
-        expect(isCrashLooping(looping({ startedAt: "2026-08-10T09:00:00.000Z" }), NOW)).toBe(false);
+        expect(watchesRestarts(looping({ startedAt: "2026-08-10T09:00:00.000Z" }), NOW)).toBe(false);
     });
 
     it("says no to one restart, which is somebody pressing the button", () => {
-        expect(isCrashLooping(looping({ restartCount: 1 }), NOW)).toBe(false);
+        expect(watchesRestarts(looping({ restartCount: 1 }), NOW)).toBe(false);
     });
 
     it("says yes to restarts piling up on a run that is seconds old", () => {
-        expect(isCrashLooping(looping(), NOW)).toBe(true);
+        expect(watchesRestarts(looping(), NOW)).toBe(true);
     });
 
     it("takes the engine's own word for it when the poll lands in the backoff", () => {
-        expect(isCrashLooping({ status: "restarting", restartCount: 1, restarting: true }, NOW)).toBe(true);
+        expect(watchesRestarts({ status: "restarting", restartCount: 4, restarting: true }, NOW)).toBe(true);
     });
 
-    it("does not convict on a count with no start time to read it against", () => {
-        expect(isCrashLooping({ status: "running", restartCount: 9 }, NOW)).toBe(false);
-        expect(isCrashLooping(looping({ startedAt: "0001-01-01T00:00:00Z" }), NOW)).toBe(false);
+    it("does not suspect a count with no start time to read it against", () => {
+        expect(watchesRestarts({ status: "running", restartCount: 9 }, NOW)).toBe(false);
+        expect(watchesRestarts(looping({ startedAt: "0001-01-01T00:00:00Z" }), NOW)).toBe(false);
+    });
+});
+
+describe("whether a container is looping", () => {
+    it("waits for a second reading rather than convicting on the first", () => {
+        expect(isCrashLooping(looping(), null, NOW)).toBe(false);
+    });
+
+    it("leaves alone a server that looped, was fixed, and is seconds into a good run", () => {
+        // This is the bug as it happened, and it cost a working server. The count
+        // never resets, and the run that finally worked began the moment the last
+        // failed one died - so a recovered container carries a high count and a
+        // young start time, which is the same shape as one still going round. The
+        // count standing still is the whole difference.
+        expect(isCrashLooping(looping({ restartCount: 12 }), seen(12), NOW)).toBe(false);
+    });
+
+    it("does not read one restart as a loop", () => {
+        expect(isCrashLooping(looping({ restartCount: 13 }), seen(12), NOW)).toBe(false);
+    });
+
+    it("says yes once the count is still climbing a minute later", () => {
+        expect(isCrashLooping(looping({ restartCount: 20 }), seen(12), NOW)).toBe(true);
+    });
+
+    it("survives a container that was rebuilt under it", () => {
+        // A redeploy makes a new container, whose count starts at zero. The old
+        // reading is then larger than the new one, which is not evidence of
+        // anything at all.
+        expect(isCrashLooping(looping({ restartCount: 1 }), seen(12), NOW)).toBe(false);
     });
 });
 
@@ -100,6 +166,23 @@ describe("what the log says went wrong", () => {
         expect(crashCause(`${ark}\nERROR: Shutdown handler: initiate app exit`)).toContain("Shutdown handler");
     });
 
+    it("never blames the crash on Polaris asking who is online", () => {
+        // Every few seconds, for as long as the server is not answering, and always
+        // the last thing in the log. Reading it back as the cause of death told a
+        // real operator their server died of a command Polaris sent it. Tested
+        // without the recovery around it, so it is the filter answering and not the
+        // rule that drops everything before a successful start.
+        const noise = RECOVERED.split("\n").slice(0, 4).join("\n");
+        expect(crashCause(`${PAPER_DOWNGRADE}\n${noise}`)).toContain("NumberFormatException");
+        expect(crashCause(noise)).toBeNull();
+    });
+
+    it("has nothing to say about a server that got up on this run", () => {
+        // The crash before last is still in a tail long enough to hold a stack
+        // trace, and it describes a run that is over.
+        expect(crashCause(RECOVERED)).toBeNull();
+    });
+
     it("says nothing about a server that is running fine", () => {
         const healthy = ['[12:00:00 INFO]: Done (21.5s)! For help, type "help"', "[12:00:04 INFO]: Alice joined"].join(
             "\n"
@@ -123,6 +206,22 @@ describe("what to do about it", () => {
         expect(loop.restarts).toBe(4);
         expect(loop.cause).toContain("NumberFormatException");
         expect(loop.advice).toContain("newer Minecraft");
+    });
+});
+
+describe("whether the server got up", () => {
+    it("recognises the run that finally worked", () => {
+        expect(reachedReady(RECOVERED)).toBe(true);
+    });
+
+    it("does not count a start that a later boot has already replaced", () => {
+        // The same log with one more restart on the end: the server was up, and
+        // then it was not, and what matters is the run it is on now.
+        expect(reachedReady(`${RECOVERED}\n2026-08-12T22:45:01.0Z [init] Running as uid=1000 gid=1000`)).toBe(false);
+    });
+
+    it("does not claim a crashing server got anywhere", () => {
+        expect(reachedReady(PAPER_DOWNGRADE)).toBe(false);
     });
 });
 

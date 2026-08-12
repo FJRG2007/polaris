@@ -19,11 +19,11 @@ import { withTimeout } from "@polaris/core";
 import { gameServerAddress } from "./address";
 import { resolveWaf } from "@/lib/waf-service";
 import { getHostLanIp } from "@/lib/host-address";
-import { readCrashLoop } from "@/lib/apps/games-health";
 import { currentReleaseRef } from "@/lib/deploy/releases";
 import type { ExecResult, RuntimePorts } from "@polaris/deploy";
 import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
 import { hostPortForApp, readAppRuntimeLog } from "@/lib/deploy-service";
+import { readCrashLoop, readRestartWatch } from "@/lib/apps/games-health";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "@/lib/apps/crash-loop";
 import { readAppContainerMetricsOrNull, readAppContainerRuntime } from "@/lib/app-container-metrics";
@@ -436,8 +436,10 @@ async function readLivePlayers(install: MinecraftInstall, ownerId: string): Prom
     // wait out: it never comes up, and the reason is in a log the person watching
     // a blank panel has no reason to open. Read off the restart count rather than
     // off the status, because the status only says "restarting" during the
-    // engine's backoff and a poll almost never lands there.
-    if (runtime && isCrashLooping(runtime, new Date())) {
+    // engine's backoff and a poll almost never lands there. The reading the sweep
+    // took a minute ago comes with it: without something to compare against, a
+    // server that has just recovered reads exactly like one still going round.
+    if (runtime && isCrashLooping(runtime, readRestartWatch(install.config ?? null), new Date())) {
         const loop = crashLoopOf(runtime, await tail(install.applicationId, ownerId, CRASH_LOG_TAIL));
         return {
             answering: false,

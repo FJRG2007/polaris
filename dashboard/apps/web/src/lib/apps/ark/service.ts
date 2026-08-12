@@ -23,9 +23,9 @@ import { withTimeout } from "@polaris/core";
 import { findApp } from "@/lib/apps/catalog";
 import { setEnvVars } from "@/lib/env-var-service";
 import * as arkAccess from "@/lib/apps/ark/access";
-import { readCrashLoop } from "@/lib/apps/games-health";
 import { readAppRuntimeLog } from "@/lib/deploy-service";
 import { withServerContainer } from "@/lib/apps/minecraft/service";
+import { readCrashLoop, readRestartWatch } from "@/lib/apps/games-health";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "@/lib/apps/crash-loop";
 import { isRconRefusal, parseArkPlayers, type ArkPlayer } from "@/lib/apps/ark/parse";
@@ -172,7 +172,9 @@ export async function getArkPlayers(ownerId: string, installedAppId: string): Pr
     }
     const runtime = await readAppContainerRuntime(install.applicationId, ownerId);
     const state = runtime?.status ?? null;
-    if (runtime && isCrashLooping(runtime, new Date())) {
+    // Against the reading the sweep took a minute ago: a restart count on its own
+    // cannot tell a server that is still looping from one that has just got out.
+    if (runtime && isCrashLooping(runtime, readRestartWatch(install.config), new Date())) {
         const loop = crashLoopOf(runtime, await readAppRuntimeLog(install.applicationId, ownerId, CRASH_LOG_TAIL).catch(() => ""));
         return {
             answering: false,

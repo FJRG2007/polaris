@@ -29,7 +29,14 @@ import { createNotification } from "@/lib/notification-service";
 import { readAppContainerRuntime } from "@/lib/app-container-metrics";
 import { readAppRuntimeLog, setApplicationRunning } from "@/lib/deploy-service";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
-import { crashLoopOf, isCrashLooping, type CrashLoop } from "@/lib/apps/crash-loop";
+import {
+    crashLoopOf,
+    isCrashLooping,
+    reachedReady,
+    watchesRestarts,
+    type CrashLoop,
+    type RestartWatch
+} from "@/lib/apps/crash-loop";
 
 /**
  * The key an install records the loop it was stopped for under.
@@ -40,6 +47,17 @@ import { crashLoopOf, isCrashLooping, type CrashLoop } from "@/lib/apps/crash-lo
  * hours later.
  */
 export const CRASH_LOOP_KEY = "crashLoop";
+
+/**
+ * The key the last suspicious reading is kept under.
+ *
+ * A verdict needs two readings a minute apart and this is the first one, held on the
+ * install because the sweep that takes it has no memory of its own and the process
+ * running it may not be the one that comes back. Written only for a container that
+ * already looks like it is restarting, and cleared the moment it stops looking like
+ * it - a healthy server never writes here at all.
+ */
+export const RESTART_WATCH_KEY = "restartWatch";
 
 /** What was written down about a loop, for the screen that has to explain a
  *  server that is off. */
@@ -89,11 +107,38 @@ export async function sweepCrashLoops(ownerId: string, now: Date = new Date()): 
         const state = await readAppContainerRuntime(applicationId, ownerId);
         if (!state) continue;
         checked += 1;
-        if (!isCrashLooping(state, now)) continue;
+
+        // Nothing to watch: forget whatever was being watched. This is the path a
+        // server that recovered leaves by, and leaving the old count behind would
+        // make its next restart look like the tail of the loop it got out of.
+        const watching = readRestartWatch(install.config);
+        if (!watchesRestarts(state, now)) {
+            if (watching) await forget(install.id, RESTART_WATCH_KEY);
+            continue;
+        }
+        // First sighting. It is only half the evidence, so it is recorded rather
+        // than acted on, and a server that is genuinely looping will have restarted
+        // several more times by the time this runs again.
+        if (!watching) {
+            await patchInstallConfig(install.id, {
+                [RESTART_WATCH_KEY]: { restartCount: state.restartCount, at: now.toISOString() } satisfies RestartWatch
+            }).catch(() => undefined);
+            continue;
+        }
+        if (!isCrashLooping(state, watching, now)) continue;
 
         // Read once, and only for a server already judged to be looping - this is
         // ten times the tail an ordinary status read pays for.
         const log = await readAppRuntimeLog(applicationId, ownerId, CRASH_LOG_TAIL).catch(() => "");
+
+        // The counters and the log disagree, and the log wins: it is the server's
+        // own account of the run it is on, where a restart count is a number about
+        // runs that are over. A server that says it is up does not get stopped for
+        // failing to start.
+        if (reachedReady(log)) {
+            await forget(install.id, RESTART_WATCH_KEY);
+            continue;
+        }
         const loop = crashLoopOf(state, log);
 
         // Written before the stop, so the reason is already on record if the stop
@@ -107,6 +152,9 @@ export async function sweepCrashLoops(ownerId: string, now: Date = new Date()): 
             .catch(() => false);
         if (!halted) continue;
         stopped += 1;
+        // The loop is over, so the readings taken of it are no longer evidence of
+        // anything: whatever happens next has to prove itself from scratch.
+        await forget(install.id, RESTART_WATCH_KEY);
 
         await createNotification({
             userId: ownerId,
@@ -121,6 +169,20 @@ export async function sweepCrashLoops(ownerId: string, now: Date = new Date()): 
         });
     }
     return { checked, stopped };
+}
+
+/** Drop a key from an install's config, best effort like everything else here. */
+async function forget(installedAppId: string, key: string): Promise<void> {
+    await patchInstallConfig(installedAppId, { [key]: null }).catch(() => undefined);
+}
+
+/** The last suspicious reading taken of this server, if one was. */
+export function readRestartWatch(config: string | null): RestartWatch | null {
+    const value = readInstallConfig(config)[RESTART_WATCH_KEY];
+    if (typeof value !== "object" || value === null) return null;
+    const record = value as Record<string, unknown>;
+    if (typeof record.restartCount !== "number") return null;
+    return { restartCount: record.restartCount, at: typeof record.at === "string" ? record.at : "" };
 }
 
 /** What was recorded about the loop this server was stopped for, if it was. */
