@@ -25,19 +25,25 @@ const RELEASES = ["1.21.6", "1.21.5", "1.21.4", "1.21.3", "1.20.6"];
 let supported: Map<string, string[]>;
 /** Set to fail every request, which is the "index could not be reached" case. */
 let offline = false;
+/** Every URL Modrinth was asked for, so a test can assert what was asked as well
+ *  as what came back. */
+let asked: string[] = [];
 
 beforeEach(() => {
     offline = false;
+    asked = [];
     // Each scenario below uses a blueprint of its own, because what a project
     // supports is looked up once and remembered for the rest of the day - which is
     // the behaviour in production and would otherwise make these order-dependent.
     supported = new Map([
         ["bedwars1058", ["1.21.4", "1.21.3"]],
+        ["dynamicworldborder", ["1.21.6", "1.21.5"]],
         ["iridiumskyblock", ["1.21.5", "1.21.3"]],
         ["geyser", ["1.21.6", "1.21.4"]],
         ["floodgate", ["1.21.6", "1.21.4"]]
     ]);
     vi.stubGlobal("fetch", async (url: string) => {
+        asked.push(url);
         if (offline) throw new Error("unreachable");
         if (url.includes("/tag/game_version")) {
             return {
@@ -48,10 +54,13 @@ beforeEach(() => {
                 ]
             } as unknown as Response;
         }
-        const slug = url.split("/project/")[1] ?? "";
+        // What a project has a build for is asked of its builds, filtered by the
+        // software they load into, rather than of the project - so the answer is a
+        // list of versions, each with the releases that one build covers.
+        const slug = (url.split("/project/")[1] ?? "").split("/")[0] ?? "";
         return {
             ok: true,
-            json: async () => ({ game_versions: supported.get(slug) ?? [] })
+            json: async () => (supported.get(slug) ?? []).map((version) => ({ game_versions: [version] }))
         } as unknown as Response;
     });
 });
@@ -124,6 +133,17 @@ describe("the release a blueprint is built on", () => {
 
     it("does not constrain a blueprint that installs nothing", async () => {
         expect((await envFor("survival")).get("VERSION")).toBe("LATEST");
+    });
+
+    it("only counts builds for the software the plugin will be loaded into", async () => {
+        // A project reports one game_versions covering everything it has ever
+        // published, across every loader at once. Trusting that pins a Paper
+        // server to a release only the Fabric build reaches, and the plugin - now
+        // a required entry - has nothing to install there.
+        asked = [];
+        await envFor("shrinking-world");
+        expect(asked.some((url) => url.includes("/version?loaders=") && url.includes("paper"))).toBe(true);
+        expect(asked.some((url) => /\/project\/[^/]+$/.test(url))).toBe(false);
     });
 });
 

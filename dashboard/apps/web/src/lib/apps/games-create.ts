@@ -30,9 +30,9 @@ import { grantPlayerAccess } from "@/lib/apps/minecraft/player-access";
 import { findGame, type GameDefinition } from "@/lib/apps/games-catalog";
 import { arkServerEnv, expectedArkMemoryMb } from "@/lib/apps/ark/config";
 import { applyAllowList, ARK_CATALOG_ID, mintJoinPassword } from "@/lib/apps/ark/service";
-import { formatProjectList, parseProjectList, projectSlug } from "@/lib/apps/minecraft/modrinth";
 import { commonVersions, knownUnsupported, wantsLatest } from "@/lib/apps/minecraft/blueprint-version";
 import { DEFAULT_BIOME, DEFAULT_LEVEL_TYPE, levelTypeEnv, seedEnvKey } from "@/lib/apps/minecraft/world";
+import { formatProjectList, loaderForType, parseProjectList, projectSlug } from "@/lib/apps/minecraft/modrinth";
 import type {
     CreateArkServerInput,
     CreateGameServerInput,
@@ -107,7 +107,7 @@ export async function minecraftShapeEnv(
     current: ReadonlyMap<string, string>
 ): Promise<Map<string, string>> {
     const env = new Map(current);
-    const versions = await commonVersions(requiredProjects(blueprint, shape.crossplay)).catch(() => []);
+    const versions = await blueprintVersions(blueprint, shape.crossplay, shape.software).catch(() => []);
     const asked = (shape.version ?? "").trim();
     if (!wantsLatest(asked) && knownUnsupported(versions, asked)) {
         throw new Error(
@@ -315,8 +315,15 @@ async function createArkServer(
  * Empty means unconstrained, not unsupported: a blueprint that installs nothing,
  * or a Modrinth nobody could reach.
  */
-export async function blueprintVersions(blueprint: GameBlueprint, crossplay = false): Promise<string[]> {
-    return commonVersions(requiredProjects(blueprint, crossplay));
+export async function blueprintVersions(
+    blueprint: GameBlueprint,
+    crossplay = false,
+    software?: string
+): Promise<string[]> {
+    // Asked about the software the plugins will actually be loaded into, because
+    // that is what decides whether a build for a release exists at all.
+    const loader = loaderForType(blueprint.software ?? software ?? "PAPER");
+    return commonVersions(requiredProjects(blueprint, crossplay), loader ?? undefined);
 }
 
 /** The newest release a blueprint can run on, or null when nothing constrains it. */

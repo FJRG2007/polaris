@@ -23,7 +23,13 @@ import { modrinthApi, modrinthJson, projectSlug } from "./modrinth";
  *  lookup covers every dialog opened for the rest of the day. */
 const CACHE_MS = 6 * 60 * 60 * 1000;
 
-const projectSchema = z.object({ game_versions: z.array(z.string().max(32)).max(500).catch([]) });
+/** Every blueprint that installs anything runs on Paper, and a caller that knows
+ *  otherwise says so. */
+const DEFAULT_LOADER = "paper";
+
+const versionsSchema = z
+    .array(z.object({ game_versions: z.array(z.string().max(32)).max(500).catch([]) }))
+    .max(500);
 
 const tagSchema = z.array(z.object({ version: z.string().max(32), version_type: z.string().max(32) })).max(2000);
 
@@ -43,11 +49,25 @@ async function cached(key: string, load: () => Promise<string[]>): Promise<strin
     return versions;
 }
 
-/** The Minecraft releases a project has a build for. */
-async function projectVersions(slug: string): Promise<string[]> {
-    return cached(`project:${slug}`, async () => {
-        const parsed = projectSchema.safeParse(await modrinthJson(`${modrinthApi}/project/${encodeURIComponent(slug)}`));
-        return parsed.success ? parsed.data.game_versions : [];
+/**
+ * The Minecraft releases a project has a build for, on the software that will
+ * load it.
+ *
+ * Asked of the project's builds rather than of the project. A project reports one
+ * `game_versions` covering everything it has ever published, across every loader
+ * at once - so a plugin whose Fabric build reaches a release its Paper build does
+ * not answers yes for that release, and a Paper server pinned to it would find
+ * nothing to install. Which is the failure this module exists to prevent, arrived
+ * at from the other end.
+ */
+async function projectVersions(slug: string, loader: string): Promise<string[]> {
+    return cached(`project:${loader}:${slug}`, async () => {
+        const parsed = versionsSchema.safeParse(
+            await modrinthJson(
+                `${modrinthApi}/project/${encodeURIComponent(slug)}/version?loaders=${encodeURIComponent(JSON.stringify([loader]))}`
+            )
+        );
+        return parsed.success ? [...new Set(parsed.data.flatMap((build) => build.game_versions))] : [];
     });
 }
 
@@ -75,13 +95,13 @@ async function releases(): Promise<string[]> {
  * their players are on, and a picker built from anything wider would offer the
  * releases that produce the silent nothing this module exists to prevent.
  */
-export async function commonVersions(projects: readonly string[]): Promise<string[]> {
+export async function commonVersions(projects: readonly string[], loader = DEFAULT_LOADER): Promise<string[]> {
     const slugs = projects.map(projectSlug).filter((slug): slug is string => slug !== null);
     if (slugs.length === 0) return [];
 
     const [ordered, supported] = await Promise.all([
         releases(),
-        Promise.all(slugs.map((slug) => projectVersions(slug)))
+        Promise.all(slugs.map((slug) => projectVersions(slug, loader)))
     ]);
     if (ordered.length === 0 || supported.some((versions) => versions.length === 0)) return [];
 
