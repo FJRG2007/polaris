@@ -21,10 +21,10 @@
 import * as world from "./world";
 import { prisma } from "@polaris/db";
 import * as policy from "./backup-policy";
-import { deployApplication } from "@/lib/deploy-service";
 import { appHasCapability, findApp } from "@/lib/apps/catalog";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import { createNotification } from "@/lib/notification-service";
+import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import { withServerContainer, type MinecraftEdition, type ServerContainer } from "./service";
 
@@ -37,6 +37,15 @@ const BEDROCK_SAVE_HOLD_MS = 1500;
  *  the command itself, so this leaves room without ever being the thing that
  *  fails. */
 const DU_BATCH = 24;
+
+/** How long to give a container to come up when something here needs it. Only the
+ *  filesystem is being waited on, not the game, so this is a container starting
+ *  rather than a world loading - seconds, with room for a slow machine. */
+const START_TIMEOUT_MS = 60_000;
+
+/** Between attempts. Each one opens the target's ports and closes them again, so
+ *  it is not free enough to do continuously. */
+const START_POLL_MS = 2000;
 
 /** One map on disk. */
 export interface WorldEntry {
@@ -450,6 +459,12 @@ export async function newWorld(
     if (!world.isLevelType(levelType)) throw new Error("That is not a world type");
     if (world.usesBiome(levelType) && !world.isBiome(biome)) throw new Error("That is not a biome");
 
+    // Copying what people are carrying reads the old level off the disk, which
+    // only the container can see. Refusing a stopped server here told somebody to
+    // go and press Start themselves and come back - a step with one possible
+    // answer, so it is taken for them.
+    if (input.keepPlayers) await startForFileAccess(ownerId, installedAppId);
+
     const planned = await withServerContainer(ownerId, installedAppId, async (server) => {
         const { level: current } = await readWorldSettings(ownerId, server.applicationId, server.edition);
         const listing = await server.run(["ls", "-1A", "--", world.levelParent(server.edition)]);
@@ -492,6 +507,41 @@ export async function newWorld(
 
     await deployApplication(await applicationOf(ownerId, installedAppId), ownerId, actorId);
     return { level: planned.target, carried: planned.keep };
+}
+
+/**
+ * Get the container up, because something here has to read the disk through it.
+ *
+ * `docker exec` needs a container that is running, and the world volume is only
+ * visible from inside one - so a stopped server cannot be read at all. The old
+ * answer was to refuse and say "start the server first", which is a step with
+ * exactly one possible response and no reason to hand back to the person.
+ *
+ * The wait is for the container, not for the game: the filesystem is there long
+ * before the world has loaded, so this returns as soon as a command runs rather
+ * than when players could join. A server that never gets that far is one that
+ * cannot start at all, and it says so in those words - the useful thing to know
+ * is that it is failing to boot, not that a copy did not happen.
+ */
+async function startForFileAccess(ownerId: string, installedAppId: string): Promise<void> {
+    const reachable = async (): Promise<boolean> =>
+        withServerContainer(ownerId, installedAppId, async (server) => {
+            const listing = await server.run(["ls", "-1A", "--", world.DATA_DIR]);
+            return listing.code === 0;
+        }).catch(() => false);
+
+    if (await reachable()) return;
+    const applicationId = await applicationOf(ownerId, installedAppId);
+    await setApplicationRunning(applicationId, ownerId, true);
+
+    const deadline = Date.now() + START_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, START_POLL_MS));
+        if (await reachable()) return;
+    }
+    throw new Error(
+        "The server would not start, so what players are carrying could not be copied. Check the console for why, or try again without carrying it across."
+    );
 }
 
 /** The policy on one server, and how it is written. */
