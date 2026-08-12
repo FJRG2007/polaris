@@ -119,6 +119,13 @@ export async function register(): Promise<void> {
     const { startDuckDnsSync } = await import("./lib/domain-service");
     startDuckDnsSync();
 
+    // The same job for the operator's own domain. A DuckDNS name has been kept
+    // pointed at this server's current address since the day it was added; the
+    // domain they actually use was written once and never revisited, so an ISP
+    // rotating the address took every one of them down silently.
+    const { startZoneAddressSync } = await import("./lib/domain-address-sync");
+    startZoneAddressSync();
+
     // Probe each deployed-app domain so a subdomain that resolves but does not
     // actually serve is flagged as down in the UI, instead of shown as a live link.
     const { startDomainHealthPoller } = await import("./lib/watch/domain-health-poller");
