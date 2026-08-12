@@ -49,6 +49,10 @@ model User {
     // keyed by event id. Events absent here (and a null column) follow the
     // catalogue default, so a newly added event never arrives muted.
     notifyPrefs   String?
+    // How this account has arranged its Overview - which cards, in what order and
+    // size, and the links it pinned - as stringified JSON. Cards absent here (and
+    // a null column) follow the catalogue, so one added later still appears.
+    overviewPrefs String?
     // Owned by the better-auth two-factor plugin; flipped on once the user has
     // verified their authenticator, and back off when they disable it.
     twoFactorEnabled Boolean @default(false)

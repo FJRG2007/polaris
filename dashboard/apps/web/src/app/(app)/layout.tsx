@@ -19,6 +19,7 @@ import { NotificationBell } from "@/components/notification-bell";
 import { resolveScope, scopeChoices } from "@/lib/workspace-scope";
 import { RouteSkeletonCapture } from "@/components/route-skeleton";
 import { DisplayFormatProvider } from "@/components/display-format";
+import { VisitRecorder } from "@/components/overview/visit-recorder";
 import { AppShell, CapabilityProvider, EditionBadge } from "@polaris/ui";
 import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 import { PresenceReporter } from "@/components/notifications/presence-reporter";
@@ -33,7 +34,9 @@ import { NotificationsProvider } from "@/components/notifications/notifications-
  * paint rather than after the live stream connects, and the user's display
  * preferences are resolved once here rather than per screen. The same goes for
  * the address Polaris is reachable at: every screen that hands out a link builds
- * it on the configured domain instead of the hostname of the tab.
+ * it on the configured domain instead of the hostname of the tab. Where the
+ * reader has been is noted here as well, once for the whole shell, so a screen
+ * added anywhere turns up on their Overview without doing anything.
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
     const user = await requireUser();
@@ -55,6 +58,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                         <NotificationsProvider initial={notifications}>
                             <NotificationFavicon />
                             <PresenceReporter />
+                            <VisitRecorder />
                             <AppShell
                                 switcher={
                                     <>

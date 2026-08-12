@@ -6,6 +6,10 @@
  * to Drive - which is what the dashboard did before apps carried a permission -
  * bounces exactly those people between a page that turns them away and a redirect
  * back to it.
+ *
+ * Overview is offered to everybody who can open anything at all, and lands them,
+ * which is why it heads every list here. For the account that can open nothing it
+ * would be an empty grid, so it is withheld and the account page still answers.
  */
 
 import { describe, expect, it } from "vitest";
@@ -22,8 +26,8 @@ const ADMIN = { isAdmin: true, can: async () => true };
 
 describe("reachableAppIds", () => {
     it("offers only the apps the permissions open", async () => {
-        expect(await reachableAppIds(holding("drive.read"))).toEqual(["drive"]);
-        expect(await reachableAppIds(holding("tasks.read"))).toEqual(["tasks"]);
+        expect(await reachableAppIds(holding("drive.read"))).toEqual(["overview", "drive"]);
+        expect(await reachableAppIds(holding("tasks.read"))).toEqual(["overview", "tasks"]);
     });
 
     it("gives an administrator Management, and withholds it from everyone else", async () => {
@@ -32,10 +36,12 @@ describe("reachableAppIds", () => {
     });
 
     it("opens Watch on the same permission as Apps, since it reports on them", async () => {
-        expect(await reachableAppIds(holding("deploy.read"))).toEqual(["apps", "watch"]);
+        expect(await reachableAppIds(holding("deploy.read"))).toEqual(["overview", "apps", "watch"]);
     });
 
-    it("offers nothing to a role that grants nothing", async () => {
+    it("offers nothing to a role that grants nothing, Overview included", async () => {
+        // Overview asks for no permission, so it would otherwise be the one app
+        // an account that reaches nothing is handed - an empty grid.
         expect(await reachableAppIds(holding())).toEqual([]);
     });
 
@@ -52,15 +58,19 @@ describe("reachableAppIds", () => {
  */
 describe("the Inbox door inside Management", () => {
     it("offers Management to a member, under Inbox's name and landing on it", async () => {
-        const [app, ...rest] = await reachableApps(holding("inbox.read"));
-        expect(rest).toEqual([]);
-        expect(app?.id).toBe("admin");
+        const apps = await reachableApps(holding("inbox.read"));
+        expect(apps.map((app) => app.id)).toEqual(["overview", "admin"]);
+        const app = apps.find((entry) => entry.id === "admin");
         expect(app?.label).toBe("Inbox");
         expect(app?.href).toBe("/inbox");
     });
 
-    it("lands a member on Inbox rather than on a page that turns them away", async () => {
-        expect(await homePathFor(holding("inbox.read"))).toBe("/inbox");
+    it("keeps the member's one door out of the Overview they land on", async () => {
+        // Their landing screen is the grid like everybody else's; what this
+        // protects is that Inbox is still on the switcher behind it, since the
+        // permission is the only thing they hold.
+        expect(await homePathFor(holding("inbox.read"))).toBe("/overview");
+        expect(await reachableAppIds(holding("inbox.read"))).toContain("admin");
     });
 
     it("keeps Management itself for an administrator", async () => {
@@ -70,7 +80,10 @@ describe("the Inbox door inside Management", () => {
     });
 
     it("marks the guest entry for the switcher, and only the guest one", async () => {
-        expect(await reachableAppNav(holding("inbox.read"))).toEqual({ ids: ["admin"], guestIds: ["admin"] });
+        expect(await reachableAppNav(holding("inbox.read"))).toEqual({
+            ids: ["overview", "admin"],
+            guestIds: ["admin"]
+        });
         expect((await reachableAppNav(ADMIN)).guestIds).toEqual([]);
     });
 
@@ -80,10 +93,9 @@ describe("the Inbox door inside Management", () => {
 });
 
 describe("homePathFor", () => {
-    it("lands on the first app the person can open", async () => {
-        expect(await homePathFor(holding("drive.read", "tasks.read"))).toBe("/drive");
-        // No Drive: the next app in the registry order is where they belong.
-        expect(await homePathFor(holding("tasks.read"))).toBe("/tasks");
+    it("lands on the Overview, whichever apps the person holds", async () => {
+        expect(await homePathFor(holding("drive.read", "tasks.read"))).toBe("/overview");
+        expect(await homePathFor(holding("tasks.read"))).toBe("/overview");
     });
 
     it("lands an account that opens nothing on its own account page", async () => {

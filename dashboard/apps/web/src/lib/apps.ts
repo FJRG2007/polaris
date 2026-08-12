@@ -100,11 +100,25 @@ export interface AppEntry {
 
 export const POLARIS_APPS: AppEntry[] = [
     {
+        id: "overview",
+        label: "Overview",
+        description: "Your services, usage and shortcuts at a glance",
+        icon: LayoutDashboard,
+        href: "/overview"
+        // No permission: it is a view onto whatever the account can already
+        // reach, so it shows what that is and nothing more. An account that
+        // reaches nothing does not get it either - see reachableApps.
+    },
+    {
         id: "drive",
         label: "Drive",
         description: "Files across every NAS",
         icon: HardDrive,
         href: "/drive",
+        // Two of its sections live at the top level rather than under /drive, so
+        // they are named here: without them the switcher and the rail fall back
+        // to whichever app happens to be first in this list.
+        match: ["/favorites", "/trash"],
         permission: "drive.read"
     },
     {
@@ -902,7 +916,8 @@ function appOwnsPath(app: AppEntry, pathname: string): boolean {
     return owns(app.href) || (app.match?.some(owns) ?? false);
 }
 
-/** The app the current path belongs to, defaulting to the first app (Drive). */
+/** The app the current path belongs to, defaulting to the first app (Overview),
+ *  which is the one screen that belongs to no app in particular. */
 export function resolveActiveApp(pathname: string): AppEntry {
     // POLARIS_APPS is a non-empty literal, so [0] is always present.
     return POLARIS_APPS.find((app) => appOwnsPath(app, pathname)) ?? POLARIS_APPS[0]!;

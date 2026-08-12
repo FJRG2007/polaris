@@ -19,6 +19,10 @@ import { POLARIS_APPS, type AppEntry } from "@/lib/apps";
 /** Where somebody with no app at all belongs. */
 export const ACCOUNT_HOME = "/account";
 
+/** The id of the landing app, which is only offered alongside something to look
+ *  at. */
+export const OVERVIEW_APP = "overview";
+
 export interface AppAccessInput {
     isAdmin: boolean;
     can: (permission: Permission) => Promise<boolean>;
@@ -30,7 +34,12 @@ export interface AppAccessInput {
  *  An admin-only app that carries a guest subject (Management carries Inbox) is
  *  returned under that subject's name and landing page for somebody who holds the
  *  permission without being an administrator, so the switcher offers them the one
- *  door they have rather than the app's own. */
+ *  door they have rather than the app's own.
+ *
+ *  Overview is the exception to "an app with no permission is open to anyone": it
+ *  is a view onto the other apps, so for an account that reaches none of them it
+ *  is an empty grid offered as somewhere to be. Those accounts belong on their
+ *  own account page, which is what dropping it here arranges. */
 export async function reachableApps({ isAdmin, can }: AppAccessInput): Promise<AppEntry[]> {
     const decided = await Promise.all(
         POLARIS_APPS.map(async (app) => {
@@ -43,7 +52,8 @@ export async function reachableApps({ isAdmin, can }: AppAccessInput): Promise<A
             return app;
         })
     );
-    return decided.filter((app): app is AppEntry => app !== null);
+    const reachable = decided.filter((app): app is AppEntry => app !== null);
+    return reachable.some((app) => app.id !== OVERVIEW_APP) ? reachable : [];
 }
 
 /**
