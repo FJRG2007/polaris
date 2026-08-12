@@ -75,6 +75,7 @@ export interface DropPointConfig {
     allowedUsers: string[];
     startsAt: string | null;
     allowUploaderDelete: boolean;
+    allowOverwrite: boolean;
     uploaderDeleteWindowSeconds: number | null;
     expiresAt: string | null;
     revokedAt: string | null;
@@ -237,6 +238,7 @@ export function DropPointDetail({
         geoCountries: config.allowedCountries,
         geoContinents: config.allowedContinents,
         allowUploaderDelete: config.allowUploaderDelete,
+        allowOverwrite: config.allowOverwrite,
         deleteWindowMin: config.uploaderDeleteWindowSeconds
             ? Math.round(config.uploaderDeleteWindowSeconds / 60)
             : undefined
@@ -616,6 +618,7 @@ function SaveTemplateDialog({
             allowedCountries: config.allowedCountries,
             allowedContinents: config.allowedContinents,
             allowUploaderDelete: config.allowUploaderDelete,
+        allowOverwrite: config.allowOverwrite,
             uploaderDeleteWindowSeconds: config.uploaderDeleteWindowSeconds
         });
         setPending(false);
@@ -721,6 +724,7 @@ function EditDropPointDialog({
             allowedUsers,
             startsAt: startsRaw ? new Date(startsRaw).toISOString() : null,
             allowUploaderDelete: form.get("allowUploaderDelete") === "on",
+            allowOverwrite: form.get("allowOverwrite") === "on",
             uploaderDeleteWindowSeconds:
                 deleteWindowMin > 0 ? Math.floor(deleteWindowMin * 60) : null,
             expiresAt: String(form.get("expiresAt") ?? "") || null
@@ -886,6 +890,15 @@ function EditDropPointDialog({
                             className="size-4"
                         />
                         Require uploaders to sign in
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                        <input
+                            type="checkbox"
+                            name="allowOverwrite"
+                            defaultChecked={config.allowOverwrite}
+                            className="size-4"
+                        />
+                        Let an upload replace a file of the same name
                     </label>
                     <div className="flex flex-col gap-1.5 text-sm">
                         <label className="flex items-center gap-2">

@@ -44,6 +44,7 @@ export interface ShareRow {
     allowRename: boolean;
     allowDelete: boolean;
     allowCreateFolder: boolean;
+    allowOverwrite: boolean;
     allowDownload: boolean;
     allowPreview: boolean;
     allowedCidrs: string[];
@@ -263,6 +264,7 @@ function EditShareDialog({
             allowRename: form.get("allowRename") === "on",
             allowDelete: form.get("allowDelete") === "on",
             allowCreateFolder: form.get("allowCreateFolder") === "on",
+            allowOverwrite: form.get("allowOverwrite") === "on",
             allowedCidrs
         });
         setPending(false);
@@ -280,6 +282,7 @@ function EditShareDialog({
             allowRename: form.get("allowRename") === "on",
             allowDelete: form.get("allowDelete") === "on",
             allowCreateFolder: form.get("allowCreateFolder") === "on",
+            allowOverwrite: form.get("allowOverwrite") === "on",
             allowedCidrs
         });
     }
@@ -366,6 +369,15 @@ function EditShareDialog({
                                     className="size-4"
                                 />
                                 Allow creating folders
+                            </label>
+                            <label className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    name="allowOverwrite"
+                                    defaultChecked={share.allowOverwrite}
+                                    className="size-4"
+                                />
+                                Let an upload replace a file of the same name
                             </label>
                             <label className="flex items-center gap-2">
                                 <input

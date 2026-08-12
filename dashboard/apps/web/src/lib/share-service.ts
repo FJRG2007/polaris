@@ -52,6 +52,7 @@ export async function createShare(
             allowRename: input.allowRename,
             allowDelete: input.allowDelete,
             allowCreateFolder: input.allowCreateFolder,
+            allowOverwrite: input.allowOverwrite,
             allowDownload: input.allowDownload,
             allowPreview: input.allowPreview,
             allowedCidrs: JSON.stringify(input.allowedCidrs),
@@ -83,6 +84,7 @@ export async function listSharesForOwner(ownerId: string) {
             allowCreateFolder: true,
             allowDownload: true,
             allowPreview: true,
+            allowOverwrite: true,
             allowedCidrs: true,
             maxDownloads: true,
             downloadCount: true,
@@ -127,6 +129,7 @@ export async function updateShare(
         allowRename?: boolean;
         allowDelete?: boolean;
         allowCreateFolder?: boolean;
+        allowOverwrite?: boolean;
         allowedCidrs?: string[];
     }
 ): Promise<void> {
@@ -142,6 +145,7 @@ export async function updateShare(
     if (input.allowRename !== undefined) data.allowRename = input.allowRename;
     if (input.allowDelete !== undefined) data.allowDelete = input.allowDelete;
     if (input.allowCreateFolder !== undefined) data.allowCreateFolder = input.allowCreateFolder;
+    if (input.allowOverwrite !== undefined) data.allowOverwrite = input.allowOverwrite;
     if (input.allowedCidrs !== undefined) data.allowedCidrs = JSON.stringify(input.allowedCidrs);
     await prisma.share.updateMany({ where: { id: shareId, ownerId }, data });
 }
@@ -185,6 +189,7 @@ export async function resolveShareByToken(token: string) {
             allowCreateFolder: true,
             allowDownload: true,
             allowPreview: true,
+            allowOverwrite: true,
             allowedCidrs: true,
             allowedCountries: true,
             allowedContinents: true,

@@ -80,6 +80,7 @@ export function ShareDialog({
             allowRename: form.get("allowRename") === "on",
             allowDelete: form.get("allowDelete") === "on",
             allowCreateFolder: form.get("allowCreateFolder") === "on",
+            allowOverwrite: form.get("allowOverwrite") === "on",
             allowDownload: form.get("allowDownload") !== "off",
             allowPreview: form.get("allowPreview") !== "off",
             allowedCidrs,
@@ -172,6 +173,10 @@ export function ShareDialog({
                                     <label className="flex items-center gap-2">
                                         <input type="checkbox" name="allowUpload" className="size-4" />
                                         Allow uploading into this folder (drop box)
+                                    </label>
+                                    <label className="flex items-center gap-2">
+                                        <input type="checkbox" name="allowOverwrite" className="size-4" />
+                                        Let an upload replace a file of the same name
                                     </label>
                                     <label className="flex items-center gap-2">
                                         <input type="checkbox" name="allowCreateFolder" className="size-4" />

@@ -54,6 +54,7 @@ export interface RequestInitial {
     geoCountries?: string[];
     geoContinents?: string[];
     allowUploaderDelete?: boolean;
+    allowOverwrite?: boolean;
     deleteWindowMin?: number;
     startsAt?: string;
 }
@@ -242,6 +243,7 @@ export function RequestDialog({
             allowedUsers,
             startsAt: startsRaw ? new Date(startsRaw).toISOString() : undefined,
             allowUploaderDelete: form.get("allowUploaderDelete") === "on",
+            allowOverwrite: form.get("allowOverwrite") === "on",
             uploaderDeleteWindowSeconds:
                 deleteWindowMin > 0 ? Math.floor(deleteWindowMin * 60) : undefined,
             expiresAt: expiry || undefined
@@ -451,6 +453,15 @@ export function RequestDialog({
                                     className="size-4"
                                 />
                                 Require uploaders to sign in
+                            </label>
+                            <label className="flex items-center gap-2 text-sm">
+                                <input
+                                    type="checkbox"
+                                    name="allowOverwrite"
+                                    defaultChecked={initial?.allowOverwrite}
+                                    className="size-4"
+                                />
+                                Let an upload replace a file of the same name
                             </label>
                             <div className="flex flex-col gap-1.5 text-sm">
                                 <label className="flex items-center gap-2">

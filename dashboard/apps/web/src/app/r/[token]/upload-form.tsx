@@ -11,10 +11,10 @@
  * time window, which the server enforces.
  */
 
+import { Button } from "@polaris/ui";
+import { formatBytes } from "@polaris/core";
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Loader2, Trash2, UploadCloud } from "lucide-react";
-import { formatBytes } from "@polaris/core";
-import { Button } from "@polaris/ui";
 
 type ItemStatus = "pending" | "uploading" | "done" | "error";
 
@@ -22,6 +22,8 @@ interface Item {
     file: File;
     status: ItemStatus;
     message?: string;
+    /** Set when the name it was stored under differs from the one that was sent. */
+    renamedTo?: string;
 }
 
 /** A file this browser uploaded, with the token that authorizes deleting it. */
@@ -136,17 +138,28 @@ export function DropUploader({
                     }
                 };
             }
-            const body = (await res.json()) as { id?: string; deleteToken?: string };
+            const body = (await res.json()) as { id?: string; name?: string; deleteToken?: string };
+            // The server answers with the name it stored the file under. It matches
+            // what was sent unless that name was taken, and the uploader is better
+            // off seeing the file that now exists than the one they picked.
+            const storedName = body.name ?? file.name;
             const record =
                 body.id && body.deleteToken
                     ? {
                           id: body.id,
-                          name: file.name,
+                          name: storedName,
                           deleteToken: body.deleteToken,
                           at: Date.now()
                       }
                     : undefined;
-            return { item: { file, status: "done" }, mine: record };
+            return {
+                item: {
+                    file,
+                    status: "done",
+                    ...(storedName === file.name ? {} : { renamedTo: storedName })
+                },
+                mine: record
+            };
         } catch {
             return { item: { file, status: "error", message: "Upload failed" } };
         }
@@ -230,7 +243,15 @@ export function DropUploader({
                             ) : (
                                 <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
                             )}
-                            <span className="min-w-0 flex-1 truncate">{item.file.name}</span>
+                            <span className="flex min-w-0 flex-1 flex-col">
+                                <span className="truncate" title={item.file.name}>{item.file.name}</span>
+                                {item.renamedTo ? (
+                                    <span className="truncate text-xs text-muted-foreground">
+                                        A file with that name was already here, so yours was
+                                        saved as {item.renamedTo}
+                                    </span>
+                                ) : null}
+                            </span>
                             <span
                                 className={
                                     item.status === "error"

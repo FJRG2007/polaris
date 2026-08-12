@@ -37,6 +37,12 @@ export const createShareSchema = z
         allowDelete: z.boolean().default(false),
         /** Allow recipients to create folders within the shared subtree. */
         allowCreateFolder: z.boolean().default(false),
+        /**
+         * Allow an upload to replace a file already in the folder. Off by default:
+         * a recipient uploading a name that is taken is colliding with somebody
+         * else's file, not revising their own, and a collision is numbered instead.
+         */
+        allowOverwrite: z.boolean().default(false),
         /** Allow recipients to download the bytes (attachment). */
         allowDownload: z.boolean().default(true),
         /** Allow recipients to preview the file inline in the browser. */

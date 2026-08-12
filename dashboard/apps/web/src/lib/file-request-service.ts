@@ -58,6 +58,7 @@ export async function createFileRequest(
             allowedUsers: JSON.stringify(input.allowedUsers),
             startsAt: input.startsAt ?? null,
             allowUploaderDelete: input.allowUploaderDelete,
+            allowOverwrite: input.allowOverwrite,
             uploaderDeleteWindowSeconds: input.uploaderDeleteWindowSeconds ?? null,
             expiresAt: input.expiresAt ?? null
         },
@@ -90,6 +91,7 @@ export async function getFileRequestForOwner(ownerId: string, requestId: string)
             allowedUsers: true,
             startsAt: true,
             allowUploaderDelete: true,
+            allowOverwrite: true,
             uploaderDeleteWindowSeconds: true,
             expiresAt: true,
             revokedAt: true,
@@ -141,6 +143,7 @@ export interface UpdateFileRequestInput {
     /** New start time, `null` to clear it, or `undefined` to keep it. */
     startsAt?: Date | null;
     allowUploaderDelete?: boolean;
+    allowOverwrite?: boolean;
     /** New window (seconds), `null` to clear it, or `undefined` to keep it. */
     uploaderDeleteWindowSeconds?: number | null;
     expiresAt?: Date | null;
@@ -179,6 +182,7 @@ export async function updateFileRequest(
     if (input.startsAt !== undefined) data.startsAt = input.startsAt;
     if (input.allowUploaderDelete !== undefined)
         data.allowUploaderDelete = input.allowUploaderDelete;
+    if (input.allowOverwrite !== undefined) data.allowOverwrite = input.allowOverwrite;
     if (input.uploaderDeleteWindowSeconds !== undefined) {
         data.uploaderDeleteWindowSeconds = input.uploaderDeleteWindowSeconds;
     }
@@ -258,6 +262,7 @@ export async function resolveFileRequestByToken(token: string) {
             allowedUsers: true,
             startsAt: true,
             allowUploaderDelete: true,
+            allowOverwrite: true,
             uploaderDeleteWindowSeconds: true,
             expiresAt: true,
             revokedAt: true

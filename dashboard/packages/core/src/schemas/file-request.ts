@@ -98,6 +98,12 @@ export const createFileRequestSchema = z.object({
     startsAt: z.coerce.date().optional(),
     /** Whether an uploader may delete files they submitted. */
     allowUploaderDelete: z.boolean().default(false),
+    /**
+     * Whether an upload may replace a file already in the destination folder.
+     * Off by default: uploaders cannot see what is there, so a name that
+     * collides belongs to somebody else and the arrival is numbered instead.
+     */
+    allowOverwrite: z.boolean().default(false),
     /** When set (and deletes allowed), only within this many seconds of upload. */
     uploaderDeleteWindowSeconds: z.number().int().nonnegative().optional(),
     /** ISO timestamp after which the request stops accepting uploads. */

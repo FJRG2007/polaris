@@ -64,6 +64,7 @@ export default async function DropPointDetailPage({ params }: { params: Promise<
         allowedUsers: parseStringArray(request.allowedUsers),
         startsAt: request.startsAt ? request.startsAt.toISOString() : null,
         allowUploaderDelete: request.allowUploaderDelete,
+        allowOverwrite: request.allowOverwrite,
         uploaderDeleteWindowSeconds: request.uploaderDeleteWindowSeconds,
         expiresAt: request.expiresAt ? request.expiresAt.toISOString() : null,
         revokedAt: request.revokedAt ? request.revokedAt.toISOString() : null,

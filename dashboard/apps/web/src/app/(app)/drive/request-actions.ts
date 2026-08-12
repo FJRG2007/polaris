@@ -196,6 +196,7 @@ const updateDropPointSchema = z.object({
         .optional(),
     startsAt: z.string().nullable().optional(),
     allowUploaderDelete: z.boolean().optional(),
+    allowOverwrite: z.boolean().optional(),
     uploaderDeleteWindowSeconds: z.number().int().nonnegative().nullable().optional(),
     expiresAt: z.string().nullable().optional()
 })
@@ -343,6 +344,7 @@ const templateConfigSchema = z
         allowedCountries: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)).optional(),
         allowedContinents: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)).optional(),
         allowUploaderDelete: z.boolean().optional(),
+        allowOverwrite: z.boolean().optional(),
         uploaderDeleteWindowSeconds: z.number().int().nonnegative().nullable().optional()
     })
     .strip();

@@ -65,6 +65,29 @@ export function extName(name: string): string {
     return idx <= 0 ? "" : base.slice(idx + 1).toLowerCase();
 }
 
+/**
+ * The nth name to try for a file whose name is already taken, counting from 1:
+ * "contract.pdf", then "contract (2).pdf", "contract (3).pdf", and so on.
+ *
+ * The number goes before the extension because that is where every file manager
+ * puts it and because the extension is what decides how the file opens - moving
+ * it, or appending after it, turns a PDF into something the recipient's machine
+ * no longer recognizes. The split is on the LAST dot, so "backup.tar.gz" becomes
+ * "backup.tar (2).gz"; a dotfile (".gitignore") has no extension to preserve and
+ * takes the suffix at the end.
+ *
+ * A name is never rewritten to make room - only the arrival that would collide
+ * is numbered - so the first upload of a name always keeps it verbatim.
+ */
+export function numberedName(name: string, attempt: number): string {
+    const base = baseName(name);
+    if (attempt <= 1) return base;
+    const dot = base.lastIndexOf(".");
+    // idx <= 0 is a dotfile or a name with no extension: nothing to preserve.
+    if (dot <= 0) return `${base} (${attempt})`;
+    return `${base.slice(0, dot)} (${attempt})${base.slice(dot)}`;
+}
+
 /** Join a normalized relative path onto a root, returning a safe POSIX join. */
 export function joinUnderRoot(root: string, relPath: string): string {
     const rel = normalizeRelPath(relPath);

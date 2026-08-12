@@ -46,6 +46,7 @@ export interface UpdateShareInput {
     allowRename?: boolean;
     allowDelete?: boolean;
     allowCreateFolder?: boolean;
+    allowOverwrite?: boolean;
     allowedCidrs?: string[];
 }
 
@@ -111,6 +112,7 @@ export async function updateShareAction(shareId: string, input: UpdateShareInput
         allowRename: input.allowRename,
         allowDelete: input.allowDelete,
         allowCreateFolder: input.allowCreateFolder,
+        allowOverwrite: input.allowOverwrite,
         allowedCidrs: input.allowedCidrs === undefined ? undefined : cidrs
     });
     await recordAudit({ actorId: user.id, action: "share.update", targetType: "share", targetId: shareId });

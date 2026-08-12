@@ -32,6 +32,7 @@ export default async function SharedPage() {
             allowRename: share.allowRename,
             allowDelete: share.allowDelete,
             allowCreateFolder: share.allowCreateFolder,
+            allowOverwrite: share.allowOverwrite,
             allowDownload: share.allowDownload,
             allowPreview: share.allowPreview,
             allowedCidrs,

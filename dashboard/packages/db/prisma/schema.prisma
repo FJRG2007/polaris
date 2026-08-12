@@ -1744,6 +1744,10 @@ model Share {
     allowRename   Boolean   @default(false)
     allowDelete   Boolean   @default(false)
     allowCreateFolder Boolean @default(false)
+    // Whether an upload may replace a file that is already there. Off by default:
+    // a visitor cannot see the folder, so overwriting is never something they
+    // chose. With it off, a colliding upload is stored under a numbered name.
+    allowOverwrite Boolean  @default(false)
     // Whether recipients may download the bytes / preview inline in the browser.
     allowDownload Boolean   @default(true)
     allowPreview  Boolean   @default(true)
@@ -1834,6 +1838,9 @@ model FileRequest {
     // within this many seconds of the upload. Null window means no time limit.
     allowUploaderDelete     Boolean   @default(false)
     uploaderDeleteWindowSeconds Int?
+    // Whether an upload may replace a file already in the destination folder. Off
+    // by default; a colliding upload is stored under a numbered name instead.
+    allowOverwrite          Boolean   @default(false)
     expiresAt               DateTime?
     createdAt               DateTime  @default(now())
     revokedAt               DateTime?

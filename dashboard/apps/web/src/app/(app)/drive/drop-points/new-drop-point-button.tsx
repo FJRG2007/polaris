@@ -43,6 +43,7 @@ interface TemplateConfig {
     allowedCountries?: string[];
     allowedContinents?: string[];
     allowUploaderDelete?: boolean;
+    allowOverwrite?: boolean;
     uploaderDeleteWindowSeconds?: number | null;
 }
 
@@ -70,6 +71,7 @@ function initialFromTemplate(config: string): RequestInitial {
         geoCountries: parsed.allowedCountries ?? [],
         geoContinents: parsed.allowedContinents ?? [],
         allowUploaderDelete: parsed.allowUploaderDelete,
+        allowOverwrite: parsed.allowOverwrite,
         deleteWindowMin: parsed.uploaderDeleteWindowSeconds
             ? Math.round(parsed.uploaderDeleteWindowSeconds / 60)
             : undefined

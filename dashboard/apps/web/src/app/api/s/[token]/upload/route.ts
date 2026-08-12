@@ -7,11 +7,12 @@
  * are avoided here because they buffer the body.
  */
 
-import { normalizeRelPath } from "@polaris/core";
+import { claimUploadPath } from "@/lib/upload-naming";
+import { gateShareRequest } from "@/lib/share-access";
+import { baseName, normalizeRelPath } from "@polaris/core";
 import { getDriverForConnection } from "@/lib/storage-service";
 import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 import { logShareAccess, resolveWithinShare } from "@/lib/share-service";
-import { gateShareRequest } from "@/lib/share-access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,10 +60,35 @@ export async function PUT(
                 // Already exists (or the driver made it implicitly); keep going.
             }
         }
-        const stat = await driver.writeStream(target, request.body);
-        await invalidateFolderSizes(share.connectionId, target);
+        // Uploading is not permission to destroy: whoever holds this link cannot see
+        // the folder, so a name that collides is somebody else's file, not a version
+        // of their own. The name is claimed before the transfer and a collision is
+        // numbered, unless the owner explicitly allowed replacing what is there.
+        let destination = target;
+        let claimed = false;
+        if (!share.allowOverwrite) {
+            destination = await claimUploadPath(driver, target);
+            claimed = true;
+        }
+        let stat;
+        try {
+            stat = await driver.writeStream(destination, request.body);
+        } catch (error) {
+            // Take back a name this request claimed, so a failed transfer leaves no
+            // half-written file under a name that reads as a complete document. A
+            // destination we were allowed to replace is left alone: it is somebody
+            // else's file, and deleting it would lose what the upload replaced.
+            if (claimed) await driver.delete(destination).catch(() => undefined);
+            throw error;
+        }
+        await invalidateFolderSizes(share.connectionId, destination);
         void logShareAccess({ shareId: share.id, action: "upload", ip, ipHash, userAgentHash });
-        return Response.json({ ok: true, path: stat.path, size: stat.size.toString() });
+        return Response.json({
+            ok: true,
+            path: stat.path,
+            name: baseName(destination),
+            size: stat.size.toString()
+        });
     } catch (error) {
         console.error("share: upload failed", error);
         return new Response("upload_failed", { status: 500 });
