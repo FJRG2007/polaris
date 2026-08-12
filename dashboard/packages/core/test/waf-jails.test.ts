@@ -74,6 +74,25 @@ describe("detectWafBans", () => {
         expect(detectWafBans({ entries: favicon, jails: [NOT_FOUND], now: NOW })).toEqual([]);
     });
 
+    // The one that banned the operator: deploying Polaris with your own tab open has
+    // that tab ask for the chunks of the build you just replaced, four or five of them
+    // inside a second, and the threshold is eight in five minutes.
+    it("does not count the assets of a build a tab outlived", () => {
+        const stale = [
+            ...hits("203.0.113.7", 5, { path: "/_next/static/chunks/9017-37194d2ed7f27aed.js" }),
+            ...hits("203.0.113.7", 5, { path: "/_next/static/chunks/app/(app)/loading-95a18046.js", agoSec: 10 }),
+            ...hits("203.0.113.7", 4, { path: "/_next/image?url=%2Flogo.png&w=64&q=75", agoSec: 20 })
+        ];
+        expect(detectWafBans({ entries: stale, jails: [NOT_FOUND], now: NOW })).toEqual([]);
+    });
+
+    // A hashed chunk name is not a URL anybody enumerates; a path that only starts the
+    // same way is.
+    it("still counts a path that only borrows the asset prefix", () => {
+        const enumerated = hits("203.0.113.7", 8, { path: "/_next/../.env" });
+        expect(detectWafBans({ entries: enumerated, jails: [NOT_FOUND], now: NOW })).toHaveLength(1);
+    });
+
     // The exclusion is for the query the framework adds, not for any path that
     // happens to carry those four letters.
     it("still counts a plain URL that only looks like one", () => {

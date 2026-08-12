@@ -60,7 +60,11 @@ export function createGuardServer(config: () => GuardConfig): Server {
             sendBlocked(res, {
                 host: header(req, "x-forwarded-host"),
                 ip: clientIp(header(req, "x-forwarded-for")),
-                accept: header(req, "accept")
+                accept: header(req, "accept"),
+                reason: decision.reason,
+                uri: header(req, "x-forwarded-uri"),
+                method: header(req, "x-forwarded-method"),
+                userAgent: header(req, "user-agent")
             });
             return;
         }

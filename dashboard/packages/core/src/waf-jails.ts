@@ -154,26 +154,42 @@ function hostMiss(entry: HttpLogLike): boolean {
 }
 
 /**
+ * Paths a page asks for on its own behalf, whose names the page was given by a
+ * build rather than typed by anybody. Every one of them 404s for as long as a tab
+ * outlives the deploy it was loaded from, and they arrive in bursts because a
+ * single page load asks for several at once.
+ */
+const BUILD_ASSET_PREFIXES = ["/_next/static/", "/_next/image", "/_next/webpack-hmr", "/__nextjs"];
+
+/**
  * A 404 the visitor never asked for.
  *
- * Two of these, and neither is the shape this jail is looking for. A framework
- * navigation carries `_rsc`: the app's own client fetching a route it was told
- * about, which means a missing one is the app being wrong about itself and the
- * person reading the page finding out on its behalf. A browser asks for
- * `/favicon.ico` whether or not anybody wanted it.
+ * None of these is the shape this jail is looking for. A framework navigation
+ * carries `_rsc`: the app's own client fetching a route it was told about, which
+ * means a missing one is the app being wrong about itself and the person reading
+ * the page finding out on its behalf. A browser asks for `/favicon.ico` whether or
+ * not anybody wanted it. A build asset is asked for by name out of markup the tab
+ * already holds, and every one of those names dies the moment a deploy replaces
+ * the build that minted it.
  *
  * They are excluded because leaving them in bans the operator. Opening the
  * dashboard prefetches every route in the nav at once, so three dead ones land in
  * the same second and eight in five minutes is a normal morning - which is exactly
- * what happened on the instance this was written for. Someone enumerating URLs is
- * not doing it through the app's own router, and the paths that give a scan away
- * are the `probes` jail's business rather than this one's.
+ * what happened on the instance this was written for. The build assets are here
+ * for the same reason and a worse case: deploying Polaris while your own tab is
+ * open has that tab ask for four or five chunks that no longer exist, inside one
+ * second, and the operator bans themselves out of the instance they just shipped.
+ * Nothing is given away by refusing to count them either - a hashed chunk name is
+ * not a URL anybody enumerates, and the paths that do give a scan away are the
+ * `probes` jail's business rather than this one's.
  */
 function selfInflicted(entry: HttpLogLike): boolean {
     const path = entry.path ?? "";
     const query = path.slice(path.indexOf("?") + 1);
     if (path.includes("?") && (query === "_rsc" || query.includes("_rsc="))) return true;
-    return path.split("?")[0] === "/favicon.ico";
+    const withoutQuery = path.split("?")[0] ?? "";
+    if (withoutQuery === "/favicon.ico") return true;
+    return BUILD_ASSET_PREFIXES.some((prefix) => withoutQuery.startsWith(prefix));
 }
 
 /** Whether a log entry counts as a failure for a jail. */
