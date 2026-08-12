@@ -23,12 +23,13 @@ import { listProjects } from "@/lib/deploy-service";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { OverviewWidgetId } from "@polaris/core";
 import { listUserActivity } from "@/lib/audit-service";
-import { myWorkCounts } from "@/lib/tasks/report-service";
 import { listUserSessions } from "@/lib/session-directory";
 import { listRecentAlarmEvents } from "@/lib/watch-service";
+import type { MyWorkTask } from "@/lib/tasks/report-service";
 import type { MetricSubjectType } from "@/lib/metrics-shared";
 import { listGameServerFacts } from "@/lib/apps/games-service";
 import { getWatchOverview } from "@/lib/watch-overview-service";
+import { myUrgentTasks, myWorkCounts } from "@/lib/tasks/report-service";
 import { HOST_CONNECTION_PREFIX, listAccessibleConnections } from "@/lib/storage-service";
 
 /** Rows shown inside one card before it defers to its own screen. A card that
@@ -83,6 +84,9 @@ export interface OverviewTasks {
     assigned: number;
     overdue: number;
     dueToday: number;
+    /** The work itself, most pressing first. Counts alone say how much there is
+     *  and nothing about what it is, which is not a reason to open anything. */
+    rows: MyWorkTask[];
 }
 
 export interface OverviewStorageEntry {
@@ -269,9 +273,11 @@ async function gameServers(userId: string): Promise<OverviewGames> {
     return {
         running: rows.filter((row) => row.running).length,
         total: rows.length,
-        // Whatever is down first: the card exists to be read at a glance.
+        // Running first, like the services card and for the same reason: the
+        // servers somebody can actually join are the list, and the count above it
+        // is what says how many are not.
         servers: [...rows]
-            .sort((left, right) => Number(left.running) - Number(right.running) || left.name.localeCompare(right.name))
+            .sort((left, right) => Number(right.running) - Number(left.running) || left.name.localeCompare(right.name))
             .slice(0, CARD_ROWS)
     };
 }
@@ -305,6 +311,23 @@ async function recentActivity(userId: string): Promise<OverviewActivityEntry[]> 
 }
 
 /**
+ * The deploy applications that are really something else wearing a container.
+ *
+ * An installed app - a game server, anything from the catalogue - is backed by a
+ * Deploy application, so it is deployed in the literal sense and would be counted
+ * and listed as a service on top of appearing on its own card and its own screen.
+ * One thing, in two lists, under two names. It belongs to whatever installed it,
+ * and Services is left saying what somebody deployed themselves.
+ */
+async function managedApplicationIds(ownerId: string): Promise<Set<string>> {
+    const installs = await prisma.installedApp.findMany({
+        where: { ownerId, status: { not: "removed" }, applicationId: { not: null } },
+        select: { applicationId: true }
+    });
+    return new Set(installs.map((install) => install.applicationId!).filter(Boolean));
+}
+
+/**
  * What is deployed, and how much of it is up.
  *
  * Read from the deploy records rather than by asking every daemon what it is
@@ -315,7 +338,10 @@ async function recentActivity(userId: string): Promise<OverviewActivityEntry[]> 
  * stopped service reads as an outage.
  */
 async function deployedServices(user: SessionUser): Promise<OverviewServices> {
-    const projects = await listProjects(user.id, await scopeOrgIdFor(user.id));
+    const [projects, managed] = await Promise.all([
+        listProjects(user.id, await scopeOrgIdFor(user.id)),
+        managedApplicationIds(user.id)
+    ]);
     const rows: OverviewRow[] = [];
     let running = 0;
     let total = 0;
@@ -323,6 +349,7 @@ async function deployedServices(user: SessionUser): Promise<OverviewServices> {
     for (const project of projects) {
         for (const environment of project.environments) {
             for (const application of environment.applications) {
+                if (managed.has(application.id)) continue;
                 total += 1;
                 const stopped = application.desiredState !== "running";
                 const up = !stopped && Boolean(application.currentDeploymentId);
@@ -339,15 +366,24 @@ async function deployedServices(user: SessionUser): Promise<OverviewServices> {
         }
     }
 
-    // Whatever is wrong first: the point of the card is to be read in a glance.
-    const rank = { down: 0, idle: 1, up: 2 } as const;
+    // What is actually running first - it is what somebody came to the card to
+    // see, and a list headed by things that are switched off reads as an outage.
+    // Then what is wrong, then what was stopped on purpose, which is the one state
+    // nobody needs to be told about twice. With more services than the card holds
+    // a stopped one can fall off the end; the count above the list is what says so,
+    // and it turns amber the moment the two numbers differ.
+    const rank = { up: 0, down: 1, idle: 2 } as const;
     rows.sort((left, right) => rank[left.state] - rank[right.state] || left.label.localeCompare(right.label));
     return { rows: rows.slice(0, CARD_ROWS), running, total, projects: projects.length };
 }
 
 async function assignedWork(user: SessionUser): Promise<OverviewTasks> {
     const scope = await shelfScope({ id: user.id, isAdmin: user.isAdmin });
-    return myWorkCounts(user.id, scope);
+    const [counts, rows] = await Promise.all([
+        myWorkCounts(user.id, scope),
+        myUrgentTasks(user.id, scope, CARD_ROWS)
+    ]);
+    return { ...counts, rows };
 }
 
 /**

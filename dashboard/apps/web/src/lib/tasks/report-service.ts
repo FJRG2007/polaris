@@ -215,3 +215,92 @@ export async function myWorkCounts(userId: string, scope: TaskScope, now = new D
     ]);
     return { assigned, overdue, dueToday };
 }
+
+export interface MyWorkTask {
+    id: string;
+    /** "ENG-42", the number somebody would search for. */
+    reference: string;
+    name: string;
+    priority: core.TaskPriority;
+    dueDate: string | null;
+    /** Whether that date has passed. Decided here, against the same day boundary
+     *  the counts use, so a card cannot disagree with the number above it. */
+    overdue: boolean;
+    /** The list it sits in, for the second line. */
+    list: string;
+    href: string;
+}
+
+/**
+ * The work somebody should actually look at, most pressing first.
+ *
+ * Ranked overdue, then by priority, then by how soon it is due. Two reads rather
+ * than one because the ranking cannot be expressed in a single ordered query:
+ * priority is stored as its own word ("urgent", "high", ...), and sorting those
+ * as text puts "high" above "low" above "none" above "normal" above "urgent",
+ * which is alphabetical and meaningless. So the soonest-due and the
+ * highest-priority are fetched separately, both bounded, and ranked here where
+ * the words have their real order.
+ */
+export async function myUrgentTasks(
+    userId: string,
+    scope: TaskScope,
+    limit: number,
+    now = new Date()
+): Promise<MyWorkTask[]> {
+    if (scopeSpaceIds(scope).length === 0) return [];
+    const mine: Prisma.TaskWhereInput = {
+        ...scopeTaskWhere(scope),
+        archived: false,
+        assignees: { some: { userId } },
+        AND: [{ OR: [{ status: null }, { status: { type: { in: [...core.UNFINISHED_STATUS_TYPES] } } }] }]
+    };
+    const select = {
+        id: true,
+        name: true,
+        number: true,
+        priority: true,
+        dueDate: true,
+        list: { select: { name: true } },
+        space: { select: { prefix: true } }
+    } as const;
+    // Enough of each that the ranking below has something to choose from, and
+    // little enough that a thousand assigned tasks cost the same as ten.
+    const pool = Math.max(limit * 4, 20);
+
+    const [dated, prioritized] = await Promise.all([
+        prisma.task.findMany({ where: { ...mine, dueDate: { not: null } }, select, orderBy: { dueDate: "asc" }, take: pool }),
+        prisma.task.findMany({
+            where: { ...mine, priority: { in: ["urgent", "high"] } },
+            select,
+            orderBy: { updatedAt: "desc" },
+            take: pool
+        })
+    ]);
+
+    const startOfToday = core.startOfDay(now);
+    const byId = new Map([...dated, ...prioritized].map((task) => [task.id, task]));
+    return [...byId.values()]
+        .map((task) => ({
+            id: task.id,
+            reference: `${task.space.prefix}-${task.number}`,
+            name: task.name,
+            // The column is free-form TEXT; an unrecognised word reads as unset
+            // rather than sorting into a rank that does not exist.
+            priority: (core.TASK_PRIORITIES as readonly string[]).includes(task.priority)
+                ? (task.priority as core.TaskPriority)
+                : "none",
+            dueDate: task.dueDate ? task.dueDate.toISOString() : null,
+            overdue: Boolean(task.dueDate && task.dueDate < startOfToday),
+            list: task.list.name,
+            href: `/tasks/t/${task.id}`
+        }))
+        .sort(
+            (left, right) =>
+                Number(right.overdue) - Number(left.overdue) ||
+                core.priorityRank(left.priority) - core.priorityRank(right.priority) ||
+                (left.dueDate ?? "9999").localeCompare(right.dueDate ?? "9999") ||
+                left.name.localeCompare(right.name)
+        )
+        .slice(0, limit);
+}
