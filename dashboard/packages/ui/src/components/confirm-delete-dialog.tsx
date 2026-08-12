@@ -50,6 +50,12 @@ export interface ConfirmDeleteDialogProps {
     children?: ReactNode;
     /** Overrides the button label when the action is not literally a delete. */
     confirmLabel?: string;
+    /** Overrides the heading for an action that is not a delete - closing a tunnel,
+     *  dropping a hostname. Say what it does, not the word the component defaults to. */
+    title?: ReactNode;
+    /** Overrides the plain question, for the same reason. Only asked when
+     *  `requireTyping` is false; name the thing, so the reader sees which row. */
+    question?: ReactNode;
     /** Blocks confirmation entirely and explains why (e.g. a volume a service needs). */
     blockedReason?: string | null;
     /** Holds the button while something in `children` is still unanswered - a
@@ -70,6 +76,8 @@ export function ConfirmDeleteDialog({
     description,
     children,
     confirmLabel,
+    title,
+    question,
     blockedReason,
     confirmDisabled = false,
     error,
@@ -95,7 +103,7 @@ export function ConfirmDeleteDialog({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <TriangleAlert className="size-4 text-danger" />
-                        Delete {kind}
+                        {title ?? `Delete ${kind}`}
                     </DialogTitle>
                     {description ? <DialogDescription>{description}</DialogDescription> : null}
                 </DialogHeader>
@@ -109,7 +117,11 @@ export function ConfirmDeleteDialog({
                         </p>
                     ) : !requireTyping ? (
                         <p className="text-sm text-muted-foreground">
-                            Delete <span className="font-medium text-foreground">{name}</span>?
+                            {question ?? (
+                                <>
+                                    Delete <span className="font-medium text-foreground">{name}</span>?
+                                </>
+                            )}
                         </p>
                     ) : (
                         <label className="flex flex-col gap-1.5" htmlFor={fieldId}>
