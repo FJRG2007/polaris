@@ -42,10 +42,11 @@ export const OVERVIEW_WIDGET_IDS = [
 export type OverviewWidgetId = (typeof OVERVIEW_WIDGET_IDS)[number];
 
 /**
- * How wide a card sits on the three-column grid: a third, two thirds, the whole
- * row. Not free-form column counts - a grid whose cards can be any width is a
- * grid that can be arranged into something unreadable, and three sizes cover
- * every card there is.
+ * How wide a card is drawn: narrow, medium, wide. What each is worth in columns
+ * is the grid's business and changes with the screen; what is stored is only
+ * which of the three it is. Not free-form column counts - a grid whose cards can
+ * be any width is a grid that can be arranged into something unreadable, and
+ * three sizes cover every card there is.
  */
 export const OVERVIEW_WIDGET_SIZES = ["sm", "md", "lg"] as const;
 
@@ -77,7 +78,10 @@ export const overviewShortcutSchema = z.object({
 export type OverviewShortcut = z.infer<typeof overviewShortcutSchema>;
 
 export const overviewPreferencesSchema = z.object({
-    widgets: z.array(overviewWidgetSchema).max(OVERVIEW_WIDGET_IDS.length * 2).default([]),
+    widgets: z
+        .array(overviewWidgetSchema)
+        .max(OVERVIEW_WIDGET_IDS.length * 2)
+        .default([]),
     shortcuts: z.array(overviewShortcutSchema).max(MAX_OVERVIEW_SHORTCUTS).default([]),
     /** The line above the grid. Off for somebody who would rather not be greeted
      *  by their own software every morning. */
@@ -86,7 +90,11 @@ export const overviewPreferencesSchema = z.object({
 
 export type OverviewPreferences = z.infer<typeof overviewPreferencesSchema>;
 
-export const EMPTY_OVERVIEW_PREFERENCES: OverviewPreferences = { widgets: [], shortcuts: [], greeting: true };
+export const EMPTY_OVERVIEW_PREFERENCES: OverviewPreferences = {
+    widgets: [],
+    shortcuts: [],
+    greeting: true
+};
 
 /**
  * The layout an account starts on, before it has chosen anything.
@@ -178,7 +186,9 @@ export function resolveOverviewLayout(
         const above = DEFAULT_OVERVIEW_LAYOUT.slice(0, at)
             .reverse()
             .find((entry) => on(entry.id));
-        const below = above ? undefined : DEFAULT_OVERVIEW_LAYOUT.slice(at + 1).find((entry) => on(entry.id));
+        const below = above
+            ? undefined
+            : DEFAULT_OVERVIEW_LAYOUT.slice(at + 1).find((entry) => on(entry.id));
         const index = above
             ? ordered.findIndex((held) => held.id === above.id) + 1
             : below
