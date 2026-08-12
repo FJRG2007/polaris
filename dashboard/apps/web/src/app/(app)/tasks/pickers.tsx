@@ -17,6 +17,7 @@ import { Avatar, preloadAvatars } from "@/components/avatar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PersonRef, TagRef, TaskRow } from "@/lib/tasks/facts";
 import type { StatusView, TagView } from "@/lib/tasks/space-service";
+import { PriorityFlag } from "@/components/priority-flag";
 import { Ban, CalendarPlus, Check, ChevronDown, Flag, Plus, Search, Settings2, UserPlus, X } from "lucide-react";
 import {
     Badge,
@@ -405,19 +406,9 @@ export function StatusMarker({
 // Priority
 // ---------------------------------------------------------------------------
 
-export function PriorityFlag({ priority, className }: { priority: core.TaskPriority; className?: string }) {
-    if (priority === "none") return null;
-    return (
-        <Flag
-            className={cn("size-3.5 shrink-0", className)}
-            // Filled, so urgency reads at a glance down a column of rows rather
-            // than only when somebody stops to look at the outline.
-            fill={core.TASK_PRIORITY_COLORS[priority]}
-            style={{ color: core.TASK_PRIORITY_COLORS[priority] }}
-            aria-label={core.TASK_PRIORITY_LABELS[priority]}
-        />
-    );
-}
+/** Re-exported from where it lives, so the board's own callers are unchanged and
+ *  the Overview does not have to import this module to draw one flag. */
+export { PriorityFlag };
 
 export function PriorityPicker({
     value,

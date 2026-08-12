@@ -78,14 +78,22 @@ body {
 
 @container (min-width: 35rem) {
     .overview-card-md,
-    .overview-card-lg {
+    .overview-card-lg,
+    .overview-card-xl {
         grid-column: span 2;
     }
 }
 
 @container (min-width: 53rem) {
-    .overview-card-lg {
+    .overview-card-lg,
+    .overview-card-xl {
         grid-column: span 3;
+    }
+}
+
+@container (min-width: 71rem) {
+    .overview-card-xl {
+        grid-column: span 4;
     }
 }
 

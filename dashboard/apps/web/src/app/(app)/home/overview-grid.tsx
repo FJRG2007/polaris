@@ -22,7 +22,7 @@ import { saveOverviewPreferencesAction } from "./actions";
 import { clearRecentPlaces } from "@/lib/overview/recent-places";
 import { ActivityWidget, SessionsWidget } from "./widgets/account";
 import type { OverviewData } from "@/lib/overview/overview-service";
-import { overviewSize, overviewWidget } from "@/lib/overview/catalog";
+import { overviewSize, overviewWidget, OVERVIEW_SIZE_LABELS } from "@/lib/overview/catalog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { emptyCards, relevanceOrder, rememberEmptyCards } from "@/lib/overview/relevance";
 import { AppsWidget, NotificationsWidget, RecentWidget, ShortcutsWidget } from "./widgets/personal";
@@ -68,7 +68,8 @@ let dataCache: { at: number; key: string; data: OverviewData } | null = null;
 const SPAN: Record<OverviewWidgetSize, string> = {
     sm: "overview-card",
     md: "overview-card overview-card-md",
-    lg: "overview-card overview-card-lg"
+    lg: "overview-card overview-card-lg",
+    xl: "overview-card overview-card-xl"
 };
 
 /** "Good morning" and the rest, by the reader's own clock. */
@@ -518,8 +519,6 @@ function WidgetGrip({ label, onStart, onEnd }: { label: string; onStart: () => v
     );
 }
 
-const SIZE_LABELS: Record<OverviewWidgetSize, string> = { sm: "Narrow", md: "Medium", lg: "Wide" };
-
 /** Arranging one card from the card itself: the gestures somebody reaches for
  *  while looking at it, without opening the panel. */
 function WidgetMenu({
@@ -575,7 +574,7 @@ function WidgetMenu({
                                 onSelect={() => onResize(option)}
                                 className={cn(option === size && "text-primary")}
                             >
-                                {SIZE_LABELS[option]}
+                                {OVERVIEW_SIZE_LABELS[option]}
                             </DropdownMenuItem>
                         ))}
                     </>

@@ -117,6 +117,9 @@ export interface OverviewSessions {
 export interface OverviewGameServer {
     id: string;
     name: string;
+    /** Which game it plays, so the row can carry that game's own mark. Null for
+     *  an install no game in the catalogue claims. */
+    game: string | null;
     /** The game it plays and the machine it runs on, as one line. */
     detail: string;
     running: boolean;
@@ -265,7 +268,11 @@ async function gameServers(userId: string): Promise<OverviewGames> {
     const rows = servers.map((server) => ({
         id: server.id,
         name: server.name,
-        detail: [server.catalogName, server.serverName].filter(Boolean).join(" - "),
+        game: server.game,
+        // The game is named in the mark beside the row when the catalogue knows
+        // it, so what is left to say is where it runs; a row whose game nothing
+        // claims keeps the name, because then the mark is a dot.
+        detail: [server.game ? null : server.catalogName, server.serverName].filter(Boolean).join(" - "),
         running: server.running,
         slots: server.slots,
         href: `${INSTALLED_BASE}/${server.id}`

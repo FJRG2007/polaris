@@ -15,16 +15,10 @@
  */
 
 import { useState } from "react";
-import { overviewWidget } from "@/lib/overview/catalog";
+import { overviewWidget, OVERVIEW_SIZE_LABELS } from "@/lib/overview/catalog";
 import { ArrowDown, ArrowUp, GripVertical, RotateCcw } from "lucide-react";
 import type { OverviewWidgetId, OverviewWidgetPreference, OverviewWidgetSize } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Select, Switch, cn } from "@polaris/ui";
-
-const SIZE_LABELS: Record<OverviewWidgetSize, string> = {
-    sm: "Narrow",
-    md: "Medium",
-    lg: "Wide"
-};
 
 export function CustomizeDialog({
     open,
@@ -116,7 +110,7 @@ export function CustomizeDialog({
                                         onValueChange={(value) => onResize(widget.id, value as OverviewWidgetSize)}
                                         aria-label={`Width of ${entry.label}`}
                                         className="h-8 w-28 shrink-0"
-                                        options={entry.sizes.map((size) => ({ value: size, label: SIZE_LABELS[size] }))}
+                                        options={entry.sizes.map((size) => ({ value: size, label: OVERVIEW_SIZE_LABELS[size] }))}
                                     />
                                 ) : null}
 

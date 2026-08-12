@@ -67,7 +67,18 @@ export type OverviewFeature = "games";
  *  treated as absent, so a new one is off until something answers for it. */
 export type OverviewFeatures = Partial<Record<OverviewFeature, boolean>>;
 
-const ALL_SIZES = ["sm", "md", "lg"] as const;
+const ALL_SIZES = ["sm", "md", "lg", "xl"] as const;
+
+/** What each width is called where somebody chooses one. Here rather than beside
+ *  either screen that offers it, because both do and a card described as "Wide"
+ *  on one and "Large" on the other is two settings as far as a reader is
+ *  concerned. */
+export const OVERVIEW_SIZE_LABELS: Record<OverviewWidgetSize, string> = {
+    sm: "Narrow",
+    md: "Medium",
+    lg: "Wide",
+    xl: "Widest"
+};
 
 export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
     {
@@ -76,7 +87,7 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
         description: "The pages and services you pinned yourself.",
         icon: Star,
         href: null,
-        sizes: ["md", "lg"],
+        sizes: ["md", "lg", "xl"],
         local: true
     },
     {

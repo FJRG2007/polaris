@@ -42,13 +42,16 @@ export const OVERVIEW_WIDGET_IDS = [
 export type OverviewWidgetId = (typeof OVERVIEW_WIDGET_IDS)[number];
 
 /**
- * How wide a card is drawn: narrow, medium, wide. What each is worth in columns
- * is the grid's business and changes with the screen; what is stored is only
- * which of the three it is. Not free-form column counts - a grid whose cards can
- * be any width is a grid that can be arranged into something unreadable, and
- * three sizes cover every card there is.
+ * How wide a card is drawn: narrow, medium, wide, widest. What each is worth in
+ * columns is the grid's business and changes with the screen; what is stored is
+ * only which of the four it is. Not free-form column counts - a grid whose cards
+ * can be any width is a grid that can be arranged into something unreadable.
+ *
+ * The widest step is for the cards that are a list rather than a figure: five
+ * rows of task names, or of pages somebody has been to, are all title and no
+ * room, and the width they were capped at was the one the names needed.
  */
-export const OVERVIEW_WIDGET_SIZES = ["sm", "md", "lg"] as const;
+export const OVERVIEW_WIDGET_SIZES = ["sm", "md", "lg", "xl"] as const;
 
 export type OverviewWidgetSize = (typeof OVERVIEW_WIDGET_SIZES)[number];
 

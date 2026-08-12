@@ -12,9 +12,11 @@
 
 import Link from "next/link";
 import { cn } from "@polaris/ui";
-import type { TaskPriority } from "@polaris/core";
+import { formatBytes } from "@polaris/core";
+import { GameLogo } from "@/components/game-picker";
+import { findGame } from "@/lib/apps/games-catalog";
+import { PriorityFlag } from "@/components/priority-flag";
 import { RelativeTime } from "@/components/relative-time";
-import { formatBytes, TASK_PRIORITY_COLORS, TASK_PRIORITY_LABELS } from "@polaris/core";
 import { StateDot, WidgetEmpty, WidgetList, WidgetRow, WidgetRowsSkeleton, WidgetUnavailable } from "../widget-card";
 import type {
     OverviewAlarms,
@@ -297,9 +299,7 @@ export function GamesWidget({ data }: { data: Loaded<OverviewGames> }) {
                     <WidgetRow
                         key={server.id}
                         href={server.href}
-                        icon={
-                            <StateDot state={server.running ? "up" : "idle"} label={server.running ? "Up" : "Stopped"} />
-                        }
+                        icon={<GameMark game={server.game} running={server.running} />}
                         label={server.name}
                         detail={server.detail || null}
                         trailing={
@@ -337,7 +337,7 @@ export function TasksWidget({ data }: { data: Loaded<OverviewTasks> }) {
                     <WidgetRow
                         key={task.id}
                         href={task.href}
-                        icon={<PriorityMark priority={task.priority} />}
+                        icon={<PriorityFlag priority={task.priority} className="mt-0.5" />}
                         label={task.name}
                         detail={`${task.reference} - ${task.list}`}
                         trailing={
@@ -354,17 +354,29 @@ export function TasksWidget({ data }: { data: Loaded<OverviewTasks> }) {
     );
 }
 
-/** The task's priority as the colour the Tasks app already uses for it, so the
- *  card and the board agree at a glance. Unset priority draws nothing rather
- *  than a grey dot that reads as a state. */
-function PriorityMark({ priority }: { priority: TaskPriority }) {
-    if (priority === "none") return <span className="size-2 shrink-0" aria-hidden="true" />;
+/**
+ * A server as its own game's mark, with whether it is up badged on it.
+ *
+ * The same logo the games table leads with, for the same reason: a list of
+ * servers of several games is scanned for "the ARK one" long before it is read.
+ * The state rides on the corner rather than replacing it, because both facts are
+ * why somebody looked - and a game nothing in the catalogue claims falls back to
+ * the plain dot rather than to a gap where a mark should be.
+ */
+function GameMark({ game, running }: { game: string | null; running: boolean }) {
+    const label = running ? "Up" : "Stopped";
+    const definition = game ? findGame(game) : undefined;
+    if (!definition) return <StateDot state={running ? "up" : "idle"} label={label} />;
     return (
-        <span
-            className="size-2 shrink-0 rounded-full"
-            style={{ backgroundColor: TASK_PRIORITY_COLORS[priority] }}
-            title={TASK_PRIORITY_LABELS[priority]}
-            aria-label={TASK_PRIORITY_LABELS[priority]}
-        />
+        <span className="relative shrink-0" title={label}>
+            <GameLogo game={definition} className="size-6" />
+            <span
+                className={cn(
+                    "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-card",
+                    running ? "bg-success" : "bg-muted-foreground"
+                )}
+                aria-label={label}
+            />
+        </span>
     );
 }
