@@ -33,7 +33,10 @@ export const OVERVIEW_WIDGET_IDS = [
     "tasks",
     "alarms",
     "storage",
-    "apps"
+    "apps",
+    "sessions",
+    "activity",
+    "games"
 ] as const;
 
 export type OverviewWidgetId = (typeof OVERVIEW_WIDGET_IDS)[number];
@@ -92,17 +95,32 @@ export const EMPTY_OVERVIEW_PREFERENCES: OverviewPreferences = { widgets: [], sh
  * pinned, what is running, what it is costing, what happened while they were
  * away. Cards further down are the ones you look at when you have already read
  * the top of the screen.
+ *
+ * The sizes are mixed rather than uniform so the four-column grid packs: a wide
+ * card is followed by something narrow enough to sit beside it. What each account
+ * actually sees is narrowed by permissions, so no fixed set of sizes can tile
+ * every grid - the grid itself backfills what is left (see its `dense` flow), and
+ * these are what make that possible rather than a row of identical halves.
+ *
+ * Every card is on. A landing screen that hides half of itself until somebody
+ * finds the customize button is a landing screen that teaches nobody what is
+ * there.
  */
 export const DEFAULT_OVERVIEW_LAYOUT: readonly OverviewWidgetPreference[] = [
     { id: "shortcuts", size: "lg", hidden: false },
-    { id: "services", size: "md", hidden: false },
     { id: "usage", size: "sm", hidden: false },
+    { id: "services", size: "md", hidden: false },
     { id: "notifications", size: "md", hidden: false },
     { id: "tasks", size: "sm", hidden: false },
-    { id: "recent", size: "md", hidden: false },
     { id: "alarms", size: "sm", hidden: false },
     { id: "storage", size: "md", hidden: false },
-    { id: "apps", size: "sm", hidden: false }
+    // Between the infrastructure cards and the account's own: it belongs with what
+    // is running, and it is only ever on the grid of somebody who runs one.
+    { id: "games", size: "md", hidden: false },
+    { id: "activity", size: "md", hidden: false },
+    { id: "sessions", size: "md", hidden: false },
+    { id: "recent", size: "md", hidden: false },
+    { id: "apps", size: "md", hidden: false }
 ];
 
 /** Read a stored blob back. Anything unparseable is an empty preference rather

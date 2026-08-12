@@ -18,12 +18,15 @@ import {
     Activity,
     Bell,
     Clock,
+    Gamepad2,
     HardDrive,
     LayoutGrid,
     ListTodo,
     Rocket,
+    ScrollText,
     Star,
     ChartColumn,
+    MonitorSmartphone,
     type LucideIcon
 } from "lucide-react";
 
@@ -45,7 +48,18 @@ export interface OverviewWidgetEntry {
     /** It reads its own data in the browser (the feed, this browser's history, or
      *  the account's own preferences) rather than from /api/overview. */
     local?: boolean;
+    /** Something that has to exist on this instance before the card means
+     *  anything, on top of the permission. A card about game servers on an
+     *  instance that runs none is an empty card teaching nobody anything. */
+    requires?: OverviewFeature;
 }
+
+/** The things a card can depend on being present, answered once on the server. */
+export type OverviewFeature = "games";
+
+/** Which of those this account actually has. A feature absent from the record is
+ *  treated as absent, so a new one is off until something answers for it. */
+export type OverviewFeatures = Partial<Record<OverviewFeature, boolean>>;
 
 const ALL_SIZES = ["sm", "md", "lg"] as const;
 
@@ -130,6 +144,37 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
         href: null,
         sizes: ALL_SIZES,
         local: true
+    },
+    {
+        id: "games",
+        label: "Game servers",
+        description: "Which of your servers are up, and how full they are.",
+        icon: Gamepad2,
+        permission: "games.read",
+        href: "/apps/games",
+        sizes: ALL_SIZES,
+        // Nobody who has never installed one wants a card about them, and being
+        // offered it in the customize panel is being told to go and find out what
+        // it would show.
+        requires: "games"
+    },
+    {
+        id: "sessions",
+        label: "Signed in",
+        description: "The devices your account is open on right now.",
+        icon: MonitorSmartphone,
+        // No permission: it is this account's own sessions, which is the one thing
+        // every account may read about itself.
+        href: "/account/sessions",
+        sizes: ALL_SIZES
+    },
+    {
+        id: "activity",
+        label: "Recent activity",
+        description: "What was done with your account, and from where.",
+        icon: ScrollText,
+        href: "/account/activity",
+        sizes: ALL_SIZES
     }
 ];
 
@@ -150,12 +195,27 @@ export function overviewSize(id: OverviewWidgetId, size: OverviewWidgetSize): Ov
 export interface OverviewAccessInput {
     isAdmin: boolean;
     can: (permission: Permission) => Promise<boolean>;
+    /** What this instance has that a card can be about. Omitted is the same as
+     *  having none of it. */
+    features?: OverviewFeatures;
 }
 
-/** The cards this account may see, in catalogue order. */
-export async function availableOverviewWidgets({ can }: OverviewAccessInput): Promise<OverviewWidgetId[]> {
+/**
+ * The cards this account may see, in catalogue order.
+ *
+ * Both tests have to pass and they answer different questions: the permission is
+ * whether this account is allowed to know, the feature is whether there is
+ * anything to know. Losing the permission takes the card away from somebody who
+ * had it - which is the point - while the feature only ever decides whether it is
+ * offered at all, so uninstalling the last game server does not delete how
+ * somebody had arranged theirs.
+ */
+export async function availableOverviewWidgets({ can, features }: OverviewAccessInput): Promise<OverviewWidgetId[]> {
     const decided = await Promise.all(
-        OVERVIEW_WIDGETS.map(async (widget) => (!widget.permission || (await can(widget.permission)) ? widget.id : null))
+        OVERVIEW_WIDGETS.map(async (widget) => {
+            if (widget.requires && features?.[widget.requires] !== true) return null;
+            return !widget.permission || (await can(widget.permission)) ? widget.id : null;
+        })
     );
     return decided.filter((id): id is OverviewWidgetId => id !== null);
 }

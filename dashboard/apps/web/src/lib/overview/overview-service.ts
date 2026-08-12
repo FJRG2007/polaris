@@ -15,15 +15,19 @@
  */
 
 import { prisma } from "@polaris/db";
+import { INSTALLED_BASE } from "@/lib/apps";
 import { sessionCanAny } from "@/lib/session";
 import { shelfScope } from "@/lib/tasks/access";
 import type { SessionUser } from "@/lib/session";
 import { listProjects } from "@/lib/deploy-service";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { OverviewWidgetId } from "@polaris/core";
+import { listUserActivity } from "@/lib/audit-service";
 import { myWorkCounts } from "@/lib/tasks/report-service";
+import { listUserSessions } from "@/lib/session-directory";
 import { listRecentAlarmEvents } from "@/lib/watch-service";
 import type { MetricSubjectType } from "@/lib/metrics-shared";
+import { listGameServerFacts } from "@/lib/apps/games-service";
 import { getWatchOverview } from "@/lib/watch-overview-service";
 import { HOST_CONNECTION_PREFIX, listAccessibleConnections } from "@/lib/storage-service";
 
@@ -89,6 +93,49 @@ export interface OverviewStorageEntry {
     href: string;
 }
 
+export interface OverviewSessionEntry {
+    id: string;
+    /** The device as it described itself, already humanized. */
+    device: string;
+    /** Where from: the address, and the country when one was resolved. */
+    where: string;
+    /** True for the session reading this screen. */
+    current: boolean;
+    lastSeenAt: string;
+}
+
+export interface OverviewSessions {
+    /** Every live session, of which `entries` is the newest handful. */
+    total: number;
+    entries: OverviewSessionEntry[];
+}
+
+export interface OverviewGameServer {
+    id: string;
+    name: string;
+    /** The game it plays and the machine it runs on, as one line. */
+    detail: string;
+    running: boolean;
+    /** How many players it was built for, null when the install never said. */
+    slots: number | null;
+    href: string;
+}
+
+export interface OverviewGames {
+    running: number;
+    total: number;
+    servers: OverviewGameServer[];
+}
+
+export interface OverviewActivityEntry {
+    id: string;
+    /** The action as recorded ("session.revoked"), for the screen to label. */
+    action: string;
+    /** What it was aimed at, or "" when it named nothing. */
+    target: string;
+    at: string;
+}
+
 /** Every card's data, each key absent when the card was not asked for and null
  *  when its source could not be read. */
 export interface OverviewData {
@@ -97,11 +144,23 @@ export interface OverviewData {
     alarms?: OverviewAlarms | null;
     tasks?: OverviewTasks | null;
     storage?: OverviewStorageEntry[] | null;
+    sessions?: OverviewSessions | null;
+    activity?: OverviewActivityEntry[] | null;
+    games?: OverviewGames | null;
 }
 
 /** The cards that are read here at all. The rest (pinned links, this browser's
  *  history, the notification feed, the launcher) are answered in the browser. */
-const SERVER_WIDGETS = ["services", "usage", "alarms", "tasks", "storage"] as const;
+const SERVER_WIDGETS = [
+    "services",
+    "usage",
+    "alarms",
+    "tasks",
+    "storage",
+    "sessions",
+    "activity",
+    "games"
+] as const;
 
 type ServerWidgetId = (typeof SERVER_WIDGETS)[number];
 
@@ -124,24 +183,30 @@ export async function getOverviewData(user: SessionUser, wanted: readonly Overvi
     const asked = new Set(wanted.filter(isServerOverviewWidget));
     if (asked.size === 0) return {};
 
-    const [canDeploy, canTasks, canDrive] = await Promise.all([
+    const [canDeploy, canTasks, canDrive, canGames] = await Promise.all([
         asked.has("services") || asked.has("usage") || asked.has("alarms")
             ? sessionCanAny(user, "deploy.read")
             : Promise.resolve(false),
         asked.has("tasks") ? sessionCanAny(user, "tasks.read") : Promise.resolve(false),
-        asked.has("storage") ? sessionCanAny(user, "drive.read") : Promise.resolve(false)
+        asked.has("storage") ? sessionCanAny(user, "drive.read") : Promise.resolve(false),
+        asked.has("games") ? sessionCanAny(user, "games.read") : Promise.resolve(false)
     ]);
 
     // Services, usage and alarms all come out of the same monitoring read, so
     // three cards cost one pass rather than three.
     const watch = canDeploy && (asked.has("usage") || asked.has("alarms")) ? card(() => getWatchOverview(user.id)) : null;
 
-    const [services, monitoring, events, tasks, storage] = await Promise.all([
+    const [services, monitoring, events, tasks, storage, sessions, activity, games] = await Promise.all([
         asked.has("services") && canDeploy ? card(() => deployedServices(user)) : Promise.resolve(undefined),
         watch ?? Promise.resolve(undefined),
         asked.has("alarms") && canDeploy ? card(() => listRecentAlarmEvents(user.id, CARD_ROWS)) : Promise.resolve(undefined),
         asked.has("tasks") && canTasks ? card(() => assignedWork(user)) : Promise.resolve(undefined),
-        asked.has("storage") && canDrive ? card(() => storageUsage(user.id)) : Promise.resolve(undefined)
+        asked.has("storage") && canDrive ? card(() => storageUsage(user.id)) : Promise.resolve(undefined),
+        // The account's own two, which ask for no permission: everybody may read
+        // where their account is open and what was done with it.
+        asked.has("sessions") ? card(() => openSessions(user)) : Promise.resolve(undefined),
+        asked.has("activity") ? card(() => recentActivity(user.id)) : Promise.resolve(undefined),
+        asked.has("games") && canGames ? card(() => gameServers(user.id)) : Promise.resolve(undefined)
     ]);
 
     const data: OverviewData = {};
@@ -176,7 +241,67 @@ export async function getOverviewData(user: SessionUser, wanted: readonly Overvi
     }
     if (asked.has("tasks")) data.tasks = canTasks ? (tasks ?? null) : null;
     if (asked.has("storage")) data.storage = canDrive ? (storage ?? null) : null;
+    if (asked.has("sessions")) data.sessions = sessions ?? null;
+    if (asked.has("activity")) data.activity = activity ?? null;
+    if (asked.has("games")) data.games = canGames ? (games ?? null) : null;
     return data;
+}
+
+/**
+ * The game servers this account runs or was given, and how many are up.
+ *
+ * Read from the install records rather than by asking each container who is on
+ * it: presence costs a command inside every running server, which is what the
+ * game screens spend and what a landing screen must not. "Up" here therefore
+ * means the server is meant to be running, and the card links to the screen that
+ * knows whether anybody is actually playing.
+ */
+async function gameServers(userId: string): Promise<OverviewGames> {
+    const servers = await listGameServerFacts(userId);
+    const rows = servers.map((server) => ({
+        id: server.id,
+        name: server.name,
+        detail: [server.catalogName, server.serverName].filter(Boolean).join(" - "),
+        running: server.running,
+        slots: server.slots,
+        href: `${INSTALLED_BASE}/${server.id}`
+    }));
+    return {
+        running: rows.filter((row) => row.running).length,
+        total: rows.length,
+        // Whatever is down first: the card exists to be read at a glance.
+        servers: [...rows]
+            .sort((left, right) => Number(left.running) - Number(right.running) || left.name.localeCompare(right.name))
+            .slice(0, CARD_ROWS)
+    };
+}
+
+/**
+ * Where this account is open right now.
+ *
+ * Read for the account making the request and no other, so the card is the same
+ * list as its own sessions screen rather than a view onto anybody else's. The
+ * session reading the screen is marked rather than hidden: "and this one" is what
+ * turns a list of devices into a list somebody can act on.
+ */
+async function openSessions(user: SessionUser): Promise<OverviewSessions> {
+    const sessions = await listUserSessions(user.id, user.sessionId);
+    return {
+        total: sessions.length,
+        entries: sessions.slice(0, CARD_ROWS).map((session) => ({
+            id: session.id,
+            device: session.device,
+            where: [session.ip, session.country].filter(Boolean).join(" - "),
+            current: session.current,
+            lastSeenAt: session.lastSeenAt
+        }))
+    };
+}
+
+/** What was done with this account lately, newest first. */
+async function recentActivity(userId: string): Promise<OverviewActivityEntry[]> {
+    const entries = await listUserActivity(userId, { limit: CARD_ROWS });
+    return entries.map((entry) => ({ id: entry.id, action: entry.action, target: entry.target, at: entry.at }));
 }
 
 /**

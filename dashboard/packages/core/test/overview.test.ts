@@ -104,13 +104,19 @@ describe("resolveOverviewLayout", () => {
     });
 
     it("puts a card nobody has arranged where the catalogue has it, not at the end", () => {
-        // Somebody who only ever hid Usage, with Services (which ships before it)
-        // and Tasks (after) never touched.
+        // Somebody who only ever hid Services, with Usage (which ships before it)
+        // and Tasks (after) never touched. Read from the shipped order rather than
+        // hard-coded, so this keeps testing the rule when the order changes.
+        const available = ["services", "usage", "tasks"] as const;
         const resolved = resolveOverviewLayout(
-            { ...EMPTY_OVERVIEW_PREFERENCES, widgets: [{ id: "usage", size: "sm", hidden: true }] },
-            ["services", "usage", "tasks"]
+            { ...EMPTY_OVERVIEW_PREFERENCES, widgets: [{ id: "services", size: "sm", hidden: true }] },
+            available
         );
-        expect(resolved.map((widget) => widget.id)).toEqual(["services", "usage", "tasks"]);
+        const catalogue = DEFAULT_OVERVIEW_LAYOUT.map((widget) => widget.id).filter((id) =>
+            (available as readonly string[]).includes(id)
+        );
+        expect(resolved.map((widget) => widget.id)).toEqual(catalogue);
+        expect(resolved.at(-1)?.id).not.toBe("usage");
     });
 
     it("draws the shipped layout for an account that has arranged nothing", () => {

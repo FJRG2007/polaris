@@ -22,7 +22,7 @@ import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Select, Switc
 const SIZE_LABELS: Record<OverviewWidgetSize, string> = {
     sm: "Narrow",
     md: "Medium",
-    lg: "Full width"
+    lg: "Wide"
 };
 
 export function CustomizeDialog({

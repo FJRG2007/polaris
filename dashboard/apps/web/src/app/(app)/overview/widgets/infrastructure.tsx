@@ -17,6 +17,7 @@ import { RelativeTime } from "@/components/relative-time";
 import { StateDot, WidgetEmpty, WidgetList, WidgetRow, WidgetRowsSkeleton, WidgetUnavailable } from "../widget-card";
 import type {
     OverviewAlarms,
+    OverviewGames,
     OverviewServices,
     OverviewStorageEntry,
     OverviewTasks,
@@ -251,6 +252,66 @@ export function StorageWidget({ data }: { data: Loaded<OverviewStorageEntry[]> }
                 );
             })}
         </ul>
+    );
+}
+
+/**
+ * The game servers this account runs.
+ *
+ * Meant to be up, not proven to be answering: proving it costs a command inside
+ * every running container, which is the games screen's business and not a landing
+ * screen's. The card says how many are meant to be running and which ones are
+ * not, and the row goes to the server whose state you just read.
+ */
+export function GamesWidget({ data }: { data: Loaded<OverviewGames> }) {
+    if (data === undefined) return <WidgetRowsSkeleton rows={2} />;
+    if (data === null) return <WidgetUnavailable>Your game servers could not be read just now.</WidgetUnavailable>;
+    if (data.total === 0) {
+        return (
+            <WidgetEmpty
+                action={
+                    <Link href="/apps/games" className="text-xs font-medium text-primary hover:underline">
+                        Create one
+                    </Link>
+                }
+            >
+                No game server yet.
+            </WidgetEmpty>
+        );
+    }
+
+    return (
+        <div className="flex flex-col gap-3">
+            <p className="text-sm">
+                <span className={cn("text-xl font-semibold", data.running < data.total && "text-warning")}>
+                    {data.running}
+                </span>
+                <span className="text-muted-foreground">
+                    {" "}
+                    of {data.total} server{data.total === 1 ? "" : "s"} up
+                </span>
+            </p>
+            <WidgetList>
+                {data.servers.map((server) => (
+                    <WidgetRow
+                        key={server.id}
+                        href={server.href}
+                        icon={
+                            <StateDot state={server.running ? "up" : "idle"} label={server.running ? "Up" : "Stopped"} />
+                        }
+                        label={server.name}
+                        detail={server.detail || null}
+                        trailing={
+                            server.slots === null ? undefined : (
+                                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                                    {server.slots} slots
+                                </span>
+                            )
+                        }
+                    />
+                ))}
+            </WidgetList>
+        </div>
     );
 }
 

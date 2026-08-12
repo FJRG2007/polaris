@@ -13,6 +13,7 @@ import { OverviewGrid } from "./overview-grid";
 import { reachableApps } from "@/lib/app-access";
 import { resolveOverviewLayout } from "@polaris/core";
 import { accessFor, requireUser } from "@/lib/session";
+import { overviewFeatures } from "@/lib/overview/features";
 import { availableOverviewWidgets } from "@/lib/overview/catalog";
 import { getOverviewPreferences } from "@/lib/overview/prefs-service";
 
@@ -21,9 +22,10 @@ export const dynamic = "force-dynamic";
 export default async function OverviewPage() {
     const user = await requireUser();
     const access = accessFor(user);
+    const features = await overviewFeatures(user.id);
     const [preferences, available, apps] = await Promise.all([
         getOverviewPreferences(user.id),
-        availableOverviewWidgets(access),
+        availableOverviewWidgets({ ...access, features }),
         reachableApps(access)
     ]);
 

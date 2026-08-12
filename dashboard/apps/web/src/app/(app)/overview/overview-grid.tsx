@@ -20,12 +20,13 @@ import { ShortcutPicker } from "./shortcut-picker";
 import { CustomizeDialog } from "./customize-dialog";
 import { saveOverviewPreferencesAction } from "./actions";
 import { clearRecentPlaces } from "@/lib/overview/recent-places";
+import { ActivityWidget, SessionsWidget } from "./widgets/account";
 import type { OverviewData } from "@/lib/overview/overview-service";
 import { overviewSize, overviewWidget } from "@/lib/overview/catalog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppsWidget, NotificationsWidget, RecentWidget, ShortcutsWidget } from "./widgets/personal";
-import { AlarmsWidget, ServicesWidget, StorageWidget, TasksWidget, UsageWidget } from "./widgets/infrastructure";
 import { ArrowDown, ArrowUp, EyeOff, LayoutGrid, MoreVertical, RefreshCw, Settings2, Trash2 } from "lucide-react";
+import { AlarmsWidget, GamesWidget, ServicesWidget, StorageWidget, TasksWidget, UsageWidget } from "./widgets/infrastructure";
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, cn } from "@polaris/ui";
 import {
     resolveOverviewLayout,
@@ -57,10 +58,19 @@ const SAVE_DEBOUNCE_MS = 600;
 // last visit already fetched.
 let dataCache: { at: number; key: string; data: OverviewData } | null = null;
 
+/**
+ * How wide each size is drawn, against a grid four columns wide.
+ *
+ * Four rather than three because three sizes on three columns leaves every wide
+ * card owning its whole row: a counter that needs a quarter of the screen sits
+ * beside three quarters of nothing. On four, a wide card still leaves a column
+ * for a narrow one, and `grid-flow-dense` below pulls one up into whatever gap is
+ * left rather than leaving the row half empty.
+ */
 const SPAN: Record<OverviewWidgetSize, string> = {
     sm: "",
-    md: "md:col-span-2",
-    lg: "md:col-span-2 xl:col-span-3"
+    md: "sm:col-span-2",
+    lg: "sm:col-span-2 lg:col-span-3"
 };
 
 /** "Good morning" and the rest, by the reader's own clock. */
@@ -288,7 +298,7 @@ export function OverviewGrid({
                     </Button>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-flow-row-dense grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {visible.map((widget, index) => {
                         const entry = overviewWidget(widget.id);
                         return (
@@ -394,10 +404,16 @@ function WidgetBody({
             return <StorageWidget data={data === undefined ? undefined : (data.storage ?? null)} />;
         case "tasks":
             return <TasksWidget data={data === undefined ? undefined : (data.tasks ?? null)} />;
+        case "sessions":
+            return <SessionsWidget data={data === undefined ? undefined : (data.sessions ?? null)} />;
+        case "activity":
+            return <ActivityWidget data={data === undefined ? undefined : (data.activity ?? null)} />;
+        case "games":
+            return <GamesWidget data={data === undefined ? undefined : (data.games ?? null)} />;
     }
 }
 
-const SIZE_LABELS: Record<OverviewWidgetSize, string> = { sm: "Narrow", md: "Medium", lg: "Full width" };
+const SIZE_LABELS: Record<OverviewWidgetSize, string> = { sm: "Narrow", md: "Medium", lg: "Wide" };
 
 /** Arranging one card from the card itself: the gestures somebody reaches for
  *  while looking at it, without opening the panel. */
