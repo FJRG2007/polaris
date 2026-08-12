@@ -21,6 +21,10 @@ build/
 # Private local-only working folders - never commit (folders included)
 /docs/tasks/
 /internal/
+# Where the game apps stage what they download (world archives, mod jars). Runtime
+# scratch, sometimes hundreds of megabytes of it. Anchored to the repo root on
+# purpose: a bare `temp/` would also swallow any source folder of that name.
+/temp/
 
 # Node / dashboard pillar
 node_modules/
