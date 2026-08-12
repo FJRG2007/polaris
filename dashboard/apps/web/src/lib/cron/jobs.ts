@@ -17,6 +17,7 @@
 import { withLease } from "./lease";
 import { prisma } from "@polaris/db";
 import { sweepDueBackups } from "@/lib/backups/service";
+import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
@@ -76,6 +77,18 @@ async function runGameSchedules(): Promise<{ started: number; stopped: number }>
         stopped += swept.stopped;
     }
     return { started, stopped };
+}
+
+async function runGameHealth(): Promise<{ checked: number; stopped: number }> {
+    let checked = 0;
+    let stopped = 0;
+    for (const ownerId of await ownersWithApps()) {
+        const swept = await sweepCrashLoops(ownerId).catch(() => null);
+        if (!swept) continue;
+        checked += swept.checked;
+        stopped += swept.stopped;
+    }
+    return { checked, stopped };
 }
 
 async function runInventories(): Promise<{ servers: number; snapshots: number; applied: number }> {
@@ -147,6 +160,18 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: Number(process.env.POLARIS_GAME_INVENTORY_MS) || 5 * MINUTE,
         leaseMs: null,
         run: runInventories
+    },
+    {
+        key: "game-health",
+        // Every minute, because what it catches costs a core and a disk for as
+        // long as nobody catches it, and because the person waiting on that server
+        // is watching it say "starting" the whole time.
+        everyMs: Number(process.env.POLARIS_GAME_HEALTH_MS) || MINUTE,
+        // Leased, unlike the other game sweeps: this one stops a container and
+        // writes a notification about it, and two runners doing that is a server
+        // stopped twice and somebody told twice.
+        leaseMs: 5 * MINUTE,
+        run: runGameHealth
     },
     {
         key: "scheduled-deletions",

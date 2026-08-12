@@ -72,6 +72,17 @@ export const BLUEPRINT_KEY = "blueprintId";
 export const MAP_KEY = "mapId";
 
 /**
+ * The key it records the release the server was actually built on.
+ *
+ * Not the same as reading `VERSION` back off the container, which is very often
+ * the literal `LATEST` and so says nothing about which Minecraft is on disk. What
+ * is written here is the value after it was resolved, which is what a later reset
+ * needs to know whether it is about to move the server to a different release -
+ * and a release change is what makes the config the last one wrote unreadable.
+ */
+export const RELEASE_KEY = "mcRelease";
+
+/**
  * The variable that carries a world for the container to fetch.
  *
  * The image downloads it once, on a start that finds no level of that name, and
@@ -293,7 +304,8 @@ async function createMinecraftServer(
     // a reset can start from what it is now.
     await patchInstallConfig(install.installedAppId, {
         [BLUEPRINT_KEY]: blueprint.id,
-        [MAP_KEY]: input.mapId ?? ""
+        [MAP_KEY]: input.mapId ?? "",
+        [RELEASE_KEY]: env.get("VERSION") ?? ""
     });
 
     // The address half of the pair, which the game has nowhere to keep. The image

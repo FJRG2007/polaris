@@ -23,10 +23,17 @@ import { withTimeout } from "@polaris/core";
 import { findApp } from "@/lib/apps/catalog";
 import { setEnvVars } from "@/lib/env-var-service";
 import * as arkAccess from "@/lib/apps/ark/access";
+import { readCrashLoop } from "@/lib/apps/games-health";
+import { readAppRuntimeLog } from "@/lib/deploy-service";
 import { withServerContainer } from "@/lib/apps/minecraft/service";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
+import { crashLoopOf, isCrashLooping, type CrashLoop } from "@/lib/apps/crash-loop";
 import { isRconRefusal, parseArkPlayers, type ArkPlayer } from "@/lib/apps/ark/parse";
-import { readAppContainerMetricsOrNull, readAppContainerState } from "@/lib/app-container-metrics";
+import { readAppContainerMetricsOrNull, readAppContainerRuntime } from "@/lib/app-container-metrics";
+
+/** Enough to reach past a crash's own noise to the line under it. Paid only for a
+ *  container already judged to be looping. */
+const CRASH_LOG_TAIL = 600;
 
 /** The catalog id an ARK server install is made from. */
 export const ARK_CATALOG_ID = "ark";
@@ -115,6 +122,10 @@ export interface ArkLive {
     readonly players: readonly ArkPlayer[];
     /** Why it is not answering, when it is not. */
     readonly message: string | null;
+    /** Set when it is restarting without ever starting, or was stopped for doing
+     *  so. The rule is a container rule, so ARK reads it the same way Minecraft
+     *  does - see `crash-loop`. */
+    readonly crashLoop: CrashLoop | null;
 }
 
 /**
@@ -129,25 +140,55 @@ export interface ArkLive {
 export async function getArkPlayers(ownerId: string, installedAppId: string): Promise<ArkLive> {
     const install = await prisma.installedApp.findFirst({
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
-        select: { applicationId: true }
+        select: { applicationId: true, config: true }
     });
     if (!install?.applicationId) {
-        return { answering: false, containerRunning: null, players: [], message: "This server has not been deployed yet" };
+        return {
+            answering: false,
+            containerRunning: null,
+            players: [],
+            message: "This server has not been deployed yet",
+            crashLoop: null
+        };
     }
     const app = await prisma.application.findFirst({
         where: { id: install.applicationId },
         select: { desiredState: true }
     });
     if (app?.desiredState !== "running") {
-        return { answering: false, containerRunning: null, players: [], message: "The server is stopped" };
+        // A server Polaris stopped for failing to start says so: by now nothing on
+        // the container remembers, and "stopped" on its own is the state somebody
+        // chose rather than the one that was forced.
+        const halted = readCrashLoop(install.config);
+        return {
+            answering: false,
+            containerRunning: null,
+            players: [],
+            message: halted
+                ? `The server kept failing to start, so it has been stopped after ${halted.restarts} restarts.${halted.cause ? ` ${halted.cause}` : ""}`
+                : "The server is stopped",
+            crashLoop: halted
+        };
     }
-    const state = await readAppContainerState(install.applicationId, ownerId);
+    const runtime = await readAppContainerRuntime(install.applicationId, ownerId);
+    const state = runtime?.status ?? null;
+    if (runtime && isCrashLooping(runtime, new Date())) {
+        const loop = crashLoopOf(runtime, await readAppRuntimeLog(install.applicationId, ownerId, CRASH_LOG_TAIL).catch(() => ""));
+        return {
+            answering: false,
+            containerRunning: false,
+            players: [],
+            message: `The server kept failing to start, so it has been stopped after ${loop.restarts} restarts.${loop.cause ? ` ${loop.cause}` : ""}`,
+            crashLoop: loop
+        };
+    }
     if (state !== null && state !== "running") {
         return {
             answering: false,
             containerRunning: false,
             players: [],
-            message: "The container is not running. Redeploy it, or read the logs to see why it stopped."
+            message: "The container is not running. Redeploy it, or read the logs to see why it stopped.",
+            crashLoop: null
         };
     }
     const containerRunning = state === null ? null : true;
@@ -168,16 +209,18 @@ export async function getArkPlayers(ownerId: string, installedAppId: string): Pr
                 message:
                     said.trim().length === 0
                         ? "The server is starting. A new one installs about 30 GB first, which takes a while."
-                        : `The server answered something Polaris could not read: ${firstLine(said)}`
+                        : `The server answered something Polaris could not read: ${firstLine(said)}`,
+                crashLoop: null
             };
         }
-        return { answering: true, containerRunning, players, message: null };
+        return { answering: true, containerRunning, players, message: null, crashLoop: null };
     } catch (caught) {
         return {
             answering: false,
             containerRunning,
             players: [],
-            message: caught instanceof Error ? caught.message : "The server is not answering"
+            message: caught instanceof Error ? caught.message : "The server is not answering",
+            crashLoop: null
         };
     }
 }

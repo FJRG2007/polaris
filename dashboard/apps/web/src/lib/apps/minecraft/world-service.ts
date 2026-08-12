@@ -470,19 +470,31 @@ export async function restoreWorldBackup(
  * level, and putting them in the new one before it exists means the fresh world
  * is generated around them. Bedrock keeps all of it inside the level database,
  * where it cannot be separated from the terrain, so there it is not offered.
+ *
+ * `fromMap` is the case where none of that applies: the world is about to be
+ * fetched already built, so the seed and the shape describe nothing. They are not
+ * merely useless written down - a blueprint's flat lobby setting on a map server
+ * is `level-type=minecraft:flat` with no layers under it, which the server reports
+ * as an error on every boot of a world it was never going to generate.
  */
 export async function newWorld(
     ownerId: string,
     installedAppId: string,
-    input: { seed?: string; levelType?: string; biome?: string; keepPlayers: boolean },
+    input: { seed?: string; levelType?: string; biome?: string; keepPlayers: boolean; fromMap?: boolean },
     actorId: string
 ): Promise<{ level: string; carried: boolean }> {
+    const generating = input.fromMap !== true;
     const seed = input.seed?.trim() ?? "";
-    if (seed.length > 0 && !world.isSeed(seed)) throw new Error("That seed will not do");
     const levelType = input.levelType ?? world.DEFAULT_LEVEL_TYPE;
     const biome = input.biome ?? world.DEFAULT_BIOME;
-    if (!world.isLevelType(levelType)) throw new Error("That is not a world type");
-    if (world.usesBiome(levelType) && !world.isBiome(biome)) throw new Error("That is not a biome");
+    // Only checked when it is going to be used. A map reset carries the
+    // blueprint's own defaults through this call, and refusing one of them would
+    // be refusing the reset over a value that is never written anywhere.
+    if (generating) {
+        if (seed.length > 0 && !world.isSeed(seed)) throw new Error("That seed will not do");
+        if (!world.isLevelType(levelType)) throw new Error("That is not a world type");
+        if (world.usesBiome(levelType) && !world.isBiome(biome)) throw new Error("That is not a biome");
+    }
 
     // Copying what people are carrying reads the old level off the disk, which
     // only the container can see. Refusing a stopped server here told somebody to
@@ -516,22 +528,95 @@ export async function newWorld(
         }
         await setEnvVars("application", server.applicationId, ownerId, [
             { key: world.levelEnvKey(server.edition), value: target, isSecret: false },
-            // Cleared rather than left behind when no seed was given: the stored one
-            // would otherwise generate the same map again and read as a bug.
-            { key: world.seedEnvKey(server.edition), value: seed, isSecret: false },
-            // Written every time, blank included, for the same reason: a shape left
-            // over from the last world would quietly generate the previous one.
-            ...Object.entries(world.levelTypeEnv(server.edition, levelType, biome)).map(([key, value]) => ({
-                key,
-                value,
-                isSecret: false
-            }))
+            // Everything below describes a world being generated, and a map is one
+            // that arrives built - so on that path only the folder is written.
+            ...(generating
+                ? [
+                      // Cleared rather than left behind when no seed was given: the
+                      // stored one would otherwise generate the same map again and
+                      // read as a bug.
+                      { key: world.seedEnvKey(server.edition), value: seed, isSecret: false },
+                      // Written every time, blank included, for the same reason: a
+                      // shape left over from the last world would quietly generate
+                      // the previous one.
+                      ...Object.entries(world.levelTypeEnv(server.edition, levelType, biome)).map(([key, value]) => ({
+                          key,
+                          value,
+                          isSecret: false
+                      }))
+                  ]
+                : [])
         ]);
         return { target, keep };
     });
 
     await deployApplication(await applicationOf(ownerId, installedAppId), ownerId, actorId);
     return { level: planned.target, carried: planned.keep };
+}
+
+/**
+ * Put the config a different Minecraft wrote out of the way, so this one can boot.
+ *
+ * A reset changes the release a server runs and deliberately leaves the volume
+ * alone, which is right for everything on it except the settings the previous
+ * release wrote about itself. Those only break in one direction and they break
+ * hard: a newer Paper writes the sentinel `default` into fields an older one reads
+ * as numbers, and the older one throws while it is still loading its own
+ * configuration - a crash before the world is even opened, on a container the
+ * deploy restarts forever. See `world.VERSIONED_CONFIG` for what moves and what
+ * pointedly does not.
+ *
+ * Moved rather than deleted, for the reason a reset keeps the old level: an
+ * operator who had tuned something has it, in a folder beside the world, and can
+ * take it back. Nothing here deletes anything.
+ *
+ * The rule is not "when the release changed", it is "unless the release provably
+ * did not". `VERSION` is very often the literal `LATEST`, so on most servers the
+ * question cannot be answered at all - and the two mistakes are not the same size.
+ * Setting config aside that did not need it costs a regenerated file that is still
+ * on disk. Leaving it costs a server that never starts again.
+ *
+ * Never throws. A server this could not reach is a server that may be about to
+ * crash-loop, and the health sweep is what says so - failing the reset here would
+ * only mean it never got the new release either.
+ */
+export async function setAsideVersionedConfig(
+    ownerId: string,
+    installedAppId: string,
+    release: { from: string | null; to: string | null }
+): Promise<string | null> {
+    if (release.from !== null && release.to !== null && release.from === release.to) return null;
+    try {
+        // The container has to be up for an exec to reach the volume, and a server
+        // being reset is quite often one somebody had already stopped.
+        await startForFileAccess(ownerId, installedAppId);
+        return await withServerContainer(ownerId, installedAppId, async (server) => {
+            // Bedrock has no config directory and rewrites its properties from the
+            // environment, so there is nothing here that a release can spoil.
+            if (server.edition === "bedrock") return null;
+
+            const listing = await server.run(["ls", "-1A", "--", world.DATA_DIR]);
+            if (listing.code !== 0) return null;
+            const present = new Set(world.parseListing(listing.output));
+            const moving = world.VERSIONED_CONFIG.filter((entry) => present.has(entry));
+            if (moving.length === 0) return null;
+
+            const aside = `${world.CONFIG_ASIDE_DIR}/${world.folderStamp(new Date())}`;
+            await makeServerDir(server, aside, "Could not set the old config aside");
+            // One move for the whole set rather than one each: on a container that
+            // is crash-looping every exec is a race against the next restart, and
+            // `mv` takes a directory as its last argument for exactly this.
+            const moved = await server.run([
+                "mv",
+                "--",
+                ...moving.map((entry) => `${world.DATA_DIR}/${entry}`),
+                aside
+            ]);
+            return moved.code === 0 ? aside : null;
+        });
+    } catch {
+        return null;
+    }
 }
 
 /**

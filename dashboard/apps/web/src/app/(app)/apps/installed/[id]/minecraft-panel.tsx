@@ -304,6 +304,7 @@ export function MinecraftPanel({
                 access={reading.access}
                 canSaveWorld={held.includes("games.moderate")}
                 onOpenPlayers={() => openTab("players")}
+                onOpenConsole={() => openTab("console")}
             />
 
             {error && <p className="text-sm text-danger">{error}</p>}
@@ -473,7 +474,8 @@ function ConnectCard({
     reach,
     access,
     canSaveWorld,
-    onOpenPlayers
+    onOpenPlayers,
+    onOpenConsole
 }: {
     status: MinecraftStatus | null;
     running: boolean;
@@ -487,6 +489,7 @@ function ConnectCard({
      *  something every reader is offered. */
     canSaveWorld: boolean;
     onOpenPlayers: () => void;
+    onOpenConsole: () => void;
 }) {
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState<string | null>(null);
@@ -548,6 +551,33 @@ function ConnectCard({
                     )}
                 </div>
                 {saved && <p className="w-full text-xs text-muted-foreground">{saved}</p>}
+
+                {/* The state that used to be invisible. A server that cannot start
+                    restarts forever and reports "starting" the whole time, which
+                    is the same word a server three minutes into its first boot
+                    reports - so this is above everything else on the card, because
+                    nothing else on it is true while this is. */}
+                {status?.crashLoop && (
+                    <div className="flex w-full items-start gap-2 rounded-md border border-danger/40 bg-danger/5 px-3 py-2">
+                        <ShieldAlert className="mt-0.5 size-4 shrink-0 text-danger" />
+                        <div className="flex flex-col items-start gap-1 text-xs">
+                            <p className="font-medium text-foreground">This server keeps failing to start</p>
+                            <p className="text-muted-foreground">
+                                It restarted {status.crashLoop.restarts} times without starting, so it has been
+                                stopped.
+                            </p>
+                            {status.crashLoop.cause && (
+                                <p className="font-mono text-muted-foreground">{status.crashLoop.cause}</p>
+                            )}
+                            {status.crashLoop.advice && (
+                                <p className="text-muted-foreground">{status.crashLoop.advice}</p>
+                            )}
+                            <button type="button" onClick={onOpenConsole} className="text-primary hover:underline">
+                                Read the console
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* An address nobody is allowed to use is not an address. Both
                     images boot with their list enforced and empty, so this is the
@@ -620,6 +650,7 @@ function withPresence(status: MinecraftStatus | null, presence: ServerPresence |
         answering: presence.answering,
         containerRunning: presence.containerRunning,
         message: presence.message,
+        crashLoop: presence.crashLoop,
         players: {
             online: presence.online,
             max: presence.max || status.players.max,
@@ -638,6 +669,9 @@ function withPresence(status: MinecraftStatus | null, presence: ServerPresence |
  */
 function statusLabel(status: MinecraftStatus | null, running: boolean): string | null {
     if (status === null) return null;
+    // Before either of the two words below, both of which a looping container is
+    // momentarily entitled to and neither of which is the useful one.
+    if (status.crashLoop) return "Crash loop";
     if (!running || !status.running) return "Stopped";
     if (status.containerRunning === false) return "Not running";
     return status.answering ? "Online" : "Starting";
@@ -646,6 +680,7 @@ function statusLabel(status: MinecraftStatus | null, running: boolean): string |
 function StatusBadge({ status, running }: { status: MinecraftStatus | null; running: boolean }) {
     const label = statusLabel(status, running);
     if (label === null) return <Skeleton className="h-6 w-20" />;
+    if (label === "Crash loop") return <Badge variant="danger">Crash loop</Badge>;
     if (label === "Not running") return <Badge variant="danger">Not running</Badge>;
     if (label === "Starting") return <Badge className="border-warning/40 text-warning">Starting</Badge>;
     if (label === "Stopped") return <Badge>Stopped</Badge>;

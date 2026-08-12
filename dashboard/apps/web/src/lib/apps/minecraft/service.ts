@@ -19,12 +19,14 @@ import { withTimeout } from "@polaris/core";
 import { gameServerAddress } from "./address";
 import { resolveWaf } from "@/lib/waf-service";
 import { getHostLanIp } from "@/lib/host-address";
+import { readCrashLoop } from "@/lib/apps/games-health";
 import { currentReleaseRef } from "@/lib/deploy/releases";
 import type { ExecResult, RuntimePorts } from "@polaris/deploy";
 import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
 import { hostPortForApp, readAppRuntimeLog } from "@/lib/deploy-service";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
-import { readAppContainerMetricsOrNull, readAppContainerState } from "@/lib/app-container-metrics";
+import { crashLoopOf, isCrashLooping, type CrashLoop } from "@/lib/apps/crash-loop";
+import { readAppContainerMetricsOrNull, readAppContainerRuntime } from "@/lib/app-container-metrics";
 import {
     lastStartupSignal,
     parseBannedIps,
@@ -93,6 +95,9 @@ export interface MinecraftStatus {
     readonly cpuPercent: number | null;
     readonly memUsedBytes: number | null;
     readonly memTotalBytes: number | null;
+    /** Set when the server is restarting without ever starting, or was stopped for
+     *  doing so. The one state that used to be indistinguishable from a slow boot. */
+    readonly crashLoop: CrashLoop | null;
 }
 
 /** Addresses the Polaris firewall blocks for this server, and whether the server
@@ -129,6 +134,9 @@ interface MinecraftInstall {
     readonly hostname: string | null;
     /** Whether that name carries the port for the client (a Java SRV record). */
     readonly portless: boolean;
+    /** The install's own config, as stored. Carried so a stopped server can still
+     *  say why Polaris stopped it, which nothing on the container knows any more. */
+    readonly config: string | null;
 }
 
 /** Resolve an installed app to the container its server runs in, asserting the
@@ -171,7 +179,8 @@ async function resolveInstall(ownerId: string, installedAppId: string): Promise<
         edition: editionOf(install.catalogId),
         hostPort,
         hostname,
-        portless
+        portless,
+        config: install.config
     };
 }
 
@@ -355,6 +364,8 @@ export interface MinecraftPlayers {
     /** Whether the container was up when it was asked. Null when that cannot be
      *  seen from here. */
     readonly containerRunning: boolean | null;
+    /** Why it will not start, when it is failing to rather than taking its time. */
+    readonly crashLoop: CrashLoop | null;
 }
 
 /** Who is on, where to reach the server, and whether it is answering at all. */
@@ -375,7 +386,8 @@ export async function getServerStatus(ownerId: string, installedAppId: string): 
         message: live.message,
         cpuPercent: usage?.cpuPercent ?? null,
         memUsedBytes: usage?.memUsedBytes ?? null,
-        memTotalBytes: usage?.memTotalBytes ?? null
+        memTotalBytes: usage?.memTotalBytes ?? null,
+        crashLoop: live.crashLoop
     };
 }
 
@@ -405,24 +417,34 @@ export async function getServerPlayers(ownerId: string, installedAppId: string):
 async function readLivePlayers(install: MinecraftInstall, ownerId: string): Promise<MinecraftPlayers> {
     const empty: PlayerList = { online: 0, max: 0, players: [] };
     if (!install.running) {
-        return { answering: false, players: empty, message: "The server is stopped", containerRunning: null };
-    }
-    const state = await readAppContainerState(install.applicationId, ownerId);
-    // A container that is being restarted over and over is the one state that
-    // looks exactly like a server that is merely slow to boot, and it is the one
-    // nobody can wait out: it never comes up, and the reason is in a log the
-    // person watching a blank panel has no reason to open. So it is named, and
-    // the reason is fetched and put in front of them.
-    if (state === "restarting") {
+        // A server Polaris stopped because it could not start is stopped for a
+        // reason worth carrying: by now the container is not restarting any more,
+        // so this record is the only thing left that knows why it is off.
+        const halted = readCrashLoop(install.config ?? null);
         return {
             answering: false,
             players: empty,
-            message: await withReason(
-                install.applicationId,
-                ownerId,
-                "The server keeps failing to start and is being restarted."
-            ),
-            containerRunning: false
+            message: halted ? crashLoopMessage(halted) : "The server is stopped",
+            containerRunning: null,
+            crashLoop: halted
+        };
+    }
+    const runtime = await readAppContainerRuntime(install.applicationId, ownerId);
+    const state = runtime?.status ?? null;
+    // A container being restarted over and over is the one state that looks
+    // exactly like a server that is merely slow to boot, and the one nobody can
+    // wait out: it never comes up, and the reason is in a log the person watching
+    // a blank panel has no reason to open. Read off the restart count rather than
+    // off the status, because the status only says "restarting" during the
+    // engine's backoff and a poll almost never lands there.
+    if (runtime && isCrashLooping(runtime, new Date())) {
+        const loop = crashLoopOf(runtime, await tail(install.applicationId, ownerId, CRASH_LOG_TAIL));
+        return {
+            answering: false,
+            players: empty,
+            message: crashLoopMessage(loop),
+            containerRunning: false,
+            crashLoop: loop
         };
     }
     if (state !== null && state !== "running") {
@@ -436,7 +458,8 @@ async function readLivePlayers(install: MinecraftInstall, ownerId: string): Prom
                 ownerId,
                 "The container is not running. Redeploy it, or read the logs to see why it stopped."
             ),
-            containerRunning: false
+            containerRunning: false,
+            crashLoop: null
         };
     }
     const containerRunning = state === null ? null : true;
@@ -450,16 +473,18 @@ async function readLivePlayers(install: MinecraftInstall, ownerId: string): Prom
                 answering: false,
                 players: empty,
                 message: await withReason(install.applicationId, ownerId, "The server is starting."),
-                containerRunning
+                containerRunning,
+                crashLoop: null
             };
         }
-        return { answering: true, players, message: null, containerRunning };
+        return { answering: true, players, message: null, containerRunning, crashLoop: null };
     } catch (caught) {
         return {
             answering: false,
             players: empty,
             message: caught instanceof Error ? caught.message : "The server is not answering",
-            containerRunning
+            containerRunning,
+            crashLoop: null
         };
     }
 }
@@ -468,8 +493,25 @@ async function readLivePlayers(install: MinecraftInstall, ownerId: string): Prom
  *  read on a poll, on every server on the page. */
 const LOG_TAIL = 60;
 
+/** Enough to reach past a stack trace to the line under it. Paid only for a
+ *  container already judged to be looping, never on the ordinary poll. */
+const CRASH_LOG_TAIL = 600;
+
 /** A line on a status card, not a log viewer. The console screen has the rest. */
 const LOG_LINE_MAX = 200;
+
+/** The log, or nothing. A cause that cannot be read is a loop reported without
+ *  one, which is still the useful half. */
+async function tail(applicationId: string, ownerId: string, lines: number): Promise<string> {
+    return readAppRuntimeLog(applicationId, ownerId, lines).catch(() => "");
+}
+
+/** What the panel says about a server that will not start. The cause carries the
+ *  sentence when there is one, because it is more specific than anything here. */
+function crashLoopMessage(loop: CrashLoop): string {
+    const opening = `The server kept failing to start, so it has been stopped after ${loop.restarts} restarts.`;
+    return loop.cause ? `${opening} ${loop.cause}` : opening;
+}
 
 /**
  * A message with the last thing the container actually said appended to it.

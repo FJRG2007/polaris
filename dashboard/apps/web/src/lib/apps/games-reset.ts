@@ -23,17 +23,21 @@
 
 import { prisma } from "@polaris/db";
 import { editionOf } from "@/lib/apps/minecraft/service";
-import { newWorld } from "@/lib/apps/minecraft/world-service";
+import { readAppRuntimeLog } from "@/lib/deploy-service";
 import { hasCrossplay } from "@/lib/apps/minecraft/blueprints";
-import { patchInstallConfig } from "@/lib/apps/install-config";
+import { parseServerVersion } from "@/lib/apps/minecraft/parse";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import { DEFAULT_LEVEL_TYPE } from "@/lib/apps/minecraft/world";
+import { wantsLatest } from "@/lib/apps/minecraft/blueprint-version";
 import type { ResetMinecraftServerInput } from "@/lib/apps/games-schema";
+import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
+import { newWorld, setAsideVersionedConfig } from "@/lib/apps/minecraft/world-service";
 import {
     BLUEPRINT_KEY,
     blueprintFor,
     MAP_KEY,
     minecraftShapeEnv,
+    RELEASE_KEY,
     withoutBlueprintProjects
 } from "@/lib/apps/games-create";
 
@@ -48,6 +52,9 @@ export interface ResetMinecraftServer {
     readonly carried: boolean;
     /** The release it was pinned to, which a blueprint may have decided. */
     readonly version: string;
+    /** Whether the settings the previous release wrote were set aside, which is
+     *  the difference between a server that starts and one that cannot. */
+    readonly configReset: boolean;
 }
 
 /**
@@ -73,7 +80,7 @@ export async function resetMinecraftServer(
 ): Promise<ResetMinecraftServer> {
     const install = await prisma.installedApp.findFirst({
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
-        select: { applicationId: true, catalogId: true }
+        select: { applicationId: true, catalogId: true, config: true }
     });
     if (!install) throw new Error("Server not found");
     if (!install.applicationId) throw new Error("This server has not been deployed yet");
@@ -107,6 +114,14 @@ export async function resetMinecraftServer(
         current
     );
 
+    // Before anything is written, because starting the server is what applies the
+    // environment: a set-aside that ran after this would boot the new release
+    // against the old release's config, which is the crash it exists to prevent.
+    const aside = await setAsideVersionedConfig(ownerId, installedAppId, {
+        from: await currentRelease(ownerId, install.applicationId, install.config, current),
+        to: resolvedRelease(env.get("VERSION"))
+    });
+
     // Only what actually moved. Writing the whole environment back would rewrite
     // every value this server holds on every reset, which is how a variable
     // somebody set by hand gets quietly restored to what it was.
@@ -119,12 +134,21 @@ export async function resetMinecraftServer(
             changed.map(([key, value]) => ({ key, value, isSecret: false }))
         );
     }
-    await patchInstallConfig(installedAppId, { [BLUEPRINT_KEY]: blueprint.id, [MAP_KEY]: input.mapId ?? "" });
+    await patchInstallConfig(installedAppId, {
+        [BLUEPRINT_KEY]: blueprint.id,
+        [MAP_KEY]: input.mapId ?? "",
+        [RELEASE_KEY]: env.get("VERSION") ?? ""
+    });
 
     // The map, and the restart that puts all of this on the server. Generating a
     // new level is the same act as the New world button and it is the same code:
     // it points LEVEL at a folder that does not exist yet, leaves the old one on
     // disk, and deploys.
+    //
+    // A map lands in a stamped folder rather than under its own name, unlike a
+    // server created on one. That is deliberate: a folder that does not exist yet
+    // is what makes the image fetch the map again, where reusing the map's name
+    // would find the copy that has been played on and boot straight back into it.
     const created = await newWorld(
         ownerId,
         installedAppId,
@@ -132,9 +156,52 @@ export async function resetMinecraftServer(
             ...(input.seed ? { seed: input.seed } : {}),
             levelType,
             ...(input.biome ? { biome: input.biome } : {}),
-            keepPlayers: input.keepPlayers
+            keepPlayers: input.keepPlayers,
+            fromMap: Boolean(input.mapId)
         },
         actorId
     );
-    return { level: created.level, carried: created.carried, version: env.get("VERSION") ?? input.version };
+    return {
+        level: created.level,
+        carried: created.carried,
+        version: env.get("VERSION") ?? input.version,
+        configReset: aside !== null
+    };
 }
+
+/**
+ * The release this server is running now, as well as it can be known.
+ *
+ * Three sources, weakest last. What Polaris wrote down when it built the server is
+ * exact when it is there at all; what the server announced in its own log is the
+ * only answer for one built on `LATEST`, and it is ground truth until the log
+ * scrolls past the banner; the variable itself counts only when somebody pinned a
+ * release into it. Null means nobody knows - which the caller reads as "assume it
+ * changed", because that is the mistake that is cheap to make.
+ */
+async function currentRelease(
+    ownerId: string,
+    applicationId: string,
+    config: string | null,
+    env: ReadonlyMap<string, string>
+): Promise<string | null> {
+    const recorded = readInstallConfig(config)[RELEASE_KEY];
+    const known = resolvedRelease(typeof recorded === "string" ? recorded : undefined);
+    if (known) return known;
+
+    const announced = await readAppRuntimeLog(applicationId, ownerId, RELEASE_LOG_TAIL)
+        .then(parseServerVersion)
+        .catch(() => null);
+    return announced ?? resolvedRelease(env.get("VERSION"));
+}
+
+/** A release somebody could compare, or null for one nobody has resolved yet.
+ *  `LATEST` is not a release, it is a question. */
+function resolvedRelease(value: string | undefined): string | null {
+    const trimmed = (value ?? "").trim();
+    return trimmed.length > 0 && !wantsLatest(trimmed) ? trimmed : null;
+}
+
+/** Enough log to reach the version banner on a server that has just restarted,
+ *  and not enough to be worth reading on anything that runs often. */
+const RELEASE_LOG_TAIL = 400;

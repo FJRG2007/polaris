@@ -619,7 +619,8 @@ function withPresence(
         answering: presence.answering,
         containerRunning: presence.containerRunning,
         players,
-        message: presence.message
+        message: presence.message,
+        crashLoop: presence.crashLoop
     };
     if (status) return { ...status, ...live };
     return {
@@ -630,7 +631,8 @@ function withPresence(
         queryPort: ports.query,
         cpuPercent: null,
         memUsedBytes: null,
-        memTotalBytes: null
+        memTotalBytes: null,
+        crashLoop: presence.crashLoop
     };
 }
 
@@ -638,6 +640,9 @@ function withPresence(
  *  different things, and the header is told which. */
 function statusLabel(status: ArkStatus | null, running: boolean): string | null {
     if (status === null) return null;
+    // Before either of the two words below, both of which a looping container is
+    // momentarily entitled to and neither of which is the useful one.
+    if (status.crashLoop) return "Crash loop";
     if (!running || !status.running) return "Stopped";
     if (status.containerRunning === false) return "Not running";
     return status.answering ? "Online" : "Starting";
@@ -646,6 +651,7 @@ function statusLabel(status: ArkStatus | null, running: boolean): string | null 
 function StatusBadge({ status, running }: { status: ArkStatus | null; running: boolean }) {
     const label = statusLabel(status, running);
     if (label === null) return <Skeleton className="h-6 w-20" />;
+    if (label === "Crash loop") return <Badge variant="danger">Crash loop</Badge>;
     if (label === "Not running") return <Badge variant="danger">Not running</Badge>;
     if (label === "Starting")
         return <Badge className="border-warning/40 text-warning">Starting</Badge>;

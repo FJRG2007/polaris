@@ -9,9 +9,9 @@
  */
 
 import { HostdClient } from "@polaris/hostd-client";
-import { parseContainerState } from "@polaris/deploy";
 import { localDockerDriver } from "@/lib/docker-service";
 import { resolveLocalContainer } from "@/lib/container-files-service";
+import { parseContainerState, type ContainerState } from "@polaris/deploy";
 
 export interface AppContainerMetrics {
     readonly state: string;
@@ -20,6 +20,10 @@ export interface AppContainerMetrics {
     readonly memPercent: number | null;
     readonly memUsedBytes: number | null;
     readonly memTotalBytes: number | null;
+    /** How many times the engine has restarted it, and when the current run
+     *  began. Together they are what says a container is looping. */
+    readonly restartCount: number;
+    readonly startedAt: string | null;
 }
 
 /**
@@ -34,15 +38,26 @@ export interface AppContainerMetrics {
  * not reach, or a container that is gone.
  */
 export async function readAppContainerState(applicationId: string, ownerId: string): Promise<string | null> {
-    return inspectContainer(applicationId, ownerId)
-        .then((state) => state.status)
-        .catch(() => null);
+    return readAppContainerRuntime(applicationId, ownerId).then((state) => state?.status ?? null);
 }
 
-async function inspectContainer(
+/**
+ * The whole of that inspect rather than the one word of it.
+ *
+ * Same call and same cost - the restart count and the start time were always in
+ * the body and were simply being dropped on the way out. What they buy is the
+ * only cheap way to tell a container that is restarting in a loop from one that
+ * is taking its time on a first boot, which from outside look identical for as
+ * long as anybody is willing to wait.
+ */
+export async function readAppContainerRuntime(
     applicationId: string,
     ownerId: string
-): Promise<{ status: string; health?: string | null }> {
+): Promise<ContainerState | null> {
+    return inspectContainer(applicationId, ownerId).catch(() => null);
+}
+
+async function inspectContainer(applicationId: string, ownerId: string): Promise<ContainerState> {
     const container = await resolveLocalContainer(applicationId, ownerId);
     const inspect = await new HostdClient().dockerRequest("GET", `/containers/${encodeURIComponent(container)}/json`);
     return parseContainerState(inspect.status === 200 ? JSON.parse(inspect.body) : null);
@@ -60,7 +75,9 @@ export async function readAppContainerMetrics(applicationId: string, ownerId: st
             cpuPercent: null,
             memPercent: null,
             memUsedBytes: null,
-            memTotalBytes: null
+            memTotalBytes: null,
+            restartCount: state.restartCount,
+            startedAt: state.startedAt ?? null
         };
     }
     const driver = localDockerDriver();
@@ -72,7 +89,9 @@ export async function readAppContainerMetrics(applicationId: string, ownerId: st
         cpuPercent: stats?.cpuPercent ?? null,
         memPercent: stats?.memPercent ?? null,
         memUsedBytes: stats?.memUsage ?? null,
-        memTotalBytes: stats?.memLimit ?? null
+        memTotalBytes: stats?.memLimit ?? null,
+        restartCount: state.restartCount,
+        startedAt: state.startedAt ?? null
     };
 }
 

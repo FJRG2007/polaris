@@ -14,6 +14,7 @@ import { freemem, totalmem } from "node:os";
 import { listHosts } from "@/lib/host-service";
 import { getHostLanIp } from "@/lib/host-address";
 import { hostPortForApp } from "@/lib/deploy-service";
+import type { CrashLoop } from "@/lib/apps/crash-loop";
 import { getLocalEnvironment } from "@/lib/network-service";
 import { readInstallConfig } from "@/lib/apps/install-config";
 import { appHasCapability, findApp } from "@/lib/apps/catalog";
@@ -114,6 +115,16 @@ export interface ServerPresence {
     readonly players: readonly PresencePlayer[];
     /** Why it is not answering, when it is not. */
     readonly message: string | null;
+    /**
+     * Set when it is failing to start rather than taking its time, or was stopped
+     * for doing so.
+     *
+     * Carried by the frame rather than left to the poll, because the frame is laid
+     * over the poll's reading every few seconds - a field this did not carry would
+     * appear once and then be wiped by the next heartbeat, which is a worse bug
+     * than not showing it at all.
+     */
+    readonly crashLoop: CrashLoop | null;
 }
 
 /** The same reading with the names alone, for the list that only prints them. */
@@ -291,7 +302,8 @@ async function readPresence(ownerId: string, server: GameServerFacts): Promise<S
             online: 0,
             max: 0,
             players: [],
-            message: server.message
+            message: server.message,
+            crashLoop: null
         };
     }
     // Each game is asked in its own language - Minecraft over rcon-cli, ARK
@@ -302,7 +314,8 @@ async function readPresence(ownerId: string, server: GameServerFacts): Promise<S
             answering: false,
             containerRunning: null,
             players: [],
-            message: caught instanceof Error ? caught.message : "The server is not answering"
+            message: caught instanceof Error ? caught.message : "The server is not answering",
+            crashLoop: null
         }));
         return {
             id: server.id,
@@ -313,14 +326,16 @@ async function readPresence(ownerId: string, server: GameServerFacts): Promise<S
             // only number there is - and the list already reads it.
             max: server.slots ?? 0,
             players: ark.players.map((player) => ({ name: player.name, id: player.steamId })),
-            message: ark.message
+            message: ark.message,
+            crashLoop: ark.crashLoop
         };
     }
     const live = await getServerPlayers(ownerId, server.id).catch((caught: unknown) => ({
         answering: false,
         containerRunning: null,
         players: { online: 0, max: 0, players: [] },
-        message: caught instanceof Error ? caught.message : "The server is not answering"
+        message: caught instanceof Error ? caught.message : "The server is not answering",
+        crashLoop: null
     }));
     return {
         id: server.id,
@@ -330,7 +345,8 @@ async function readPresence(ownerId: string, server: GameServerFacts): Promise<S
         max: live.players.max,
         // A Minecraft name is the identity, so there is no second id to carry.
         players: live.players.players.map((name) => ({ name, id: null })),
-        message: live.message
+        message: live.message,
+        crashLoop: live.crashLoop
     };
 }
 

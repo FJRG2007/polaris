@@ -15,6 +15,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { clearResourceGrants } from "@polaris/auth";
 import { installRef } from "@/lib/apps/install-access";
 import { flushGameWorld } from "@/lib/apps/games-flush";
+import { clearCrashLoop } from "@/lib/apps/games-health";
 import { getInstalledApp, uninstallApp } from "@/lib/apps/install-service";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import { requirePermissionOn, type ResourceAccess } from "@/lib/resource-access";
@@ -48,6 +49,9 @@ export async function setInstalledAppRunningAction(id: string, running: boolean)
         const { access } = await requirePermissionOn("deploy.manage", installRef(id));
         const applicationId = await applicationFor(access, id);
         if (!running) await flushGameWorld(access.ownerId, id);
+        // Starting it again is somebody saying the crash it was stopped for has
+        // been dealt with. If it has not, the health sweep says so within a minute.
+        if (running) await clearCrashLoop(id);
         await setApplicationRunning(applicationId, access.ownerId, running);
         revalidatePath(`/apps/installed/${id}`);
         return {};

@@ -36,6 +36,40 @@ export const STAGING_DIR = `${DATA_DIR}/.polaris-restore`;
  *  server's own files. */
 export const BEDROCK_WORLDS_DIR = `${DATA_DIR}/worlds`;
 
+/** Where config written by a release this server no longer runs is put out of the
+ *  way. Hidden and outside the level names, for the same reason the restore folder
+ *  is: a half-recognised folder must never read as a world. */
+export const CONFIG_ASIDE_DIR = `${DATA_DIR}/.polaris-config`;
+
+/**
+ * The files a server's own release wrote and a different one cannot read.
+ *
+ * Paper keeps its settings under `config/` and the format is version specific in a
+ * way that only breaks in one direction: a newer build writes the sentinel
+ * `default` into fields an older build deserializes as numbers, and the older one
+ * throws `NumberFormatException` while it is still reading its own configuration.
+ * That is not a setting that does not apply, it is a server that never starts, and
+ * a container the deploy will restart forever. The three loose files beside it are
+ * the pre-1.19 layout, present on anything that ever ran older Paper, and the
+ * Bukkit trio regenerates blank - they are here because leaving three of a set of
+ * seven behind is how the next version-skew is found the hard way.
+ *
+ * `server.properties` is deliberately not here: the image rewrites the keys it
+ * owns from the environment on every boot, so it is not stale in the way these
+ * are. `plugins` is deliberately not here either - a plugin built against a newer
+ * API fails its own load with an unsupported version and the server carries on,
+ * which is a plugin that does not work rather than a server that does not start.
+ */
+export const VERSIONED_CONFIG = [
+    "config",
+    "bukkit.yml",
+    "spigot.yml",
+    "paper.yml",
+    "commands.yml",
+    "help.yml",
+    "permissions.yml"
+] as const;
+
 /** The level each image generates into when it is told nothing else. */
 const DEFAULT_LEVEL: Record<MinecraftEdition, string> = { java: "world", bedrock: "Bedrock level" };
 
@@ -120,6 +154,17 @@ export function backupTakenAt(name: string): Date | null {
 }
 
 /**
+ * A moment as a folder name: `20260812-210456`.
+ *
+ * Sorts chronologically as text, which is the whole point - these folders are
+ * only ever read by somebody looking for the most recent one, in a listing that
+ * sorts by name.
+ */
+export function folderStamp(at: Date): string {
+    return at.toISOString().slice(0, 19).replace(/[:T-]/g, "").replace(/(\d{8})(\d{6})/, "$1-$2");
+}
+
+/**
  * A level name nothing else is using.
  *
  * Stamped rather than counted, because the alternative is reading the folder to
@@ -127,7 +172,7 @@ export function backupTakenAt(name: string): Date | null {
  * keeps them together in a listing and says what they are.
  */
 export function newLevelName(at: Date, taken: readonly string[] = []): string {
-    const stamp = at.toISOString().slice(0, 19).replace(/[:T-]/g, "").replace(/(\d{8})(\d{6})/, "$1-$2");
+    const stamp = folderStamp(at);
     let candidate = `world-${stamp}`;
     let suffix = 2;
     while (taken.includes(candidate)) candidate = `world-${stamp}-${suffix++}`;

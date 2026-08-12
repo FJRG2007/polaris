@@ -14,6 +14,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { clearResourceGrants } from "@polaris/auth";
 import { findMap } from "@/lib/apps/minecraft/maps";
 import { flushGameWorld } from "@/lib/apps/games-flush";
+import { clearCrashLoop } from "@/lib/apps/games-health";
 import { uninstallApp } from "@/lib/apps/install-service";
 import { GAMES, type GameId } from "@/lib/apps/games-catalog";
 import { gameDomainSuffix } from "@/lib/apps/minecraft/address";
@@ -195,6 +196,10 @@ export async function setGameServerRunningAction(
         // Written out before it goes down. A stop that does not finish gracefully
         // is killed, and what a kill costs is the last few minutes everyone played.
         if (!running) await flushGameWorld(access.ownerId, installedAppId);
+        // Somebody starting it again is somebody saying the last crash is dealt
+        // with, or at least worth another try. If it was not, the health sweep
+        // writes the loop back within the minute.
+        if (running) await clearCrashLoop(installedAppId);
         await setApplicationRunning(access.install.applicationId, access.ownerId, running);
         await recordAudit({
             actorId: user.id,

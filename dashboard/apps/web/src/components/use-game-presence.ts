@@ -40,7 +40,18 @@ const readingSchema = z.object({
             online: z.number(),
             max: z.number(),
             players: z.array(z.object({ name: z.string(), id: z.string().nullable() })),
-            message: z.string().nullable()
+            message: z.string().nullable(),
+            // Optional rather than required, because a frame is dropped whole when
+            // it fails this - and a tab left open across the deploy that added
+            // this would otherwise stop showing presence altogether.
+            crashLoop: z
+                .object({
+                    restarts: z.number(),
+                    cause: z.string().nullable(),
+                    advice: z.string().nullable()
+                })
+                .nullable()
+                .default(null)
         })
     )
 });

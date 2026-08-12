@@ -1131,7 +1131,8 @@ export async function resetGameServerAction(
                 map: shape.mapId ?? null,
                 version: done.version,
                 level: done.level,
-                keptPlayers: done.carried
+                keptPlayers: done.carried,
+                configReset: done.configReset
             }
         });
         revalidatePath(`/apps/installed/${installedAppId}`);
