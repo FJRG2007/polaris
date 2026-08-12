@@ -332,10 +332,16 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // with, and the permission plugin both are administered through.
                     // Each carries "?" so a Minecraft release they have no build for
                     // yet warns instead of stopping the server from booting.
+                    //
+                    // GrimAC also says which builds count, because it publishes
+                    // nothing else: every one of its Modrinth builds is tagged
+                    // alpha, and the image takes finished releases by default - so
+                    // the anticheat every server was supposed to get was quietly
+                    // never installed on any of them.
                     key: "MODRINTH_PROJECTS",
                     label: "Mods and plugins",
                     help: "Modrinth projects to install, comma separated. Managed from the Mods tab.",
-                    default: "grimac?,coreprotect?,luckperms?",
+                    default: "grimac?:alpha,coreprotect?,luckperms?",
                     tunable: true,
                     group: "Mods"
                 },

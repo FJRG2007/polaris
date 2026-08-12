@@ -17,7 +17,7 @@
  */
 
 import { z } from "zod";
-import { modrinthApi, modrinthJson, projectSlug } from "./modrinth";
+import { admitsBuild, entryReleaseType, modrinthApi, modrinthJson, projectSlug, type ReleaseType } from "./modrinth";
 
 /** Modrinth's own answers move about as often as Minecraft is released, so one
  *  lookup covers every dialog opened for the rest of the day. */
@@ -28,7 +28,12 @@ const CACHE_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_LOADER = "paper";
 
 const versionsSchema = z
-    .array(z.object({ game_versions: z.array(z.string().max(32)).max(500).catch([]) }))
+    .array(
+        z.object({
+            game_versions: z.array(z.string().max(32)).max(500).catch([]),
+            version_type: z.string().max(32).catch("release")
+        })
+    )
     .max(500);
 
 const tagSchema = z.array(z.object({ version: z.string().max(32), version_type: z.string().max(32) })).max(2000);
@@ -60,14 +65,24 @@ async function cached(key: string, load: () => Promise<string[]>): Promise<strin
  * nothing to install. Which is the failure this module exists to prevent, arrived
  * at from the other end.
  */
-async function projectVersions(slug: string, loader: string): Promise<string[]> {
-    return cached(`project:${loader}:${slug}`, async () => {
+async function projectVersions(slug: string, loader: string, wanted: ReleaseType): Promise<string[]> {
+    return cached(`project:${loader}:${wanted}:${slug}`, async () => {
         const parsed = versionsSchema.safeParse(
             await modrinthJson(
                 `${modrinthApi}/project/${encodeURIComponent(slug)}/version?loaders=${encodeURIComponent(JSON.stringify([loader]))}`
             )
         );
-        return parsed.success ? [...new Set(parsed.data.flatMap((build) => build.game_versions))] : [];
+        if (!parsed.success) return [];
+        return [
+            ...new Set(
+                parsed.data
+                    // The same builds the image would consider. Counting the rest is
+                    // what pinned a release only a snapshot build reached, which the
+                    // image then refused to install anything for.
+                    .filter((build) => admitsBuild(wanted, build.version_type))
+                    .flatMap((build) => build.game_versions)
+            )
+        ];
     });
 }
 
@@ -96,12 +111,16 @@ async function releases(): Promise<string[]> {
  * releases that produce the silent nothing this module exists to prevent.
  */
 export async function commonVersions(projects: readonly string[], loader = DEFAULT_LOADER): Promise<string[]> {
-    const slugs = projects.map(projectSlug).filter((slug): slug is string => slug !== null);
-    if (slugs.length === 0) return [];
+    // Each entry carries its own answer to "how finished does a build have to be",
+    // so each is asked about the builds it would actually accept.
+    const asked = projects
+        .map((entry) => ({ slug: projectSlug(entry), wanted: entryReleaseType(entry) }))
+        .filter((item): item is { slug: string; wanted: ReleaseType } => item.slug !== null);
+    if (asked.length === 0) return [];
 
     const [ordered, supported] = await Promise.all([
         releases(),
-        Promise.all(slugs.map((slug) => projectVersions(slug, loader)))
+        Promise.all(asked.map((item) => projectVersions(item.slug, loader, item.wanted)))
     ]);
     if (ordered.length === 0 || supported.some((versions) => versions.length === 0)) return [];
 

@@ -341,6 +341,17 @@ function projectList(blueprint: GameBlueprint, current: string | undefined, cros
 }
 
 /**
+ * Plugins Polaris used to put on a server's list and no longer does.
+ *
+ * Floodgate went on every crossplay server until it turned out GeyserMC
+ * publishes no Paper build of it on Modrinth, which made it an entry the image
+ * could never satisfy. A server that still carries it is one a reset should take
+ * it off, so this is not just history - it is what stops the previous answer
+ * outliving the correction.
+ */
+const RETIRED_PROJECTS = ["floodgate"] as const;
+
+/**
  * A plugin list with every blueprint's own plugins taken back out of it.
  *
  * What a reset needs, and only a reset: rebuilding the list around the new
@@ -354,7 +365,7 @@ function projectList(blueprint: GameBlueprint, current: string | undefined, cros
  */
 export function withoutBlueprintProjects(current: string | undefined): string {
     const owned = new Set(
-        [...GAME_BLUEPRINTS.flatMap((blueprint) => blueprint.projects), ...CROSSPLAY_PROJECTS]
+        [...GAME_BLUEPRINTS.flatMap((blueprint) => blueprint.projects), ...CROSSPLAY_PROJECTS, ...RETIRED_PROJECTS]
             .map(projectSlug)
             .filter((slug): slug is string => slug !== null)
             .map((slug) => slug.toLowerCase())

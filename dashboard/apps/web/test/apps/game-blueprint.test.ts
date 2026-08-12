@@ -12,7 +12,8 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { knownUnsupported } from "@/lib/apps/minecraft/blueprint-version";
+import { entryReleaseType, projectSlug } from "@/lib/apps/minecraft/modrinth";
+import { commonVersions, knownUnsupported } from "@/lib/apps/minecraft/blueprint-version";
 import { blueprintFor, minecraftShapeEnv, withoutBlueprintProjects } from "@/lib/apps/games-create";
 import { CROSSPLAY_PROJECTS, GAME_BLUEPRINTS, findBlueprint } from "@/lib/apps/minecraft/blueprints";
 
@@ -20,9 +21,13 @@ import { CROSSPLAY_PROJECTS, GAME_BLUEPRINTS, findBlueprint } from "@/lib/apps/m
  *  the snapshots a blueprint must never pin mixed in. */
 const RELEASES = ["1.21.6", "1.21.5", "1.21.4", "1.21.3", "1.20.6"];
 
-/** What each project claims to support, by slug. Anything not named here answers
- *  as a project Modrinth has never heard of. */
+/** What each project has a finished release for, by slug. Anything not named here
+ *  answers as a project Modrinth has never heard of. */
 let supported: Map<string, string[]>;
+/** And what it only ever published as a snapshot - which is how BedWars1058 ships
+ *  every release from 1.21 on, and the reason a server built on one restarted
+ *  forever until the entry said it would take a beta. */
+let betaOnly: Map<string, string[]>;
 /** Set to fail every request, which is the "index could not be reached" case. */
 let offline = false;
 /** Every URL Modrinth was asked for, so a test can assert what was asked as well
@@ -39,9 +44,9 @@ beforeEach(() => {
         ["bedwars1058", ["1.21.4", "1.21.3"]],
         ["dynamicworldborder", ["1.21.6", "1.21.5"]],
         ["iridiumskyblock", ["1.21.5", "1.21.3"]],
-        ["geyser", ["1.21.6", "1.21.4"]],
-        ["floodgate", ["1.21.6", "1.21.4"]]
+        ["geyser", ["1.21.6", "1.21.4"]]
     ]);
+    betaOnly = new Map();
     vi.stubGlobal("fetch", async (url: string) => {
         asked.push(url);
         if (offline) throw new Error("unreachable");
@@ -60,7 +65,16 @@ beforeEach(() => {
         const slug = (url.split("/project/")[1] ?? "").split("/")[0] ?? "";
         return {
             ok: true,
-            json: async () => (supported.get(slug) ?? []).map((version) => ({ game_versions: [version] }))
+            json: async () => [
+                ...(supported.get(slug) ?? []).map((version) => ({
+                    game_versions: [version],
+                    version_type: "release"
+                })),
+                ...(betaOnly.get(slug) ?? []).map((version) => ({
+                    game_versions: [version],
+                    version_type: "beta"
+                }))
+            ]
         } as unknown as Response;
     });
 });
@@ -90,6 +104,14 @@ describe("what a blueprint installs", () => {
             }
         }
         for (const project of CROSSPLAY_PROJECTS) expect(project.endsWith("?")).toBe(false);
+    });
+
+    it("does not name a plugin Modrinth has no Paper build of", () => {
+        // Floodgate's Modrinth project carries Fabric and NeoForge only. Naming it
+        // beside Geyser asked the image for something that does not exist, which
+        // was harmless while these were optional and is a server that will not
+        // start now they are not.
+        expect(CROSSPLAY_PROJECTS.map(projectSlug)).not.toContain("floodgate");
     });
 
     it("says what is still left to do for a game that ships no map of its own", () => {
@@ -135,6 +157,26 @@ describe("the release a blueprint is built on", () => {
         expect((await envFor("survival")).get("VERSION")).toBe("LATEST");
     });
 
+    it("only counts builds the image would actually install", async () => {
+        // The failure this pair exists for: BedWars1058 reaches 1.21 only in
+        // snapshot builds, the image takes finished releases by default, and
+        // counting the snapshots anyway pinned a release it then refused to
+        // install anything for. The container restarted forever on it.
+        betaOnly.set("infiniteparkour", ["1.21.6"]);
+        supported.set("infiniteparkour", ["1.21.3"]);
+        expect(await commonVersions(["infiniteparkour"])).toEqual(["1.21.3"]);
+        expect(await commonVersions(["infiniteparkour:beta"])).toEqual(["1.21.6", "1.21.3"]);
+    });
+
+    it("reads the release type off the entry the way the image does", () => {
+        expect(entryReleaseType("bedwars1058")).toBe("release");
+        expect(entryReleaseType("bedwars1058:beta")).toBe("beta");
+        expect(entryReleaseType("grimac?:alpha")).toBe("alpha");
+        // A colon can introduce a version rather than a type, and a version is not
+        // a licence to install an unfinished build.
+        expect(entryReleaseType("bedwars1058:25.3-SNAPSHOT")).toBe("release");
+    });
+
     it("only counts builds for the software the plugin will be loaded into", async () => {
         // A project reports one game_versions covering everything it has ever
         // published, across every loader at once. Trusting that pins a Paper
@@ -169,7 +211,9 @@ describe("the world a blueprint opens on", () => {
     it("loads the blueprint's plugins into the software they need", async () => {
         const env = await envFor("bedwars", {}, { MODRINTH_PROJECTS: "grimac?,coreprotect?" });
         expect(env.get("TYPE")).toBe("PAPER");
-        expect(env.get("MODRINTH_PROJECTS")).toBe("grimac?,coreprotect?,bedwars1058");
+        // The entry keeps the release type it was declared with, so the image
+        // applies the same rule the version was resolved under.
+        expect(env.get("MODRINTH_PROJECTS")).toBe("grimac?,coreprotect?,bedwars1058:beta");
         // A heavier game for the same number of players gets a heavier heap.
         expect(env.get("MEMORY")).toBe("3G");
     });

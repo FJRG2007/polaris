@@ -109,7 +109,12 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
         summary: "Teams, beds and a lot of shouting. Installs BedWars1058.",
         editions: ["java"],
         software: "PAPER",
-        projects: ["bedwars1058"],
+        // BedWars1058's finished releases stop at 1.20.4; everything from 1.21 on
+        // is published as a snapshot, so a server built on a modern release has to
+        // be willing to take one. Said here rather than left to the image's
+        // default, which takes finished releases only and refused the jar - the
+        // container then restarted forever on an error nobody was shown.
+        projects: ["bedwars1058:beta"],
         levelType: FLAT_LEVEL_TYPE,
         // The one blueprint whose game does not exist until somebody makes it. Said
         // plainly, because a server that looks like an empty world is exactly what
@@ -141,15 +146,22 @@ export function blueprintsFor(edition: "java" | "bedrock"): readonly GameBluepri
 }
 
 /**
- * The plugins that let Bedrock clients join a Java server. Geyser translates the
- * protocol and Floodgate is what lets them in without a Java account; both are
- * GeyserMC's, and both have to be there for it to work.
+ * The plugin that lets Bedrock clients join a Java server.
  *
- * Required, for the same reason a blueprint's own plugins are: a server created
- * as "Both" whose Geyser quietly did not install is a Java server, and the person
- * who finds that out is a Bedrock player who cannot connect to it.
+ * Geyser translates the protocol, and it is required for the same reason a
+ * blueprint's own plugins are: a server created as "Both" whose Geyser quietly
+ * did not install is a Java server, and the person who finds that out is a
+ * Bedrock player who cannot connect to it. GeyserMC publishes it as a rolling
+ * build rather than as tagged releases, so the entry says which builds count.
+ *
+ * Floodgate is deliberately not here. It is the half that lets a Bedrock player
+ * in without a Java account, and GeyserMC publishes no Paper build of it on
+ * Modrinth at all - the project there carries Fabric and NeoForge only. Naming it
+ * anyway asked the image for something that does not exist, which was harmless
+ * while these entries were optional and is a server that will not start now they
+ * are not. Bedrock players still join; they need a Java account to do it.
  */
-export const CROSSPLAY_PROJECTS = ["geyser", "floodgate"] as const;
+export const CROSSPLAY_PROJECTS = ["geyser:beta"] as const;
 
 /** Everything a server built from this blueprint has to be able to install, which
  *  is what the release it runs on is pinned against. */
@@ -165,9 +177,10 @@ export function requiredProjects(blueprint: GameBlueprint, crossplay: boolean): 
  * server somebody added Geyser to by hand answers yes as well.
  */
 export function hasCrossplay(projects: string | undefined): boolean {
-    return (projects ?? "")
-        .split(/[,\n]/)
-        .some((entry) => projectSlug(entry)?.toLowerCase() === CROSSPLAY_PROJECTS[0]);
+    // Both sides through the same parser: the entry carries a release type, and
+    // comparing the raw strings would stop matching the day one is added to it.
+    const geyser = projectSlug(CROSSPLAY_PROJECTS[0])?.toLowerCase();
+    return (projects ?? "").split(/[,\n]/).some((entry) => projectSlug(entry)?.toLowerCase() === geyser);
 }
 
 /**

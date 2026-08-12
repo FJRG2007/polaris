@@ -389,6 +389,46 @@ export function projectSlug(entry: string): string | null {
     return /^[A-Za-z0-9!@$()`.+,_-]{1,64}$/.test(slug) ? slug : null;
 }
 
+/** How finished a build has to be before the image will install it. Cumulative,
+ *  as the image reads them: beta also admits releases, alpha admits all three. */
+export type ReleaseType = "release" | "beta" | "alpha";
+
+const RELEASE_TYPES: readonly ReleaseType[] = ["release", "beta", "alpha"];
+
+/** What each one admits, so a lookup asks about the same builds the image will. */
+const ADMITS: Record<ReleaseType, ReadonlySet<string>> = {
+    release: new Set(["release"]),
+    beta: new Set(["release", "beta"]),
+    alpha: new Set(["release", "beta", "alpha"])
+};
+
+/**
+ * The release type an entry asks for, which is the image's own syntax: a colon
+ * followed by `release`, `beta` or `alpha`.
+ *
+ * It has to be read here as well as passed through, because the two have to
+ * agree. BedWars1058 only reaches 1.21 in snapshot builds, and asking Modrinth
+ * "which releases does it support" without saying which builds count answered
+ * 1.21.4 - a version the image then refused to install anything for, because by
+ * default it takes finished releases only. The server restarted forever on it.
+ *
+ * A colon can also introduce a version rather than a type, so only the three
+ * words count; anything else leaves the default alone.
+ */
+export function entryReleaseType(entry: string): ReleaseType {
+    const parts = entry.trim().replace(/\?+$/, "").split(":");
+    for (const part of parts.slice(1)) {
+        const value = part.trim().toLowerCase();
+        if ((RELEASE_TYPES as readonly string[]).includes(value)) return value as ReleaseType;
+    }
+    return "release";
+}
+
+/** Whether a build of this type is one an entry asking for `wanted` would take. */
+export function admitsBuild(wanted: ReleaseType, buildType: string): boolean {
+    return ADMITS[wanted].has(buildType);
+}
+
 /** The MODRINTH_PROJECTS value, as the list of projects it names. The image
  *  accepts commas or newlines, and an entry may carry a version or a prefix. */
 export function parseProjectList(value: string): string[] {
