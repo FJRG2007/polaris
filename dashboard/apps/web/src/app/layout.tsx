@@ -1,7 +1,8 @@
-import "@polaris/ui/styles.css";
 import "./globals.css";
+import "@polaris/ui/styles.css";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { DropGuard } from "@/components/drop-guard";
 
 export const metadata: Metadata = {
     title: "Polaris",
@@ -11,7 +12,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
     return (
         <html lang="en" suppressHydrationWarning>
-            <body>{children}</body>
+            <body>
+                <DropGuard />
+                {children}
+            </body>
         </html>
     );
 }

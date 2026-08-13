@@ -32,6 +32,7 @@ import { matchesStructured, parseSearch } from "./search-query";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { UserProfileDialog } from "@/components/user-profile-dialog";
 import { FilePreview, isViewable, type ViewerTarget } from "./file-viewer";
+import { filesToItems, gatherDropItems, type UploadItem } from "@/lib/drop-items";
 import { ITEM_ICONS, ITEM_ICON_COLORS, iconColorClass, iconComponent } from "./item-icons";
 import {
     FILE_CATEGORIES,
@@ -2919,41 +2920,6 @@ function EntryIcon({ entry, className = "size-4" }: { entry: DriveEntry; classNa
     return <Icon className={cn(className, color)} />;
 }
 
-interface UploadItem {
-    file: File;
-    relPath: string;
-}
-
-/** Map a FileList to upload items, preserving folder structure when present. */
-function filesToItems(fileList: FileList): UploadItem[] {
-    return Array.from(fileList).map((file) => ({
-        file,
-        relPath: (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name
-    }));
-}
-
-/** Read every batch from a directory reader (readEntries returns in chunks). */
-function readAllEntries(reader: {
-    readEntries: (cb: (entries: unknown[]) => void, err: (e: unknown) => void) => void;
-}): Promise<unknown[]> {
-    return new Promise((resolve) => {
-        const all: unknown[] = [];
-        const next = () => {
-            reader.readEntries(
-                (batch) => {
-                    if (batch.length === 0) resolve(all);
-                    else {
-                        all.push(...batch);
-                        next();
-                    }
-                },
-                () => resolve(all)
-            );
-        };
-        next();
-    });
-}
-
 /**
  * Replace the drag ghost with the number of items being carried. The browser
  * draws only the row under the pointer, which reads as though the rest of the
@@ -2969,47 +2935,6 @@ function showCountDragImage(event: React.DragEvent, count: number) {
     event.dataTransfer.setDragImage(ghost, 12, 12);
     // The image is snapshotted synchronously, so the node is only needed for this frame.
     requestAnimationFrame(() => ghost.remove());
-}
-
-/**
- * Collect files (with folder-relative paths) from a drag-and-drop, walking any
- * dropped directories via the FileSystem entry API. Falls back to the flat file
- * list when the browser does not expose directory entries.
- */
-async function gatherDropItems(dataTransfer: DataTransfer): Promise<UploadItem[]> {
-    const roots: unknown[] = [];
-    for (let index = 0; index < dataTransfer.items.length; index++) {
-        const item = dataTransfer.items[index] as DataTransferItem & {
-            webkitGetAsEntry?: () => unknown;
-        };
-        const entry = item.webkitGetAsEntry?.();
-        if (entry) roots.push(entry);
-    }
-    if (roots.length === 0) return filesToItems(dataTransfer.files);
-
-    const out: UploadItem[] = [];
-    const walk = async (entry: unknown, prefix: string): Promise<void> => {
-        const node = entry as {
-            isFile?: boolean;
-            isDirectory?: boolean;
-            name: string;
-            file?: (cb: (file: File) => void, err: (e: unknown) => void) => void;
-            createReader?: () => {
-                readEntries: (cb: (entries: unknown[]) => void, err: (e: unknown) => void) => void;
-            };
-        };
-        if (node.isFile && node.file) {
-            const file = await new Promise<File | null>((resolve) =>
-                node.file!(resolve, () => resolve(null))
-            );
-            if (file) out.push({ file, relPath: `${prefix}${node.name}` });
-        } else if (node.isDirectory && node.createReader) {
-            const children = await readAllEntries(node.createReader());
-            for (const child of children) await walk(child, `${prefix}${node.name}/`);
-        }
-    };
-    for (const root of roots) await walk(root, "");
-    return out;
 }
 
 /** Minimal File System Access API shapes (avoids depending on lib.dom having them). */

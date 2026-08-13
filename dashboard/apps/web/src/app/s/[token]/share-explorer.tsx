@@ -18,6 +18,7 @@ import { formatBytes } from "@polaris/core";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { RelativeTime } from "@/components/relative-time";
 import type { DriveEntry } from "@/app/(app)/drive/types";
+import { filesToItems, gatherDropItems } from "@/lib/drop-items";
 import { iconColorClass, iconComponent } from "@/app/(app)/drive/item-icons";
 import { matchesStructured, parseSearch } from "@/app/(app)/drive/search-query";
 import { FileViewer, isViewable, type ViewerTarget } from "@/app/(app)/drive/file-viewer";
@@ -517,8 +518,14 @@ export function ShareExplorer({
         if (!allowUpload || !event.dataTransfer.types.includes("Files")) return;
         event.preventDefault();
         setDragUpload(false);
-        const files = Array.from(event.dataTransfer.files);
-        void uploadFiles(files.map((file) => ({ file, relPath: file.name })));
+        // Read the transfer synchronously; it is emptied once this handler returns.
+        // Walking it is also what makes a dropped FOLDER work here: in the flat file
+        // list a folder arrives as one zero-length entry that uploaded as an empty
+        // file of the same name.
+        const transfer = event.dataTransfer;
+        void gatherDropItems(transfer).then((items) => {
+            if (items.length > 0) void uploadFiles(items);
+        });
     }
 
     function toggleOne(key: string) {
@@ -724,8 +731,8 @@ export function ShareExplorer({
                                 multiple
                                 hidden
                                 onChange={(event) => {
-                                    const files = event.target.files ? Array.from(event.target.files) : [];
-                                    void uploadFiles(files.map((file) => ({ file, relPath: file.name })));
+                                    if (event.target.files) void uploadFiles(filesToItems(event.target.files));
+                                    event.target.value = "";
                                 }}
                             />
                         </>

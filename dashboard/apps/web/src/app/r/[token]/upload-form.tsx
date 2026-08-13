@@ -11,8 +11,9 @@
  * time window, which the server enforces.
  */
 
-import { Button } from "@polaris/ui";
+import { Button, cn } from "@polaris/ui";
 import { formatBytes } from "@polaris/core";
+import { gatherDropItems } from "@/lib/drop-items";
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Loader2, Trash2, UploadCloud } from "lucide-react";
 
@@ -69,6 +70,7 @@ export function DropUploader({
 }) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [items, setItems] = useState<Item[]>([]);
+    const [dragging, setDragging] = useState(false);
     const [busy, setBusy] = useState(false);
     const [mine, setMine] = useState<MyUpload[]>([]);
     const [now, setNow] = useState(0);
@@ -156,9 +158,8 @@ export function DropUploader({
         }
     }
 
-    async function onFiles(fileList: FileList | null) {
-        if (!fileList || fileList.length === 0) return;
-        const files = Array.from(fileList);
+    async function onFiles(files: File[]) {
+        if (files.length === 0) return;
         setBusy(true);
         setItems(files.map((file) => ({ file, status: "uploading" })));
         const results: Item[] = [];
@@ -178,6 +179,29 @@ export function DropUploader({
         if (added.length > 0) persist([...added, ...mine]);
         setBusy(false);
         if (inputRef.current) inputRef.current.value = "";
+    }
+
+    /**
+     * Files dragged in from a file manager. A dropped FOLDER is walked rather than
+     * read off `dataTransfer.files`, where it arrives as a single zero-length entry
+     * that would upload as an empty file named after the folder. What lands here is
+     * flat: the route stores each file under its own name, so sending a folder
+     * sends what is in it, however deep.
+     */
+    function onDrop(event: React.DragEvent) {
+        if (busy || !event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        setDragging(false);
+        // Read synchronously: the transfer is emptied once this handler returns.
+        const transfer = event.dataTransfer;
+        void gatherDropItems(transfer).then((dropped) => onFiles(dropped.map((item) => item.file)));
+    }
+
+    function onDragOver(event: React.DragEvent) {
+        if (busy || !event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+        setDragging(true);
     }
 
     async function onDelete(entry: MyUpload) {
@@ -204,11 +228,19 @@ export function DropUploader({
             <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
+                onDragOver={onDragOver}
+                onDragLeave={() => setDragging(false)}
+                onDrop={onDrop}
                 disabled={busy}
-                className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border bg-surface/40 p-8 text-center text-sm text-muted-foreground transition-colors hover:border-primary hover:text-foreground disabled:opacity-60"
+                className={cn(
+                    "flex flex-col items-center gap-2 rounded-lg border border-dashed p-8 text-center text-sm transition-colors disabled:opacity-60",
+                    dragging
+                        ? "border-primary bg-primary/5 text-foreground"
+                        : "border-border bg-surface/40 text-muted-foreground hover:border-primary hover:text-foreground"
+                )}
             >
                 <UploadCloud className="size-8" />
-                <span className="font-medium">Choose files to upload</span>
+                <span className="font-medium">Drop files here, or click to choose</span>
                 <span className="text-xs">Up to {formatBytes(BigInt(maxSizeBytes))} each</span>
             </button>
             <input
@@ -217,7 +249,7 @@ export function DropUploader({
                 multiple
                 hidden
                 accept={accept}
-                onChange={(event) => onFiles(event.target.files)}
+                onChange={(event) => onFiles(event.target.files ? Array.from(event.target.files) : [])}
             />
 
             {items.length > 0 ? (
