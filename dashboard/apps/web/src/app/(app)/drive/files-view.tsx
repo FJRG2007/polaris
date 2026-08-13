@@ -224,6 +224,7 @@ export function FilesView({
     onDelete,
     onRename,
     onShare,
+    onShareFolder,
     onRequestFiles,
     onToggleHidden,
     onSetFavorite,
@@ -253,9 +254,12 @@ export function FilesView({
     onUpload: (items: { file: File; relPath: string }[]) => void;
     onDelete: (entries: DriveEntry[]) => void;
     onRename: (entry: DriveEntry, nextName: string) => void;
-    /** Share a link to an item. Absent on a source with no saved connection behind
-     *  it - a server or a running container - where a link has nothing to hang off. */
-    onShare?: (entry: DriveEntry) => void;
+    /** Share a link to each of these items. Absent on a source with no saved
+     *  connection behind it - a server or a running container - where a link has
+     *  nothing to hang off. */
+    onShare?: (entries: DriveEntry[]) => void;
+    /** Share the folder that is open, which is not one of the listed entries. */
+    onShareFolder?: () => void;
     /** Ask somebody to drop files into a folder. Absent for the same reason. */
     onRequestFiles?: (path: string, name: string) => void;
     onToggleHidden: (entry: DriveEntry) => void;
@@ -320,7 +324,9 @@ export function FilesView({
     } | null>(null);
     // Actor whose profile is open from the activity feed.
     const [profileUserId, setProfileUserId] = useState<string | null>(null);
-    const [iconTarget, setIconTarget] = useState<DriveEntry | null>(null);
+    // Items whose icon the picker is editing. A whole selection can be restyled at
+    // once; the swatches preview the first one, and every item takes the pick.
+    const [iconTargets, setIconTargets] = useState<DriveEntry[] | null>(null);
     const [detailsTarget, setDetailsTarget] = useState<DriveEntry | null>(null);
     const [noteTarget, setNoteTarget] = useState<DriveEntry | null>(null);
     const [noteValue, setNoteValue] = useState("");
@@ -377,6 +383,16 @@ export function FilesView({
         setNoteValue(entry.note ?? "");
     }
 
+    /** The item the icon picker highlights and previews: the first of its targets. */
+    const iconPreview = iconTargets?.[0] ?? null;
+
+    /** Give every item the picker is editing the same icon, and keep the preview. */
+    function applyIcon(icon: string, color: string) {
+        if (!iconTargets) return;
+        for (const item of iconTargets) onSetIcon(item, icon, color);
+        setIconTargets(iconTargets.map((item) => ({ ...item, icon, iconColor: color })));
+    }
+
     /** Parent folder path of a relative path ("a/b/c" -> "a/b"). */
     function parentOf(target: string): string {
         const slash = target.lastIndexOf("/");
@@ -430,13 +446,7 @@ export function FilesView({
 
     /** Paste the clipboard into the current folder: copy duplicates, cut moves. */
     function paste() {
-        if (!clipboard) return;
-        for (const entry of clipboard.entries) {
-            if (movesIntoSelf(entry.path, path)) continue;
-            if (clipboard.mode === "cut") onMove(entry, path);
-            else onCopy(entry, path);
-        }
-        if (clipboard.mode === "cut") setClipboard(null);
+        pasteInto(path);
     }
 
     function openViewer(entry: DriveEntry) {
@@ -455,7 +465,7 @@ export function FilesView({
     /** Share the file the preview is showing. */
     function shareViewerTarget() {
         const entry = entries.find((item) => item.path === viewerTarget?.path);
-        if (entry) onShare?.(entry);
+        if (entry) onShare?.([entry]);
     }
 
     // Keep the open viewer's properties honest after a refresh: saving from one of
@@ -799,6 +809,9 @@ export function FilesView({
         selectedEntries.length > 1 || selectedEntries.some((entry) => entry.kind === "dir")
             ? "Download ZIP"
             : "Download";
+    // Each selected item gets its own link, so the count is worth saying out loud.
+    const shareLabel =
+        selectedEntries.length > 1 ? `Share ${selectedEntries.length} items` : "Share";
     const searchError = useMemo(() => parseSearch(query).error, [query]);
 
     // Items marked for a cut are shown dimmed until pasted, the way a file
@@ -903,14 +916,64 @@ export function FilesView({
         };
     }
 
-    /** The right-click menu for a single entry, shared by the list and grid views.
+    /**
+     * What a right-click acts on: the whole selection when the clicked item is part
+     * of it, otherwise that item alone. Every file manager works this way, and it
+     * is the only rule under which an action never quietly reaches something the
+     * pointer was never on.
+     */
+    function menuTargets(entry: DriveEntry): DriveEntry[] {
+        return selected.has(entry.path) && selectedEntries.length > 1
+            ? selectedEntries
+            : [entry];
+    }
+
+    /**
+     * Right-clicking outside the selection moves the selection onto that item
+     * before its menu opens, so what the menu is about to act on is what is
+     * highlighted. Clicking inside the selection leaves it alone.
+     */
+    function adoptForMenu(index: number, entry: DriveEntry) {
+        if (selected.has(entry.path)) return;
+        setSelected(new Set([entry.path]));
+        lastIndex.current = index;
+        cursorRef.current = index;
+    }
+
+    /** Paste the clipboard into a folder in the listing rather than the open one. */
+    function pasteInto(destFolder: string) {
+        if (!clipboard) return;
+        for (const item of clipboard.entries) {
+            if (movesIntoSelf(item.path, destFolder)) continue;
+            if (clipboard.mode === "cut") onMove(item, destFolder);
+            else onCopy(item, destFolder);
+        }
+        if (clipboard.mode === "cut") setClipboard(null);
+    }
+
+    /** The right-click menu for an entry, shared by the list and grid views. It
+     *  covers the whole selection when the entry belongs to one, so the items that
+     *  only make sense for a single thing (open, rename, notes, details) drop out.
      *  Rename puts an input where the name was, so the menu leaves focus there
      *  instead of taking it back and blurring the field away. */
     function entryMenu(entry: DriveEntry) {
+        const targets = menuTargets(entry);
+        const many = targets.length > 1;
+        const label = many ? `${targets.length} items selected` : entry.name;
+        // A mixed selection commits to one direction rather than flipping each
+        // item: anything not yet starred/hidden decides, so a second pass undoes
+        // the first instead of leaving the group half-and-half.
+        const starring = targets.some((item) => !item.favorite);
+        const hiding = targets.some((item) => !item.hidden);
         return (
             <ContextMenuContent onCloseAutoFocus={keepFocusOnClose}>
-                <ContextMenuLabel>{entry.name}</ContextMenuLabel>
-                {entry.kind === "dir" ? (
+                <ContextMenuLabel>{label}</ContextMenuLabel>
+                {many ? (
+                    <ContextMenuItem onSelect={() => downloadSelection(connectionId, targets)}>
+                        <Download className="size-4" />
+                        Download as ZIP
+                    </ContextMenuItem>
+                ) : entry.kind === "dir" ? (
                     <>
                         <ContextMenuItem asChild>
                             <Link href={href(connectionId, entry.path)}>
@@ -931,18 +994,12 @@ export function FilesView({
                             </ContextMenuItem>
                         ) : null}
                         {clipboard ? (
-                            <ContextMenuItem
-                                onSelect={() => {
-                                    for (const item of clipboard.entries) {
-                                        if (movesIntoSelf(item.path, entry.path)) continue;
-                                        if (clipboard.mode === "cut") onMove(item, entry.path);
-                                        else onCopy(item, entry.path);
-                                    }
-                                    if (clipboard.mode === "cut") setClipboard(null);
-                                }}
-                            >
+                            <ContextMenuItem onSelect={() => pasteInto(entry.path)}>
                                 <ClipboardPaste className="size-4" />
                                 Paste here
+                                {clipboard.entries.length > 1
+                                    ? ` (${clipboard.entries.length})`
+                                    : ""}
                             </ContextMenuItem>
                         ) : null}
                     </>
@@ -966,84 +1023,96 @@ export function FilesView({
                         ) : null}
                     </>
                 )}
-                <ContextMenuItem onSelect={() => startRename(entry)}>
-                    <Pencil className="size-4" />
-                    Rename
-                    <span className="ml-auto pl-6 text-xs text-muted-foreground">F2</span>
-                </ContextMenuItem>
+                {many ? null : (
+                    <ContextMenuItem onSelect={() => startRename(entry)}>
+                        <Pencil className="size-4" />
+                        Rename
+                        <span className="ml-auto pl-6 text-xs text-muted-foreground">F2</span>
+                    </ContextMenuItem>
+                )}
                 <ContextMenuItem
-                    onSelect={() =>
-                        setClipboard({
-                            entries: selected.has(entry.path) ? selectedEntries : [entry],
-                            mode: "copy"
-                        })
-                    }
+                    onSelect={() => setClipboard({ entries: targets, mode: "copy" })}
                 >
                     <Copy className="size-4" />
-                    Copy
+                    {many ? `Copy ${targets.length} items` : "Copy"}
                     <span className="ml-auto pl-6 text-xs text-muted-foreground">Ctrl+C</span>
                 </ContextMenuItem>
-                <ContextMenuItem
-                    onSelect={() =>
-                        setClipboard({
-                            entries: selected.has(entry.path) ? selectedEntries : [entry],
-                            mode: "cut"
-                        })
-                    }
-                >
+                <ContextMenuItem onSelect={() => setClipboard({ entries: targets, mode: "cut" })}>
                     <Scissors className="size-4" />
-                    Cut
+                    {many ? `Cut ${targets.length} items` : "Cut"}
                     <span className="ml-auto pl-6 text-xs text-muted-foreground">Ctrl+X</span>
                 </ContextMenuItem>
-                <ContextMenuItem onSelect={() => duplicate(entry)}>
+                <ContextMenuItem
+                    onSelect={() => {
+                        for (const item of targets) duplicate(item);
+                    }}
+                >
                     <Files className="size-4" />
                     Duplicate
                 </ContextMenuItem>
-                <ContextMenuItem
-                    onSelect={() => openMove(selected.has(entry.path) ? selectedEntries : [entry])}
-                >
+                <ContextMenuItem onSelect={() => openMove(targets)}>
                     <FolderInput className="size-4" />
                     Move to...
                 </ContextMenuItem>
-                <ContextMenuItem onSelect={() => void navigator.clipboard.writeText(entry.path)}>
+                <ContextMenuItem
+                    onSelect={() =>
+                        void navigator.clipboard.writeText(
+                            targets.map((item) => item.path).join("\n")
+                        )
+                    }
+                >
                     <ClipboardCopy className="size-4" />
-                    Copy path
+                    {many ? "Copy paths" : "Copy path"}
                 </ContextMenuItem>
                 {onShare ? (
-                    <ContextMenuItem onSelect={() => onShare(entry)}>
+                    <ContextMenuItem onSelect={() => onShare(targets)}>
                         <Share2 className="size-4" />
-                        Share
+                        {many ? `Share ${targets.length} items` : "Share"}
                     </ContextMenuItem>
                 ) : null}
                 <ContextMenuSeparator />
-                <ContextMenuItem onSelect={() => onSetFavorite(entry, !entry.favorite)}>
+                <ContextMenuItem
+                    onSelect={() => {
+                        for (const item of targets) onSetFavorite(item, starring);
+                    }}
+                >
                     <Star
-                        className={cn("size-4", entry.favorite && "fill-amber-400 text-amber-400")}
+                        className={cn("size-4", !starring && "fill-amber-400 text-amber-400")}
                     />
-                    {entry.favorite ? "Remove from favorites" : "Add to favorites"}
+                    {starring ? "Add to favorites" : "Remove from favorites"}
                 </ContextMenuItem>
-                <ContextMenuItem onSelect={() => setIconTarget(entry)}>
+                <ContextMenuItem onSelect={() => setIconTargets(targets)}>
                     <Palette className="size-4" />
                     Change icon
                 </ContextMenuItem>
-                <ContextMenuItem onSelect={() => onToggleHidden(entry)}>
-                    {entry.hidden ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
-                    {entry.hidden ? "Unhide" : "Hide"}
+                <ContextMenuItem
+                    onSelect={() => {
+                        for (const item of targets) {
+                            if (item.hidden !== hiding) onToggleHidden(item);
+                        }
+                    }}
+                >
+                    {hiding ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    {hiding ? "Hide" : "Unhide"}
                 </ContextMenuItem>
-                <ContextMenuItem onSelect={() => openNote(entry)}>
-                    <StickyNote className="size-4" />
-                    {entry.note ? "Edit note" : "Add note"}
-                </ContextMenuItem>
-                <ContextMenuItem onSelect={() => setDetailsTarget(entry)}>
-                    <Info className="size-4" />
-                    Details
-                </ContextMenuItem>
-                {onManageAccess ? (
-                    <ContextMenuItem onSelect={() => onManageAccess(entry)}>
-                        <ShieldCheck className="size-4" />
-                        Permissions &amp; lock
-                    </ContextMenuItem>
-                ) : null}
+                {many ? null : (
+                    <>
+                        <ContextMenuItem onSelect={() => openNote(entry)}>
+                            <StickyNote className="size-4" />
+                            {entry.note ? "Edit note" : "Add note"}
+                        </ContextMenuItem>
+                        <ContextMenuItem onSelect={() => setDetailsTarget(entry)}>
+                            <Info className="size-4" />
+                            Details
+                        </ContextMenuItem>
+                        {onManageAccess ? (
+                            <ContextMenuItem onSelect={() => onManageAccess(entry)}>
+                                <ShieldCheck className="size-4" />
+                                Permissions &amp; lock
+                            </ContextMenuItem>
+                        ) : null}
+                    </>
+                )}
                 <ContextMenuSeparator />
                 <ContextMenuSub>
                     <ContextMenuSubTrigger className="text-danger data-[state=open]:bg-danger/10 focus:bg-danger/10">
@@ -1051,27 +1120,19 @@ export function FilesView({
                         Delete
                     </ContextMenuSubTrigger>
                     <ContextMenuSubContent>
-                        <ContextMenuItem
-                            onSelect={() =>
-                                onDelete(selected.has(entry.path) ? selectedEntries : [entry])
-                            }
-                        >
+                        <ContextMenuItem onSelect={() => onDelete(targets)}>
                             <Trash2 className="size-4" />
                             Move to Trash
                             <span className="ml-auto pl-6 text-xs text-muted-foreground">Del</span>
                         </ContextMenuItem>
                         <ContextMenuItem
                             variant="danger"
-                            onSelect={() =>
-                                onDeletePermanent(
-                                    selected.has(entry.path) ? selectedEntries : [entry]
-                                )
-                            }
+                            onSelect={() => onDeletePermanent(targets)}
                         >
                             <Trash2 className="size-4" />
                             Delete permanently
                         </ContextMenuItem>
-                        {entry.kind === "dir" ? (
+                        {!many && entry.kind === "dir" ? (
                             <>
                                 <ContextMenuSeparator />
                                 <ContextMenuItem onSelect={() => onEmptyFolder(entry, false)}>
@@ -1088,13 +1149,7 @@ export function FilesView({
                             </>
                         ) : null}
                         <ContextMenuSeparator />
-                        <ContextMenuItem
-                            onSelect={() =>
-                                onScheduleDelete(
-                                    selected.has(entry.path) ? selectedEntries : [entry]
-                                )
-                            }
-                        >
+                        <ContextMenuItem onSelect={() => onScheduleDelete(targets)}>
                             <CalendarClock className="size-4" />
                             Delete later...
                         </ContextMenuItem>
@@ -1445,6 +1500,19 @@ export function FilesView({
                                 </span>
                             </Button>
                         ) : null}
+                        {onShareFolder ? (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={onShareFolder}
+                                disabled={pending}
+                                title="Share this folder"
+                                aria-label="Share this folder"
+                            >
+                                <Share2 className="size-4" />
+                                <span className="hidden sm:inline">Share</span>
+                            </Button>
+                        ) : null}
                         {onRequestFiles ? (
                             <Button
                                 size="sm"
@@ -1781,6 +1849,18 @@ export function FilesView({
                                     entries={selectedEntries}
                                     currentPath={path}
                                 />
+                                {onShare ? (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => onShare(selectedEntries)}
+                                        title={shareLabel}
+                                        aria-label={shareLabel}
+                                    >
+                                        <Share2 className="size-4" />
+                                        <span className="hidden sm:inline">Share</span>
+                                    </Button>
+                                ) : null}
                                 <Button
                                     size="sm"
                                     variant="ghost"
@@ -1889,6 +1969,9 @@ export function FilesView({
                                                                             index,
                                                                             entry
                                                                         )
+                                                                    }
+                                                                    onContextMenu={() =>
+                                                                        adoptForMenu(index, entry)
                                                                     }
                                                                     onDoubleClick={() => {
                                                                         if (!isRenaming)
@@ -2040,6 +2123,12 @@ export function FilesView({
                                                                         onClick={(event) =>
                                                                             rowClick(
                                                                                 event,
+                                                                                index,
+                                                                                entry
+                                                                            )
+                                                                        }
+                                                                        onContextMenu={() =>
+                                                                            adoptForMenu(
                                                                                 index,
                                                                                 entry
                                                                             )
@@ -2280,11 +2369,17 @@ export function FilesView({
                                                                                 <Button
                                                                                     size="icon"
                                                                                     variant="ghost"
-                                                                                    onClick={() =>
+                                                                                    onClick={(
+                                                                                        event
+                                                                                    ) => {
+                                                                                        event.stopPropagation();
                                                                                         onShare(
-                                                                                            entry
-                                                                                        )
-                                                                                    }
+                                                                                            menuTargets(
+                                                                                                entry
+                                                                                            )
+                                                                                        );
+                                                                                    }}
+                                                                                    title={`Share ${entry.name}`}
                                                                                     aria-label={`Share ${entry.name}`}
                                                                                 >
                                                                                     <Share2 className="size-4" />
@@ -2339,6 +2434,12 @@ export function FilesView({
                                 {SHORTCUT_HINTS["upload-folder"]}
                             </span>
                         </ContextMenuItem>
+                        {onShareFolder ? (
+                            <ContextMenuItem onSelect={onShareFolder}>
+                                <Share2 className="size-4" />
+                                Share this folder
+                            </ContextMenuItem>
+                        ) : null}
                         {onRequestFiles ? (
                             <ContextMenuItem
                                 onSelect={() => onRequestFiles(path, path.split("/").pop() ?? "")}
@@ -2354,6 +2455,9 @@ export function FilesView({
                             <ContextMenuItem onSelect={paste}>
                                 <ClipboardPaste className="size-4" />
                                 Paste
+                                {clipboard.entries.length > 1
+                                    ? ` (${clipboard.entries.length})`
+                                    : ""}
                             </ContextMenuItem>
                         ) : null}
                     </ContextMenuContent>
@@ -2593,14 +2697,16 @@ export function FilesView({
             </Dialog>
 
             <Dialog
-                open={iconTarget !== null}
-                onOpenChange={(open) => !open && setIconTarget(null)}
+                open={iconTargets !== null}
+                onOpenChange={(open) => !open && setIconTargets(null)}
             >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Change icon</DialogTitle>
                         <DialogDescription className="truncate">
-                            {iconTarget?.name}
+                            {iconTargets && iconTargets.length > 1
+                                ? `${iconTargets.length} items`
+                                : iconPreview?.name}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex flex-col gap-4">
@@ -2609,18 +2715,10 @@ export function FilesView({
                                 <button
                                     key={name}
                                     type="button"
-                                    onClick={() => {
-                                        if (!iconTarget) return;
-                                        onSetIcon(
-                                            iconTarget,
-                                            name,
-                                            iconTarget.iconColor ?? "primary"
-                                        );
-                                        setIconTarget({ ...iconTarget, icon: name });
-                                    }}
+                                    onClick={() => applyIcon(name, iconPreview?.iconColor ?? "primary")}
                                     className={cn(
                                         "flex items-center justify-center rounded-md border p-2 transition-colors hover:bg-muted",
-                                        iconTarget?.icon === name
+                                        iconPreview?.icon === name
                                             ? "border-primary"
                                             : "border-border"
                                     )}
@@ -2628,7 +2726,7 @@ export function FilesView({
                                     <Icon
                                         className={cn(
                                             "size-5",
-                                            iconColorClass(iconTarget?.iconColor)
+                                            iconColorClass(iconPreview?.iconColor)
                                         )}
                                     />
                                 </button>
@@ -2640,22 +2738,12 @@ export function FilesView({
                                     key={color.id}
                                     type="button"
                                     aria-label={color.id}
-                                    onClick={() => {
-                                        if (!iconTarget) return;
-                                        onSetIcon(
-                                            iconTarget,
-                                            iconTarget.icon ?? "folder",
-                                            color.id
-                                        );
-                                        setIconTarget({
-                                            ...iconTarget,
-                                            icon: iconTarget.icon ?? "folder",
-                                            iconColor: color.id
-                                        });
-                                    }}
+                                    onClick={() =>
+                                        applyIcon(iconPreview?.icon ?? "folder", color.id)
+                                    }
                                     className={cn(
                                         "size-6 rounded-full ring-offset-2 ring-offset-background transition",
-                                        iconTarget?.iconColor === color.id
+                                        iconPreview?.iconColor === color.id
                                             ? "ring-2 ring-primary"
                                             : ""
                                     )}
@@ -2672,13 +2760,15 @@ export function FilesView({
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => {
-                                    if (iconTarget) onSetIcon(iconTarget, null, null);
-                                    setIconTarget(null);
+                                    for (const item of iconTargets ?? []) {
+                                        onSetIcon(item, null, null);
+                                    }
+                                    setIconTargets(null);
                                 }}
                             >
                                 Reset to default
                             </Button>
-                            <Button type="button" size="sm" onClick={() => setIconTarget(null)}>
+                            <Button type="button" size="sm" onClick={() => setIconTargets(null)}>
                                 Done
                             </Button>
                         </div>

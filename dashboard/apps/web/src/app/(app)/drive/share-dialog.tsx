@@ -1,17 +1,21 @@
 "use client";
 
 /**
- * Create-share dialog. Controlled by a `target` so it can be opened from a row
- * action or a right-click context menu (one dialog instance, not one per row).
- * Produces a public link with optional guardrails - password, expiry, download
- * cap, an IP/CIDR allowlist, whether downloads and previews are permitted, and
- * for folders a drop-box upload flag. The generated link is shown once with a
- * copy button; the raw token is never persisted anywhere the client can read it
- * back, so this is the only chance to copy it.
+ * Create-share dialog. Controlled by a list of `targets` so it can be opened from
+ * a row action, a right-click context menu or the toolbar (one dialog instance,
+ * not one per row) - and so a multi-selection shares every item it holds rather
+ * than the one that happened to be right-clicked. One set of guardrails applies
+ * to all of them: password, expiry, download cap, an IP/CIDR allowlist, whether
+ * downloads and previews are permitted, and for folders a drop-box upload flag.
+ * Each item gets its own link, shown once with a copy button; the raw tokens are
+ * never persisted anywhere the client can read them back, so this is the only
+ * chance to copy them.
  */
 
-import { useState, type FormEvent } from "react";
 import { Check, Copy, Link2 } from "lucide-react";
+import { GeoPicker } from "@/components/geo-picker";
+import { createShareAction } from "./share-actions";
+import { useEffect, useState, type FormEvent } from "react";
 import {
     Button,
     Dialog,
@@ -21,8 +25,6 @@ import {
     DialogTitle,
     Input
 } from "@polaris/ui";
-import { GeoPicker } from "@/components/geo-picker";
-import { createShareAction } from "./share-actions";
 
 export interface ShareTarget {
     connectionId: string;
@@ -31,34 +33,50 @@ export interface ShareTarget {
     isDir: boolean;
 }
 
+/** One target's outcome: the link that was minted, or why it could not be. */
+interface ShareResult {
+    path: string;
+    name: string;
+    url?: string;
+    error?: string;
+}
+
 export function ShareDialog({
-    target,
+    targets,
     onOpenChange
 }: {
-    target: ShareTarget | null;
+    targets: ShareTarget[] | null;
     onOpenChange: (open: boolean) => void;
 }) {
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [url, setUrl] = useState<string | null>(null);
-    const [copied, setCopied] = useState(false);
+    const [results, setResults] = useState<ShareResult[] | null>(null);
+    const [copied, setCopied] = useState<string | null>(null);
     const [geoCountries, setGeoCountries] = useState<string[]>([]);
     const [geoContinents, setGeoContinents] = useState<string[]>([]);
 
-    function handleOpenChange(next: boolean) {
-        if (next) {
-            setError(null);
-            setUrl(null);
-            setCopied(false);
-            setGeoCountries([]);
-            setGeoContinents([]);
-        }
-        onOpenChange(next);
-    }
+    const items = targets ?? [];
+    const many = items.length > 1;
+    // Folder-only permissions are offered whenever the selection holds a folder;
+    // they are ignored for the files in it, which have nothing to drop into.
+    const anyDir = items.some((target) => target.isDir);
+    const links = (results ?? []).filter((result) => result.url);
+
+    // The dialog opens by its targets changing, never through onOpenChange, so
+    // this is the only thing that can clear the last run: without it, sharing a
+    // second item shows the first one's link instead of the form.
+    const targetKey = items.map((target) => `${target.connectionId}:${target.path}`).join("|");
+    useEffect(() => {
+        setError(null);
+        setResults(null);
+        setCopied(null);
+        setGeoCountries([]);
+        setGeoContinents([]);
+    }, [targetKey]);
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        if (!target) return;
+        if (items.length === 0) return;
         setPending(true);
         setError(null);
         const form = new FormData(event.currentTarget);
@@ -69,10 +87,8 @@ export function ShareDialog({
             .split(/[\s,]+/)
             .map((value) => value.trim())
             .filter(Boolean);
-        const result = await createShareAction({
-            connectionId: target.connectionId,
-            path: target.path,
-            kind: "public",
+        const guardrails = {
+            kind: "public" as const,
             password: password || undefined,
             maxDownloads: maxDownloads ? Number(maxDownloads) : undefined,
             expiresAt: expiresAt ? String(expiresAt) : undefined,
@@ -81,47 +97,124 @@ export function ShareDialog({
             allowDelete: form.get("allowDelete") === "on",
             allowCreateFolder: form.get("allowCreateFolder") === "on",
             allowOverwrite: form.get("allowOverwrite") === "on",
-            allowDownload: form.get("allowDownload") !== "off",
-            allowPreview: form.get("allowPreview") !== "off",
+            allowDownload: form.get("allowDownload") === "on",
+            allowPreview: form.get("allowPreview") === "on",
             allowedCidrs,
             allowedCountries: geoCountries,
             allowedContinents: geoContinents
-        });
+        };
+
+        // One at a time: each link is its own row, and a target that fails should
+        // report against its own name rather than sink the ones that worked.
+        const created: ShareResult[] = [];
+        for (const target of items) {
+            const result = await createShareAction({
+                ...guardrails,
+                connectionId: target.connectionId,
+                path: target.path
+            });
+            created.push({
+                path: target.path,
+                name: target.name,
+                url: result.url,
+                error: result.error
+            });
+        }
         setPending(false);
-        if (result.error) {
-            setError(result.error);
+        if (created.every((result) => result.error)) {
+            setError(created[0]?.error ?? "Could not create the link.");
             return;
         }
-        setUrl(result.url ?? null);
+        setResults(created);
     }
 
-    async function onCopy() {
-        if (!url) return;
-        await navigator.clipboard.writeText(url);
-        setCopied(true);
+    async function onCopy(key: string, value: string) {
+        await navigator.clipboard.writeText(value);
+        setCopied(key);
     }
 
     return (
-        <Dialog open={target !== null} onOpenChange={handleOpenChange}>
+        <Dialog open={items.length > 0} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Share {target?.isDir ? "folder" : "file"}</DialogTitle>
-                    <DialogDescription className="truncate">{target?.name}</DialogDescription>
+                    <DialogTitle>
+                        {many
+                            ? `Share ${items.length} items`
+                            : `Share ${items[0]?.isDir ? "folder" : "file"}`}
+                    </DialogTitle>
+                    <DialogDescription className="truncate">
+                        {many
+                            ? items.map((target) => target.name).join(", ")
+                            : items[0]?.name}
+                    </DialogDescription>
                 </DialogHeader>
 
-                {url ? (
+                {results ? (
                     <div className="flex flex-col gap-3">
                         <p className="text-sm text-muted-foreground">
-                            Anyone with this link can access it under the limits you set. Copy it now - it is
-                            shown only once.
+                            Anyone with {many ? "these links" : "this link"} can access{" "}
+                            {many ? "them" : "it"} under the limits you set. Copy{" "}
+                            {many ? "them" : "it"} now - {many ? "they are" : "it is"} shown only
+                            once.
                         </p>
-                        <div className="flex items-center gap-2">
-                            <Input readOnly value={url} className="font-mono text-xs" />
-                            <Button type="button" size="icon" variant="secondary" onClick={onCopy}>
-                                {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
-                            </Button>
+                        <div className="flex max-h-64 flex-col gap-2 overflow-auto">
+                            {results.map((result) => (
+                                <div key={result.path} className="flex flex-col gap-1">
+                                    {many ? (
+                                        <span className="truncate text-xs text-muted-foreground">
+                                            {result.name}
+                                        </span>
+                                    ) : null}
+                                    {result.url ? (
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                readOnly
+                                                value={result.url}
+                                                className="font-mono text-xs"
+                                            />
+                                            <Button
+                                                type="button"
+                                                size="icon"
+                                                variant="secondary"
+                                                onClick={() =>
+                                                    onCopy(result.path, result.url ?? "")
+                                                }
+                                                title={`Copy the link to ${result.name}`}
+                                                aria-label={`Copy the link to ${result.name}`}
+                                            >
+                                                {copied === result.path ? (
+                                                    <Check className="size-4 text-success" />
+                                                ) : (
+                                                    <Copy className="size-4" />
+                                                )}
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-danger">{result.error}</p>
+                                    )}
+                                </div>
+                            ))}
                         </div>
-                        <div className="flex justify-end">
+                        <div className="flex justify-end gap-2">
+                            {links.length > 1 ? (
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() =>
+                                        onCopy(
+                                            "all",
+                                            links.map((result) => result.url).join("\n")
+                                        )
+                                    }
+                                >
+                                    {copied === "all" ? (
+                                        <Check className="size-4 text-success" />
+                                    ) : (
+                                        <Copy className="size-4" />
+                                    )}
+                                    Copy all links
+                                </Button>
+                            ) : null}
                             <Button type="button" onClick={() => onOpenChange(false)}>
                                 Done
                             </Button>
@@ -129,6 +222,11 @@ export function ShareDialog({
                     </div>
                 ) : (
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
+                        {many ? (
+                            <p className="text-sm text-muted-foreground">
+                                Each item gets its own link under the settings below.
+                            </p>
+                        ) : null}
                         <label className="flex flex-col gap-1 text-sm">
                             Password (optional)
                             <Input name="password" type="password" placeholder="No password" autoComplete="off" />
@@ -168,11 +266,11 @@ export function ShareDialog({
                                 <input type="checkbox" name="allowPreview" defaultChecked className="size-4" />
                                 Allow previewing in the browser
                             </label>
-                            {target?.isDir ? (
+                            {anyDir ? (
                                 <>
                                     <label className="flex items-center gap-2">
                                         <input type="checkbox" name="allowUpload" className="size-4" />
-                                        Allow uploading into this folder (drop box)
+                                        Allow uploading into {many ? "the shared folders" : "this folder"} (drop box)
                                     </label>
                                     <label className="flex items-center gap-2">
                                         <input type="checkbox" name="allowOverwrite" className="size-4" />
@@ -197,7 +295,11 @@ export function ShareDialog({
                         <div className="mt-1 flex justify-end gap-2">
                             <Button type="submit" disabled={pending}>
                                 <Link2 className="size-4" />
-                                {pending ? "Creating..." : "Create link"}
+                                {pending
+                                    ? "Creating..."
+                                    : many
+                                      ? `Create ${items.length} links`
+                                      : "Create link"}
                             </Button>
                         </div>
                     </form>

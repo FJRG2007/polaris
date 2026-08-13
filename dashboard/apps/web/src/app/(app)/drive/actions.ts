@@ -804,6 +804,61 @@ async function copyRecursive(driver: Driver, from: string, to: string): Promise<
 }
 
 /**
+ * Move an item into a destination folder within the same connection - what a
+ * paste, a drag onto a folder and the move dialog all do. Unlike a rename the
+ * name is incidental, so a name already taken at the destination gets the same
+ * " copy" suffix a copy would get, instead of refusing the move and leaving the
+ * item behind. Both ends are authorized: the item leaves one folder and is
+ * written into another.
+ */
+export async function moveIntoAction(
+    connectionId: string,
+    from: string,
+    destFolder: string
+): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const source = normalizeRelPath(from);
+    const destParent = normalizeRelPath(destFolder);
+    if (destParent === source || destParent.startsWith(`${source}/`)) {
+        return { error: "You cannot move a folder into itself." };
+    }
+    let driver;
+    try {
+        await authorizeDrive(user.id, connectionId, destFolder, "write");
+        driver = await requireDriveDriver(user.id, connectionId, from, "rename");
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "You cannot move into that location.") };
+    }
+    const base = baseName(source);
+    let destination = normalizeRelPath(destParent ? `${destParent}/${base}` : base);
+    try {
+        // Already where it was asked to go: nothing to do, and a free name would
+        // otherwise turn a no-op into a pointless " copy".
+        if (destination === source) return {};
+        destination = await freeName(driver, destination);
+        await driver.move(source, destination);
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "Could not move the item.") };
+    } finally {
+        await driver.dispose();
+    }
+    // Keep any custom icon / hidden flag attached to the item after it moves.
+    await moveItemMeta(connectionId, source, destination);
+    // Both ends change weight: the folder it left and the one it landed in.
+    await invalidateFolderSizes(connectionId, source);
+    await invalidateFolderSizes(connectionId, destination);
+    await recordAudit({
+        actorId: user.id,
+        action: "drive.move",
+        targetType: "connection",
+        targetId: connectionId,
+        metadata: { from: source, to: destination }
+    });
+    revalidatePath("/drive");
+    return {};
+}
+
+/**
  * Copy an item into a destination folder within the same connection. The driver
  * has a native move but no copy, so this streams file bytes and walks folders.
  * Collisions get a " copy" suffix so pasting into the source folder is safe.

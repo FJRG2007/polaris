@@ -157,7 +157,7 @@ export function DriveExplorer({
     const [scheduleTargets, setScheduleTargets] = useState<DriveEntry[] | null>(null);
     const [deleteConn, setDeleteConn] = useState<ConnectionSummary | null>(null);
     const [editConn, setEditConn] = useState<ConnectionSummary | null>(null);
-    const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null);
+    const [shareTargets, setShareTargets] = useState<ShareTarget[] | null>(null);
     const [requestTarget, setRequestTarget] = useState<RequestTarget | null>(null);
     const [ops, setOps] = useState<{ id: string; label: string }[]>([]);
     const [opError, setOpError] = useState<string | null>(null);
@@ -406,7 +406,7 @@ export function DriveExplorer({
         if (to === entry.path) return;
         setEntries((prev) => prev.filter((row) => row.path !== entry.path));
         runOp(`Moving ${entry.name}`, () =>
-            driveActions.renameAction(connectionId, entry.path, to)
+            driveActions.moveIntoAction(connectionId, entry.path, destFolderPath)
         );
     }
 
@@ -626,13 +626,31 @@ export function DriveExplorer({
                         onRename={onRename}
                         onShare={
                             isSavedConnection(connectionId)
-                                ? (entry) =>
-                                      setShareTarget({
-                                          connectionId,
-                                          path: entry.path,
-                                          name: entry.name,
-                                          isDir: entry.kind === "dir"
-                                      })
+                                ? (items) =>
+                                      setShareTargets(
+                                          items.map((entry) => ({
+                                              connectionId,
+                                              path: entry.path,
+                                              name: entry.name,
+                                              isDir: entry.kind === "dir"
+                                          }))
+                                      )
+                                : undefined
+                        }
+                        onShareFolder={
+                            isSavedConnection(connectionId)
+                                ? () =>
+                                      setShareTargets([
+                                          {
+                                              connectionId,
+                                              path,
+                                              name:
+                                                  segments[segments.length - 1] ??
+                                                  selectedConnection?.name ??
+                                                  "This folder",
+                                              isDir: true
+                                          }
+                                      ])
                                 : undefined
                         }
                         onRequestFiles={
@@ -723,8 +741,8 @@ export function DriveExplorer({
             ) : null}
 
             <ShareDialog
-                target={shareTarget}
-                onOpenChange={(open) => !open && setShareTarget(null)}
+                targets={shareTargets}
+                onOpenChange={(open) => !open && setShareTargets(null)}
             />
             <RequestDialog
                 target={requestTarget}
