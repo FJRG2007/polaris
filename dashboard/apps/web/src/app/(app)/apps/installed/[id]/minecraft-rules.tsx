@@ -98,12 +98,20 @@ export function MinecraftRules({
         }
     }
 
-    // Only what this server answered for. A rule it has never heard of would be a
-    // switch that fails every time it is touched.
+    // Whether this server told us anything at all. Some releases - 26.2 among them
+    // - will set a rule and refuse to read one back, and on those the answer is not
+    // "this server has no rules": it is that nobody can see what they are.
+    const answered = Object.keys(rules?.values ?? {}).length > 0;
+
+    // Every rule when the server said nothing, and only the ones it answered for
+    // when it did. A rule a server has never heard of is a switch that fails every
+    // time it is touched; a rule whose value could not be read is a switch that
+    // works and whose position is unknown, and the two want opposite treatment -
+    // hide the first, show the second and say so.
     const groups = ruleGroups()
         .map((group) => ({
             ...group,
-            rules: group.rules.filter((rule) => rules?.values[rule.id] !== undefined)
+            rules: answered ? group.rules.filter((rule) => rules?.values[rule.id] !== undefined) : group.rules
         }))
         .filter((group) => group.rules.length > 0);
 
@@ -191,9 +199,10 @@ export function MinecraftRules({
                                                 key={rule.id}
                                                 rule={rule}
                                                 value={rules.values[rule.id] ?? ""}
+                                                unknown={rules.values[rule.id] === undefined}
                                                 first={index === 0}
                                                 busy={busy === rule.id}
-                                                disabled={!canManage}
+                                                disabled={!canManage || rules.values[rule.id] === undefined}
                                                 onChange={(value) => void apply(rule, value)}
                                             />
                                         ))}
@@ -211,6 +220,7 @@ export function MinecraftRules({
 function RuleRow({
     rule,
     value,
+    unknown = false,
     first,
     busy,
     disabled,
@@ -218,6 +228,9 @@ function RuleRow({
 }: {
     rule: GameRule;
     value: string;
+    /** The server would not say what this is set to. The row still draws - the
+     *  rule exists and applies - but nothing here should look like a reading. */
+    unknown?: boolean;
     /** The first row carries no divider above it. */
     first: boolean;
     busy: boolean;
@@ -242,12 +255,20 @@ function RuleRow({
                     {busy ? <Loader2 className="size-3.5 animate-spin text-muted-foreground" /> : null}
                 </p>
                 {rule.hint ? <p className="text-xs text-muted-foreground">{rule.hint}</p> : null}
+                {unknown && (
+                    <p className="text-xs text-warning">
+                        This server will not say what it is set to, so this is not its current value.
+                    </p>
+                )}
             </div>
             {rule.type === "boolean" ? (
                 <Switch
                     aria-label={rule.label}
                     disabled={disabled || busy}
-                    checked={value === "true"}
+                    // Off rather than a guess: an unread rule drawn as on would be
+                    // a screen asserting something about somebody's world that
+                    // nothing checked.
+                    checked={!unknown && value === "true"}
                     onChange={(next) => onChange(next ? "true" : "false")}
                 />
             ) : (
@@ -258,7 +279,8 @@ function RuleRow({
                     disabled={disabled || busy}
                     min={rule.min}
                     max={rule.max}
-                    value={draft}
+                    placeholder={unknown ? "?" : undefined}
+                    value={unknown ? "" : draft}
                     onChange={(event) => setDraft(event.target.value)}
                     onBlur={() => draft !== value && onChange(draft)}
                     onKeyDown={(event) => {
