@@ -55,7 +55,7 @@ import type { GameBlueprint } from "./blueprints";
 
 /** Where the mirrored archives live. One tag, so a map added later is a commit
  *  and a new tag rather than a new place for these to come from. */
-const MIRROR = "https://cdn.jsdelivr.net/gh/FJRG2007/polaris-minecraft-worlds@v3";
+const MIRROR = "https://cdn.jsdelivr.net/gh/FJRG2007/polaris-minecraft-worlds@v4";
 
 /** The kind of game a map is, which is what a blueprint offers a choice of. */
 export type MapCategory = "skyblock" | "parkour" | "bedwars" | "luckyblock";
@@ -172,8 +172,8 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         author: "Hielke",
         source: "https://hielkemaps.com/maps/parkour-spiral",
         url: `${MIRROR}/parkour-spiral.zip`,
-        sha256: "6ad92d235ed01e5bb4172af18168064e55876fefdeeb46e7920d78aaecda8836",
-        bytes: 10488466,
+        sha256: "d8ca9541c2c38b9e31170322ed6b3f0fde59b2f75078b8d2f297c1e769513f3f",
+        bytes: 5367784,
         // The build the author publishes for the current release. Pinned rather
         // than floated: the courses are run by command blocks, and the author
         // reissues the map for a new release rather than the map surviving one.
@@ -191,8 +191,8 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         author: "TriplicataMC",
         source: "https://www.minecraftmaps.com/51834-bedwars-treasure-island",
         url: `${MIRROR}/bedwars-treasure-island.zip`,
-        sha256: "a13834575ed84953f1ce52df87ea9514241725684604912977a6789af15a7d74",
-        bytes: 12756637,
+        sha256: "0649d573b032b0635512e10f47aab19994d24336d9e33d4cdd6b70ea8be52008",
+        bytes: 4889177,
         // The game is a datapack, and a datapack declares the release it was
         // written for: this one is 1.19's, which a later server refuses to load.
         // Its shop functions are older than that refusal matters for anyway - they
