@@ -254,7 +254,10 @@ export async function createGameServer(
 async function createMinecraftServer(
     ownerId: string,
     actorId: string,
-    input: CreateMinecraftServerInput
+    input: CreateMinecraftServerInput & {
+        /** The settings a saved template carries, already read and filtered. */
+        readonly templateSettings?: Record<string, string>;
+    }
 ): Promise<CreatedGameServer> {
     const catalogId = TEMPLATE_BY_EDITION[input.edition];
     const manifest = findApp(catalogId);
@@ -279,6 +282,12 @@ async function createMinecraftServer(
         new Map(base.env.map((entry) => [entry.key, entry.value]))
     );
     env.set("MAX_PLAYERS", String(input.maxPlayers));
+
+    // A server somebody already built, applied over the blueprint's answer and
+    // under the ones below it. Over, because the whole point of saving one is that
+    // its owner disagreed with a default; under, because nothing saved a month ago
+    // is allowed to decide who may join this server or which port it takes.
+    for (const [key, value] of Object.entries(input.templateSettings ?? {})) env.set(key, value);
 
     // Who the server lets in, decided before it boots rather than left to a list
     // that starts enforced and empty. Last over the blueprint, because no blueprint

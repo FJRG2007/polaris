@@ -18,7 +18,8 @@
 import { useState } from "react";
 import { findMap } from "@/lib/apps/minecraft/maps";
 import { resetGameServerAction } from "./minecraft-actions";
-import { Loader2, RotateCcw, TriangleAlert } from "lucide-react";
+import { saveServerAsTemplateAction } from "@/app/(app)/apps/games/actions";
+import { BookmarkPlus, Loader2, RotateCcw, TriangleAlert } from "lucide-react";
 import { formatMemory, recommendedMemoryMb, findBlueprint } from "@/lib/apps/minecraft/blueprints";
 import {
     BlueprintFields,
@@ -147,6 +148,9 @@ function ResetDialog({
     });
     const [concurrentPlayers, setConcurrentPlayers] = useState(8);
     const [keepPlayers, setKeepPlayers] = useState(false);
+    const [templateName, setTemplateName] = useState("");
+    const [templateNote, setTemplateNote] = useState<string | null>(null);
+    const [savingTemplate, setSavingTemplate] = useState(false);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -209,6 +213,43 @@ function ResetDialog({
                             Player slots and everything else on Settings are left as they are.
                         </span>
                     </label>
+
+                    {/* The opposite of everything else on this screen: it changes
+                        nothing about this server, it writes down how it is built so
+                        another can be built the same way. Here because this is
+                        where its blueprint and its map are, which is most of what
+                        gets written down. */}
+                    <div className="flex flex-wrap items-end gap-2 rounded-md border border-border p-3">
+                        <label className="flex flex-1 flex-col gap-1 text-sm">
+                            <span className="font-medium">Save this server as a template</span>
+                            <Input
+                                value={templateName}
+                                onChange={(event) => setTemplateName(event.target.value)}
+                                placeholder="My survival setup"
+                                maxLength={60}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                                {templateNote ??
+                                    "Keeps what you changed from the blueprint's defaults - not this server's address, players or ports."}
+                            </span>
+                        </label>
+                        <Button
+                            variant="secondary"
+                            disabled={savingTemplate || templateName.trim().length === 0}
+                            onClick={() => {
+                                setSavingTemplate(true);
+                                setTemplateNote(null);
+                                void saveServerAsTemplateAction(installedAppId, templateName, "").then((answer) => {
+                                    setSavingTemplate(false);
+                                    setTemplateNote(answer.error ?? "Saved. It is offered when you create a server.");
+                                    if (!answer.error) setTemplateName("");
+                                });
+                            }}
+                        >
+                            {savingTemplate ? <Loader2 className="size-4 animate-spin" /> : <BookmarkPlus className="size-4" />}
+                            Save
+                        </Button>
+                    </div>
 
                     <label className={cn("flex items-start gap-2 text-sm", carriesPlayers ? "cursor-pointer" : "opacity-60")}>
                         <Checkbox

@@ -33,7 +33,14 @@ import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
 import { createGameServerSchema, isModIdList } from "@/lib/apps/games-schema";
 import { Gamepad2, Loader2, MemoryStick, RefreshCw, ShieldCheck, Users } from "lucide-react";
 import { findBlueprint, formatMemory, recommendedMemoryMb } from "@/lib/apps/minecraft/blueprints";
-import { createGameServerAction, gameMachinesAction, gameSetupAction, type GameSetup } from "./actions";
+import type { ServerTemplateView } from "@/lib/apps/game-templates";
+import {
+    createGameServerAction,
+    gameMachinesAction,
+    gameSetupAction,
+    listServerTemplatesAction,
+    type GameSetup
+} from "./actions";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
 import {
     BlueprintFields,
@@ -68,6 +75,10 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
     /** The game this server plays and the map it plays it on, as one value: the
      *  same one the reset dialog holds, from the same fields. */
     const [shape, setShape] = useState<BlueprintShape>(DEFAULT_SHAPE);
+    /** A server this person already built, when they are building another like it.
+     *  Only the id travels: what is inside it is read on the server. */
+    const [templateId, setTemplateId] = useState("");
+    const [templates, setTemplates] = useState<ServerTemplateView[]>([]);
     const [ownerPlayer, setOwnerPlayer] = useState("");
     const [ownerAddress, setOwnerAddress] = useState("");
 
@@ -83,6 +94,21 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
     useEffect(() => {
         if (setup?.yourAddress && ownerAddress.length === 0) setOwnerAddress(setup.yourAddress);
     }, [setup, ownerAddress]);
+
+    // What this person has saved, for the game they are creating. Read every time
+    // the game changes rather than once, because a Minecraft template has no
+    // business being offered on an ARK server.
+    useEffect(() => {
+        let active = true;
+        void listServerTemplatesAction(game).then((loaded) => {
+            if (!active) return;
+            setTemplates(loaded.templates);
+            setTemplateId("");
+        });
+        return () => {
+            active = false;
+        };
+    }, [game]);
 
     useEffect(() => {
         let active = true;
@@ -189,6 +215,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                       ownerAddress: ownerAddress.trim(),
                       edition,
                       crossplay,
+                      templateId: templateId || undefined,
                       blueprintId: shape.blueprintId,
                       mapId: shape.mapId || undefined,
                       software: edition === "java" ? shape.software : undefined,
@@ -275,6 +302,45 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                     />
                                 </div>
                             </div>
+
+                            {/* Above the blueprint, because picking one answers
+                                most of what is below it. Nothing is hidden by
+                                choosing a template: it fills the fields in and
+                                they can all still be changed. */}
+                            {templates.length > 0 && (
+                                <label className="flex flex-col gap-1 text-sm">
+                                    <span className="font-medium">Build it like one you saved</span>
+                                    <Select
+                                        value={templateId}
+                                        onValueChange={(id) => {
+                                            setTemplateId(id);
+                                            const picked = templates.find((entry) => entry.id === id);
+                                            if (!picked) return;
+                                            setEdition(picked.edition === "bedrock" ? "bedrock" : "java");
+                                            setCrossplay(picked.crossplay);
+                                            setConcurrentPlayers(picked.concurrentPlayers);
+                                            setShape({
+                                                ...shape,
+                                                blueprintId: picked.blueprintId || shape.blueprintId,
+                                                mapId: picked.mapId,
+                                                version: picked.version || shape.version
+                                            });
+                                        }}
+                                        options={[
+                                            { value: "", label: "Start from a blueprint instead" },
+                                            ...templates.map((entry) => ({
+                                                value: entry.id,
+                                                label: `${entry.name} (${entry.settings} settings)`
+                                            }))
+                                        ]}
+                                        aria-label="A server you saved to build again"
+                                    />
+                                    <span className="text-xs text-muted-foreground">
+                                        {templates.find((entry) => entry.id === templateId)?.summary ||
+                                            "Its settings are applied on top of the blueprint. The address, the players and the ports are this server's own."}
+                                    </span>
+                                </label>
+                            )}
 
                             <BlueprintFields
                                 edition={edition}

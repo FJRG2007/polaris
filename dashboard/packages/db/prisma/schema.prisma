@@ -2323,6 +2323,48 @@ model GameSample {
     @@index([ts])
 }
 
+// A server somebody already built, kept so they can build that one again.
+//
+// The blueprints and the maps are compiled into Polaris and are the same for
+// everybody, which is right for "a bed wars server" and no help at all once
+// somebody has spent an evening getting theirs exactly so. This is that evening,
+// written down: the game, what it was built from, and the settings that ended up
+// differing from the defaults.
+//
+// Deliberately not a second kind of blueprint. A blueprint says what a game *is*
+// and is Polaris's to define; this says how one person likes theirs, and belongs
+// to them - which is why it is a row with an owner rather than an entry in a list
+// the whole instance shares.
+model ServerTemplate {
+    id      String @id @default(uuid(7)) @db.Uuid
+    ownerId String @db.Uuid
+    name    String
+    /** In the person's own words, since a name alone stops meaning anything by the
+     *  fourth one. */
+    summary String @default("")
+    /** minecraft | ark - a template only ever builds the game it came from. */
+    game    String
+    /** java | bedrock, for the one game that has two. */
+    edition String @default("java")
+    /** What it was built from, so the same plugins and settings come with it. */
+    blueprintId String @default("")
+    /** The prebuilt world it was built on, when it was built on one. */
+    mapId       String @default("")
+    /** The release it was pinned to, LATEST included. */
+    version     String @default("LATEST")
+    /** Stringified Record<string, string>: the container settings that differed
+     *  from what the blueprint would have given it. Only the differences, so a
+     *  template made a year ago does not force last year's defaults back onto a
+     *  server built from it today. */
+    env         String @default("{}")
+    concurrentPlayers Int @default(8)
+    crossplay   Boolean @default(false)
+    createdAt   DateTime @default(now())
+
+    @@unique([ownerId, name])
+    @@index([ownerId])
+}
+
 // ---------------------------------------------------------------------------
 // Messaging (unified inbox across WhatsApp / Telegram / Discord / Slack)
 // ---------------------------------------------------------------------------

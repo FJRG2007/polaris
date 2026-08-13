@@ -27,6 +27,13 @@ import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import { adoptGameServersApp, installGameServersApp } from "@/lib/apps/game-install";
 import { createGameServerSchema, type CreateGameServerInput } from "@/lib/apps/games-schema";
 import { installRef, requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
+import { isTemplateName, type ServerTemplateView } from "@/lib/apps/game-templates";
+import {
+    deleteServerTemplate,
+    listServerTemplates,
+    readServerTemplate,
+    saveServerAsTemplate
+} from "@/lib/apps/game-templates-service";
 import { GAME_BLUEPRINTS, recommendedMemoryMb, formatMemory } from "@/lib/apps/minecraft/blueprints";
 
 export interface GameSetup {
@@ -156,13 +163,20 @@ export async function blueprintVersionsAction(
 
 /** Create a server. Returns its installed-app id so the page can open it. */
 export async function createGameServerAction(
-    input: CreateGameServerInput
+    input: CreateGameServerInput & { templateId?: string }
 ): Promise<{ installedAppId?: string; hostname?: string | null; error?: string }> {
     const user = await requirePermission("games.manage");
     const parsed = createGameServerSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        const created = await createGameServer(user.id, user.id, parsed.data);
+        // A saved server's settings, if this one is being built from one. Read here
+        // rather than trusted from the form: what the browser sends is which
+        // template, never what is in it.
+        const template = input.templateId ? await readServerTemplate(user.id, input.templateId) : null;
+        const created = await createGameServer(user.id, user.id, {
+            ...parsed.data,
+            ...(template ? { templateSettings: template.settings } : {})
+        });
         await recordAudit({
             actorId: user.id,
             action: "games.create",
@@ -182,6 +196,53 @@ export async function createGameServerAction(
         return { installedAppId: created.installedAppId, hostname: created.hostname };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not create the server" };
+    }
+}
+
+/** Everything this person has saved, for the create dialog to offer. */
+export async function listServerTemplatesAction(game?: string): Promise<{ templates: ServerTemplateView[] }> {
+    try {
+        const user = await requirePermission("games.read");
+        return { templates: await listServerTemplates(user.id, game) };
+    } catch {
+        return { templates: [] };
+    }
+}
+
+/** Write down how a server is built, so another can be built the same way. */
+export async function saveServerAsTemplateAction(
+    installedAppId: string,
+    name: string,
+    summary: string
+): Promise<{ id?: string; error?: string }> {
+    if (!isTemplateName(name)) return { error: "Give the template a name" };
+    try {
+        const { user, access } = await requireGameServer("games.manage", installedAppId);
+        const saved = await saveServerAsTemplate(access.ownerId, installedAppId, name, summary);
+        if (saved.id) {
+            await recordAudit({
+                actorId: user.id,
+                action: "games.template-save",
+                targetType: "installedApp",
+                targetId: installedAppId,
+                metadata: { name: name.trim() }
+            });
+            revalidatePath("/apps/games");
+        }
+        return saved;
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save this as a template" };
+    }
+}
+
+export async function deleteServerTemplateAction(id: string): Promise<{ error?: string }> {
+    try {
+        const user = await requirePermission("games.manage");
+        await deleteServerTemplate(user.id, id);
+        revalidatePath("/apps/games");
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not delete that template" };
     }
 }
 
