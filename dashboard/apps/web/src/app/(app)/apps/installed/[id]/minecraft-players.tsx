@@ -18,6 +18,7 @@
  */
 
 import * as actions from "./minecraft-actions";
+import { GAME_MODES } from "./minecraft-actions";
 import { useConfirm } from "@/components/confirm-dialog";
 import { ToolbarSwitch } from "@/components/toolbar-switch";
 import type { MinecraftModeration } from "./minecraft-actions";
@@ -68,6 +69,7 @@ import {
     Clock,
     Crown,
     DoorOpen,
+    Gamepad2,
     History,
     LocateFixed,
     MapPin,
@@ -170,6 +172,15 @@ export function MinecraftPlayers({
             return next.size === current.size ? current : next;
         });
     }, [known]);
+
+    /** Put one or several players into a game mode, and re-read afterwards so the
+     *  table shows what the server actually did. */
+    async function setGamemode(names: readonly string[], mode: string): Promise<void> {
+        setError(null);
+        const answer = await actions.setGamemodeAction({ installedAppId, players: names, mode });
+        if (answer.error) setError(answer.error);
+        onChanged();
+    }
 
     /** Show a change now, and put it back if the server refuses it. */
     function expect(player: string, patch: Partial<PlayerEntry>): () => void {
@@ -438,6 +449,7 @@ export function MinecraftPlayers({
                         pending={pending}
                         onModerate={moderate}
                         onModerateWithConfirm={moderateWithConfirm}
+                        onGamemode={setGamemode}
                         timeout={timeoutFor(timeouts, player.name)}
                         waiting={
                             waiting.filter((entry) => entry.username.toLowerCase() === player.name.toLowerCase())
@@ -560,6 +572,7 @@ function PlayerRow({
     waiting,
     onModerate,
     onModerateWithConfirm,
+    onGamemode,
     onOpen,
     onRevoke
 }: {
@@ -581,6 +594,7 @@ function PlayerRow({
         title: string,
         description: string
     ) => Promise<void>;
+    onGamemode: (players: readonly string[], mode: string) => Promise<void>;
     onOpen: (dialog: PlayerDialog) => void;
     onRevoke: () => void;
 }) {
@@ -741,6 +755,7 @@ function PlayerRow({
                         live={live}
                         onOpen={onOpen}
                         onModerateWithConfirm={onModerateWithConfirm}
+                        onGamemode={onGamemode}
                     />
                 </div>
             </td>
@@ -811,7 +826,8 @@ function MoreActions({
     bedrock,
     live,
     onOpen,
-    onModerateWithConfirm
+    onModerateWithConfirm,
+    onGamemode
 }: {
     player: PlayerEntry;
     bedrock: boolean;
@@ -822,6 +838,7 @@ function MoreActions({
         title: string,
         description: string
     ) => Promise<void>;
+    onGamemode: (players: readonly string[], mode: string) => Promise<void>;
 }) {
     return (
         <DropdownMenu>
@@ -857,9 +874,27 @@ function MoreActions({
                 <DropdownMenuItem disabled={!live || bedrock || !player.online} onSelect={() => onOpen("teleport")}>
                     <MapPin className="size-4" /> Teleport
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled={player.sessions.length === 0} onSelect={() => onOpen("history")}>
+                {/* Never disabled any more: the record of who played is kept by
+                    Polaris now rather than read out of a log that may not reach
+                    back far enough, so there is something to show for somebody who
+                    has not been on since last month. */}
+                <DropdownMenuItem onSelect={() => onOpen("history")}>
                     <History className="size-4" /> {playerMenuItem.history}
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {/* Flat rather than a submenu. Four items is not enough to be worth
+                    a second layer somebody has to hover exactly onto. */}
+                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Game mode</DropdownMenuLabel>
+                {GAME_MODES.map((mode) => (
+                    <DropdownMenuItem
+                        key={mode}
+                        disabled={!live || !player.online}
+                        onSelect={() => void onGamemode([player.name], mode)}
+                    >
+                        <Gamepad2 className="size-4" />
+                        <span className="capitalize">{mode}</span>
+                    </DropdownMenuItem>
+                ))}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                     className="text-danger"

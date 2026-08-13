@@ -99,6 +99,17 @@ const moderationSchema = z.object({
 
 export type MinecraftModeration = z.infer<typeof moderationSchema>;
 
+/** The four the game has, in the order a menu should offer them. */
+export const GAME_MODES = ["survival", "creative", "adventure", "spectator"] as const;
+
+const gamemodeSchema = z.object({
+    installedAppId: z.string().uuid(),
+    /** Several at once, because the question is nearly always asked about a group -
+     *  everyone building, or everyone who just arrived for an event. */
+    players: z.array(playerNameSchema).min(1).max(50),
+    mode: z.enum(GAME_MODES)
+});
+
 const consoleSchema = z.object({
     installedAppId: z.string().uuid(),
     line: z.string().trim().min(1).max(400)
@@ -129,6 +140,47 @@ function moderationArgv(input: MinecraftModeration): string[] {
             return ["whitelist", "add", input.player];
         case "whitelist-remove":
             return ["whitelist", "remove", input.player];
+    }
+}
+
+/**
+ * Put one or several players into a game mode.
+ *
+ * Its own action rather than another moderation verb: every one of those is a
+ * yes-or-no thing done to a name, and this one carries a value. Sent per player
+ * rather than with a selector, so a name the server does not know fails on its own
+ * instead of taking the rest of the group down with it.
+ */
+export async function setGamemodeAction(input: {
+    installedAppId: string;
+    players: readonly string[];
+    mode: string;
+}): Promise<{ applied?: number; error?: string }> {
+    const parsed = gamemodeSchema.safeParse({ ...input, players: [...input.players] });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        let applied = 0;
+        for (const player of parsed.data.players) {
+            const done = await runServerCommand(access.ownerId, parsed.data.installedAppId, [
+                "gamemode",
+                parsed.data.mode,
+                player
+            ])
+                .then(() => true)
+                .catch(() => false);
+            if (done) applied += 1;
+        }
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.gamemode",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { mode: parsed.data.mode, players: parsed.data.players, applied }
+        });
+        return { applied };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
     }
 }
 

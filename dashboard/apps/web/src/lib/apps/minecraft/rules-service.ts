@@ -62,11 +62,23 @@ export async function readWorldRules(server: ServerContainer): Promise<WorldRule
     // different thing to tell somebody than "it is not running".
     if (values.size === 0) {
         const said = output.trim().replace(/\s+/g, " ").slice(0, 200);
-        throw new Error(
-            said && !/connection refused/i.test(said)
-                ? `The server did not answer: ${said}`
-                : "The server is not accepting commands yet - start it first"
-        );
+        if (!said || /connection refused/i.test(said)) {
+            throw new Error("The server is not accepting commands yet - start it first");
+        }
+        // It answered, and refused every one of them. Seen on Minecraft 26.2, which
+        // will not read a rule back the way every release before it did - so the
+        // question "what is this set to" has no answer here, while setting one still
+        // works perfectly.
+        //
+        // Handing the operator the server's own parser errors is the worst of the
+        // options: three lines of `<--[HERE]` in place of a screen, about a command
+        // they never typed. An empty set says the same thing and lets the screen
+        // draw, and the values it does not know are shown as unset rather than
+        // invented.
+        if (/incorrect argument|unknown or incomplete|<--\[HERE\]/i.test(said)) {
+            return { values: {}, difficulty: parseDifficulty(output) };
+        }
+        throw new Error(`The server did not answer: ${said}`);
     }
     return { values: Object.fromEntries(values), difficulty: parseDifficulty(output) };
 }
