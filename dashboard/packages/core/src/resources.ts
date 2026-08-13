@@ -95,7 +95,7 @@ export const RESOURCE_KIND_META: Readonly<Record<ResourceKind, ResourceKindMeta>
     install: {
         label: "Installed app",
         plural: "Installed apps",
-        actions: ["games.read", "games.moderate", "games.manage", "deploy.read", "deploy.manage"]
+        actions: ["games.read", "games.moderate", "games.console", "games.manage", "deploy.read", "deploy.manage"]
     },
     project: { label: "Project", plural: "Projects", actions: ["deploy.read", "deploy.manage"] },
     domain: { label: "Domain", plural: "Domains", actions: ["deploy.manage"] },

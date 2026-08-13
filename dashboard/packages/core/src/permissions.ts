@@ -20,6 +20,7 @@ export const PERMISSIONS = [
     "deploy.manage",
     "games.read",
     "games.moderate",
+    "games.console",
     "games.manage",
     "agents.read",
     "agents.manage",
@@ -62,6 +63,7 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "deploy.manage",
         "games.read",
         "games.moderate",
+        "games.console",
         "games.manage",
         "agents.read",
         "agents.manage",
@@ -101,7 +103,12 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     "deploy.manage": { area: "Apps", label: "Deploy, restart and configure apps" },
     "games.read": { area: "Game servers", label: "See game servers and who is playing" },
     "games.moderate": { area: "Game servers", label: "Op, kick, ban and whitelist players" },
-    "games.manage": { area: "Game servers", label: "Create servers, run console commands and change settings" },
+    // Its own thing rather than part of managing, because the console is how every
+    // other verb on this list can be done without going through the screen that
+    // offers it. Somebody who should be able to run commands and not rebuild the
+    // server had nowhere to sit before this.
+    "games.console": { area: "Game servers", label: "Run commands on the server console" },
+    "games.manage": { area: "Game servers", label: "Create servers, change settings and rebuild" },
     "agents.read": { area: "Apps", label: "See coding-agent repositories and runs" },
     "agents.manage": { area: "Apps", label: "Enable repositories and start agent runs" },
     "tasks.read": { area: "Tasks", label: "See spaces, lists and tasks" },
@@ -131,10 +138,13 @@ export const IMPLIED_PERMISSIONS: Readonly<Partial<Record<Permission, readonly P
     // Whoever may deploy anything on this machine may already run a game server
     // on it, so the game-server grants ride along - which also means an operator
     // who set their roles up before these existed does not have to redo them.
-    "deploy.manage": ["deploy.read", "games.read", "games.moderate", "games.manage"],
+    "deploy.manage": ["deploy.read", "games.read", "games.moderate", "games.console", "games.manage"],
     "deploy.read": ["games.read"],
     "games.moderate": ["games.read"],
-    "games.manage": ["games.read", "games.moderate"],
+    "games.console": ["games.read"],
+    // Managing still carries the console, so every grant that worked yesterday
+    // works today and nobody loses a screen they had.
+    "games.manage": ["games.read", "games.moderate", "games.console"],
     "agents.manage": ["agents.read"],
     "tasks.manage": ["tasks.read"],
     "inbox.manage": ["inbox.read"]

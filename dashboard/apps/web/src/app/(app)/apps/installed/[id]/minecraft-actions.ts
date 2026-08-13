@@ -1337,9 +1337,11 @@ export async function sendConsoleCommandAction(
     const parsed = consoleSchema.safeParse({ installedAppId, line });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That command is not valid" };
     try {
-        // The console runs any command the server takes, op included, so it is the
-        // full grant rather than the moderator one.
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        // The console runs any command the server takes, op included, so it is not
+        // the moderator grant - but it is no longer the full one either. Somebody
+        // who should run commands and not rebuild the server has a grant of their
+        // own now, and everybody who could manage still holds it.
+        const { user, access } = await requireGameServer("games.console", parsed.data.installedAppId);
         // Recorded before it runs, and recorded whatever it does.
         //
         // Every other thing this screen can do to a server leaves a line in the

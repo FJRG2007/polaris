@@ -39,7 +39,7 @@ const EVERY_GAME: readonly GameId[] = ["minecraft", "ark"];
 
 export const GAME_TABS: readonly GameTab[] = [
     { slug: "", label: "Overview", permission: "games.read", games: EVERY_GAME },
-    { slug: "console", label: "Console", permission: "games.manage", games: EVERY_GAME },
+    { slug: "console", label: "Console", permission: "games.console", games: EVERY_GAME },
     { slug: "players", label: "Players", permission: "games.read", games: EVERY_GAME },
     { slug: "world", label: "World", permission: "games.manage", games: ["minecraft"] },
     { slug: "rules", label: "Rules", permission: "games.read", games: ["minecraft"] },
