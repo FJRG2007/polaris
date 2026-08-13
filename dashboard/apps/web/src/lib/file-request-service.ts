@@ -237,6 +237,20 @@ export async function revokeFileRequest(ownerId: string, requestId: string): Pro
     });
 }
 
+/**
+ * Delete a drop point the caller owns. Its submissions and visits go with it (both
+ * cascade), and the folder on the storage connection does not: what to do with the
+ * files is the caller's decision, made before this is called, because it is the
+ * only half that cannot be undone.
+ */
+export async function deleteFileRequestForOwner(
+    ownerId: string,
+    requestId: string
+): Promise<boolean> {
+    const removed = await prisma.fileRequest.deleteMany({ where: { id: requestId, ownerId } });
+    return removed.count > 0;
+}
+
 /** Resolve a file request by its raw token (looked up by hash), or null. */
 export async function resolveFileRequestByToken(token: string) {
     return prisma.fileRequest.findUnique({

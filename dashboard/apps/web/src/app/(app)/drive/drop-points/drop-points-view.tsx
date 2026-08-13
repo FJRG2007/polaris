@@ -3,18 +3,24 @@
 /**
  * Drop-points list. A search box filters by title, destination, or connection.
  * Each row links to the drop point's detail page (collected files, config,
- * visitors); inline Close/Reopen actions sit outside the row link so clicking
- * them does not navigate. The public link is never shown here - only its hash is
- * stored.
+ * visitors); the Close/Reopen and Delete actions sit outside the row link so
+ * clicking them does not navigate. Deleting asks what to do with the folder, so
+ * it opens its own dialog rather than the shared confirm. The public link is never
+ * shown here - only its hash is stored.
  */
 
 import Link from "next/link";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useDisplayFormat } from "@/components/display-format";
-import { Ban, Inbox, Lock, RotateCcw, Search } from "lucide-react";
 import { Badge, Button, Card, CardBody, Input } from "@polaris/ui";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { reopenFileRequestAction, revokeFileRequestAction } from "../request-actions";
+import { Ban, Inbox, Lock, RotateCcw, Search, Trash2 } from "lucide-react";
+import { DeleteDropPointDialog, type DropPointTarget } from "./delete-drop-point-dialog";
+import {
+    deleteFileRequestAction,
+    reopenFileRequestAction,
+    revokeFileRequestAction
+} from "../request-actions";
 
 export interface DropPointRow {
     id: string;
@@ -53,6 +59,7 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
     const [query, setQuery] = useState("");
     const [pending, startTransition] = useTransition();
     const [busy, setBusy] = useState<string | null>(null);
+    const [deleting, setDeleting] = useState<DropPointTarget | null>(null);
     const [confirm, confirmDialog] = useConfirm();
 
     // The rows are held locally so closing or reopening one is instant. That
@@ -102,6 +109,29 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
                 prev.map((row) => (row.id === id ? { ...row, revokedAt: null } : row))
             );
             setBusy(null);
+        });
+    }
+
+    function onDelete(deleteFolder: boolean) {
+        const target = deleting;
+        if (!target) return;
+        setBusy(target.id);
+        startTransition(async () => {
+            const result = await deleteFileRequestAction(target.id, deleteFolder);
+            setBusy(null);
+            if (result.error) {
+                // Nothing was deleted: the drop point and its folder are both still
+                // there, so the row stays and the reason is put in front of the user.
+                setDeleting(null);
+                await confirm({
+                    title: "Couldn't delete this drop point",
+                    description: result.error,
+                    alert: true
+                });
+                return;
+            }
+            setRows((prev) => prev.filter((row) => row.id !== target.id));
+            setDeleting(null);
         });
     }
 
@@ -196,6 +226,24 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
                                                 Close
                                             </Button>
                                         )}
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            aria-label={`Delete ${request.title}`}
+                                            title="Delete"
+                                            onClick={() =>
+                                                setDeleting({
+                                                    id: request.id,
+                                                    title: request.title,
+                                                    destinationPath: request.destinationPath,
+                                                    connectionName: request.connectionName,
+                                                    submissionCount: request.submissionCount
+                                                })
+                                            }
+                                            disabled={pending && busy === request.id}
+                                        >
+                                            <Trash2 className="size-4" />
+                                        </Button>
                                     </div>
                                 </CardBody>
                             </Card>
@@ -203,6 +251,12 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
                     })}
                 </div>
             )}
+            <DeleteDropPointDialog
+                target={deleting}
+                busy={pending && busy === deleting?.id}
+                onCancel={() => setDeleting(null)}
+                onConfirm={onDelete}
+            />
             {confirmDialog}
         </div>
     );

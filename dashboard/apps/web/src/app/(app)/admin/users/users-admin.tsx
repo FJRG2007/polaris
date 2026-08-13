@@ -17,9 +17,11 @@ import { revokeInviteAction } from "./actions";
 import { useEffect, useMemo, useState } from "react";
 import type { RoleOption } from "@/lib/role-service";
 import { RecoveryRequests } from "./recovery-requests";
+import { RelativeTime } from "@/components/relative-time";
 import type { InviteListItem } from "@/lib/invite-service";
 import type { DirectoryUser } from "@/lib/user-admin-service";
 import { useDisplayFormat } from "@/components/display-format";
+import { isOnline, OnlineDot, useNow } from "@/components/presence";
 import type { AccessGroupOption } from "@/components/access-rules-editor";
 import type { RecoveryRequestView } from "@/lib/account-recovery-service";
 import { Badge, Button, Card, CardBody, Input, Select, cn } from "@polaris/ui";
@@ -75,6 +77,7 @@ export function UsersAdmin({
     openUserId?: string | null;
 }) {
     const router = useRouter();
+    const now = useNow();
     const format = useDisplayFormat();
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState<Filter>("all");
@@ -86,6 +89,19 @@ export function UsersAdmin({
     useEffect(() => {
         if (openUserId) router.replace(`/admin/users/${openUserId}`);
     }, [openUserId, router]);
+
+    // Who is here changes while this page is open, and the rows were whatever the
+    // server said when it was rendered - so an operator watching the directory saw
+    // an account go stale and never come back. The clock ages the "Online" mark on
+    // its own; this asks the server for newer activity, and only while the tab is
+    // actually being looked at, so a directory left open in a background tab costs
+    // nothing.
+    useEffect(() => {
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") router.refresh();
+        }, 30_000);
+        return () => clearInterval(timer);
+    }, [router]);
 
     const shown = useMemo(() => {
         const needle = query.trim().toLowerCase();
@@ -224,9 +240,25 @@ export function UsersAdmin({
                                         </div>
                                     </td>
                                     <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
-                                        {user.lastSeenAt
-                                            ? format.dateTime(user.lastSeenAt)
-                                            : "Never"}
+                                        {isOnline(user.lastSeenAt, now) ? (
+                                            <span
+                                                className="flex items-center gap-1.5 text-success"
+                                                title={
+                                                    user.lastSeenAt
+                                                        ? format.dateTime(user.lastSeenAt)
+                                                        : undefined
+                                                }
+                                            >
+                                                <OnlineDot />
+                                                Online
+                                            </span>
+                                        ) : user.lastSeenAt ? (
+                                            <span title={format.dateTime(user.lastSeenAt)}>
+                                                <RelativeTime iso={user.lastSeenAt} />
+                                            </span>
+                                        ) : (
+                                            "Never"
+                                        )}
                                         {user.lastCountry ? ` - ${user.lastCountry}` : ""}
                                     </td>
                                     <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">

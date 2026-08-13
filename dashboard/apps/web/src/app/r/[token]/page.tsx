@@ -9,11 +9,15 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
-import { formatBytes } from "@polaris/core";
-import { Badge, Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
+import { DropPresence } from "./presence";
 import { getSession } from "@/lib/session";
+import { noteActivity } from "@/lib/session-guard";
+import { formatBytes } from "@polaris/core";
+import { DropUploader } from "./upload-form";
 import { clientIp } from "@/lib/request-context";
+import { RequestPasswordForm } from "./request-password-form";
 import { getDisplayFormat } from "@/lib/display-prefs-service";
+import { Badge, Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
 import {
     fileRequestIpAllowed,
     fileRequestUnlockCookie,
@@ -23,9 +27,6 @@ import {
     resolveFileRequestByToken,
     verifyFileRequestUnlock
 } from "@/lib/file-request-service";
-import { DropUploader } from "./upload-form";
-import { DropPresence } from "./presence";
-import { RequestPasswordForm } from "./request-password-form";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -102,6 +103,11 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
             return <RequestPasswordForm token={token} title={request.title} />;
         }
     }
+
+    // Someone with an account who opens this page is here, and the directory has no
+    // other way to learn that: the session guard runs on the dashboard, not on a
+    // public page like this one.
+    await noteActivity((await getSession())?.session?.id);
 
     // A per-user allowlist also forces sign-in, even when requireLogin is off.
     const allowedUsers = parseStringArray(request.allowedUsers);

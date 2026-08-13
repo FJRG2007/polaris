@@ -7,36 +7,22 @@
  * re-validates its input with the shared Zod schema before touching the database.
  */
 
-import { cookies } from "next/headers";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
-import { sharingBaseUrl } from "@/lib/domain-service";
-import { ensureShareReachability } from "@/lib/public-reach";
-import { cidrOrIp, createFileRequestSchema, normalizeRelPath, randomDropPointName } from "@polaris/core";
-import type { StorageDriver } from "@polaris/storage";
+import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
-import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
-import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
-import { invalidateFolderSizes } from "@/lib/drive-folder-size";
-import {
-    createFileRequest,
-    createTemplate,
-    deleteSubmissionForOwner,
-    deleteTemplate,
-    fileRequestUnlockCookie,
-    fileRequestUsability,
-    listTemplates,
-    reopenFileRequest,
-    resolveFileRequestByToken,
-    revokeFileRequest,
-    signFileRequestUnlock,
-    updateFileRequest,
-    verifyFileRequestPassword
-} from "@/lib/file-request-service";
-import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
-import { clientIp, hashForLog } from "@/lib/request-context";
 import { recordAudit } from "@/lib/audit-service";
+import { sharingBaseUrl } from "@/lib/domain-service";
+import * as dropPoints from "@/lib/file-request-service";
+import { ensureShareReachability } from "@/lib/public-reach";
+import { clientIp, hashForLog } from "@/lib/request-context";
+import { invalidateFolderSizes } from "@/lib/drive-folder-size";
+import { StorageError, type StorageDriver } from "@polaris/storage";
+import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
+import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
+import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
+import { cidrOrIp, createFileRequestSchema, normalizeRelPath, randomDropPointName } from "@polaris/core";
 
 /** The shared base folder every drop point's own folder is grouped under. */
 const DROP_POINTS_BASE = "Drop Points";
@@ -135,7 +121,7 @@ export async function createFileRequestAction(
         };
     }
 
-    const { id, token } = await createFileRequest(user.id, {
+    const { id, token } = await dropPoints.createFileRequest(user.id, {
         ...parsed.data,
         title,
         destinationPath
@@ -225,7 +211,7 @@ export async function updateFileRequestAction(
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid changes" };
 
     const { expiresAt, startsAt, ...rest } = parsed.data;
-    await updateFileRequest(user.id, requestId, {
+    await dropPoints.updateFileRequest(user.id, requestId, {
         ...rest,
         // A date string sets the time, `null` clears it, `undefined` leaves it.
         startsAt: startsAt === undefined ? undefined : startsAt ? new Date(startsAt) : null,
@@ -245,7 +231,7 @@ export async function updateFileRequestAction(
 /** Reopen a closed drop point the caller owns so it accepts uploads again. Owner-scoped. */
 export async function reopenFileRequestAction(requestId: string): Promise<void> {
     const user = await requirePermission("requests.create");
-    await reopenFileRequest(user.id, requestId);
+    await dropPoints.reopenFileRequest(user.id, requestId);
     await recordAudit({
         actorId: user.id,
         action: "request.reopen",
@@ -265,16 +251,16 @@ export async function unlockFileRequestAction(
     token: string,
     password: string
 ): Promise<{ error?: string }> {
-    const request = await resolveFileRequestByToken(token);
+    const request = await dropPoints.resolveFileRequestByToken(token);
     if (!request) return { error: "This link is not available." };
-    if (!fileRequestUsability(request).ok) return { error: "This link is no longer available." };
+    if (!dropPoints.fileRequestUsability(request).ok) return { error: "This link is no longer available." };
 
     const limitKey = `drop-unlock:${request.id}:${hashForLog(await clientIp()) ?? "unknown"}`;
     if (!(await rateLimit(limitKey, 10, 15 * 60 * 1000)).ok) {
         return { error: "Too many attempts. Please wait a few minutes and try again." };
     }
 
-    if (!(await verifyFileRequestPassword(request.passwordHash, password))) {
+    if (!(await dropPoints.verifyFileRequestPassword(request.passwordHash, password))) {
         return { error: "Incorrect PIN." };
     }
     await resetRateLimit(limitKey);
@@ -282,8 +268,8 @@ export async function unlockFileRequestAction(
     const env = loadEnv();
     const store = await cookies();
     store.set(
-        fileRequestUnlockCookie(request.id),
-        signFileRequestUnlock(request.id, env.POLARIS_AUTH_SECRET),
+        dropPoints.fileRequestUnlockCookie(request.id),
+        dropPoints.signFileRequestUnlock(request.id, env.POLARIS_AUTH_SECRET),
         {
             httpOnly: true,
             sameSite: "lax",
@@ -298,7 +284,7 @@ export async function unlockFileRequestAction(
 /** Revoke a file request the caller owns. Owner-scoped, so IDOR is impossible. */
 export async function revokeFileRequestAction(requestId: string): Promise<void> {
     const user = await requirePermission("requests.create");
-    await revokeFileRequest(user.id, requestId);
+    await dropPoints.revokeFileRequest(user.id, requestId);
     await recordAudit({
         actorId: user.id,
         action: "request.revoke",
@@ -309,13 +295,83 @@ export async function revokeFileRequestAction(requestId: string): Promise<void> 
     revalidatePath(`/drive/drop-points/${requestId}`);
 }
 
+/**
+ * Delete a drop point, and optionally the folder it collected into.
+ *
+ * The folder goes first. A drop point gets its own folder when it is created, so
+ * removing both is the usual intent - but if the storage is unreachable, or the
+ * caller may no longer write there, the whole thing is called off with nothing
+ * destroyed rather than leaving files nobody can find from a drop point that no
+ * longer exists. A folder already gone by other means is not an obstacle: the end
+ * state it was asked for is the one that is already true.
+ */
+export async function deleteFileRequestAction(
+    requestId: string,
+    deleteFolder: boolean
+): Promise<{ error?: string }> {
+    const user = await requirePermission("requests.create");
+    const request = await dropPoints.getFileRequestForOwner(user.id, requestId);
+    if (!request) return { error: "That drop point no longer exists." };
+
+    if (deleteFolder) {
+        try {
+            await authorizeDrive(
+                user.id,
+                request.destinationConnectionId,
+                request.destinationPath,
+                "write"
+            );
+            const driver = await getDriverForConnection(request.destinationConnectionId);
+            try {
+                await driver.delete(request.destinationPath, { recursive: true });
+            } finally {
+                await driver.dispose();
+            }
+            await invalidateFolderSizes(
+                request.destinationConnectionId,
+                request.destinationPath
+            );
+        } catch (caught) {
+            if (caught instanceof DriveAccessError)
+                return { error: "You cannot delete that folder" };
+            if (caught instanceof DriveLockedError) return { error: "That folder is locked" };
+            const code = caught instanceof StorageError ? caught.code : null;
+            if (code !== "not_found") {
+                return {
+                    error:
+                        caught instanceof Error
+                            ? `The folder could not be deleted: ${caught.message}`
+                            : "The folder could not be deleted"
+                };
+            }
+        }
+    }
+
+    if (!(await dropPoints.deleteFileRequestForOwner(user.id, requestId))) {
+        return { error: "That drop point no longer exists." };
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: "request.delete",
+        targetType: "fileRequest",
+        targetId: requestId,
+        metadata: {
+            destinationConnectionId: request.destinationConnectionId,
+            destinationPath: request.destinationPath,
+            folderDeleted: deleteFolder
+        }
+    });
+    revalidatePath("/drive/drop-points");
+    return {};
+}
+
 /** Delete a collected file. Owner-scoped: only the drop point's owner may call it. */
 export async function deleteSubmissionAction(
     requestId: string,
     submissionId: string
 ): Promise<{ error?: string }> {
     const user = await requirePermission("requests.create");
-    const ok = await deleteSubmissionForOwner(user.id, requestId, submissionId);
+    const ok = await dropPoints.deleteSubmissionForOwner(user.id, requestId, submissionId);
     if (!ok) return { error: "That file no longer exists." };
     await recordAudit({
         actorId: user.id,
@@ -359,7 +415,7 @@ export async function saveDropPointTemplateAction(
     if (!trimmed) return { error: "Name the template." };
     const parsed = templateConfigSchema.safeParse(config);
     if (!parsed.success) return { error: "That template config is invalid." };
-    const { id } = await createTemplate(
+    const { id } = await dropPoints.createTemplate(
         user.id,
         trimmed.slice(0, 120),
         JSON.stringify(parsed.data)
@@ -373,7 +429,7 @@ export async function listDropPointTemplatesAction(): Promise<
     { id: string; name: string; config: string; createdAt: string }[]
 > {
     const user = await requirePermission("requests.create");
-    const rows = await listTemplates(user.id);
+    const rows = await dropPoints.listTemplates(user.id);
     return rows.map((row) => ({
         id: row.id,
         name: row.name,
@@ -385,6 +441,6 @@ export async function listDropPointTemplatesAction(): Promise<
 /** Delete one of the caller's templates. Owner-scoped and idempotent. */
 export async function deleteDropPointTemplateAction(id: string): Promise<void> {
     const user = await requirePermission("requests.create");
-    await deleteTemplate(user.id, id);
+    await dropPoints.deleteTemplate(user.id, id);
     revalidatePath("/drive/drop-points");
 }

@@ -13,10 +13,17 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
-import { baseName, normalizeRelPath } from "@polaris/core";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
+import { getSession } from "@/lib/session";
+import { noteActivity } from "@/lib/session-guard";
+import { ShareExplorer } from "./share-explorer";
+import { ShareFileCard } from "./share-file-card";
 import { ArrowUpRight, LogIn } from "lucide-react";
+import { dymoIpAllowed } from "@/lib/dymo-service";
+import { SharePasswordForm } from "./share-password-form";
+import { baseName, normalizeRelPath } from "@polaris/core";
 import { getDriverForConnection } from "@/lib/storage-service";
+import { clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
 import {
     logShareAccess,
     resolveShareByToken,
@@ -27,12 +34,6 @@ import {
     shareUsability,
     verifyShareUnlock
 } from "@/lib/share-service";
-import { clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
-import { dymoIpAllowed } from "@/lib/dymo-service";
-import { getSession } from "@/lib/session";
-import { SharePasswordForm } from "./share-password-form";
-import { ShareExplorer } from "./share-explorer";
-import { ShareFileCard } from "./share-file-card";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -95,6 +96,10 @@ export default async function SharePage({
     // chrome (a shortcut back into the app), never the access decision.
     const session = await getSession();
     const signedIn = Boolean(session?.user);
+    // Being on a share page is being here, and the guard that records that runs
+    // only on the dashboard - so without this the directory calls a user absent
+    // while they are reading a folder someone shared with them.
+    await noteActivity(session?.session?.id);
 
     const share = await resolveShareByToken(token);
     if (!share) return <Unavailable signedIn={signedIn} message="This link does not exist or has been removed." />;

@@ -13,13 +13,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatBytes } from "@polaris/core";
 import { tokenList } from "@/lib/token-field";
+import { useNow } from "@/components/presence";
 import { GeoPicker } from "@/components/geo-picker";
 import { useFormChanged } from "@/lib/use-form-changed";
 import { useConfirm } from "@/components/confirm-dialog";
 import { AccountInput } from "@/components/account-input";
 import { useDisplayFormat } from "@/components/display-format";
 import { RequestDialog } from "@/app/(app)/drive/request-dialog";
-import { useMemo, useState, useTransition, type FormEvent, type ReactNode } from "react";
+import { useState, useTransition, type FormEvent, type ReactNode } from "react";
+import { DeleteDropPointDialog } from "@/app/(app)/drive/drop-points/delete-drop-point-dialog";
 import {
     Ban,
     ChevronLeft,
@@ -48,6 +50,7 @@ import {
     DialogDescription
 } from "@polaris/ui";
 import {
+    deleteFileRequestAction,
     deleteSubmissionAction,
     reopenFileRequestAction,
     revokeFileRequestAction,
@@ -160,6 +163,7 @@ export function DropPointDetail({
     const [savingTemplate, setSavingTemplate] = useState(false);
     const [tab, setTab] = useState<"overview" | "files" | "visitors">("overview");
     const [files, setFiles] = useState(submissions);
+    const [deleting, setDeleting] = useState(false);
     const [confirm, confirmDialog] = useConfirm();
 
     const state = status(config);
@@ -185,6 +189,23 @@ export function DropPointDetail({
         startTransition(async () => {
             await revokeFileRequestAction(config.id);
             router.refresh();
+        });
+    }
+
+    function onDelete(deleteFolder: boolean) {
+        startTransition(async () => {
+            const result = await deleteFileRequestAction(config.id, deleteFolder);
+            if (result.error) {
+                setDeleting(false);
+                await confirm({
+                    title: "Couldn't delete this drop point",
+                    description: result.error,
+                    alert: true
+                });
+                return;
+            }
+            // Back to the list: this page's subject no longer exists.
+            router.replace("/drive/drop-points");
         });
     }
 
@@ -304,6 +325,16 @@ export function DropPointDetail({
                             Open folder
                         </Link>
                     </Button>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label="Delete this drop point"
+                        title="Delete"
+                        onClick={() => setDeleting(true)}
+                        disabled={pending}
+                    >
+                        <Trash2 className="size-4" />
+                    </Button>
                 </div>
             </div>
 
@@ -356,6 +387,22 @@ export function DropPointDetail({
                 connections={connections}
                 initial={cloneInitial}
                 onOpenChange={(open) => !open && setCloning(false)}
+            />
+            <DeleteDropPointDialog
+                target={
+                    deleting
+                        ? {
+                              id: config.id,
+                              title: config.title,
+                              destinationPath: config.destinationPath,
+                              connectionName: config.connectionName,
+                              submissionCount: files.length
+                          }
+                        : null
+                }
+                busy={pending}
+                onCancel={() => setDeleting(false)}
+                onConfirm={onDelete}
             />
             {confirmDialog}
         </div>
@@ -502,8 +549,9 @@ function FilesTab({
 }
 
 function VisitorsTab({ visitors }: { visitors: VisitorRow[] }) {
-    // Compute "live" and duration relative to now on the client at render time.
-    const now = useMemo(() => Date.now(), []);
+    // A ticking clock, not one read at render: "Active now" used to stay on screen
+    // for as long as the tab was open, however long ago the visitor left.
+    const now = useNow(10_000);
     const format = useDisplayFormat();
     if (visitors.length === 0) {
         return (

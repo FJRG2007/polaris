@@ -51,7 +51,7 @@ const ALLOWED: SessionVerdict = {
 };
 
 /** How stale the activity stamp may get before it is worth a write. */
-const ACTIVITY_WRITE_INTERVAL_MS = 60_000;
+export const ACTIVITY_WRITE_INTERVAL_MS = 60_000;
 
 interface GuardInput {
     userId: string;
@@ -80,6 +80,33 @@ async function revokeSession(sessionId: string): Promise<void> {
  * A session Polaris has never guarded has no recorded address and is left alone:
  * guardSession evaluates it in full the first time it serves a request.
  */
+/**
+ * Record that a signed-in person was here, from a page the guard does not run on.
+ *
+ * The dashboard stamps activity through guardSession, so a public page - a drop
+ * point, a share - left an account looking untouched for days while its owner was
+ * demonstrably using Polaris. The directory reads that stamp to say who was last
+ * here, and it was wrong by whole days.
+ *
+ * Only for a real page load. It must not be called from a heartbeat: the idle lock
+ * measures the same stamp, and a poll from a tab nobody is sitting at would hold an
+ * unattended session open forever. The write is throttled by the same interval the
+ * guard uses, in the WHERE clause, so calling it on every render costs one
+ * no-op statement.
+ */
+export async function noteActivity(sessionId: string | undefined | null): Promise<void> {
+    if (!sessionId) return;
+    await prisma.sessionState
+        .updateMany({
+            where: {
+                sessionId,
+                lastSeenAt: { lt: new Date(Date.now() - ACTIVITY_WRITE_INTERVAL_MS) }
+            },
+            data: { lastSeenAt: new Date() }
+        })
+        .catch(() => undefined);
+}
+
 export async function revokeSessionsRefusedByRules(userId: string): Promise<number> {
     const states = await prisma.sessionState.findMany({
         where: { userId, session: { expiresAt: { gt: new Date() } } },
