@@ -16,6 +16,7 @@
 import { connect } from "node:net";
 import { prisma } from "@polaris/db";
 import { pingSteamQuery } from "@/lib/apps/ark/a2s";
+import { pingJava } from "@/lib/apps/minecraft/slp";
 import { pingBedrock } from "@/lib/apps/minecraft/raknet";
 import { isCarrierGradeNat, isPublicIpv4 } from "@polaris/core";
 import { getHostLanIp, isLanAddress } from "@/lib/host-address";
@@ -141,41 +142,49 @@ function answersOnUdp(host: string, port: number, timeoutMs: number): Promise<bo
     );
 }
 
-/** A local connect crosses no router, so it either answers at once or there is
- *  nothing there. Short enough that a page can wait for it. */
+/** A ping that crosses no router is answered at once or not at all. Short enough
+ *  that a page can wait for it, and every port is asked at the same time, so this
+ *  is what the whole question costs rather than what each port costs. */
 const LOCAL_PROBE_TIMEOUT_MS = 700;
 
 /**
- * Whether anything is listening on these ports here, on this network.
+ * Whether the game is answering on these ports here, on this network.
  *
- * The question the reach advice was missing. A server that is still generating
- * its world answers nothing, from inside or out, and reading that silence as "the
- * router is not forwarding it" is what told an operator to open a port they had
- * already opened - and then ticked it by itself once the server finished booting.
+ * The question the reach advice was missing. A server that is still fetching
+ * itself or generating its world answers nothing, from inside or out, and reading
+ * that silence as "the router is not forwarding it" is what told an operator to
+ * open a port they had already opened - and then ticked it by itself once the
+ * server finished booting.
  *
- * Null when there is no address to try, so the advice can say nothing about it
- * rather than infer. A UDP port can only ever answer yes here: the games that
- * reply to a ping do, but one that speaks something else is silent whether it is
- * up or down, and reading that silence as "down" would be the same mistake in the
- * other direction.
+ * Every port is asked in its own game's language rather than knocked on, and that
+ * is the whole point: the container engine publishes a host port the moment the
+ * container exists and accepts connections on the server's behalf, so a plain
+ * connect succeeds throughout a boot that has not started the game yet. A game
+ * that replies has replied.
+ *
+ * Silence reads as "not answering", which it may only do here. There is nothing
+ * between this and the port - no router to drop the packet, no forward to be
+ * missing - so the one thing silence can mean is that the game is not up. Outward,
+ * where all of those exist, silence still means nothing: that is `probeReach`.
+ *
+ * Null when there is nothing to ask about, so a caller with no ports is not handed
+ * a verdict about them.
  */
 export async function probeListening(ports: readonly GamePort[], lanIp: string | null): Promise<boolean | null> {
+    if (ports.length === 0) return null;
     const host = lanIp ?? "127.0.0.1";
-    const udp = ports.filter((entry) => entry.protocol === "udp");
     // Every port at once: a game publishes several and only one of them answers,
-    // so asking in turn is a page waiting out the ones that never will.
-    if (udp.length > 0) {
-        const answers = await Promise.all(
-            udp.map((port) => answersOnUdp(host, port.port, LOCAL_PROBE_TIMEOUT_MS))
-        );
-        if (answers.some(Boolean)) return true;
-    }
-    const tcp = ports.filter((entry) => entry.protocol === "tcp");
-    if (tcp.length === 0) return null;
-    for (const port of tcp) {
-        if (await probeGamePort(host, port.port, LOCAL_PROBE_TIMEOUT_MS)) return true;
-    }
-    return false;
+    // so asking in turn is a page waiting out the ones that never will. A TCP port
+    // is Minecraft: Java's - the only game in the catalog whose clients speak it -
+    // and the UDP ones are asked in both languages, as they are outward.
+    const answers = await Promise.all(
+        ports.map((entry) =>
+            entry.protocol === "udp"
+                ? answersOnUdp(host, entry.port, LOCAL_PROBE_TIMEOUT_MS)
+                : pingJava(host, entry.port, LOCAL_PROBE_TIMEOUT_MS)
+        )
+    );
+    return answers.some(Boolean);
 }
 
 /** How long a probe's answer stands before the port is worth knocking on again.

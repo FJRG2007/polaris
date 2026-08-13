@@ -608,6 +608,27 @@ export async function listGamePorts(): Promise<GamePortRow[]> {
     return rows.filter((row) => row.ports.length > 0);
 }
 
+/**
+ * Knock on every unproven game port whose server is up, and record the ones that
+ * answer.
+ *
+ * The same pass the two screens make while somebody is watching them, on a timer
+ * so that nobody has to be. The panel promises Polaris marks the port done by
+ * itself the moment it answers from outside, and until this existed that promise
+ * held only for as long as a tab was open on it: a server created in the evening
+ * and left to generate its world was still "not confirmed" in the morning, having
+ * been reachable for eight hours.
+ *
+ * Only a running server is knocked on, and `probeReach` refuses to knock twice
+ * inside its own rate limit - so this costs one connection per unproven server and
+ * nothing at all once they are proven.
+ */
+export async function sweepGameReach(): Promise<{ pending: number; proven: number }> {
+    const pending = (await listGamePorts()).filter((server) => !server.confirmed && server.running);
+    const proven = await probeReach(pending);
+    return { pending: pending.length, proven: proven.length };
+}
+
 /** Every game server's ports, what is still in the way of the ones not proven,
  *  and the settings the router instructions are written from. */
 export interface GamePortsReading {

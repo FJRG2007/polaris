@@ -37,6 +37,13 @@ vi.mock("@/lib/apps/install-config", () => ({
     },
     readInstallConfig: () => ({})
 }));
+vi.mock("@/lib/host-address", async (importActual) => ({
+    ...(await importActual<typeof import("@/lib/host-address")>()),
+    // The probe dials the address this machine holds on its own network, which a
+    // test cannot have. Everything else - what counts as a LAN address, which is
+    // what decides whether a join proves anything - keeps the real rule.
+    getHostLanIp: async () => "127.0.0.1"
+}));
 vi.mock("@/lib/apps/port-block-store", () => ({
     getPortPolicy: async () => "range",
     getPortBlocks: async () => ({ tcp: { start: 25565, end: 25664 }, udp: { start: 19132, end: 19231 } })
@@ -97,6 +104,45 @@ async function bedrock(speaks: "raknet" | "gibberish"): Promise<{ port: number; 
 
 function closeSocket(socket: Socket): Promise<void> {
     return new Promise((resolve) => socket.close(() => resolve()));
+}
+
+/** A status reply as a Java server frames it: the length of what follows, the
+ *  packet id, then the JSON row a client would draw on its server list. */
+function statusReply(): Buffer {
+    const json = Buffer.from('{"description":"a server"}', "utf8");
+    const body = Buffer.concat([Buffer.from([0x00, json.length]), json]);
+    return Buffer.concat([Buffer.from([body.length]), body]);
+}
+
+/**
+ * A TCP port that answers like a Java server, or like the two things that are not
+ * one.
+ *
+ * `silence` is the case this whole probe exists for: the container engine publishes
+ * the host port the moment the container exists and accepts on the server's behalf,
+ * so a port with no game behind it opens cleanly and says nothing. Reading that as
+ * a running server is what sent an operator into their router about a server that
+ * had not started yet.
+ */
+async function java(speaks: "status" | "silence" | "gibberish"): Promise<{ port: number; server: Server }> {
+    const server = createServer((socket) => {
+        // The probe hangs up the moment it has its answer, and a hang-up on a
+        // request this side never read is a reset - which is an error event with
+        // nobody listening, and that ends the run rather than the connection.
+        socket.on("error", () => socket.destroy());
+        if (speaks === "silence") {
+            // Read the request and answer nothing, which is what a published port
+            // with no game behind it does. Left unread, the request would hold the
+            // socket open against the hang-up and the listener could never close.
+            socket.resume();
+            return;
+        }
+        socket.once("data", () => socket.write(speaks === "status" ? statusReply() : Buffer.from("HTTP/1.1 200 OK")));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (address === null || typeof address === "string") throw new Error("no port");
+    return { port: address.port, server };
 }
 
 afterEach(() => {
@@ -217,27 +263,61 @@ describe("what a server that is turned off is told", () => {
         expect(advice.title).toContain("cannot be checked");
         expect(patched).toEqual([]);
     });
+});
 
-    it("asks about the forward again once it is running", async () => {
-        application = { sourceConfig: bedrockPorts, desiredState: "running" };
+/**
+ * The same refusal one step later, and the state a brand new server spends its
+ * first minutes in: Polaris means it to be up, and the game has not opened its
+ * world yet.
+ */
+describe("what a server that has not finished starting is told", () => {
+    it("refuses to name the router while the port is published but silent", async () => {
+        const { port, server } = await java("silence");
+        application = {
+            sourceConfig: JSON.stringify({ hostPort: port, hostProtocol: "tcp" }),
+            desiredState: "running"
+        };
 
-        const advice = await reachAdviceFor("on");
+        const advice = await reachAdviceFor("starting");
+
+        // What the operator saw on a server they had just created: an open socket
+        // held by the engine on behalf of a game that was still fetching itself,
+        // read as a running server, read in turn as a router that had not been
+        // told about it.
+        expect(advice.forward).toBe(false);
+        expect(advice.actionable).toBe(false);
+        expect(advice.title).toContain("Not answering yet");
+        await close(server);
+    });
+
+    it("asks about the forward once the game itself answers", async () => {
+        const { port, server } = await java("status");
+        application = {
+            sourceConfig: JSON.stringify({ hostPort: port, hostProtocol: "tcp" }),
+            desiredState: "running"
+        };
+
+        const advice = await reachAdviceFor("up");
 
         expect(advice.forward).toBe(true);
         expect(advice.title).toContain("not confirmed");
+        await close(server);
     });
 });
 
-describe("whether the server is even listening", () => {
-    it("says yes while something answers here, and no once nothing does", async () => {
-        const { port, server } = await listener();
+describe("whether the game is answering here", () => {
+    it("hears a Java server, and not a port that merely accepts", async () => {
+        const answering = await java("status");
+        const published = await java("silence");
+        const impostor = await java("gibberish");
 
-        expect(await probeListening([{ port, protocol: "tcp" }], "127.0.0.1")).toBe(true);
-        await close(server);
+        expect(await probeListening([{ port: answering.port, protocol: "tcp" }], "127.0.0.1")).toBe(true);
         // This is the state that used to be read as "your router is not forwarding
-        // it": a server still generating its world answers nothing, from inside or
-        // out, and the advice has to say so instead of naming the router.
-        expect(await probeListening([{ port, protocol: "tcp" }], "127.0.0.1")).toBe(false);
+        // it": the port is held and open, and nothing is playing Minecraft behind
+        // it. Something answered on the third, and it was not the game.
+        expect(await probeListening([{ port: published.port, protocol: "tcp" }], "127.0.0.1")).toBe(false);
+        expect(await probeListening([{ port: impostor.port, protocol: "tcp" }], "127.0.0.1")).toBe(false);
+        await Promise.all([close(answering.server), close(published.server), close(impostor.server)]);
     });
 
     it("hears a Bedrock server on UDP, and nothing else", async () => {
@@ -245,9 +325,30 @@ describe("whether the server is even listening", () => {
 
         expect(await probeListening([{ port, protocol: "udp" }], "127.0.0.1")).toBe(true);
         await closeSocket(socket);
-        // Once it stops answering there is no state to report rather than a "no":
-        // a UDP game that does not speak RakNet is silent whether it is up or down.
-        expect(await probeListening([{ port, protocol: "udp" }], "127.0.0.1")).toBeNull();
+        // Silence on the way out means nothing - a router that will not loop its
+        // own address back inward sounds the same. Silence here is the game not
+        // answering, since there is nothing in between to lose the packet.
+        expect(await probeListening([{ port, protocol: "udp" }], "127.0.0.1")).toBe(false);
+        // And a server with no ports is not handed a verdict about them.
         expect(await probeListening([], "127.0.0.1")).toBeNull();
+    });
+
+    it("answers on the port that is up when a server publishes several", async () => {
+        const { port, socket } = await bedrock("raknet");
+        const quiet = await java("silence");
+
+        // ARK publishes three and only the query port ever replies; a game that
+        // answered on any of them is up.
+        expect(
+            await probeListening(
+                [
+                    { port: quiet.port, protocol: "tcp" },
+                    { port, protocol: "udp" }
+                ],
+                "127.0.0.1"
+            )
+        ).toBe(true);
+        await closeSocket(socket);
+        await close(quiet.server);
     });
 });

@@ -23,9 +23,9 @@ import { getServerPlayers } from "@/lib/apps/minecraft/service";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { sweepGameActivity } from "@/lib/apps/games-activity-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
-import { runGameRoutines, sweepGameSchedules } from "@/lib/apps/minecraft/schedule-service";
-import { isGameServerApp, syncFirewallBans } from "@/lib/apps/games-service";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
+import { runGameRoutines, sweepGameSchedules } from "@/lib/apps/minecraft/schedule-service";
+import { isGameServerApp, sweepGameReach, syncFirewallBans } from "@/lib/apps/games-service";
 
 const MINUTE = 60 * 1000;
 
@@ -202,6 +202,18 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // stopped twice and somebody told twice.
         leaseMs: 5 * MINUTE,
         run: runGameHealth
+    },
+    {
+        key: "game-reach",
+        // Two minutes, because it is only ever answering a question the operator
+        // has already been told the answer arrives on its own: a port opened while
+        // the server was still starting, or a forward made after the tab was
+        // closed. Nothing is knocked on once it is proven.
+        everyMs: Number(process.env.POLARIS_GAME_REACH_MS) || 2 * MINUTE,
+        // Unleased like the other read-only sweeps: two runners knock on the same
+        // port and write the same timestamp, which is the same outcome.
+        leaseMs: null,
+        run: sweepGameReach
     },
     {
         key: "scheduled-deletions",

@@ -137,8 +137,8 @@ export function gameReachAdvice(
     lanIp: string | null = null,
     policy: PortPolicy = "per-port",
     blocks: PortBlocks = DEFAULT_PORT_BLOCKS,
-    /** Whether anything is listening on the port here, on this network. Null when
-     *  it was not checked. */
+    /** Whether the game answers on the port here, on this network. Null when it
+     *  was not checked. */
     listening: boolean | null = null
 ): GameReachAdvice {
     if (ports.length === 0) return NO_PORTS;
@@ -154,18 +154,20 @@ export function gameReachAdvice(
             forward: false
         };
     }
-    // Nothing is listening here, so nothing outside could have answered either -
-    // and there is no evidence about the router one way or the other. Telling the
-    // operator to forward a port at this point is a demand built on a missing
-    // answer, which is exactly how somebody ends up opening a port that was open
-    // all along and watching it tick itself minutes later, once the server had
+    // The game is not answering here, so nothing outside could have answered
+    // either - and there is no evidence about the router one way or the other.
+    // Telling the operator to forward a port at this point is a demand built on a
+    // missing answer, which is exactly how somebody ends up opening a port that was
+    // open all along and watching it tick itself minutes later, once the server had
     // finished starting.
     if (listening === false) {
         return {
             ok: false,
             actionable: false,
-            title: "Not answering yet, so its port cannot be checked",
-            detail: `Nothing is listening on ${named} here, so whether it reaches this machine from outside cannot be told apart from the server being down. Start it - or wait for it to finish generating its world - and this checks itself.`,
+            title: many
+                ? "Not answering yet, so its ports cannot be checked"
+                : "Not answering yet, so its port cannot be checked",
+            detail: `The server is not answering on ${named} yet, and a port with nothing behind it looks the same from outside whether it is open or not. A first start takes minutes - the server fetches itself, then generates a world - and Polaris checks this by itself once it answers.`,
             steps: [],
             forward: false
         };
