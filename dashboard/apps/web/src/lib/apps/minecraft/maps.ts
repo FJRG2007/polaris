@@ -55,7 +55,7 @@ import type { GameBlueprint } from "./blueprints";
 
 /** Where the mirrored archives live. One tag, so a map added later is a commit
  *  and a new tag rather than a new place for these to come from. */
-const MIRROR = "https://cdn.jsdelivr.net/gh/FJRG2007/polaris-minecraft-worlds@v2";
+const MIRROR = "https://cdn.jsdelivr.net/gh/FJRG2007/polaris-minecraft-worlds@v3";
 
 /** The kind of game a map is, which is what a blueprint offers a choice of. */
 export type MapCategory = "skyblock" | "parkour" | "bedwars" | "luckyblock";
@@ -152,7 +152,7 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         name: "Skyblock 2.1",
         category: "skyblock",
         summary: "The original island in the void, a tree and a chest. Survive on what you can make of it.",
-        author: "Polaris",
+        author: "Noobcrew",
         source: "https://skyblock.net",
         url: `${MIRROR}/skyblock-2-1.zip`,
         sha256: "2dc429f5b76292559fe20de44676400d60ed7d1cb4fa0959291ff39358554920",
@@ -169,7 +169,7 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         name: "Parkour Spiral",
         category: "parkour",
         summary: "A tower of themed courses with checkpoints, climbed from the bottom.",
-        author: "Polaris",
+        author: "Hielke",
         source: "https://hielkemaps.com/maps/parkour-spiral",
         url: `${MIRROR}/parkour-spiral.zip`,
         sha256: "6ad92d235ed01e5bb4172af18168064e55876fefdeeb46e7920d78aaecda8836",
@@ -188,7 +188,7 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         name: "Bedwars: Treasure Island",
         category: "bedwars",
         summary: "Eight teams, a bed each and a pirate island in the middle. Shops, generators and traps are built in.",
-        author: "Polaris",
+        author: "TriplicataMC",
         source: "https://www.minecraftmaps.com/51834-bedwars-treasure-island",
         url: `${MIRROR}/bedwars-treasure-island.zip`,
         sha256: "a13834575ed84953f1ce52df87ea9514241725684604912977a6789af15a7d74",
@@ -218,8 +218,8 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         author: "Polaris",
         source: "https://www.minecraftmaps.com",
         url: `${MIRROR}/luckyblock-towers.zip`,
-        sha256: "e8bd1acbb05a3203dda363ee133fb6c1b572335899b32aa0ae345df5c14d45b0",
-        bytes: 2313341,
+        sha256: "9c86023e637b4aae3a291932b395f3cd4b65db89d2bb646499d0e9946981a310",
+        bytes: 2170584,
         // Command blocks only, and every command in them is the modern syntax -
         // no items are given with NBT, which is the change that breaks maps of
         // this age - so it plays on the current release.
