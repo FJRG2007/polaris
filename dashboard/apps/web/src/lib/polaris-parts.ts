@@ -13,13 +13,25 @@
  */
 
 /**
+ * The compose projects of the two tunnels the control plane opens for its own
+ * address, defined here and used by the services that start them.
+ *
+ * One definition rather than two, because the failure of two is silent: a project
+ * renamed where it is created would go on being started under the new name and
+ * simply stop counting as Polaris here, and the figures would still look
+ * plausible.
+ */
+export const TUNNEL_PROJECT = "polaris-tunnel";
+export const PUBLIC_TUNNEL_PROJECT = "polaris-ptunnel";
+
+/**
  * The compose projects that are Polaris rather than something it runs.
  *
- * The stack itself, and the two tunnels the control plane opens for its own
- * address - a tunnel exists to publish Polaris, so what it costs is part of what
- * Polaris costs. A tunnel a deployed app was given belongs to that app.
+ * The stack itself, and the two tunnels above - a tunnel exists to publish
+ * Polaris, so what it costs is part of what Polaris costs. A tunnel a deployed app
+ * was given belongs to that app.
  */
-const OWN_PROJECTS = ["polaris", "polaris-tunnel", "polaris-ptunnel"];
+const OWN_PROJECTS = ["polaris", TUNNEL_PROJECT, PUBLIC_TUNNEL_PROJECT];
 
 /** What each part of the stack is called, and what it is for. Keyed by the compose
  *  service, which is the name in the file and survives the container being

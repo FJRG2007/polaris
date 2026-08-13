@@ -282,9 +282,9 @@ export function GamesView({
             <PageHeader
                 title="Game servers"
                 description={
-                    servers.length === 0
+                    rows.length === 0
                         ? "Run game servers on your own machines."
-                        : `${servers.length} ${servers.length === 1 ? "server" : "servers"}, ${playing} playing right now.`
+                        : `${rows.length} ${rows.length === 1 ? "server" : "servers"}, ${playing} playing right now.`
                 }
                 actions={
                     canCreate ? (
@@ -297,7 +297,7 @@ export function GamesView({
 
             {error && <p className="text-sm text-danger">{error}</p>}
 
-            {servers.length === 0 ? (
+            {rows.length === 0 ? (
                 <Card>
                     <CardBody className="flex flex-col items-center gap-3 py-12 text-center">
                         <Gamepad2 className="size-8 text-muted-foreground" />

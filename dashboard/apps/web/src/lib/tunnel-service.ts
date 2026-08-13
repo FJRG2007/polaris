@@ -10,11 +10,12 @@
  */
 
 import { edgeAddress } from "./deploy/dial";
+import { TUNNEL_PROJECT } from "./polaris-parts";
 import { HostdPorts } from "./deploy/ports-hostd";
 import type { ComposeSpec } from "@polaris/deploy";
 import { getIntegrationSecret, getIntegrationState } from "./integration-service";
 
-const PROJECT = "polaris-tunnel";
+const PROJECT = TUNNEL_PROJECT;
 const SERVICE = "polaris-tunnel";
 const PROXY_NETWORK = "polaris-proxy";
 

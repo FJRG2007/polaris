@@ -75,7 +75,13 @@ async function measure(driver: DockerDriver): Promise<PolarisFootprint> {
     // mount the same volume, and counting it twice would report a stack twice the
     // size of the one on disk.
     const ports = new HostdPorts();
-    const measured = new Map<string, number | null>();
+    /** Every named volume the stack mounts, measured or not - which is what says
+     *  whether the disk figures are a total or a floor. */
+    const seen = new Set<string>();
+    /** Only the readings that came back. A failed attempt is not cached as a
+     *  measurement of null, or the first part to mount a shared volume while
+     *  stopped would settle it for every running part that mounts it too. */
+    const measured = new Map<string, number>();
     const parts: FootprintPart[] = [];
     try {
         for (const container of own) {
@@ -84,21 +90,15 @@ async function measure(driver: DockerDriver): Promise<PolarisFootprint> {
             const volumes: FootprintVolume[] = [];
             for (const mount of detail?.mounts ?? []) {
                 if (!mount.name) continue;
-                if (!measured.has(mount.name)) {
-                    // A stopped part cannot be asked, and a read-only mount is
-                    // somebody else's volume seen from here - both are measured
-                    // wherever they are writable and running, or not at all.
-                    const used =
-                        container.state === "running"
-                            ? await ports.diskUsage(container.name, mount.destination)
-                            : null;
-                    measured.set(mount.name, used);
+                seen.add(mount.name);
+                // A stopped part cannot be asked, and a read-only mount is
+                // somebody else's volume seen from here - both are measured
+                // wherever they are writable and running, or not at all.
+                if (!measured.has(mount.name) && container.state === "running" && mount.rw) {
+                    const used = await ports.diskUsage(container.name, mount.destination);
+                    if (used !== null) measured.set(mount.name, used);
                 }
-                volumes.push({
-                    name: mount.name,
-                    path: mount.destination,
-                    usedBytes: measured.get(mount.name) ?? null
-                });
+                volumes.push({ name: mount.name, path: mount.destination, usedBytes: null });
             }
             parts.push({
                 id: container.id,
@@ -118,22 +118,30 @@ async function measure(driver: DockerDriver): Promise<PolarisFootprint> {
         await ports.dispose().catch(() => undefined);
     }
 
+    // Filled in once every part has been walked, so a volume a stopped part
+    // mounts still carries the figure the running part that shares it measured,
+    // whichever of the two the engine listed first.
+    const measuredParts = parts.map((part) => ({
+        ...part,
+        volumes: part.volumes.map((volume) => ({ ...volume, usedBytes: measured.get(volume.name) ?? null }))
+    }));
+
     // An image shared by two parts is one image on disk. Keyed by what the part
     // reports as its image, which is the same string for both.
     const images = new Map<string, number>();
-    for (const part of parts) {
+    for (const part of measuredParts) {
         if (part.imageBytes !== null) images.set(part.image, part.imageBytes);
     }
 
     return {
-        parts,
-        memUsedBytes: sum(parts.map((part) => part.memUsedBytes)),
+        parts: measuredParts,
+        memUsedBytes: sum(measuredParts.map((part) => part.memUsedBytes)),
         memTotalBytes: info?.memTotal ?? null,
-        cpuPercent: Math.round(sum(parts.map((part) => part.cpuPercent)) * 100) / 100,
+        cpuPercent: Math.round(sum(measuredParts.map((part) => part.cpuPercent)) * 100) / 100,
         imageBytes: [...images.values()].reduce((total, bytes) => total + bytes, 0),
-        writableBytes: sum(parts.map((part) => part.writableBytes)),
-        volumeBytes: sum([...measured.values()]),
-        diskComplete: [...measured.values()].every((bytes) => bytes !== null),
+        writableBytes: sum(measuredParts.map((part) => part.writableBytes)),
+        volumeBytes: [...measured.values()].reduce((total, bytes) => total + bytes, 0),
+        diskComplete: seen.size === measured.size,
         at: new Date().toISOString()
     };
 }

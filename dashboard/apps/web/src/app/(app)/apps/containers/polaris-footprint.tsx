@@ -15,10 +15,11 @@
  * that.
  */
 
+import { useCallback, useRef } from "react";
 import { formatBytes } from "@polaris/core";
 import { RefreshCw, Sparkles } from "lucide-react";
+import { useLiveRead } from "@/components/use-live-resource";
 import { Button, Card, CardBody, Skeleton } from "@polaris/ui";
-import { useLiveResource } from "@/components/use-live-resource";
 import { footprintDiskBytes, type FootprintPart, type PolarisFootprint } from "./types";
 
 /** Slow to measure and slow to change: a stack that has just been asked how big it
@@ -26,20 +27,44 @@ import { footprintDiskBytes, type FootprintPart, type PolarisFootprint } from ".
 const REFRESH_MS = 5 * 60_000;
 
 export function PolarisFootprintCard() {
+    // Set for the next read only, so the button gets a measurement taken now while
+    // the poll behind it goes on sharing the one the server is holding - which is
+    // what keeps a page open in two tabs from measuring the stack twice.
+    const forced = useRef(false);
+
+    const load = useCallback(async (signal: AbortSignal): Promise<PolarisFootprint> => {
+        const fresh = forced.current;
+        forced.current = false;
+        const response = await fetch(`/api/polaris/footprint${fresh ? "?fresh=1" : ""}`, {
+            cache: "no-store",
+            signal
+        });
+        const body: unknown = await response.json();
+        if (!response.ok) {
+            throw new Error(
+                typeof body === "object" && body !== null && "error" in body
+                    ? String((body as { error: unknown }).error)
+                    : "The engine did not say why."
+            );
+        }
+        return body as PolarisFootprint;
+    }, []);
+
     const {
         data: footprint,
         loading,
         error,
+        stale,
         refreshing,
         refresh
-    } = useLiveResource<PolarisFootprint>({
-        url: "/api/polaris/footprint",
-        cacheKey: "polaris.footprint",
-        intervalMs: REFRESH_MS,
-        select: (body) => body as PolarisFootprint
-    });
+    } = useLiveRead<PolarisFootprint>({ load, cacheKey: "polaris.footprint", intervalMs: REFRESH_MS });
 
-    if (error && !footprint) return null;
+    const measureAgain = (): void => {
+        forced.current = true;
+        refresh();
+    };
+
+    const problem = error ?? stale;
 
     return (
         <Card className="mb-4">
@@ -49,37 +74,41 @@ export function PolarisFootprintCard() {
                         <Sparkles className="size-4 text-muted-foreground" />
                         Polaris itself
                     </div>
-                    <Button size="sm" variant="ghost" onClick={refresh} disabled={refreshing || loading}>
+                    <Button size="sm" variant="ghost" onClick={measureAgain} disabled={refreshing}>
                         <RefreshCw className="size-4" />
                         Measure again
                     </Button>
                 </div>
 
-                {footprint ? <Totals footprint={footprint} /> : <Skeleton className="h-4 w-72" />}
+                {problem && <p className="text-sm text-danger">Polaris could not measure itself. {problem}</p>}
 
-                <div className="overflow-x-auto">
-                    <table className="w-full min-w-[38rem] text-sm">
-                        <thead className="text-left text-xs text-muted-foreground">
-                            <tr>
-                                <th className="py-1 pr-3 font-medium">Part</th>
-                                <th className="py-1 pr-3 font-medium">CPU</th>
-                                <th className="py-1 pr-3 font-medium">Memory</th>
-                                <th className="py-1 font-medium">Disk</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {footprint
-                                ? footprint.parts.map((part) => <PartRow key={part.id} part={part} />)
-                                : [0, 1, 2, 3].map((row) => (
-                                      <tr key={row} className="border-t border-border">
-                                          <td className="py-2 pr-3" colSpan={4}>
-                                              <Skeleton className="h-4 w-full" />
-                                          </td>
-                                      </tr>
-                                  ))}
-                        </tbody>
-                    </table>
-                </div>
+                {footprint ? <Totals footprint={footprint} /> : loading ? <Skeleton className="h-4 w-72" /> : null}
+
+                {(footprint || loading) && (
+                    <div className="overflow-x-auto">
+                        <table className="w-full min-w-[38rem] text-sm">
+                            <thead className="text-left text-xs text-muted-foreground">
+                                <tr>
+                                    <th className="py-1 pr-3 font-medium">Part</th>
+                                    <th className="py-1 pr-3 font-medium">CPU</th>
+                                    <th className="py-1 pr-3 font-medium">Memory</th>
+                                    <th className="py-1 font-medium">Disk</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {footprint
+                                    ? footprint.parts.map((part) => <PartRow key={part.id} part={part} />)
+                                    : [0, 1, 2, 3].map((row) => (
+                                          <tr key={row} className="border-t border-border">
+                                              <td className="py-2 pr-3" colSpan={4}>
+                                                  <Skeleton className="h-4 w-full" />
+                                              </td>
+                                          </tr>
+                                      ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </CardBody>
         </Card>
     );
