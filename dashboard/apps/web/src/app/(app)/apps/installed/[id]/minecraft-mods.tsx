@@ -25,7 +25,17 @@ import { updateServerSettingsAction } from "./minecraft-actions";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { Badge, Button, Card, CardBody, Input, Select, Skeleton, cn } from "@polaris/ui";
-import { ArrowUpCircle, Download, ExternalLink, Loader2, Plus, RotateCw, Search, Trash2, TriangleAlert } from "lucide-react";
+import {
+    ArrowUpCircle,
+    Download,
+    ExternalLink,
+    Loader2,
+    Plus,
+    RotateCw,
+    Search,
+    Trash2,
+    TriangleAlert
+} from "lucide-react";
 import {
     categoriesForLoader,
     formatProjectList,
@@ -67,7 +77,10 @@ export function MinecraftMods({
     const loader = loaderForType(serverType);
     const version = pinnedVersion(settings.find((setting) => setting.key === VERSION_KEY)?.value);
 
-    const installed = useMemo(() => parseProjectList(projectsSetting?.value ?? ""), [projectsSetting?.value]);
+    const installed = useMemo(
+        () => parseProjectList(projectsSetting?.value ?? ""),
+        [projectsSetting?.value]
+    );
     const [projects, setProjects] = useState<string[]>(installed);
     const [dependencies, setDependencies] = useState(dependenciesSetting?.value ?? "required");
     const [query, setQuery] = useState("");
@@ -90,7 +103,11 @@ export function MinecraftMods({
      *  runs, what release it is on, and what it is already carrying. */
     const serverQuery = useCallback(
         (extra: Record<string, string>) =>
-            new URLSearchParams({ loader: loader ?? "", ...(version ? { version } : {}), ...extra }).toString(),
+            new URLSearchParams({
+                loader: loader ?? "",
+                ...(version ? { version } : {}),
+                ...extra
+            }).toString(),
         [loader, version]
     );
 
@@ -106,7 +123,10 @@ export function MinecraftMods({
                     `/api/apps/installed/${installedAppId}/minecraft/modrinth?${serverQuery({ query: term.trim(), category: tag })}`,
                     { cache: "no-store" }
                 );
-                const data = (await response.json()) as { projects?: ModrinthProject[]; error?: string };
+                const data = (await response.json()) as {
+                    projects?: ModrinthProject[];
+                    error?: string;
+                };
                 setResults(data.projects ?? []);
                 setError(response.ok ? null : (data.error ?? "Could not search Modrinth"));
             } catch {
@@ -164,6 +184,28 @@ export function MinecraftMods({
         void readList(projects);
     }, [projects, readList]);
 
+    /**
+     * Taking a project off the list.
+     *
+     * Asked about first because nothing here puts it back: the row goes on one
+     * click, and what is lost with it is the build it was pinned to and the search
+     * that found it in the first place.
+     */
+    async function removeProject(entry: string, title: string): Promise<void> {
+        if (
+            !(await confirm({
+                title: `Remove ${title}?`,
+                description:
+                    "It comes off the list now. The server uninstalls it when you save and restart.",
+                confirmLabel: "Remove",
+                danger: true
+            }))
+        ) {
+            return;
+        }
+        setProjects((current) => current.filter((item) => item !== entry));
+    }
+
     async function save(): Promise<void> {
         setError(null);
         const warning =
@@ -203,8 +245,8 @@ export function MinecraftMods({
                     </p>
                     {serverType && (
                         <p className="text-sm text-muted-foreground">
-                            Change the server software under Settings to Paper for plugins, or Fabric, Forge or NeoForge
-                            for mods.
+                            Change the server software under Settings to Paper for plugins, or
+                            Fabric, Forge or NeoForge for mods.
                         </p>
                     )}
                 </CardBody>
@@ -223,11 +265,15 @@ export function MinecraftMods({
                 conflicts={conflicts}
                 version={version}
                 dependencies={dependencies}
-                dependencyOptions={dependenciesSetting?.options ?? [{ value: "required", label: "Required only" }]}
+                dependencyOptions={
+                    dependenciesSetting?.options ?? [{ value: "required", label: "Required only" }]
+                }
                 onDependencies={setDependencies}
-                onRemove={(entry) => setProjects((current) => current.filter((item) => item !== entry))}
+                onRemove={(entry, title) => void removeProject(entry, title)}
                 onRepin={(entry, build) =>
-                    setProjects((current) => current.map((item) => (item === entry ? repinEntry(item, build) : item)))
+                    setProjects((current) =>
+                        current.map((item) => (item === entry ? repinEntry(item, build) : item))
+                    )
                 }
             />
 
@@ -244,7 +290,9 @@ export function MinecraftMods({
                                 aria-label="Search Modrinth"
                             />
                         </div>
-                        {searching && <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />}
+                        {searching && (
+                            <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
+                        )}
                     </div>
 
                     {/* Shelves rather than a blank search box. Somebody who knows
@@ -291,8 +339,12 @@ export function MinecraftMods({
                                     key={project.slug}
                                     installedAppId={installedAppId}
                                     project={project}
-                                    added={projects.some((entry) => entry.replace(/\?+$/, "") === project.slug)}
-                                    onAdd={() => setProjects((current) => [...current, project.slug])}
+                                    added={projects.some(
+                                        (entry) => entry.replace(/\?+$/, "") === project.slug
+                                    )}
+                                    onAdd={() =>
+                                        setProjects((current) => [...current, project.slug])
+                                    }
                                 />
                             ))}
                         </ul>
@@ -305,7 +357,11 @@ export function MinecraftMods({
                     {changed ? "Changes apply on the next restart." : "Nothing to apply."}
                 </p>
                 <Button onClick={() => void save()} disabled={pending || !changed}>
-                    {pending ? <Loader2 className="size-4 animate-spin" /> : <RotateCw className="size-4" />}
+                    {pending ? (
+                        <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                        <RotateCw className="size-4" />
+                    )}
                     Save and restart
                 </Button>
             </div>
@@ -387,7 +443,12 @@ function ProjectCard({
                     </a>
                 </p>
             </div>
-            <Button size="sm" variant={added ? "ghost" : "secondary"} disabled={added} onClick={onAdd}>
+            <Button
+                size="sm"
+                variant={added ? "ghost" : "secondary"}
+                disabled={added}
+                onClick={onAdd}
+            >
                 <Plus className="size-4" />
                 {added ? "Added" : "Add"}
             </Button>
@@ -434,7 +495,7 @@ function InstalledList({
     dependencies: string;
     dependencyOptions: ReadonlyArray<{ value: string; label: string }>;
     onDependencies: (value: string) => void;
-    onRemove: (entry: string) => void;
+    onRemove: (entry: string, title: string) => void;
 }) {
     const conflictsFor = (slug: string): string[] =>
         conflicts
@@ -447,10 +508,12 @@ function InstalledList({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                         <p className="text-sm font-medium">
-                            Installed <span className="text-muted-foreground">{entries.length || ""}</span>
+                            Installed{" "}
+                            <span className="text-muted-foreground">{entries.length || ""}</span>
                         </p>
                         <p className="text-xs text-muted-foreground">
-                            The server installs these when it boots and removes whatever is taken off.
+                            The server installs these when it boots and removes whatever is taken
+                            off.
                         </p>
                     </div>
                     <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -486,9 +549,15 @@ function InstalledList({
                                     key={project.entry}
                                     className="flex items-start gap-3 rounded-md border border-border p-2"
                                 >
-                                    <ProjectIcon installedAppId={installedAppId} project={project} />
+                                    <ProjectIcon
+                                        installedAppId={installedAppId}
+                                        project={project}
+                                    />
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm font-medium" title={project.title}>
+                                        <p
+                                            className="truncate text-sm font-medium"
+                                            title={project.title}
+                                        >
                                             {project.title}
                                         </p>
                                         {project.description && (
@@ -498,15 +567,23 @@ function InstalledList({
                                         )}
                                         <div className="mt-1 flex flex-wrap items-center gap-1">
                                             {!project.known && (
-                                                <Badge variant="warning" title="Modrinth has no project by this name">
-                                                    <TriangleAlert className="size-3" /> not on Modrinth
+                                                <Badge
+                                                    variant="warning"
+                                                    title="Modrinth has no project by this name"
+                                                >
+                                                    <TriangleAlert className="size-3" /> not on
+                                                    Modrinth
                                                 </Badge>
                                             )}
                                             {project.known && !project.fitsLoader && (
-                                                <Badge variant="warning">no build for this software</Badge>
+                                                <Badge variant="warning">
+                                                    no build for this software
+                                                </Badge>
                                             )}
                                             {project.known && project.fitsVersion === false && (
-                                                <Badge variant="warning">no build for {version}</Badge>
+                                                <Badge variant="warning">
+                                                    no build for {version}
+                                                </Badge>
                                             )}
                                             {/* Only ever on an entry nailed to a
                                                 build. One that follows the newest
@@ -515,11 +592,17 @@ function InstalledList({
                                             {project.newest && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => onRepin(project.entry, project.newest as string)}
+                                                    onClick={() =>
+                                                        onRepin(
+                                                            project.entry,
+                                                            project.newest as string
+                                                        )
+                                                    }
                                                     title={`Pinned to ${project.pinned}. Move it to ${project.newest}.`}
                                                 >
                                                     <Badge variant="primary">
-                                                        <ArrowUpCircle className="size-3" /> {project.newest} available
+                                                        <ArrowUpCircle className="size-3" />{" "}
+                                                        {project.newest} available
                                                     </Badge>
                                                 </button>
                                             )}
@@ -528,8 +611,8 @@ function InstalledList({
                                                     variant="danger"
                                                     title={`Its publisher says it cannot run alongside ${clashes.join(", ")}`}
                                                 >
-                                                    <TriangleAlert className="size-3" /> clashes with{" "}
-                                                    {clashes.join(", ")}
+                                                    <TriangleAlert className="size-3" /> clashes
+                                                    with {clashes.join(", ")}
                                                 </Badge>
                                             )}
                                         </div>
@@ -540,7 +623,7 @@ function InstalledList({
                                         aria-label={`Remove ${project.title}`}
                                         title={`Remove ${project.title}`}
                                         className="text-danger hover:text-danger"
-                                        onClick={() => onRemove(project.entry)}
+                                        onClick={() => onRemove(project.entry, project.title)}
                                     >
                                         <Trash2 className="size-4" />
                                     </Button>

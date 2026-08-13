@@ -54,6 +54,16 @@ export interface ServerUptime {
 
 export const NO_UPTIME: ServerUptime = { lastOnlineAt: null, onlineSince: null };
 
+/**
+ * What one sweep managed to establish about a server.
+ *
+ * Three states rather than two, because silence is not the same evidence as a
+ * container that is down. A server that took too long to answer one rcon or
+ * arkmanager call has told nobody anything, and a run that has been going for a
+ * week must survive it: "unknown" is the reading that writes nothing at all.
+ */
+export type UptimeReading = "up" | "down" | "unknown";
+
 function readTime(value: unknown): string | null {
     return typeof value === "string" && !Number.isNaN(Date.parse(value)) ? value : null;
 }
@@ -76,13 +86,25 @@ export function readServerUptime(config: string | null | undefined): ServerUptim
  * the record of it would otherwise go stale. Everything else is the same answer as
  * a minute ago, and writing it would be a row updated every minute for every
  * server to say that nothing happened.
+ *
+ * A reading that established nothing writes nothing. Treating it as "down" would
+ * end the run and stamp the server as last seen up at a moment nobody saw it up -
+ * and the next sweep, finding no run in progress, would start a fresh one and
+ * report a world that never went down as up since just now.
  */
-export function uptimePatch(current: ServerUptime, answering: boolean, now: Date): InstallConfig | null {
+export function uptimePatch(
+    current: ServerUptime,
+    reading: UptimeReading,
+    now: Date
+): InstallConfig | null {
+    if (reading === "unknown") return null;
     const at = now.toISOString();
-    if (!answering) {
+    if (reading === "down") {
         // Watched going down, which is the only moment the exact time is known.
         // A server that was already down has nothing new to say.
-        return current.onlineSince === null ? null : { [ONLINE_SINCE_KEY]: null, [LAST_ONLINE_KEY]: at };
+        return current.onlineSince === null
+            ? null
+            : { [ONLINE_SINCE_KEY]: null, [LAST_ONLINE_KEY]: at };
     }
     const last = current.lastOnlineAt === null ? null : Date.parse(current.lastOnlineAt);
     // Back after a gap nobody watched: the run it is in started now as far as

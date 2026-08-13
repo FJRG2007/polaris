@@ -10,11 +10,12 @@
  */
 
 import { edgeAddress } from "./deploy/dial";
+import { TUNNEL_PROJECT } from "./polaris-parts";
 import { HostdPorts } from "./deploy/ports-hostd";
 import type { ComposeSpec } from "@polaris/deploy";
 import { getIntegrationSecret, getIntegrationState } from "./integration-service";
 
-const PROJECT = "polaris-tunnel";
+const PROJECT = TUNNEL_PROJECT;
 const SERVICE = "polaris-tunnel";
 const PROXY_NETWORK = "polaris-proxy";
 
@@ -28,7 +29,10 @@ export interface TunnelStatus {
 
 /** The enabled tunnel provider and its token, or null when none is configured. A
  *  single tunnel runs per server, so the first enabled provider with a token wins. */
-async function activeTunnel(): Promise<{ provider: (typeof PROVIDERS)[number]; token: string } | null> {
+async function activeTunnel(): Promise<{
+    provider: (typeof PROVIDERS)[number];
+    token: string;
+} | null> {
     for (const provider of PROVIDERS) {
         const state = await getIntegrationState(provider);
         if (!state?.enabled) continue;
@@ -67,13 +71,17 @@ function tunnelCommand(provider: (typeof PROVIDERS)[number]): string[] {
     // point at http://<box-ip>:80). ngrok forwards to the edge by its name on this
     // network - the container is on it, and the box's LAN address is a value that
     // moves, which would leave the tunnel forwarding into nothing.
-    return provider === "cloudflare" ? ["tunnel", "--no-autoupdate", "run"] : ["http", edgeAddress()];
+    return provider === "cloudflare"
+        ? ["tunnel", "--no-autoupdate", "run"]
+        : ["http", edgeAddress()];
 }
 
 /** The compose spec for the tunnel container of the chosen provider. */
 function tunnelSpec(provider: (typeof PROVIDERS)[number], token: string): ComposeSpec {
     const isCloudflare = provider === "cloudflare";
-    const env: Record<string, string> = isCloudflare ? { TUNNEL_TOKEN: token } : { NGROK_AUTHTOKEN: token };
+    const env: Record<string, string> = isCloudflare
+        ? { TUNNEL_TOKEN: token }
+        : { NGROK_AUTHTOKEN: token };
     const service = {
         name: SERVICE,
         image: isCloudflare ? "cloudflare/cloudflared:latest" : "ngrok/ngrok:latest",
@@ -132,11 +140,16 @@ export async function reconcileTunnel(): Promise<void> {
             State?: { Running?: boolean };
             Config?: { Cmd?: string[] };
         } | null;
-        const serving = Boolean(info?.State?.Running) && (info?.Config?.Cmd ?? []).join(" ") === expected.join(" ");
+        const serving =
+            Boolean(info?.State?.Running) &&
+            (info?.Config?.Cmd ?? []).join(" ") === expected.join(" ");
         if (serving) return;
         await ports.composeUp(tunnelSpec(active.provider, active.token));
     } catch (error) {
-        console.error("polaris: tunnel reconcile failed:", error instanceof Error ? error.message : error);
+        console.error(
+            "polaris: tunnel reconcile failed:",
+            error instanceof Error ? error.message : error
+        );
     } finally {
         await ports.dispose();
     }
