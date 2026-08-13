@@ -443,3 +443,85 @@ export function formatProjectList(projects: readonly string[]): string {
     return [...new Set(projects)].join(",");
 }
 
+
+/**
+ * The exact build an entry is nailed to, if it is nailed to one.
+ *
+ * `slug` on its own takes whatever is newest at the next restart, so it can never
+ * be out of date; `slug:beta` is a rule about which builds count, not a version.
+ * Only an actual version is a pin, and only a pin can fall behind.
+ *
+ * Which is what makes an "update available" mark honest. Marking every entry would
+ * be telling somebody their server is stale when it updates itself every boot.
+ */
+export function pinnedBuild(entry: string): string | null {
+    const parts = entry
+        .trim()
+        .replace(/\?+$/, "")
+        .split(":")
+        .slice(1)
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0);
+    return parts.find((part) => !(RELEASE_TYPES as readonly string[]).includes(part.toLowerCase())) ?? null;
+}
+
+/** The same entry pointed at another build, with everything else about it - the
+ *  release type, the trailing `?` that makes it optional - left alone. */
+export function repinEntry(entry: string, build: string): string {
+    const optional = /\?+$/.test(entry.trim());
+    const bare = entry.trim().replace(/\?+$/, "");
+    const [slug, ...rest] = bare.split(":");
+    const kept = rest
+        .map((part) => part.trim())
+        .filter((part) => (RELEASE_TYPES as readonly string[]).includes(part.toLowerCase()));
+    return `${[slug, ...kept, build].join(":")}${optional ? "?" : ""}`;
+}
+
+const buildSchema = z
+    .array(
+        z.object({
+            version_number: z.string().max(64).catch(""),
+            version_type: z.string().max(32).catch("release"),
+            game_versions: z.array(z.string().max(32)).max(200).catch([])
+        })
+    )
+    .max(50);
+
+/**
+ * The newest build each pinned entry could move to, or nothing.
+ *
+ * Asked only about the entries that are pinned, which is usually none of them - an
+ * unpinned list costs no requests at all. The build has to be one this server would
+ * actually accept: the right loader, the release this server runs, and a type the
+ * entry admits, or the offer is to move somebody onto something their next restart
+ * would refuse to install.
+ */
+export async function newestBuilds(
+    entries: readonly string[],
+    loader: string,
+    version: string | null
+): Promise<Map<string, string>> {
+    const newest = new Map<string, string>();
+    const wanted = (version ?? "").trim();
+    for (const entry of entries) {
+        const slug = projectSlug(entry);
+        const pin = pinnedBuild(entry);
+        if (!slug || !pin) continue;
+        const builds = buildSchema.safeParse(
+            await modrinthJson(
+                `${modrinthApi}/project/${encodeURIComponent(slug)}/version?loaders=${encodeURIComponent(JSON.stringify([loader]))}`
+            ).catch(() => null)
+        );
+        if (!builds.success) continue;
+        const admitted = builds.data.find(
+            (build) =>
+                build.version_number.length > 0 &&
+                admitsBuild(entryReleaseType(entry), build.version_type) &&
+                (!VERSION.test(wanted) || build.game_versions.includes(wanted))
+        );
+        // Newest first is Modrinth's own order. Nothing to say when the pin is
+        // already it.
+        if (admitted && admitted.version_number !== pin) newest.set(entry, admitted.version_number);
+    }
+    return newest;
+}

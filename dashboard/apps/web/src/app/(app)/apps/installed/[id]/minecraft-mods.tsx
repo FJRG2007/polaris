@@ -25,12 +25,13 @@ import { updateServerSettingsAction } from "./minecraft-actions";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { Badge, Button, Card, CardBody, Input, Select, Skeleton, cn } from "@polaris/ui";
-import { Download, ExternalLink, Loader2, Plus, RotateCw, Search, Trash2, TriangleAlert } from "lucide-react";
+import { ArrowUpCircle, Download, ExternalLink, Loader2, Plus, RotateCw, Search, Trash2, TriangleAlert } from "lucide-react";
 import {
     categoriesForLoader,
     formatProjectList,
     loaderForType,
     parseProjectList,
+    repinEntry,
     type InstalledProject,
     type ModrinthConflict,
     type ModrinthProject
@@ -74,7 +75,7 @@ export function MinecraftMods({
     const [results, setResults] = useState<ModrinthProject[] | null>(null);
     const [searching, setSearching] = useState(false);
     /** What is on the list, as real projects. Null until the first read answers. */
-    const [onList, setOnList] = useState<InstalledProject[] | null>(null);
+    const [onList, setOnList] = useState<InstalledRow[] | null>(null);
     const [conflicts, setConflicts] = useState<ModrinthConflict[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -138,7 +139,7 @@ export function MinecraftMods({
                 );
                 if (!response.ok) return;
                 const data = (await response.json()) as {
-                    projects?: InstalledProject[];
+                    projects?: InstalledRow[];
                     conflicts?: ModrinthConflict[];
                 };
                 setOnList(data.projects ?? []);
@@ -225,6 +226,9 @@ export function MinecraftMods({
                 dependencyOptions={dependenciesSetting?.options ?? [{ value: "required", label: "Required only" }]}
                 onDependencies={setDependencies}
                 onRemove={(entry) => setProjects((current) => current.filter((item) => item !== entry))}
+                onRepin={(entry, build) =>
+                    setProjects((current) => current.map((item) => (item === entry ? repinEntry(item, build) : item)))
+                }
             />
 
             <Card>
@@ -401,11 +405,19 @@ function ProjectCard({
  * comes up without its plugins; and two that their own publishers say cannot both
  * be there.
  */
+/** An installed entry as this screen reads it back: what Modrinth knows, plus what
+ *  the entry is pinned to and the newer build it could move to. */
+interface InstalledRow extends InstalledProject {
+    readonly pinned?: string | null;
+    readonly newest?: string | null;
+}
+
 function InstalledList({
     installedAppId,
     entries,
     projects,
     conflicts,
+    onRepin,
     version,
     dependencies,
     dependencyOptions,
@@ -414,8 +426,10 @@ function InstalledList({
 }: {
     installedAppId: string;
     entries: readonly string[];
-    projects: InstalledProject[] | null;
+    projects: InstalledRow[] | null;
     conflicts: readonly ModrinthConflict[];
+    /** Move a pinned entry onto a newer build. */
+    onRepin: (entry: string, build: string) => void;
     version: string;
     dependencies: string;
     dependencyOptions: ReadonlyArray<{ value: string; label: string }>;
@@ -493,6 +507,21 @@ function InstalledList({
                                             )}
                                             {project.known && project.fitsVersion === false && (
                                                 <Badge variant="warning">no build for {version}</Badge>
+                                            )}
+                                            {/* Only ever on an entry nailed to a
+                                                build. One that follows the newest
+                                                updates itself every boot and is
+                                                never behind. */}
+                                            {project.newest && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onRepin(project.entry, project.newest as string)}
+                                                    title={`Pinned to ${project.pinned}. Move it to ${project.newest}.`}
+                                                >
+                                                    <Badge variant="primary">
+                                                        <ArrowUpCircle className="size-3" /> {project.newest} available
+                                                    </Badge>
+                                                </button>
                                             )}
                                             {clashes.length > 0 && (
                                                 <Badge
