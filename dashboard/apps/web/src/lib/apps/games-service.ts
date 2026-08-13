@@ -384,7 +384,11 @@ async function readPresence(ownerId: string, server: GameServerFacts): Promise<S
         return {
             id: server.id,
             answering: false,
-            containerRunning: null,
+            // A server Polaris was told to stop is not a server nobody could
+            // reach: the stop is the answer. Only one that has never been
+            // deployed leaves this unknown, because there is no container to
+            // have an opinion about.
+            containerRunning: server.applicationId ? false : null,
             online: 0,
             max: 0,
             players: [],

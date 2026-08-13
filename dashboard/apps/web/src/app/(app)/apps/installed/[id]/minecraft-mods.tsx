@@ -175,7 +175,7 @@ export function MinecraftMods({
         if (
             !(await confirm({
                 title: `Remove ${title}?`,
-                description: "It comes off the list now. The server uninstalls it the next time it restarts.",
+                description: "It comes off the list now. The server uninstalls it when you save and restart.",
                 confirmLabel: "Remove",
                 danger: true
             }))

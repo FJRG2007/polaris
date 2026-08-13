@@ -34,6 +34,14 @@ const CACHE_MS = 60_000;
 
 let cached: { at: number; footprint: PolarisFootprint } | null = null;
 
+/** The measurement under way, if there is one. The cache only spares the second
+ *  reader who arrives after the first has finished; this one spares the second
+ *  reader who arrives while it is still running - two tabs pressing Measure
+ *  again, a reload mid-measure - which is the expensive case, since a forced
+ *  read walks every part with `size` and asks each running container to measure
+ *  its own volumes. */
+let running: Promise<PolarisFootprint> | null = null;
+
 /**
  * Measure Polaris.
  *
@@ -41,6 +49,12 @@ let cached: { at: number; footprint: PolarisFootprint } | null = null;
  */
 export async function readPolarisFootprint(force = false): Promise<PolarisFootprint> {
     if (!force && cached && Date.now() - cached.at < CACHE_MS) return cached.footprint;
+    if (running) return running;
+    running = measureOnce();
+    return running;
+}
+
+async function measureOnce(): Promise<PolarisFootprint> {
     const driver = localDockerDriver();
     try {
         const footprint = await measure(driver);
@@ -48,6 +62,7 @@ export async function readPolarisFootprint(force = false): Promise<PolarisFootpr
         return footprint;
     } finally {
         await driver.dispose().catch(() => undefined);
+        running = null;
     }
 }
 
