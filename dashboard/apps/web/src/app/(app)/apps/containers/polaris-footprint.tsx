@@ -57,7 +57,11 @@ export function PolarisFootprintCard() {
         stale,
         refreshing,
         refresh
-    } = useLiveRead<PolarisFootprint>({ load, cacheKey: "polaris.footprint", intervalMs: REFRESH_MS });
+    } = useLiveRead<PolarisFootprint>({
+        load,
+        cacheKey: "polaris.footprint",
+        intervalMs: REFRESH_MS
+    });
 
     const measureAgain = (): void => {
         forced.current = true;
@@ -80,9 +84,17 @@ export function PolarisFootprintCard() {
                     </Button>
                 </div>
 
-                {problem && <p className="text-sm text-danger">Polaris could not measure itself. {problem}</p>}
+                {problem && (
+                    <p className="text-sm text-danger">
+                        Polaris could not measure itself. {problem}
+                    </p>
+                )}
 
-                {footprint ? <Totals footprint={footprint} /> : loading ? <Skeleton className="h-4 w-72" /> : null}
+                {footprint ? (
+                    <Totals footprint={footprint} />
+                ) : loading ? (
+                    <Skeleton className="h-4 w-72" />
+                ) : null}
 
                 {(footprint || loading) && (
                     <div className="overflow-x-auto">
@@ -97,7 +109,9 @@ export function PolarisFootprintCard() {
                             </thead>
                             <tbody>
                                 {footprint
-                                    ? footprint.parts.map((part) => <PartRow key={part.id} part={part} />)
+                                    ? footprint.parts.map((part) => (
+                                          <PartRow key={part.id} part={part} />
+                                      ))
                                     : [0, 1, 2, 3].map((row) => (
                                           <tr key={row} className="border-t border-border">
                                               <td className="py-2 pr-3" colSpan={4}>
@@ -119,14 +133,21 @@ function Totals({ footprint }: { footprint: PolarisFootprint }) {
     const disk = footprintDiskBytes(footprint);
     return (
         <p className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{formatBytes(footprint.memUsedBytes)}</span> of memory
-            {footprint.memTotalBytes ? ` of the machine's ${formatBytes(footprint.memTotalBytes)}` : ""},{" "}
-            <span className="font-medium text-foreground">{footprint.cpuPercent}%</span> CPU, and{" "}
-            <span className="font-medium text-foreground">{footprint.diskComplete ? "" : "at least "}
+            <span className="font-medium text-foreground">
+                {formatBytes(footprint.memUsedBytes)}
+            </span>{" "}
+            of memory
+            {footprint.memTotalBytes
+                ? ` of the machine's ${formatBytes(footprint.memTotalBytes)}`
+                : ""}
+            , <span className="font-medium text-foreground">{footprint.cpuPercent}%</span> CPU, and{" "}
+            <span className="font-medium text-foreground">
+                {footprint.diskComplete ? "" : "at least "}
                 {formatBytes(disk)}
             </span>{" "}
-            on disk - {formatBytes(footprint.imageBytes)} of images, {formatBytes(footprint.volumeBytes)} of data,{" "}
-            {formatBytes(footprint.writableBytes)} written by the containers themselves.
+            on disk - {formatBytes(footprint.imageBytes)} of images,{" "}
+            {formatBytes(footprint.volumeBytes)} of data, {formatBytes(footprint.writableBytes)}{" "}
+            written by the containers themselves.
         </p>
     );
 }
@@ -139,13 +160,17 @@ function PartRow({ part }: { part: FootprintPart }) {
         <tr className="border-t border-border align-top">
             <td className="py-2 pr-3">
                 <div className="font-medium">{part.label}</div>
-                {part.summary && <div className="text-xs text-muted-foreground">{part.summary}</div>}
+                {part.summary && (
+                    <div className="text-xs text-muted-foreground">{part.summary}</div>
+                )}
                 <div className="truncate text-xs text-muted-foreground/80" title={part.image}>
                     {part.name}
                     {running ? "" : ` - ${part.state}`}
                 </div>
             </td>
-            <td className="py-2 pr-3 text-muted-foreground">{part.cpuPercent === null ? "-" : `${part.cpuPercent}%`}</td>
+            <td className="py-2 pr-3 text-muted-foreground">
+                {part.cpuPercent === null ? "-" : `${part.cpuPercent}%`}
+            </td>
             <td className="py-2 pr-3 text-muted-foreground">
                 {part.memUsedBytes === null ? "-" : formatBytes(part.memUsedBytes)}
             </td>
@@ -153,7 +178,9 @@ function PartRow({ part }: { part: FootprintPart }) {
                 className="py-2 text-muted-foreground"
                 title={[
                     part.imageBytes === null ? null : `image ${formatBytes(part.imageBytes)}`,
-                    part.writableBytes === null ? null : `written ${formatBytes(part.writableBytes)}`,
+                    part.writableBytes === null
+                        ? null
+                        : `written ${formatBytes(part.writableBytes)}`,
                     ...part.volumes.map(
                         (volume) =>
                             `${volume.name} ${volume.usedBytes === null ? "not measured" : formatBytes(volume.usedBytes)}`

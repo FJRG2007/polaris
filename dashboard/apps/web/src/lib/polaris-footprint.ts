@@ -25,7 +25,11 @@ import type { DockerDriver } from "@polaris/docker";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import { localDockerDriver } from "@/lib/docker-service";
 import { describePart, isPolarisPart } from "@/lib/polaris-parts";
-import type { FootprintPart, FootprintVolume, PolarisFootprint } from "@/app/(app)/apps/containers/types";
+import type {
+    FootprintPart,
+    FootprintVolume,
+    PolarisFootprint
+} from "@/app/(app)/apps/containers/types";
 
 /** How long a reading is worth serving again. Long enough that a page open in two
  *  tabs, or reloaded while somebody reads it, costs one measurement; short enough
@@ -80,7 +84,10 @@ async function measure(driver: DockerDriver): Promise<PolarisFootprint> {
         await Promise.all(
             own.map(
                 async (container) =>
-                    [container.id, await driver.inspect(container.id, { size: true }).catch(() => null)] as const
+                    [
+                        container.id,
+                        await driver.inspect(container.id, { size: true }).catch(() => null)
+                    ] as const
             )
         )
     );
@@ -125,7 +132,9 @@ async function measure(driver: DockerDriver): Promise<PolarisFootprint> {
                 memUsedBytes: sample?.memUsage ?? null,
                 writableBytes: detail?.sizeRw ?? null,
                 imageBytes:
-                    detail && detail.sizeRootFs !== null ? Math.max(0, detail.sizeRootFs - (detail.sizeRw ?? 0)) : null,
+                    detail && detail.sizeRootFs !== null
+                        ? Math.max(0, detail.sizeRootFs - (detail.sizeRw ?? 0))
+                        : null,
                 volumes
             });
         }
@@ -138,7 +147,10 @@ async function measure(driver: DockerDriver): Promise<PolarisFootprint> {
     // whichever of the two the engine listed first.
     const measuredParts = parts.map((part) => ({
         ...part,
-        volumes: part.volumes.map((volume) => ({ ...volume, usedBytes: measured.get(volume.name) ?? null }))
+        volumes: part.volumes.map((volume) => ({
+            ...volume,
+            usedBytes: measured.get(volume.name) ?? null
+        }))
     }));
 
     // An image shared by two parts is one image on disk. Keyed by what the part

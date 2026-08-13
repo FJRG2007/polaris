@@ -64,9 +64,13 @@ function tunnelSpec(): ComposeSpec {
 async function readUrlFromLogs(ports: HostdPorts): Promise<string | null> {
     let buffer = "";
     try {
-        await ports.logs(SERVICE, (chunk) => {
-            buffer += chunk.toString("utf8");
-        }, { tail: 200, follow: false });
+        await ports.logs(
+            SERVICE,
+            (chunk) => {
+                buffer += chunk.toString("utf8");
+            },
+            { tail: 200, follow: false }
+        );
     } catch {
         return null;
     }
@@ -74,7 +78,10 @@ async function readUrlFromLogs(ports: HostdPorts): Promise<string | null> {
 }
 
 async function getStoredUrl(): Promise<string | null> {
-    const row = await prisma.setting.findUnique({ where: { key: URL_KEY }, select: { value: true } });
+    const row = await prisma.setting.findUnique({
+        where: { key: URL_KEY },
+        select: { value: true }
+    });
     return row?.value ?? null;
 }
 
@@ -83,7 +90,11 @@ async function setStoredUrl(url: string | null): Promise<void> {
         await prisma.setting.deleteMany({ where: { key: URL_KEY } });
         return;
     }
-    await prisma.setting.upsert({ where: { key: URL_KEY }, create: { key: URL_KEY, value: url, scope: "global" }, update: { value: url } });
+    await prisma.setting.upsert({
+        where: { key: URL_KEY },
+        create: { key: URL_KEY, value: url, scope: "global" },
+        update: { value: url }
+    });
 }
 
 function delay(ms: number): Promise<void> {
@@ -101,7 +112,10 @@ function delay(ms: number): Promise<void> {
  */
 async function isServing(ports: HostdPorts): Promise<boolean> {
     try {
-        const info = (await ports.inspect(SERVICE)) as { State?: { Running?: boolean }; Config?: { Cmd?: string[] } };
+        const info = (await ports.inspect(SERVICE)) as {
+            State?: { Running?: boolean };
+            Config?: { Cmd?: string[] };
+        };
         return Boolean(info?.State?.Running) && (info?.Config?.Cmd ?? []).includes(ORIGIN);
     } catch {
         return false;

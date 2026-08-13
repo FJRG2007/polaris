@@ -35,8 +35,18 @@ import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service"
 import { readInstallConfig, type InstallConfig } from "@/lib/apps/install-config";
 import { getServerMetrics, peekServerMetrics } from "@/lib/server-metrics-service";
 import { applyFirewallBans, editionOf, getServerPlayers } from "@/lib/apps/minecraft/service";
-import { gamePorts, probeListening, probeReach, reachConfirmedAt } from "@/lib/apps/minecraft/reach";
-import { gameReachAdvice, gameStoppedAdvice, type GamePort, type GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
+import {
+    gamePorts,
+    probeListening,
+    probeReach,
+    reachConfirmedAt
+} from "@/lib/apps/minecraft/reach";
+import {
+    gameReachAdvice,
+    gameStoppedAdvice,
+    type GamePort,
+    type GameReachAdvice
+} from "@/lib/apps/minecraft/reach-advice";
 
 /** How many players the server was built for. */
 const SLOTS_VAR = "MAX_PLAYERS";
@@ -187,7 +197,10 @@ export interface GameServerLive extends Omit<ServerPresence, "players"> {
  * something different from its row would be the kind of disagreement nobody can
  * resolve without reading both.
  */
-export async function gameServerFacts(ownerId: string, installedAppId: string): Promise<GameServerFacts | null> {
+export async function gameServerFacts(
+    ownerId: string,
+    installedAppId: string
+): Promise<GameServerFacts | null> {
     const servers = await listGameServerFacts(ownerId, [installedAppId]);
     return servers.find((server) => server.id === installedAppId) ?? null;
 }
@@ -244,7 +257,10 @@ export async function listGameServerFacts(
     const [isolated, hosts, lanIp, settings] = await Promise.all([
         prisma.deployment
             .findMany({
-                where: { id: { in: presentIds(apps.map((app) => app.currentDeploymentId)) }, isolated: true },
+                where: {
+                    id: { in: presentIds(apps.map((app) => app.currentDeploymentId)) },
+                    isolated: true
+                },
                 select: { id: true }
             })
             .then((rows) => new Set(rows.map((row) => row.id))),
@@ -282,7 +298,9 @@ export async function listGameServerFacts(
         const config = readInstallConfig(install.config);
         const hostname = typeof config.hostname === "string" ? config.hostname : null;
         const running = app?.desiredState === "running";
-        const env = app ? (settings.get(app.id) ?? new Map<string, string>()) : new Map<string, string>();
+        const env = app
+            ? (settings.get(app.id) ?? new Map<string, string>())
+            : new Map<string, string>();
         const uptime = readServerUptime(install.config);
         const slots = Number.parseInt(env.get(SLOTS_VAR) ?? "", 10);
         const game = gameOfServer(install.catalogId);
@@ -297,7 +315,9 @@ export async function listGameServerFacts(
             running,
             slots: Number.isFinite(slots) ? slots : null,
             release: releaseOf(config, env.get(RELEASE_VAR)),
-            software: (env.get(SOFTWARE_VAR) ?? "").trim() ? titleCase((env.get(SOFTWARE_VAR) as string).trim()) : null,
+            software: (env.get(SOFTWARE_VAR) ?? "").trim()
+                ? titleCase((env.get(SOFTWARE_VAR) as string).trim())
+                : null,
             edition: game?.id === "minecraft" ? editionOf(install.catalogId) : null,
             crossplay: hasCrossplay(env.get(CROSSPLAY_VAR)),
             lastOnlineAt: uptime.lastOnlineAt,
@@ -311,10 +331,16 @@ export async function listGameServerFacts(
                           : app.target.kind === "local" || !app.target.hostId
                             ? lanIp
                             : (hosts.get(app.target.hostId) ?? null),
-                      port: pinnedHostPort(app.sourceConfig) ?? hostPortForApp(publishedSubject(app, isolated))
+                      port:
+                          pinnedHostPort(app.sourceConfig) ??
+                          hostPortForApp(publishedSubject(app, isolated))
                   })
                 : null,
-            message: app ? (running ? null : "The server is stopped") : "This server is still being set up"
+            message: app
+                ? running
+                    ? null
+                    : "The server is stopped"
+                : "This server is still being set up"
         };
     });
 }
@@ -328,7 +354,8 @@ export async function listGameServerFacts(
  * worth printing as one.
  */
 function releaseOf(config: InstallConfig, setting: string | undefined): string | null {
-    const recorded = typeof config[RELEASE_KEY] === "string" ? (config[RELEASE_KEY] as string).trim() : "";
+    const recorded =
+        typeof config[RELEASE_KEY] === "string" ? (config[RELEASE_KEY] as string).trim() : "";
     const declared = (setting ?? "").trim();
     const release = recorded || declared;
     return release.length > 0 && !wantsLatest(release) ? release : null;
@@ -351,7 +378,9 @@ function publishedSubject(
     app: { id: string; currentDeploymentId: string | null },
     isolated: ReadonlySet<string>
 ): string {
-    return app.currentDeploymentId && isolated.has(app.currentDeploymentId) ? app.currentDeploymentId : app.id;
+    return app.currentDeploymentId && isolated.has(app.currentDeploymentId)
+        ? app.currentDeploymentId
+        : app.id;
 }
 
 /**
@@ -513,10 +542,17 @@ async function committedMemoryByTarget(ownerId: string): Promise<Map<string, num
     if (games.length === 0) return new Map();
 
     const targets = await prisma.deployTarget.findMany({
-        where: { id: { in: games.map((game) => game.targetId).filter((id): id is string => id !== null) } },
+        where: {
+            id: { in: games.map((game) => game.targetId).filter((id): id is string => id !== null) }
+        },
         select: { id: true, kind: true, hostId: true }
     });
-    const machineOf = new Map(targets.map((target) => [target.id, target.kind === "host" && target.hostId ? target.hostId : "local"]));
+    const machineOf = new Map(
+        targets.map((target) => [
+            target.id,
+            target.kind === "host" && target.hostId ? target.hostId : "local"
+        ])
+    );
 
     const vars = await prisma.envVar.findMany({
         where: {
@@ -537,7 +573,8 @@ async function committedMemoryByTarget(ownerId: string): Promise<Map<string, num
         // read as empty on the form deciding where the third goes.
         const declared = readInstallConfig(game.config).memoryMb;
         const megabytes =
-            memoryOf.get(game.applicationId as string) || (typeof declared === "number" ? declared : 0);
+            memoryOf.get(game.applicationId as string) ||
+            (typeof declared === "number" ? declared : 0);
         byMachine.set(machine, (byMachine.get(machine) ?? 0) + megabytes);
     }
     return byMachine;
@@ -553,7 +590,9 @@ async function committedMemoryByTarget(ownerId: string): Promise<Map<string, num
  * up promised more heap than it has.
  */
 export function parseMemoryMb(value: string): number {
-    const match = /^(\d+(?:\.\d+)?)\s*([gm])b?$/i.exec(value.trim()) ?? /^(\d+(?:\.\d+)?)$/.exec(value.trim());
+    const match =
+        /^(\d+(?:\.\d+)?)\s*([gm])b?$/i.exec(value.trim()) ??
+        /^(\d+(?:\.\d+)?)$/.exec(value.trim());
     if (!match) return 0;
     const amount = Number(match[1]);
     if (!Number.isFinite(amount)) return 0;
@@ -661,7 +700,11 @@ export async function gameServerForApplication(
         select: { id: true, name: true, catalogId: true }
     });
     if (!install || !isGameServerApp(install.catalogId)) return null;
-    return { installedAppId: install.id, name: install.name, game: gameOfServer(install.catalogId)?.id ?? null };
+    return {
+        installedAppId: install.id,
+        name: install.name,
+        game: gameOfServer(install.catalogId)?.id ?? null
+    };
 }
 
 /** Every game server's published ports, for the screens that ask an operator to
@@ -677,7 +720,10 @@ export async function listGamePorts(): Promise<GamePortRow[]> {
     const running = new Set(
         (
             await prisma.application.findMany({
-                where: { id: { in: presentIds(games.map((game) => game.applicationId)) }, desiredState: "running" },
+                where: {
+                    id: { in: presentIds(games.map((game) => game.applicationId)) },
+                    desiredState: "running"
+                },
                 select: { id: true }
             })
         ).map((app) => app.id)

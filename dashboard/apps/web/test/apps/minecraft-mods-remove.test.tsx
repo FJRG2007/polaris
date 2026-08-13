@@ -65,7 +65,14 @@ afterEach(() => {
 describe("removing a mod from an installed server", () => {
     it("holds the row until the dialog is confirmed, and drops it on Cancel", async () => {
         const user = userEvent.setup();
-        render(<MinecraftMods installedAppId="server-1" settings={SETTINGS} playersOnline={0} onSaved={vi.fn()} />);
+        render(
+            <MinecraftMods
+                installedAppId="server-1"
+                settings={SETTINGS}
+                playersOnline={0}
+                onSaved={vi.fn()}
+            />
+        );
 
         await screen.findByText("CoreProtect");
 
@@ -73,7 +80,9 @@ describe("removing a mod from an installed server", () => {
 
         expect(await screen.findByText("Remove CoreProtect?")).toBeTruthy();
         expect(
-            screen.getByText("It comes off the list now. The server uninstalls it when you save and restart.")
+            screen.getByText(
+                "It comes off the list now. The server uninstalls it when you save and restart."
+            )
         ).toBeTruthy();
 
         // Cancel: the dialog closes and the row is exactly where it was.
@@ -88,6 +97,8 @@ describe("removing a mod from an installed server", () => {
 
         expect(screen.queryByText("Remove CoreProtect?")).toBeNull();
         expect(screen.queryByText("CoreProtect")).toBeNull();
-        expect(await screen.findByText("Nothing installed yet. Browse below to add a mod or plugin.")).toBeTruthy();
+        expect(
+            await screen.findByText("Nothing installed yet. Browse below to add a mod or plugin.")
+        ).toBeTruthy();
     });
 });

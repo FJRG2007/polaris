@@ -92,13 +92,19 @@ export function readServerUptime(config: string | null | undefined): ServerUptim
  * and the next sweep, finding no run in progress, would start a fresh one and
  * report a world that never went down as up since just now.
  */
-export function uptimePatch(current: ServerUptime, reading: UptimeReading, now: Date): InstallConfig | null {
+export function uptimePatch(
+    current: ServerUptime,
+    reading: UptimeReading,
+    now: Date
+): InstallConfig | null {
     if (reading === "unknown") return null;
     const at = now.toISOString();
     if (reading === "down") {
         // Watched going down, which is the only moment the exact time is known.
         // A server that was already down has nothing new to say.
-        return current.onlineSince === null ? null : { [ONLINE_SINCE_KEY]: null, [LAST_ONLINE_KEY]: at };
+        return current.onlineSince === null
+            ? null
+            : { [ONLINE_SINCE_KEY]: null, [LAST_ONLINE_KEY]: at };
     }
     const last = current.lastOnlineAt === null ? null : Date.parse(current.lastOnlineAt);
     // Back after a gap nobody watched: the run it is in started now as far as

@@ -78,7 +78,10 @@ export interface ActivitySweep {
  * wrong answers available - and the gap in the readings says plainly that nobody
  * could see.
  */
-export async function sweepGameActivity(ownerId: string, now: Date = new Date()): Promise<ActivitySweep> {
+export async function sweepGameActivity(
+    ownerId: string,
+    now: Date = new Date()
+): Promise<ActivitySweep> {
     const presences = await listGameServerPresence(ownerId).catch(() => []);
     const known = new Map<string, number | null>();
     let arrived = 0;
@@ -91,7 +94,12 @@ export async function sweepGameActivity(ownerId: string, now: Date = new Date())
 
     for (const presence of presences) {
         known.set(presence.id, presence.answering ? presence.online : null);
-        await recordUptime(presence.id, uptime.get(presence.id) ?? NO_UPTIME, uptimeReading(presence), now);
+        await recordUptime(
+            presence.id,
+            uptime.get(presence.id) ?? NO_UPTIME,
+            uptimeReading(presence),
+            now
+        );
 
         // A container that is down is not a server anybody is on, and its visits
         // have to be closed rather than left running: an open visit counts up to
@@ -129,7 +137,11 @@ export async function sweepGameActivity(ownerId: string, now: Date = new Date())
         if (change.arrived.length > 0) {
             await prisma.gamePlayerSession
                 .createMany({
-                    data: change.arrived.map((name) => ({ installedAppId: presence.id, name, joinedAt: now }))
+                    data: change.arrived.map((name) => ({
+                        installedAppId: presence.id,
+                        name,
+                        joinedAt: now
+                    }))
                 })
                 .catch(() => undefined);
             arrived += change.arrived.length;
@@ -162,7 +174,11 @@ export interface PlayerRecord {
 const VISIT_LIMIT = 50;
 
 /** What Polaris has watched this player do on this server. */
-export async function readPlayerRecord(installedAppId: string, name: string, now: Date = new Date()): Promise<PlayerRecord> {
+export async function readPlayerRecord(
+    installedAppId: string,
+    name: string,
+    now: Date = new Date()
+): Promise<PlayerRecord> {
     const rows = await prisma.gamePlayerSession
         .findMany({
             where: { installedAppId, name: { equals: name, mode: "insensitive" } },
@@ -203,7 +219,10 @@ export async function readPlayerCounts(
  * otherwise, and an open visit is counted up to now - so a server switched off in
  * March would still be adding playtime in August.
  */
-export async function closeGameSessions(installedAppId: string, at: Date = new Date()): Promise<void> {
+export async function closeGameSessions(
+    installedAppId: string,
+    at: Date = new Date()
+): Promise<void> {
     await prisma.gamePlayerSession
         .updateMany({ where: { installedAppId, leftAt: null }, data: { leftAt: at } })
         .catch(() => undefined);
@@ -213,7 +232,10 @@ export async function closeGameSessions(installedAppId: string, at: Date = new D
 async function readUptimes(installedAppIds: readonly string[]): Promise<Map<string, ServerUptime>> {
     if (installedAppIds.length === 0) return new Map();
     const rows = await prisma.installedApp
-        .findMany({ where: { id: { in: [...installedAppIds] } }, select: { id: true, config: true } })
+        .findMany({
+            where: { id: { in: [...installedAppIds] } },
+            select: { id: true, config: true }
+        })
         .catch(() => []);
     return new Map(rows.map((row) => [row.id, readServerUptime(row.config)]));
 }
@@ -247,8 +269,14 @@ async function recordUptime(
 }
 
 /** One reading, and never a reason to fail the sweep around it. */
-async function recordSample(installedAppId: string, ts: Date, playersOnline: number): Promise<void> {
-    await prisma.gameSample.create({ data: { installedAppId, ts, playersOnline } }).catch(() => undefined);
+async function recordSample(
+    installedAppId: string,
+    ts: Date,
+    playersOnline: number
+): Promise<void> {
+    await prisma.gameSample
+        .create({ data: { installedAppId, ts, playersOnline } })
+        .catch(() => undefined);
 }
 
 /** Drop what is past keeping, occasionally rather than every minute. */

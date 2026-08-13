@@ -29,7 +29,9 @@ describe("reading what an install recorded", () => {
     it("treats an unreadable config, a missing one and a nonsense date as nothing recorded", () => {
         expect(readServerUptime("not json")).toEqual(NO_UPTIME);
         expect(readServerUptime(null)).toEqual(NO_UPTIME);
-        expect(readServerUptime(JSON.stringify({ lastOnlineAt: "whenever", onlineSince: 7 }))).toEqual(NO_UPTIME);
+        expect(
+            readServerUptime(JSON.stringify({ lastOnlineAt: "whenever", onlineSince: 7 }))
+        ).toEqual(NO_UPTIME);
     });
 });
 
@@ -81,11 +83,15 @@ describe("a reading that established nothing", () => {
         // as last seen up at a moment nobody saw it up, and the next sweep - with
         // no run in progress - would start a fresh one and report a world that
         // never went down as up since just now.
-        expect(uptimePatch({ lastOnlineAt: at(1), onlineSince: at(10_000) }, "unknown", NOW)).toBeNull();
+        expect(
+            uptimePatch({ lastOnlineAt: at(1), onlineSince: at(10_000) }, "unknown", NOW)
+        ).toBeNull();
     });
 
     it("does not start a run for a server nobody has seen answer", () => {
         expect(uptimePatch(NO_UPTIME, "unknown", NOW)).toBeNull();
-        expect(uptimePatch({ lastOnlineAt: at(4000), onlineSince: null }, "unknown", NOW)).toBeNull();
+        expect(
+            uptimePatch({ lastOnlineAt: at(4000), onlineSince: null }, "unknown", NOW)
+        ).toBeNull();
     });
 });

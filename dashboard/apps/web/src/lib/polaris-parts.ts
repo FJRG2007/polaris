@@ -37,16 +37,25 @@ const OWN_PROJECTS = ["polaris", TUNNEL_PROJECT, PUBLIC_TUNNEL_PROJECT];
  *  service, which is the name in the file and survives the container being
  *  replaced. */
 const PARTS: Record<string, { label: string; summary: string }> = {
-    web: { label: "Dashboard", summary: "The control plane: every page, the API, and the background sweeps." },
+    web: {
+        label: "Dashboard",
+        summary: "The control plane: every page, the API, and the background sweeps."
+    },
     postgres: { label: "Database", summary: "Everything Polaris remembers." },
     traefik: { label: "Edge", summary: "Routes every domain and holds the certificates." },
-    "edge-guard": { label: "Edge guard", summary: "Applies the firewall to requests as they arrive." },
+    "edge-guard": {
+        label: "Edge guard",
+        summary: "Applies the firewall to requests as they arrive."
+    },
     hostd: { label: "Host daemon", summary: "Mounts, host files and the Docker proxy." },
     mdns: { label: "Local discovery", summary: "Answers to polaris.local on the network." },
     "mc-router": { label: "Minecraft router", summary: "One port for every Java server." },
     caddy: { label: "Edge (legacy)", summary: "The previous edge, kept for rollback." },
     ptunnel: { label: "Public tunnel", summary: "Publishes Polaris without a port forward." },
-    "polaris-tunnel": { label: "Public tunnel", summary: "Publishes Polaris without a port forward." }
+    "polaris-tunnel": {
+        label: "Public tunnel",
+        summary: "Publishes Polaris without a port forward."
+    }
 };
 
 /** What the classification needs of a container. A subset of the engine's summary

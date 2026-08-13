@@ -38,7 +38,15 @@ import { GAMES, type GameId } from "@/lib/apps/games-catalog";
 import { useDisplayFormat } from "@/components/display-format";
 import { useGamePresence } from "@/components/use-game-presence";
 import type { GameServerFacts, GameServerLive } from "@/lib/apps/games-service";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useTransition,
+    type ReactNode
+} from "react";
 import {
     deleteGameServerAction,
     installGameServersAction,
@@ -126,7 +134,9 @@ export function GamesView({
     // Stars and archivings this tab has just made, laid over what the page was
     // rendered with. Starring is a click on a row's own icon and has to land on
     // the row, not a page later.
-    const [prefs, setPrefs] = useState<Map<string, { favorite: boolean; archived: boolean }>>(new Map());
+    const [prefs, setPrefs] = useState<Map<string, { favorite: boolean; archived: boolean }>>(
+        new Map()
+    );
 
     const [query, setQuery] = useState("");
     const [gameFilter, setGameFilter] = useState("");
@@ -211,11 +221,22 @@ export function GamesView({
                 })),
         [servers, facts, live, removed, prefs]
     );
-    const playing = useMemo(() => rows.reduce((total, row) => total + (row.live?.online ?? 0), 0), [rows]);
+    const playing = useMemo(
+        () => rows.reduce((total, row) => total + (row.live?.online ?? 0), 0),
+        [rows]
+    );
     const archivedCount = useMemo(() => rows.filter((row) => row.archived).length, [rows]);
-    const shelf = useMemo(() => rows.filter((row) => row.archived === showArchived), [rows, showArchived]);
+    const shelf = useMemo(
+        () => rows.filter((row) => row.archived === showArchived),
+        [rows, showArchived]
+    );
     const visible = useMemo(
-        () => list.sortServers(list.filterServers(shelf, query, gameFilter, statusFilter), sortKey, sortDir),
+        () =>
+            list.sortServers(
+                list.filterServers(shelf, query, gameFilter, statusFilter),
+                sortKey,
+                sortDir
+            ),
         [shelf, query, gameFilter, statusFilter, sortKey, sortDir]
     );
     const filtering = query.trim().length > 0 || gameFilter !== "" || statusFilter !== "";
@@ -235,7 +256,10 @@ export function GamesView({
 
     /** Star a server or put it away, on the row, now. The write follows; if it is
      *  refused the row goes back to what it was and says why. */
-    function setPref(server: list.ServerView, patch: { favorite?: boolean; archived?: boolean }): void {
+    function setPref(
+        server: list.ServerView,
+        patch: { favorite?: boolean; archived?: boolean }
+    ): void {
         const before = { favorite: server.favorite, archived: server.archived };
         setPrefs((held) => new Map(held).set(server.id, { ...before, ...patch }));
         setError(null);
@@ -303,8 +327,8 @@ export function GamesView({
                         <Gamepad2 className="size-8 text-muted-foreground" />
                         <p className="text-sm font-medium">No servers yet</p>
                         <p className="max-w-md text-sm text-muted-foreground">
-                            Pick the game, say who plays on it, and Polaris sizes it, closes it to everyone else and
-                            gives it an address.
+                            Pick the game, say who plays on it, and Polaris sizes it, closes it to
+                            everyone else and gives it an address.
                         </p>
                         {canCreate && (
                             <Button onClick={() => setCreating(true)}>
@@ -353,7 +377,11 @@ export function GamesView({
                             <Button
                                 variant={showArchived ? "secondary" : "ghost"}
                                 onClick={() => setShowArchived((shown) => !shown)}
-                                title={showArchived ? "Back to the servers you use" : "The servers you put away"}
+                                title={
+                                    showArchived
+                                        ? "Back to the servers you use"
+                                        : "The servers you put away"
+                                }
                             >
                                 <Archive className="size-4" />
                                 Archived {archivedCount > 0 ? `(${archivedCount})` : ""}
@@ -376,9 +404,13 @@ export function GamesView({
                                         sorted={sortKey === "players" ? sortDir : null}
                                         onClick={() => toggleSort("players")}
                                     />
-                                    <th className="hidden px-3 py-2 font-medium md:table-cell">Version</th>
+                                    <th className="hidden px-3 py-2 font-medium md:table-cell">
+                                        Version
+                                    </th>
                                     <th className="px-3 py-2 font-medium">Address</th>
-                                    <th className="hidden px-3 py-2 font-medium lg:table-cell">Machine</th>
+                                    <th className="hidden px-3 py-2 font-medium lg:table-cell">
+                                        Machine
+                                    </th>
                                     <th className="px-3 py-2" />
                                 </tr>
                             </thead>
@@ -400,7 +432,10 @@ export function GamesView({
                                 ))}
                                 {visible.length === 0 && (
                                     <tr>
-                                        <td colSpan={7} className="px-3 py-10 text-center text-sm text-muted-foreground">
+                                        <td
+                                            colSpan={7}
+                                            className="px-3 py-10 text-center text-sm text-muted-foreground"
+                                        >
                                             {filtering ? (
                                                 <span className="flex flex-col items-center gap-2">
                                                     No server matches what you asked for.
@@ -513,9 +548,9 @@ function TurnOnGameServers({ canAdd }: { canAdd: boolean }) {
                     <div className="flex flex-col gap-1">
                         <p className="text-sm font-medium">Run game servers</p>
                         <p className="max-w-xl text-sm text-muted-foreground">
-                            Create as many as you want, of any game below, each with its own address, console,
-                            players and settings. Nothing is downloaded until you create a server, and only for the
-                            game that server plays.
+                            Create as many as you want, of any game below, each with its own
+                            address, console, players and settings. Nothing is downloaded until you
+                            create a server, and only for the game that server plays.
                         </p>
                     </div>
 
@@ -529,7 +564,9 @@ function TurnOnGameServers({ canAdd }: { canAdd: boolean }) {
                                 <div className="min-w-0">
                                     <p className="text-sm font-medium">{game.name}</p>
                                     <p className="text-xs text-muted-foreground">{game.summary}</p>
-                                    <p className="text-xs text-muted-foreground/80">{game.demands}</p>
+                                    <p className="text-xs text-muted-foreground/80">
+                                        {game.demands}
+                                    </p>
                                 </div>
                             </div>
                         ))}
@@ -567,7 +604,9 @@ function TurnOnGameServers({ canAdd }: { canAdd: boolean }) {
  *  keeps them somewhere else, and landing on an empty directory reads as a server
  *  with nothing in it. */
 function filesHref(applicationId: string | null, game: GameId | null): string | null {
-    return applicationId ? `/drive?c=container:${applicationId}&p=${game === "ark" ? "/app" : "/data"}` : null;
+    return applicationId
+        ? `/drive?c=container:${applicationId}&p=${game === "ark" ? "/app" : "/data"}`
+        : null;
 }
 
 /** Why the files of a stopped server cannot be browsed. The explorer reads them
@@ -646,7 +685,11 @@ function ServerRow({
                         <AddressCell name={server.name} facts={facts} />
                     </td>
                     <td className="hidden px-3 py-2 text-xs text-muted-foreground lg:table-cell">
-                        {facts === null ? <Skeleton className="h-4 w-24" /> : (facts.serverName ?? "-")}
+                        {facts === null ? (
+                            <Skeleton className="h-4 w-24" />
+                        ) : (
+                            (facts.serverName ?? "-")
+                        )}
                     </td>
                     <td className="px-3 py-2">
                         <div className="flex justify-end gap-1">
@@ -659,7 +702,12 @@ function ServerRow({
                                 disabled={pending}
                                 onClick={() => onPref({ favorite: !server.favorite })}
                             >
-                                <Star className={cn("size-4", server.favorite && "fill-amber-400 text-amber-400")} />
+                                <Star
+                                    className={cn(
+                                        "size-4",
+                                        server.favorite && "fill-amber-400 text-amber-400"
+                                    )}
+                                />
                             </IconButton>
                             <IconLink label={`Open ${server.name}`} href={href}>
                                 <ExternalLink className="size-4" />
@@ -667,7 +715,9 @@ function ServerRow({
                             {files && (
                                 <IconLink
                                     label={
-                                        browsable ? `Browse the files of ${server.name}` : FILES_NEED_RUNNING
+                                        browsable
+                                            ? `Browse the files of ${server.name}`
+                                            : FILES_NEED_RUNNING
                                     }
                                     href={files}
                                     disabled={!browsable}
@@ -679,13 +729,23 @@ function ServerRow({
                                 <IconButton
                                     label={running ? `Stop ${server.name}` : `Start ${server.name}`}
                                     disabled={pending || !known || !server.applicationId}
-                                    onClick={() => onRun(() => setGameServerRunningAction(server.id, !running))}
+                                    onClick={() =>
+                                        onRun(() => setGameServerRunningAction(server.id, !running))
+                                    }
                                 >
-                                    {running ? <Square className="size-4" /> : <Play className="size-4" />}
+                                    {running ? (
+                                        <Square className="size-4" />
+                                    ) : (
+                                        <Play className="size-4" />
+                                    )}
                                 </IconButton>
                             )}
                             {canRemove && (
-                                <IconButton label={`Delete ${server.name}`} disabled={pending} onClick={onDelete}>
+                                <IconButton
+                                    label={`Delete ${server.name}`}
+                                    disabled={pending}
+                                    onClick={onDelete}
+                                >
                                     <Trash2 className="size-4" />
                                 </IconButton>
                             )}
@@ -724,12 +784,24 @@ function ServerRow({
                     </ContextMenuItem>
                 )}
                 <ContextMenuSeparator />
-                <ContextMenuItem disabled={pending} onSelect={() => onPref({ favorite: !server.favorite })}>
-                    <Star className={cn("size-4", server.favorite && "fill-amber-400 text-amber-400")} />
+                <ContextMenuItem
+                    disabled={pending}
+                    onSelect={() => onPref({ favorite: !server.favorite })}
+                >
+                    <Star
+                        className={cn("size-4", server.favorite && "fill-amber-400 text-amber-400")}
+                    />
                     {server.favorite ? "Remove from favourites" : "Add to favourites"}
                 </ContextMenuItem>
-                <ContextMenuItem disabled={pending} onSelect={() => onPref({ archived: !server.archived })}>
-                    {server.archived ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />}
+                <ContextMenuItem
+                    disabled={pending}
+                    onSelect={() => onPref({ archived: !server.archived })}
+                >
+                    {server.archived ? (
+                        <ArchiveRestore className="size-4" />
+                    ) : (
+                        <Archive className="size-4" />
+                    )}
                     {server.archived ? "Put back in the list" : "Archive"}
                 </ContextMenuItem>
                 {canManage && (
@@ -737,7 +809,9 @@ function ServerRow({
                         <ContextMenuSeparator />
                         <ContextMenuItem
                             disabled={pending || !known || !server.applicationId}
-                            onSelect={() => onRun(() => setGameServerRunningAction(server.id, !running))}
+                            onSelect={() =>
+                                onRun(() => setGameServerRunningAction(server.id, !running))
+                            }
                         >
                             {running ? <Square className="size-4" /> : <Play className="size-4" />}
                             {running ? "Stop" : "Start"}
@@ -766,7 +840,13 @@ function ServerRow({
 /** Who is on, and the names behind the count for a server small enough to say. A
  *  server that is not meant to be up has nobody on it, which is known without
  *  asking it. */
-function PlayersCell({ facts, live }: { facts: GameServerFacts | null; live: GameServerLive | null }) {
+function PlayersCell({
+    facts,
+    live
+}: {
+    facts: GameServerFacts | null;
+    live: GameServerLive | null;
+}) {
     // A server nobody can be on still has a size, and it is worth saying: "0 / 20"
     // is the same shape as every other row, where a dash reads as "not known" and
     // makes the column impossible to scan down.
@@ -807,7 +887,9 @@ function VersionCell({ facts }: { facts: GameServerFacts | null }) {
     if (!release) return <span className="text-xs text-muted-foreground">-</span>;
     return (
         <div className="flex min-w-0 flex-col">
-            <span className="truncate text-xs" title={release}>{release}</span>
+            <span className="truncate text-xs" title={release}>
+                {release}
+            </span>
             {facts.crossplay && (
                 <span
                     className="truncate text-xs text-muted-foreground"
@@ -825,7 +907,11 @@ function VersionCell({ facts }: { facts: GameServerFacts | null }) {
 function AddressCell({ name, facts }: { name: string; facts: GameServerFacts | null }) {
     if (facts === null) return <Skeleton className="h-4 w-40" />;
     if (!facts.address) {
-        return <span className="text-xs text-muted-foreground">{facts.message ?? "No address yet"}</span>;
+        return (
+            <span className="text-xs text-muted-foreground">
+                {facts.message ?? "No address yet"}
+            </span>
+        );
     }
     return (
         <div className="flex min-w-0 items-center gap-1">
@@ -874,7 +960,14 @@ function IconButton({
     children: ReactNode;
 }) {
     return (
-        <Button size="icon" variant="ghost" onClick={onClick} disabled={disabled} aria-label={label} title={label}>
+        <Button
+            size="icon"
+            variant="ghost"
+            onClick={onClick}
+            disabled={disabled}
+            aria-label={label}
+            title={label}
+        >
             {children}
         </Button>
     );
