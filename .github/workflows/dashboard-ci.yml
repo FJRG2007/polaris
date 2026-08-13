@@ -13,9 +13,19 @@ name: Dashboard CI
 # packages' declarations and nothing more. Now the app build and the gates run
 # beside each other, and the run costs the longer of the two instead of the sum.
 # Both still run: nothing is skipped to make this faster.
+#
+# Not on main, and that is the point. The publish workflow calls this one, and both
+# instances share the concurrency group below; with cancellation off on main the
+# called one simply waited for the standalone one to finish and then ran the
+# identical suite again, which cost the publish four minutes before it started. On
+# main the call is the run. What that gives up is a push to main touching only paths
+# the publish does not watch (docs/, scripts/, ROADMAP.md): those get no run there.
+# Everything reaches main through a pull request, so that code was already checked on
+# its branch.
 
 on:
   push:
+    branches-ignore: [main]
     paths:
       - "dashboard/**"
       - ".github/workflows/dashboard-ci.yml"
@@ -24,6 +34,11 @@ on:
       - "dashboard/**"
       - ".github/workflows/dashboard-ci.yml"
   workflow_call:
+    inputs:
+      skip_app:
+        description: "Skip the app build - the caller is building the same app inside its image."
+        type: boolean
+        default: false
 
 # A superseded run is stopped on a branch, and left to finish on the default one.
 # GitHub records a cancelled run as a failure against its commit, and main's
@@ -65,8 +80,17 @@ jobs:
       - run: npm run lint --if-present
       - run: npm run test
 
+  # Proof that the app compiles, for branches and pull requests. The publish workflow
+  # builds the very same app inside the image it ships, so it asks for this to be
+  # skipped rather than paying for a second Next build of the same commit.
+  #
+  # The condition is a negation of an input that defaults to false on purpose. An
+  # `inputs.build_app != false` reads as the obvious form and is wrong: on a push
+  # there is no input, and GitHub casts both null and false to 0, so the job would
+  # be skipped exactly where it is the only gate there is.
   app:
     name: build
+    if: ${{ !inputs.skip_app }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

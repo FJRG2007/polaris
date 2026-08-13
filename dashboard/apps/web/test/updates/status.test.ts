@@ -163,18 +163,25 @@ describe("what counts as an update", () => {
 describe("a commit that failed its checks", () => {
     const PASSED: CheckRun[] = [
         { name: "changes", status: "completed", conclusion: "success" },
-        { name: "dashboard-ci / build", status: "completed", conclusion: "success" },
-        // A job the push did not need is not a job that failed.
-        { name: "web", status: "completed", conclusion: "skipped" }
+        { name: "dashboard-ci / typecheck, lint, test", status: "completed", conclusion: "success" },
+        // The publish asks dashboard-ci to skip its own app build: the image it is
+        // about to build is that same app. A job that was skipped did not fail.
+        { name: "dashboard-ci / build", status: "completed", conclusion: "skipped" },
+        { name: "web", status: "completed", conclusion: "success" },
+        { name: "tag", status: "completed", conclusion: "success" }
     ];
     const FAILED: CheckRun[] = [
         { name: "changes", status: "completed", conclusion: "success" },
         {
-            name: "dashboard-ci / build",
+            name: "dashboard-ci / typecheck, lint, test",
             status: "completed",
             conclusion: "failure",
             html_url: "https://github.com/o/p/actions/runs/1/job/2"
-        }
+        },
+        // The image built anyway - it runs beside the suites now - but nothing gave
+        // it the name a deployment pulls.
+        { name: "web", status: "completed", conclusion: "success" },
+        { name: "tag", status: "completed", conclusion: "skipped" }
     ];
 
     it("is not offered, even with the image already published", async () => {
@@ -215,11 +222,32 @@ describe("a commit that failed its checks", () => {
         const status = await check({
             published: IMAGE(NEWER),
             compare: { status: "ahead", ahead_by: 1 },
-            checks: [{ name: "dashboard-ci / build", status: "in_progress", conclusion: null }]
+            checks: [{ name: "dashboard-ci / typecheck, lint, test", status: "in_progress", conclusion: null }]
         });
 
         expect(status.phase).toBe("available");
         expect(status.checks).toBe("running");
+    });
+
+    // The image is pushed by digest and named afterwards, so `tag` is the job that
+    // decides what `latest` resolves to. One that failed leaves an image in the
+    // registry that no deployment can reach by name; offering it as an update would
+    // be offering a commit the box cannot actually pull.
+    it("is not offered when the image was built but never tagged", async () => {
+        const status = await check({
+            published: IMAGE(NEWER),
+            compare: { status: "ahead", ahead_by: 1 },
+            checks: [
+                { name: "changes", status: "completed", conclusion: "success" },
+                { name: "dashboard-ci / typecheck, lint, test", status: "completed", conclusion: "success" },
+                { name: "web", status: "completed", conclusion: "success" },
+                { name: "tag", status: "completed", conclusion: "failure", html_url: "https://ci/tag" }
+            ]
+        });
+
+        expect(status.phase).toBe("blocked");
+        expect(status.checks).toBe("failed");
+        expect(status.checksUrl).toBe("https://ci/tag");
     });
 });
 

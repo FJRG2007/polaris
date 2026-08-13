@@ -101,14 +101,14 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 const WEB_IMAGE_PATHS =
     /^dashboard\/(apps|packages|cli|patches)\/|^dashboard\/docker\/(Dockerfile|entrypoint\.sh)|^dashboard\/package(-lock)?\.json$|^\.github\/workflows\/dashboard-publish\.yml$/;
 
-/** Check runs that decide whether the dashboard image is safe to install
- *  (mirrors dashboard-publish.yml: `web` needs `changes` and `dashboard-ci`, the
- *  latter being dashboard-ci.yml's `build` job - named bare when it runs on the
- *  push and prefixed when the publish calls it). `rust-ci` gates the host daemon
- *  and every other image job gates its own image, so a failure there says nothing
- *  about this one; letting it veto pinned a deployment to a commit it could never
- *  move off, because the commits that fixed it rebuilt no dashboard image. */
-const WEB_IMAGE_CHECKS = /^(changes|web|build|dashboard-ci \/ .+)$/;
+/** Check runs that decide whether the dashboard image is safe to install (mirrors
+ *  dashboard-publish.yml: `changes` picks the images, `web` builds this one, and
+ *  `tag` is what gives it the `latest` name, which it does only once the called
+ *  `dashboard-ci` suites are green). `rust-ci` gates the host daemon and every
+ *  other image job gates its own image, so a failure there says nothing about this
+ *  one; letting it veto pinned a deployment to a commit it could never move off,
+ *  because the commits that fixed it rebuilt no dashboard image. */
+const WEB_IMAGE_CHECKS = /^(changes|web|tag|dashboard-ci \/ .+)$/;
 
 let cache: { status: UpdateStatus; at: number; } | null = null;
 let inflight: Promise<UpdateStatus> | null = null;

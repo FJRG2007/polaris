@@ -9,7 +9,16 @@ on:
   # whole workspace before failing to say anything about itself. workflow_call is
   # deliberately unfiltered: dashboard-publish.yml gates its image on this, and a
   # gate that skips itself is not a gate.
+  #
+  # Not on main, for the reason dashboard-ci.yml is not either: the publish calls
+  # this workflow, both instances land in the concurrency group below, and with
+  # cancellation off on main the called one waited out the standalone one and then
+  # repeated it - four minutes before the daemon image could start building. The
+  # call is the run there. A push to main touching only `plugins/**` or
+  # `rust-toolchain.toml` (which the publish does not watch, since the daemon
+  # depends on neither) gets no run; it was checked on its pull request.
   push:
+    branches-ignore: [main]
     paths:
       - "crates/**"
       - "plugins/**"

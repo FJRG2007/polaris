@@ -58,6 +58,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OWNER: ${{ github.repository_owner }}
           DRY_RUN: ${{ inputs.dry_run }}
+          # polaris-buildcache is deliberately not here. It holds the images'
+          # buildkit cache, whose tags (web, guard, hostd-amd64, ...) are none of
+          # them `latest`, so this would delete the cache after every publish and
+          # make the next build of each image a cold one.
           PACKAGES: >-
             polaris-dashboard
             polaris-mdns
