@@ -190,6 +190,32 @@ function MotdCard({
         [map, raw, shown.length, text]
     );
 
+    /**
+     * A colour outside the sixteen, applied from the caret onwards.
+     *
+     * Not toggled over a selection the way a named colour is. Sixteen shades can be
+     * reasoned about as a set - is this one on, take it off - and sixteen million
+     * cannot, so this does what a colour code does in the game: it holds until
+     * something changes it.
+     */
+    const applyHex = useCallback(
+        (hex: string) => {
+            const field = area.current;
+            const from = field?.selectionStart ?? shown.length;
+            const start = raw ? mc.plainIndexAt(map, from) : from;
+            const next = mc.applyMotdHex(text, start, hex);
+            setText(next.text);
+            requestAnimationFrame(() => {
+                if (!field) return;
+                field.focus();
+                const after = mc.motdMap(next.text);
+                const caret = raw ? (after.offsets[next.start] ?? next.text.length) : next.start;
+                field.setSelectionRange(caret, caret);
+            });
+        },
+        [map, raw, shown.length, text]
+    );
+
     /** What the person typed, folded back into the string the server stores. */
     const edit = useCallback(
         (value: string) => setText((current) => (raw ? value : mc.replaceMotdPlain(current, value))),
@@ -256,6 +282,23 @@ function MotdCard({
                             style={{ backgroundColor: colour.hex }}
                         />
                     ))}
+                    {/* Anything the sixteen do not have. Modern servers draw it;
+                        one old enough not to shows the nearest it knows, which is
+                        the game's own behaviour rather than something to guard. */}
+                    <label
+                        className="relative size-6 cursor-pointer overflow-hidden rounded border border-border transition-transform hover:scale-110"
+                        title="Any other colour"
+                        style={{
+                            background: "conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)"
+                        }}
+                    >
+                        <input
+                            type="color"
+                            className="absolute inset-0 cursor-pointer opacity-0"
+                            aria-label="Any other colour"
+                            onChange={(event) => applyHex(event.target.value)}
+                        />
+                    </label>
                     <span className="mx-1 h-5 w-px bg-border" />
                     {Object.entries(mc.MOTD_STYLES).map(([code, label]) => (
                         <Button

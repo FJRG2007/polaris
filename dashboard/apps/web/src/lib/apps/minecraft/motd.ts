@@ -94,6 +94,39 @@ function freshState(): MotdState {
 }
 
 /** Whether a character is a code this understands, in either notation. */
+/** What introduces a six-digit colour, and how long the whole thing is: the marker,
+ *  the `x`, and six more marker-and-digit pairs. */
+const HEX_CODE = "x";
+const HEX_SEQUENCE_LENGTH = 14;
+
+/**
+ * The colour written at this position, if a whole one is written there.
+ *
+ * All or nothing on purpose. A half-typed sequence is not a colour and must not be
+ * read as one - reading it would swallow the characters after it and change what
+ * the rest of the line says.
+ */
+export function hexColorAt(line: string, from: number): string | null {
+    if (line.length < from + HEX_SEQUENCE_LENGTH) return null;
+    const isMarker = (at: number): boolean => line[at] === AMPERSAND || line[at] === SECTION;
+    if (!isMarker(from) || (line[from + 1] ?? "").toLowerCase() !== HEX_CODE) return null;
+    let hex = "";
+    for (let pair = 0; pair < 6; pair += 1) {
+        const at = from + 2 + pair * 2;
+        const digit = line[at + 1] ?? "";
+        if (!isMarker(at) || !/^[0-9a-fA-F]$/.test(digit)) return null;
+        hex += digit.toLowerCase();
+    }
+    return `#${hex}`;
+}
+
+/** The same colour as the game wants it written. */
+export function hexMotdCode(hex: string): string | null {
+    const digits = hex.trim().replace(/^#/, "").toLowerCase();
+    if (!/^[0-9a-f]{6}$/.test(digits)) return null;
+    return `${SECTION}${HEX_CODE}${[...digits].map((digit) => `${SECTION}${digit}`).join("")}`;
+}
+
 export function isFormatCode(character: string): boolean {
     const code = character.toLowerCase();
     return code === RESET || code in MOTD_COLORS || code in MOTD_STYLES;
@@ -129,6 +162,22 @@ function spansForLine(line: string, state: MotdState): MotdSpan[] {
         const character = line[index] as string;
         const marker = character === AMPERSAND || character === SECTION;
         const code = marker ? (line[index + 1] ?? "").toLowerCase() : "";
+
+        // The modern colour, which is fourteen characters that draw nothing: a
+        // marker, an x, and the six digits each behind a marker of its own. Read
+        // before the sixteen named ones, because `x` is not one of them and the
+        // whole sequence would otherwise come out as literal text in the preview -
+        // and, worse, be counted as literal text when centring the line.
+        if (marker && code === HEX_CODE) {
+            const hex = hexColorAt(line, index);
+            if (hex) {
+                flush();
+                Object.assign(state, freshState(), { color: hex });
+                index += HEX_SEQUENCE_LENGTH - 1;
+                continue;
+            }
+        }
+
         if (!marker || !isFormatCode(code)) {
             text += character;
             continue;
@@ -507,6 +556,29 @@ export function applyMotdCode(
     const on = !selected.every((codes) => codeIsOn(codes, code));
     const next = map.codes.map((codes, index) => (index >= from && index < to ? withCode(codes, code, on) : codes));
     return { text: encodeMotdCodes(map.plain, next), start: from, end: to };
+}
+
+/**
+ * Colour the text from here on with a colour the sixteen do not have.
+ *
+ * Written at the point the caret is, rather than around a selection, because that
+ * is what a colour code does in the game: it applies until something changes it.
+ * The named colours are toggled over a selection because they can be reasoned about
+ * as a set; six digits out of sixteen million cannot, and pretending otherwise
+ * would mean re-encoding the whole line to strip one shade back out.
+ */
+export function applyMotdHex(
+    raw: string,
+    /** Offset into the visible text, as a text field reports it. */
+    at: number,
+    hex: string
+): { readonly text: string; readonly start: number; readonly end: number } {
+    const token = hexMotdCode(hex);
+    const map = motdMap(raw);
+    const from = Math.max(0, Math.min(at, map.plain.length));
+    if (!token) return { text: raw, start: from, end: from };
+    const rawFrom = map.offsets[from] ?? raw.length;
+    return { text: raw.slice(0, rawFrom) + token + raw.slice(rawFrom), start: from, end: from };
 }
 
 /**
