@@ -17,7 +17,7 @@
 
 import * as actions from "./minecraft-actions";
 import { CopyButton } from "@/components/copy-button";
-import { useDisplayFormat } from "@/components/display-format";
+import { PlayerRecordPanel } from "@/components/player-history";
 import type { PlayerStats } from "@/lib/apps/games-activity";
 import type { PlayerRecord } from "@/lib/apps/games-activity-service";
 import { AccountInput } from "@/components/account-input";
@@ -321,33 +321,11 @@ function Reading({
     );
 }
 
-/** How long somebody has played, in the largest unit that still says something. */
-function playedFor(ms: number): string {
-    const minutes = Math.floor(ms / 60_000);
-    if (minutes < 1) return "under a minute";
-    if (minutes < 60) return `${minutes} min`;
-    const hours = minutes / 60;
-    // One decimal up to a day, because "1.5 h" is a real difference from "1 h";
-    // past that nobody cares about the fraction.
-    if (hours < 24) return `${Number(hours.toFixed(1))} h`;
-    return `${Math.round(hours)} h`;
-}
-
 /** What the record read comes back as. Declared here rather than exported from the
  *  actions file, which may only export the actions themselves. */
 interface PlayerRecordReading {
     readonly record: PlayerRecord | null;
     readonly stats: PlayerStats | null;
-}
-
-/** One figure with its label, for the row of them at the top of the history. */
-function Figure({ label, value }: { label: string; value: string }) {
-    return (
-        <div className="rounded-md border border-border bg-muted/40 px-3 py-2">
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="truncate text-sm font-medium" title={value}>{value}</p>
-        </div>
-    );
 }
 
 /**
@@ -378,7 +356,6 @@ export function HistoryDialog({
 }) {
     const newestFirst = [...sessions].reverse();
     const known = new Set(registered);
-    const format = useDisplayFormat();
     const [record, setRecord] = useState<PlayerRecordReading | null>(null);
     const [reading, setReading] = useState(true);
 
@@ -397,8 +374,6 @@ export function HistoryDialog({
         };
     }, [installedAppId, player]);
 
-    const history = record?.record?.history;
-    const stats = record?.stats;
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -410,37 +385,7 @@ export function HistoryDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                {(history?.visits ?? 0) > 0 && history && (
-                    <div className="grid grid-cols-2 gap-2">
-                        <Figure label="Played" value={playedFor(history.playedMs)} />
-                        <Figure label="Visits" value={String(history.visits)} />
-                        <Figure
-                            label="First seen"
-                            value={history.firstSeen ? format.date(history.firstSeen) : "-"}
-                        />
-                        <Figure
-                            label={history.online ? "On now, since" : "Last seen"}
-                            value={history.lastSeen ? format.dateTime(history.lastSeen) : "-"}
-                        />
-                    </div>
-                )}
-
-                {stats && (
-                    <div className="grid grid-cols-3 gap-2">
-                        {/* Counted by the server rather than by Polaris, so it
-                            covers the whole life of the world. */}
-                        <Figure label="Playtime, all time" value={playedFor(stats.playedMs)} />
-                        <Figure label="Deaths" value={String(stats.deaths)} />
-                        <Figure label="Mobs killed" value={String(stats.mobKills)} />
-                    </div>
-                )}
-
-                {reading && !history && (
-                    <p className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
-                        <Loader2 className="size-4 animate-spin" aria-hidden />
-                        Reading the record
-                    </p>
-                )}
+                <PlayerRecordPanel record={record?.record ?? null} stats={record?.stats ?? null} loading={reading} />
 
                 {newestFirst.length === 0 ? (
                     <p className="py-8 text-center text-sm text-muted-foreground">

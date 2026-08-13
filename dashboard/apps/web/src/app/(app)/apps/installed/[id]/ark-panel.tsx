@@ -37,16 +37,16 @@ import { findArkMap, mapRequirementHint } from "@/lib/apps/ark/maps";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import type { ArkAccessView, ArkStatus } from "@/lib/apps/ark/service";
-import { ArkMessageDialog, ArkPlayerDialog } from "./ark-player-dialogs";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { PlayerTimeoutDialog } from "@/components/player-timeout-dialog";
 import { PlayerIconAction, PlayersTable } from "@/components/game-players-table";
 import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs";
-import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { ArkHistoryDialog, ArkMessageDialog, ArkPlayerDialog } from "./ark-player-dialogs";
 import { timeoutFor, timeoutRemaining, type PlayerTimeout } from "@/lib/apps/player-timeout";
 import { foldArkPlayers, matchesArkPlayer, type ArkPlayerEntry } from "@/lib/apps/ark/players";
 import { generateJoinPassword, isJoinPassword, JOIN_PASSWORD_HINT } from "@/lib/apps/ark/access";
+import { CONSUMPTION_METRICS, MetricsHistory, PLAYER_METRICS } from "@/components/metrics-history";
 import {
     playerAction,
     playerConfirm,
@@ -335,10 +335,18 @@ export function ArkPanel({
             )}
             {tab === "usage" &&
                 (applicationId ? (
-                    <MetricsHistory
-                        endpoint={`/api/deploy/apps/${applicationId}/metrics/history`}
-                        metrics={CONSUMPTION_METRICS}
-                    />
+                    <div className="space-y-4">
+                        {/* The one an operator opens this tab for: what the box
+                            cost only means something beside how many it carried. */}
+                        <MetricsHistory
+                            endpoint={`/api/apps/installed/${installedAppId}/game/players`}
+                            metrics={PLAYER_METRICS}
+                        />
+                        <MetricsHistory
+                            endpoint={`/api/deploy/apps/${applicationId}/metrics/history`}
+                            metrics={CONSUMPTION_METRICS}
+                        />
+                    </div>
                 ) : (
                     <Card>
                         <CardBody className="py-10 text-center text-sm text-muted-foreground">
@@ -837,7 +845,7 @@ function PlayersTab({
      *  about nobody yet. */
     const [acting, setActing] = useState<{
         entry: ArkPlayerEntry | null;
-        dialog: "player" | "message" | "timeout";
+        dialog: "player" | "message" | "timeout" | "history";
     } | null>(null);
     /** A refusal belongs in the dialog that asked for it, not behind it on a page
      *  the reader has stopped looking at. */
@@ -903,7 +911,7 @@ function PlayersTab({
         run(() => actions.setArkExclusiveJoinAction(installedAppId, closed));
     }
 
-    function open(dialog: "player" | "message" | "timeout", entry: ArkPlayerEntry | null): void {
+    function open(dialog: "player" | "message" | "timeout" | "history", entry: ArkPlayerEntry | null): void {
         setDialogError(null);
         setActing({ entry, dialog });
     }
@@ -1023,6 +1031,7 @@ function PlayersTab({
                             })
                         }
                         onEdit={() => open("player", entry)}
+                        onHistory={() => open("history", entry)}
                         onMessage={() => open("message", entry)}
                         onKick={() =>
                             void confirm({
@@ -1087,6 +1096,14 @@ function PlayersTab({
                 press Tab and use <code className="font-mono">enablecheats</code>, then{" "}
                 <code className="font-mono">cheat TeleportToPlayer</code>.
             </p>
+
+            {acting?.dialog === "history" && target && (
+                <ArkHistoryDialog
+                    installedAppId={installedAppId}
+                    player={target.name}
+                    onClose={() => setActing(null)}
+                />
+            )}
 
             {acting?.dialog === "player" && (
                 <ArkPlayerDialog
@@ -1236,6 +1253,7 @@ function ArkPlayerRow({
     onAllow,
     onRemove,
     onEdit,
+    onHistory,
     onMessage,
     onKick,
     onBan,
@@ -1256,6 +1274,7 @@ function ArkPlayerRow({
     onAllow: () => void;
     onRemove: () => void;
     onEdit: () => void;
+    onHistory: () => void;
     onMessage: () => void;
     onKick: () => void;
     onBan: () => void;
@@ -1408,6 +1427,12 @@ function ArkPlayerRow({
                                     >
                                         <Eye className="size-4" /> Open their Steam profile
                                     </a>
+                                </DropdownMenuItem>
+                                {/* Kept whether or not they are on: how much
+                                    somebody has played is exactly the question
+                                    asked about a name that is not there. */}
+                                <DropdownMenuItem onSelect={onHistory}>
+                                    <Clock className="size-4" /> Their history
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                     disabled={!live || !entry.online}

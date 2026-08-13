@@ -14,8 +14,11 @@
  * id can be given a better label but never changed into another person.
  */
 
-import { Button, Input } from "@polaris/ui";
-import { useState, useTransition } from "react";
+import * as actions from "./ark-actions";
+import { useEffect, useState, useTransition } from "react";
+import { PlayerRecordPanel } from "@/components/player-history";
+import type { PlayerRecord } from "@/lib/apps/games-activity-service";
+import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 import { isSteamId } from "@/lib/apps/ark/access";
 import { Loader2, UserSearch } from "lucide-react";
 import { AccountInput } from "@/components/account-input";
@@ -201,5 +204,59 @@ export function ArkMessageDialog({
                 />
             </PlayerFormField>
         </PlayerFormDialog>
+    );
+}
+
+/**
+ * How much somebody has played on this server, and when they were last on.
+ *
+ * ARK never had this. It could say who was connected at that second and nothing
+ * else - no last seen, no playtime, no sense of whether a name on the list is a
+ * regular or somebody who joined once in March. The record behind this is not read
+ * out of the game, which prints nothing worth parsing: Polaris asks who is on once
+ * a minute and writes down what changed, so the same rule that gives Minecraft its
+ * history gives ARK one too.
+ */
+export function ArkHistoryDialog({
+    installedAppId,
+    player,
+    onClose
+}: {
+    installedAppId: string;
+    player: string;
+    onClose: () => void;
+}) {
+    const [record, setRecord] = useState<PlayerRecord | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let live = true;
+        void actions.readArkPlayerRecordAction(installedAppId, player).then((answer) => {
+            if (!live) return;
+            setRecord(answer.record ?? null);
+            setLoading(false);
+        });
+        return () => {
+            live = false;
+        };
+    }, [installedAppId, player]);
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{player} on this server</DialogTitle>
+                    <DialogDescription>
+                        Counted from the moment Polaris started watching this server.
+                    </DialogDescription>
+                </DialogHeader>
+                <PlayerRecordPanel record={record} loading={loading} />
+                <div className="flex justify-end">
+                    <Button variant="ghost" onClick={onClose}>
+                        Close
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }

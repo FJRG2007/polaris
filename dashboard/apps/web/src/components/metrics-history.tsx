@@ -327,6 +327,21 @@ export function formatRate(value: number): string {
     return `${formatBytes(value)}/s`;
 }
 
+/** How many were playing, drawn by the same component as everything else. One
+ *  line, because the question is one question. */
+export const PLAYER_METRICS: MetricSpec<{ t: number; players: number | null }>[] = [
+    {
+        key: "players",
+        label: "Players",
+        value: (point) => point.players,
+        format: (value) => (value === 1 ? "1 player" : `${Math.round(value)} players`),
+        tone: "primary",
+        // The peak is what somebody asks a player chart: the last reading is
+        // whoever happens to be on right now, which the panel already says.
+        summary: "max"
+    }
+];
+
 /**
  * What something costs, as every screen that charts consumption shows it.
  *

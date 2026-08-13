@@ -27,11 +27,10 @@ import { MinecraftRules } from "./minecraft-rules";
 import { MinecraftReset } from "./minecraft-reset";
 import { MinecraftWorld } from "./minecraft-world";
 import { findMap } from "@/lib/apps/minecraft/maps";
-import { isConfigCrash } from "@/lib/apps/crash-loop";
 import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
+import { isConfigCrash } from "@/lib/apps/crash-loop";
 import { CopyButton } from "@/components/copy-button";
-import { resetServerConfigAction, saveWorldAction } from "./minecraft-actions";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
 import { MinecraftAppearance } from "./minecraft-appearance";
@@ -48,9 +47,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import { findBlueprint, hasCrossplay } from "@/lib/apps/minecraft/blueprints";
+import { resetServerConfigAction, saveWorldAction } from "./minecraft-actions";
 import { FolderOpen, Loader2, Save, ShieldAlert, UserPlus } from "lucide-react";
 import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs";
-import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
+import { CONSUMPTION_METRICS, MetricsHistory, PLAYER_METRICS } from "@/components/metrics-history";
 import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
 
 /** Mods are managed on their own screen, so their variables are not repeated as
@@ -372,10 +372,19 @@ export function MinecraftPanel({
                     // server is one: it is already sampled and already stored, and a
                     // second copy of it under another name would be a second thing
                     // to keep true.
-                    <MetricsHistory
-                        endpoint={`/api/deploy/apps/${applicationId}/metrics/history`}
-                        metrics={CONSUMPTION_METRICS}
-                    />
+                    <div className="space-y-4">
+                        {/* Above the machine's numbers, because it is the one
+                            somebody opens this tab for: what the server cost is
+                            only interesting next to how many people it carried. */}
+                        <MetricsHistory
+                            endpoint={`/api/apps/installed/${installedAppId}/game/players`}
+                            metrics={PLAYER_METRICS}
+                        />
+                        <MetricsHistory
+                            endpoint={`/api/deploy/apps/${applicationId}/metrics/history`}
+                            metrics={CONSUMPTION_METRICS}
+                        />
+                    </div>
                 ) : (
                     <Card>
                         <CardBody className="py-10 text-center text-sm text-muted-foreground">

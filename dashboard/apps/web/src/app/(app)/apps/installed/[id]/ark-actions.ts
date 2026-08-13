@@ -23,6 +23,7 @@ import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/player-timeout";
 import { GAME_LOG, isJoinPassword, isSteamId } from "@/lib/apps/ark/access";
 import { liftArkTimeout, timeoutArkPlayer } from "@/lib/apps/ark/timeout-service";
 import { requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
+import { readPlayerRecord, type PlayerRecord } from "@/lib/apps/games-activity-service";
 
 const playerSchema = z.object({
     installedAppId: z.string().trim().min(1),
@@ -60,6 +61,29 @@ export async function addArkPlayerAction(
 
 /** Take somebody off the server. Refused rather than recorded when the running
  *  server could not be told, so the list never claims somebody is out who is in. */
+/**
+ * How much somebody has played on this server, from Polaris's own record.
+ *
+ * ARK counts nothing of its own - there is no statistics file beside the world and
+ * nothing in the log worth reading - so this is entirely what the sweep has
+ * watched, and it starts from the day Polaris first asked.
+ */
+export async function readArkPlayerRecordAction(
+    installedAppId: string,
+    player: string
+): Promise<{ record?: PlayerRecord; error?: string }> {
+    const parsed = z
+        .object({ installedAppId: z.string().uuid(), player: z.string().trim().min(1).max(64) })
+        .safeParse({ installedAppId, player });
+    if (!parsed.success) return { error: "Check the details and try again" };
+    try {
+        await requireGameServer("games.read", parsed.data.installedAppId);
+        return { record: await readPlayerRecord(parsed.data.installedAppId, parsed.data.player) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not read this player's history" };
+    }
+}
+
 export async function removeArkPlayerAction(
     installedAppId: string,
     steamId: string
