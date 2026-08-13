@@ -14,8 +14,17 @@ name: Publish dashboard image
 # pulls, and the update card offers whatever commit that tag was built from - so
 # publishing from a commit whose tests failed is how a broken build reaches every
 # box that presses Update. The suites are called here rather than watched for:
-# they run standalone on every push too (that is the signal on branches and pull
-# requests), and this call is the one an image waits on.
+# they run standalone on every push to a branch or a pull request (that is the
+# signal there), and on main this call is the only run of them.
+#
+# The gate is on the TAG, not on the build. An image whose sources changed starts
+# building the moment the push lands, beside the suites rather than behind them,
+# and is pushed to the registry by digest with no tag on it. Nothing resolves a
+# digest nobody was told about: `update.sh` asks for `:latest`, and only the `tag`
+# job at the end moves that tag, only once the suites are green. So the guarantee is
+# the one above, and the build no longer waits four minutes to learn something that
+# has nothing to do with whether it compiles. A digest that never gets tagged is
+# cleaned up by ghcr-prune.yml, which keeps only what `latest` resolves to.
 
 on:
   push:
@@ -25,6 +34,7 @@ on:
       - "dashboard/packages/**"
       - "dashboard/cli/**"
       - "dashboard/patches/**"
+      - "dashboard/scripts/**"
       - "dashboard/docker/**"
       - "dashboard/mdns/**"
       - "dashboard/services/messaging-bridge/**"
@@ -40,6 +50,15 @@ on:
 permissions:
   contents: read
   packages: write
+
+# One publish at a time. An image is now pushed untagged and named minutes later by
+# the `tag` job, so two overlapping runs interleave: the older one's `tag` can land
+# after the newer one's and move `latest` back to the commit before it. Cancellation
+# stays off - a run stopped between the push and the tag leaves images in the
+# registry that nothing will ever name.
+concurrency:
+  group: dashboard-publish
+  cancel-in-progress: false
 
 jobs:
   # Decide which images need rebuilding from the paths that changed in this push.
@@ -83,7 +102,7 @@ jobs:
           # and published no image at all.
           has() { grep -qE "$1" "$CHANGED"; }
           if has '^\.github/workflows/dashboard-publish\.yml$'; then all; exit 0; fi
-          has '^dashboard/(apps|packages|cli|patches)/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$' && out web true || out web false
+          has '^dashboard/(apps|packages|cli|patches|scripts)/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$' && out web true || out web false
           has '^dashboard/mdns/' && out mdns true || out mdns false
           has '^crates/polaris-hostd/|^Cargo\.(toml|lock)$' && out hostd true || out hostd false
           has '^dashboard/docker/updater/' && out updater true || out updater false
@@ -98,6 +117,10 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.bridge == 'true' || needs.changes.outputs.guard == 'true' || github.event_name == 'workflow_dispatch' }}
     uses: ./.github/workflows/dashboard-ci.yml
+    with:
+      # The web image builds the same app from the same commit; building it twice
+      # proves nothing the image build does not already prove.
+      skip_app: true
 
   rust-ci:
     needs: changes
@@ -106,10 +129,24 @@ jobs:
 
   # Next.js dashboard. amd64 only (the runtime servers are x86). Layer caching in
   # the Dockerfile keeps `npm ci` cached across source-only changes.
+  #
+  # The build cache lives in the registry rather than in the Actions cache. What it
+  # holds is the installed workspace - a single 895 MB layer - and pushing that
+  # through the Actions cache API cost a minute and a half of "exporting to GitHub
+  # Actions Cache" on every run, plus forty seconds to read it back. The registry is
+  # where this job is already authenticated and already pushing. It is also a cache
+  # that does not compete with five other scopes for the repository's 10 GB Actions
+  # cache allowance, where an eviction turns the next build cold with no warning.
+  #
+  # A separate package, deliberately: ghcr-prune.yml keeps only what each package's
+  # `latest` tag resolves to, so a cache tag parked inside polaris-dashboard would be
+  # deleted after every publish. polaris-buildcache is not in its list.
   web:
-    needs: [changes, dashboard-ci]
+    needs: changes
     if: ${{ needs.changes.outputs.web == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -118,16 +155,16 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - id: build
+        uses: docker/build-push-action@v6
         with:
           context: dashboard
           file: dashboard/docker/Dockerfile
-          push: true
-          tags: ghcr.io/fjrg2007/polaris-dashboard:latest
           build-args: |
             POLARIS_BUILD_SHA=${{ github.sha }}
-          cache-from: type=gha,scope=web
-          cache-to: type=gha,mode=max,scope=web
+          cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web
+          cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web,mode=max
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-dashboard,push-by-digest=true,name-canonical=true,push=true
 
   mdns:
     needs: changes
@@ -146,23 +183,28 @@ jobs:
           context: dashboard/mdns
           push: true
           tags: ghcr.io/fjrg2007/polaris-mdns:latest
-          cache-from: type=gha,scope=mdns
-          cache-to: type=gha,mode=max,scope=mdns
+          cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:mdns
+          cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:mdns,mode=max
 
   # Privileged host daemon (Rust workspace at the repo root). Built per-arch on
   # NATIVE runners - amd64 on ubuntu-latest, arm64 on ubuntu-24.04-arm - instead of
   # emulating arm64 under QEMU (which made this the ~7-minute bottleneck). Each arch
-  # pushes by digest; the manifest job below stitches them into the :latest tag.
+  # pushes by digest; the manifest job below stitches them into the :latest tag,
+  # and that is where the Rust suites are waited on - the same arrangement as the
+  # dashboard images. Nothing pulls a digest, so building one before the suites
+  # have spoken commits to nothing.
   hostd:
-    needs: [changes, rust-ci]
+    needs: changes
     if: ${{ needs.changes.outputs.hostd == 'true' || github.event_name == 'workflow_dispatch' }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: linux/amd64
+            arch: amd64
             runner: ubuntu-latest
           - platform: linux/arm64
+            arch: arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     steps:
@@ -179,8 +221,8 @@ jobs:
           context: .
           file: crates/polaris-hostd/Dockerfile
           platforms: ${{ matrix.platform }}
-          cache-from: type=gha,scope=hostd-${{ matrix.platform }}
-          cache-to: type=gha,mode=max,scope=hostd-${{ matrix.platform }}
+          cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:hostd-${{ matrix.arch }}
+          cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:hostd-${{ matrix.arch }},mode=max
           outputs: type=image,name=ghcr.io/fjrg2007/polaris-hostd,push-by-digest=true,name-canonical=true,push=true
       - name: Export digest
         run: |
@@ -194,9 +236,12 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  # Stitch the per-arch digests into the multi-arch :latest manifest.
+  # Stitch the per-arch digests into the multi-arch :latest manifest, once the Rust
+  # suites have passed. A failed `rust-ci` skips this job, which leaves both arch
+  # digests in the registry with no tag pointing at them - unreachable, and cleaned
+  # up by ghcr-prune.yml.
   hostd-manifest:
-    needs: [changes, hostd]
+    needs: [changes, rust-ci, hostd]
     if: ${{ needs.changes.outputs.hostd == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
@@ -237,17 +282,19 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ghcr.io/fjrg2007/polaris-updater:latest
-          cache-from: type=gha,scope=updater
-          cache-to: type=gha,mode=max,scope=updater
+          cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:updater
+          cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:updater,mode=max
 
   # Messaging bridge sidecar. The marketplace installs this image as a managed
   # Deploy app (it is not part of the web image), so it must be published for
   # installs to pull. amd64 only, matching the runtime servers. Its build context
   # is the dashboard root so the workspace and @polaris/messaging are available.
   bridge:
-    needs: [changes, dashboard-ci]
+    needs: changes
     if: ${{ needs.changes.outputs.bridge == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -256,23 +303,25 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - id: build
+        uses: docker/build-push-action@v6
         with:
           context: dashboard
           file: dashboard/services/messaging-bridge/Dockerfile
-          push: true
-          tags: ghcr.io/fjrg2007/polaris-messaging-bridge:latest
-          cache-from: type=gha,scope=bridge
-          cache-to: type=gha,mode=max,scope=bridge
+          cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:bridge
+          cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:bridge,mode=max
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-messaging-bridge,push-by-digest=true,name-canonical=true,push=true
 
   # WAF sidecar that sits at each server's edge. Published for the same reason the
   # bridge is: it was build-only, so an update pulled a newer dashboard and left the
   # guard at whatever was built on install day. The two have to move together - the
   # dashboard writes edge routes that name the guard's listeners.
   guard:
-    needs: [changes, dashboard-ci]
+    needs: changes
     if: ${{ needs.changes.outputs.guard == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -281,11 +330,46 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - id: build
+        uses: docker/build-push-action@v6
         with:
           context: dashboard
           file: dashboard/services/edge-guard/Dockerfile
-          push: true
-          tags: ghcr.io/fjrg2007/polaris-edge-guard:latest
-          cache-from: type=gha,scope=guard
-          cache-to: type=gha,mode=max,scope=guard
+          cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:guard
+          cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:guard,mode=max
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-edge-guard,push-by-digest=true,name-canonical=true,push=true
+
+  # The gate. The three images above are already in the registry by the time this
+  # runs; what it does is give them the name every deployment pulls, and only if the
+  # suites passed. Each image is tagged on its own result, so a bridge that failed to
+  # build does not hold back a web that did.
+  #
+  # `!cancelled()` rather than `always()`: a cancelled run must leave `latest` where
+  # it is, and a skipped dashboard-ci (nothing here was rebuilt) skips this too,
+  # since its result is then not 'success'.
+  tag:
+    needs: [dashboard-ci, web, bridge, guard]
+    if: ${{ !cancelled() && needs.dashboard-ci.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Tag the dashboard
+        if: ${{ needs.web.result == 'success' }}
+        run: |
+          docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-dashboard:latest \
+            ghcr.io/fjrg2007/polaris-dashboard@${{ needs.web.outputs.digest }}
+      - name: Tag the messaging bridge
+        if: ${{ needs.bridge.result == 'success' }}
+        run: |
+          docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-messaging-bridge:latest \
+            ghcr.io/fjrg2007/polaris-messaging-bridge@${{ needs.bridge.outputs.digest }}
+      - name: Tag the edge guard
+        if: ${{ needs.guard.result == 'success' }}
+        run: |
+          docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-edge-guard:latest \
+            ghcr.io/fjrg2007/polaris-edge-guard@${{ needs.guard.outputs.digest }}

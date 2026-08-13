@@ -39,9 +39,10 @@ dashboard/
     └── ui/             # @polaris/ui           self-hosted component system + shell
 ```
 
-Dependency order: `config -> db -> core -> {auth, hostd-client} -> storage -> ui -> apps`.
-App code owns only routing and composition; anything a second app could reuse
-lives in a package.
+Packages depend on each other's built `dist/`; `npm run build:packages` reads
+that order out of the manifests and builds each wave in parallel, so no
+dependency order needs to be tracked here. App code owns only routing and
+composition; anything a second app could reuse lives in a package.
 
 ## Development
 

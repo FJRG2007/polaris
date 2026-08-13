@@ -28,7 +28,7 @@ const NEWER = "2222222222222222222222222222222222222222";
 interface Compare {
     readonly status: string;
     readonly ahead_by: number;
-    readonly files?: { filename: string; }[];
+    readonly files?: { filename: string }[];
 }
 
 /** One entry of a check-runs response. */
@@ -72,7 +72,8 @@ async function check(options: {
         vi.fn(async (url: string) => {
             const path = String(url);
             let answer: unknown;
-            if (path.includes("/check-runs")) answer = options.checks && { check_runs: options.checks };
+            if (path.includes("/check-runs"))
+                answer = options.checks && { check_runs: options.checks };
             else if (path.includes("/compare/")) answer = options.compare;
             // A deployment that builds its own image asks what the branch points at.
             else answer = options.head === undefined ? null : options.head && { sha: options.head };
@@ -114,7 +115,11 @@ describe("what counts as an update", () => {
     it("says nothing is available while the commit is still being built", async () => {
         const status = await check({
             published: IMAGE(RUNNING),
-            compare: { status: "ahead", ahead_by: 2, files: [{ filename: "dashboard/apps/web/src/page.tsx" }] }
+            compare: {
+                status: "ahead",
+                ahead_by: 2,
+                files: [{ filename: "dashboard/apps/web/src/page.tsx" }]
+            }
         });
 
         expect(status.phase).toBe("building");
@@ -135,7 +140,10 @@ describe("what counts as an update", () => {
     });
 
     it("is up to date when the running build is the published one", async () => {
-        const status = await check({ published: IMAGE(RUNNING), compare: { status: "identical", ahead_by: 0 } });
+        const status = await check({
+            published: IMAGE(RUNNING),
+            compare: { status: "identical", ahead_by: 0 }
+        });
 
         expect(status.phase).toBe("up-to-date");
         expect(status.upToDate).toBe(true);
@@ -163,18 +171,29 @@ describe("what counts as an update", () => {
 describe("a commit that failed its checks", () => {
     const PASSED: CheckRun[] = [
         { name: "changes", status: "completed", conclusion: "success" },
-        { name: "dashboard-ci / build", status: "completed", conclusion: "success" },
-        // A job the push did not need is not a job that failed.
-        { name: "web", status: "completed", conclusion: "skipped" }
+        {
+            name: "dashboard-ci / typecheck, lint, test",
+            status: "completed",
+            conclusion: "success"
+        },
+        // The publish asks dashboard-ci to skip its own app build: the image it is
+        // about to build is that same app. A job that was skipped did not fail.
+        { name: "dashboard-ci / build", status: "completed", conclusion: "skipped" },
+        { name: "web", status: "completed", conclusion: "success" },
+        { name: "tag", status: "completed", conclusion: "success" }
     ];
     const FAILED: CheckRun[] = [
         { name: "changes", status: "completed", conclusion: "success" },
         {
-            name: "dashboard-ci / build",
+            name: "dashboard-ci / typecheck, lint, test",
             status: "completed",
             conclusion: "failure",
             html_url: "https://github.com/o/p/actions/runs/1/job/2"
-        }
+        },
+        // The image built anyway - it runs beside the suites now - but nothing gave
+        // it the name a deployment pulls.
+        { name: "web", status: "completed", conclusion: "success" },
+        { name: "tag", status: "completed", conclusion: "skipped" }
     ];
 
     it("is not offered, even with the image already published", async () => {
@@ -192,7 +211,11 @@ describe("a commit that failed its checks", () => {
     it("is not called a build still on its way", async () => {
         const status = await check({
             published: IMAGE(RUNNING),
-            compare: { status: "ahead", ahead_by: 1, files: [{ filename: "dashboard/apps/web/src/page.tsx" }] },
+            compare: {
+                status: "ahead",
+                ahead_by: 1,
+                files: [{ filename: "dashboard/apps/web/src/page.tsx" }]
+            },
             checks: FAILED
         });
 
@@ -215,11 +238,47 @@ describe("a commit that failed its checks", () => {
         const status = await check({
             published: IMAGE(NEWER),
             compare: { status: "ahead", ahead_by: 1 },
-            checks: [{ name: "dashboard-ci / build", status: "in_progress", conclusion: null }]
+            checks: [
+                {
+                    name: "dashboard-ci / typecheck, lint, test",
+                    status: "in_progress",
+                    conclusion: null
+                }
+            ]
         });
 
         expect(status.phase).toBe("available");
         expect(status.checks).toBe("running");
+    });
+
+    // The image is pushed by digest and named afterwards, so `tag` is the job that
+    // decides what `latest` resolves to. One that failed leaves an image in the
+    // registry that no deployment can reach by name; offering it as an update would
+    // be offering a commit the box cannot actually pull.
+    it("is not offered when the image was built but never tagged", async () => {
+        const status = await check({
+            published: IMAGE(NEWER),
+            compare: { status: "ahead", ahead_by: 1 },
+            checks: [
+                { name: "changes", status: "completed", conclusion: "success" },
+                {
+                    name: "dashboard-ci / typecheck, lint, test",
+                    status: "completed",
+                    conclusion: "success"
+                },
+                { name: "web", status: "completed", conclusion: "success" },
+                {
+                    name: "tag",
+                    status: "completed",
+                    conclusion: "failure",
+                    html_url: "https://ci/tag"
+                }
+            ]
+        });
+
+        expect(status.phase).toBe("blocked");
+        expect(status.checks).toBe("failed");
+        expect(status.checksUrl).toBe("https://ci/tag");
     });
 });
 
@@ -245,10 +304,20 @@ describe("a failure that belongs to another image", () => {
                 { name: "updater", status: "completed", conclusion: "skipped" },
                 { name: "mdns", status: "completed", conclusion: "skipped" },
                 { name: "rust-ci / python", status: "completed", conclusion: "success" },
-                { name: "rust-ci / rust", status: "completed", conclusion: "failure", html_url: "https://ci/rust" },
+                {
+                    name: "rust-ci / rust",
+                    status: "completed",
+                    conclusion: "failure",
+                    html_url: "https://ci/rust"
+                },
                 { name: "dashboard-ci / build", status: "completed", conclusion: "success" },
                 { name: "changes", status: "completed", conclusion: "success" },
-                { name: "rust", status: "completed", conclusion: "failure", html_url: "https://ci/rust" },
+                {
+                    name: "rust",
+                    status: "completed",
+                    conclusion: "failure",
+                    html_url: "https://ci/rust"
+                },
                 { name: "python", status: "completed", conclusion: "success" },
                 { name: "build", status: "completed", conclusion: "success" }
             ]
@@ -265,7 +334,12 @@ describe("a failure that belongs to another image", () => {
             compare: { status: "ahead", ahead_by: 1 },
             checks: [
                 { name: "rust", status: "completed", conclusion: "success" },
-                { name: "web", status: "completed", conclusion: "failure", html_url: "https://ci/web" }
+                {
+                    name: "web",
+                    status: "completed",
+                    conclusion: "failure",
+                    html_url: "https://ci/web"
+                }
             ]
         });
 
@@ -281,7 +355,12 @@ describe("a failure that belongs to another image", () => {
             compare: { status: "ahead", ahead_by: 1 },
             checks: [
                 { name: "web", status: "completed", conclusion: "success" },
-                { name: "rust", status: "completed", conclusion: "failure", html_url: "https://ci/rust" }
+                {
+                    name: "rust",
+                    status: "completed",
+                    conclusion: "failure",
+                    html_url: "https://ci/rust"
+                }
             ]
         });
 
@@ -293,7 +372,14 @@ describe("a failure that belongs to another image", () => {
         const status = await check({
             published: IMAGE(NEWER),
             compare: { status: "ahead", ahead_by: 1 },
-            checks: [{ name: "rust", status: "completed", conclusion: "failure", html_url: "https://ci/rust" }]
+            checks: [
+                {
+                    name: "rust",
+                    status: "completed",
+                    conclusion: "failure",
+                    html_url: "https://ci/rust"
+                }
+            ]
         });
 
         expect(status.phase).toBe("available");

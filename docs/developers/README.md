@@ -60,10 +60,10 @@ npm run db:generate       # regenerate the Prisma client
 npm run db:migrate        # apply migrations (deploy)
 ```
 
-Packages depend on each other's built `dist/`, so build in dependency order
-(`config -> db -> core -> {auth, hostd-client} -> storage -> ui -> apps`) or run
-the workspace `build`. Progress and what's in flight is tracked in
-[`../../dashboard/ROADMAP.md`](../../dashboard/ROADMAP.md).
+Packages depend on each other's built `dist/`. `npm run build:packages` reads that
+order out of the manifests and builds everything a wave at a time, in parallel
+within each wave, so building one by one is never necessary. Progress and what's in
+flight is tracked in [`../../dashboard/ROADMAP.md`](../../dashboard/ROADMAP.md).
 
 ## Rust (plugins + host daemon)
 
