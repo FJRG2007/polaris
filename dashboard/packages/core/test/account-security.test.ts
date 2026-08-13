@@ -137,6 +137,7 @@ describe("api keys", () => {
             "deploy.manage",
             "games.read",
             "games.moderate",
+            "games.console",
             "games.manage"
         ]);
     });
