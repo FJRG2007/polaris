@@ -31,6 +31,16 @@ export interface WorldRules {
     readonly values: Record<string, string>;
     /** Null when the server did not report one. */
     readonly difficulty: Difficulty | null;
+    /**
+     * Why there are no values, when there are none.
+     *
+     * A rule is a thing the game has, not a thing this server told us about: the
+     * list of them is in Polaris and a stopped server does not change it. So a
+     * failed read is a sentence to put above the rules rather than a reason to
+     * draw nothing - the screen owes somebody the catalogue and an explanation,
+     * not a daemon error about a container id they have never seen.
+     */
+    readonly reason: string | null;
 }
 
 /** A rule name is only ever one of ours, and this is what says so out loud before
@@ -49,7 +59,9 @@ function assertKnownRuleNames(): void {
  * how one screen serves 1.13 and 1.21 without knowing which it is looking at.
  */
 export async function readWorldRules(server: ServerContainer): Promise<WorldRules> {
-    if (server.edition !== "java") return { values: {}, difficulty: null };
+    if (server.edition !== "java") {
+        return { values: {}, difficulty: null, reason: "Bedrock keeps its rules inside the world rather than answering for them." };
+    }
     assertKnownRuleNames();
     const script = [...GAME_RULES.map((rule) => `rcon-cli gamerule ${rule.id}`), "rcon-cli difficulty"].join(
         "; "
@@ -63,7 +75,7 @@ export async function readWorldRules(server: ServerContainer): Promise<WorldRule
     if (values.size === 0) {
         const said = output.trim().replace(/\s+/g, " ").slice(0, 200);
         if (!said || /connection refused/i.test(said)) {
-            throw new Error("The server is not accepting commands yet - start it first");
+            return { values: {}, difficulty: null, reason: "Start the server to read what these are set to." };
         }
         // It answered, and refused every one of them. Seen on Minecraft 26.2, which
         // will not read a rule back the way every release before it did - so the
@@ -76,16 +88,29 @@ export async function readWorldRules(server: ServerContainer): Promise<WorldRule
         // draw, and the values it does not know are shown as unset rather than
         // invented.
         if (/incorrect argument|unknown or incomplete|<--\[HERE\]/i.test(said)) {
-            return { values: {}, difficulty: parseDifficulty(output) };
+            return {
+                values: {},
+                difficulty: parseDifficulty(output),
+                reason: "This server's version will not say what a rule is set to. Setting one still works."
+            };
         }
-        throw new Error(`The server did not answer: ${said}`);
+        return { values: {}, difficulty: parseDifficulty(output), reason: `The server answered: ${said}` };
     }
-    return { values: Object.fromEntries(values), difficulty: parseDifficulty(output) };
+    return { values: Object.fromEntries(values), difficulty: parseDifficulty(output), reason: null };
 }
 
 /** The same, opening the machine for it. */
 export async function readRulesFor(ownerId: string, installedAppId: string): Promise<WorldRules> {
-    return withServerContainer(ownerId, installedAppId, readWorldRules);
+    // A server that is off cannot be opened at all, and the daemon says so by
+    // naming a container id nobody has ever seen. That is not an answer to put on
+    // a screen, and it is not a reason to withhold the rules either: they are the
+    // game's, they are in Polaris, and the only thing a stopped server changes is
+    // that none of them can be read or set right now.
+    return withServerContainer(ownerId, installedAppId, readWorldRules).catch(() => ({
+        values: {},
+        difficulty: null,
+        reason: "The server is stopped, so its rules cannot be read or changed yet."
+    }));
 }
 
 /**

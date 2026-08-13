@@ -17,7 +17,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, Info, Loader2, RefreshCw } from "lucide-react";
 import type { WorldRules } from "@/lib/apps/minecraft/rules-service";
 import { Button, Card, CardBody, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
 import { DIFFICULTIES, ruleGroups, normalizeRuleValue, type GameRule } from "@/lib/apps/minecraft/rules";
@@ -102,6 +102,11 @@ export function MinecraftRules({
     // - will set a rule and refuse to read one back, and on those the answer is not
     // "this server has no rules": it is that nobody can see what they are.
     const answered = Object.keys(rules?.values ?? {}).length > 0;
+    // Why the values are missing, in Polaris's words. The rules themselves are in
+    // the code and are drawn regardless: a stopped server does not change what
+    // rules the game has, and a daemon error naming a container id is not an
+    // answer to put in front of anybody.
+    const reason = rules?.reason ?? null;
 
     // Every rule when the server said nothing, and only the ones it answered for
     // when it did. A rule a server has never heard of is a switch that fails every
@@ -178,6 +183,15 @@ export function MinecraftRules({
                             />
                         </CardBody>
                     </Card>
+
+                    {reason && (
+                        <Card>
+                            <CardBody className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
+                                <Info className="size-4 shrink-0" aria-hidden />
+                                <span>{reason}</span>
+                            </CardBody>
+                        </Card>
+                    )}
 
                     {groups.length === 0 ? (
                         <Card>
