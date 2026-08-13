@@ -112,3 +112,58 @@ export interface OverviewData {
     aggregateCpuPercent: number;
     aggregateMemUsage: number;
 }
+
+/** One volume a part of Polaris keeps its data in. */
+export interface FootprintVolume {
+    readonly name: string;
+    /** Where the container sees it, which is what was measured. */
+    readonly path: string;
+    /** Null when it could not be measured: a stopped container has nothing to ask. */
+    readonly usedBytes: number | null;
+}
+
+/** One part of Polaris and what it is using. */
+export interface FootprintPart {
+    readonly id: string;
+    readonly name: string;
+    readonly label: string;
+    readonly summary: string;
+    readonly image: string;
+    readonly state: string;
+    /** Null for a part that is not running, which uses neither. */
+    readonly cpuPercent: number | null;
+    readonly memUsedBytes: number | null;
+    /** What it has written since it started, on top of its image. */
+    readonly writableBytes: number | null;
+    /** What its image occupies. Shared between containers of the same image, so
+     *  the total below counts each image once rather than once per container. */
+    readonly imageBytes: number | null;
+    readonly volumes: readonly FootprintVolume[];
+}
+
+/** Polaris' whole footprint on the machine it runs on, as /api/polaris/footprint
+ *  answers. Measured by `lib/polaris-footprint`; the shape lives here because the
+ *  card that renders it runs in the browser, and that module reaches the Docker
+ *  engine. */
+export interface PolarisFootprint {
+    readonly parts: readonly FootprintPart[];
+    /** Memory the running parts hold right now, and what the machine has. */
+    readonly memUsedBytes: number;
+    readonly memTotalBytes: number | null;
+    readonly cpuPercent: number;
+    /** Disk, split the three ways it is actually spent. Images are counted once
+     *  each however many containers run them. */
+    readonly imageBytes: number;
+    readonly writableBytes: number;
+    readonly volumeBytes: number;
+    /** Whether every volume answered. False means the disk figures are a floor
+     *  rather than a total, and the panel says so rather than quietly under-
+     *  reporting. */
+    readonly diskComplete: boolean;
+    readonly at: string;
+}
+
+/** Everything Polaris occupies on disk, which is the three figures added up. */
+export function footprintDiskBytes(footprint: PolarisFootprint): number {
+    return footprint.imageBytes + footprint.writableBytes + footprint.volumeBytes;
+}

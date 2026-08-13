@@ -43,6 +43,12 @@ vi.mock("../../src/app/(app)/apps/containers/actions", () => ({
 vi.mock("../../src/app/(app)/apps/containers/docker-connection-dialog", () => ({
     DockerConnectionDialog: () => null
 }));
+// Its own read, over the same hook this file stubs with a host snapshot. What it
+// puts on screen is measured elsewhere; here it would only be reading somebody
+// else's answer.
+vi.mock("../../src/app/(app)/apps/containers/polaris-footprint", () => ({
+    PolarisFootprintCard: () => null
+}));
 
 const { ContainersView } = await import("../../src/app/(app)/apps/containers/containers-view");
 

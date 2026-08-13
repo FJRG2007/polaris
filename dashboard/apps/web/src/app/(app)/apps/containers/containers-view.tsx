@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { carryForwardUsage } from "./usage";
 import { formatAge, STALE_AFTER_MS } from "./freshness";
 import { useConfirm } from "@/components/confirm-dialog";
+import { PolarisFootprintCard } from "./polaris-footprint";
 import { useLiveResource } from "@/components/use-live-resource";
 import { DockerConnectionDialog } from "./docker-connection-dialog";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
@@ -66,6 +67,9 @@ export function ContainersView({
     localDiagnostic: LocalHostDiagnostic | null;
 }) {
     const router = useRouter();
+    // Whether the host on screen is the machine Polaris runs on, which is the only
+    // one that has a Polaris to measure.
+    const isLocalHost = connections.some((connection) => connection.id === connectionId && connection.local);
     const [pending, startTransition] = useTransition();
     const [live, setLive] = useState(true);
     const [confirm, confirmDialog] = useConfirm();
@@ -295,6 +299,12 @@ export function ContainersView({
                                 ))
                             )}
                         </div>
+
+                        {/* Only where Polaris is installed. Its own containers are
+                            in the table below, mixed in with everything deployed,
+                            which says whether they are running and nothing about
+                            what they cost. */}
+                        {isLocalHost && <PolarisFootprintCard />}
 
                         <div className="mb-2 flex items-center justify-between">
                             <span className="text-xs text-muted-foreground">{statusLabel}</span>

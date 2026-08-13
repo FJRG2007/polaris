@@ -35,6 +35,11 @@ export interface ContainerSummary {
     readonly image: string;
     readonly state: string;
     readonly status: string;
+    /** The compose project and service it was started as, when it was started by
+     *  compose. This is how a caller tells one stack's containers from another's
+     *  without matching on names, which are the operator's to choose. */
+    readonly composeProject: string | null;
+    readonly composeService: string | null;
 }
 
 export interface ContainerStats {
@@ -64,7 +69,13 @@ export interface ContainerDetail {
     readonly restartCount: number;
     readonly command: string;
     readonly ports: ReadonlyArray<{ readonly container: string; readonly host: string | null }>;
-    readonly mounts: ReadonlyArray<{ readonly source: string; readonly destination: string; readonly rw: boolean }>;
+    readonly mounts: ReadonlyArray<{
+        readonly source: string;
+        readonly destination: string;
+        readonly rw: boolean;
+        /** The named volume behind it, when it is one rather than a host path. */
+        readonly name: string | null;
+    }>;
     readonly networks: readonly string[];
     readonly env: readonly string[];
     /** The compose project this container belongs to, when it has one. */
@@ -165,12 +176,15 @@ export class DockerDriver {
         );
         return raw.map((entry) => {
             const names = (entry.Names as string[] | undefined) ?? [];
+            const labels = (entry.Labels as Record<string, string> | undefined) ?? {};
             return {
                 id: String(entry.Id ?? ""),
                 name: (names[0] ?? "").replace(/^\//, "") || String(entry.Id ?? "").slice(0, 12),
                 image: String(entry.Image ?? ""),
                 state: String(entry.State ?? ""),
-                status: String(entry.Status ?? "")
+                status: String(entry.Status ?? ""),
+                composeProject: labels["com.docker.compose.project"] ?? null,
+                composeService: labels["com.docker.compose.service"] ?? null
             };
         });
     }
@@ -258,7 +272,8 @@ export class DockerDriver {
             mounts: ((raw.Mounts ?? []) as Array<Record<string, unknown>>).map((mount) => ({
                 source: String(mount.Source ?? mount.Name ?? ""),
                 destination: String(mount.Destination ?? ""),
-                rw: Boolean(mount.RW)
+                rw: Boolean(mount.RW),
+                name: mount.Type === "volume" && mount.Name ? String(mount.Name) : null
             })),
             networks: Object.keys(networks),
             // Values are dropped: an env list is where secrets live, and the panel
