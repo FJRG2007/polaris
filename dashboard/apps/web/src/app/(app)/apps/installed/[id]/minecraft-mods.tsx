@@ -164,6 +164,27 @@ export function MinecraftMods({
         void readList(projects);
     }, [projects, readList]);
 
+    /**
+     * Taking a project off the list.
+     *
+     * Asked about first because nothing here puts it back: the row goes on one
+     * click, and what is lost with it is the build it was pinned to and the search
+     * that found it in the first place.
+     */
+    async function removeProject(entry: string, title: string): Promise<void> {
+        if (
+            !(await confirm({
+                title: `Remove ${title}?`,
+                description: "It comes off the list now. The server uninstalls it the next time it restarts.",
+                confirmLabel: "Remove",
+                danger: true
+            }))
+        ) {
+            return;
+        }
+        setProjects((current) => current.filter((item) => item !== entry));
+    }
+
     async function save(): Promise<void> {
         setError(null);
         const warning =
@@ -225,7 +246,7 @@ export function MinecraftMods({
                 dependencies={dependencies}
                 dependencyOptions={dependenciesSetting?.options ?? [{ value: "required", label: "Required only" }]}
                 onDependencies={setDependencies}
-                onRemove={(entry) => setProjects((current) => current.filter((item) => item !== entry))}
+                onRemove={(entry, title) => void removeProject(entry, title)}
                 onRepin={(entry, build) =>
                     setProjects((current) => current.map((item) => (item === entry ? repinEntry(item, build) : item)))
                 }
@@ -434,7 +455,7 @@ function InstalledList({
     dependencies: string;
     dependencyOptions: ReadonlyArray<{ value: string; label: string }>;
     onDependencies: (value: string) => void;
-    onRemove: (entry: string) => void;
+    onRemove: (entry: string, title: string) => void;
 }) {
     const conflictsFor = (slug: string): string[] =>
         conflicts
@@ -540,7 +561,7 @@ function InstalledList({
                                         aria-label={`Remove ${project.title}`}
                                         title={`Remove ${project.title}`}
                                         className="text-danger hover:text-danger"
-                                        onClick={() => onRemove(project.entry)}
+                                        onClick={() => onRemove(project.entry, project.title)}
                                     >
                                         <Trash2 className="size-4" />
                                     </Button>
