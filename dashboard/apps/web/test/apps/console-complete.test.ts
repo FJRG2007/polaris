@@ -36,8 +36,16 @@ describe("the command itself", () => {
         expect(completion.from).toBe(1);
     });
 
-    it("offers everything on an empty line", () => {
-        expect(at("").options.length).toBeGreaterThan(10);
+    it("offers nothing at all until something is typed", () => {
+        // An empty box is not a question. Every command in the game, in the way,
+        // from the moment the console is opened.
+        expect(at("").options).toEqual([]);
+        expect(at("/").options).toEqual([]);
+        expect(at("  ").options).toEqual([]);
+    });
+
+    it("starts offering on the first character", () => {
+        expect(at("s").options.length).toBeGreaterThan(0);
     });
 });
 

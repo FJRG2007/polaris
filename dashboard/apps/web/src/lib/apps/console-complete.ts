@@ -197,7 +197,16 @@ export function completeConsole(line: string, caret: number, sources: Completion
         token
     });
 
-    if (index === 0) return narrow(commandsFor(sources.game).map((command) => command.name));
+    // Nothing typed is not a question. An empty box offering every command the
+    // game has is a list in the way of somebody who came to type `stop`, and it
+    // appears the moment the console is opened - so the command list waits for a
+    // first character. An empty token *after* a space is different: that is a
+    // position in a command somebody is already writing, and the whole list for
+    // that position is exactly what helps.
+    if (index === 0) {
+        if (token.length === 0) return { options: [], from, token };
+        return narrow(commandsFor(sources.game).map((command) => command.name));
+    }
 
     const command = commandsFor(sources.game).find(
         (entry) => entry.name.toLowerCase() === (parts[0] ?? "").toLowerCase()
