@@ -110,7 +110,7 @@ const WEB_IMAGE_PATHS =
  *  because the commits that fixed it rebuilt no dashboard image. */
 const WEB_IMAGE_CHECKS = /^(changes|web|tag|dashboard-ci \/ .+)$/;
 
-let cache: { status: UpdateStatus; at: number; } | null = null;
+let cache: { status: UpdateStatus; at: number } | null = null;
 let inflight: Promise<UpdateStatus> | null = null;
 
 function short(sha: string): string {
@@ -145,13 +145,15 @@ async function compare(repo: string, base: string, head: string): Promise<Compar
             ahead_by?: number;
             html_url?: string;
             permalink_url?: string;
-            files?: { filename?: string; }[];
+            files?: { filename?: string }[];
         };
         return {
             status: data.status ?? null,
             aheadBy: typeof data.ahead_by === "number" ? data.ahead_by : null,
             url: data.html_url ?? data.permalink_url ?? null,
-            files: (data.files ?? []).map((file) => file.filename ?? "").filter((name) => name.length > 0)
+            files: (data.files ?? [])
+                .map((file) => file.filename ?? "")
+                .filter((name) => name.length > 0)
         };
     } catch {
         // Best-effort: the registry has already answered the question that matters.
@@ -182,7 +184,9 @@ interface ChecksResult {
  */
 async function checksFor(repo: string, ref: string, gates?: RegExp): Promise<ChecksResult | null> {
     try {
-        const data = (await github(`/repos/${repo}/commits/${encodeURIComponent(ref)}/check-runs?per_page=100`)) as {
+        const data = (await github(
+            `/repos/${repo}/commits/${encodeURIComponent(ref)}/check-runs?per_page=100`
+        )) as {
             check_runs?: {
                 name?: string;
                 status?: string;
@@ -193,9 +197,14 @@ async function checksFor(repo: string, ref: string, gates?: RegExp): Promise<Che
         const all = data.check_runs ?? [];
         const runs = gates ? all.filter((run) => gates.test(run.name ?? "")) : all;
         if (runs.length === 0) return null;
-        const failed = runs.find((run) => run.conclusion === "failure" || run.conclusion === "timed_out");
+        const failed = runs.find(
+            (run) => run.conclusion === "failure" || run.conclusion === "timed_out"
+        );
         if (failed) return { verdict: "failed", url: failed.html_url ?? null };
-        return { verdict: runs.some((run) => run.status !== "completed") ? "running" : "passed", url: null };
+        return {
+            verdict: runs.some((run) => run.status !== "completed") ? "running" : "passed",
+            url: null
+        };
     } catch {
         // Best-effort: an unanswered check leaves the phase where it was.
         return null;
@@ -205,7 +214,9 @@ async function checksFor(repo: string, ref: string, gates?: RegExp): Promise<Che
 /** The commit a branch points at, or null when GitHub cannot say. */
 async function branchHead(repo: string, branch: string): Promise<string | null> {
     try {
-        const data = (await github(`/repos/${repo}/commits/${encodeURIComponent(branch)}`)) as { sha?: string; };
+        const data = (await github(`/repos/${repo}/commits/${encodeURIComponent(branch)}`)) as {
+            sha?: string;
+        };
         return data.sha ?? null;
     } catch {
         return null;
@@ -304,7 +315,14 @@ async function query(): Promise<UpdateStatus> {
     // A source or dev run carries no build stamp, and an image without one cannot
     // be placed either. Say so rather than implying a state.
     if (!running || !target) {
-        return { ...base, phase: "unknown", behindBy: null, upToDate: false, buildingCount: null, url: branchUrl };
+        return {
+            ...base,
+            phase: "unknown",
+            behindBy: null,
+            upToDate: false,
+            buildingCount: null,
+            url: branchUrl
+        };
     }
 
     // Already running the published image: the only thing left to report is whether
@@ -324,10 +342,10 @@ async function query(): Promise<UpdateStatus> {
             phase: blocked ? "blocked" : building ? "building" : "up-to-date",
             behindBy: 0,
             upToDate: !building,
-            buildingCount: building ? pending?.aheadBy ?? null : null,
+            buildingCount: building ? (pending?.aheadBy ?? null) : null,
             checks: checks?.verdict ?? null,
             checksUrl: checks?.url ?? null,
-            url: building ? pending?.url ?? branchUrl : branchUrl
+            url: building ? (pending?.url ?? branchUrl) : branchUrl
         };
     }
 
@@ -335,7 +353,14 @@ async function query(): Promise<UpdateStatus> {
     // deployment that built its own image from a newer checkout is not behind.
     const moved = await compare(repo, running, target);
     if (moved && (moved.status === "behind" || moved.status === "identical")) {
-        return { ...base, phase: "up-to-date", behindBy: 0, upToDate: true, buildingCount: null, url: branchUrl };
+        return {
+            ...base,
+            phase: "up-to-date",
+            behindBy: 0,
+            upToDate: true,
+            buildingCount: null,
+            url: branchUrl
+        };
     }
     // There is something to install; whether it should be installed is the last
     // question, and only a verdict that came back failed answers it no.

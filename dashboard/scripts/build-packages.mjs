@@ -38,7 +38,8 @@ function readPackages() {
         if (!existsSync(manifestPath)) continue;
         const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
         if (!manifest.scripts?.build) continue;
-        if (!WORKSPACE_NAME.test(manifest.name)) throw new Error(`unexpected package name: ${manifest.name}`);
+        if (!WORKSPACE_NAME.test(manifest.name))
+            throw new Error(`unexpected package name: ${manifest.name}`);
         const dependencies = { ...manifest.dependencies, ...manifest.devDependencies };
         found.push({
             name: manifest.name,
@@ -62,7 +63,8 @@ function planWaves(packages) {
         );
         // Only reachable through a dependency cycle between packages, which npm
         // installs happily and nothing else would report until a build hung.
-        if (wave.length === 0) throw new Error(`circular dependency between ${[...remaining.keys()].join(", ")}`);
+        if (wave.length === 0)
+            throw new Error(`circular dependency between ${[...remaining.keys()].join(", ")}`);
         for (const p of wave) remaining.delete(p.name);
         for (const p of wave) built.add(p.name);
         waves.push(wave.map((p) => p.name));
@@ -91,9 +93,16 @@ function build(name) {
         let output = "";
         child.stdout.on("data", (chunk) => (output += chunk));
         child.stderr.on("data", (chunk) => (output += chunk));
-        child.on("error", (error) => resolve({ name, ok: false, output: String(error), seconds: 0 }));
+        child.on("error", (error) =>
+            resolve({ name, ok: false, output: String(error), seconds: 0 })
+        );
         child.on("close", (code) =>
-            resolve({ name, ok: code === 0, output, seconds: ((Date.now() - started) / 1000).toFixed(1) })
+            resolve({
+                name,
+                ok: code === 0,
+                output,
+                seconds: ((Date.now() - started) / 1000).toFixed(1)
+            })
         );
     });
 }
