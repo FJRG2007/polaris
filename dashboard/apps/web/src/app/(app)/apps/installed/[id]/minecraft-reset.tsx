@@ -155,7 +155,11 @@ function ResetDialog({
     const memory = formatMemory(recommendedMemoryMb(concurrentPlayers, blueprint?.weight ?? "normal"));
     // Bedrock keeps player data inside the level database, where it cannot be
     // separated from the terrain, so there it is not offered.
-    const carriesPlayers = edition === "java";
+    // Not onto a map, and not as a preference: carrying players means creating the
+    // new level folder before the server boots, and the image fetches the map only
+    // when that folder is absent. Offering the choice would be offering a server
+    // with no map in it.
+    const carriesPlayers = edition === "java" && !mapId;
 
     async function submit(): Promise<void> {
         setPending(true);
@@ -218,7 +222,9 @@ function ResetDialog({
                             <span className="text-xs text-muted-foreground">
                                 {carriesPlayers
                                     ? "Inventories, ender chests, stats and advancements come across. The server has to be running for the copy to be made."
-                                    : "Bedrock keeps player data inside the world itself, so a new map always starts everyone over."}
+                                    : mapId
+                                      ? "A built map comes with its own spawn and its own idea of what you start with, so everyone begins it fresh."
+                                      : "Bedrock keeps player data inside the world itself, so a new map always starts everyone over."}
                             </span>
                         </span>
                     </label>

@@ -517,7 +517,21 @@ export async function newWorld(
         const listing = await server.run(["ls", "-1A", "--", world.levelParent(server.edition)]);
         const taken = listing.code === 0 ? world.parseListing(listing.output) : [];
         const target = world.newLevelName(new Date(), taken);
-        const keep = input.keepPlayers && world.canCarryPlayers(server.edition);
+        // Never onto a map, and this is not a preference - it is the one thing that
+        // stops the map arriving at all.
+        //
+        // Carrying players forward means creating the new level folder now and
+        // copying their data into it. The image downloads the world archive only
+        // when that folder does not exist, so creating it first is exactly the
+        // instruction "there is already a world here, do not fetch one" - and the
+        // server boots into an empty flat void with the map's settings on it and no
+        // map. Which is precisely what it did: spawn at y=-63, and straight through
+        // the floor.
+        //
+        // A map is also the case where carrying least belongs. It is built around
+        // its own spawn and its own idea of what a player starts with, and the
+        // inventories from the world before it are not part of that.
+        const keep = input.keepPlayers && world.canCarryPlayers(server.edition) && input.fromMap !== true;
 
         if (keep) {
             // Written out first, or what is copied is the last save rather than
