@@ -22,9 +22,13 @@ export async function GET(request: Request): Promise<Response> {
     try {
         return NextResponse.json(await readPolarisFootprint(fresh));
     } catch (caught) {
+        // Nothing here can be a bad request: there is nothing to get wrong but the
+        // one flag above. Everything that fails does so behind this - the engine
+        // being unreachable, hostd refusing, an inspect timing out - so it is
+        // reported as what it is, and stays legible to logs and retries.
         return NextResponse.json(
             { error: caught instanceof Error ? caught.message : "Could not measure Polaris" },
-            { status: 400 }
+            { status: 502 }
         );
     }
 }

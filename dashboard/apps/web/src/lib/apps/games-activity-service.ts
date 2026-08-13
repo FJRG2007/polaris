@@ -19,7 +19,13 @@
 import { prisma } from "@polaris/db";
 import { patchInstallConfig } from "@/lib/apps/install-config";
 import { listGameServerPresence } from "@/lib/apps/games-service";
-import { NO_UPTIME, readServerUptime, uptimePatch, type ServerUptime } from "@/lib/apps/games-uptime";
+import {
+    NO_UPTIME,
+    readServerUptime,
+    uptimePatch,
+    type ServerUptime,
+    type UptimeReading
+} from "@/lib/apps/games-uptime";
 import {
     fillGaps,
     historyOf,
@@ -85,7 +91,7 @@ export async function sweepGameActivity(ownerId: string, now: Date = new Date())
 
     for (const presence of presences) {
         known.set(presence.id, presence.answering ? presence.online : null);
-        await recordUptime(presence.id, uptime.get(presence.id) ?? NO_UPTIME, presence.answering, now);
+        await recordUptime(presence.id, uptime.get(presence.id) ?? NO_UPTIME, uptimeReading(presence), now);
 
         // A container that is down is not a server anybody is on, and its visits
         // have to be closed rather than left running: an open visit counts up to
@@ -212,15 +218,30 @@ async function readUptimes(installedAppIds: readonly string[]): Promise<Map<stri
     return new Map(rows.map((row) => [row.id, readServerUptime(row.config)]));
 }
 
+/**
+ * What this reading establishes about whether the server is up.
+ *
+ * The same distinction the visits are kept on, and for the same reason: a server
+ * that did not answer has not been seen going down, it has not been seen at all.
+ * Only a container that is known to be stopped ends a run.
+ */
+function uptimeReading(presence: {
+    readonly answering: boolean;
+    readonly containerRunning: boolean | null;
+}): UptimeReading {
+    if (presence.answering) return "up";
+    return presence.containerRunning === false ? "down" : "unknown";
+}
+
 /** Write down that a server is up, came up, or has gone down - and nothing at all
  *  for one that is doing what it was doing a minute ago. */
 async function recordUptime(
     installedAppId: string,
     current: ServerUptime,
-    answering: boolean,
+    reading: UptimeReading,
     now: Date
 ): Promise<void> {
-    const patch = uptimePatch(current, answering, now);
+    const patch = uptimePatch(current, reading, now);
     if (!patch) return;
     await patchInstallConfig(installedAppId, patch).catch(() => undefined);
 }

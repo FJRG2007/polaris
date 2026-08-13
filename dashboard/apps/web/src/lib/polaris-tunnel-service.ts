@@ -16,8 +16,9 @@ import { newestUrl } from "./deploy/tunnel-url";
 import { dashboardOrigin } from "./domain-edge";
 import { HostdPorts } from "./deploy/ports-hostd";
 import type { ComposeSpec } from "@polaris/deploy";
+import { PUBLIC_TUNNEL_PROJECT } from "./polaris-parts";
 
-const PROJECT = "polaris-ptunnel";
+const PROJECT = PUBLIC_TUNNEL_PROJECT;
 const SERVICE = "ptunnel";
 const IMAGE = "cloudflare/cloudflared:latest";
 const URL_KEY = "polaris.ptunnel.url";
