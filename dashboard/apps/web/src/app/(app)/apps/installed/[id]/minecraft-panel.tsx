@@ -346,7 +346,13 @@ export function MinecraftPanel({
                 />
             )}
             {tab === "console" && (
-                <GameConsole installedAppId={installedAppId} applicationId={applicationId} running={isRunning} />
+                <GameConsole
+                    installedAppId={installedAppId}
+                    applicationId={applicationId}
+                    running={isRunning}
+                    game={status?.edition === "bedrock" ? "bedrock" : "java"}
+                    players={[...(status?.players.players ?? [])]}
+                />
             )}
             {tab === "players" && (
                 <MinecraftPlayers

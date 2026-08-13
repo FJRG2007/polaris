@@ -317,6 +317,8 @@ export function ArkPanel({
                     running={isRunning}
                     logName="ark"
                     hint="ListPlayers, or Broadcast Server restarting in 5"
+                    game="ark"
+                    players={(status?.players ?? []).map((player) => player.name)}
                 />
             )}
             {tab === "players" && (

@@ -1265,7 +1265,22 @@ export async function sendConsoleCommandAction(
     try {
         // The console runs any command the server takes, op included, so it is the
         // full grant rather than the moderator one.
-        const { access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        // Recorded before it runs, and recorded whatever it does.
+        //
+        // Every other thing this screen can do to a server leaves a line in the
+        // audit - who opped whom, who banned whom, who changed the world. The
+        // console is how you do all of those without going through any of them,
+        // and it was the one action that left nothing at all. A server where the
+        // deliberate route is written down and the general-purpose one is not is a
+        // server with no record of anything that mattered.
+        await recordAudit({
+            actorId: user.id,
+            action: "games.console",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { line: parsed.data.line }
+        });
         // One console, two languages underneath. Which one is decided here rather
         // than by the screen: the panel that renders the console is the same one.
         const output =
