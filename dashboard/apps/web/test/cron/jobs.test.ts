@@ -46,10 +46,12 @@ describe("the work Polaris runs on a schedule", () => {
     it("leases the ones where a second runner would cost something", () => {
         // Backups would take a second copy of the same world; reminders would send
         // somebody the same notification twice; the health pass would stop a
-        // server twice and tell its owner twice. The rest are written to be re-run
-        // and several already are, from the screens that sweep them lazily.
+        // server twice and tell its owner twice; the schedule pass now also writes
+        // down who was playing, and two runners open a second visit for everybody
+        // already on. The rest are written to be re-run and several already are,
+        // from the screens that sweep them lazily.
         const leased = SCHEDULED_JOBS.filter((job) => job.leaseMs !== null).map((job) => job.key);
-        expect(leased.sort()).toEqual(["backups", "game-health", "task-reminders"]);
+        expect(leased.sort()).toEqual(["backups", "game-health", "game-schedules", "task-reminders"]);
     });
 
     it("holds a lease for longer than the pass that takes it could run", () => {

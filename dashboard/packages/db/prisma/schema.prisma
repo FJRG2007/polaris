@@ -2274,6 +2274,55 @@ model PlayerActionQueue {
     @@index([expiresAt])
 }
 
+// One visit to a game server: when somebody arrived, and when they went.
+//
+// The joins and leaves were always in the container's log and were read out of it
+// on demand, which meant the history reached exactly as far back as the log tail
+// and ended the moment the container was replaced. Two of them, and an evening
+// somebody wants to look back on is gone. This is that evening, kept.
+//
+// It doubles as the sampler's memory. The rows with no `leftAt` are precisely who
+// was on when it last looked, so the next sweep has the roster to compare against
+// without storing one anywhere else - a name that appears is an arrival and a name
+// that has gone is a departure.
+//
+// Names rather than accounts: ARK answers with what somebody called themselves and
+// Minecraft with a username, and neither is a Polaris user.
+model GamePlayerSession {
+    id             String    @id @default(uuid(7)) @db.Uuid
+    installedAppId String    @db.Uuid
+    // As the server spells it. Compared case-insensitively by the reader, because
+    // only the server decides how it capitalises a name.
+    name           String
+    joinedAt       DateTime
+    // Open while they are still on. An open session is also how the sweep knows
+    // who was there a minute ago.
+    leftAt         DateTime?
+
+    @@index([installedAppId, joinedAt])
+    @@index([installedAppId, leftAt])
+    @@index([installedAppId, name])
+}
+
+// How many were playing, once a minute.
+//
+// Derivable from the sessions above, and kept anyway, because the two answer
+// different questions. Sessions say who was on; this says that anybody looked.
+// Without it an empty night and a night when Polaris was not running are the same
+// flat line, and a chart that cannot tell those apart is a chart that lies.
+//
+// Deliberately not a column on MetricSample: that table takes a row per subject
+// per tick for every application on the platform, and a field only game servers
+// could ever fill would be dead weight on all of them.
+model GameSample {
+    installedAppId String   @db.Uuid
+    ts             DateTime @default(now())
+    playersOnline  Int
+
+    @@id([installedAppId, ts])
+    @@index([ts])
+}
+
 // ---------------------------------------------------------------------------
 // Messaging (unified inbox across WhatsApp / Telegram / Discord / Slack)
 // ---------------------------------------------------------------------------

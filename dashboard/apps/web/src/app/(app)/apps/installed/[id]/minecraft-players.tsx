@@ -533,6 +533,7 @@ export function MinecraftPlayers({
             )}
             {acting?.dialog === "history" && target && (
                 <HistoryDialog
+                    installedAppId={installedAppId}
                     player={target.name}
                     sessions={target.sessions}
                     registered={target.addresses}

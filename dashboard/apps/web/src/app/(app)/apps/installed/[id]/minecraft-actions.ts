@@ -17,13 +17,13 @@ import { setEnvVars } from "@/lib/env-var-service";
 import { requirePermissionAny } from "@/lib/session";
 import { runArkCommand } from "@/lib/apps/ark/service";
 import { clearCrashLoop } from "@/lib/apps/games-health";
-import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import { applyWorldSchedule } from "@/lib/backups/manage";
 import { DIFFICULTIES } from "@/lib/apps/minecraft/rules";
 import { findGameIdentity } from "@/lib/apps/game-identity";
 import { isAddressRule } from "@/lib/apps/minecraft/access";
 import { ITEM_ID_PATTERN } from "@/lib/apps/minecraft/items";
 import { stripFormatting } from "@/lib/apps/minecraft/parse";
+import type { PlayerStats } from "@/lib/apps/games-activity";
 import { requireGameServer } from "@/lib/apps/install-access";
 import { resetMinecraftServer } from "@/lib/apps/games-reset";
 import { userSessionAddresses } from "@/lib/session-directory";
@@ -34,10 +34,13 @@ import { isMissingEntityReply } from "@/lib/apps/minecraft/snbt";
 import { writeContainerFile } from "@/lib/container-files-service";
 import type { InventoryItem } from "@/lib/apps/minecraft/inventory";
 import { setGameSchedule } from "@/lib/apps/minecraft/schedule-service";
+import { readMinecraftStats } from "@/lib/apps/minecraft/stats-service";
 import { gameOfServer, routesByHostname } from "@/lib/apps/games-catalog";
 import { setGameHostname, setGameRouted } from "@/lib/apps/minecraft/address";
+import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import { liftTimeout, timeoutPlayer } from "@/lib/apps/minecraft/timeout-service";
 import { MAX_BACKUP_BYTES, MAX_KEEP_LAST } from "@/lib/apps/minecraft/backup-policy";
+import { readPlayerRecord, type PlayerRecord } from "@/lib/apps/games-activity-service";
 import { cancelAction, pendingFor, queueAction } from "@/lib/apps/minecraft/queue-service";
 import { isBackupName, isBiome, isLevelName, isLevelType } from "@/lib/apps/minecraft/world";
 import { parseDimension, parsePosition, type PlayerPosition } from "@/lib/apps/minecraft/position";
@@ -422,6 +425,36 @@ export async function readPlayerPositionAction(
                     ? caught.message
                     : "Could not read the position - the player has to be on the server"
         };
+    }
+}
+
+/**
+ * Everything known about one player's time on this server.
+ *
+ * Two sources, and they answer different questions. Polaris's own record covers
+ * every visit it has watched, with the times; the world's own statistics cover
+ * everything the server has ever counted, including whatever happened before
+ * Polaris was looking. Neither is a substitute for the other, and a missing one is
+ * not an error - a young server has no statistics file yet, and a server Polaris
+ * has only just met has no visits.
+ */
+export async function readPlayerRecordAction(
+    installedAppId: string,
+    player: string
+): Promise<{ record?: PlayerRecord; stats?: PlayerStats | null; error?: string }> {
+    const parsed = z
+        .object({ installedAppId: z.string().uuid(), player: playerNameSchema })
+        .safeParse({ installedAppId, player });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        const { access } = await requireGameServer("games.read", parsed.data.installedAppId);
+        const [record, stats] = await Promise.all([
+            readPlayerRecord(parsed.data.installedAppId, parsed.data.player),
+            readMinecraftStats(access.ownerId, parsed.data.installedAppId, parsed.data.player)
+        ]);
+        return { record, stats };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not read this player's history" };
     }
 }
 

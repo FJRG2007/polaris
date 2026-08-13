@@ -17,6 +17,9 @@
 
 import * as actions from "./minecraft-actions";
 import { CopyButton } from "@/components/copy-button";
+import { useDisplayFormat } from "@/components/display-format";
+import type { PlayerStats } from "@/lib/apps/games-activity";
+import type { PlayerRecord } from "@/lib/apps/games-activity-service";
 import { AccountInput } from "@/components/account-input";
 import { InventoryEditor } from "./minecraft-inventory-editor";
 import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
@@ -318,15 +321,52 @@ function Reading({
     );
 }
 
-/** When somebody arrived and when they left, newest first, as far back as the
- *  server's log still reaches. */
+/** How long somebody has played, in the largest unit that still says something. */
+function playedFor(ms: number): string {
+    const minutes = Math.floor(ms / 60_000);
+    if (minutes < 1) return "under a minute";
+    if (minutes < 60) return `${minutes} min`;
+    const hours = minutes / 60;
+    // One decimal up to a day, because "1.5 h" is a real difference from "1 h";
+    // past that nobody cares about the fraction.
+    if (hours < 24) return `${Number(hours.toFixed(1))} h`;
+    return `${Math.round(hours)} h`;
+}
+
+/** What the record read comes back as. Declared here rather than exported from the
+ *  actions file, which may only export the actions themselves. */
+interface PlayerRecordReading {
+    readonly record: PlayerRecord | null;
+    readonly stats: PlayerStats | null;
+}
+
+/** One figure with its label, for the row of them at the top of the history. */
+function Figure({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="rounded-md border border-border bg-muted/40 px-3 py-2">
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="truncate text-sm font-medium" title={value}>{value}</p>
+        </div>
+    );
+}
+
+/**
+ * What somebody has done on this server: what it adds up to, then every visit.
+ *
+ * Two records behind it and they cover different ground. Polaris's own goes back
+ * to whenever it started watching and knows the times; the world's own statistics
+ * were counted by the server itself and cover everything that ever happened on it,
+ * including before any of this existed. Whichever is missing simply does not draw.
+ */
 export function HistoryDialog({
+    installedAppId,
     player,
     sessions,
     registered = [],
     onClose,
     onRegister
 }: {
+    installedAppId: string;
     player: string;
     sessions: readonly PlayerSessionEvent[];
     /** The addresses this player is already allowed from, so the ones that are
@@ -338,6 +378,27 @@ export function HistoryDialog({
 }) {
     const newestFirst = [...sessions].reverse();
     const known = new Set(registered);
+    const format = useDisplayFormat();
+    const [record, setRecord] = useState<PlayerRecordReading | null>(null);
+    const [reading, setReading] = useState(true);
+
+    // The kept record is a database read rather than something the page already
+    // has, so it arrives after the dialog does. The log-derived list below draws
+    // immediately either way, which is why this never blocks anything.
+    useEffect(() => {
+        let live = true;
+        void actions.readPlayerRecordAction(installedAppId, player).then((answer) => {
+            if (!live) return;
+            setRecord(answer.error ? null : { record: answer.record ?? null, stats: answer.stats ?? null });
+            setReading(false);
+        });
+        return () => {
+            live = false;
+        };
+    }, [installedAppId, player]);
+
+    const history = record?.record?.history;
+    const stats = record?.stats;
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -345,9 +406,42 @@ export function HistoryDialog({
                 <DialogHeader>
                     <DialogTitle>{player} on this server</DialogTitle>
                     <DialogDescription>
-                        Read from the server&apos;s log, so it reaches back as far as the log does.
+                        What Polaris has watched, and what the world itself has counted.
                     </DialogDescription>
                 </DialogHeader>
+
+                {(history?.visits ?? 0) > 0 && history && (
+                    <div className="grid grid-cols-2 gap-2">
+                        <Figure label="Played" value={playedFor(history.playedMs)} />
+                        <Figure label="Visits" value={String(history.visits)} />
+                        <Figure
+                            label="First seen"
+                            value={history.firstSeen ? format.date(history.firstSeen) : "-"}
+                        />
+                        <Figure
+                            label={history.online ? "On now, since" : "Last seen"}
+                            value={history.lastSeen ? format.dateTime(history.lastSeen) : "-"}
+                        />
+                    </div>
+                )}
+
+                {stats && (
+                    <div className="grid grid-cols-3 gap-2">
+                        {/* Counted by the server rather than by Polaris, so it
+                            covers the whole life of the world. */}
+                        <Figure label="Playtime, all time" value={playedFor(stats.playedMs)} />
+                        <Figure label="Deaths" value={String(stats.deaths)} />
+                        <Figure label="Mobs killed" value={String(stats.mobKills)} />
+                    </div>
+                )}
+
+                {reading && !history && (
+                    <p className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
+                        <Loader2 className="size-4 animate-spin" aria-hidden />
+                        Reading the record
+                    </p>
+                )}
+
                 {newestFirst.length === 0 ? (
                     <p className="py-8 text-center text-sm text-muted-foreground">
                         Nothing in the log this far back.

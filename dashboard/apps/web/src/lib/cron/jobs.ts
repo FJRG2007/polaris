@@ -21,6 +21,7 @@ import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
+import { sweepGameActivity } from "@/lib/apps/games-activity-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
 import { sweepGameSchedules } from "@/lib/apps/minecraft/schedule-service";
 import { isGameServerApp, syncFirewallBans } from "@/lib/apps/games-service";
@@ -67,16 +68,36 @@ async function runFirewall(): Promise<{ servers: number; banned: number; kicked:
     return { servers, banned, kicked, allowed };
 }
 
-async function runGameSchedules(): Promise<{ started: number; stopped: number }> {
+/**
+ * Ask every game server who is on it, write that down, and then apply the schedules
+ * with the answer already in hand.
+ *
+ * One pass rather than two, because asking is the expensive half - a command inside
+ * a container, per server - and the schedule sweep already takes a map of counts
+ * somebody else has paid for. Two jobs on the same minute would ask every server
+ * twice for the same number.
+ */
+async function runGameActivity(): Promise<{ started: number; stopped: number; arrived: number; left: number }> {
     let started = 0;
     let stopped = 0;
+    let arrived = 0;
+    let left = 0;
     for (const ownerId of await ownersWithApps()) {
-        const swept = await sweepGameSchedules(ownerId).catch(() => null);
-        if (!swept) continue;
-        started += swept.started;
-        stopped += swept.stopped;
+        const now = new Date();
+        const activity = await sweepGameActivity(ownerId, now).catch(() => null);
+        const swept = await sweepGameSchedules(ownerId, now, {
+            ...(activity ? { known: activity.known } : {})
+        }).catch(() => null);
+        if (activity) {
+            arrived += activity.arrived;
+            left += activity.left;
+        }
+        if (swept) {
+            started += swept.started;
+            stopped += swept.stopped;
+        }
     }
-    return { started, stopped };
+    return { started, stopped, arrived, left };
 }
 
 async function runGameHealth(): Promise<{ checked: number; stopped: number }> {
@@ -152,8 +173,12 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
     {
         key: "game-schedules",
         everyMs: Number(process.env.POLARIS_GAME_SCHEDULE_MS) || MINUTE,
-        leaseMs: null,
-        run: runGameSchedules
+        // Leased now that the same pass records who was playing. A duplicate
+        // schedule decision was harmless and a duplicate history is not: two
+        // runners write two readings a millisecond apart and open a second visit
+        // for everybody already on.
+        leaseMs: 5 * MINUTE,
+        run: runGameActivity
     },
     {
         key: "game-inventories",
