@@ -14,14 +14,17 @@ import { freemem, totalmem } from "node:os";
 import { listHosts } from "@/lib/host-service";
 import { getHostLanIp } from "@/lib/host-address";
 import { hostPortForApp } from "@/lib/deploy-service";
+import { RELEASE_KEY } from "@/lib/apps/games-create";
 import type { CrashLoop } from "@/lib/apps/crash-loop";
+import { readServerUptime } from "@/lib/apps/games-uptime";
 import { getLocalEnvironment } from "@/lib/network-service";
-import { readInstallConfig } from "@/lib/apps/install-config";
+import { hasCrossplay } from "@/lib/apps/minecraft/blueprints";
 import { appHasCapability, findApp } from "@/lib/apps/catalog";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { gameServerAddress } from "@/lib/apps/minecraft/address";
 import { sweepArkTimeouts } from "@/lib/apps/ark/timeout-service";
 import type { PortBlocks, PortPolicy } from "@/lib/apps/port-block";
+import { wantsLatest } from "@/lib/apps/minecraft/blueprint-version";
 import { gameOfServer, type GameId } from "@/lib/apps/games-catalog";
 import { sweepTimeouts } from "@/lib/apps/minecraft/timeout-service";
 import { applyAllowList, getArkPlayers } from "@/lib/apps/ark/service";
@@ -29,10 +32,31 @@ import { syncMinecraftRoutes } from "@/lib/apps/minecraft/router-service";
 import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
 import { enforcePlayerAddresses } from "@/lib/apps/minecraft/player-access";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
+import { readInstallConfig, type InstallConfig } from "@/lib/apps/install-config";
 import { getServerMetrics, peekServerMetrics } from "@/lib/server-metrics-service";
 import { applyFirewallBans, editionOf, getServerPlayers } from "@/lib/apps/minecraft/service";
 import { gamePorts, probeListening, probeReach, reachConfirmedAt } from "@/lib/apps/minecraft/reach";
 import { gameReachAdvice, gameStoppedAdvice, type GamePort, type GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
+
+/** How many players the server was built for. */
+const SLOTS_VAR = "MAX_PLAYERS";
+
+/** The release it was asked for, which is the release it runs only when it names
+ *  one - the install's own record is the better answer (see `releaseOf`). */
+const RELEASE_VAR = "VERSION";
+
+/** What it runs the release on: Paper, Fabric, Vanilla. */
+const SOFTWARE_VAR = "TYPE";
+
+/** The plugin list, which is where a Java server's crossplay lives: Bedrock
+ *  clients get in because Geyser is installed, not because a setting says so. */
+const CROSSPLAY_VAR = "MODRINTH_PROJECTS";
+
+/** `PAPER` as somebody writes it. The setting is an option list of shouted words,
+ *  and a table is not the place to shout. */
+function titleCase(value: string): string {
+    return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
 
 /** Whether a catalog id names a game server rather than any other installed app.
  *  The manifest's capability is the authority - a game server is not a list of
@@ -84,6 +108,29 @@ export interface GameServerFacts {
      *  the running server, so the list can say "0 / 20" about one that is down -
      *  a dash there reads as "unknown", and the number is not unknown. */
     readonly slots: number | null;
+    /**
+     * The release it runs, for the games where which one matters.
+     *
+     * Minecraft only in practice, and there it is what decides whether somebody can
+     * join at all: a client is one release and so is the server. The resolved
+     * release rather than the setting, which is very often the literal LATEST and
+     * says nothing about what is on disk. Null for a game that updates itself, and
+     * for a server built before Polaris wrote this down.
+     */
+    readonly release: string | null;
+    /** What the server runs the release on - Paper, Fabric, Vanilla - which is the
+     *  other half of what decides whether a mod or a plugin fits it. Null for a
+     *  game or an edition with only one. */
+    readonly software: string | null;
+    /** java | bedrock, for the one game with two. Null for the games with one. */
+    readonly edition: string | null;
+    /** Whether Bedrock clients can join this Java server too. */
+    readonly crossplay: boolean;
+    /** The last minute it was seen answering, so a stopped server can say when it
+     *  was last up rather than only that it is not. */
+    readonly lastOnlineAt: string | null;
+    /** When the run it is still in began, for one that is up. */
+    readonly onlineSince: string | null;
     /** Why there is no address, when there is none. */
     readonly message: string | null;
 }
@@ -194,7 +241,7 @@ export async function listGameServerFacts(
     // An address needs the release the server actually publishes on, and the
     // machine's own address for every server without a name of its own. Both are
     // read once for the whole list rather than per row.
-    const [isolated, hosts, lanIp, slots] = await Promise.all([
+    const [isolated, hosts, lanIp, settings] = await Promise.all([
         prisma.deployment
             .findMany({
                 where: { id: { in: presentIds(apps.map((app) => app.currentDeploymentId)) }, isolated: true },
@@ -210,10 +257,24 @@ export async function listGameServerFacts(
         local ? getHostLanIp().catch(() => null) : null,
         prisma.envVar
             .findMany({
-                where: { scopeType: "application", scopeId: { in: apps.map((app) => app.id) }, key: "MAX_PLAYERS" },
-                select: { scopeId: true, value: true }
+                where: {
+                    scopeType: "application",
+                    scopeId: { in: apps.map((app) => app.id) },
+                    // The three settings the list itself renders. One query for all
+                    // of them: a second one per field would be a query per column.
+                    key: { in: [SLOTS_VAR, RELEASE_VAR, SOFTWARE_VAR, CROSSPLAY_VAR] }
+                },
+                select: { scopeId: true, key: true, value: true }
             })
-            .then((rows) => new Map(rows.map((row) => [row.scopeId, Number.parseInt(row.value ?? "", 10)])))
+            .then((rows) => {
+                const byApp = new Map<string, Map<string, string>>();
+                for (const row of rows) {
+                    const held = byApp.get(row.scopeId) ?? new Map<string, string>();
+                    held.set(row.key, row.value ?? "");
+                    byApp.set(row.scopeId, held);
+                }
+                return byApp;
+            })
     ]);
 
     return installs.map((install) => {
@@ -221,16 +282,26 @@ export async function listGameServerFacts(
         const config = readInstallConfig(install.config);
         const hostname = typeof config.hostname === "string" ? config.hostname : null;
         const running = app?.desiredState === "running";
+        const env = app ? (settings.get(app.id) ?? new Map<string, string>()) : new Map<string, string>();
+        const uptime = readServerUptime(install.config);
+        const slots = Number.parseInt(env.get(SLOTS_VAR) ?? "", 10);
+        const game = gameOfServer(install.catalogId);
         return {
             id: install.id,
             name: install.name,
             catalogId: install.catalogId,
             catalogName: findApp(install.catalogId)?.name ?? install.catalogId,
-            game: gameOfServer(install.catalogId)?.id ?? null,
+            game: game?.id ?? null,
             applicationId: install.applicationId,
             serverName: install.targetId ? (targetName.get(install.targetId) ?? null) : null,
             running,
-            slots: app && Number.isFinite(slots.get(app.id)) ? (slots.get(app.id) as number) : null,
+            slots: Number.isFinite(slots) ? slots : null,
+            release: releaseOf(config, env.get(RELEASE_VAR)),
+            software: (env.get(SOFTWARE_VAR) ?? "").trim() ? titleCase((env.get(SOFTWARE_VAR) as string).trim()) : null,
+            edition: game?.id === "minecraft" ? editionOf(install.catalogId) : null,
+            crossplay: hasCrossplay(env.get(CROSSPLAY_VAR)),
+            lastOnlineAt: uptime.lastOnlineAt,
+            onlineSince: uptime.onlineSince,
             address: app
                 ? gameServerAddress({
                       hostname,
@@ -246,6 +317,21 @@ export async function listGameServerFacts(
             message: app ? (running ? null : "The server is stopped") : "This server is still being set up"
         };
     });
+}
+
+/**
+ * The release the server actually runs.
+ *
+ * The resolved release the install recorded when it was built, and the setting only
+ * when there is no record - a server created before Polaris wrote that down. The
+ * setting is very often the literal `LATEST`, which names no release and is not
+ * worth printing as one.
+ */
+function releaseOf(config: InstallConfig, setting: string | undefined): string | null {
+    const recorded = typeof config[RELEASE_KEY] === "string" ? (config[RELEASE_KEY] as string).trim() : "";
+    const declared = (setting ?? "").trim();
+    const release = recorded || declared;
+    return release.length > 0 && !wantsLatest(release) ? release : null;
 }
 
 /** The port the install pinned for this application, when it pinned one. An

@@ -12,6 +12,7 @@ import { FilesPanel } from "./files-panel";
 import * as deployActions from "./actions";
 import { VolumesTab } from "./volumes-panel";
 import { TerminalPanel } from "./terminal-panel";
+import { relativeTime } from "@/lib/relative-time";
 import { LogViewer } from "@/components/log-viewer";
 import type { HttpLogEntry } from "@polaris/deploy";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
@@ -191,15 +192,6 @@ export function ServiceDetail({
 }
 
 type DepSummary = Awaited<ReturnType<typeof deployActions.listDeploymentsAction>>[number];
-
-function relativeTime(iso: string, format: DisplayFormat): string {
-    const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-    if (minutes < 1) return "just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
-    if (minutes < 10080) return `${Math.floor(minutes / 1440)}d ago`;
-    return format.date(iso);
-}
 
 function depBadge(deployment: DepSummary): { label: string; cls: string } {
     if (deployment.isCurrent) return { label: "ACTIVE", cls: "bg-success/15 text-success" };

@@ -17,7 +17,9 @@
  */
 
 import { prisma } from "@polaris/db";
+import { patchInstallConfig } from "@/lib/apps/install-config";
 import { listGameServerPresence } from "@/lib/apps/games-service";
+import { NO_UPTIME, readServerUptime, uptimePatch, type ServerUptime } from "@/lib/apps/games-uptime";
 import {
     fillGaps,
     historyOf,
@@ -76,8 +78,14 @@ export async function sweepGameActivity(ownerId: string, now: Date = new Date())
     let arrived = 0;
     let left = 0;
 
+    // What each of them was last seen doing, read for the whole set in one query.
+    // This sweep is the only thing that watches every server every minute, so it is
+    // also the only thing in a position to notice one going up or down.
+    const uptime = await readUptimes(presences.map((presence) => presence.id));
+
     for (const presence of presences) {
         known.set(presence.id, presence.answering ? presence.online : null);
+        await recordUptime(presence.id, uptime.get(presence.id) ?? NO_UPTIME, presence.answering, now);
 
         // A container that is down is not a server anybody is on, and its visits
         // have to be closed rather than left running: an open visit counts up to
@@ -193,6 +201,28 @@ export async function closeGameSessions(installedAppId: string, at: Date = new D
     await prisma.gamePlayerSession
         .updateMany({ where: { installedAppId, leftAt: null }, data: { leftAt: at } })
         .catch(() => undefined);
+}
+
+/** What every one of these servers was last seen doing, in one read. */
+async function readUptimes(installedAppIds: readonly string[]): Promise<Map<string, ServerUptime>> {
+    if (installedAppIds.length === 0) return new Map();
+    const rows = await prisma.installedApp
+        .findMany({ where: { id: { in: [...installedAppIds] } }, select: { id: true, config: true } })
+        .catch(() => []);
+    return new Map(rows.map((row) => [row.id, readServerUptime(row.config)]));
+}
+
+/** Write down that a server is up, came up, or has gone down - and nothing at all
+ *  for one that is doing what it was doing a minute ago. */
+async function recordUptime(
+    installedAppId: string,
+    current: ServerUptime,
+    answering: boolean,
+    now: Date
+): Promise<void> {
+    const patch = uptimePatch(current, answering, now);
+    if (!patch) return;
+    await patchInstallConfig(installedAppId, patch).catch(() => undefined);
 }
 
 /** One reading, and never a reason to fail the sweep around it. */

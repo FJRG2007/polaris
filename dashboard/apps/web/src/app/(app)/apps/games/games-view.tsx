@@ -20,14 +20,22 @@
  * right-click for the rest. Deleting is deliberately among them - a server whose
  * create failed has a page with nothing to render, and until now the only way to
  * be rid of one was the page that would not open.
+ *
+ * Searching, filtering, sorting and what somebody has starred or put away all live
+ * on the client, over rows that are already here. A dozen servers is not a data
+ * set, and asking the server to filter would put a round trip - and a spinner -
+ * between a keystroke and a table that could have been reordered as it was typed.
  */
 
 import Link from "next/link";
+import * as list from "./list";
 import { useRouter } from "next/navigation";
+import { relativeTime } from "@/lib/relative-time";
 import { GameLogo } from "@/components/game-picker";
 import { CopyButton } from "@/components/copy-button";
 import { NewServerDialog } from "./new-server-dialog";
 import { GAMES, type GameId } from "@/lib/apps/games-catalog";
+import { useDisplayFormat } from "@/components/display-format";
 import { useGamePresence } from "@/components/use-game-presence";
 import type { GameServerFacts, GameServerLive } from "@/lib/apps/games-service";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
@@ -35,9 +43,15 @@ import {
     deleteGameServerAction,
     installGameServersAction,
     redeployGameServerAction,
+    setGameServerPrefAction,
     setGameServerRunningAction
 } from "./actions";
 import {
+    Archive,
+    ArchiveRestore,
+    ArrowDown,
+    ArrowUp,
+    ArrowUpDown,
     Copy,
     ExternalLink,
     FolderOpen,
@@ -46,7 +60,9 @@ import {
     Play,
     Plus,
     RefreshCw,
+    Search,
     Square,
+    Star,
     Trash2,
     Users
 } from "lucide-react";
@@ -63,7 +79,9 @@ import {
     ContextMenuLabel,
     ContextMenuSeparator,
     ContextMenuTrigger,
+    Input,
     PageHeader,
+    Select,
     Skeleton
 } from "@polaris/ui";
 
@@ -73,39 +91,12 @@ import {
  *  backstop if that stream cannot be held open at all. */
 const POLL_MS = 20000;
 
-/** What the page knows before anything is polled. */
-export interface GameServerSeed {
-    id: string;
-    name: string;
-    catalogId: string;
-    catalogName: string;
-    /** Which game it plays. Null only for a catalog that has drifted. */
-    game: GameId | null;
-    /** The service behind it, for the screens that reach past the game. */
-    applicationId: string | null;
-    status: string;
-    /** Whether this viewer may start, stop and redeploy THIS server. Access is per
-     *  server now: a table can hold one somebody runs and one they were only
-     *  invited to watch. */
-    canManage: boolean;
-    /** Whether they may delete it. The owner's, and an administrator's. */
-    canRemove: boolean;
-}
-
-/** What a row is, as its two reads catch up with the seed. */
-interface ServerView extends GameServerSeed {
-    /** Where it runs and where a player connects. Null until the first read. */
-    facts: GameServerFacts | null;
-    /** Who is on it. Null until the servers themselves have answered. */
-    live: GameServerLive | null;
-}
-
 export function GamesView({
     servers,
     installed,
     canCreate
 }: {
-    servers: GameServerSeed[];
+    servers: list.GameServerSeed[];
     /** Whether the Game servers app is on for this owner. False means the page is
      *  an offer to turn it on rather than a list of nothing. */
     installed: boolean;
@@ -126,12 +117,23 @@ export function GamesView({
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
     // The server the delete dialog is asking about, and what it refused with.
-    const [deleting, setDeleting] = useState<ServerView | null>(null);
+    const [deleting, setDeleting] = useState<list.ServerView | null>(null);
     const [deleteError, setDeleteError] = useState<string | null>(null);
     // Servers already deleted. They leave the table at once - tearing a container
     // down takes a moment, and a row that sits there until the next poll reads as
     // a button that did nothing.
     const [removed, setRemoved] = useState<string[]>([]);
+    // Stars and archivings this tab has just made, laid over what the page was
+    // rendered with. Starring is a click on a row's own icon and has to land on
+    // the row, not a page later.
+    const [prefs, setPrefs] = useState<Map<string, { favorite: boolean; archived: boolean }>>(new Map());
+
+    const [query, setQuery] = useState("");
+    const [gameFilter, setGameFilter] = useState("");
+    const [statusFilter, setStatusFilter] = useState("");
+    const [showArchived, setShowArchived] = useState(false);
+    const [sortKey, setSortKey] = useState<list.SortKey>(null);
+    const [sortDir, setSortDir] = useState<list.SortDir>("asc");
 
     const loadFacts = useCallback(async () => {
         if (!managerInstalled) return;
@@ -197,18 +199,26 @@ export function GamesView({
         );
     }, [presence]);
 
-    const rows = useMemo<ServerView[]>(
+    const rows = useMemo<list.ServerView[]>(
         () =>
             servers
                 .filter((server) => !removed.includes(server.id))
                 .map((server) => ({
                     ...server,
+                    ...(prefs.get(server.id) ?? {}),
                     facts: facts.get(server.id) ?? null,
                     live: live.get(server.id) ?? null
                 })),
-        [servers, facts, live, removed]
+        [servers, facts, live, removed, prefs]
     );
     const playing = useMemo(() => rows.reduce((total, row) => total + (row.live?.online ?? 0), 0), [rows]);
+    const archivedCount = useMemo(() => rows.filter((row) => row.archived).length, [rows]);
+    const shelf = useMemo(() => rows.filter((row) => row.archived === showArchived), [rows, showArchived]);
+    const visible = useMemo(
+        () => list.sortServers(list.filterServers(shelf, query, gameFilter, statusFilter), sortKey, sortDir),
+        [shelf, query, gameFilter, statusFilter, sortKey, sortDir]
+    );
+    const filtering = query.trim().length > 0 || gameFilter !== "" || statusFilter !== "";
 
     function run(action: () => Promise<{ error?: string }>): void {
         setError(null);
@@ -221,6 +231,31 @@ export function GamesView({
             await reload();
             router.refresh();
         });
+    }
+
+    /** Star a server or put it away, on the row, now. The write follows; if it is
+     *  refused the row goes back to what it was and says why. */
+    function setPref(server: list.ServerView, patch: { favorite?: boolean; archived?: boolean }): void {
+        const before = { favorite: server.favorite, archived: server.archived };
+        setPrefs((held) => new Map(held).set(server.id, { ...before, ...patch }));
+        setError(null);
+        startTransition(async () => {
+            const result = await setGameServerPrefAction(server.id, patch);
+            if (result.error) {
+                setPrefs((held) => new Map(held).set(server.id, before));
+                setError(result.error);
+                return;
+            }
+            router.refresh();
+        });
+    }
+
+    /** Click a sortable column: its own end first, then the other, then back to
+     *  the order the page was built in. */
+    function toggleSort(key: Exclude<list.SortKey, null>): void {
+        const next = list.nextSort({ key: sortKey, dir: sortDir }, key);
+        setSortKey(next.key);
+        setSortDir(next.dir);
     }
 
     function onConfirmDelete(): void {
@@ -279,36 +314,120 @@ export function GamesView({
                     </CardBody>
                 </Card>
             ) : (
-                <div className="overflow-x-auto rounded-lg border border-border">
-                    <table className="w-full min-w-[52rem] text-sm">
-                        <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
-                            <tr>
-                                <th className="px-3 py-2 font-medium">Server</th>
-                                <th className="px-3 py-2 font-medium">Status</th>
-                                <th className="px-3 py-2 font-medium">Players</th>
-                                <th className="px-3 py-2 font-medium">Address</th>
-                                <th className="hidden px-3 py-2 font-medium lg:table-cell">Machine</th>
-                                <th className="px-3 py-2" />
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {rows.map((server) => (
-                                <ServerRow
-                                    key={server.id}
-                                    server={server}
-                                    canManage={server.canManage}
-                                    canRemove={server.canRemove}
-                                    pending={pending}
-                                    onRun={run}
-                                    onDelete={() => {
-                                        setDeleteError(null);
-                                        setDeleting(server);
-                                    }}
-                                />
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                <>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative min-w-48 flex-1">
+                            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                value={query}
+                                onChange={(event) => setQuery(event.target.value)}
+                                placeholder="Search servers, addresses, machines or versions"
+                                className="pl-8"
+                                aria-label="Search servers"
+                            />
+                        </div>
+                        <Select
+                            value={gameFilter}
+                            onValueChange={setGameFilter}
+                            aria-label="Filter by game"
+                            className="w-40"
+                            options={[
+                                { value: "", label: "Every game" },
+                                ...GAMES.map((game) => ({ value: game.id, label: game.name }))
+                            ]}
+                        />
+                        <Select
+                            value={statusFilter}
+                            onValueChange={setStatusFilter}
+                            aria-label="Filter by status"
+                            className="w-40"
+                            options={[
+                                { value: "", label: "Any status" },
+                                { value: "online", label: "Online" },
+                                { value: "starting", label: "Starting" },
+                                { value: "stopped", label: "Stopped" },
+                                { value: "problem", label: "Needs attention" }
+                            ]}
+                        />
+                        {(archivedCount > 0 || showArchived) && (
+                            <Button
+                                variant={showArchived ? "secondary" : "ghost"}
+                                onClick={() => setShowArchived((shown) => !shown)}
+                                title={showArchived ? "Back to the servers you use" : "The servers you put away"}
+                            >
+                                <Archive className="size-4" />
+                                Archived {archivedCount > 0 ? `(${archivedCount})` : ""}
+                            </Button>
+                        )}
+                    </div>
+
+                    <div className="overflow-x-auto rounded-lg border border-border">
+                        <table className="w-full min-w-[52rem] text-sm">
+                            <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                                <tr>
+                                    <th className="px-3 py-2 font-medium">Server</th>
+                                    <SortHeader
+                                        label="Status"
+                                        sorted={sortKey === "status" ? sortDir : null}
+                                        onClick={() => toggleSort("status")}
+                                    />
+                                    <SortHeader
+                                        label="Players"
+                                        sorted={sortKey === "players" ? sortDir : null}
+                                        onClick={() => toggleSort("players")}
+                                    />
+                                    <th className="hidden px-3 py-2 font-medium md:table-cell">Version</th>
+                                    <th className="px-3 py-2 font-medium">Address</th>
+                                    <th className="hidden px-3 py-2 font-medium lg:table-cell">Machine</th>
+                                    <th className="px-3 py-2" />
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {visible.map((server) => (
+                                    <ServerRow
+                                        key={server.id}
+                                        server={server}
+                                        canManage={server.canManage}
+                                        canRemove={server.canRemove}
+                                        pending={pending}
+                                        onRun={run}
+                                        onPref={(patch) => setPref(server, patch)}
+                                        onDelete={() => {
+                                            setDeleteError(null);
+                                            setDeleting(server);
+                                        }}
+                                    />
+                                ))}
+                                {visible.length === 0 && (
+                                    <tr>
+                                        <td colSpan={7} className="px-3 py-10 text-center text-sm text-muted-foreground">
+                                            {filtering ? (
+                                                <span className="flex flex-col items-center gap-2">
+                                                    No server matches what you asked for.
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => {
+                                                            setQuery("");
+                                                            setGameFilter("");
+                                                            setStatusFilter("");
+                                                        }}
+                                                    >
+                                                        Clear the filters
+                                                    </Button>
+                                                </span>
+                                            ) : showArchived ? (
+                                                "Nothing is archived."
+                                            ) : (
+                                                "Every server is archived."
+                                            )}
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
             )}
 
             {creating && <NewServerDialog onClose={() => setCreating(false)} />}
@@ -323,6 +442,40 @@ export function GamesView({
                 onConfirm={onConfirmDelete}
             />
         </div>
+    );
+}
+
+/** A column that can be sorted by, with the arrows that say whether it is and
+ *  which way. */
+function SortHeader({
+    label,
+    sorted,
+    onClick
+}: {
+    label: string;
+    /** The direction it is sorted in, or null when the table is sorted by
+     *  something else. */
+    sorted: list.SortDir | null;
+    onClick: () => void;
+}) {
+    return (
+        <th className="px-3 py-2 font-medium">
+            <button
+                type="button"
+                onClick={onClick}
+                className="flex items-center gap-1 transition-colors hover:text-foreground"
+                title={`Sort by ${label.toLowerCase()}`}
+            >
+                {label}
+                {sorted === null ? (
+                    <ArrowUpDown className="size-3 opacity-50" />
+                ) : sorted === "asc" ? (
+                    <ArrowUp className="size-3" />
+                ) : (
+                    <ArrowDown className="size-3" />
+                )}
+            </button>
+        </th>
     );
 }
 
@@ -417,19 +570,27 @@ function filesHref(applicationId: string | null, game: GameId | null): string | 
     return applicationId ? `/drive?c=container:${applicationId}&p=${game === "ark" ? "/app" : "/data"}` : null;
 }
 
+/** Why the files of a stopped server cannot be browsed. The explorer reads them
+ *  from inside the container, so one that is not running has nothing to read - it
+ *  used to answer with an empty directory, which reads as a server whose world has
+ *  been deleted. */
+const FILES_NEED_RUNNING = "Start the server to browse its files";
+
 function ServerRow({
     server,
     canManage,
     canRemove,
     pending,
     onRun,
+    onPref,
     onDelete
 }: {
-    server: ServerView;
+    server: list.ServerView;
     canManage: boolean;
     canRemove: boolean;
     pending: boolean;
     onRun: (action: () => Promise<{ error?: string }>) => void;
+    onPref: (patch: { favorite?: boolean; archived?: boolean }) => void;
     onDelete: () => void;
 }) {
     const { facts, live } = server;
@@ -442,6 +603,7 @@ function ServerRow({
     // first read - so they are offered as soon as it lands rather than waiting on
     // the containers to be asked who is playing.
     const known = facts !== null;
+    const browsable = list.canBrowseFiles(server);
 
     return (
         <ContextMenu>
@@ -472,10 +634,13 @@ function ServerRow({
                         </div>
                     </td>
                     <td className="px-3 py-2">
-                        <StatusBadge facts={facts} live={live} status={server.status} />
+                        <StatusCell server={server} />
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">
                         <PlayersCell facts={facts} live={live} />
+                    </td>
+                    <td className="hidden px-3 py-2 md:table-cell">
+                        <VersionCell facts={facts} />
                     </td>
                     <td className="px-3 py-2">
                         <AddressCell name={server.name} facts={facts} />
@@ -485,24 +650,39 @@ function ServerRow({
                     </td>
                     <td className="px-3 py-2">
                         <div className="flex justify-end gap-1">
+                            <IconButton
+                                label={
+                                    server.favorite
+                                        ? `Take ${server.name} off your favourites`
+                                        : `Keep ${server.name} at the top`
+                                }
+                                disabled={pending}
+                                onClick={() => onPref({ favorite: !server.favorite })}
+                            >
+                                <Star className={cn("size-4", server.favorite && "fill-amber-400 text-amber-400")} />
+                            </IconButton>
                             <IconLink label={`Open ${server.name}`} href={href}>
                                 <ExternalLink className="size-4" />
                             </IconLink>
                             {files && (
-                                <IconLink label={`Browse the files of ${server.name}`} href={files}>
+                                <IconLink
+                                    label={
+                                        browsable ? `Browse the files of ${server.name}` : FILES_NEED_RUNNING
+                                    }
+                                    href={files}
+                                    disabled={!browsable}
+                                >
                                     <FolderOpen className="size-4" />
                                 </IconLink>
                             )}
                             {canManage && (
-                                <>
-                                    <IconButton
-                                        label={running ? `Stop ${server.name}` : `Start ${server.name}`}
-                                        disabled={pending || !known || !server.applicationId}
-                                        onClick={() => onRun(() => setGameServerRunningAction(server.id, !running))}
-                                    >
-                                        {running ? <Square className="size-4" /> : <Play className="size-4" />}
-                                    </IconButton>
-                                </>
+                                <IconButton
+                                    label={running ? `Stop ${server.name}` : `Start ${server.name}`}
+                                    disabled={pending || !known || !server.applicationId}
+                                    onClick={() => onRun(() => setGameServerRunningAction(server.id, !running))}
+                                >
+                                    {running ? <Square className="size-4" /> : <Play className="size-4" />}
+                                </IconButton>
                             )}
                             {canRemove && (
                                 <IconButton label={`Delete ${server.name}`} disabled={pending} onClick={onDelete}>
@@ -522,18 +702,36 @@ function ServerRow({
                         <ExternalLink className="size-4" /> Open
                     </Link>
                 </ContextMenuItem>
-                {files && (
-                    <ContextMenuItem asChild>
-                        <Link href={files}>
+                {files &&
+                    (browsable ? (
+                        <ContextMenuItem asChild>
+                            <Link href={files}>
+                                <FolderOpen className="size-4" /> Files
+                            </Link>
+                        </ContextMenuItem>
+                    ) : (
+                        // A disabled item takes no pointer events, so it says why
+                        // it is disabled rather than holding the reason in a
+                        // tooltip nobody can reach.
+                        <ContextMenuItem disabled>
                             <FolderOpen className="size-4" /> Files
-                        </Link>
-                    </ContextMenuItem>
-                )}
+                            <span className="ml-auto pl-3 text-xs">{FILES_NEED_RUNNING}</span>
+                        </ContextMenuItem>
+                    ))}
                 {address && (
                     <ContextMenuItem onSelect={() => void navigator.clipboard?.writeText(address)}>
                         <Copy className="size-4" /> Copy address
                     </ContextMenuItem>
                 )}
+                <ContextMenuSeparator />
+                <ContextMenuItem disabled={pending} onSelect={() => onPref({ favorite: !server.favorite })}>
+                    <Star className={cn("size-4", server.favorite && "fill-amber-400 text-amber-400")} />
+                    {server.favorite ? "Remove from favourites" : "Add to favourites"}
+                </ContextMenuItem>
+                <ContextMenuItem disabled={pending} onSelect={() => onPref({ archived: !server.archived })}>
+                    {server.archived ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />}
+                    {server.archived ? "Put back in the list" : "Archive"}
+                </ContextMenuItem>
                 {canManage && (
                     <>
                         <ContextMenuSeparator />
@@ -574,7 +772,7 @@ function PlayersCell({ facts, live }: { facts: GameServerFacts | null; live: Gam
     // makes the column impossible to scan down.
     const answering = live?.answering ?? false;
     if (!answering && facts === null) return <Skeleton className="h-4 w-12" />;
-    const online = answering ? live?.online ?? 0 : 0;
+    const online = answering ? (live?.online ?? 0) : 0;
     const total = (answering ? live?.max : null) || facts?.slots;
     if (!total) return <span>-</span>;
     return (
@@ -591,6 +789,34 @@ function PlayersCell({ facts, live }: { facts: GameServerFacts | null; live: Gam
             <Users className="size-3.5" />
             {online} / {total}
         </span>
+    );
+}
+
+/**
+ * What the server runs, for the games where it decides who can join.
+ *
+ * Minecraft, in practice: a client is one release and so is the server, and
+ * "which version is that one again" is the question this table was being read to
+ * answer. The software beside it (Paper, Fabric) is the other half - it is what
+ * decides whether a plugin or a mod fits. Games that update themselves have
+ * nothing useful to put here.
+ */
+function VersionCell({ facts }: { facts: GameServerFacts | null }) {
+    if (facts === null) return <Skeleton className="h-4 w-16" />;
+    const release = list.releaseLabel(facts);
+    if (!release) return <span className="text-xs text-muted-foreground">-</span>;
+    return (
+        <div className="flex min-w-0 flex-col">
+            <span className="truncate text-xs" title={release}>{release}</span>
+            {facts.crossplay && (
+                <span
+                    className="truncate text-xs text-muted-foreground"
+                    title="Bedrock clients can join this Java server"
+                >
+                    Bedrock too
+                </span>
+            )}
+        </div>
     );
 }
 
@@ -611,29 +837,29 @@ function AddressCell({ name, facts }: { name: string; facts: GameServerFacts | n
     );
 }
 
-function StatusBadge({
-    facts,
-    live,
-    status
-}: {
-    facts: GameServerFacts | null;
-    live: GameServerLive | null;
-    status: string;
-}) {
-    // An install that failed stays failed however the container reads: a create
-    // that fell over leaves nothing running, and reporting that as merely
-    // "Stopped" invites somebody to press Start on a server that was never built.
-    if (status === "failed" && !facts?.running) return <Badge variant="danger">Failed</Badge>;
-    if (facts === null) return <Badge>Loading</Badge>;
-    if (!facts.running) return <Badge>Stopped</Badge>;
-    // Meant to be up and is not: stopped from outside Polaris, or fallen over.
-    if (live?.containerRunning === false) return <Badge variant="danger">Not running</Badge>;
-    // Up, but whether it is actually answering is the read that is still out -
-    // saying "Online" before the server has said so would be reporting the
-    // container, which is the thing an operator opens this page to distrust.
-    if (live === null) return <Badge variant="warning">Checking</Badge>;
-    if (!live.answering) return <Badge variant="warning">Starting</Badge>;
-    return <Badge variant="success">Online</Badge>;
+/**
+ * What the server is doing, and since when.
+ *
+ * The same shape a player's row has, for the same reason: "Stopped" is the same
+ * word whether it went down ten minutes ago or in March, and those are not the
+ * same server. A server that is up says how long it has been, which is what tells
+ * a restart loop from a world that has been fine all week.
+ */
+function StatusCell({ server }: { server: list.ServerView }) {
+    const format = useDisplayFormat();
+    const badge = list.STATUS_BADGE[list.statusOf(server)];
+    const line = list.uptimeLine(server);
+
+    return (
+        <div className="flex flex-col items-start gap-0.5">
+            <Badge {...(badge.variant ? { variant: badge.variant } : {})}>{badge.label}</Badge>
+            {line && (
+                <span className="text-xs text-muted-foreground" title={format.dateTime(line.at)}>
+                    {line.prefix} {relativeTime(line.at, format)}
+                </span>
+            )}
+        </div>
+    );
 }
 
 function IconButton({
@@ -655,8 +881,32 @@ function IconButton({
 }
 
 /** The same control, for the ones that open a page. A link rather than a click
- *  handler so it can be middle-clicked, opened in a tab, or copied. */
-function IconLink({ label, href, children }: { label: string; href: string; children: ReactNode }) {
+ *  handler so it can be middle-clicked, opened in a tab, or copied - unless it
+ *  leads somewhere that has nothing to show, in which case it is a disabled button
+ *  saying why rather than a link to an empty page. */
+function IconLink({
+    label,
+    href,
+    disabled,
+    children
+}: {
+    label: string;
+    href: string;
+    disabled?: boolean;
+    children: ReactNode;
+}) {
+    if (disabled) {
+        // The title goes on the wrapper, not the button: a disabled control takes
+        // no pointer events, so the reason it is disabled would never be readable
+        // on the one thing somebody would hover to ask.
+        return (
+            <span title={label} className="inline-flex">
+                <Button size="icon" variant="ghost" disabled aria-label={label}>
+                    {children}
+                </Button>
+            </span>
+        );
+    }
     return (
         <Button size="icon" variant="ghost" asChild aria-label={label} title={label}>
             <Link href={href}>{children}</Link>

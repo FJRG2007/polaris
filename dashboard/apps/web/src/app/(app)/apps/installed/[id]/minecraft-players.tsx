@@ -18,16 +18,18 @@
  */
 
 import * as actions from "./minecraft-actions";
+import { relativeTime } from "@/lib/relative-time";
 import { useConfirm } from "@/components/confirm-dialog";
 import { ToolbarSwitch } from "@/components/toolbar-switch";
+import { useDisplayFormat } from "@/components/display-format";
 import type { MinecraftModeration } from "./minecraft-actions";
 import { ACCESS_REACH_NOTE } from "@/lib/apps/minecraft/access";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
 import { PlayerTimeoutDialog } from "@/components/player-timeout-dialog";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
-import { foldPlayers, GAME_MODES, type PlayerEntry } from "@/lib/apps/minecraft/players";
 import { PlayerIconAction, PlayersTable } from "@/components/game-players-table";
+import { foldPlayers, GAME_MODES, type PlayerEntry } from "@/lib/apps/minecraft/players";
 import { describeQueued, waitingOn, type QueuedAction } from "@/lib/apps/minecraft/queue";
 import { timeoutFor, timeoutRemaining, type PlayerTimeout } from "@/lib/apps/player-timeout";
 import type { MinecraftFirewall, MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
@@ -772,6 +774,7 @@ function PlayerRow({
  * them.
  */
 function StatusCell({ player, onOpen }: { player: PlayerEntry; onOpen: (dialog: PlayerDialog) => void }) {
+    const format = useDisplayFormat();
     const badge =
         player.presence === "playing" ? (
             <Badge variant="success">{playerPresence.playing}</Badge>
@@ -794,28 +797,11 @@ function StatusCell({ player, onOpen }: { player: PlayerEntry; onOpen: (dialog: 
                     title={`When ${player.name} joined and left`}
                 >
                     {player.presence === "playing" ? "since " : ""}
-                    {relativeTime(player.lastSeen)}
+                    {relativeTime(player.lastSeen, format, "time not logged")}
                 </button>
             )}
         </div>
     );
-}
-
-/** How long ago, as somebody says it out loud. Absolute below a minute is noise;
- *  past a week the date itself is what an operator wants. */
-function relativeTime(iso: string | null): string {
-    if (!iso) return "time not logged";
-    const at = Date.parse(iso);
-    if (Number.isNaN(at)) return "time not logged";
-    const seconds = Math.round((Date.now() - at) / 1000);
-    if (seconds < 60) return "just now";
-    const minutes = Math.round(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.round(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.round(hours / 24);
-    if (days <= 7) return `${days}d ago`;
-    return new Date(at).toLocaleDateString();
 }
 
 /** The verbs that are not one press: the ones that need a value, and the ones

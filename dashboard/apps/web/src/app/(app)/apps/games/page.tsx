@@ -17,6 +17,7 @@ import { isGameServerApp } from "@/lib/apps/games-service";
 import { adoptGameServersApp } from "@/lib/apps/game-install";
 import { listInstalledApps } from "@/lib/apps/install-service";
 import { requirePermissionAny, userHasManage } from "@/lib/session";
+import { NO_GAME_SERVER_PREFS, readGameServerPrefs } from "@/lib/apps/games-prefs";
 import { gamePermissionsFor, reachableInstallIds } from "@/lib/apps/install-access";
 
 export const dynamic = "force-dynamic";
@@ -37,25 +38,34 @@ export default async function GameServersPage() {
     // here, which is the first place its owner would notice either way.
     const installed = await adoptGameServersApp(user.id);
     const installs = await listInstalledApps(user.id, granted);
+    const games = installs.filter((install) => isGameServerApp(install.catalogId));
+    // Where this person keeps each of them - starred, put away - read for the whole
+    // list in one go. Theirs alone: the same server is one somebody else may have
+    // archived, and neither of them decides that for the other.
+    const prefs = await readGameServerPrefs(
+        user.id,
+        games.map((install) => install.id)
+    );
     const servers = await Promise.all(
-        installs
-            .filter((install) => isGameServerApp(install.catalogId))
-            .map(async (install) => {
-                const held = await gamePermissionsFor(user, install.id);
-                return {
-                    id: install.id,
-                    name: install.name,
-                    catalogId: install.catalogId,
-                    catalogName: findApp(install.catalogId)?.name ?? install.catalogId,
-                    game: gameOfServer(install.catalogId)?.id ?? null,
-                    applicationId: install.applicationId,
-                    status: install.status,
-                    canManage: held.includes("games.manage"),
-                    // Deleting stays with whoever created it. "Manage this server"
-                    // was never an offer to take it off somebody.
-                    canRemove: install.ownerId === user.id || user.isAdmin
-                };
-            })
+        games.map(async (install) => {
+            const held = await gamePermissionsFor(user, install.id);
+            const pref = prefs.get(install.id) ?? NO_GAME_SERVER_PREFS;
+            return {
+                id: install.id,
+                name: install.name,
+                catalogId: install.catalogId,
+                catalogName: findApp(install.catalogId)?.name ?? install.catalogId,
+                game: gameOfServer(install.catalogId)?.id ?? null,
+                applicationId: install.applicationId,
+                status: install.status,
+                canManage: held.includes("games.manage"),
+                // Deleting stays with whoever created it. "Manage this server"
+                // was never an offer to take it off somebody.
+                canRemove: install.ownerId === user.id || user.isAdmin,
+                favorite: pref.favorite,
+                archived: pref.archived
+            };
+        })
     );
     return <GamesView servers={servers} installed={installed !== null} canCreate={canCreate} />;
 }

@@ -2365,6 +2365,33 @@ model ServerTemplate {
     @@index([ownerId])
 }
 
+// What one person has decided about one game server, for themselves.
+//
+// Per viewer rather than per server, because a server has several: the owner runs
+// four of them and lives in one, while somebody invited to help with that one has
+// no opinion about the other three. Whose list a server is kept at the top of, or
+// put away from, is therefore not a property of the server at all.
+//
+// A row exists only for a server somebody has said something about, on the
+// DriveItemMeta precedent - the absence of a row is the default, so nothing has to
+// be written when a server is created and nothing is left behind for the servers
+// nobody has an opinion about. Bare ids, per the InstalledApp precedent.
+model GameServerPref {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    userId         String   @db.Uuid
+    installedAppId String   @db.Uuid
+    /** Kept at the top of their list. */
+    favorite       Boolean  @default(false)
+    /** Put away: still theirs, still running, out of the list until asked for. */
+    archived       Boolean  @default(false)
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+
+    @@unique([userId, installedAppId])
+    @@index([userId])
+    @@index([installedAppId])
+}
+
 // ---------------------------------------------------------------------------
 // Messaging (unified inbox across WhatsApp / Telegram / Discord / Slack)
 // ---------------------------------------------------------------------------

@@ -24,17 +24,18 @@ import { releaseVersions } from "@/lib/apps/minecraft/blueprint-version";
 import { blueprintVersions, createGameServer } from "@/lib/apps/games-create";
 import { listGameMachines, type GameMachine } from "@/lib/apps/games-service";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
+import { clearGameServerPrefs, setGameServerPref } from "@/lib/apps/games-prefs";
+import { isTemplateName, type ServerTemplateView } from "@/lib/apps/game-templates";
 import { adoptGameServersApp, installGameServersApp } from "@/lib/apps/game-install";
 import { createGameServerSchema, type CreateGameServerInput } from "@/lib/apps/games-schema";
 import { installRef, requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
-import { isTemplateName, type ServerTemplateView } from "@/lib/apps/game-templates";
+import { GAME_BLUEPRINTS, recommendedMemoryMb, formatMemory } from "@/lib/apps/minecraft/blueprints";
 import {
     deleteServerTemplate,
     listServerTemplates,
     readServerTemplate,
     saveServerAsTemplate
 } from "@/lib/apps/game-templates-service";
-import { GAME_BLUEPRINTS, recommendedMemoryMb, formatMemory } from "@/lib/apps/minecraft/blueprints";
 
 export interface GameSetup {
     /** Machines a server can run on, with what each has left. */
@@ -246,6 +247,28 @@ export async function deleteServerTemplateAction(id: string): Promise<{ error?: 
     }
 }
 
+/**
+ * Keep a server at the top of your own list, or put it away.
+ *
+ * Only ever about the caller's list: it takes `games.read` because seeing a server
+ * is the whole qualification for having an opinion about where it sits, and it
+ * changes nothing about the server - somebody else's list, and the server itself,
+ * are untouched. Nothing is audited for the same reason.
+ */
+export async function setGameServerPrefAction(
+    installedAppId: string,
+    patch: { favorite?: boolean; archived?: boolean }
+): Promise<{ error?: string }> {
+    try {
+        const { user } = await requireGameServer("games.read", installedAppId);
+        await setGameServerPref(user.id, installedAppId, patch);
+        revalidatePath("/apps/games");
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not update your list" };
+    }
+}
+
 /** Start or stop a server from the list, without opening it. */
 export async function setGameServerRunningAction(
     installedAppId: string,
@@ -309,7 +332,13 @@ export async function deleteGameServerAction(installedAppId: string): Promise<{ 
         // And so is everything that only described this server: the bags it was
         // keeping copies of, and the decisions still waiting for players who will
         // never join it again.
-        await Promise.all([clearSnapshots(installedAppId), clearQueue(installedAppId)]);
+        // Including where it sat on somebody's list: a favourite of a server that
+        // is gone is a row nothing will ever read again.
+        await Promise.all([
+            clearSnapshots(installedAppId),
+            clearQueue(installedAppId),
+            clearGameServerPrefs(installedAppId)
+        ]);
         await recordAudit({
             actorId: user.id,
             action: "games.delete",
