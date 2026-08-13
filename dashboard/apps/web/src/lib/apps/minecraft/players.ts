@@ -108,3 +108,13 @@ export function foldPlayers(
         return left.name.localeCompare(right.name);
     });
 }
+
+/**
+ * The four modes the game has, in the order a menu should offer them.
+ *
+ * Here rather than beside the action that sends them, because a server-actions
+ * module may only export async functions: a constant exported from one reaches the
+ * browser as a reference to an action, and the screen that tried to list it got
+ * "map is not a function" and took the page down with it.
+ */
+export const GAME_MODES = ["survival", "creative", "adventure", "spectator"] as const;

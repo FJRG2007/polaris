@@ -13,6 +13,7 @@ import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { clientIp } from "@/lib/request-context";
 import { recordAudit } from "@/lib/audit-service";
+import { GAME_MODES } from "@/lib/apps/minecraft/players";
 import { setEnvVars } from "@/lib/env-var-service";
 import { requirePermissionAny } from "@/lib/session";
 import { runArkCommand } from "@/lib/apps/ark/service";
@@ -98,9 +99,6 @@ const moderationSchema = z.object({
 });
 
 export type MinecraftModeration = z.infer<typeof moderationSchema>;
-
-/** The four the game has, in the order a menu should offer them. */
-export const GAME_MODES = ["survival", "creative", "adventure", "spectator"] as const;
 
 const gamemodeSchema = z.object({
     installedAppId: z.string().uuid(),

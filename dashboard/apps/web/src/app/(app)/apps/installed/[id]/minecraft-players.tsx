@@ -18,7 +18,6 @@
  */
 
 import * as actions from "./minecraft-actions";
-import { GAME_MODES } from "./minecraft-actions";
 import { useConfirm } from "@/components/confirm-dialog";
 import { ToolbarSwitch } from "@/components/toolbar-switch";
 import type { MinecraftModeration } from "./minecraft-actions";
@@ -27,7 +26,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
 import { PlayerTimeoutDialog } from "@/components/player-timeout-dialog";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
-import { foldPlayers, type PlayerEntry } from "@/lib/apps/minecraft/players";
+import { foldPlayers, GAME_MODES, type PlayerEntry } from "@/lib/apps/minecraft/players";
 import { PlayerIconAction, PlayersTable } from "@/components/game-players-table";
 import { describeQueued, waitingOn, type QueuedAction } from "@/lib/apps/minecraft/queue";
 import { timeoutFor, timeoutRemaining, type PlayerTimeout } from "@/lib/apps/player-timeout";
