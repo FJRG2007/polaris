@@ -15,6 +15,7 @@
 
 import { prisma } from "@polaris/db";
 import type { DockerDriver } from "@polaris/docker";
+import { inFlightDeployments } from "./deploy-service";
 import { isLocalMachine, localMachineIdentity } from "./local-machine";
 import { hostRouteId, LOCAL_HOST_SUBJECT, type MetricSubjectType } from "./metrics-shared";
 import { cachedSamples, oldestSampleAt, refreshSamples, STATS_TTL_MS } from "./container-stats-cache";
@@ -217,18 +218,26 @@ async function buildServices(ownerId: string, alarms: Map<string, number>): Prom
         orderBy: { createdAt: "asc" }
     });
 
-    const series = await sparklines("app", apps.map((app) => app.id), now);
+    const [series, building] = await Promise.all([
+        sparklines("app", apps.map((app) => app.id), now),
+        inFlightDeployments(apps.map((app) => app.id))
+    ]);
     return apps.map((app) => {
         const readings = readingsFor(series.get(app.id), now);
+        // A service that is not deployed is idle, not down: nothing is wrong, there
+        // is simply nothing running to measure. Its first build is idle for the same
+        // reason, and says so - "Not deployed" for something that is being deployed
+        // right now sends somebody to look at a screen where nothing is wrong. A
+        // service that already has a release keeps reporting its own readings while
+        // the next one builds; that release is still the one answering.
+        const firstBuild = !app.currentDeploymentId && building.has(app.id);
         return {
             id: app.id,
             kind: "service" as const,
             name: app.name,
             detail: `${app.environment.project.name} / ${app.environment.name}`,
-            // A service that is not deployed is idle, not down: nothing is wrong,
-            // there is simply nothing running to measure.
             state: app.currentDeploymentId ? readings.state : ("idle" as const),
-            stateLabel: app.currentDeploymentId ? readings.stateLabel : "Not deployed",
+            stateLabel: app.currentDeploymentId ? readings.stateLabel : firstBuild ? "Deploying" : "Not deployed",
             cpuPercent: readings.cpuPercent,
             memUsedBytes: readings.memUsedBytes,
             memTotalBytes: readings.memTotalBytes,

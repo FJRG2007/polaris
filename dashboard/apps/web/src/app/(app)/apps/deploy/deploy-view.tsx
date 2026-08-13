@@ -299,10 +299,7 @@ function AppCard({
                     </span>
                     <span className="truncate text-sm font-medium group-enabled:group-hover:text-primary">{app.name}</span>
                 </button>
-                <StatusPill
-                    tone={app.currentDeploymentId ? dbTone(app.deployStatus ?? "") : "idle"}
-                    label={app.currentDeploymentId ? (app.deployStatus ?? "deployed") : "Not deployed"}
-                />
+                <StatusPill tone={dbTone(app.deployStatus ?? "")} label={app.deployStatus ?? "Not deployed"} />
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -1504,7 +1501,9 @@ export function StatusPill({ tone, label }: { tone: "success" | "warning" | "dan
         idle: "border-border/60 bg-surface text-muted-foreground"
     }[tone];
     return (
-        <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${chip}`}>
+        <span
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs capitalize ${chip}`}
+        >
             <span className={`size-1.5 rounded-full ${dot} ${tone === "warning" ? "animate-pulse" : ""}`} />
             {label}
         </span>

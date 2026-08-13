@@ -19,7 +19,6 @@ import { INSTALLED_BASE } from "@/lib/apps";
 import { sessionCanAny } from "@/lib/session";
 import { shelfScope } from "@/lib/tasks/access";
 import type { SessionUser } from "@/lib/session";
-import { listProjects } from "@/lib/deploy-service";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { OverviewWidgetId } from "@polaris/core";
 import { listUserActivity } from "@/lib/audit-service";
@@ -29,6 +28,7 @@ import type { MyWorkTask } from "@/lib/tasks/report-service";
 import type { MetricSubjectType } from "@/lib/metrics-shared";
 import { listGameServerFacts } from "@/lib/apps/games-service";
 import { getWatchOverview } from "@/lib/watch-overview-service";
+import { inFlightDeployments, listProjects } from "@/lib/deploy-service";
 import { myUrgentTasks, myWorkCounts } from "@/lib/tasks/report-service";
 import { HOST_CONNECTION_PREFIX, listAccessibleConnections } from "@/lib/storage-service";
 
@@ -353,6 +353,14 @@ async function deployedServices(user: SessionUser): Promise<OverviewServices> {
     let running = 0;
     let total = 0;
 
+    // A service whose first build is running is on its way up, not down: nothing is
+    // wrong with it and nobody needs to be sent to look at it.
+    const building = await inFlightDeployments(
+        projects.flatMap((project) =>
+            project.environments.flatMap((environment) => environment.applications.map((application) => application.id))
+        )
+    );
+
     for (const project of projects) {
         for (const environment of project.environments) {
             for (const application of environment.applications) {
@@ -360,13 +368,17 @@ async function deployedServices(user: SessionUser): Promise<OverviewServices> {
                 total += 1;
                 const stopped = application.desiredState !== "running";
                 const up = !stopped && Boolean(application.currentDeploymentId);
+                // Only its first build, so a service that already has a release goes
+                // on counting as running while the next one builds - that release is
+                // still the one answering.
+                const firstBuild = !application.currentDeploymentId && building.has(application.id);
                 if (up) running += 1;
                 rows.push({
                     id: application.id,
                     label: application.name,
                     detail: `${project.name} / ${environment.name}`,
-                    state: up ? "up" : stopped ? "idle" : "down",
-                    stateLabel: up ? "Running" : stopped ? "Stopped" : "Not deployed",
+                    state: up ? "up" : stopped || firstBuild ? "idle" : "down",
+                    stateLabel: up ? "Running" : stopped ? "Stopped" : firstBuild ? "Deploying" : "Not deployed",
                     href: `/apps/deploy/${project.id}`
                 });
             }

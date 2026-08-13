@@ -10,9 +10,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DeployCanvas } from "./deploy-canvas";
 import { ServiceDetail } from "./service-detail";
-import { useState, type ReactNode } from "react";
-import { List, ShieldCheck, Waypoints } from "lucide-react";
 import { useStagedChanges } from "./staged-changes";
+import { isInFlightStatus } from "@/lib/deploy/status";
+import { useEffect, useState, type ReactNode } from "react";
+import { List, ShieldCheck, Waypoints } from "lucide-react";
 import { EnvironmentServices, NewServiceButton, type ProjectApp, type ProjectSummary } from "./deploy-view";
 
 export function ProjectDetail({
@@ -43,6 +44,21 @@ export function ProjectDetail({
         : undefined;
     const active =
         linked ?? environments.find((environment) => environment.id === activeEnvironmentId) ?? defaultEnv;
+
+    // Something is building or provisioning, so the board has a reason to look again:
+    // a deploy finishes on the server with nothing to tell the page about it, and
+    // without this the service sat at "deploying" until it was reloaded by hand.
+    const settling = environments.some(
+        (environment) =>
+            environment.applications.some((app) => isInFlightStatus(app.deployStatus)) ||
+            environment.databases.some((database) => isInFlightStatus(database.status))
+    );
+    useEffect(() => {
+        if (!settling) return;
+        const timer = setInterval(refresh, 3000);
+        return () => clearInterval(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [settling]);
 
     const [view, setView] = useState<"canvas" | "list">("canvas");
     const [detailAppId, setDetailAppId] = useState<string | null>(openService ?? null);

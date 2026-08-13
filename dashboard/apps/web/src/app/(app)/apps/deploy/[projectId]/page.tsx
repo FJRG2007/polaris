@@ -8,7 +8,7 @@ import { refreshCapabilities } from "@polaris/hostd-client";
 import type { TunnelDomain } from "@/lib/deploy/tunnel-domains";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { listActiveTunnelDomains } from "@/lib/deploy/tunnel-domains";
-import { getDeploymentStatuses, getProjectFull, hostPortForApp } from "@/lib/deploy-service";
+import { getApplicationDeployStatuses, getProjectFull, hostPortForApp } from "@/lib/deploy-service";
 
 export const dynamic = "force-dynamic";
 
@@ -63,10 +63,11 @@ export default async function DeployProjectPage({
     const caps = canManage ? await refreshCapabilities() : null;
     const localReady = Boolean(caps?.deploy);
 
-    const deploymentIds = project.environments.flatMap((environment) =>
-        environment.applications.map((app) => app.currentDeploymentId).filter((id): id is string => Boolean(id))
+    const statuses = await getApplicationDeployStatuses(
+        project.environments.flatMap((environment) =>
+            environment.applications.map((app) => ({ id: app.id, currentDeploymentId: app.currentDeploymentId }))
+        )
     );
-    const statuses = await getDeploymentStatuses(deploymentIds);
     const serverIp = await getPublicIp();
     const appIds = project.environments.flatMap((environment) => environment.applications.map((app) => app.id));
     const tunnelDomains = await listActiveTunnelDomains(appIds);
@@ -94,7 +95,9 @@ export default async function DeployProjectPage({
                 environmentId: environment.id,
                 sourceType: app.sourceType,
                 currentDeploymentId: app.currentDeploymentId,
-                deployStatus: app.currentDeploymentId ? (statuses[app.currentDeploymentId] ?? null) : null,
+                // What the service is doing now: the build in flight, or the release
+                // it serves. Null only when it has never been deployed.
+                deployStatus: statuses[app.id] ?? null,
                 targetId: app.targetId,
                 serverId: app.target.kind === "local" || !app.target.hostId ? "local" : app.target.hostId,
                 serverName: app.target.name,

@@ -100,8 +100,8 @@ function nodesFromEnvironment(environment: ProjectSummary["environments"][number
         name: app.name,
         kind: serviceKindOf(app.sourceType),
         subtitle: primaryDomain(app.domains)?.hostname ?? (app.sourceType === "image" ? "Docker image" : "Git repository"),
-        tone: app.currentDeploymentId ? dbTone(app.deployStatus ?? "") : "idle",
-        statusLabel: app.currentDeploymentId ? (app.deployStatus ?? "deployed") : "Not deployed",
+        tone: dbTone(app.deployStatus ?? ""),
+        statusLabel: app.deployStatus ?? "Not deployed",
         volumes: app.volumes
     }));
     const databases = environment.databases.map((database): CanvasNode => ({
@@ -636,7 +636,7 @@ export function DeployCanvas({
                                                 <span
                                                     className={`size-2 rounded-full ${TONE_DOT[node.tone]} ${pulsing ? "animate-pulse" : ""}`}
                                                 />
-                                                <span className={TONE_TEXT[node.tone]}>{label}</span>
+                                                <span className={`capitalize ${TONE_TEXT[node.tone]}`}>{label}</span>
                                             </>
                                         )}
                                     </div>

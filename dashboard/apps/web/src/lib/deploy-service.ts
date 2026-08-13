@@ -30,6 +30,7 @@ import { notifyDeployFinished } from "./notifications/deploy-events";
 import { githubCloneAuthHeader, githubTokenForOwner } from "./github-access";
 import { applicationDefaultWafPresets, isTunnelHostname } from "@polaris/core";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
+import { IN_FLIGHT_DEPLOY_STATUSES, TERMINAL_DEPLOY_STATUSES } from "./deploy/status";
 import { deployHostname, deployZoneHosts, type ZoneMintFailure } from "./domain-zones";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
 import { gitBuildContext, type BuildCommands, type GitSource } from "./git-build-service";
@@ -1900,11 +1901,67 @@ export async function listDeployments(applicationId: string, ownerId: string): P
 }
 
 /** Map deployment ids to their current status (for showing running/failed/…). */
-export async function getDeploymentStatuses(ids: string[]): Promise<Record<string, string>> {
+async function getDeploymentStatuses(ids: string[]): Promise<Record<string, string>> {
     const unique = [...new Set(ids.filter(Boolean))];
     if (unique.length === 0) return {};
     const rows = await prisma.deployment.findMany({ where: { id: { in: unique } }, select: { id: true, status: true } });
     return Object.fromEntries(rows.map((row) => [row.id, row.status]));
+}
+
+/**
+ * The build each of these applications has running, by application id, or nothing
+ * for the ones standing still.
+ *
+ * Asked of the deployments rather than of the service's current-release pointer,
+ * because that pointer is only set once a deploy succeeds: a first build has none
+ * for as long as it runs, so a service created a second ago and already cloning its
+ * repository read as "Not deployed" until it finished. A redeploy has the opposite
+ * problem - the pointer still names the old release - and reads as untouched while
+ * its replacement builds.
+ */
+export async function inFlightDeployments(applicationIds: string[]): Promise<Map<string, string>> {
+    const unique = [...new Set(applicationIds.filter(Boolean))];
+    if (unique.length === 0) return new Map();
+    const rows = await prisma.deployment.findMany({
+        where: {
+            deployableType: "application",
+            deployableId: { in: unique },
+            status: { in: [...IN_FLIGHT_DEPLOY_STATUSES] }
+        },
+        orderBy: { createdAt: "desc" },
+        select: { deployableId: true, status: true }
+    });
+    // Newest first, so the first row seen for a service is the build it is on.
+    const building = new Map<string, string>();
+    for (const row of rows) {
+        if (!building.has(row.deployableId)) building.set(row.deployableId, row.status);
+    }
+    return building;
+}
+
+/**
+ * What each application is doing right now: the build in flight when there is one,
+ * otherwise the release it is serving. Absent from the map means nothing has ever
+ * been deployed.
+ */
+export async function getApplicationDeployStatuses(
+    apps: { id: string; currentDeploymentId: string | null }[]
+): Promise<Record<string, string>> {
+    if (apps.length === 0) return {};
+    const [building, current] = await Promise.all([
+        inFlightDeployments(apps.map((app) => app.id)),
+        getDeploymentStatuses(apps.map((app) => app.currentDeploymentId ?? ""))
+    ]);
+    const statuses: Record<string, string> = {};
+    for (const app of apps) {
+        if (!app.currentDeploymentId) continue;
+        // A pointer at a row that is no longer there still means the service was
+        // deployed, so it does not fall back to "never deployed".
+        statuses[app.id] = current[app.currentDeploymentId] ?? "deployed";
+    }
+    // What is happening now wins over the release the build is replacing.
+    for (const [id, status] of building) statuses[id] = status;
+    return statuses;
 }
 
 /** Set the container port an application listens on (stored in its source config).
@@ -2196,11 +2253,6 @@ function runDeployment(
         buildCommands
     );
 }
-
-/** The states a deployment never moves out of. Named once because three separate
- *  decisions read it: whether a queued job should still run, whether a verdict may
- *  overwrite the row, and whether the UI should keep polling. */
-export const TERMINAL_DEPLOY_STATUSES = new Set(["running", "success", "failed", "cancelled", "rolled_back", "stopped", "removed"]);
 
 /**
  * How long a single deploy may take before it is stopped.

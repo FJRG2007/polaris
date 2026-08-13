@@ -12,7 +12,15 @@ import { useRouter } from "next/navigation";
 import { ServiceIcon, type ServiceKind } from "./deploy-view";
 import { RegistryCredentialsButton } from "./registry-credentials";
 import { createProjectAction, deleteProjectAction } from "./actions";
-import { forwardRef, useMemo, useState, useTransition, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import {
+    forwardRef,
+    useEffect,
+    useMemo,
+    useState,
+    useTransition,
+    type ComponentPropsWithoutRef,
+    type ReactNode
+} from "react";
 import {
     Copy,
     ExternalLink,
@@ -49,6 +57,9 @@ export interface ProjectCardData {
     environmentName: string;
     services: ServiceKind[];
     online: number;
+    /** Services building or provisioning right now: what the card reports instead of
+     *  a count that has not moved yet, and what keeps the page looking again. */
+    deploying: number;
     total: number;
 }
 
@@ -88,6 +99,16 @@ export function ProjectsGrid({
             router.refresh();
         });
     }
+
+    // Look again while any project has a build running: it finishes on the server,
+    // which has no way to say so, and the card would otherwise sit on the count it
+    // was rendered with until the page was reloaded.
+    const settling = projects.some((project) => project.deploying > 0);
+    useEffect(() => {
+        if (!settling) return;
+        const timer = setInterval(() => router.refresh(), 3000);
+        return () => clearInterval(timer);
+    }, [settling, router]);
 
     const visible = useMemo(
         () => projects.filter((project) => !removing.includes(project.id)),
@@ -287,11 +308,38 @@ function ProjectMenu({
     );
 }
 
-function statusTone(online: number, total: number): { dot: string; text: string; label: string } {
-    if (total === 0) return { dot: "bg-muted-foreground", text: "text-muted-foreground", label: "No services" };
-    if (online >= total)
-        return { dot: "bg-success", text: "text-muted-foreground", label: `${online}/${total} services online` };
-    return { dot: "bg-warning", text: "text-warning", label: `${online}/${total} services online` };
+/** How a project reads on its card. A build in progress is what the project is doing,
+ *  so it is what the card says: a count of what is up says nothing at all while the
+ *  first service is still being made. */
+function statusTone(project: ProjectCardData): { dot: string; text: string; chip: string; label: string; busy: boolean } {
+    const { online, total, deploying } = project;
+    const busy = deploying > 0;
+    const label = busy
+        ? deploying === 1
+            ? "Deploying"
+            : `Deploying ${deploying}`
+        : total === 0
+          ? "No services"
+          : `${online}/${total} online`;
+    if (total === 0) {
+        return {
+            dot: "bg-muted-foreground",
+            text: "text-muted-foreground",
+            chip: "border-border/60 bg-surface text-muted-foreground",
+            label,
+            busy
+        };
+    }
+    if (!busy && online >= total) {
+        return {
+            dot: "bg-success",
+            text: "text-muted-foreground",
+            chip: "border-success/25 bg-success/10 text-success",
+            label,
+            busy
+        };
+    }
+    return { dot: "bg-warning", text: "text-warning", chip: "border-warning/25 bg-warning/10 text-warning", label, busy };
 }
 
 function ServiceTiles({ services }: { services: ServiceKind[] }) {
@@ -330,14 +378,8 @@ const DOT_CANVAS: React.CSSProperties = {
  */
 const ProjectCard = forwardRef<HTMLAnchorElement, { project: ProjectCardData } & ComponentPropsWithoutRef<"a">>(
     function ProjectCard({ project, className, ...rest }, ref) {
-        const status = statusTone(project.online, project.total);
-        const partial = project.total > 0 && project.online < project.total;
-        const chip =
-            project.total === 0
-                ? "border-border/60 bg-surface text-muted-foreground"
-                : partial
-                  ? "border-warning/25 bg-warning/10 text-warning"
-                  : "border-success/25 bg-success/10 text-success";
+        const status = statusTone(project);
+        const partial = status.busy || (project.total > 0 && project.online < project.total);
         return (
             <Link
                 ref={ref}
@@ -368,10 +410,10 @@ const ProjectCard = forwardRef<HTMLAnchorElement, { project: ProjectCardData } &
                         {project.environmentName}
                     </span>
                     <span
-                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${chip}`}
+                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${status.chip}`}
                     >
                         <span className={`size-1.5 rounded-full ${status.dot} ${partial ? "animate-pulse" : ""}`} />
-                        {project.total === 0 ? "No services" : `${project.online}/${project.total} online`}
+                        {status.label}
                     </span>
                 </div>
             </Link>
@@ -381,7 +423,7 @@ const ProjectCard = forwardRef<HTMLAnchorElement, { project: ProjectCardData } &
 
 const ProjectRow = forwardRef<HTMLAnchorElement, { project: ProjectCardData } & ComponentPropsWithoutRef<"a">>(
     function ProjectRow({ project, className, ...rest }, ref) {
-        const status = statusTone(project.online, project.total);
+        const status = statusTone(project);
         return (
             <Link
                 ref={ref}
@@ -401,7 +443,7 @@ const ProjectRow = forwardRef<HTMLAnchorElement, { project: ProjectCardData } & 
                     ))}
                 </div>
                 <span className="flex items-center gap-2 text-xs">
-                    <span className={`size-1.5 rounded-full ${status.dot}`} />
+                    <span className={`size-1.5 rounded-full ${status.dot} ${status.busy ? "animate-pulse" : ""}`} />
                     <span className="text-muted-foreground">{project.environmentName}</span>
                     <span className={status.text}>{status.label}</span>
                 </span>

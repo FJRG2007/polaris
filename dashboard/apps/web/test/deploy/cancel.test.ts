@@ -38,9 +38,8 @@ vi.mock("@polaris/db", () => ({
 }));
 vi.mock("@/lib/notifications/deploy-events", () => ({ notifyDeployFinished }));
 
-const { cancelDeployment, recoverAbandonedDeployments, TERMINAL_DEPLOY_STATUSES } = await import(
-    "@/lib/deploy-service"
-);
+const { cancelDeployment, recoverAbandonedDeployments } = await import("@/lib/deploy-service");
+const { TERMINAL_DEPLOY_STATUSES } = await import("@/lib/deploy/status");
 
 beforeEach(() => {
     found = { status: "deploying" };
@@ -103,9 +102,9 @@ describe("recovering after a restart", () => {
 
 describe("the terminal states", () => {
     it("holds every state a deployment stops moving in", () => {
-        // Read by three separate decisions - whether a queued job still runs, whether a
-        // verdict may be written, whether the UI keeps polling - and they drifted apart
-        // when each kept its own copy.
+        // Read by four separate decisions - whether a queued job still runs, whether a
+        // verdict may be written, whether a screen keeps looking, what a card says the
+        // service is doing - and they drifted apart when each kept its own copy.
         for (const status of ["running", "failed", "cancelled", "rolled_back", "stopped", "removed"]) {
             expect(TERMINAL_DEPLOY_STATUSES.has(status)).toBe(true);
         }

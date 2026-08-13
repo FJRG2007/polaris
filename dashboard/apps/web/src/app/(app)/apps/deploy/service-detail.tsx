@@ -15,6 +15,7 @@ import { TerminalPanel } from "./terminal-panel";
 import { relativeTime } from "@/lib/relative-time";
 import { LogViewer } from "@/components/log-viewer";
 import type { HttpLogEntry } from "@polaris/deploy";
+import { isInFlightStatus } from "@/lib/deploy/status";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageServiceDeleteAction } from "./project-actions";
 import { useDisplayFormat } from "@/components/display-format";
@@ -116,9 +117,7 @@ export function ServiceDetail({
                 <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
                     <ServiceIcon kind={serviceKindOf(app.sourceType)} className="size-5 shrink-0 text-foreground" />
                     <DialogTitle className="truncate text-base font-semibold">{app.name}</DialogTitle>
-                    {app.currentDeploymentId && (
-                        <StatusPill tone={dbTone(app.deployStatus ?? "")} label={app.deployStatus ?? "deployed"} />
-                    )}
+                    {app.deployStatus && <StatusPill tone={dbTone(app.deployStatus)} label={app.deployStatus} />}
                     {staged && (
                         <span className="shrink-0 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                             Removal pending
@@ -205,7 +204,7 @@ function depBadge(deployment: DepSummary): { label: string; cls: string } {
 /** Whether a deployment has stopped moving. Everything else is still queued or
  *  building, and has no container behind it yet. */
 function isSettled(deployment: DepSummary): boolean {
-    return !["queued", "deploying"].includes(deployment.status);
+    return !isInFlightStatus(deployment.status);
 }
 
 function depTitle(deployment: DepSummary): string {
