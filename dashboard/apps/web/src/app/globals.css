@@ -1,12 +1,19 @@
+/*
+ * The token stylesheet first: its CSS variables and dark-by-default surface have
+ * to be in place before Tailwind's base and utilities.
+ *
+ * Imported here rather than beside this file in the root layout, which is where it
+ * used to be. Two side-effect imports in a .tsx file are two lines a formatter is
+ * free to sort - and the repository's import rule sorts by length, so adding any
+ * import to that file silently swapped these two and inverted the cascade. In CSS
+ * the order is the meaning, and nothing reorders it.
+ */
+@import "@polaris/ui/styles.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/*
- * The token stylesheet (@polaris/ui/styles.css) is imported first in the root
- * layout so its CSS variables and dark-by-default surface are in place before
- * Tailwind's utilities. Here we only set app-level base defaults.
- */
 :root {
     --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", monospace;
     color-scheme: dark;

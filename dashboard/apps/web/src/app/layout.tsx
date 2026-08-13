@@ -1,5 +1,6 @@
+// One stylesheet, which pulls in the design tokens itself: see globals.css for why
+// the token import cannot live here.
 import "./globals.css";
-import "@polaris/ui/styles.css";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { DropGuard } from "@/components/drop-guard";
