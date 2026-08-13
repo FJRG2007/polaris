@@ -27,6 +27,9 @@ import {
     type GameSchedule,
     type GameScheduleMode,
     type GameScheduleWindow,
+    type RoutineActionKind,
+    type RoutineRun,
+    type ScheduledRoutine,
     type ScheduleState
 } from "@/lib/apps/minecraft/schedule";
 
@@ -45,10 +48,14 @@ const OVERNIGHT: GameScheduleWindow = { days: [], from: "00:00", to: "10:00", mo
 export function MinecraftSchedule({
     installedAppId,
     schedule: saved,
-    state = null
+    state = null,
+    runs = null
 }: {
     installedAppId: string;
     schedule: GameSchedule;
+    /** What each routine did last time, so one that has been failing every night
+     *  says so rather than looking identical to one that has never run. */
+    runs?: Record<string, RoutineRun> | null;
     /** What the last sweep of this schedule saw. Null on a screen that did not
      *  read it. */
     state?: ScheduleState | null;
@@ -182,6 +189,57 @@ export function MinecraftSchedule({
                                 onClick={() => update({ windows: [...schedule.windows, OVERNIGHT] })}
                             >
                                 <Plus className="size-4" /> Add a window
+                            </Button>
+                        </div>
+
+                        {/* A different question from the one above. The windows say
+                            whether the server should be up; these are errands to run
+                            while it is. */}
+                        <div className="flex flex-col gap-2 border-t border-border pt-4">
+                            <div>
+                                <p className="text-sm font-medium">Routines</p>
+                                <p className="text-xs text-muted-foreground">
+                                    Things to do at a time: restart it, warn everyone, take a backup, run a command.
+                                </p>
+                            </div>
+                            {schedule.routines.map((routine, index) => (
+                                <RoutineRow
+                                    key={routine.id}
+                                    routine={routine}
+                                    run={runs?.[routine.id] ?? null}
+                                    onChange={(patch) =>
+                                        update({
+                                            routines: schedule.routines.map((entry, at) =>
+                                                at === index ? { ...entry, ...patch } : entry
+                                            )
+                                        })
+                                    }
+                                    onRemove={() =>
+                                        update({ routines: schedule.routines.filter((_, at) => at !== index) })
+                                    }
+                                />
+                            ))}
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                className="w-fit"
+                                onClick={() =>
+                                    update({
+                                        routines: [
+                                            ...schedule.routines,
+                                            {
+                                                id: `r${Date.now()}`,
+                                                name: "Nightly restart",
+                                                enabled: true,
+                                                days: [],
+                                                at: "04:00",
+                                                actions: [{ kind: "restart", value: "" }]
+                                            }
+                                        ]
+                                    })
+                                }
+                            >
+                                <Plus className="size-4" /> Add a routine
                             </Button>
                         </div>
 
@@ -358,6 +416,130 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
             <span className="text-xs text-muted-foreground">{label}</span>
             {children}
         </label>
+    );
+}
+
+
+/** The words for each kind of step, in the order somebody would think of them. */
+const ACTION_LABELS: { value: RoutineActionKind; label: string; needs: boolean; placeholder: string }[] = [
+    { value: "restart", label: "Restart the server", needs: false, placeholder: "" },
+    { value: "broadcast", label: "Tell everyone", needs: true, placeholder: "Restarting in 5 minutes" },
+    { value: "command", label: "Run a command", needs: true, placeholder: "time set day" },
+    { value: "backup", label: "Take a backup", needs: false, placeholder: "" }
+];
+
+/** One routine: when, and what it does in order. */
+function RoutineRow({
+    routine,
+    run,
+    onChange,
+    onRemove
+}: {
+    routine: ScheduledRoutine;
+    run: RoutineRun | null;
+    onChange: (patch: Partial<ScheduledRoutine>) => void;
+    onRemove: () => void;
+}) {
+    return (
+        <div className="flex flex-col gap-2 rounded-md border border-border p-3">
+            <div className="flex flex-wrap items-end gap-2">
+                <Field label="Name">
+                    <Input
+                        value={routine.name}
+                        onChange={(event) => onChange({ name: event.target.value })}
+                        placeholder="Nightly restart"
+                        className="w-48"
+                    />
+                </Field>
+                <Field label="At">
+                    <Input
+                        type="time"
+                        value={routine.at}
+                        onChange={(event) => onChange({ at: event.target.value })}
+                        className="w-32"
+                    />
+                </Field>
+                <label className="flex items-center gap-2 pb-2 text-xs text-muted-foreground">
+                    <Switch checked={routine.enabled} onChange={(on: boolean) => onChange({ enabled: on })} />
+                    On
+                </label>
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    className="ml-auto"
+                    onClick={onRemove}
+                    aria-label={`Remove ${routine.name || "this routine"}`}
+                >
+                    <Trash2 className="size-4" />
+                </Button>
+            </div>
+
+            <div className="flex flex-col gap-2">
+                {routine.actions.map((action, index) => {
+                    const spec = ACTION_LABELS.find((entry) => entry.value === action.kind);
+                    return (
+                        <div key={index} className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs text-muted-foreground">{index + 1}.</span>
+                            <Select
+                                value={action.kind}
+                                onValueChange={(kind) =>
+                                    onChange({
+                                        actions: routine.actions.map((entry, at) =>
+                                            at === index ? { ...entry, kind: kind as RoutineActionKind } : entry
+                                        )
+                                    })
+                                }
+                                options={ACTION_LABELS.map((entry) => ({ value: entry.value, label: entry.label }))}
+                                className="w-48"
+                            />
+                            {spec?.needs && (
+                                <Input
+                                    value={action.value}
+                                    onChange={(event) =>
+                                        onChange({
+                                            actions: routine.actions.map((entry, at) =>
+                                                at === index ? { ...entry, value: event.target.value } : entry
+                                            )
+                                        })
+                                    }
+                                    placeholder={spec.placeholder}
+                                    className="w-64 font-mono"
+                                />
+                            )}
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={routine.actions.length === 1}
+                                onClick={() =>
+                                    onChange({ actions: routine.actions.filter((_, at) => at !== index) })
+                                }
+                                aria-label="Remove this step"
+                            >
+                                <Trash2 className="size-4" />
+                            </Button>
+                        </div>
+                    );
+                })}
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    className="w-fit"
+                    disabled={routine.actions.length >= 8}
+                    onClick={() => onChange({ actions: [...routine.actions, { kind: "broadcast", value: "" }] })}
+                >
+                    <Plus className="size-4" /> Add a step
+                </Button>
+            </div>
+
+            {/* What it did last time. A routine that has been failing every night
+                for a week looks exactly like one that has never run, unless the
+                screen says which. */}
+            {run && (
+                <p className={`text-xs ${run.ok ? "text-muted-foreground" : "text-danger"}`}>
+                    Last run {new Date(run.at).toLocaleString()}: {run.ok ? "went through" : run.detail || "failed"}
+                </p>
+            )}
+        </div>
     );
 }
 

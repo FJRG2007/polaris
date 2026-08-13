@@ -23,7 +23,14 @@ import { listPlayerAccess } from "@/lib/apps/minecraft/player-access";
 import { gameOfServer, routesByHostname } from "@/lib/apps/games-catalog";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import { editionOf, type MinecraftEdition } from "@/lib/apps/minecraft/service";
-import { readSchedule, readScheduleState, type GameSchedule, type ScheduleState } from "@/lib/apps/minecraft/schedule";
+import {
+    readRoutineRuns,
+    readSchedule,
+    readScheduleState,
+    type GameSchedule,
+    type RoutineRun,
+    type ScheduleState
+} from "@/lib/apps/minecraft/schedule";
 
 export interface GameContext {
     /** The name it answers to, when it has one. */
@@ -56,6 +63,8 @@ export interface GameContext {
     readonly schedule: GameSchedule;
     /** What the last sweep of that schedule saw. */
     readonly scheduleState: ScheduleState;
+    /** What each routine did last time it ran. */
+    readonly routineRuns: Record<string, RoutineRun>;
     /**
      * Who this server is meant to let in, in whichever shape its game keeps that.
      *
@@ -118,6 +127,7 @@ export async function gameContextFor(app: {
         mapId: typeof config[MAP_KEY] === "string" && config[MAP_KEY] ? (config[MAP_KEY] as string) : null,
         schedule: readSchedule(config),
         scheduleState: readScheduleState(config),
+        routineRuns: readRoutineRuns(config),
         arkAccess,
         playerAccess,
         gamePort: ports?.gamePort ?? null,

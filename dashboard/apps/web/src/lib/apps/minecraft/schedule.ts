@@ -31,6 +31,56 @@ export interface GameScheduleWindow {
     readonly mode: GameScheduleMode;
 }
 
+/**
+ * A thing to do at a time, rather than a state to be in.
+ *
+ * The windows above answer "should this server be up right now", which is the
+ * question a schedule was built for and not the only one people have. The rest are
+ * errands: restart it before anybody is on, tell everyone the server is going down
+ * in five minutes, take a backup at four in the morning, run the one command that
+ * resets the arena.
+ *
+ * There is deliberately no "wait five minutes" step. Panels that have one sleep
+ * inside the runner, and a sweep that sleeps is a sweep that is not sweeping - the
+ * schedules of every other server on the box wait behind it. The warning sequence
+ * everybody actually wants is two routines at two times, which says the same thing
+ * and cannot wedge anything.
+ */
+export type RoutineActionKind = "command" | "broadcast" | "restart" | "backup";
+
+export interface RoutineAction {
+    readonly kind: RoutineActionKind;
+    /** The command to run, or the message to send. Ignored by the two that take no
+     *  argument. */
+    readonly value: string;
+}
+
+export interface ScheduledRoutine {
+    readonly id: string;
+    /** What it is for, in the operator's words. Shown against its last result, so
+     *  a routine that failed is nameable rather than "the one at 4am". */
+    readonly name: string;
+    readonly enabled: boolean;
+    /** Days of the week it runs, 0 for Sunday. Empty means every day. */
+    readonly days: readonly number[];
+    /** Local time, "HH:MM", read in the schedule's own timezone. */
+    readonly at: string;
+    /** Run in order, and stopping at the first one that fails: the point of an
+     *  order is that the later steps assumed the earlier ones happened. */
+    readonly actions: readonly RoutineAction[];
+}
+
+/** What happened the last time a routine ran, kept so a schedule that quietly does
+ *  nothing can be told apart from one that is working. */
+export interface RoutineRun {
+    readonly at: string;
+    readonly ok: boolean;
+    readonly detail: string;
+}
+
+/** Where those results live in the install's config, keyed by routine id. */
+export const ROUTINE_RUNS_KEY = "routineRuns";
+
 export interface GameSchedule {
     readonly enabled: boolean;
     /** IANA zone the times are read in, e.g. "Europe/Madrid". */
@@ -40,6 +90,9 @@ export interface GameSchedule {
     /** How long with nobody on before a sleeping window stops the server. */
     readonly idleMinutes: number;
     readonly windows: readonly GameScheduleWindow[];
+    /** Errands to run at a time, which is a different question from whether the
+     *  server should be up. */
+    readonly routines: readonly ScheduledRoutine[];
 }
 
 /** Off until somebody sets one up, so an install that has never been near this
@@ -49,7 +102,8 @@ export const NO_SCHEDULE: GameSchedule = {
     timezone: "UTC",
     otherwise: "on",
     idleMinutes: 30,
-    windows: []
+    windows: [],
+    routines: []
 };
 
 /** Where the schedule lives inside the install's config. */
@@ -112,7 +166,8 @@ export function readSchedule(config: Record<string, unknown>): GameSchedule {
         timezone: typeof value.timezone === "string" && value.timezone.length > 0 ? value.timezone : "UTC",
         otherwise: readMode(value.otherwise) ?? "on",
         idleMinutes: clampIdle(typeof value.idleMinutes === "number" ? value.idleMinutes : NO_SCHEDULE.idleMinutes),
-        windows
+        windows,
+        routines: Array.isArray(value.routines) ? value.routines.flatMap(readRoutine) : []
     };
 }
 
@@ -234,4 +289,103 @@ export function describeSchedule(schedule: GameSchedule, at: Date): string {
     if (mode === "on") return "Right now: kept running.";
     if (mode === "off") return "Right now: kept stopped.";
     return `Right now: stopped once nobody has played for ${schedule.idleMinutes} minutes.`;
+}
+
+/** The longest a message or a command is allowed to be, so a settings blob cannot
+ *  become a way to push arbitrary length into a container. */
+const ROUTINE_VALUE_MAX = 400;
+
+function readAction(value: unknown): RoutineAction[] {
+    if (typeof value !== "object" || value === null) return [];
+    const entry = value as Partial<Record<keyof RoutineAction, unknown>>;
+    const kind = entry.kind;
+    if (kind !== "command" && kind !== "broadcast" && kind !== "restart" && kind !== "backup") return [];
+    const raw = typeof entry.value === "string" ? entry.value.trim().slice(0, ROUTINE_VALUE_MAX) : "";
+    // The two that take an argument are nothing without one: an empty broadcast is
+    // a message nobody sees, and an empty command is a step that silently does
+    // nothing in the middle of a sequence that assumed it did something.
+    if ((kind === "command" || kind === "broadcast") && raw.length === 0) return [];
+    return [{ kind, value: raw }];
+}
+
+function readRoutine(value: unknown): ScheduledRoutine[] {
+    if (typeof value !== "object" || value === null) return [];
+    const entry = value as Partial<Record<keyof ScheduledRoutine, unknown>>;
+    const at = typeof entry.at === "string" ? entry.at : "";
+    if (parseTime(at) === null) return [];
+    const actions = Array.isArray(entry.actions) ? entry.actions.flatMap(readAction) : [];
+    if (actions.length === 0) return [];
+    const days = Array.isArray(entry.days)
+        ? [...new Set(entry.days.filter((day): day is number => Number.isInteger(day) && day >= 0 && day <= 6))]
+        : [];
+    return [
+        {
+            id: typeof entry.id === "string" && entry.id.length > 0 ? entry.id : at,
+            name: typeof entry.name === "string" ? entry.name.slice(0, 80) : "",
+            enabled: entry.enabled !== false,
+            days: days.sort(),
+            at,
+            actions
+        }
+    ];
+}
+
+/** What was recorded about each routine's last run. */
+export function readRoutineRuns(config: Record<string, unknown>): Record<string, RoutineRun> {
+    const raw = config[ROUTINE_RUNS_KEY];
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return {};
+    const runs: Record<string, RoutineRun> = {};
+    for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
+        if (typeof value !== "object" || value === null) continue;
+        const entry = value as Record<string, unknown>;
+        if (typeof entry.at !== "string") continue;
+        runs[id] = {
+            at: entry.at,
+            ok: entry.ok !== false,
+            detail: typeof entry.detail === "string" ? entry.detail : ""
+        };
+    }
+    return runs;
+}
+
+/**
+ * Which routines are due right now.
+ *
+ * Due means the local clock has reached the minute it asks for and it has not
+ * already run in that minute. Both halves matter: the sweep runs about once a
+ * minute but not exactly, so an equality test alone would miss a routine whenever
+ * a pass landed a few seconds late - and a sweep that ran twice in the same minute
+ * would restart the server twice.
+ *
+ * So a routine fires when its minute has arrived and the last run was in an
+ * earlier minute, and a pass that was late still catches it. A pass that was very
+ * late - the box was asleep, the container was down for an hour - does not: an
+ * errand whose moment passed long ago is one nobody wants suddenly happening now.
+ */
+export function routinesDue(
+    schedule: GameSchedule,
+    at: Date,
+    runs: Record<string, RoutineRun>,
+    graceMinutes = 10
+): ScheduledRoutine[] {
+    if (!schedule.enabled) return [];
+    const { day, minutes } = zonedMoment(at, schedule.timezone);
+    return schedule.routines.filter((routine) => {
+        if (!routine.enabled) return false;
+        if (routine.days.length > 0 && !routine.days.includes(day)) return false;
+        const wanted = parseTime(routine.at);
+        if (wanted === null) return false;
+        const late = minutes - wanted;
+        if (late < 0 || late > graceMinutes) return false;
+
+        const last = runs[routine.id];
+        if (!last) return true;
+        const lastAt = Date.parse(last.at);
+        if (Number.isNaN(lastAt)) return true;
+        // Ran already for this occurrence: same day, and at or after the minute it
+        // was due. Compared in the same zone the routine is written in.
+        const previous = zonedMoment(new Date(lastAt), schedule.timezone);
+        const sameDay = at.getTime() - lastAt < 23 * 60 * 60 * 1000 && previous.day === day;
+        return !(sameDay && previous.minutes >= wanted);
+    });
 }

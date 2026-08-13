@@ -14,13 +14,25 @@
 
 import { prisma } from "@polaris/db";
 import { withTimeout } from "@polaris/core";
-import { getServerPlayers } from "./service";
+import { createWorldBackup } from "./world-service";
+import { getServerPlayers, runConsoleLine } from "./service";
+import { runArkCommand } from "@/lib/apps/ark/service";
 import { getArkPlayers } from "@/lib/apps/ark/service";
 import { gameOfServer } from "@/lib/apps/games-catalog";
 import { flushGameWorld } from "@/lib/apps/games-flush";
 import { setApplicationRunning } from "@/lib/deploy-service";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
-import { CHECKED_AT_KEY, EMPTY_SINCE_KEY, readSchedule, scheduleAction, type GameSchedule } from "./schedule";
+import {
+    CHECKED_AT_KEY,
+    EMPTY_SINCE_KEY,
+    ROUTINE_RUNS_KEY,
+    readRoutineRuns,
+    readSchedule,
+    routinesDue,
+    scheduleAction,
+    type GameSchedule,
+    type ScheduledRoutine
+} from "./schedule";
 
 /**
  * How long a server gets to say who is on it before the sweep stops waiting.
@@ -204,4 +216,103 @@ async function trackEmptiness(
     const now = at.toISOString();
     await patchInstallConfig(installedAppId, { [EMPTY_SINCE_KEY]: now }).catch(() => undefined);
     return now;
+}
+
+/**
+ * Run the errands whose moment has arrived.
+ *
+ * Separate from the windows above because it is a different question. A window
+ * decides whether the server should be up; a routine is a thing to do while it is -
+ * restart it before anybody is on, warn everyone, take a backup, run the command
+ * that resets the arena.
+ *
+ * Each routine's actions run in order and stop at the first failure, because the
+ * order is the point: a restart that happens whether or not the warning went out is
+ * not the sequence anybody wrote. What happened is recorded against the routine,
+ * which is the difference between a schedule that works and one that quietly does
+ * nothing at four in the morning with nobody watching.
+ */
+export async function runGameRoutines(ownerId: string, installedAppId: string, now: Date = new Date()): Promise<number> {
+    const install = await prisma.installedApp
+        .findFirst({
+            where: { id: installedAppId, ownerId, status: { not: "removed" } },
+            select: { config: true, catalogId: true }
+        })
+        .catch(() => null);
+    if (!install) return 0;
+
+    const config = readInstallConfig(install.config);
+    const due = routinesDue(readSchedule(config), now, readRoutineRuns(config));
+    if (due.length === 0) return 0;
+
+    const ark = gameOfServer(install.catalogId)?.id === "ark";
+    let ran = 0;
+    for (const routine of due) {
+        const outcome = await runRoutine(ownerId, installedAppId, routine, ark);
+        // Written whether it worked or not, and written first: a routine whose last
+        // step killed the process still has to be recorded as having started, or
+        // the next sweep runs the whole thing again.
+        await patchInstallConfig(installedAppId, {
+            [ROUTINE_RUNS_KEY]: {
+                ...readRoutineRuns(readInstallConfig(install.config)),
+                [routine.id]: { at: now.toISOString(), ok: outcome === null, detail: outcome ?? "" }
+            }
+        }).catch(() => undefined);
+        ran += 1;
+    }
+    return ran;
+}
+
+/** Every action in order, stopping at the first that fails. Returns why it
+ *  stopped, or null when it all went through. */
+async function runRoutine(
+    ownerId: string,
+    installedAppId: string,
+    routine: ScheduledRoutine,
+    ark: boolean
+): Promise<string | null> {
+    for (const action of routine.actions) {
+        try {
+            switch (action.kind) {
+                case "broadcast":
+                    // Each game says it its own way, and saying it the other way is
+                    // a message nobody in the game ever sees.
+                    if (ark) await runArkCommand(ownerId, installedAppId, `Broadcast ${action.value}`);
+                    else await runConsoleLine(ownerId, installedAppId, `say ${action.value}`);
+                    break;
+                case "command":
+                    if (ark) await runArkCommand(ownerId, installedAppId, action.value);
+                    else await runConsoleLine(ownerId, installedAppId, action.value);
+                    break;
+                case "backup":
+                    // ARK has no backup in Polaris at all, so this is a step that
+                    // would silently do nothing - said out loud instead.
+                    if (ark) return "This server has no backups to take";
+                    await createWorldBackup(ownerId, installedAppId);
+                    break;
+                case "restart":
+                    // Flushed first, exactly as a scheduled stop is: a restart that
+                    // drops the last few minutes of a world is a restart nobody
+                    // asked for.
+                    await flushGameWorld(ownerId, installedAppId).catch(() => undefined);
+                    await setApplicationRunning(await applicationOf(ownerId, installedAppId), ownerId, false);
+                    await setApplicationRunning(await applicationOf(ownerId, installedAppId), ownerId, true);
+                    break;
+            }
+        } catch (caught) {
+            return caught instanceof Error ? caught.message : "That step did not work";
+        }
+    }
+    return null;
+}
+
+/** The deploy behind an install, which the restart action needs and nothing else
+ *  in this file did. */
+async function applicationOf(ownerId: string, installedAppId: string): Promise<string> {
+    const install = await prisma.installedApp.findFirst({
+        where: { id: installedAppId, ownerId },
+        select: { applicationId: true }
+    });
+    if (!install?.applicationId) throw new Error("This server has not been deployed yet");
+    return install.applicationId;
 }

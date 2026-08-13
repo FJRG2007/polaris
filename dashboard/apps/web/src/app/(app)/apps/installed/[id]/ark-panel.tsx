@@ -380,6 +380,7 @@ export function ArkPanel({
             {tab === "settings" && (
                 <div className="flex flex-col gap-4">
                     <MinecraftSchedule
+                        runs={game?.routineRuns ?? null}
                         installedAppId={installedAppId}
                         schedule={game?.schedule ?? NO_SCHEDULE}
                         state={game?.scheduleState ?? null}

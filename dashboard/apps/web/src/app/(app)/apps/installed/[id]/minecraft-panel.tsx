@@ -439,6 +439,7 @@ export function MinecraftPanel({
                         onSaved={reloadSettings}
                     />
                     <MinecraftSchedule
+                        runs={game?.routineRuns ?? null}
                         installedAppId={installedAppId}
                         state={game?.scheduleState ?? null}
                         schedule={game?.schedule ?? NO_SCHEDULE}

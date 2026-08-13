@@ -520,7 +520,29 @@ const scheduleSchema = z.object({
         timezone: z.string().min(1).max(64).refine(isKnownTimezone, "That is not a time zone this server knows"),
         otherwise: z.enum(["on", "off", "sleep"]),
         idleMinutes: z.number().int().min(MIN_IDLE_MINUTES).max(MAX_IDLE_MINUTES),
-        windows: z.array(scheduleWindowSchema).max(24)
+        windows: z.array(scheduleWindowSchema).max(24),
+        // Bounded like the windows are, and for the same reason: this is written
+        // into a settings blob that something later reads in a loop.
+        routines: z
+            .array(
+                z.object({
+                    id: z.string().min(1).max(64),
+                    name: z.string().max(80),
+                    enabled: z.boolean(),
+                    days: z.array(z.number().int().min(0).max(6)).max(7),
+                    at: z.string().regex(/^\d{2}:\d{2}$/, "A time like 04:00"),
+                    actions: z
+                        .array(
+                            z.object({
+                                kind: z.enum(["command", "broadcast", "restart", "backup"]),
+                                value: z.string().max(400)
+                            })
+                        )
+                        .min(1)
+                        .max(8)
+                })
+            )
+            .max(12)
     })
 });
 

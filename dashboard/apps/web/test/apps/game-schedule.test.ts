@@ -15,7 +15,10 @@ const OVERNIGHT: GameSchedule = {
     timezone: "Europe/Madrid",
     otherwise: "on",
     idleMinutes: 30,
-    windows: [{ days: [], from: "00:00", to: "10:00", mode: "sleep" }]
+    windows: [{ days: [], from: "00:00", to: "10:00", mode: "sleep" }],
+    // A schedule with no errands attached, which is what every one of these was
+    // until routines existed and is still the ordinary case.
+    routines: []
 };
 
 describe("zonedMoment", () => {

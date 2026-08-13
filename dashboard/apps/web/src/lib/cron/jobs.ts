@@ -23,7 +23,7 @@ import { getServerPlayers } from "@/lib/apps/minecraft/service";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { sweepGameActivity } from "@/lib/apps/games-activity-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
-import { sweepGameSchedules } from "@/lib/apps/minecraft/schedule-service";
+import { runGameRoutines, sweepGameSchedules } from "@/lib/apps/minecraft/schedule-service";
 import { isGameServerApp, syncFirewallBans } from "@/lib/apps/games-service";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
 
@@ -88,6 +88,11 @@ async function runGameActivity(): Promise<{ started: number; stopped: number; ar
         const swept = await sweepGameSchedules(ownerId, now, {
             ...(activity ? { known: activity.known } : {})
         }).catch(() => null);
+        // After the windows, not before: a routine that restarts a server should
+        // not race the sweep that was about to stop it for being empty.
+        for (const installedAppId of activity?.known.keys() ?? []) {
+            await runGameRoutines(ownerId, installedAppId, now).catch(() => 0);
+        }
         if (activity) {
             arrived += activity.arrived;
             left += activity.left;
