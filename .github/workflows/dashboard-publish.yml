@@ -34,6 +34,7 @@ on:
       - "dashboard/packages/**"
       - "dashboard/cli/**"
       - "dashboard/patches/**"
+      - "dashboard/scripts/**"
       - "dashboard/docker/**"
       - "dashboard/mdns/**"
       - "dashboard/services/messaging-bridge/**"
@@ -49,6 +50,15 @@ on:
 permissions:
   contents: read
   packages: write
+
+# One publish at a time. An image is now pushed untagged and named minutes later by
+# the `tag` job, so two overlapping runs interleave: the older one's `tag` can land
+# after the newer one's and move `latest` back to the commit before it. Cancellation
+# stays off - a run stopped between the push and the tag leaves images in the
+# registry that nothing will ever name.
+concurrency:
+  group: dashboard-publish
+  cancel-in-progress: false
 
 jobs:
   # Decide which images need rebuilding from the paths that changed in this push.
@@ -92,7 +102,7 @@ jobs:
           # and published no image at all.
           has() { grep -qE "$1" "$CHANGED"; }
           if has '^\.github/workflows/dashboard-publish\.yml$'; then all; exit 0; fi
-          has '^dashboard/(apps|packages|cli|patches)/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$' && out web true || out web false
+          has '^dashboard/(apps|packages|cli|patches|scripts)/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$' && out web true || out web false
           has '^dashboard/mdns/' && out mdns true || out mdns false
           has '^crates/polaris-hostd/|^Cargo\.(toml|lock)$' && out hostd true || out hostd false
           has '^dashboard/docker/updater/' && out updater true || out updater false

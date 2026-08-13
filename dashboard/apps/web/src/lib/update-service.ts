@@ -99,7 +99,7 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
  *  path filter). Used only to tell "a build is pending" from "a commit landed that
  *  never produces a new image" - a daemon-only or docs commit is not an update. */
 const WEB_IMAGE_PATHS =
-    /^dashboard\/(apps|packages|cli|patches)\/|^dashboard\/docker\/(Dockerfile|entrypoint\.sh)|^dashboard\/package(-lock)?\.json$|^\.github\/workflows\/dashboard-publish\.yml$/;
+    /^dashboard\/(apps|packages|cli|patches|scripts)\/|^dashboard\/docker\/(Dockerfile|entrypoint\.sh)|^dashboard\/package(-lock)?\.json$|^\.github\/workflows\/dashboard-publish\.yml$/;
 
 /** Check runs that decide whether the dashboard image is safe to install (mirrors
  *  dashboard-publish.yml: `changes` picks the images, `web` builds this one, and

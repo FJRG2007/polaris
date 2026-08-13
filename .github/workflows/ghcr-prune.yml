@@ -1,9 +1,10 @@
 name: Prune published images
 
-# Every push of `latest` leaves the image it replaced behind as an untagged
+# Every push of a tag leaves the manifest it replaced behind as an untagged
 # version, and those pile up forever: the registry keeps them, nothing pulls
 # them, and they still count against the account. This deletes them, so each
-# package holds exactly what `latest` resolves to now and nothing else.
+# package holds what its live tags resolve to now and nothing else. That is
+# `latest` for the shipped images, and one tag per image for the build cache.
 #
 # It runs after a publish rather than inside it: the publish only rebuilds the
 # images whose sources changed, and the versions left behind are worth clearing
@@ -16,6 +17,13 @@ name: Prune published images
 # child - deleting those would leave `latest` pointing at manifests the registry
 # no longer holds, which breaks the pull for everyone. When the tag cannot be
 # read at all the package is skipped rather than guessed at.
+#
+# Nor is anything pushed in the last hour. The publish pushes each image by digest
+# and names it minutes later, once the suites are green, so a digest with no tag on
+# it is as likely to be a build waiting for its name as a build that lost it - and
+# this run's picture of what `latest` resolves to is a snapshot taken before the
+# other run moved it. An hour is longer than any publish takes; what it protects
+# stops being protected on the next run.
 #
 # A rollback is not affected: update.sh returns to the image already on the box,
 # it does not fetch the old digest again. An installation that has lost its local
@@ -53,15 +61,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Delete every version that is not latest
+      - name: Delete every version nothing points at
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OWNER: ${{ github.repository_owner }}
           DRY_RUN: ${{ inputs.dry_run }}
-          # polaris-buildcache is deliberately not here. It holds the images'
-          # buildkit cache, whose tags (web, guard, hostd-amd64, ...) are none of
-          # them `latest`, so this would delete the cache after every publish and
-          # make the next build of each image a cold one.
+          # The shipped images: `latest` is the only tag any of them carries, so
+          # everything else in the package is a build it replaced.
           PACKAGES: >-
             polaris-dashboard
             polaris-mdns
@@ -69,11 +75,21 @@ jobs:
             polaris-updater
             polaris-messaging-bridge
             polaris-edge-guard
+          # The buildkit cache, pruned by the other rule below. Its tags (web,
+          # guard, hostd-amd64, ...) are none of them `latest` and all of them
+          # live, so keeping only what `latest` names would delete the cache after
+          # every publish and make the next build of each image a cold one. What
+          # does pile up here is the manifest each `cache-to` push leaves behind
+          # when it moves its tag: untagged, one per image per build, and nothing
+          # else was ever going to collect it.
+          CACHE_PACKAGES: polaris-buildcache
         run: |
           set -uo pipefail
           repo=$(echo "$OWNER" | tr "[:upper:]" "[:lower:]")
           failed=0
           removed=0
+          # Anything newer than this belongs to a publish that may still be running.
+          cutoff=$(date -u -d "-60 minutes" +%s)
 
           # Deleting is a write like any other, and a backlog is thousands of them
           # in a row - which is what the registry throttles rather than refuses,
@@ -93,23 +109,30 @@ jobs:
             done
           }
 
-          for package in $PACKAGES; do
+          for package in $PACKAGES $CACHE_PACKAGES; do
             echo "::group::$package"
+            case " $CACHE_PACKAGES " in *" $package "*) cache=true;; *) cache=false;; esac
 
-            # The tag as the registry resolves it now. Everything it names is
-            # load-bearing; anything else in the package is a replaced build.
-            index=$(docker buildx imagetools inspect "ghcr.io/$repo/$package:latest" --raw 2>/dev/null)
-            if [ -z "$index" ]; then
-              echo "no latest tag to read - skipped rather than guessed at"
-              echo "::endgroup::"
-              continue
+            keep=""
+            if [ "$cache" = false ]; then
+              # The tag as the registry resolves it now. Everything it names is
+              # load-bearing; anything else in the package is a replaced build.
+              index=$(docker buildx imagetools inspect "ghcr.io/$repo/$package:latest" --raw 2>/dev/null)
+              if [ -z "$index" ]; then
+                echo "no latest tag to read - skipped rather than guessed at"
+                echo "::endgroup::"
+                continue
+              fi
+              keep=$(echo "$index" | jq -r '.manifests[]?.digest')
+              echo "latest references $(echo "$keep" | grep -c . || true) manifest(s)"
             fi
-            keep=$(echo "$index" | jq -r '.manifests[]?.digest')
-            echo "latest references $(echo "$keep" | grep -c . || true) manifest(s)"
             refused=0
 
+            # created_at before the tags: with a tab IFS the shell collapses the
+            # empty field an untagged version writes, so a column after it would
+            # be read as the tags of a version that has none.
             if ! versions=$(gh api --paginate "/users/$OWNER/packages/container/$package/versions" \
-              --jq '.[] | [.id, .name, ((.metadata.container.tags // []) | join(","))] | @tsv' 2>&1); then
+              --jq '.[] | [.id, .name, .created_at, ((.metadata.container.tags // []) | join(","))] | @tsv' 2>&1); then
               # A package nobody has published yet has nothing to prune, and is
               # not a reason to hold the run red until it exists.
               case "$versions" in
@@ -120,13 +143,25 @@ jobs:
               continue
             fi
 
-            while IFS=$'\t' read -r id digest tags; do
+            while IFS=$'\t' read -r id digest created tags; do
               [ -n "${id:-}" ] || continue
-              case ",${tags:-}," in *,latest,*) continue;; esac
-              # Fed by a here-string, not a pipe: `grep -q` closing the pipe on
-              # its first hit fails the writer under `pipefail`, and a digest
-              # that is on the keep list would read as one that is not.
-              grep -qx "$digest" <<<"$keep" && continue
+              if [ "$cache" = true ]; then
+                # Every tag this package carries is a cache another build reads.
+                [ -z "${tags:-}" ] || continue
+              else
+                case ",${tags:-}," in *,latest,*) continue;; esac
+                # Fed by a here-string, not a pipe: `grep -q` closing the pipe on
+                # its first hit fails the writer under `pipefail`, and a digest
+                # that is on the keep list would read as one that is not.
+                grep -qx "$digest" <<<"$keep" && continue
+              fi
+              # An unreadable date is treated as recent: too new to delete is a
+              # wasted run, too old is a digest pulled out from under a publish.
+              pushed=$([ -n "${created:-}" ] && date -u -d "$created" +%s 2>/dev/null || true)
+              if [ -z "$pushed" ] || [ "$pushed" -gt "$cutoff" ]; then
+                echo "$digest was pushed minutes ago - left for the next run"
+                continue
+              fi
               if [ "${DRY_RUN:-false}" = "true" ]; then
                 echo "would delete $digest ${tags:+(tagged $tags)}"
                 continue

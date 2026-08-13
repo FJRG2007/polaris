@@ -100,6 +100,7 @@ function build(name) {
 
 const started = Date.now();
 const waves = planWaves(readPackages());
+let broke = false;
 
 for (const [index, wave] of waves.entries()) {
     log(`wave ${index + 1}/${waves.length}: ${wave.join(", ")}`);
@@ -109,9 +110,14 @@ for (const [index, wave] of waves.entries()) {
         for (const failure of failed) {
             process.stderr.write(`\n[build-packages] ${failure.name} failed\n${failure.output}\n`);
         }
-        process.exit(1);
+        // Not process.exit: stderr is a pipe under CI and under `npm run`, so those
+        // writes are asynchronous and exiting discards whatever is still queued -
+        // which is exactly the long compiler dump they were buffered to keep intact.
+        process.exitCode = 1;
+        broke = true;
+        break;
     }
     log(results.map((r) => `${r.name} ${r.seconds}s`).join(", "));
 }
 
-log(`done in ${((Date.now() - started) / 1000).toFixed(1)}s`);
+if (!broke) log(`done in ${((Date.now() - started) / 1000).toFixed(1)}s`);
