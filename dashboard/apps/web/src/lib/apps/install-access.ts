@@ -77,7 +77,15 @@ export async function requireGameServerOwner(
  *  to draw. Only the games grants: the deploy ones belong to the install's own
  *  lifecycle, which the game screens do not offer. */
 export async function gamePermissionsFor(user: SessionUser, installedAppId: string): Promise<core.Permission[]> {
-    return heldOn(user, installRef(installedAppId), ["games.read", "games.moderate", "games.manage"]);
+    // Every permission a game screen is gated on has to be asked for here. This is
+    // the list the tab bar is built from, so one left out is a tab nobody can see -
+    // including the person who owns the server.
+    return heldOn(user, installRef(installedAppId), [
+        "games.read",
+        "games.moderate",
+        "games.console",
+        "games.manage"
+    ]);
 }
 
 /** Ids of the installs this user reaches beyond the ones they own. */
