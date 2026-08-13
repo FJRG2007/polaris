@@ -316,6 +316,59 @@ export function DeployCanvas({
         return { x: clientX - (rect?.left ?? 0), y: clientY - (rect?.top ?? 0) };
     }, []);
 
+    /** Scroll the board as little as it takes to put a card inside the frame, and
+     *  nothing at all when it is already there. */
+    const revealCard = useCallback((point: Point) => {
+        const container = containerRef.current;
+        if (!container) return;
+        const pad = 24;
+        const { scrollLeft, scrollTop, clientWidth, clientHeight } = container;
+        if (point.x - pad < scrollLeft) container.scrollLeft = Math.max(0, point.x - pad);
+        else if (point.x + NODE_W + pad > scrollLeft + clientWidth) {
+            container.scrollLeft = point.x + NODE_W + pad - clientWidth;
+        }
+        if (point.y - pad < scrollTop) container.scrollTop = Math.max(0, point.y - pad);
+        else if (point.y + NODE_H + pad > scrollTop + clientHeight) {
+            container.scrollTop = point.y + NODE_H + pad - clientHeight;
+        }
+    }, []);
+
+    /**
+     * Open the board on the services rather than on the corner it starts in.
+     *
+     * The board is a fixed coordinate space that opens at its top-left corner, and a
+     * seeded node sits some 300px into it - past the right edge of a phone, and past
+     * a narrow window on a desktop. Nothing said the board scrolled, so a project
+     * with services in it opened on an empty stretch of dots and had to be dragged
+     * around until they turned up. Framed once per environment, so panning the board
+     * by hand is never undone underneath whoever is doing it.
+     */
+    const framedFor = useRef<string | null>(null);
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container || framedFor.current === environment.id) return;
+        const points = nodes.map((node) => pos[node.id]).filter((point): point is Point => Boolean(point));
+        if (points.length === 0) return;
+        framedFor.current = environment.id;
+        // Centred on the services, unless they spread wider than the frame - then the
+        // first one is put against the edge, so a phone opens on a whole card instead
+        // of on the gap between two halves.
+        const offset = (low: number, high: number, frame: number, extentOf: number): number =>
+            Math.max(0, Math.min(high - low > frame ? low - 24 : (low + high) / 2 - frame / 2, extentOf - frame));
+        container.scrollLeft = offset(
+            Math.min(...points.map((point) => point.x)),
+            Math.max(...points.map((point) => point.x + NODE_W)),
+            container.clientWidth,
+            container.scrollWidth
+        );
+        container.scrollTop = offset(
+            Math.min(...points.map((point) => point.y)),
+            Math.max(...points.map((point) => point.y + NODE_H)),
+            container.clientHeight,
+            container.scrollHeight
+        );
+    }, [environment.id, nodes, pos]);
+
     // Where the board was last right-clicked, and where a service created from that
     // menu should land (armed only when the user actually picks a type).
     const menuSpawnRef = useRef<Point | null>(null);
@@ -339,7 +392,12 @@ export function DeployCanvas({
         }
         setPos(next);
         persist(next, links);
-    }, [nodes, links, persist]);
+        // A service made from the toolbar lands wherever there is room, which can be
+        // outside the frame - and a card nobody can see reads as a service that was
+        // never created. Waits a frame for the board to grow to its new extent.
+        const landed = missing[0] ? next[missing[0].id] : undefined;
+        if (landed) requestAnimationFrame(() => revealCard(landed));
+    }, [nodes, links, persist, revealCard]);
 
     function openNewService(view: ServiceView) {
         pendingSpawnRef.current = menuSpawnRef.current;
