@@ -27,7 +27,10 @@ import { StorageError, type StorageDriver } from "@polaris/storage";
 export async function deleteDriveEntry(driver: StorageDriver, path: string): Promise<void> {
     const target = normalizeRelPath(path);
     if (target === "") {
-        throw new StorageError("permission_denied", "The whole connection cannot be deleted at once");
+        throw new StorageError(
+            "permission_denied",
+            "The whole connection cannot be deleted at once"
+        );
     }
     // Reached by name rather than by recursion, so this is a caller with a bug or a
     // visitor guessing at the one path the browser never shows them. Neither gets it,
@@ -46,5 +49,7 @@ export async function deleteDriveEntry(driver: StorageDriver, path: string): Pro
  * is the bin and the quarantine.
  */
 export function deletableChildren(paths: readonly string[]): string[] {
-    return paths.map((path) => normalizeRelPath(path)).filter((path) => path !== "" && !isReservedPath(path));
+    return paths
+        .map((path) => normalizeRelPath(path))
+        .filter((path) => path !== "" && !isReservedPath(path));
 }

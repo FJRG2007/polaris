@@ -246,7 +246,9 @@ export async function setUnasShareAction(
 }
 
 /** What removing this connection would take with it, for the confirmation dialog. */
-export async function connectionRemovalPlanAction(connectionId: string): Promise<ConnectionRemovalPlan | null> {
+export async function connectionRemovalPlanAction(
+    connectionId: string
+): Promise<ConnectionRemovalPlan | null> {
     const user = await requirePermission("connections.manage");
     return getConnectionRemovalPlan(user.id, connectionId);
 }

@@ -97,8 +97,8 @@ export function DeleteDropPointDialog({
                         </div>
                     ) : (
                         <p className="rounded-md border border-border p-3 text-xs text-muted-foreground">
-                            This one collects straight into {target?.connectionName}, so it has no folder of
-                            its own. Whatever was collected stays where it is.
+                            This one collects straight into {target?.connectionName}, so it has no
+                            folder of its own. Whatever was collected stays where it is.
                         </p>
                     )}
 

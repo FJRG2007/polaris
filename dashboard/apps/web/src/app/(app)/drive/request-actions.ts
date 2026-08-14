@@ -23,7 +23,12 @@ import { StorageError, type StorageDriver } from "@polaris/storage";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
 import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
-import { cidrOrIp, createFileRequestSchema, normalizeRelPath, randomDropPointName } from "@polaris/core";
+import {
+    cidrOrIp,
+    createFileRequestSchema,
+    normalizeRelPath,
+    randomDropPointName
+} from "@polaris/core";
 
 /** The shared base folder every drop point's own folder is grouped under. */
 const DROP_POINTS_BASE = "Drop Points";
@@ -145,48 +150,49 @@ export async function createFileRequestAction(
 }
 
 /** Validated shape of an edit to a drop point's guardrails (owner-only). */
-const updateDropPointSchema = z.object({
-    title: z.string().trim().min(1).max(200).optional(),
-    instructions: z.string().trim().max(2000).nullable().optional(),
-    requireLogin: z.boolean().optional(),
-    password: z.string().nullable().optional(),
-    maxSizeBytes: z.number().int().positive().optional(),
-    minSizeBytes: z.number().int().nonnegative().nullable().optional(),
-    maxFiles: z.number().int().positive().nullable().optional(),
-    allowedExtensions: z.array(z.string().trim().toLowerCase()).optional(),
-    deniedExtensions: z.array(z.string().trim().toLowerCase()).optional(),
-    allowedMimeTypes: z.array(z.string().trim()).optional(),
-    allowedCidrs: z.array(cidrOrIp).optional(),
-    allowedCountries: z
-        .array(
-            z
-                .string()
-                .trim()
-                .toUpperCase()
-                .regex(/^[A-Z]{2}$/)
-        )
-        .optional(),
-    allowedContinents: z
-        .array(
-            z
-                .string()
-                .trim()
-                .toUpperCase()
-                .regex(/^[A-Z]{2}$/)
-        )
-        .optional(),
-    allowedUsers: z
-        .array(z.string().trim().toLowerCase())
-        .transform((values) =>
-            Array.from(new Set(values.map((value) => value.replace(/^@+/, "")).filter(Boolean)))
-        )
-        .optional(),
-    startsAt: z.string().nullable().optional(),
-    allowUploaderDelete: z.boolean().optional(),
-    allowOverwrite: z.boolean().optional(),
-    uploaderDeleteWindowSeconds: z.number().int().nonnegative().nullable().optional(),
-    expiresAt: z.string().nullable().optional()
-})
+const updateDropPointSchema = z
+    .object({
+        title: z.string().trim().min(1).max(200).optional(),
+        instructions: z.string().trim().max(2000).nullable().optional(),
+        requireLogin: z.boolean().optional(),
+        password: z.string().nullable().optional(),
+        maxSizeBytes: z.number().int().positive().optional(),
+        minSizeBytes: z.number().int().nonnegative().nullable().optional(),
+        maxFiles: z.number().int().positive().nullable().optional(),
+        allowedExtensions: z.array(z.string().trim().toLowerCase()).optional(),
+        deniedExtensions: z.array(z.string().trim().toLowerCase()).optional(),
+        allowedMimeTypes: z.array(z.string().trim()).optional(),
+        allowedCidrs: z.array(cidrOrIp).optional(),
+        allowedCountries: z
+            .array(
+                z
+                    .string()
+                    .trim()
+                    .toUpperCase()
+                    .regex(/^[A-Z]{2}$/)
+            )
+            .optional(),
+        allowedContinents: z
+            .array(
+                z
+                    .string()
+                    .trim()
+                    .toUpperCase()
+                    .regex(/^[A-Z]{2}$/)
+            )
+            .optional(),
+        allowedUsers: z
+            .array(z.string().trim().toLowerCase())
+            .transform((values) =>
+                Array.from(new Set(values.map((value) => value.replace(/^@+/, "")).filter(Boolean)))
+            )
+            .optional(),
+        startsAt: z.string().nullable().optional(),
+        allowUploaderDelete: z.boolean().optional(),
+        allowOverwrite: z.boolean().optional(),
+        uploaderDeleteWindowSeconds: z.number().int().nonnegative().nullable().optional(),
+        expiresAt: z.string().nullable().optional()
+    })
     .refine(
         (value) =>
             value.minSizeBytes == null ||
@@ -254,7 +260,8 @@ export async function unlockFileRequestAction(
 ): Promise<{ error?: string }> {
     const request = await dropPoints.resolveFileRequestByToken(token);
     if (!request) return { error: "This link is not available." };
-    if (!dropPoints.fileRequestUsability(request).ok) return { error: "This link is no longer available." };
+    if (!dropPoints.fileRequestUsability(request).ok)
+        return { error: "This link is no longer available." };
 
     const limitKey = `drop-unlock:${request.id}:${hashForLog(await clientIp()) ?? "unknown"}`;
     if (!(await rateLimit(limitKey, 10, 15 * 60 * 1000)).ok) {
@@ -337,10 +344,7 @@ export async function deleteFileRequestAction(
             } finally {
                 await driver.dispose();
             }
-            await invalidateFolderSizes(
-                request.destinationConnectionId,
-                request.destinationPath
-            );
+            await invalidateFolderSizes(request.destinationConnectionId, request.destinationPath);
         } catch (caught) {
             if (caught instanceof DriveAccessError)
                 return { error: "You cannot delete that folder" };
@@ -407,8 +411,24 @@ const templateConfigSchema = z
         requireLogin: z.boolean().optional(),
         allowedUsers: z.array(z.string()).optional(),
         allowedCidrs: z.array(cidrOrIp).optional(),
-        allowedCountries: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)).optional(),
-        allowedContinents: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)).optional(),
+        allowedCountries: z
+            .array(
+                z
+                    .string()
+                    .trim()
+                    .toUpperCase()
+                    .regex(/^[A-Z]{2}$/)
+            )
+            .optional(),
+        allowedContinents: z
+            .array(
+                z
+                    .string()
+                    .trim()
+                    .toUpperCase()
+                    .regex(/^[A-Z]{2}$/)
+            )
+            .optional(),
         allowUploaderDelete: z.boolean().optional(),
         allowOverwrite: z.boolean().optional(),
         uploaderDeleteWindowSeconds: z.number().int().nonnegative().nullable().optional()

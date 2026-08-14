@@ -35,7 +35,10 @@ vi.mock("@/lib/session", () => ({ requirePermission: async () => ({ id: OWNER })
 vi.mock("@/lib/audit-service", () => ({ recordAudit }));
 vi.mock("@/lib/domain-service", () => ({ sharingBaseUrl: async () => "https://polaris.test" }));
 vi.mock("@/lib/public-reach", () => ({ ensureShareReachability: async () => undefined }));
-vi.mock("@/lib/request-context", () => ({ clientIp: async () => "1.2.3.4", hashForLog: () => "h" }));
+vi.mock("@/lib/request-context", () => ({
+    clientIp: async () => "1.2.3.4",
+    hashForLog: () => "h"
+}));
 vi.mock("@/lib/drive-folder-size", () => ({ invalidateFolderSizes }));
 vi.mock("@/lib/rate-limit-service", () => ({
     rateLimit: async () => ({ ok: true }),
