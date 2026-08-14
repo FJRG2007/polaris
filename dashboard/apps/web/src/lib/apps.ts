@@ -16,6 +16,7 @@ import {
     CalendarRange,
     ChartColumn,
     Clock,
+    Code2,
     Contact,
     Container,
     Database,
@@ -43,6 +44,7 @@ import {
     ScanLine,
     Scale,
     ScrollText,
+    SendHorizontal,
     Server,
     Settings,
     ShieldCheck,
@@ -126,6 +128,14 @@ export const POLARIS_APPS: AppEntry[] = [
         // to whichever app happens to be first in this list.
         match: ["/favorites", "/trash"],
         permission: "drive.read"
+    },
+    {
+        id: "vault",
+        label: "Vault",
+        description: "Passwords, keys and secrets, encrypted in your browser",
+        icon: KeyRound,
+        href: "/vault",
+        permission: "vault.use"
     },
     {
         id: "apps",
@@ -246,8 +256,45 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         { label: "Favorites", href: "/favorites", icon: Star, keywords: ["starred"] },
         { label: "Recent", href: "/drive/recent", icon: Clock },
         { label: "Shared links", href: "/drive/shared-links", icon: Link2, keywords: ["shares", "public"] },
-        { label: "Drop points", href: "/drive/drop-points", icon: Inbox, keywords: ["file requests", "uploads"] },
+        {
+            label: "Snippets",
+            href: "/drive/snippets",
+            icon: Code2,
+            keywords: ["paste", "pastebin", "code", "text", "env", "secret", "gist", "share text"]
+        },
+        {
+            label: "Drop points",
+            href: "/drive/drop-points",
+            icon: Inbox,
+            keywords: ["file requests", "uploads", "ask for text", "collect"]
+        },
         { label: "Trash", href: "/trash", icon: Trash2, keywords: ["deleted", "bin"] }
+    ],
+    vault: [
+        {
+            label: "Items",
+            href: "/vault",
+            icon: KeyRound,
+            keywords: ["passwords", "logins", "notes", "cards", "identities", "ssh keys", "bitwarden"]
+        },
+        {
+            label: "Sends",
+            href: "/vault/sends",
+            icon: SendHorizontal,
+            keywords: ["share a secret", "one time", "send", "hand over"]
+        },
+        {
+            label: "Connect an app",
+            href: "/vault/clients",
+            icon: MonitorSmartphone,
+            keywords: ["bitwarden", "browser extension", "cli", "desktop", "mobile", "sync"]
+        },
+        {
+            label: "Settings",
+            href: "/vault/settings",
+            icon: SlidersHorizontal,
+            keywords: ["master password", "kdf", "argon2", "export", "delete vault"]
+        }
     ],
     apps: [
         { label: "Deploy", href: "/apps/deploy", icon: Rocket, keywords: ["projects", "services", "docker"] },

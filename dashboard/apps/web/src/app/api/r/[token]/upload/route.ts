@@ -13,6 +13,7 @@ import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
 import { getSession } from "@/lib/session";
 import { dymoIpAllowed } from "@/lib/dymo-service";
+import { notify } from "@/lib/notifications/dispatch";
 import { geoAllowedForIp } from "@/lib/geo-service";
 import { scanDropPointUpload } from "@/lib/scan-service";
 import * as fileRequests from "@/lib/file-request-service";
@@ -213,6 +214,17 @@ export async function PUT(
         const visitorKey = (await cookies()).get(fileRequests.fileRequestVisitCookie(fileRequest.id))?.value;
         if (visitorKey) await fileRequests.bumpVisitUpload(fileRequest.id, visitorKey);
         const deleteToken = fileRequests.signSubmissionDelete(submission.id, loadEnv().POLARIS_AUTH_SECRET);
+
+        // Tell the owner. A drop point exists to collect something somebody is
+        // waiting for, and until this there was nothing to say it had arrived
+        // short of opening the page and looking.
+        await notify({
+            userId: fileRequest.ownerId,
+            event: "drive.dropPoint.received",
+            title: `A file arrived at "${fileRequest.title}"`,
+            body: safeName,
+            href: `/drive/drop-points/${fileRequest.id}`
+        });
 
         return Response.json({
             ok: true,

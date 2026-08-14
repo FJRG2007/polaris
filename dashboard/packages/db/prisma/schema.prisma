@@ -84,6 +84,10 @@ model User {
     shareInvites      ShareInvite[]
     fileRequests      FileRequest[]
     submissions       FileRequestSubmission[]
+    snippets           Snippet[]
+    snippetsSubmitted  Snippet[]              @relation("SnippetSubmitter")
+    snippetInvites     SnippetInvite[]
+    textRequests       TextRequest[]
     dropPointVisits   FileRequestVisit[]
     dropPointTemplates DropPointTemplate[]
     uploads           UploadSession[]
@@ -1917,6 +1921,170 @@ model FileRequestSubmission {
     storedNode  Node?       @relation(fields: [storedNodeId], references: [id], onDelete: SetNull)
 
     @@index([requestId])
+}
+
+// ---------------------------------------------------------------------------
+// Snippets (text out) and text drop points (text in)
+// ---------------------------------------------------------------------------
+
+// A piece of text - a config file, an .env, a stack trace, a few files of code -
+// that can be handed out by link the same way a file is.
+//
+// It is not a Drive file and deliberately does not become one: a snippet has no
+// storage connection behind it, and writing secrets onto a NAS in the clear to
+// get a share link would be the wrong trade. The bytes live here instead,
+// envelope-encrypted under the master key, which is what lets Polaris highlight
+// and search them.
+//
+// The link columns are the same shape as Share's, and the same guards in
+// lib/link-guards run over them. The snippet IS the shared thing, so they sit on
+// this row rather than on a table beside it: a paste with no link is just one
+// whose visibility is private.
+model Snippet {
+    id          String  @id @default(uuid(7)) @db.Uuid
+    ownerId     String  @db.Uuid
+    title       String
+    description String?
+    // private | link | invite
+    visibility  String  @default("private")
+
+    // SHA-256 of the link token; lookups are by hash so a dump yields no links.
+    // Null until the snippet is shared at all.
+    tokenHash      String?   @unique
+    // The token, envelope-encrypted, so the owner can reveal the link again.
+    encryptedToken Bytes?
+    tokenNonce     Bytes?
+    tokenKeyId     String?
+    // scrypt hash of the optional link password.
+    passwordHash   String?
+    maxViews       Int?
+    viewCount      Int       @default(0)
+    expiresAt      DateTime?
+    revokedAt      DateTime?
+    // Whether serving it once wipes the stored bytes. Distinct from maxViews = 1,
+    // which only stops answering: this leaves nothing behind to be read out of a
+    // later backup, which is the whole point of a one-time secret.
+    burnAfterRead  Boolean   @default(false)
+    // Set when the sender sealed the text in their browser under a key that rides
+    // in the URL fragment. Polaris then holds ciphertext it cannot read, so the
+    // viewer decrypts client-side and nothing here can preview or search it.
+    clientSealed   Boolean   @default(false)
+
+    // JSON string arrays, read through the same parser as a share's.
+    allowedCidrs      String @default("[]")
+    allowedCountries  String @default("[]")
+    allowedContinents String @default("[]")
+
+    // Set when a text drop point produced this rather than its owner writing it.
+    requestId         String? @db.Uuid
+    submittedByUserId String? @db.Uuid
+    submittedIpHash   String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    owner       User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    request     TextRequest?       @relation(fields: [requestId], references: [id], onDelete: SetNull)
+    submittedBy User?              @relation("SnippetSubmitter", fields: [submittedByUserId], references: [id], onDelete: SetNull)
+    files       SnippetFile[]
+    invites     SnippetInvite[]
+    accessLogs  SnippetAccessLog[]
+
+    @@index([ownerId, requestId, updatedAt])
+    @@index([requestId])
+    @@index([submittedByUserId])
+}
+
+// One file inside a snippet. A paste is usually one, but an .env plus the
+// compose file that reads it is two, and splitting them is what lets each carry
+// its own language.
+model SnippetFile {
+    id            String @id @default(uuid(7)) @db.Uuid
+    snippetId     String @db.Uuid
+    name          String
+    // The highlight.js token, or "" for plain text.
+    language      String @default("")
+    encryptedBody Bytes
+    bodyNonce     Bytes
+    bodyKeyId     String
+    // Plaintext length in bytes, so a listing can show the size without
+    // decrypting every file in it.
+    size          Int
+    position      Int    @default(0)
+
+    snippet Snippet @relation(fields: [snippetId], references: [id], onDelete: Cascade)
+
+    @@index([snippetId])
+}
+
+model SnippetInvite {
+    id        String @id @default(uuid(7)) @db.Uuid
+    snippetId String @db.Uuid
+    userId    String @db.Uuid
+
+    snippet Snippet @relation(fields: [snippetId], references: [id], onDelete: Cascade)
+    user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([snippetId, userId])
+    @@index([userId])
+}
+
+model SnippetAccessLog {
+    id            String   @id @default(uuid(7)) @db.Uuid
+    snippetId     String   @db.Uuid
+    at            DateTime @default(now())
+    // Raw address for the owner's own log, hashed copy for abuse review.
+    ip            String?
+    ipHash        String?
+    userAgentHash String?
+    action        String
+    reason        String?
+
+    snippet Snippet @relation(fields: [snippetId], references: [id], onDelete: Cascade)
+
+    @@index([snippetId])
+}
+
+// The inverse of a snippet link: a URL that asks somebody for text.
+//
+// A drop point takes files into a folder; this takes an .env, a key or a log
+// into the owner's snippets. What arrives is envelope-encrypted at rest like any
+// other snippet, which means Polaris can read it - said plainly on the page, so
+// nobody mistakes it for end-to-end.
+model TextRequest {
+    id             String  @id @default(uuid(7)) @db.Uuid
+    ownerId        String  @db.Uuid
+    tokenHash      String  @unique
+    encryptedToken Bytes?
+    tokenNonce     Bytes?
+    tokenKeyId     String?
+    title          String
+    instructions   String?
+    passwordHash   String?
+    requireLogin   Boolean @default(false)
+    // JSON string array of allowed sender identities (email or username,
+    // lowercased). Non-empty implies sign-in is required.
+    allowedUsers   String  @default("[]")
+    // Per-submission ceiling in characters, and the cap on how many may arrive.
+    maxLength      Int
+    maxSubmissions Int?
+    // Whether the sender may seal what they send in their own browser. The owner
+    // then needs the key from the sender to read it, so it is off by default.
+    allowSealed    Boolean @default(false)
+
+    allowedCidrs      String @default("[]")
+    allowedCountries  String @default("[]")
+    allowedContinents String @default("[]")
+
+    startsAt  DateTime?
+    expiresAt DateTime?
+    createdAt DateTime  @default(now())
+    revokedAt DateTime?
+
+    owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    submissions Snippet[]
+
+    @@index([ownerId])
 }
 
 // ---------------------------------------------------------------------------

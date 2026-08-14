@@ -7,21 +7,10 @@
  */
 
 import { z } from "zod";
-import { isCidr, isIpAddress } from "../cidr.js";
+import { accountIdentityList, addressRuleFields } from "./link-rules.js";
 
 /** One gibibyte, the default per-upload ceiling. */
 const DEFAULT_MAX_SIZE = 1024 * 1024 * 1024;
-
-/** An IP address or CIDR range. Shared by every drop-point schema (create,
- *  update, and templates) so an allowlist entry is validated the same way
- *  everywhere - a malformed rule that slips through fails closed and locks out
- *  every uploader, so all three paths must reject it at save time. */
-export const cidrOrIp = z
-    .string()
-    .trim()
-    .refine((value) => isCidr(value) || isIpAddress(value), {
-        message: "Must be an IP address or CIDR range"
-    });
 
 /** Normalize an extension list to lowercase, dot-less, deduplicated entries. */
 const extensionList = z
@@ -66,34 +55,8 @@ export const createFileRequestSchema = z.object({
      * leading "@" removed. Non-empty implies sign-in is required and only these
      * accounts may upload. Empty means no per-user restriction.
      */
-    allowedUsers: z
-        .array(z.string().trim().toLowerCase())
-        .transform((values) =>
-            Array.from(new Set(values.map((value) => value.replace(/^@+/, "")).filter(Boolean)))
-        )
-        .default([]),
-    /** IP/CIDR allowlist. Empty means no IP restriction. */
-    allowedCidrs: z.array(cidrOrIp).default([]),
-    /** ISO-3166 alpha-2 country allowlist. Empty means no country restriction. */
-    allowedCountries: z
-        .array(
-            z
-                .string()
-                .trim()
-                .toUpperCase()
-                .regex(/^[A-Z]{2}$/)
-        )
-        .default([]),
-    /** Continent-code allowlist (AF/AS/EU/NA/SA/OC/AN). Empty means no restriction. */
-    allowedContinents: z
-        .array(
-            z
-                .string()
-                .trim()
-                .toUpperCase()
-                .regex(/^[A-Z]{2}$/)
-        )
-        .default([]),
+    allowedUsers: accountIdentityList.default([]),
+    ...addressRuleFields,
     /** ISO timestamp before which the request does not yet accept uploads. */
     startsAt: z.coerce.date().optional(),
     /** Whether an uploader may delete files they submitted. */

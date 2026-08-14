@@ -15,9 +15,11 @@ import { noteActivity } from "@/lib/session-guard";
 import { formatBytes } from "@polaris/core";
 import { DropUploader } from "./upload-form";
 import { clientIp } from "@/lib/request-context";
-import { RequestPasswordForm } from "./request-password-form";
+import { LinkPasswordForm } from "@/components/link-password-form";
+import { LinkUnavailable, PublicShell } from "@/components/public-shell";
+import { unlockFileRequestAction } from "@/app/(app)/drive/request-actions";
 import { getDisplayFormat } from "@/lib/display-prefs-service";
-import { Badge, Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
+import { Badge, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import {
     fileRequestIpAllowed,
     fileRequestUnlockCookie,
@@ -31,40 +33,13 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function Shell({ children }: { children: React.ReactNode }) {
-    return (
-        <div className="mx-auto flex min-h-screen max-w-2xl flex-col gap-4 p-6">
-            <div className="flex items-center gap-2 text-muted-foreground">
-                <PolarisMark className="size-6" />
-                <span className="text-sm font-medium">Polaris</span>
-            </div>
-            {children}
-        </div>
-    );
-}
-
-function Notice({ title, message }: { title: string; message: string }) {
-    return (
-        <Shell>
-            <Card>
-                <CardHeader>
-                    <CardTitle>{title}</CardTitle>
-                </CardHeader>
-                <CardBody>
-                    <p className="text-sm text-muted-foreground">{message}</p>
-                </CardBody>
-            </Card>
-        </Shell>
-    );
-}
-
 export default async function DropPointPage({ params }: { params: Promise<{ token: string }> }) {
     const { token } = await params;
     const format = await getDisplayFormat();
     const request = await resolveFileRequestByToken(token);
     if (!request)
         return (
-            <Notice
+            <LinkUnavailable
                 title="Link unavailable"
                 message="This drop point does not exist or was removed."
             />
@@ -74,10 +49,10 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
     if (!usable.ok) {
         if (usable.reason === "scheduled") {
             const when = request.startsAt ? format.dateTime(request.startsAt) : "a later date";
-            return <Notice title="Not open yet" message={`This drop point opens on ${when}.`} />;
+            return <LinkUnavailable title="Not open yet" message={`This drop point opens on ${when}.`} />;
         }
         return (
-            <Notice
+            <LinkUnavailable
                 title="Link unavailable"
                 message={
                     usable.reason === "expired"
@@ -90,7 +65,7 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
 
     if (!fileRequestIpAllowed(request.allowedCidrs, await clientIp())) {
         return (
-            <Notice
+            <LinkUnavailable
                 title="Not available"
                 message="This drop point is not available from your network."
             />
@@ -100,7 +75,14 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
     if (request.passwordHash) {
         const cookieValue = (await cookies()).get(fileRequestUnlockCookie(request.id))?.value;
         if (!verifyFileRequestUnlock(request.id, cookieValue, loadEnv().POLARIS_AUTH_SECRET)) {
-            return <RequestPasswordForm token={token} title={request.title} />;
+            return (
+                <LinkPasswordForm
+                    token={token}
+                    unlock={unlockFileRequestAction}
+                    description={`"${request.title}" is protected. Enter its PIN to continue.`}
+                    label="PIN"
+                />
+            );
         }
     }
 
@@ -116,7 +98,7 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
         const userId = (session?.user as { id?: string } | undefined)?.id ?? null;
         if (!userId) {
             return (
-                <Shell>
+                <PublicShell>
                     <Card>
                         <CardHeader>
                             <CardTitle>{request.title}</CardTitle>
@@ -133,12 +115,12 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
                             </Link>
                         </CardBody>
                     </Card>
-                </Shell>
+                </PublicShell>
             );
         }
         if (!(await fileRequestUserAllowed(request.allowedUsers, userId))) {
             return (
-                <Notice
+                <LinkUnavailable
                     title="Not available"
                     message="This drop point is limited to specific accounts, and yours is not one of them."
                 />
@@ -152,7 +134,7 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
     const minSizeBytes = request.minSizeBytes !== null ? Number(request.minSizeBytes) : 0;
 
     return (
-        <Shell>
+        <PublicShell>
             <Card>
                 <CardHeader>
                     <CardTitle>{request.title}</CardTitle>
@@ -203,6 +185,6 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
                     />
                 </CardBody>
             </Card>
-        </Shell>
+        </PublicShell>
     );
 }

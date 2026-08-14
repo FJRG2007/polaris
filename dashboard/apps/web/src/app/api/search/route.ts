@@ -17,6 +17,7 @@ import type { SearchResource } from "@/lib/search/entries";
 import { requireUser, userHasManage } from "@/lib/session";
 import { listInstalledApps } from "@/lib/apps/install-service";
 import { listRunnerPools } from "@/lib/runners/runner-service";
+import { listSnippetsForOwner } from "@/lib/snippet-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -100,6 +101,22 @@ export async function GET(): Promise<Response> {
                 label: pool.name,
                 context: pool.scopeSummary,
                 href: "/apps/runners"
+            });
+        }
+    }
+
+    if (await userHasManage(user, "snippets.read")) {
+        // Titles and file names only. The text itself is not indexed here: it is
+        // often the exact thing that should not be sitting in a payload the
+        // palette holds in memory for the rest of the session.
+        const snippets = await listSnippetsForOwner(user.id);
+        for (const snippet of snippets.slice(0, MAX_PER_SOURCE)) {
+            resources.push({
+                id: snippet.id,
+                kind: "snippet",
+                label: snippet.title,
+                context: snippet.files.map((file) => file.name).join(", "),
+                href: `/drive/snippets/${snippet.id}`
             });
         }
     }

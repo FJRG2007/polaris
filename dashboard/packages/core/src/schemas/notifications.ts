@@ -229,6 +229,14 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "drive.dropPoint.received",
+        group: "drive",
+        label: "Something arrived at a drop point",
+        description: "A file or a piece of text was sent to one of your drop points.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "scan.detection",
         group: "drive",
         label: "Malware in an upload",

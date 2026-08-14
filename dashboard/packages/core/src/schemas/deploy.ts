@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { cidrOrIp } from "./file-request.js";
+import { cidrOrIp } from "./link-rules.js";
 import { normalizeRelPath, UnsafePathError } from "../paths.js";
 
 export const DEPLOY_VOLUME_KINDS = ["volume", "bind", "nas"] as const;
