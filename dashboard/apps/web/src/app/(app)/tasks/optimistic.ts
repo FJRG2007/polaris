@@ -91,6 +91,25 @@ export function taskOverlay(change: TaskEdit | Record<string, unknown>, context:
 }
 
 /**
+ * Whether a change would actually change the task.
+ *
+ * A field edited and put back where it started is not an edit, and writing it
+ * anyway costs a round trip and leaves a line in the task's history saying somebody
+ * changed nothing. It matters most where a field saves itself while it is being
+ * typed, because there the same value arrives again on every pause.
+ *
+ * Compared against the task as the server last confirmed it rather than against the
+ * screen: a write that was refused has to still look like an edit, or it is never
+ * tried again. Anything the row does not hold under that name - a list of ids, a
+ * recurrence rule - counts as a change, because the cost of an unnecessary write is
+ * one request and the cost of a skipped one is somebody's paragraph.
+ */
+export function wouldChange(change: Record<string, unknown>, task: TaskRow): boolean {
+    const row = task as unknown as Record<string, unknown>;
+    return Object.entries(change).some(([field, value]) => !Object.is(row[field], value));
+}
+
+/**
  * The same, for a change a menu is applying to a whole selection.
  *
  * People and tags arrive there as additions and removals rather than as a list,

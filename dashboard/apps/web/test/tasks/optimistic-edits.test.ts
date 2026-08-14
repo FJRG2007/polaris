@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { TaskRow } from "../../src/lib/tasks/facts";
-import { bulkOverlay, taskOverlay } from "../../src/app/(app)/tasks/optimistic";
+import { bulkOverlay, taskOverlay, wouldChange } from "../../src/app/(app)/tasks/optimistic";
 
 const context = {
     statuses: [
@@ -117,5 +117,37 @@ describe("the overlay a change to a selection paints", () => {
     it("paints nothing for a move or an archive, which take the row off the screen", () => {
         expect(bulkOverlay(row(), { listId: "l2" }, context)).toEqual({});
         expect(bulkOverlay(row(), { archived: true }, context)).toEqual({});
+    });
+});
+
+describe("whether a change is worth writing", () => {
+    it("skips a value the task already holds", () => {
+        // A field that saves itself while it is being typed sends the same value
+        // again on every pause, and each one would be a round trip and a line in
+        // the task's history saying somebody changed nothing.
+        expect(wouldChange({ description: "Ship it" }, row({ description: "Ship it" }))).toBe(false);
+        expect(wouldChange({ points: null }, row({ points: null }))).toBe(false);
+    });
+
+    it("writes a value that came back to where it started as no change at all", () => {
+        expect(wouldChange({ name: "Backup codes" }, row({ name: "Backup codes" }))).toBe(false);
+    });
+
+    it("writes anything that differs, including a value being cleared", () => {
+        expect(wouldChange({ description: "Ship it" }, row({ description: "" }))).toBe(true);
+        expect(wouldChange({ blockedNote: "" }, row({ blockedNote: "waiting on legal" }))).toBe(true);
+        expect(wouldChange({ points: null }, row({ points: 3 }))).toBe(true);
+    });
+
+    it("treats anything the row does not hold under that name as a change", () => {
+        // A list of ids, a recurrence rule: the row draws the resolved version of
+        // those, so there is nothing to compare against. Writing one that was not
+        // needed costs a request; skipping one that was costs somebody's edit.
+        expect(wouldChange({ assigneeIds: ["u1"] }, row())).toBe(true);
+        expect(wouldChange({ recurring: { every: "week" } }, row())).toBe(true);
+    });
+
+    it("writes when any one field of a change differs", () => {
+        expect(wouldChange({ name: "Same", points: 5 }, row({ name: "Same", points: 3 }))).toBe(true);
     });
 });

@@ -97,12 +97,16 @@ export function CustomFieldEditor({
     value,
     people,
     disabled,
+    onEdit,
     onChange
 }: {
     field: CustomFieldView;
     value: string;
     people: readonly PersonRef[];
     disabled?: boolean;
+    /** Told on every keystroke of the controls somebody types into, so what was
+     *  typed is not waiting on the blur to exist anywhere but the screen. */
+    onEdit?: (value: string) => void;
     onChange: (value: string) => void;
 }) {
     const [draft, setDraft] = useState(value);
@@ -133,6 +137,7 @@ export function CustomFieldEditor({
                     rows={3}
                     disabled={disabled}
                     aria-label={field.name}
+                    onChange={(event) => onEdit?.(event.target.value)}
                     onBlur={(event) => commit(event.target.value)}
                     className="w-full resize-y rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
                 />
@@ -161,6 +166,7 @@ export function CustomFieldEditor({
                     aria-label={field.name}
                     min={field.config.min ?? (field.type === "rating" ? 0 : undefined)}
                     max={field.config.max ?? (field.type === "rating" ? 5 : field.type === "percent" ? 100 : undefined)}
+                    onChange={(event) => onEdit?.(event.target.value.trim())}
                     onBlur={(event) => commit(event.target.value.trim())}
                     className="h-8 w-24 text-xs"
                 />
@@ -227,6 +233,7 @@ export function CustomFieldEditor({
                     defaultValue={draft}
                     disabled={disabled}
                     aria-label={field.name}
+                    onChange={(event) => onEdit?.(event.target.value.trim())}
                     onBlur={(event) => commit(event.target.value.trim())}
                     className="h-8 text-xs"
                 />
