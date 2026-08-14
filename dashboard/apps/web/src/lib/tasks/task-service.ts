@@ -17,6 +17,7 @@
 import * as core from "@polaris/core";
 import { nextTaskNumber } from "./numbering";
 import { prisma, type Prisma } from "@polaris/db";
+import * as activity from "@/lib/activity/activity";
 import { notify } from "@/lib/notifications/dispatch";
 import type { PersonRef, TagRef, TaskRow } from "./facts";
 import { notifyMentions } from "@/lib/rich-text/mention-notify";
@@ -255,14 +256,9 @@ export interface DependencyView {
     readonly finished: boolean;
 }
 
-export interface ActivityView {
-    readonly id: string;
-    readonly action: string;
-    readonly fromValue: string | null;
-    readonly toValue: string | null;
-    readonly authorName: string | null;
-    readonly createdAt: string;
-}
+/** A task's history is the shared one. Kept under this name because that is what
+ *  the Tasks screens call it. */
+export type ActivityView = activity.ActivityLine;
 
 export interface TimeEntryView {
     readonly id: string;
@@ -348,8 +344,8 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
                 where: { blockedId: taskId },
                 select: { id: true, type: true, blocker: { select: DEPENDENCY_SELECT } }
             }),
-            prisma.taskActivity.findMany({
-                where: { taskId },
+            prisma.activity.findMany({
+                where: { subjectType: "task", subjectId: taskId },
                 orderBy: { createdAt: "desc" },
                 take: 100,
                 select: { id: true, action: true, fromValue: true, toValue: true, userId: true, createdAt: true }
@@ -475,9 +471,7 @@ async function logActivity(
     fromValue?: string | null,
     toValue?: string | null
 ): Promise<void> {
-    await prisma.taskActivity.create({
-        data: { taskId, userId, action, fromValue: fromValue ?? null, toValue: toValue ?? null }
-    });
+    await activity.record({ subjectType: "task", subjectId: taskId, userId, action, fromValue, toValue });
 }
 
 // ---------------------------------------------------------------------------
@@ -783,7 +777,9 @@ async function rescheduleIfRecurring(taskId: string, actorId: string): Promise<v
     if (!task || !rule) return;
 
     const anchor = rule.basis === "completion" ? new Date() : (task.dueDate ?? new Date());
-    const occurrences = await prisma.taskActivity.count({ where: { taskId, action: "recurred" } });
+    const occurrences = await prisma.activity.count({
+        where: { subjectType: "task", subjectId: taskId, action: "recurred" }
+    });
     const nextDue = core.nextOccurrence(rule, anchor, occurrences);
     if (!nextDue) return;
 
@@ -1131,7 +1127,7 @@ export async function bulkUpdate(
         for (const row of rows) statusNames.set(row.id, row.name);
     }
 
-    const lines: Prisma.TaskActivityCreateManyInput[] = [];
+    const lines: activity.ActivityEntry[] = [];
     const statusChanged: string[] = [];
     const completed: string[] = [];
     const priorityChanged: string[] = [];
@@ -1142,7 +1138,7 @@ export async function bulkUpdate(
         const status = statusPerSpace.get(task.spaceId);
         const movedTo = status && status.id !== task.statusId ? status : null;
         const line = (action: string, fromValue: string | null = null, toValue: string | null = null) =>
-            lines.push({ taskId: task.id, userId: actorId, action, fromValue, toValue });
+            lines.push({ subjectType: "task", subjectId: task.id, userId: actorId, action, fromValue, toValue });
         const written = lines.length;
 
         if (movedTo) {
@@ -1183,7 +1179,7 @@ export async function bulkUpdate(
         if (lines.length === written) line("bulk");
     }
 
-    if (lines.length > 0) await prisma.taskActivity.createMany({ data: lines });
+    await activity.recordMany(lines);
 
     const names = new Map(before.map((task) => [task.id, task.name]));
     await announceHandover(handedTo, names, actorId);
@@ -1259,16 +1255,40 @@ async function announceHandover(
 }
 
 export async function deleteTask(taskId: string): Promise<void> {
-    await prisma.task.delete({ where: { id: taskId } });
+    await deleteTasks([taskId]);
 }
 
 /** Delete a selection. The ids arrive already narrowed to the tasks the caller
- *  may write, so this is one statement rather than a loop of them; subtasks,
- *  comments and tracked time follow through the schema's cascades either way. */
+ *  may write, so this is one statement rather than a loop of them; comments,
+ *  tracked time and the subtasks themselves follow through the schema's
+ *  cascades.
+ *
+ *  History does not: it lives in one table for every app and has no foreign key
+ *  to cascade along, so it is dropped here - for the subtasks as well as for
+ *  what was asked for, since those are going too. */
 export async function deleteTasks(taskIds: readonly string[]): Promise<number> {
     if (taskIds.length === 0) return 0;
-    const { count } = await prisma.task.deleteMany({ where: { id: { in: [...taskIds] } } });
-    return count;
+    const going = await withSubtasks(taskIds);
+    return prisma.$transaction(async (tx) => {
+        const { count } = await tx.task.deleteMany({ where: { id: { in: [...taskIds] } } });
+        await activity.forget("task", going, tx);
+        return count;
+    });
+}
+
+/** A set of tasks and everything nested under them, however deep. */
+async function withSubtasks(taskIds: readonly string[]): Promise<string[]> {
+    const all = new Set(taskIds);
+    let frontier = [...taskIds];
+    while (frontier.length > 0) {
+        const children = await prisma.task.findMany({
+            where: { parentId: { in: frontier } },
+            select: { id: true }
+        });
+        frontier = children.map((child) => child.id).filter((id) => !all.has(id));
+        for (const id of frontier) all.add(id);
+    }
+    return [...all];
 }
 
 /** Duplicate a task, including its checklists. Subtasks come along too, because

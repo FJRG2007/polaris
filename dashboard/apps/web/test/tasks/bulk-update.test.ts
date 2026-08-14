@@ -50,7 +50,7 @@ vi.mock("@polaris/db", () => ({
             createMany: assigneeCreateMany
         },
         taskTagLink: { findMany: tagFindMany, deleteMany: vi.fn(), createMany: vi.fn() },
-        taskActivity: { createMany: activityCreateMany, create: activityCreate, count: activityCount }
+        activity: { createMany: activityCreateMany, create: activityCreate, count: activityCount }
     }
 }));
 
@@ -126,9 +126,16 @@ describe("applying a change to a selection", () => {
         await bulkUpdate(ACTOR, allowed, { taskIds: ["a", "b"], statusId: "doing" });
 
         expect(lines()).toEqual([
-            { taskId: "a", userId: ACTOR, action: "status", fromValue: "To do", toValue: "In progress" },
+            {
+                subjectType: "task",
+                subjectId: "a",
+                userId: ACTOR,
+                action: "status",
+                fromValue: "To do",
+                toValue: "In progress"
+            },
             // Already there: nothing moved, so nothing is claimed to have.
-            { taskId: "b", userId: ACTOR, action: "bulk", fromValue: null, toValue: null }
+            { subjectType: "task", subjectId: "b", userId: ACTOR, action: "bulk", fromValue: null, toValue: null }
         ]);
     });
 

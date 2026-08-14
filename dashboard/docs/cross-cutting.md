@@ -9,7 +9,7 @@ about *any* object answers it about exactly one kind:
 
 | Concern              | What exists                 | Reaches                        |
 | -------------------- | --------------------------- | ------------------------------ |
-| History of a change  | `TaskActivity`              | Tasks                          |
+| History of a change  | `Activity`                  | **Anything** - done, see below |
 | Discussion           | `TaskComment`               | Tasks                          |
 | Following something  | `TaskWatcher`               | Tasks                          |
 | Labelling            | `TaskTag`, `TaskTagLink`    | Tasks                          |
@@ -49,11 +49,22 @@ Four generic subjects, each owning one table addressed by `(subjectType,
 subjectId)` the way `Notification` already is, and each with one module in
 `lib/` and one component in `@polaris/ui`:
 
-1. **Activity.** An append-only record of what happened to an object, written
-   where the change is made rather than derived, with the attribute, its old
-   value and its new one already resolved to names. `TaskActivity` is this, minus
-   the subject type. This is the foundation: comments, following and the inbox
-   all read it.
+1. **Activity - done.** `lib/activity/activity.ts` over one `Activity` table
+   addressed by `(subjectType, subjectId)`, with `SUBJECTS` naming the kinds.
+   Tasks moved onto it with its screens unchanged, and Deploy is its second
+   reader: a service now records who deployed, restarted, stopped or duplicated
+   it, which variable changed, and what the port was set to. `components/
+   activity-feed.tsx` draws it; each app hands in its own wording, because
+   "moved it from Doing to Done" and "changed the PORT variable" are the same
+   row and different sentences.
+
+   Two things to know before adding a subject. Nothing cascades - whatever
+   deletes a subject calls `forget` for it, which is why deleting a task now
+   gathers its subtasks first. And a service event is written to the audit log
+   as well: that log answers "who did this, from where, on which session" for
+   administrators and the firewall, this one answers "what happened to this
+   service" for whoever owns it, and `recordServiceEvent` writes both so neither
+   is forgotten.
 2. **Comments.** A thread on any object, on the same rich-text surface the rest
    of Polaris uses, with mentions that resolve through the existing `polaris:`
    address scheme. A mention is what makes a comment reach somebody, so it raises
@@ -69,10 +80,10 @@ its screens keep working because the module they call keeps its shape.
 
 ## Ordering
 
-Activity first: it is the one the other three read. Then comments, which is the
-one people notice. Then following, which is only useful once there is something
-to be told about. Saved views are independent of all three and can go at any
-point.
+Activity first, because it is the one the other three read - that is done. Then
+comments, which is the one people notice. Then following, which is only useful
+once there is something to be told about. Saved views are independent of all
+three and can go at any point.
 
 ## What was looked at, and deliberately not taken
 

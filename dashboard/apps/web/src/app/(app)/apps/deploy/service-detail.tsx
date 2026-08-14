@@ -16,6 +16,9 @@ import { relativeTime } from "@/lib/relative-time";
 import { LogViewer } from "@/components/log-viewer";
 import type { HttpLogEntry } from "@polaris/deploy";
 import { isInFlightStatus } from "@/lib/deploy/status";
+import { describeServiceEvent } from "./service-history";
+import { ActivityFeed } from "@/components/activity-feed";
+import type { ActivityLine } from "@/lib/activity/activity";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageServiceDeleteAction } from "./project-actions";
 import { useDisplayFormat } from "@/components/display-format";
@@ -600,6 +603,48 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                     )}
                 </>
             )}
+
+            <ServiceActivity applicationId={app.id} />
+        </div>
+    );
+}
+
+/**
+ * Everything that happened to this service that was not a release: who
+ * restarted it, who stopped it, which variable changed. The releases above
+ * answer "what is running"; this answers "what did somebody do to it", which is
+ * the question after something stops working.
+ */
+function ServiceActivity({ applicationId }: { applicationId: string }) {
+    const [lines, setLines] = useState<ActivityLine[] | null>(null);
+    const [open, setOpen] = useState(false);
+
+    useEffect(() => {
+        setLines(null);
+        void deployActions.serviceHistoryAction(applicationId).then(setLines);
+    }, [applicationId]);
+
+    // Nothing yet means nothing to open, and a heading over an empty box is a
+    // control that does nothing.
+    if (lines !== null && lines.length === 0) return null;
+
+    return (
+        <div className="flex flex-col gap-2">
+            <button
+                type="button"
+                onClick={() => setOpen((value) => !value)}
+                className="inline-flex items-center gap-1 self-start text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+            >
+                <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-90")} />
+                Activity
+            </button>
+            {open ? (
+                lines === null ? (
+                    <Loading />
+                ) : (
+                    <ActivityFeed lines={lines} describe={describeServiceEvent} />
+                )
+            ) : null}
         </div>
     );
 }

@@ -4210,7 +4210,6 @@ model Task {
     blocking    TaskDependency[]       @relation("TaskBlocker")
     blockedBy   TaskDependency[]       @relation("TaskBlocked")
     timeEntries TaskTimeEntry[]
-    activity    TaskActivity[]
     reminders   TaskReminder[]
     submissions TaskFormSubmission[]
     attachments TaskAttachment[]
@@ -4375,21 +4374,34 @@ model TaskTimeEntry {
 
 // What changed on a task, for the history panel. `userId` carries no FK so the
 // trail survives an account being deleted.
-model TaskActivity {
-    id        String   @id @default(uuid(7)) @db.Uuid
-    taskId    String   @db.Uuid
-    userId    String?  @db.Uuid
+// One line of what happened to something, for any something.
+//
+// The subject is a name and an id rather than a relation, because a foreign key
+// per kind is a column this table would grow every time an app is added, and
+// seven apps that each want a history is how Polaris ended up with one that only
+// tasks had. The cost of that choice is that nothing cascades: whatever deletes
+// a subject calls `forgetActivity` for it, and `lib/activity` is the only place
+// that writes here so there is one list of callers to check.
+//
+// `userId` carries no foreign key on purpose. History outlives the account that
+// made it - "who archived this" is still the answer after they leave - so the id
+// is kept and the name is looked up when the feed is read.
+model Activity {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    // task | service | server | volume | ... - ActivitySubject in lib/activity.
+    subjectType String
+    subjectId   String   @db.Uuid
+    userId      String?  @db.Uuid
     // created | status | priority | assignee | due | moved | archived | ...
-    action    String
+    action      String
     // Human-readable endpoints of the change, already resolved to names so the
     // history does not have to look up a deleted status to render a line.
-    fromValue String?
-    toValue   String?
-    createdAt DateTime @default(now())
+    fromValue   String?
+    toValue     String?
+    createdAt   DateTime @default(now())
 
-    task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
-
-    @@index([taskId, createdAt])
+    @@index([subjectType, subjectId, createdAt])
+    @@index([userId, createdAt])
 }
 
 // A saved way of looking at work: which tasks, grouped how, sorted how. Bound to

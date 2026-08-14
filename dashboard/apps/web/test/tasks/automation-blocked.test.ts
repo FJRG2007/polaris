@@ -24,7 +24,7 @@ vi.mock("@polaris/db", () => ({
         task: { findMany: taskFindMany, update: taskUpdate },
         taskAutomation: { findMany: automationFindMany, update: automationUpdate },
         taskDependency: { findMany: dependencyFindMany },
-        taskActivity: { createMany: activityCreateMany }
+        activity: { createMany: activityCreateMany }
     }
 }));
 

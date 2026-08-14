@@ -18,6 +18,7 @@
 import * as core from "@polaris/core";
 import { nextTaskNumber } from "./numbering";
 import { prisma, type Prisma } from "@polaris/db";
+import * as activity from "@/lib/activity/activity";
 
 export interface AutomationEventInput {
     readonly trigger: core.AutomationTrigger;
@@ -209,7 +210,7 @@ export async function runAutomationsFor(event: AutomationBatchInput): Promise<vo
     // Counted rather than incremented per run: a rule that fired on forty rows is
     // forty runs and one write.
     const runs = new Map<string, number>();
-    const lines: Prisma.TaskActivityCreateManyInput[] = [];
+    const lines: activity.ActivityEntry[] = [];
 
     for (const record of involved) {
         const facts = toFacts(
@@ -235,14 +236,19 @@ export async function runAutomationsFor(event: AutomationBatchInput): Promise<vo
                     await applyAction(record, action, event.actorId);
                 }
                 runs.set(rule.id, (runs.get(rule.id) ?? 0) + 1);
-                lines.push({ taskId: record.id, userId: null, action: "automation", toValue: definition.name });
+                lines.push({
+                    subjectType: "task",
+                    subjectId: record.id,
+                    action: "automation",
+                    toValue: definition.name
+                });
             } catch (caught) {
                 console.error(`polaris: automation "${definition.name}" failed:`, caught);
             }
         }
     }
 
-    if (lines.length > 0) await prisma.taskActivity.createMany({ data: lines });
+    await activity.recordMany(lines);
     const ranAt = new Date();
     for (const [ruleId, count] of runs) {
         await prisma.taskAutomation.update({

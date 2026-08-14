@@ -12,6 +12,7 @@ import { loadEnv } from "@polaris/config";
 import { createWriteStream } from "node:fs";
 import { localDialHost } from "./deploy/dial";
 import { appBaseUrl } from "./domain-service";
+import * as activity from "./activity/activity";
 import { commitUrl } from "./deploy/commit-url";
 import { decryptSecret } from "@polaris/storage";
 import { mkdir, readFile } from "node:fs/promises";
@@ -1843,6 +1844,20 @@ export interface DeploymentSummary {
     commitUrl: string | null;
     /** The hostname this release answers on while it is kept, if it has one. */
     hostname: string | null;
+}
+
+/**
+ * What has happened to a service: deploys, restarts, the variable somebody
+ * changed on Friday. Owner-checked the same way the deployment list is, because
+ * the history of a service says as much about it as the releases do.
+ */
+export async function serviceHistory(applicationId: string, ownerId: string): Promise<activity.ActivityLine[]> {
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } },
+        select: { id: true }
+    });
+    if (!app) throw new Error("Application not found");
+    return activity.history("service", applicationId, 60);
 }
 
 /** An application's deployment history, most recent first (owner-checked). */

@@ -13,6 +13,7 @@ import { listHosts } from "@/lib/host-service";
 import { normalizeRoot } from "@polaris/deploy";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
+import * as activity from "@/lib/activity/activity";
 import * as deployService from "@/lib/deploy-service";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { DomainOwner } from "@/lib/owner-domains";
@@ -89,6 +90,35 @@ import {
 } from "@polaris/core";
 
 const DEPLOY_PATH = "/apps/deploy";
+
+/**
+ * Record something that happened to a service, in both places it belongs.
+ *
+ * The audit log and the activity feed look like the same row and are not. The
+ * audit log answers "who did this, from what address, on which session", is read
+ * by administrators and by the firewall, and is kept and indexed for that. The
+ * activity feed answers "what happened to this service", is read by whoever owns
+ * it, and carries the before and after of the change. One event, two readers,
+ * different retention - so both are written, and they are written here together
+ * rather than at thirty call sites where one of them would be forgotten.
+ */
+async function recordServiceEvent(
+    actorId: string,
+    applicationId: string,
+    audit: string,
+    action: string,
+    values?: { from?: string | null; to?: string | null }
+): Promise<void> {
+    await recordAudit({ actorId, action: audit, targetType: "application", targetId: applicationId });
+    await activity.record({
+        subjectType: "service",
+        subjectId: applicationId,
+        userId: actorId,
+        action,
+        fromValue: values?.from ?? null,
+        toValue: values?.to ?? null
+    });
+}
 
 export async function createProjectAction(input: { name: string }): Promise<{ error?: string; id?: string }> {
     const user = await requirePermission("deploy.manage");
@@ -321,6 +351,15 @@ export async function saveEnvVarAction(input: {
     const user = await requirePermission("deploy.manage");
     try {
         await setEnvVar(input.scope, input.scopeId, user.id, { key: input.key, value: input.value, isSecret: input.isSecret });
+        if (input.scope === "application") {
+            await activity.record({
+                subjectType: "service",
+                subjectId: input.scopeId,
+                userId: user.id,
+                action: "variable",
+                toValue: input.key
+            });
+        }
         void deployService.redeployForEnvScope(input.scope, input.scopeId, user.id).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
@@ -341,6 +380,15 @@ export async function importEnvVarsAction(input: {
         const parsed = parseDotEnv(input.text).map((item) => ({ ...item, isSecret: input.isSecret }));
         if (parsed.length === 0) return { error: "No KEY=value lines found" };
         const count = await setEnvVars(input.scope, input.scopeId, user.id, parsed);
+        if (input.scope === "application") {
+            await activity.record({
+                subjectType: "service",
+                subjectId: input.scopeId,
+                userId: user.id,
+                action: "variables-imported",
+                toValue: String(count)
+            });
+        }
         void deployService.redeployForEnvScope(input.scope, input.scopeId, user.id).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return { count };
@@ -362,6 +410,14 @@ export async function deleteEnvVarAction(id: string): Promise<{ error?: string }
     const user = await requirePermission("deploy.manage");
     const scope = await deleteEnvVar(id, user.id);
     if (scope) void deployService.redeployForEnvScope(scope.scope, scope.scopeId, user.id).catch(() => undefined);
+    if (scope?.scope === "application") {
+        await activity.record({
+            subjectType: "service",
+            subjectId: scope.scopeId,
+            userId: user.id,
+            action: "variable-removed"
+        });
+    }
     revalidatePath(DEPLOY_PATH);
     return {};
 }
@@ -370,6 +426,16 @@ export async function deleteEnvVarAction(id: string): Promise<{ error?: string }
 export async function listDeploymentsAction(applicationId: string): Promise<deployService.DeploymentSummary[]> {
     const user = await requirePermission("deploy.manage");
     return deployService.listDeployments(applicationId, user.id);
+}
+
+/** What has happened to this service, releases aside. */
+export async function serviceHistoryAction(applicationId: string): Promise<activity.ActivityLine[]> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        return await deployService.serviceHistory(applicationId, user.id);
+    } catch {
+        return [];
+    }
 }
 
 export async function deployApplicationAction(applicationId: string): Promise<{ error?: string; deploymentId?: string }> {
@@ -385,7 +451,7 @@ export async function deployApplicationAction(applicationId: string): Promise<{ 
             // No public IP / free-subdomain base; the app can still deploy without one.
         }
         const deploymentId = await deployService.deployApplication(applicationId, user.id, user.id);
-        await recordAudit({ actorId: user.id, action: "deploy.app.deploy", targetType: "application", targetId: applicationId });
+        await recordServiceEvent(user.id, applicationId, "deploy.app.deploy", "deployed");
         revalidatePath(DEPLOY_PATH);
         return { deploymentId };
     } catch (caught) {
@@ -411,6 +477,13 @@ export async function setAppPortAction(applicationId: string, port: number): Pro
     const user = await requirePermission("deploy.manage");
     try {
         await deployService.setApplicationPort(applicationId, user.id, port);
+        await activity.record({
+            subjectType: "service",
+            subjectId: applicationId,
+            userId: user.id,
+            action: "port",
+            toValue: String(port)
+        });
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -458,7 +531,7 @@ export async function restartApplicationAction(applicationId: string): Promise<{
     const user = await requirePermission("deploy.manage");
     try {
         await deployService.restartApplication(applicationId, user.id);
-        await recordAudit({ actorId: user.id, action: "deploy.app.restart", targetType: "application", targetId: applicationId });
+        await recordServiceEvent(user.id, applicationId, "deploy.app.restart", "restarted");
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -470,12 +543,12 @@ export async function setApplicationRunningAction(applicationId: string, running
     const user = await requirePermission("deploy.manage");
     try {
         await deployService.setApplicationRunning(applicationId, user.id, running);
-        await recordAudit({
-            actorId: user.id,
-            action: running ? "deploy.app.start" : "deploy.app.stop",
-            targetType: "application",
-            targetId: applicationId
-        });
+        await recordServiceEvent(
+            user.id,
+            applicationId,
+            running ? "deploy.app.start" : "deploy.app.stop",
+            running ? "started" : "stopped"
+        );
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -487,7 +560,7 @@ export async function removeApplicationDeploymentAction(applicationId: string): 
     const user = await requirePermission("deploy.manage");
     try {
         await deployService.removeApplicationDeployment(applicationId, user.id);
-        await recordAudit({ actorId: user.id, action: "deploy.app.remove", targetType: "application", targetId: applicationId });
+        await recordServiceEvent(user.id, applicationId, "deploy.app.remove", "torn down");
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -500,6 +573,9 @@ export async function deleteApplicationAction(applicationId: string): Promise<{ 
     try {
         await deployService.deleteApplication(applicationId, user.id);
         await recordAudit({ actorId: user.id, action: "deploy.app.delete", targetType: "application", targetId: applicationId });
+        // The audit row stays - it is the record that somebody deleted this - but
+        // the feed was about a service that no longer exists, so it goes with it.
+        await activity.forget("service", applicationId);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -511,7 +587,7 @@ export async function duplicateApplicationAction(applicationId: string): Promise
     const user = await requirePermission("deploy.manage");
     try {
         const id = await deployService.duplicateApplication(applicationId, user.id);
-        await recordAudit({ actorId: user.id, action: "deploy.app.duplicate", targetType: "application", targetId: applicationId });
+        await recordServiceEvent(user.id, applicationId, "deploy.app.duplicate", "duplicated");
         revalidatePath(DEPLOY_PATH);
         return { id };
     } catch (caught) {
