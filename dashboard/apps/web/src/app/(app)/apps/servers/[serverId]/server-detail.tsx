@@ -19,6 +19,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ServerUsage } from "../server-usage";
 import { ServerWorkload } from "./server-workload";
+import { ServerNotesPanel } from "../server-notes-panel";
 import { ENVIRONMENT_META } from "../environment-meta";
 import type { ServerMetrics } from "@/lib/server-probe";
 import { RemoveServerDialog } from "../remove-server-dialog";
@@ -46,7 +47,10 @@ const STATUS_POLL_MS = 30_000;
 
 const TABS = [
     { id: "overview", label: "Overview" },
-    { id: "connection", label: "Connection" }
+    { id: "connection", label: "Connection" },
+    // Only a registered server has an id to hang a history on: the box Polaris
+    // runs on has no Host row until it is enrolled.
+    { id: "notes", label: "Notes", needsHost: true }
 ] as const;
 
 export function ServerDetail({
@@ -67,7 +71,7 @@ export function ServerDetail({
     initialUsage?: { at: number; value: ServerMetrics };
 }) {
     const router = useRouter();
-    const [tab, setTab] = useState<"overview" | "connection">("overview");
+    const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("overview");
     const [shellOpen, setShellOpen] = useState(false);
     const [asRoot, setAsRoot] = useState(false);
     const [location, setLocation] = useState<EnvironmentTarget | null>(null);
@@ -143,7 +147,7 @@ export function ServerDetail({
             </div>
 
             <div className="flex gap-1 border-b border-border/60">
-                {TABS.map((entry) => (
+                {TABS.filter((entry) => !("needsHost" in entry) || server.hostId).map((entry) => (
                     <button
                         key={entry.id}
                         type="button"
@@ -161,7 +165,9 @@ export function ServerDetail({
                 ))}
             </div>
 
-            {tab === "overview" ? (
+            {tab === "notes" && server.hostId ? (
+                <ServerNotesPanel hostId={server.hostId} />
+            ) : tab === "overview" ? (
                 <div className="flex flex-col gap-5">
                     <Reachability server={server} status={status} />
 

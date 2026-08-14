@@ -29,7 +29,8 @@ better to reach for.
 
 ## What each one cost
 
-Three of these are fixed; the fourth is what is left.
+Three of these are fixed. The fourth is deliberately not, and the last
+paragraph of this section says why.
 
 - **A deploy that failed had no history.** Who redeployed it, what changed
   between the working release and this one, and when somebody edited an
@@ -37,8 +38,8 @@ Three of these are fixed; the fourth is what is left.
   could. *Fixed.*
 - **There was nowhere to say anything.** A server, a runner job, a vault item and
   a document are all things two people need to discuss, and the only object in
-  Polaris with a comment box was a task. *Fixed for services; the other subjects
-  are a line in `SUBJECTS` and a panel each.*
+  Polaris with a comment box was a task. *Fixed for services and servers; the
+  rest are a line in `SUBJECTS` and a panel each.*
 - **Following something was per-app or absent.** Nothing decided who heard about
   a service, so a failed deploy told its owner and stopped there. *Fixed.*
 - **Every table is somebody's first table.** Drive, Servers, Runners, Firewall
@@ -56,10 +57,11 @@ avatar, the relative clock and the rich-text surface, which are the app's:
 
 1. **Activity - done.** `lib/activity/activity.ts` over one `Activity` table
    addressed by `(subjectType, subjectId)`, with `SUBJECTS` naming the kinds.
-   Tasks moved onto it with its screens unchanged, and Deploy is its second
-   reader: a service now records who deployed, restarted, stopped or duplicated
-   it, which variable changed, and what the port was set to. `components/
-   activity-feed.tsx` draws it; each app hands in its own wording, because
+   Tasks moved onto it with its screens unchanged. Deploy is its second reader -
+   a service records who deployed, restarted, stopped or duplicated it, which
+   variable changed, and what the port was set to - and Servers its third, where
+   renaming a box or saying where it lives leaves a line. `components/
+   activity-feed.tsx` draws all three; each app hands in its own wording, because
    "moved it from Doing to Done" and "changed the PORT variable" are the same
    row and different sentences.
 
@@ -77,9 +79,10 @@ avatar, the relative clock and the rich-text surface, which are the app's:
    run on a comment - by composing the module: who hears about a comment belongs
    to the app that owns the subject, not to the table.
 
-   A service is the second reader, under Notes on its panel, drawn by
-   `components/discussion.tsx` - a plainer thread than the one Tasks draws,
-   because a service is a thing people leave notes on rather than negotiate over.
+   A service is the second reader and a server the third, both under Notes and
+   both drawn by `components/discussion.tsx` - a plainer thread than the one
+   Tasks draws, because a service is something people leave notes on rather than
+   negotiate over.
 
    Two things to keep in mind. `forget` again: deleting a task or a service drops
    its thread, and neither cascades. And a comment id says nothing about which
@@ -98,22 +101,41 @@ avatar, the relative clock and the rich-text surface, which are the app's:
    Tasks moved over with its watchers intact. A service is the second reader:
    the bell on its panel, and `notifyDeployFinished` now tells its followers as
    well as its owner and whoever pressed deploy - which is the point, since the
-   person who spent the afternoon on it is usually neither of those two.
+   person who spent the afternoon on it is usually neither of those two. A server
+   is the third, beside its notes.
 
    The rule engine paid for this: watchers used to arrive with the task row
    through a relation and are now one query for the batch, beside the dependency
    lookup that was already there.
-4. **Saved views.** Which rows, grouped how, sorted how, which columns - private
-   or shared, per screen. `TaskView` is this, minus the binding to a list.
+4. **Saved views - not yet, on purpose.** Which rows, grouped how, sorted how,
+   which columns - private or shared, per screen. `TaskView` is this, minus the
+   binding to a list, and generalising it is a small change.
 
-Doing this to Tasks means moving four tables it owns, not writing four new ones;
-its screens keep working because the module they call keeps its shape.
+   It is not being done yet because there is nothing to generalise it *for*.
+   Every other list in Polaris was checked: Drive, Servers, Containers, Backups,
+   Runners, Firewall and the game panels have a search box, and the game list
+   also has a sort key. None has grouping, column choices or a filter with more
+   than one term - so a saved view on any of them would store a string somebody
+   can retype in two seconds, and the table would exist to serve one caller.
+
+   The prerequisite is a screen with enough view state to be worth naming. When
+   one gets it - the obvious candidates are Drive's file list and the Servers
+   list - promote `TaskView` then, with a real second caller to shape it.
+
+Doing this to Tasks meant moving tables it owned rather than writing new ones;
+its screens kept working because the modules they call kept their shape.
 
 ## Ordering
 
 Activity, then comments, then following - each read the one before it, and all
-three are done. Saved views are independent of the other three and are what is
-left.
+three are done. Saved views are independent of the other three and are waiting on
+a second screen that has a view worth saving, which none has today.
+
+What is worth doing instead is widening the three that exist. A new subject is a
+line in `SUBJECTS`, a panel, and a `forget` call wherever it is deleted. A server
+already has all three - Notes on its page, with its history under the thread and
+a Follow control beside it - which is the shape a volume or a runner job would
+take next.
 
 ## What was looked at, and deliberately not taken
 

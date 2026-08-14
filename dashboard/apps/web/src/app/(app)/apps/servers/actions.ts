@@ -11,6 +11,9 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
+import * as notes from "@/lib/server-notes-service";
+import type { CommentView } from "@/lib/comments/comments";
+import type { ActivityLine } from "@/lib/activity/activity";
 import type { ServerMetrics } from "@/lib/server-probe";
 import { setLocalEnvironment } from "@/lib/network-service";
 import { getServerMetrics } from "@/lib/server-metrics-service";
@@ -21,6 +24,7 @@ import {
     createHostSchema,
     removeServerSchema,
     renameServerSchema,
+    subjectCommentSchema,
     setServerEnvironmentSchema
 } from "@polaris/core";
 import {
@@ -47,6 +51,74 @@ import {
 } from "@/lib/server-removal-service";
 
 const SERVERS_PATH = "/apps/servers";
+
+/** What has happened to this server. */
+export async function serverHistoryAction(hostId: string): Promise<ActivityLine[]> {
+    const user = await requirePermission("system.manage");
+    try {
+        return await notes.serverHistory(hostId, user.id);
+    } catch {
+        return [];
+    }
+}
+
+/** What people have written down about it. */
+export async function serverNotesAction(hostId: string): Promise<CommentView[]> {
+    const user = await requirePermission("system.manage");
+    try {
+        return await notes.serverNotes(hostId, user.id);
+    } catch {
+        return [];
+    }
+}
+
+export async function postServerNoteAction(input: { hostId: string; body: string }): Promise<{ error?: string }> {
+    const user = await requirePermission("system.manage");
+    const parsed = subjectCommentSchema.safeParse({ subjectId: input.hostId, body: input.body });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That note cannot be posted" };
+    try {
+        await notes.postServerNote(parsed.data.subjectId, user.id, parsed.data.body);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not post the note" };
+    }
+}
+
+export async function deleteServerNoteAction(input: {
+    hostId: string;
+    commentId: string;
+}): Promise<{ error?: string }> {
+    const user = await requirePermission("system.manage");
+    try {
+        await notes.deleteServerNote(input.hostId, user.id, input.commentId);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not delete the note" };
+    }
+}
+
+/** Whether the reader hears about this server, and changing that. */
+export async function serverFollowStateAction(hostId: string): Promise<{ following: boolean }> {
+    const user = await requirePermission("system.manage");
+    try {
+        return { following: await notes.isFollowingServer(hostId, user.id) };
+    } catch {
+        return { following: false };
+    }
+}
+
+export async function setServerFollowAction(input: {
+    hostId: string;
+    following: boolean;
+}): Promise<{ error?: string }> {
+    const user = await requirePermission("system.manage");
+    try {
+        await notes.setFollowingServer(input.hostId, user.id, input.following);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not change that" };
+    }
+}
 
 export async function createHostAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
@@ -90,6 +162,7 @@ export async function setServerEnvironmentAction(input: unknown): Promise<{ erro
         targetId: hostId ?? "local",
         metadata: { environment }
     });
+    if (hostId) await notes.recordServerEvent(hostId, user.id, "environment", { to: environment });
     revalidatePath(SERVERS_PATH);
     return {};
 }
@@ -117,6 +190,7 @@ export async function renameServerAction(input: unknown): Promise<{ error?: stri
         targetId: hostId ?? "local",
         metadata: { name }
     });
+    if (hostId) await notes.recordServerEvent(hostId, user.id, "renamed", { to: name });
     revalidatePath(SERVERS_PATH);
     return {};
 }
@@ -226,6 +300,9 @@ export async function removeServerAction(
     if (result.error) return result;
 
     if ((await getLocalHostId()) === hostId) await setLocalHostId(null);
+    // The history, the notes and the followers were about a server that is gone.
+    // None of them cascades, so removing it says so.
+    await notes.forgetServer(hostId);
     await recordAudit({
         actorId: user.id,
         action: "host.delete",
