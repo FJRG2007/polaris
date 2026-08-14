@@ -153,7 +153,7 @@ export async function shareCipher(context: VaultContext): Promise<Response> {
     if (!parsed.success) {
         return vaultError(parsed.error.issues[0]?.message ?? "Invalid item", 400);
     }
-    const result = await ciphers.shareCipher(
+    const result = await ciphers.moveCipher(
         principal.userId,
         context.params.id ?? "",
         parsed.data.cipher,

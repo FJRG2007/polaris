@@ -16,7 +16,7 @@
 
 import * as core from "@polaris/core";
 import { useState, type FormEvent } from "react";
-import { createVaultAction } from "./vault-actions";
+import { createAccountVaultAction } from "./vault-actions";
 import { createVaultKeys } from "@/lib/vault/crypto";
 import type { SymmetricKey } from "@/lib/vault/crypto";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
@@ -72,7 +72,7 @@ export function VaultSetup({
                 email,
                 core.DEFAULT_KDF_SETTINGS
             );
-            const result = await createVaultAction({
+            const result = await createAccountVaultAction({
                 masterPasswordHash: keys.masterPasswordHash,
                 masterPasswordHint: hint.trim() || null,
                 key: keys.protectedKey,

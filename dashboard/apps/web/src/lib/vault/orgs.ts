@@ -1,14 +1,19 @@
 /**
- * Organization vaults.
+ * Vaults beyond the one every account starts with: a second vault of somebody's
+ * own, or an organization's.
  *
- * Polaris already knows who is in an organization and what they may do there.
- * What it has no concept of is the key: an organization's items are encrypted
- * under a key of its own, and being on the roster does not hand it to you -
- * somebody who already holds it has to wrap it to your public key. That step is
- * the whole difference between a permission and access, and it is why this has
- * its own membership rows beside the Polaris ones.
+ * Both are one row and one set of rules here, because they are the same thing -
+ * a key, and the people who hold it. What differs is only who decides the shape:
+ * an organization's is governed by the Polaris roster and the `vault.manage`
+ * permission, a personal one by whoever owns it.
  *
- * Setting one up and confirming a member both happen from the Polaris screens,
+ * The key is the part Polaris cannot help with. Items are encrypted under the
+ * vault's own key, and being on a roster does not hand it to you - somebody who
+ * already holds it has to wrap it to your public key. That step is the whole
+ * difference between a permission and access, and it is why membership lives
+ * here beside the Polaris rows rather than being read off them.
+ *
+ * Creating one and confirming a member both happen from the Polaris screens,
  * because both need a browser holding an unlocked vault. Clients read what
  * exists and work inside it; they do not create it.
  */
@@ -17,6 +22,8 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
 import { bumpRevision } from "@/lib/vault/account";
+import { deleteVaultBlob } from "@/lib/vault/blobs";
+import { vaultAttachmentPaths } from "@/lib/vault/ciphers";
 
 /** The one form an address is stored in. `VaultOrgUser` is unique on
  *  `(orgId, email)`, so a creator stored with different case than an invite
@@ -60,41 +67,41 @@ export function mayAdminister(standing: OrgStanding | null): boolean {
     );
 }
 
-/**
- * Give a Polaris organization a vault.
- *
- * The keys are minted in a browser: the organization's own pair, and its
- * symmetric key wrapped to the creator's public key so they can open it again.
- * Nothing here can produce them, which is the point.
- */
-export async function createOrganizationVault(input: {
-    organizationId: string;
+/** The keys a browser minted for a new vault, whoever it is going to belong to. */
+interface NewVaultKeys {
     creatorUserId: string;
+    creatorEmail: string;
     publicKey: string;
     encryptedPrivateKey: string;
-    /** The organization key, wrapped to the creator's public key. */
+    /** The vault's key, wrapped to the creator's public key. */
     creatorKey: string;
-    /** The first collection's name, encrypted under the organization key. */
+    /** The first collection's name, encrypted under the vault's key. */
     collectionName: string;
-    creatorEmail: string;
-}): Promise<{ ok: true; id: string } | { ok: false; reason: "exists" | "keys" }> {
-    if (
-        !core.isEncString(input.encryptedPrivateKey) ||
-        !core.isEncString(input.creatorKey) ||
-        !core.isEncString(input.collectionName) ||
-        input.publicKey.length === 0
-    ) {
-        return { ok: false, reason: "keys" };
-    }
-    const existing = await prisma.vaultOrganization.findUnique({
-        where: { organizationId: input.organizationId },
-        select: { id: true }
-    });
-    if (existing) return { ok: false, reason: "exists" };
+}
 
+/** Whether a set of minted keys is the shape a vault can be built from. */
+function keysUsable(input: NewVaultKeys): boolean {
+    return (
+        core.isEncString(input.encryptedPrivateKey) &&
+        core.isEncString(input.creatorKey) &&
+        core.isEncString(input.collectionName) &&
+        input.publicKey.length > 0
+    );
+}
+
+/**
+ * Write the vault, its first collection, and its creator as the one member who
+ * holds the key. The owner is whichever of the two ids is set.
+ */
+async function insertVault(
+    owner: { organizationId: string; name?: undefined } | { organizationId?: undefined; name: string },
+    input: NewVaultKeys
+): Promise<string> {
     const created = await prisma.vaultOrganization.create({
         data: {
-            organizationId: input.organizationId,
+            organizationId: owner.organizationId ?? null,
+            ownerUserId: owner.organizationId ? null : input.creatorUserId,
+            name: owner.name ?? null,
             publicKey: input.publicKey,
             privateKey: input.encryptedPrivateKey,
             members: {
@@ -111,50 +118,141 @@ export async function createOrganizationVault(input: {
         },
         select: { id: true }
     });
+    await bumpRevision(input.creatorUserId);
+    return created.id;
+}
+
+/**
+ * Give a Polaris organization a vault.
+ *
+ * The keys are minted in a browser: the organization's own pair, and its
+ * symmetric key wrapped to the creator's public key so they can open it again.
+ * Nothing here can produce them, which is the point.
+ */
+export async function createOrganizationVault(
+    input: NewVaultKeys & { organizationId: string }
+): Promise<{ ok: true; id: string } | { ok: false; reason: "exists" | "keys" }> {
+    if (!keysUsable(input)) return { ok: false, reason: "keys" };
+    const existing = await prisma.vaultOrganization.findUnique({
+        where: { organizationId: input.organizationId },
+        select: { id: true }
+    });
+    if (existing) return { ok: false, reason: "exists" };
+
+    const id = await insertVault({ organizationId: input.organizationId }, input);
     await recordAudit({
         actorId: input.creatorUserId,
         action: "vault.org.create",
         targetType: "organization",
         targetId: input.organizationId
     });
-    await bumpRevision(input.creatorUserId);
-    return { ok: true, id: created.id };
+    return { ok: true, id };
 }
 
-/** The vault organization behind a Polaris organization, or null. */
-export async function vaultOrgFor(organizationId: string) {
+/**
+ * Give somebody a second vault of their own.
+ *
+ * The same row an organization's vault uses, with one member in it. That is what
+ * makes it shareable later without moving anything: letting somebody in is the
+ * step that already exists, and until it happens this is a vault of one.
+ */
+export async function createPersonalVault(
+    input: NewVaultKeys & { name: string }
+): Promise<{ ok: true; id: string } | { ok: false; reason: "keys" | "too_many" }> {
+    if (!keysUsable(input)) return { ok: false, reason: "keys" };
+    const held = await prisma.vaultOrganization.count({
+        where: { ownerUserId: input.creatorUserId }
+    });
+    if (held >= core.MAX_OWNED_VAULTS) return { ok: false, reason: "too_many" };
+
+    const id = await insertVault({ name: input.name }, input);
+    await recordAudit({
+        actorId: input.creatorUserId,
+        action: "vault.create",
+        targetType: "vault",
+        targetId: id
+    });
+    return { ok: true, id };
+}
+
+/** One vault, whoever owns it. */
+export async function vaultById(vaultId: string) {
     return prisma.vaultOrganization.findUnique({
-        where: { organizationId },
-        select: { id: true, publicKey: true, privateKey: true }
+        where: { id: vaultId },
+        select: {
+            id: true,
+            organizationId: true,
+            ownerUserId: true,
+            name: true,
+            publicKey: true,
+            organization: { select: { name: true, slug: true } }
+        }
     });
 }
 
-/** The same, for a whole list at once, by Polaris organization id. A screen
- *  asking about a dozen organizations should cost one query, not a dozen. */
-export async function vaultOrgsFor(organizationIds: string[]) {
-    if (organizationIds.length === 0) return new Map<string, { id: string; publicKey: string }>();
-    const rows = await prisma.vaultOrganization.findMany({
-        where: { organizationId: { in: organizationIds } },
-        select: { id: true, organizationId: true, publicKey: true }
+/**
+ * Every vault this account can see, in one query.
+ *
+ * Three ways in, and they are not the same: a vault of your own, one somebody
+ * let you into, and one belonging to an organization you are on the roster of -
+ * that last one appears even before anybody hands you its key, because it is
+ * what the screen offers to let you in through.
+ */
+export async function vaultsReachableBy(userId: string, organizationIds: string[]) {
+    return prisma.vaultOrganization.findMany({
+        where: {
+            OR: [
+                { ownerUserId: userId },
+                { members: { some: { userId, status: { not: core.ORG_USER_REVOKED } } } },
+                ...(organizationIds.length > 0
+                    ? [{ organizationId: { in: organizationIds } }]
+                    : [])
+            ]
+        },
+        orderBy: { createdAt: "asc" },
+        select: {
+            id: true,
+            organizationId: true,
+            ownerUserId: true,
+            name: true,
+            publicKey: true,
+            organization: { select: { name: true, slug: true } },
+            members: {
+                where: { userId },
+                select: { id: true, key: true, status: true, type: true, accessAll: true }
+            }
+        }
     });
-    return new Map(
-        rows.map((row) => [row.organizationId, { id: row.id, publicKey: row.publicKey }])
-    );
 }
 
-/** This account's membership rows across a set of vault organizations, by the
- *  vault organization's id. */
-export async function membershipsFor(userId: string, vaultOrgIds: string[]) {
-    if (vaultOrgIds.length === 0) {
-        return new Map<string, { id: string; key: string | null; status: number }>();
-    }
-    const rows = await prisma.vaultOrgUser.findMany({
-        where: { userId, orgId: { in: vaultOrgIds } },
-        select: { id: true, orgId: true, key: true, status: true }
+/** Rename a vault of somebody's own. An organization's takes its name from the
+ *  organization, so there is nothing here to change. */
+export async function renameVault(vaultId: string, name: string): Promise<boolean> {
+    const { count } = await prisma.vaultOrganization.updateMany({
+        where: { id: vaultId, ownerUserId: { not: null } },
+        data: { name }
     });
-    return new Map(
-        rows.map((row) => [row.orgId, { id: row.id, key: row.key, status: row.status }])
-    );
+    return count === 1;
+}
+
+/**
+ * Delete a vault and everything in it.
+ *
+ * The rows cascade; the attachment ciphertext does not, so it is read before the
+ * delete and removed after. Every member's revision is bumped first - a client
+ * that never notices keeps drawing a vault whose key opens nothing.
+ */
+export async function deleteVault(vaultId: string): Promise<boolean> {
+    const members = await prisma.vaultOrgUser.findMany({
+        where: { orgId: vaultId },
+        select: { userId: true }
+    });
+    const paths = await vaultAttachmentPaths(vaultId);
+    const { count } = await prisma.vaultOrganization.deleteMany({ where: { id: vaultId } });
+    if (count === 0) return false;
+    for (const path of paths) await deleteVaultBlob(path);
+    for (const member of members) await bumpRevision(member.userId);
+    return true;
 }
 
 /** Invite somebody by address. They hold no key until they are confirmed. */
@@ -180,34 +278,94 @@ export async function inviteMember(
 }
 
 /**
- * Hand the organization's key to a member.
+ * Hand the vault's key to a member, and say how much of the vault they reach.
  *
  * The wrapped key is produced by an administrator's browser, to that member's
  * public key. Until this runs the member is on the list and can decrypt nothing,
  * which is the correct state for somebody who has been invited but not vouched
  * for.
  *
- * Confirming also grants the whole organization, because holding the key already
- * is the access: per-collection rules exist as rows but have no screen behind
- * them yet, and a member confirmed without one would reach nothing at all.
+ * The key opens the whole vault either way - one key, one vault, and there is no
+ * arithmetic that hands over half of it. What the scope decides is what the
+ * server will SHOW them and let them write: a member scoped to two collections
+ * syncs those two. That is a real boundary against the clients people use and a
+ * paper one against somebody who keeps the key and writes their own client, and
+ * it is the same trade Bitwarden makes. Sharing a vault with somebody you would
+ * not trust with all of it means a second vault, not a narrower scope.
  */
 export async function confirmMember(
     orgId: string,
     memberId: string,
-    wrappedKey: string
+    wrappedKey: string,
+    scope: core.VaultScope
 ): Promise<boolean> {
     if (!core.isEncString(wrappedKey)) return false;
     const { count } = await prisma.vaultOrgUser.updateMany({
         where: { id: memberId, orgId },
-        data: { key: wrappedKey, status: core.ORG_USER_CONFIRMED, accessAll: true }
+        data: { key: wrappedKey, status: core.ORG_USER_CONFIRMED, accessAll: scope.accessAll }
     });
     if (count === 0) return false;
+    await writeScope(orgId, memberId, scope);
+    return true;
+}
+
+/**
+ * Change what a member reaches: the whole vault, or the collections named.
+ *
+ * The rows are replaced rather than merged. Taking somebody out of a collection
+ * is the half that matters, and a merge cannot express it.
+ */
+export async function setMemberScope(
+    orgId: string,
+    memberId: string,
+    scope: core.VaultScope
+): Promise<boolean> {
+    const { count } = await prisma.vaultOrgUser.updateMany({
+        where: { id: memberId, orgId },
+        data: { accessAll: scope.accessAll }
+    });
+    if (count === 0) return false;
+    await writeScope(orgId, memberId, scope);
+    return true;
+}
+
+/** The collection rows behind a scope, kept to collections of THIS vault. */
+async function writeScope(
+    orgId: string,
+    memberId: string,
+    scope: core.VaultScope
+): Promise<void> {
+    const wanted = scope.accessAll ? [] : scope.collections;
+    const allowed = new Set(
+        (
+            await prisma.vaultCollection.findMany({
+                where: { orgId, id: { in: wanted.map((row) => row.collectionId) } },
+                select: { id: true }
+            })
+        ).map((row) => row.id)
+    );
+    await prisma.$transaction([
+        prisma.vaultCollectionAccess.deleteMany({ where: { orgUserId: memberId } }),
+        ...(allowed.size > 0
+            ? [
+                  prisma.vaultCollectionAccess.createMany({
+                      data: wanted
+                          .filter((row) => allowed.has(row.collectionId))
+                          .map((row) => ({
+                              orgUserId: memberId,
+                              collectionId: row.collectionId,
+                              readOnly: row.readOnly,
+                              hidePasswords: row.hidePasswords
+                          }))
+                  })
+              ]
+            : [])
+    ]);
     const member = await prisma.vaultOrgUser.findUnique({
         where: { id: memberId },
         select: { userId: true }
     });
     await bumpRevision(member?.userId);
-    return true;
 }
 
 /** Take somebody out of an organization's vault. Their key stops being valid
@@ -235,7 +393,11 @@ export async function listMembers(orgId: string): Promise<Record<string, unknown
             status: true,
             type: true,
             accessAll: true,
-            vault: { select: { user: { select: { name: true } } } }
+            vault: { select: { user: { select: { name: true } } } },
+            collections: {
+                where: { collection: { orgId } },
+                select: { collectionId: true, readOnly: true, hidePasswords: true }
+            }
         }
     });
     return rows.map((row) => ({
@@ -250,7 +412,15 @@ export async function listMembers(orgId: string): Promise<Record<string, unknown
         twoFactorEnabled: false,
         permissions: {},
         resetPasswordEnrolled: false,
-        collections: []
+        // What they reach when they do not reach everything. A client draws this
+        // beside the member, and an empty list under `accessAll: false` is the
+        // honest way to say "nothing yet".
+        collections: row.collections.map((access) => ({
+            id: access.collectionId,
+            readOnly: access.readOnly,
+            hidePasswords: access.hidePasswords,
+            manage: false
+        }))
     }));
 }
 
@@ -317,20 +487,47 @@ export async function deleteCollection(orgId: string, collectionId: string): Pro
     return count === 1;
 }
 
-/** Put a member in a collection, or change what they may do in it. */
-export async function setCollectionAccess(
+/**
+ * Who is in one collection, replacing whoever was.
+ *
+ * The other side of `setMemberScope`, and the one clients use: they send a
+ * collection with its whole user list rather than a member with their whole
+ * scope. Both write the same rows, and both drop what is not in the list -
+ * taking somebody out is the half that matters.
+ */
+export async function setCollectionMembers(
+    orgId: string,
     collectionId: string,
-    orgUserId: string,
-    access: { readOnly: boolean; hidePasswords: boolean }
+    users: { id: string; readOnly: boolean; hidePasswords: boolean }[]
 ): Promise<void> {
-    await prisma.vaultCollectionAccess.upsert({
-        where: { collectionId_orgUserId: { collectionId, orgUserId } },
-        create: { collectionId, orgUserId, ...access },
-        update: access
+    const collection = await prisma.vaultCollection.findFirst({
+        where: { id: collectionId, orgId },
+        select: { id: true }
     });
-    const member = await prisma.vaultOrgUser.findUnique({
-        where: { id: orgUserId },
-        select: { userId: true }
+    if (!collection) return;
+    // Only members of THIS vault: an id from another one would grant access
+    // across a boundary that nothing else would ever check again.
+    const members = await prisma.vaultOrgUser.findMany({
+        where: { orgId, id: { in: users.map((user) => user.id) } },
+        select: { id: true, userId: true }
     });
-    await bumpRevision(member?.userId);
+    const allowed = new Map(members.map((member) => [member.id, member.userId]));
+    await prisma.$transaction([
+        prisma.vaultCollectionAccess.deleteMany({ where: { collectionId } }),
+        ...(allowed.size > 0
+            ? [
+                  prisma.vaultCollectionAccess.createMany({
+                      data: users
+                          .filter((user) => allowed.has(user.id))
+                          .map((user) => ({
+                              collectionId,
+                              orgUserId: user.id,
+                              readOnly: user.readOnly,
+                              hidePasswords: user.hidePasswords
+                          }))
+                  })
+              ]
+            : [])
+    ]);
+    for (const userId of allowed.values()) await bumpRevision(userId);
 }

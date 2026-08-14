@@ -78,8 +78,8 @@ export async function setUnlockTimeoutAction(minutes: number): Promise<{ error?:
     return {};
 }
 
-/** Set a vault up from keys the browser just minted. */
-export async function createVaultAction(input: unknown): Promise<{ error?: string }> {
+/** Set this account's own vault up from keys the browser just minted. */
+export async function createAccountVaultAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("vault.use");
     const parsed = core.vaultRegisterSchema.safeParse(input);
     if (!parsed.success) {
@@ -157,8 +157,11 @@ export async function deauthorizeVaultAction(): Promise<void> {
     await account.deauthorizeSessions(user.id);
 }
 
-/** Delete the vault and everything in it. Irreversible by design. */
-export async function deleteVaultAction(input: unknown): Promise<{ error?: string }> {
+/**
+ * Delete this account's whole vault - its own items, its keys, and with them
+ * every vault of its own. Irreversible by design.
+ */
+export async function deleteAccountVaultAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("vault.use");
     const parsed = core.vaultVerifySchema.safeParse(input);
     if (!parsed.success) return { error: "Invalid request" };
@@ -185,10 +188,17 @@ export async function vaultContentsAction(): Promise<{
     return { ciphers: items, folders: folderRows, sends: sendRows };
 }
 
-/** Write an item the browser encrypted. */
+/**
+ * Write an item the browser encrypted.
+ *
+ * A new item can go straight into a vault rather than being made personal and
+ * moved: the collections say where inside it lands, and an item written into a
+ * vault with none would be one only an administrator ever sees again.
+ */
 export async function saveItemAction(
     itemId: string | null,
-    input: unknown
+    input: unknown,
+    collectionIds: string[] = []
 ): Promise<{ item?: Record<string, unknown>; error?: string }> {
     const user = await requirePermission("vault.use");
     const parsed = core.cipherSchema.safeParse(input);
@@ -196,8 +206,11 @@ export async function saveItemAction(
         return { error: parsed.error.issues[0]?.message ?? "That item is not encrypted." };
     }
     if (!itemId) {
-        const item = await ciphers.createCipher(user.id, parsed.data);
-        if (!item) return { error: "You are not a member of that organization." };
+        if (parsed.data.organizationId && collectionIds.length === 0) {
+            return { error: "Pick a collection to put it in." };
+        }
+        const item = await ciphers.createCipher(user.id, parsed.data, collectionIds);
+        if (!item) return { error: "You are not in that vault." };
         revalidatePath("/vault");
         return { item };
     }

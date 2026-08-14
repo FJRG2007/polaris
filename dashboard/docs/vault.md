@@ -43,25 +43,61 @@ A **folder** is how one person arranges their own vault. Its name is encrypted
 under their own key, so it can never mean anything to anybody else, and it is
 not how a password is shared.
 
-A **collection** is. It belongs to an organization, everything in it is
-encrypted under that organization's key, and holding that key is the whole of
-access - being on the Polaris roster is not enough and cannot be made enough.
-Somebody who already holds it has to wrap it to your public key first, in their
-browser. That step is what `/vault/shared` exists for:
+A **collection** is. It belongs to a vault, everything in it is encrypted under
+that vault's key, and holding that key is the whole of access - being on the
+Polaris roster is not enough and cannot be made enough. Somebody who already
+holds it has to wrap it to your public key first, in their browser.
 
-- Giving an organization a vault mints its key and pair in the browser and wraps
-  the key to the creator's public key, so the server never sees an openable one.
+## More than one vault
+
+Every account starts with one vault of its own. Beside it, `/vault/vaults` makes
+as many as `MAX_OWNED_VAULTS` more, and an organization can be given one:
+
+| Kind                | Who owns it              | Who may change its shape                       | What it is called            |
+| ------------------- | ------------------------ | ---------------------------------------------- | ---------------------------- |
+| The account's own   | The account              | Its owner                                      | "My own vault"               |
+| One of your own     | The account that made it | Its owner, or a member made an administrator   | Whatever it was named        |
+| An organization's   | The Polaris organization | Anybody with the `vault.manage` permission     | The organization's name      |
+
+The two extra kinds are one row and one set of rules: a vault is a key and the
+people who hold it, and "mine alone" is that with one member. Clients read both
+as organizations, which is why they work in the browser extension and the phone
+apps without knowing the difference.
+
+The name is the one thing about a vault the server can read. Everything in it -
+items, collection names, attachments - is encrypted under the vault's key.
+
+### Letting somebody in, and how much they reach
+
+- Creating a vault mints its key and pair in the browser and wraps the key to the
+  creator's public key, so the server never sees an openable one.
 - Adding somebody puts them on the list and hands them nothing. "Let them in"
-  unwraps the organization's key in an administrator's browser and wraps it
-  again to that person's public key.
-- The Polaris permission `vault.manage` gates who may do any of that. It gates
-  the SHAPE of the vault, never its contents: a permission cannot hand over a
-  key.
-- Sharing one item into a collection is one-way, from the item itself. It is
-  re-encrypted under the organization's key and the personal copy is replaced.
+  unwraps the vault's key in an administrator's browser and wraps it again to
+  that person's public key.
+- The same dialog asks how much of it they reach: the whole vault, or named
+  collections, each read-only or not. It is asked the same way the first time and
+  every time after, and it can be changed later without handing the key again.
+- The Polaris permission `vault.manage` gates all of that for an ORGANIZATION's
+  vault. It gates the SHAPE of the vault, never its contents: a permission cannot
+  hand over a key. For a vault of somebody's own, owning it is what gates it.
+- Being added does not need the other person's agreement, so leaving does not
+  need the adder's: anybody let into a vault can leave it from the same screen.
+- A scope is what the server shows a member and lets them write. The key opens
+  the whole vault either way, and no arithmetic hands over half of one - so it is
+  a real boundary against the clients people use and a paper one against somebody
+  who keeps the key and writes their own. Share what you would not hand over
+  entirely as a second vault, not as a narrower scope.
 
-Somebody removed from a vault keeps whatever they already synced - a key cannot
-be un-given - so change what they knew if it matters.
+### Moving an item
+
+Moving one item between vaults - into one, into another, or back to the account's
+own - happens from the item itself. It is re-encrypted under the key of wherever
+it is going and the old ciphertext is replaced; there is no row to reassign,
+because which key opens it IS where it lives.
+
+Whoever already synced it keeps their copy, and somebody removed from a vault
+keeps whatever they already synced - a key cannot be un-given - so change what
+they knew if it matters.
 
 ## Connecting a client
 
@@ -88,10 +124,9 @@ it: the vault's second factor IS the account's, not a second one.
 - **No personal API keys.** The `client_credentials` grant is not offered: it
   would be a second credential for the vault with none of the master password's
   guarantees.
-- **Organizations are set up in Polaris.** Clients read them and work inside
-  them, but creating an organization vault and confirming a member both need a
-  browser holding an unlocked vault to wrap a key, so both live in the Polaris
-  screens (`/vault/shared`).
+- **Vaults are set up in Polaris.** Clients read them and work inside them, but
+  creating one and confirming a member both need a browser holding an unlocked
+  vault to wrap a key, so both live in the Polaris screens (`/vault/vaults`).
 - **Icons are fetched by this server**, not by Bitwarden's icon service - a
   request per saved site is a list of the sites somebody has accounts on.
 - **The notifications hub answers `negotiate` with no transports.** Polaris does
@@ -111,11 +146,8 @@ Named here rather than left to be discovered:
   thing and does not reach the vault.
 - Push notifications, and therefore live sync between clients. They sync on
   their own schedule.
-- Organization member management from a client (inviting, confirming, changing a
-  role). Read-only from clients; done in Polaris at `/vault/shared`.
-- Per-collection access rules from a screen. The rows and the endpoint exist
-  (`setCollectionAccessAction`), and today every confirmed member of an
-  organization reaches all of its collections.
+- Member management from a client (inviting, confirming, changing a role).
+  Read-only from clients; done in Polaris at `/vault/vaults`.
 - Reading a KeePass `.kdbx` directly. It is a database rather than an export;
   KeePass writes XML or CSV from File > Export and both are read.
 - The breached-password report, and the `/api/hibp/breach` endpoint behind it.
@@ -130,7 +162,8 @@ apps/web/src/lib/vault/portability.ts   reading and writing every import/export 
 apps/web/src/lib/vault/api/routes.ts    every path the surface answers
 apps/web/src/app/(app)/vault/           the Polaris screens
 apps/web/src/app/(app)/vault/vault-session.tsx  where the opened key is held
-apps/web/src/app/(app)/vault/share-actions.ts   the organization side
+apps/web/src/app/(app)/vault/share-actions.ts   vaults, members and scopes
+apps/web/src/lib/vault/orgs.ts          a vault of any kind, and who is in it
 apps/web/src/app/vs/[id]/               the public Send viewer
 ```
 

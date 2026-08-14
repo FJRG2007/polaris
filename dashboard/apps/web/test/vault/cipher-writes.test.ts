@@ -151,36 +151,58 @@ describe("createCipher", () => {
     });
 });
 
-describe("shareCipher", () => {
-    it("refuses to hand an owned item to an organization the caller is not in", async () => {
-        orgUsers.mockResolvedValue([]);
-        const result = await ciphers.shareCipher(USER, CIPHER, input({ organizationId: ORG }), [
+describe("moveCipher", () => {
+    it("refuses an item this account cannot write", async () => {
+        cipherFindFirst.mockResolvedValue(null as unknown as { id: string });
+        const result = await ciphers.moveCipher(USER, CIPHER, input({ organizationId: ORG }), [
             COLLECTION
         ]);
         expect(result).toEqual({ ok: false, reason: "not_found" });
         expect(transaction).not.toHaveBeenCalled();
     });
 
-    it("refuses when none of the named collections are the organization's", async () => {
+    it("refuses to hand an item to a vault the caller is not in", async () => {
+        orgUsers.mockResolvedValue([]);
+        const result = await ciphers.moveCipher(USER, CIPHER, input({ organizationId: ORG }), [
+            COLLECTION
+        ]);
+        expect(result).toEqual({ ok: false, reason: "not_found" });
+        expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it("refuses when none of the named collections are that vault's", async () => {
         orgUsers.mockResolvedValue([{ id: "member-1", orgId: ORG, accessAll: true }]);
         collections.mockResolvedValue([]);
-        const result = await ciphers.shareCipher(USER, CIPHER, input({ organizationId: ORG }), [
+        const result = await ciphers.moveCipher(USER, CIPHER, input({ organizationId: ORG }), [
             OTHER_COLLECTION
         ]);
         expect(result).toEqual({ ok: false, reason: "not_found" });
         expect(transaction).not.toHaveBeenCalled();
     });
 
-    it("shares into the collections that checked out", async () => {
+    it("moves into the collections that checked out", async () => {
         orgUsers.mockResolvedValue([{ id: "member-1", orgId: ORG, accessAll: true }]);
         collections.mockResolvedValue([{ id: COLLECTION }]);
-        const result = await ciphers.shareCipher(USER, CIPHER, input({ organizationId: ORG }), [
+        const result = await ciphers.moveCipher(USER, CIPHER, input({ organizationId: ORG }), [
             COLLECTION,
             OTHER_COLLECTION
         ]);
         expect(result.ok).toBe(true);
         expect(txClient.vaultCipher.update.mock.calls[0]?.[0].data.collections).toEqual({
             create: [{ collectionId: COLLECTION }]
+        });
+    });
+
+    it("moves back to the caller's own vault, with no collection and no owner", async () => {
+        orgUsers.mockResolvedValue([{ id: "member-1", orgId: ORG, accessAll: true }]);
+        const result = await ciphers.moveCipher(USER, CIPHER, input(), []);
+        expect(result.ok).toBe(true);
+        const written = txClient.vaultCipher.update.mock.calls[0]?.[0].data;
+        expect(written.userId).toBe(USER);
+        expect(written.organizationId).toBeNull();
+        // The links to wherever it was are dropped whichever way it goes.
+        expect(txClient.vaultCollectionCipher.deleteMany).toHaveBeenCalledWith({
+            where: { cipherId: CIPHER }
         });
     });
 });

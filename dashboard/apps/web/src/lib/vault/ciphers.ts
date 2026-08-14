@@ -333,6 +333,9 @@ export async function createCipher(
     if (organizationId) {
         const allowed = await writableCollections(userId, organizationId, collectionIds);
         if (allowed === null) return null;
+        // Naming collections that all turn out to be somebody else's would
+        // otherwise write the item into the vault with nothing pointing at it.
+        if (collectionIds.length > 0 && allowed.length === 0) return null;
         collections = allowed;
     }
     const row = await prisma.vaultCipher.create({
@@ -436,10 +439,9 @@ export async function updateCipherPartial(
 /**
  * Set which of an organization's collections an item is in.
  *
- * Only for an item that already belongs to an organization: putting a personal
- * item into a collection is `shareCipher`, because that one has to be
- * re-encrypted under the organization's key first and this one must not look
- * like a way around it.
+ * Only for an item that already belongs to a vault: putting a personal item into
+ * a collection is `moveCipher`, because that one has to be re-encrypted under the
+ * vault's key first and this one must not look like a way around it.
  */
 export async function setCipherCollections(
     userId: string,
@@ -574,6 +576,15 @@ async function attachmentPaths(cipherIds: string[]): Promise<string[]> {
     return rows.map((row) => row.storedPath);
 }
 
+/** The same, for everything one vault holds - read before the vault goes. */
+export async function vaultAttachmentPaths(vaultId: string): Promise<string[]> {
+    const rows = await prisma.vaultAttachment.findMany({
+        where: { cipher: { organizationId: vaultId } },
+        select: { storedPath: true }
+    });
+    return rows.map((row) => row.storedPath);
+}
+
 /**
  * Send items to the trash, or take them out for good.
  *
@@ -640,41 +651,55 @@ export async function moveCiphers(
 }
 
 /**
- * Hand a personal item to an organization.
+ * Move an item into a vault, into a different one, or back to being personal.
  *
- * The client re-encrypted it under the organization's key before calling, which
- * is why the whole item is sent again: this is not a change of owner on a row,
- * it is a different ciphertext that happens to replace one.
+ * The caller re-encrypted it under the key of wherever it is going before
+ * calling, which is why the whole item is sent again: this is not a change of
+ * owner on a row, it is a different ciphertext that happens to replace one.
+ *
+ * Two questions, and they are separate. Being able to write the item says it may
+ * leave; standing where it is going says it may arrive. Without the second,
+ * anybody could push an item into a vault they are not in and every member of it
+ * would sync a copy.
+ *
+ * Everybody who already synced it keeps their copy - a key cannot be un-given -
+ * so this changes where the item is kept from now on, not where it has been.
  */
-export async function shareCipher(
+export async function moveCipher(
     userId: string,
     cipherId: string,
     input: CipherInput,
     collectionIds: string[]
 ): Promise<CipherWriteResult> {
-    const owned = await prisma.vaultCipher.findFirst({
-        where: { id: cipherId, userId },
-        select: { id: true }
-    });
-    if (!owned || !input.organizationId) return { ok: false, reason: "not_found" };
-    // Owning the item says it may leave; standing in the organization says it may
-    // arrive. Without the second, anybody could push an item into a vault they
-    // are not in and every member of it would sync a copy.
-    const collections = await writableCollections(userId, input.organizationId, collectionIds);
-    if (collections === null || collections.length === 0) return { ok: false, reason: "not_found" };
+    if (!(await mayWrite(userId, cipherId))) return { ok: false, reason: "not_found" };
+    const target = input.organizationId ?? null;
+    let collections: string[] = [];
+    if (target) {
+        const allowed = await writableCollections(userId, target, collectionIds);
+        // No collection means an item only an administrator of that vault would
+        // ever see again, which is not a move anybody meant to make.
+        if (allowed === null || allowed.length === 0) return { ok: false, reason: "not_found" };
+        collections = allowed;
+    }
 
+    const folderId = target ? null : await ownFolderId(userId, input.folderId);
     const row = await prisma.$transaction(async (tx) => {
         await tx.vaultCollectionCipher.deleteMany({ where: { cipherId } });
         return tx.vaultCipher.update({
             where: { id: cipherId },
             data: {
-                userId: null,
-                organizationId: input.organizationId,
+                // An item belongs to a person or to a vault, never both: the key
+                // it is encrypted under is one or the other.
+                userId: target ? null : userId,
+                organizationId: target,
+                folderId,
                 data: toDocument(input),
                 type: input.type,
                 reprompt: input.reprompt ?? 0,
                 revisionDate: new Date(),
-                collections: { create: collections.map((collectionId) => ({ collectionId })) }
+                ...(collections.length > 0
+                    ? { collections: { create: collections.map((collectionId) => ({ collectionId })) } }
+                    : {})
             },
             select: CIPHER_SELECT
         });

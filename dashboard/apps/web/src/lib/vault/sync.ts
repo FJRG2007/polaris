@@ -29,6 +29,7 @@ export async function membershipsFor(userId: string) {
                 select: {
                     id: true,
                     publicKey: true,
+                    name: true,
                     organization: { select: { name: true, slug: true } }
                 }
             }
@@ -37,6 +38,17 @@ export async function membershipsFor(userId: string) {
 }
 
 type Membership = Awaited<ReturnType<typeof membershipsFor>>[number];
+
+/**
+ * What a vault is called on the wire.
+ *
+ * An organization's takes the organization's name; a vault of somebody's own
+ * carries its own. Clients label every shared item with this, so a vault with no
+ * name at all would show up as an empty badge rather than as a mistake.
+ */
+export function vaultLabel(vault: { name: string | null; organization: { name: string } | null }): string {
+    return vault.organization?.name ?? vault.name ?? "Vault";
+}
 
 /**
  * One organization as a client reads it off the profile.
@@ -51,8 +63,11 @@ function toProfileOrganization(membership: Membership): Record<string, unknown> 
     return {
         object: "profileOrganization",
         id: membership.organization.id,
-        name: membership.organization.organization.name,
-        identifier: membership.organization.organization.slug,
+        name: vaultLabel(membership.organization),
+        // A vault of somebody's own has no handle to answer with, and clients
+        // treat this as optional - it is only used to point a login at an
+        // organization by name.
+        identifier: membership.organization.organization?.slug ?? null,
         key: membership.key,
         status: membership.status,
         type: membership.type,

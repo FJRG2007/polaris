@@ -18,9 +18,9 @@ import { useVaultSession } from "@/app/(app)/vault/vault-session";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/app/(app)/vault/vault-actions", () => ({ createVaultAction: vi.fn() }));
+vi.mock("@/app/(app)/vault/vault-actions", () => ({ createAccountVaultAction: vi.fn() }));
 vi.mock("@/app/(app)/vault/share-actions", () => ({
-    vaultOrganizationsAction: vi.fn(async () => [])
+    vaultListAction: vi.fn(async () => [])
 }));
 
 const { VaultSessionProvider } = await import("@/app/(app)/vault/vault-session");

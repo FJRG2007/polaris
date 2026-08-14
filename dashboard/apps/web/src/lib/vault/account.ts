@@ -263,16 +263,35 @@ export async function deauthorizeSessions(userId: string): Promise<void> {
  * rows. The ciphertext behind them sits on whatever storage uploads go to, and
  * bytes left there with nothing naming them can never be reclaimed - so the
  * paths are read first and the blobs dropped after.
+ *
+ * Vaults of their own go the same way, with one exception: one somebody else was
+ * let into stays. Those members hold its key and can still read it, and the key
+ * being deleted here is not theirs to lose.
  */
 export async function deleteVault(userId: string): Promise<void> {
+    const orphaned = await prisma.vaultOrganization.findMany({
+        where: {
+            ownerUserId: userId,
+            members: { none: { userId: { not: userId }, status: core.ORG_USER_CONFIRMED } }
+        },
+        select: { id: true }
+    });
+    const orphanedIds = orphaned.map((row) => row.id);
     const [attachments, sends] = await Promise.all([
         prisma.vaultAttachment.findMany({
-            where: { cipher: { userId } },
+            where: {
+                cipher: {
+                    OR: [{ userId }, ...(orphanedIds.length > 0 ? [{ organizationId: { in: orphanedIds } }] : [])]
+                }
+            },
             select: { storedPath: true }
         }),
         prisma.vaultSend.findMany({ where: { userId }, select: { storedPath: true } })
     ]);
     await prisma.vaultAccount.deleteMany({ where: { userId } });
+    if (orphanedIds.length > 0) {
+        await prisma.vaultOrganization.deleteMany({ where: { id: { in: orphanedIds } } });
+    }
     for (const row of [...attachments, ...sends]) await deleteVaultBlob(row.storedPath);
     await recordAudit({
         actorId: userId,

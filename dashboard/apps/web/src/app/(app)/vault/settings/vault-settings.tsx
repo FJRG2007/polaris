@@ -23,7 +23,7 @@ import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@p
 import {
     changeMasterPasswordAction,
     deauthorizeVaultAction,
-    deleteVaultAction,
+    deleteAccountVaultAction,
     setUnlockTimeoutAction
 } from "../vault-actions";
 
@@ -130,7 +130,7 @@ export function VaultSettings() {
         setError(null);
         try {
             const masterKey = await crypto.deriveMasterKey(current, email, kdf);
-            const result = await deleteVaultAction({
+            const result = await deleteAccountVaultAction({
                 masterPasswordHash: await crypto.masterPasswordHash(masterKey, current)
             });
             if (result.error) {

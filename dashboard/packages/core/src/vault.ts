@@ -287,6 +287,14 @@ export function vaultUnlockTimeoutValid(minutes: number): boolean {
     return VAULT_UNLOCK_TIMEOUTS.includes(minutes as (typeof VAULT_UNLOCK_TIMEOUTS)[number]);
 }
 
+/**
+ * How many vaults of their own one account may keep, beside the vault it starts
+ * with. Not a licence tier: each one is a key somebody has to remember they hold,
+ * and an account with hundreds of them is a mistake or a script, not a filing
+ * system.
+ */
+export const MAX_OWNED_VAULTS = 20;
+
 /** Where an account stands in an organization. */
 export const ORG_USER_INVITED = 0;
 export const ORG_USER_ACCEPTED = 1;

@@ -256,12 +256,18 @@ export const deviceSchema = z.object({
     pushToken: z.string().max(2000).nullish()
 });
 
+/**
+ * A key pair a browser minted. The public half is plain - it is what somebody
+ * else's key gets wrapped to - and the private half arrives already wrapped.
+ */
+const keyPair = z.object({ publicKey: z.string().min(1), encryptedPrivateKey: encString });
+
 /** Setting up a vault: the keys a browser minted, and how it derives them. */
 export const vaultRegisterSchema = z.object({
     masterPasswordHash: z.string().min(1).max(512),
     masterPasswordHint: z.string().max(500).nullish(),
     key: encString,
-    keys: z.object({ publicKey: z.string().min(1), encryptedPrivateKey: encString }),
+    keys: keyPair,
     kdf: z.number().int().min(0).max(1),
     kdfIterations: z.number().int().positive(),
     kdfMemory: z.number().int().positive().nullish(),
@@ -291,6 +297,53 @@ export const vaultOrganizationSchema = z.object({
     organizationId: z.string().uuid(),
     /** The organization's key, wrapped to the creator's own public key. */
     key: encString,
-    keys: z.object({ publicKey: z.string().min(1), encryptedPrivateKey: encString }),
+    keys: keyPair,
     collectionName: encString
 });
+
+/** Long enough to name a vault, short enough to stay a label in a picker. */
+export const VAULT_NAME_MAX = 60;
+
+/**
+ * What a vault is called.
+ *
+ * Only a vault of somebody's own has one - an organization's takes the
+ * organization's name - and unlike everything else in a vault it is stored in
+ * the clear, because clients read it off the profile to label the vault.
+ */
+export const vaultNameField = z
+    .string()
+    .trim()
+    .min(1, "Give it a name")
+    .max(VAULT_NAME_MAX, `At most ${VAULT_NAME_MAX} characters`);
+
+/** A second vault of somebody's own being created, with the keys for it. */
+export const personalVaultSchema = z.object({
+    name: vaultNameField,
+    /** The vault's key, wrapped to the creator's own public key. */
+    key: encString,
+    keys: keyPair,
+    collectionName: encString
+});
+
+/**
+ * What one member of a vault reaches.
+ *
+ * Either the whole vault, or the collections named here and nothing else. The
+ * two are not combined: `accessAll` already reaches every collection, so rows
+ * beside it would be dead weight that outlives the day somebody takes it away.
+ */
+export const vaultScopeSchema = z.object({
+    accessAll: z.boolean(),
+    collections: z
+        .array(
+            z.object({
+                collectionId: z.string().uuid(),
+                readOnly: z.boolean(),
+                hidePasswords: z.boolean()
+            })
+        )
+        .max(200)
+});
+
+export type VaultScope = z.infer<typeof vaultScopeSchema>;

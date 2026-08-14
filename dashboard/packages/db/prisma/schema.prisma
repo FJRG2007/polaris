@@ -143,6 +143,7 @@ model User {
     backupPlans         BackupPlan[]
     protectedResources  ProtectedResource[]
     backupJobs          BackupJob[]
+    ownedVaults         VaultOrganization[]  @relation("VaultOwner")
 }
 
 // What somebody last searched for, so the panel opens on their own work.
@@ -2226,27 +2227,43 @@ model VaultFavorite {
     @@index([cipherId])
 }
 
-// An organization's vault, hanging off the Polaris organization rather than
-// replacing it: who is in it, and what they may do in Polaris, is already
-// settled elsewhere. What is here is only what that model has no concept of -
-// the keys.
+// A vault beyond the one every account starts with: a second vault of somebody's
+// own, or an organization's.
 //
-// The pair is the organization's own. The private key is wrapped under the
-// organization's symmetric key, and each member holds that symmetric key wrapped
-// under their own public key, which is what lets somebody be added without any
-// existing member being online to re-share every item.
+// Both are the same thing and are stored as one row on purpose. A vault is a key
+// plus the people who hold it, and "mine alone" is that with one member - so a
+// personal second vault costs no second model, and clients that already read
+// organizations read it without knowing it is one person's.
+//
+// Exactly one owner is set. `organizationId` hangs it off a Polaris organization,
+// whose roster and permissions are already settled elsewhere; `ownerUserId` makes
+// it one person's, and then `name` is what it is called, because there is no
+// organization row to take a name from.
+//
+// The pair is the vault's own. The private key is wrapped under the vault's
+// symmetric key, and each member holds that symmetric key wrapped under their own
+// public key, which is what lets somebody be added without any existing member
+// being online to re-share every item.
 model VaultOrganization {
     id             String   @id @default(uuid(7)) @db.Uuid
-    organizationId String   @unique @db.Uuid
+    organizationId String?  @unique @db.Uuid
+    ownerUserId    String?  @db.Uuid
+    // Set on a personal vault only. Stored in the clear, like an organization's
+    // name: clients read it off the profile to label the vault, and a name they
+    // cannot decrypt is a vault that shows up unnamed everywhere.
+    name           String?
     publicKey      String
     privateKey     String
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
 
-    organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    organization Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    owner        User?             @relation("VaultOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
     members      VaultOrgUser[]
     collections  VaultCollection[]
     ciphers      VaultCipher[]
+
+    @@index([ownerUserId])
 }
 
 // One person's place in an organization's vault.

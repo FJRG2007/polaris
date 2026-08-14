@@ -105,13 +105,16 @@ Vault:
       code generation
 - [x] One unlocked-vault session shared across every `/vault` screen with a
       per-account idle timeout, folder create/rename/delete (including from the
-      item form), and organization vaults/collections/member confirmation/item
-      sharing from `/vault/shared` - see [`docs/vault.md`](docs/vault.md)
+      item form), and vaults/collections/member confirmation from
+      `/vault/vaults` - see [`docs/vault.md`](docs/vault.md)
+- [x] More than one vault per account: extra vaults of somebody's own beside the
+      organization ones, shared whole or by collection with a per-member scope,
+      and items moved between them from the item itself
 - [x] Import and export in the browser: Bitwarden JSON, KeePass 2 XML, and CSV
 - [x] Sign-in reuses the Polaris account's own second factor rather than a
       second, vault-only one
-- [ ] Emergency access, push/live sync, organization member management from a
-      client, and the breached-password report - named as not implemented yet in
+- [ ] Emergency access, push/live sync, member management from a client, and the
+      breached-password report - named as not implemented yet in
       [`docs/vault.md`](docs/vault.md)
 
 Containers app (Docker):

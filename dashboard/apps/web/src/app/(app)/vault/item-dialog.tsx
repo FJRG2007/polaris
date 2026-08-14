@@ -13,8 +13,10 @@
 
 import * as core from "@polaris/core";
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, FolderPlus, Loader2, Plus, RefreshCw, X } from "lucide-react";
+import { useVaultSession } from "./vault-session";
+import { useVaultCollections } from "./use-vault-collections";
 import { PasswordGenerator, generate } from "@/components/password-generator";
+import { FolderPlus, Loader2, Lock, LockOpen, Plus, RefreshCw, X } from "lucide-react";
 import { emptyItem, IDENTITY_FIELDS, type VaultFolder, type VaultItem } from "./vault-model";
 import {
     Button,
@@ -58,16 +60,25 @@ export function ItemDialog({
     item: VaultItem | null;
     folders: VaultFolder[];
     onClose: () => void;
-    onSave: (item: VaultItem) => Promise<string | null>;
+    /** The collections are where a NEW item lands when it is written straight
+     *  into another vault; an item that already exists keeps the ones it is in. */
+    onSave: (item: VaultItem, collectionIds: string[]) => Promise<string | null>;
     /** Makes a folder and answers with its id, or null if it could not. */
     onCreateFolder: (name: string) => Promise<string | null>;
 }) {
+    const { vaults, vaultKeys } = useVaultSession();
     const [draft, setDraft] = useState<VaultItem>(emptyItem(core.CIPHER_LOGIN));
-    const [revealed, setRevealed] = useState(false);
     const [generator, setGenerator] = useState(false);
     const [newFolder, setNewFolder] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [collectionId, setCollectionId] = useState("");
+    // Only a new item chooses: moving one that exists re-encrypts it, which is
+    // the move dialog's job and not something a Save button should do quietly.
+    const choosable = draft.id
+        ? []
+        : vaults.filter((vault) => vault.vaultId !== null && vaultKeys.has(vault.vaultId));
+    const { collections } = useVaultCollections(draft.id ? null : draft.organizationId);
     // Not `autoFocus`: the Select's focus scope is still trapping when this
     // field mounts and hands focus straight back to the trigger.
     const folderNameField = useDeferredFocus<HTMLInputElement>(newFolder !== null);
@@ -75,11 +86,16 @@ export function ItemDialog({
     useEffect(() => {
         if (!item) return;
         setDraft(item);
-        setRevealed(false);
         setGenerator(false);
         setNewFolder(null);
         setError(null);
     }, [item]);
+
+    // Land on the first collection of whichever vault is picked, and never keep
+    // an id belonging to the vault chosen before it.
+    useEffect(() => {
+        setCollectionId(collections[0]?.id ?? "");
+    }, [collections]);
 
     /** Make the folder that was just typed and file this item in it. */
     async function createFolder(): Promise<void> {
@@ -101,9 +117,14 @@ export function ItemDialog({
     }
 
     async function onSubmit(): Promise<void> {
+        const intoVault = !draft.id && draft.organizationId !== null;
+        if (intoVault && !collectionId) {
+            setError("Pick a collection to put it in.");
+            return;
+        }
         setPending(true);
         setError(null);
-        const failure = await onSave(draft);
+        const failure = await onSave(draft, intoVault ? [collectionId] : []);
         setPending(false);
         if (failure) {
             setError(failure);
@@ -158,6 +179,46 @@ export function ItemDialog({
                             />
                         </label>
                     </div>
+
+                    {/* Which vault it goes in, and where inside it. Only for a new
+                        item: moving one that exists re-encrypts it under another
+                        key, which is what the move dialog is for. */}
+                    {choosable.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-3">
+                            <label className="flex flex-col gap-1 text-sm">
+                                Vault
+                                <Select
+                                    value={draft.organizationId ?? ""}
+                                    onValueChange={(value) =>
+                                        patch({ organizationId: value || null })
+                                    }
+                                    aria-label="Vault"
+                                    options={[
+                                        { value: "", label: "My own vault" },
+                                        ...choosable.map((vault) => ({
+                                            value: vault.vaultId ?? "",
+                                            label: vault.name
+                                        }))
+                                    ]}
+                                />
+                            </label>
+                            {draft.organizationId ? (
+                                <label className="flex flex-col gap-1 text-sm">
+                                    Collection
+                                    <Select
+                                        value={collectionId}
+                                        onValueChange={setCollectionId}
+                                        aria-label="Collection"
+                                        placeholder="No collections here yet"
+                                        options={collections.map((collection) => ({
+                                            value: collection.id,
+                                            label: collection.name
+                                        }))}
+                                    />
+                                </label>
+                            ) : null}
+                        </div>
+                    ) : null}
 
                     {/* Revealed by the picker above rather than opening a second
                         dialog over this one: the item being written is still
@@ -227,36 +288,23 @@ export function ItemDialog({
                             <label className="flex flex-col gap-1 text-sm">
                                 Password
                                 <div className="flex items-center gap-2">
-                                    <Input
-                                        type={revealed ? "text" : "password"}
-                                        value={draft.login.password}
-                                        onChange={(event) =>
-                                            patch({
-                                                login: {
-                                                    ...draft.login,
-                                                    password: event.target.value
-                                                }
-                                            })
-                                        }
-                                        autoComplete="off"
-                                        className="font-mono"
-                                    />
-                                    <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="secondary"
-                                        title={revealed ? "Hide" : "Show"}
-                                        aria-label={
-                                            revealed ? "Hide the password" : "Show the password"
-                                        }
-                                        onClick={() => setRevealed((prev) => !prev)}
-                                    >
-                                        {revealed ? (
-                                            <EyeOff className="size-4" />
-                                        ) : (
-                                            <Eye className="size-4" />
-                                        )}
-                                    </Button>
+                                    {/* The Input carries its own show/hide eye. */}
+                                    <div className="flex-1">
+                                        <Input
+                                            type="password"
+                                            value={draft.login.password}
+                                            onChange={(event) =>
+                                                patch({
+                                                    login: {
+                                                        ...draft.login,
+                                                        password: event.target.value
+                                                    }
+                                                })
+                                            }
+                                            autoComplete="off"
+                                            className="font-mono"
+                                        />
+                                    </div>
                                     <Button
                                         type="button"
                                         size="icon"
@@ -277,7 +325,6 @@ export function ItemDialog({
                                                     })
                                                 }
                                             });
-                                            setRevealed(true);
                                         }}
                                     >
                                         <RefreshCw className="size-4" />
@@ -296,7 +343,6 @@ export function ItemDialog({
                                     <PasswordGenerator
                                         onUse={(value) => {
                                             patch({ login: { ...draft.login, password: value } });
-                                            setRevealed(true);
                                             setGenerator(false);
                                         }}
                                     />
@@ -392,7 +438,7 @@ export function ItemDialog({
                                 <label className="flex flex-col gap-1 text-sm">
                                     Security code
                                     <Input
-                                        type={revealed ? "text" : "password"}
+                                        type="password"
                                         value={draft.card.code}
                                         onChange={(event) =>
                                             patch({
@@ -511,32 +557,37 @@ export function ItemDialog({
                                         })
                                     }
                                 />
-                                <Input
-                                    value={field.value}
-                                    placeholder="Value"
-                                    type={
-                                        field.type === core.FIELD_HIDDEN && !revealed
-                                            ? "password"
-                                            : "text"
-                                    }
-                                    onChange={(event) =>
-                                        patch({
-                                            fields: draft.fields.map((entry, at) =>
-                                                at === index
-                                                    ? { ...entry, value: event.target.value }
-                                                    : entry
-                                            )
-                                        })
-                                    }
-                                />
+                                {/* A hidden field masks itself and carries the eye
+                                    that shows it; the button beside it is the
+                                    stored kind, not a second reveal. */}
+                                <div className="flex-1">
+                                    <Input
+                                        value={field.value}
+                                        placeholder="Value"
+                                        type={
+                                            field.type === core.FIELD_HIDDEN ? "password" : "text"
+                                        }
+                                        onChange={(event) =>
+                                            patch({
+                                                fields: draft.fields.map((entry, at) =>
+                                                    at === index
+                                                        ? { ...entry, value: event.target.value }
+                                                        : entry
+                                                )
+                                            })
+                                        }
+                                    />
+                                </div>
                                 <Button
                                     type="button"
                                     size="icon"
                                     variant="ghost"
                                     title={
-                                        field.type === core.FIELD_HIDDEN ? "Show as text" : "Hide"
+                                        field.type === core.FIELD_HIDDEN
+                                            ? "Keep as plain text"
+                                            : "Keep hidden"
                                     }
-                                    aria-label="Toggle whether this field is hidden"
+                                    aria-label="Toggle whether this field is stored hidden"
                                     onClick={() =>
                                         patch({
                                             fields: draft.fields.map((entry, at) =>
@@ -554,9 +605,9 @@ export function ItemDialog({
                                     }
                                 >
                                     {field.type === core.FIELD_HIDDEN ? (
-                                        <EyeOff className="size-4" />
+                                        <Lock className="size-4" />
                                     ) : (
-                                        <Eye className="size-4" />
+                                        <LockOpen className="size-4" />
                                     )}
                                 </Button>
                                 <Button

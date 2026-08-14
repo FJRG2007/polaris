@@ -17,7 +17,7 @@ import Link from "next/link";
 import * as core from "@polaris/core";
 import { TotpCode } from "./totp-code";
 import { ItemDialog } from "./item-dialog";
-import { ShareDialog } from "./share-dialog";
+import { MoveDialog } from "./move-dialog";
 import { FolderDialog } from "./folder-dialog";
 import { useVaultSession } from "./vault-session";
 import * as vaultCrypto from "@/lib/vault/crypto";
@@ -50,7 +50,7 @@ import {
     FileText,
     FolderCog,
     Contact,
-    Share2,
+    MoveRight,
     Building2,
     KeyRound,
     Loader2,
@@ -73,10 +73,17 @@ const TYPE_ICON: Record<number, typeof KeyRound> = {
 };
 
 /** What the list can be narrowed to. */
-type Filter = "all" | "favorites" | "trash" | `type:${number}` | `folder:${string}`;
+type Filter =
+    | "all"
+    | "favorites"
+    | "trash"
+    | "vault:mine"
+    | `type:${number}`
+    | `folder:${string}`
+    | `vault:${string}`;
 
 export function VaultApp() {
-    const { key, lock, keyFor, orgKeys, organizations } = useVaultSession();
+    const { key, lock, keyFor, vaultKeys, vaults } = useVaultSession();
     const [items, setItems] = useState<VaultItem[]>([]);
     const [folders, setFolders] = useState<VaultFolder[]>([]);
     const [loading, setLoading] = useState(false);
@@ -85,7 +92,7 @@ export function VaultApp() {
     const [selected, setSelected] = useState<string | null>(null);
     const [editing, setEditing] = useState<VaultItem | null>(null);
     const [managingFolders, setManagingFolders] = useState(false);
-    const [sharing, setSharing] = useState<VaultItem | null>(null);
+    const [moving, setMoving] = useState<VaultItem | null>(null);
     const [revealed, setRevealed] = useState(false);
     const [copied, setCopied] = useState<string | null>(null);
     const [confirm, confirmDialog] = useConfirm();
@@ -93,8 +100,8 @@ export function VaultApp() {
     /**
      * Pull everything and open it. Runs on unlock and after every write.
      *
-     * Each item is opened with the key of whoever owns it - this account's, or
-     * an organization's. An item whose key this account does not hold is skipped
+     * Each item is opened with the key of the vault it is in - this account's own,
+     * or another one's. An item whose key this account does not hold is skipped
      * rather than shown as a row of empty fields: being on a roster is not the
      * same as having been vouched for, and a half-drawn item would suggest it is.
      */
@@ -104,7 +111,7 @@ export function VaultApp() {
         const opened: VaultItem[] = [];
         for (const raw of contents.ciphers) {
             const owner = typeof raw.organizationId === "string" ? raw.organizationId : null;
-            const itemKey = owner ? (orgKeys.get(owner) ?? null) : withKey;
+            const itemKey = owner ? (vaultKeys.get(owner) ?? null) : withKey;
             if (!itemKey) continue;
             opened.push(await decryptItem(raw, itemKey));
         }
@@ -115,11 +122,11 @@ export function VaultApp() {
 
     useEffect(() => {
         if (key) void load(key);
-        // The organization keys arrive a beat after the vault key, so this runs
-        // again when they do. Not on every render: that would re-decrypt the
+        // The other vaults' keys arrive a beat after this account's own, so this
+        // runs again when they do. Not on every render: that would re-decrypt the
         // whole vault for nothing.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [key, orgKeys]);
+    }, [key, vaultKeys]);
 
     const visible = useMemo(() => {
         const needle = query.trim().toLowerCase();
@@ -128,6 +135,14 @@ export function VaultApp() {
             if (filter === "favorites" && !item.favorite) return false;
             if (filter.startsWith("type:") && item.type !== Number(filter.slice(5))) return false;
             if (filter.startsWith("folder:") && item.folderId !== filter.slice(7)) return false;
+            if (filter === "vault:mine" && item.organizationId !== null) return false;
+            if (
+                filter.startsWith("vault:") &&
+                filter !== "vault:mine" &&
+                item.organizationId !== filter.slice(6)
+            ) {
+                return false;
+            }
             if (!needle) return true;
             return [item.name, item.login.username, item.login.uris.join(" "), item.notes]
                 .join(" ")
@@ -138,10 +153,15 @@ export function VaultApp() {
 
     const current = visible.find((item) => item.id === selected) ?? null;
 
-    /** Whose shared vault an item belongs to, by the id the item carries. */
-    function ownerName(vaultOrgId: string): string {
-        return organizations.find((org) => org.vaultOrgId === vaultOrgId)?.name ?? "Shared";
+    /** Which vault an item belongs to, by the id the item carries. */
+    function ownerName(vaultId: string): string {
+        return vaults.find((vault) => vault.vaultId === vaultId)?.name ?? "Another vault";
     }
+
+    /** The vaults this account can actually read, for the filter and the badge. */
+    const readable = vaults.filter(
+        (vault) => vault.vaultId !== null && vaultKeys.has(vault.vaultId)
+    );
 
     async function copy(label: string, value: string): Promise<void> {
         await navigator.clipboard.writeText(value);
@@ -149,15 +169,15 @@ export function VaultApp() {
         window.setTimeout(() => setCopied(null), 2000);
     }
 
-    async function onSave(item: VaultItem): Promise<string | null> {
+    async function onSave(item: VaultItem, collectionIds: string[]): Promise<string | null> {
         if (!key) return "Your vault is locked.";
-        // A shared item is written back under its organization's key, never the
-        // personal one - saving it under the wrong key would leave the other
+        // An item in another vault is written back under THAT vault's key, never
+        // this account's - saving it under the wrong key would leave the other
         // members with an item none of them can open.
         const itemKey = keyFor(item.organizationId);
-        if (!itemKey) return "You do not hold the key for that organization.";
+        if (!itemKey) return "You do not hold the key for that vault.";
         const body = await encryptItem(item, itemKey);
-        const result = await saveItemAction(item.id || null, body);
+        const result = await saveItemAction(item.id || null, body, collectionIds);
         if (result.error) return result.error;
         await load(key);
         return null;
@@ -270,6 +290,17 @@ export function VaultApp() {
                     options={[
                         { value: "all", label: "Everything" },
                         { value: "favorites", label: "Favorites" },
+                        // Only worth offering once there is more than one vault
+                        // to tell apart.
+                        ...(readable.length > 0
+                            ? [
+                                  { value: "vault:mine", label: "My own vault" },
+                                  ...readable.map((vault) => ({
+                                      value: `vault:${vault.vaultId}`,
+                                      label: vault.name
+                                  }))
+                              ]
+                            : []),
                         ...core.CIPHER_TYPES.map((type) => ({
                             value: `type:${type}`,
                             label: core.CIPHER_TYPE_LABEL[type]
@@ -394,22 +425,23 @@ export function VaultApp() {
                                                     className={`size-4 ${current.favorite ? "fill-amber-400 text-amber-400" : ""}`}
                                                 />
                                             </Button>
-                                            {/* Only a personal item, and only
-                                                when there is a shared vault to
-                                                put it in: sharing is one-way, so
-                                                offering it where it cannot work
-                                                is worse than not offering it. */}
+                                            {/* Only when there is somewhere to
+                                                move it: another vault whose key
+                                                this account holds, or back to its
+                                                own when it is already elsewhere. */}
                                             {!current.deleted &&
-                                            !current.organizationId &&
-                                            orgKeys.size > 0 ? (
+                                            (readable.some(
+                                                (vault) => vault.vaultId !== current.organizationId
+                                            ) ||
+                                                current.organizationId) ? (
                                                 <Button
                                                     size="sm"
                                                     variant="ghost"
-                                                    title="Share with an organization"
-                                                    aria-label={`Share ${current.name}`}
-                                                    onClick={() => setSharing(current)}
+                                                    title="Move to another vault"
+                                                    aria-label={`Move ${current.name}`}
+                                                    onClick={() => setMoving(current)}
                                                 >
-                                                    <Share2 className="size-4" />
+                                                    <MoveRight className="size-4" />
                                                 </Button>
                                             ) : null}
                                             {current.deleted ? (
@@ -590,10 +622,10 @@ export function VaultApp() {
                     onChanged={() => load(key)}
                 />
             ) : null}
-            <ShareDialog
-                item={sharing}
-                onClose={() => setSharing(null)}
-                onShared={() => (key ? load(key) : Promise.resolve())}
+            <MoveDialog
+                item={moving}
+                onClose={() => setMoving(null)}
+                onMoved={() => (key ? load(key) : Promise.resolve())}
             />
             {confirmDialog}
         </div>

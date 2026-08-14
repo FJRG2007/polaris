@@ -32,7 +32,7 @@ import { VaultSetup } from "./vault-setup";
 import { VaultUnlock } from "./vault-unlock";
 import type { VaultState } from "./vault-actions";
 import * as vaultCrypto from "@/lib/vault/crypto";
-import { vaultOrganizationsAction, type VaultOrgView } from "./share-actions";
+import { vaultListAction, type VaultView } from "./share-actions";
 import {
     createContext,
     useCallback,
@@ -68,18 +68,18 @@ interface VaultSessionValue {
      *  a vault that locks itself without saying why reads as a fault. */
     lock: (reason?: string) => void;
     unlockTimeout: number;
-    /** Every organization this account is in, and where it stands in each vault. */
-    organizations: VaultOrgView[];
-    /** The organization keys this account actually holds, by VAULT organization
-     *  id. Absent means invited but not yet vouched for - which reads nothing. */
-    orgKeys: ReadonlyMap<string, vaultCrypto.SymmetricKey>;
+    /** Every vault this account can see, and where it stands in each. */
+    vaults: VaultView[];
+    /** The vault keys this account actually holds, by vault id. Absent means
+     *  invited but not yet vouched for - which reads nothing. */
+    vaultKeys: ReadonlyMap<string, vaultCrypto.SymmetricKey>;
     /** This account's RSA private half, for unwrapping a key sent to it. */
     privateKey: Uint8Array | null;
     /** The key an item of a given owner is encrypted under, by the id the item
-     *  itself carries - the vault organization's, or null for a personal item. */
-    keyFor: (vaultOrgId: string | null) => vaultCrypto.SymmetricKey | null;
-    /** Pick the organizations up again, after one is created or joined. */
-    reloadOrgs: () => Promise<void>;
+     *  itself carries - the vault's, or null for an item in this account's own. */
+    keyFor: (vaultId: string | null) => vaultCrypto.SymmetricKey | null;
+    /** Pick the vaults up again, after one is created, renamed or joined. */
+    reloadVaults: () => Promise<void>;
     /** Why the vault locked, when something other than the deadline did it. */
     lockNotice: string | null;
 }
@@ -128,8 +128,8 @@ export function VaultSessionProvider({
     // as locked, and drawing the lock screen for the moment before a held key is
     // found would make every navigation flash it.
     const [restored, setRestored] = useState(timeout === core.VAULT_LOCK_IMMEDIATELY);
-    const [organizations, setOrganizations] = useState<VaultOrgView[]>([]);
-    const [orgKeys, setOrgKeys] = useState<Map<string, vaultCrypto.SymmetricKey>>(new Map());
+    const [vaults, setVaults] = useState<VaultView[]>([]);
+    const [vaultKeys, setVaultKeys] = useState<Map<string, vaultCrypto.SymmetricKey>>(new Map());
     const [privateKey, setPrivateKey] = useState<Uint8Array | null>(null);
     const [lockNotice, setLockNotice] = useState<string | null>(null);
     const keyRef = useRef<vaultCrypto.SymmetricKey | null>(null);
@@ -164,68 +164,68 @@ export function VaultSessionProvider({
 
     const lock = useCallback((reason?: string) => {
         setKey(null);
-        setOrgKeys(new Map());
+        setVaultKeys(new Map());
         setPrivateKey(null);
         setLockNotice(reason ?? null);
         window.sessionStorage.removeItem(STORAGE_KEY);
     }, []);
 
     /**
-     * Work out which shared vaults this account can actually read.
+     * Work out which of the other vaults this account can actually read.
      *
-     * Three steps, and each is a different kind of key: the vault key opens the
-     * account's own RSA private half, the private half unwraps the organization
-     * key somebody wrapped to it, and that key is what the shared items are
+     * Three steps, and each is a different kind of key: the account's own vault
+     * key opens its RSA private half, the private half unwraps the vault key
+     * somebody wrapped to it, and that key is what the items in that vault are
      * encrypted under. A membership with no wrapped key is somebody who has been
      * invited and not yet vouched for, and it reads nothing - which is the state
      * this whole arrangement exists to make possible.
      */
-    const loadOrgs = useCallback(
+    const loadVaults = useCallback(
         async (withKey: vaultCrypto.SymmetricKey) => {
-            const orgs = await vaultOrganizationsAction();
-            setOrganizations(orgs);
+            const rows = await vaultListAction();
+            setVaults(rows);
 
             const wrappedPrivate = state.privateKey;
             if (!wrappedPrivate) {
                 setPrivateKey(null);
-                setOrgKeys(new Map());
+                setVaultKeys(new Map());
                 return;
             }
             const opened = await vaultCrypto.decryptBytes(wrappedPrivate, withKey);
             setPrivateKey(opened);
             if (!opened) {
-                setOrgKeys(new Map());
+                setVaultKeys(new Map());
                 return;
             }
 
-            // Keyed by the VAULT organization's id, not the Polaris one: that is
+            // Keyed by the VAULT's id, not the Polaris organization's: that is
             // what an item carries, and confusing the two produces a map that
-            // never matches anything and a shared vault that appears empty.
+            // never matches anything and a vault that appears empty.
             const keys = new Map<string, vaultCrypto.SymmetricKey>();
-            for (const org of orgs) {
-                if (!org.confirmed || !org.wrappedKey || !org.vaultOrgId) continue;
-                const raw = await vaultCrypto.decryptRsa(org.wrappedKey, opened);
+            for (const vault of rows) {
+                if (!vault.confirmed || !vault.wrappedKey || !vault.vaultId) continue;
+                const raw = await vaultCrypto.decryptRsa(vault.wrappedKey, opened);
                 if (raw?.length === 64) {
-                    keys.set(org.vaultOrgId, vaultCrypto.symmetricKeyFromBytes(raw));
+                    keys.set(vault.vaultId, vaultCrypto.symmetricKeyFromBytes(raw));
                 }
             }
-            setOrgKeys(keys);
+            setVaultKeys(keys);
         },
         [state.privateKey]
     );
 
-    const reloadOrgs = useCallback(async () => {
-        if (keyRef.current) await loadOrgs(keyRef.current);
-    }, [loadOrgs]);
+    const reloadVaults = useCallback(async () => {
+        if (keyRef.current) await loadVaults(keyRef.current);
+    }, [loadVaults]);
 
     useEffect(() => {
-        if (key) void loadOrgs(key);
-    }, [key, loadOrgs]);
+        if (key) void loadVaults(key);
+    }, [key, loadVaults]);
 
-    /** Which key opens an item: the account's own, or its organization's. */
+    /** Which key opens an item: the account's own vault, or another one's. */
     const keyFor = useCallback(
-        (vaultOrgId: string | null) => (vaultOrgId ? (orgKeys.get(vaultOrgId) ?? null) : key),
-        [key, orgKeys]
+        (vaultId: string | null) => (vaultId ? (vaultKeys.get(vaultId) ?? null) : key),
+        [key, vaultKeys]
     );
 
     // Pick the key back up on mount, which is what makes a navigation or a
@@ -273,11 +273,11 @@ export function VaultSessionProvider({
             hold,
             lock,
             unlockTimeout: timeout,
-            organizations,
-            orgKeys,
+            vaults,
+            vaultKeys,
             privateKey,
             keyFor,
-            reloadOrgs,
+            reloadVaults,
             lockNotice
         }),
         [
@@ -287,11 +287,11 @@ export function VaultSessionProvider({
             hold,
             lock,
             timeout,
-            organizations,
-            orgKeys,
+            vaults,
+            vaultKeys,
             privateKey,
             keyFor,
-            reloadOrgs,
+            reloadVaults,
             lockNotice
         ]
     );

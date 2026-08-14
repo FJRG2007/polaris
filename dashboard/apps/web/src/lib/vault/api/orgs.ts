@@ -13,7 +13,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import * as orgs from "@/lib/vault/orgs";
 import { vaultError } from "@/lib/vault/auth";
-import { collectionsFor } from "@/lib/vault/sync";
+import { collectionsFor, vaultLabel } from "@/lib/vault/sync";
 import { readJsonBody, requirePrincipal, type VaultContext } from "@/lib/vault/api/router";
 
 function list(data: unknown[]): Response {
@@ -46,14 +46,14 @@ export async function getOrganization(context: VaultContext): Promise<Response> 
     if (!standing) return vaultError("Not found", 404);
     const row = await prisma.vaultOrganization.findUnique({
         where: { id: orgId },
-        select: { id: true, organization: { select: { name: true, slug: true } } }
+        select: { id: true, name: true, organization: { select: { name: true, slug: true } } }
     });
     if (!row) return vaultError("Not found", 404);
     return Response.json({
         object: "organization",
         id: row.id,
-        name: row.organization.name,
-        identifier: row.organization.slug,
+        name: vaultLabel(row),
+        identifier: row.organization?.slug ?? null,
         selfHost: true,
         useTotp: true,
         usePolicies: true,
@@ -114,11 +114,8 @@ export async function createCollection(context: VaultContext): Promise<Response>
         parsed.data.externalId
     );
     if (!collection) return vaultError("A collection name must be encrypted.", 400);
-    for (const member of parsed.data.users ?? []) {
-        await orgs.setCollectionAccess(String(collection.id), member.id, {
-            readOnly: member.readOnly,
-            hidePasswords: member.hidePasswords
-        });
+    if (parsed.data.users) {
+        await orgs.setCollectionMembers(guard.orgId, String(collection.id), parsed.data.users);
     }
     return Response.json(collection);
 }
@@ -132,13 +129,7 @@ export async function updateCollection(context: VaultContext): Promise<Response>
     const collection = await orgs.updateCollection(guard.orgId, collectionId, parsed.data.name);
     if (!collection) return vaultError("Not found", 404);
     if (parsed.data.users) {
-        await prisma.vaultCollectionAccess.deleteMany({ where: { collectionId } });
-        for (const member of parsed.data.users) {
-            await orgs.setCollectionAccess(collectionId, member.id, {
-                readOnly: member.readOnly,
-                hidePasswords: member.hidePasswords
-            });
-        }
+        await orgs.setCollectionMembers(guard.orgId, collectionId, parsed.data.users);
     }
     return Response.json(collection);
 }
