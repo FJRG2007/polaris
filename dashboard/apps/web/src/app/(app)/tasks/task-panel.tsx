@@ -137,7 +137,9 @@ export function TaskPanel({
 
     /** Draw a change over the task on screen. */
     const paint = (overlay: TaskOverlay) =>
-        setDetail((current) => (current ? { ...current, task: { ...current.task, ...overlay } } : current));
+        setDetail((current) =>
+            current ? { ...current, task: { ...current.task, ...overlay } } : current
+        );
 
     /**
      * Persist a change to the open task.
@@ -161,7 +163,10 @@ export function TaskPanel({
         // already showing what was typed, and drawing over it takes the caret with it.
         if (mode === "picker") paint(overlay);
 
-        const result = await runAction(() => actions.updateTaskAction({ taskId: openId, ...input }), setError);
+        const result = await runAction(
+            () => actions.updateTaskAction({ taskId: openId, ...input }),
+            setError
+        );
         if (!result || result.error) {
             if (result?.error) setError(result.error);
             // The screen is showing something the server did not take. A picker is put
@@ -191,14 +196,21 @@ export function TaskPanel({
 
     /** One of the space's own fields, which is stored beside the task rather than on
      *  it and so takes a write of its own. */
-    const commitField = async (fieldId: string, value: string, settled: boolean): Promise<boolean> => {
+    const commitField = async (
+        fieldId: string,
+        value: string,
+        settled: boolean
+    ): Promise<boolean> => {
         const task = saved.current;
         if (!task || !openId) return true;
 
         let row = task;
         if ((task.customValues[fieldId] ?? "") !== value) {
             setError("");
-            const result = await runAction(() => actions.setCustomValueAction(openId, fieldId, value), setError);
+            const result = await runAction(
+                () => actions.setCustomValueAction(openId, fieldId, value),
+                setError
+            );
             if (!result || result.error) {
                 if (result?.error) setError(result.error);
                 return false;
@@ -218,13 +230,16 @@ export function TaskPanel({
     };
 
     /** Write a change now, the way a control that repaints on the click does. */
-    const patch = (input: Record<string, unknown>) => auto.save(fieldsOf(input), () => commit(input, "picker"));
+    const patch = (input: Record<string, unknown>) =>
+        auto.save(fieldsOf(input), () => commit(input, "picker"));
 
     /** Hold a keystroke, and write it once typing stops. */
-    const hold = (input: Record<string, unknown>) => auto.queue(fieldsOf(input), () => commit(input, "typing"));
+    const hold = (input: Record<string, unknown>) =>
+        auto.queue(fieldsOf(input), () => commit(input, "typing"));
 
     /** Write what was typed now: the caret left the field, or the panel is closing. */
-    const save = (input: Record<string, unknown>) => auto.save(fieldsOf(input), () => commit(input, "typed"));
+    const save = (input: Record<string, unknown>) =>
+        auto.save(fieldsOf(input), () => commit(input, "typed"));
 
     /**
      * Commit whatever has focus but has not been committed.
@@ -293,14 +308,21 @@ export function TaskPanel({
     /** A tag born where it is needed - in a picker or a menu - instead of in the
      *  space's settings, which is where the reason for it gets forgotten. */
     const createTag = async (name: string, color: string) => {
-        const created = await runAction(() => actions.createTagAction(context.spaceId, name, color), setError);
+        const created = await runAction(
+            () => actions.createTagAction(context.spaceId, name, color),
+            setError
+        );
         if (created?.id) onChanged();
         return created?.id ?? null;
     };
 
     const task = detail?.task;
-    const watching = detail?.watchers.some((person) => person.id === context.currentUserId) ?? false;
-    const runningHere = detail?.timeEntries.some((entry) => entry.running && entry.userId === context.currentUserId) ?? false;
+    const watching =
+        detail?.watchers.some((person) => person.id === context.currentUserId) ?? false;
+    const runningHere =
+        detail?.timeEntries.some(
+            (entry) => entry.running && entry.userId === context.currentUserId
+        ) ?? false;
 
     return (
         <Dialog
@@ -324,14 +346,20 @@ export function TaskPanel({
                             it needs a name while it is still loading - otherwise a
                             screen reader opens an unnamed window. */}
                         <DialogTitle className="sr-only">Task</DialogTitle>
-                        {loading ? <Loader2 className="size-5 animate-spin" /> : (error || "Loading the task")}
+                        {loading ? (
+                            <Loader2 className="size-5 animate-spin" />
+                        ) : (
+                            error || "Loading the task"
+                        )}
                     </div>
                 )}
 
                 {task && (
                     <>
                         <header className="flex flex-wrap items-center gap-2 border-b border-border py-3 pl-5 pr-14">
-                            <span className="font-mono text-xs text-muted-foreground">{task.reference}</span>
+                            <span className="font-mono text-xs text-muted-foreground">
+                                {task.reference}
+                            </span>
                             {/* The same copy control the rest of Polaris uses,
                                 acknowledgement included - a reference people
                                 quote in chat is a reference they copy. */}
@@ -354,7 +382,10 @@ export function TaskPanel({
                                     role="status"
                                     className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
                                 >
-                                    <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden="true" />
+                                    <Loader2
+                                        className="size-3.5 shrink-0 animate-spin"
+                                        aria-hidden="true"
+                                    />
                                     Saving
                                 </span>
                             )}
@@ -362,7 +393,10 @@ export function TaskPanel({
                                 Created {format.date(task.createdAt)}
                             </span>
                             {task.recurring && (
-                                <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground" title="This task repeats">
+                                <span
+                                    className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
+                                    title="This task repeats"
+                                >
                                     <Repeat className="size-3.5" /> Repeats
                                 </span>
                             )}
@@ -375,12 +409,19 @@ export function TaskPanel({
                                 aria-label={watching ? "Stop watching" : "Watch this task"}
                                 title={watching ? "Stop watching" : "Watch this task"}
                                 onClick={async () => {
-                                    await runAction(() => actions.setWatchingAction(task.id, !watching), setError);
+                                    await runAction(
+                                        () => actions.setWatchingAction(task.id, !watching),
+                                        setError
+                                    );
                                     load(task.id);
                                 }}
                                 className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
-                                {watching ? <Bell className="size-4" /> : <BellOff className="size-4" />}
+                                {watching ? (
+                                    <Bell className="size-4" />
+                                ) : (
+                                    <BellOff className="size-4" />
+                                )}
                             </button>
                             {context.canEdit && (
                                 <DropdownMenu>
@@ -394,7 +435,11 @@ export function TaskPanel({
                                             <MoreHorizontal className="size-4" />
                                         </button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-52" onCloseAutoFocus={keepFocusOnClose}>
+                                    <DropdownMenuContent
+                                        align="end"
+                                        className="w-52"
+                                        onCloseAutoFocus={keepFocusOnClose}
+                                    >
                                         <DropdownMenuItem
                                             onSelect={async () => {
                                                 const result = await runAction(
@@ -407,10 +452,20 @@ export function TaskPanel({
                                         >
                                             Duplicate
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onSelect={() => void patch({ milestone: !task.milestone })}>
-                                            {task.milestone ? "Not a milestone" : "Mark as a milestone"}
+                                        <DropdownMenuItem
+                                            onSelect={() =>
+                                                void patch({ milestone: !task.milestone })
+                                            }
+                                        >
+                                            {task.milestone
+                                                ? "Not a milestone"
+                                                : "Mark as a milestone"}
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onSelect={() => void patch({ archived: !task.archived })}>
+                                        <DropdownMenuItem
+                                            onSelect={() =>
+                                                void patch({ archived: !task.archived })
+                                            }
+                                        >
                                             {task.archived ? "Unarchive" : "Archive"}
                                         </DropdownMenuItem>
                                         <DropdownMenuSeparator />
@@ -438,7 +493,9 @@ export function TaskPanel({
                                         // Held while it is being typed and written
                                         // once typing stops, so a name only ever
                                         // exists on the screen for a moment.
-                                        onChange={(event) => hold({ name: event.target.value.trim() })}
+                                        onChange={(event) =>
+                                            hold({ name: event.target.value.trim() })
+                                        }
                                         onBlur={(event) => {
                                             const next = event.target.value.trim();
                                             // A task cannot be nameless: an emptied
@@ -453,7 +510,10 @@ export function TaskPanel({
                                 </DialogTitle>
 
                                 {error && (
-                                    <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                                    <p
+                                        role="alert"
+                                        className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                                    >
                                         {error}
                                     </p>
                                 )}
@@ -464,7 +524,8 @@ export function TaskPanel({
                                     running={runningHere}
                                     waitingOn={
                                         detail?.dependencies.filter(
-                                            (edge) => edge.direction === "waitingOn" && !edge.finished
+                                            (edge) =>
+                                                edge.direction === "waitingOn" && !edge.finished
                                         ).length ?? 0
                                     }
                                     patch={(input) => void patch(input)}
@@ -498,10 +559,14 @@ export function TaskPanel({
                                     task={task}
                                     context={context}
                                     hold={(fieldId, value) =>
-                                        auto.queue(`field:${fieldId}`, () => commitField(fieldId, value, false))
+                                        auto.queue(`field:${fieldId}`, () =>
+                                            commitField(fieldId, value, false)
+                                        )
                                     }
                                     onChange={(fieldId, value) =>
-                                        void auto.save(`field:${fieldId}`, () => commitField(fieldId, value, true))
+                                        void auto.save(`field:${fieldId}`, () =>
+                                            commitField(fieldId, value, true)
+                                        )
                                     }
                                 />
 

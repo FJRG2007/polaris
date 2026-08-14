@@ -53,7 +53,10 @@ const PASSTHROUGH = [
  * rather than null: an overlay is merged over the row, and null would erase a value
  * nobody touched.
  */
-export function taskOverlay(change: TaskEdit | Record<string, unknown>, context: Directory): TaskOverlay {
+export function taskOverlay(
+    change: TaskEdit | Record<string, unknown>,
+    context: Directory
+): TaskOverlay {
     // A row's menu speaks `TaskEdit`; the panel sends the whole update input, which is
     // wider and open-ended. Read as one bag of keys here, and only the ones named
     // below are taken out of it - the interface has no index signature and adding one
@@ -129,7 +132,8 @@ export function bulkOverlay(task: TaskRow, change: TaskBulkEdit, context: Direct
     for (const id of change.addTagIds ?? []) tags.add(id);
     for (const id of change.removeTagIds ?? []) tags.delete(id);
 
-    const touchesPeople = change.addAssigneeIds !== undefined || change.removeAssigneeIds !== undefined;
+    const touchesPeople =
+        change.addAssigneeIds !== undefined || change.removeAssigneeIds !== undefined;
     const touchesTags = change.addTagIds !== undefined || change.removeTagIds !== undefined;
 
     return taskOverlay(

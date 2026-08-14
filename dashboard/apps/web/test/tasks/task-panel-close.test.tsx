@@ -121,7 +121,11 @@ function heldOpen() {
     const server = new Promise<{ error?: string }>((resolve) => {
         answer = resolve;
     });
-    return { server, taken: () => answer({}), refused: () => answer({ error: "Could not save the task" }) };
+    return {
+        server,
+        taken: () => answer({}),
+        refused: () => answer({ error: "Could not save the task" })
+    };
 }
 
 beforeEach(() => {

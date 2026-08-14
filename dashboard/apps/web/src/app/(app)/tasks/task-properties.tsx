@@ -108,7 +108,9 @@ export function PropertyRows({
                     disabled={disabled}
                     onChange={(assigneeIds) => patch({ assigneeIds })}
                 />
-                {task.assignees.length === 0 && <span className="text-xs text-muted-foreground">Nobody yet</span>}
+                {task.assignees.length === 0 && (
+                    <span className="text-xs text-muted-foreground">Nobody yet</span>
+                )}
             </Property>
 
             <Property icon={<CalendarDays className="size-3.5" />} label="Dates">
@@ -314,7 +316,11 @@ export function FieldsSection({
             {open && (
                 <div className="flex flex-col">
                     {shown.map((field) => (
-                        <Property key={field.id} icon={<span className="inline-block size-3.5" />} label={field.name}>
+                        <Property
+                            key={field.id}
+                            icon={<span className="inline-block size-3.5" />}
+                            label={field.name}
+                        >
                             <CustomFieldEditor
                                 field={field}
                                 value={task.customValues[field.id] ?? ""}

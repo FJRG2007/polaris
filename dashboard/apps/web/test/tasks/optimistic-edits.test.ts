@@ -95,9 +95,9 @@ describe("the overlay a change to a selection paints", () => {
             ]
         });
 
-        expect(bulkOverlay(task, { removeAssigneeIds: ["u1"] }, context).assignees?.map((p) => p.name)).toEqual([
-            "Grace"
-        ]);
+        expect(
+            bulkOverlay(task, { removeAssigneeIds: ["u1"] }, context).assignees?.map((p) => p.name)
+        ).toEqual(["Grace"]);
     });
 
     it("adds a label the task does not have and keeps the one it does", () => {
@@ -125,7 +125,9 @@ describe("whether a change is worth writing", () => {
         // A field that saves itself while it is being typed sends the same value
         // again on every pause, and each one would be a round trip and a line in
         // the task's history saying somebody changed nothing.
-        expect(wouldChange({ description: "Ship it" }, row({ description: "Ship it" }))).toBe(false);
+        expect(wouldChange({ description: "Ship it" }, row({ description: "Ship it" }))).toBe(
+            false
+        );
         expect(wouldChange({ points: null }, row({ points: null }))).toBe(false);
     });
 
@@ -135,7 +137,9 @@ describe("whether a change is worth writing", () => {
 
     it("writes anything that differs, including a value being cleared", () => {
         expect(wouldChange({ description: "Ship it" }, row({ description: "" }))).toBe(true);
-        expect(wouldChange({ blockedNote: "" }, row({ blockedNote: "waiting on legal" }))).toBe(true);
+        expect(wouldChange({ blockedNote: "" }, row({ blockedNote: "waiting on legal" }))).toBe(
+            true
+        );
         expect(wouldChange({ points: null }, row({ points: 3 }))).toBe(true);
     });
 
@@ -148,6 +152,8 @@ describe("whether a change is worth writing", () => {
     });
 
     it("writes when any one field of a change differs", () => {
-        expect(wouldChange({ name: "Same", points: 5 }, row({ name: "Same", points: 3 }))).toBe(true);
+        expect(wouldChange({ name: "Same", points: 5 }, row({ name: "Same", points: 3 }))).toBe(
+            true
+        );
     });
 });

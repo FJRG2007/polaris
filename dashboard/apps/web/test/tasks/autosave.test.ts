@@ -167,7 +167,11 @@ describe("the autosave behind a task", () => {
         expect(written).toEqual(["the first pause: sent", "the first pause: answered"]);
 
         await act(async () => void (await vi.advanceTimersByTimeAsync(SETTLE_MS)));
-        expect(written).toEqual(["the first pause: sent", "the first pause: answered", "still typing"]);
+        expect(written).toEqual([
+            "the first pause: sent",
+            "the first pause: answered",
+            "still typing"
+        ]);
     });
 
     it("lets go of an edit the caller has decided to abandon", async () => {
@@ -194,7 +198,13 @@ describe("the autosave behind a task", () => {
         act(() => result.current.queue("description", writer(written, "held description")));
         act(() => result.current.queue("name", writer(written, "held name")));
 
-        await act(async () => void (await result.current.save("description", writer(written, "blurred description"))));
+        await act(
+            async () =>
+                void (await result.current.save(
+                    "description",
+                    writer(written, "blurred description")
+                ))
+        );
 
         expect(written).toEqual(["held name", "blurred description"]);
 
