@@ -26,7 +26,7 @@ https://<your polaris>/vault
 ```
 
 Clients derive the rest from it (`/vault/api`, `/vault/identity`,
-`/vault/notifications`, `/vault/icons`). The paths are served by a rewrite in
+`/vault/notifications`, `/vault/icons`, `/vault/events`). The paths are served by a rewrite in
 `next.config.mjs` into `app/api/bw/[...path]`, which dispatches the route table
 in `lib/vault/api/routes.ts` - that file is the list of everything the surface
 answers.

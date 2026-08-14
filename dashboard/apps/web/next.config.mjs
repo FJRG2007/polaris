@@ -48,9 +48,10 @@ const nextConfig = {
      * The vault's Bitwarden-compatible surface.
      *
      * Official clients are given one server URL and derive the rest from it:
-     * `<base>/api`, `<base>/identity`, `<base>/notifications`, `<base>/icons`.
-     * Pointing them at `<origin>/vault` therefore means answering on those five
-     * paths, and they cannot move - a client will not be told otherwise.
+     * `<base>/api`, `<base>/identity`, `<base>/notifications`, `<base>/icons`,
+     * `<base>/events`. Pointing them at `<origin>/vault` therefore means
+     * answering on those five paths, and they cannot move - a client will not
+     * be told otherwise.
      *
      * They are rewritten rather than served from `app/vault/api/...` because
      * `/vault` is also a page: a route group and a plain folder of the same name
