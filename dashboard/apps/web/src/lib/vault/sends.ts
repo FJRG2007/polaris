@@ -124,6 +124,18 @@ export async function listSends(userId: string): Promise<Record<string, unknown>
     return rows.map(toSendResponse);
 }
 
+/** One Send of this account's own, or null. */
+export async function getSend(
+    userId: string,
+    sendId: string
+): Promise<Record<string, unknown> | null> {
+    const row = await prisma.vaultSend.findFirst({
+        where: { id: sendId, userId },
+        select: SEND_SELECT
+    });
+    return row ? toSendResponse(row) : null;
+}
+
 /**
  * Create a Send.
  *

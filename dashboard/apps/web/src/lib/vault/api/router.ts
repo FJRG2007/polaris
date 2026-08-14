@@ -89,8 +89,15 @@ export async function readAnyBody(request: Request): Promise<Record<string, stri
     }
 }
 
-/** Match one route pattern against a request's segments. */
-function match(pattern: string, segments: string[]): Record<string, string> | null {
+/**
+ * Match one route pattern against a request's segments.
+ *
+ * Exported so the table can be checked against itself: two routes of the same
+ * length where the earlier one has a capture in a position the later one spells
+ * out mean the later one is unreachable, and nothing about reading the table
+ * makes that visible.
+ */
+export function matchRoute(pattern: string, segments: string[]): Record<string, string> | null {
     const parts = pattern.split("/").filter(Boolean);
     if (parts.length !== segments.length) return null;
     const params: Record<string, string> = {};
@@ -124,7 +131,7 @@ export async function dispatchVault(
     let pathExists = false;
 
     for (const route of routes) {
-        const params = match(route.path, segments);
+        const params = matchRoute(route.path, segments);
         if (!params) continue;
         pathExists = true;
         if (route.method !== request.method) continue;

@@ -101,3 +101,29 @@ export async function negotiate(): Promise<Response> {
 export async function events(): Promise<Response> {
     return Response.json({ object: "list", continuationToken: null, data: [] });
 }
+
+/**
+ * The three lists a client polls for features Polaris does not run.
+ *
+ * Security tasks are an organization telling members to change a password;
+ * auth requests are signing in on one device by approving it on another. Neither
+ * exists here, and an empty list is how a client is told so - a 404 makes the
+ * extension log an error on a timer and retry it forever.
+ */
+export async function emptyList(): Promise<Response> {
+    return Response.json({ object: "list", continuationToken: null, data: [] });
+}
+
+/**
+ * Whether an organization enrolls its members in password reset automatically.
+ *
+ * Polaris does not: an administrator who could reset a member's master password
+ * could open their vault, which is the one thing this whole feature exists to
+ * make impossible.
+ */
+export async function autoEnrollStatus(context: VaultContext): Promise<Response> {
+    return Response.json({
+        id: context.params.orgId ?? "",
+        resetPasswordEnabled: false
+    });
+}

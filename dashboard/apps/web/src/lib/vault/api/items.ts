@@ -84,6 +84,68 @@ export async function updateCipher(context: VaultContext): Promise<Response> {
     return Response.json(result.cipher);
 }
 
+/**
+ * Filing and starring, without the item.
+ *
+ * A browser extension moving a login into a folder sends this rather than the
+ * whole login, which is the difference between one small write and re-uploading
+ * every field it is holding open.
+ */
+export async function updateCipherPartial(context: VaultContext): Promise<Response> {
+    const principal = requirePrincipal(context);
+    const parsed = core.cipherPartialSchema.safeParse(await readJsonBody(context.request));
+    if (!parsed.success) return vaultError("Invalid request", 400);
+    const result = await ciphers.updateCipherPartial(
+        principal.userId,
+        context.params.id ?? "",
+        parsed.data
+    );
+    if (!result.ok) return vaultError("Not found", 404);
+    return Response.json(result.cipher);
+}
+
+/** Which of an organization's collections an item sits in. */
+export async function setCipherCollections(context: VaultContext): Promise<Response> {
+    const principal = requirePrincipal(context);
+    const parsed = core.cipherCollectionsSchema.safeParse(await readJsonBody(context.request));
+    if (!parsed.success) return vaultError("Invalid request", 400);
+    const result = await ciphers.setCipherCollections(
+        principal.userId,
+        context.params.id ?? "",
+        parsed.data.collectionIds
+    );
+    if (!result.ok) return vaultError("Not found", 404);
+    // The v2 spelling wants the item wrapped; the older one wants it bare. Both
+    // are answered with the wrapper, which newer clients read and older ones
+    // ignore the extra key of.
+    return Response.json({ ...result.cipher, cipher: result.cipher });
+}
+
+/** Every item of one organization, which is what a client's org view lists. */
+export async function listOrganizationCiphers(context: VaultContext): Promise<Response> {
+    const organizationId = context.query.get("organizationId") ?? "";
+    if (!organizationId) return list([]);
+    return list(
+        await ciphers.listOrganizationCiphers(requirePrincipal(context).userId, organizationId)
+    );
+}
+
+/**
+ * A vault imported from a client's own screen.
+ *
+ * One request for the whole file, because the folders and the items are paired
+ * by position and that pairing only exists while both are in hand.
+ */
+export async function importCiphers(context: VaultContext): Promise<Response> {
+    const principal = requirePrincipal(context);
+    const parsed = core.vaultImportSchema.safeParse(await readJsonBody(context.request));
+    if (!parsed.success) {
+        return vaultError(parsed.error.issues[0]?.message ?? "Invalid request", 400);
+    }
+    await ciphers.importCiphers(principal.userId, parsed.data);
+    return new Response(null, { status: 200 });
+}
+
 /** Hand a personal item to an organization, re-encrypted by the client first. */
 export async function shareCipher(context: VaultContext): Promise<Response> {
     const principal = requirePrincipal(context);
@@ -190,6 +252,12 @@ export async function purge(context: VaultContext): Promise<Response> {
 
 export async function listFolders(context: VaultContext): Promise<Response> {
     return list(await folders.listFolders(requirePrincipal(context).userId));
+}
+
+export async function getFolder(context: VaultContext): Promise<Response> {
+    const folder = await folders.getFolder(requirePrincipal(context).userId, context.params.id ?? "");
+    if (!folder) return vaultError("Not found", 404);
+    return Response.json(folder);
 }
 
 export async function createFolder(context: VaultContext): Promise<Response> {

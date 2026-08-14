@@ -170,6 +170,41 @@ export const collectionSchema = z.object({
         .nullish()
 });
 
+/**
+ * A partial edit: the two things a client changes without re-encrypting.
+ *
+ * Filing an item and starring it are the only writes that touch nothing
+ * encrypted, and clients send them on their own endpoint precisely so a browser
+ * extension can do them without holding the whole item. Accepting the full item
+ * schema here instead would make the extension re-upload a login to move it.
+ */
+export const cipherPartialSchema = z.object({
+    folderId: z.string().uuid().nullish(),
+    favorite: z.boolean().nullish()
+});
+
+/** Which of an organization's collections an item belongs to. */
+export const cipherCollectionsSchema = z.object({
+    collectionIds: z.array(z.string().uuid()).default([])
+});
+
+/**
+ * A whole vault arriving from a client's own import screen.
+ *
+ * `folderRelationships` is Bitwarden's way of saying which item goes in which
+ * folder without ids that do not exist yet: both arrays are positional, and each
+ * relationship pairs an index in one with an index in the other.
+ */
+export const vaultImportSchema = z.object({
+    folders: z.array(vaultFolderSchema).default([]),
+    ciphers: z.array(cipherSchema).default([]),
+    folderRelationships: z
+        .array(z.object({ key: z.number().int().nonnegative(), value: z.number().int().nonnegative() }))
+        .default([])
+});
+
+export type VaultImportInput = z.infer<typeof vaultImportSchema>;
+
 /** Items being moved between folders, or emptied out of the trash. */
 export const cipherIdsSchema = z.object({ ids: z.array(z.string().uuid()).min(1) });
 

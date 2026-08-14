@@ -384,6 +384,142 @@ export async function updateCipher(
     return { ok: true, cipher: toCipherResponse(row, favorite !== null) };
 }
 
+/**
+ * Change only where an item is filed and whether it is starred.
+ *
+ * Neither of those is inside the ciphertext, so a client can send them without
+ * having the item open - which is exactly why Bitwarden gives them their own
+ * endpoint, and why this one never touches `data`.
+ */
+export async function updateCipherPartial(
+    userId: string,
+    cipherId: string,
+    changes: { folderId?: string | null; favorite?: boolean | null }
+): Promise<CipherWriteResult> {
+    if (!(await mayWrite(userId, cipherId))) return { ok: false, reason: "not_found" };
+    const row = await prisma.vaultCipher.update({
+        where: { id: cipherId },
+        data: {
+            // Undefined leaves it where it is; null is "no folder", which is a
+            // change a client does make.
+            ...(changes.folderId === undefined
+                ? {}
+                : { folderId: await ownFolderId(userId, changes.folderId) }),
+            revisionDate: new Date()
+        },
+        select: CIPHER_SELECT
+    });
+    if (changes.favorite !== null && changes.favorite !== undefined) {
+        await setFavorite(userId, cipherId, changes.favorite);
+    }
+    await bumpRevision(userId);
+    const favorite = await prisma.vaultFavorite.findUnique({
+        where: { userId_cipherId: { userId, cipherId } },
+        select: { userId: true }
+    });
+    return { ok: true, cipher: toCipherResponse(row, favorite !== null) };
+}
+
+/**
+ * Set which of an organization's collections an item is in.
+ *
+ * Only for an item that already belongs to an organization: putting a personal
+ * item into a collection is `shareCipher`, because that one has to be
+ * re-encrypted under the organization's key first and this one must not look
+ * like a way around it.
+ */
+export async function setCipherCollections(
+    userId: string,
+    cipherId: string,
+    collectionIds: string[]
+): Promise<CipherWriteResult> {
+    if (!(await mayWrite(userId, cipherId))) return { ok: false, reason: "not_found" };
+    const current = await prisma.vaultCipher.findUnique({
+        where: { id: cipherId },
+        select: { organizationId: true }
+    });
+    if (!current?.organizationId) return { ok: false, reason: "not_found" };
+    const allowed = await writableCollections(userId, current.organizationId, collectionIds);
+    if (allowed === null) return { ok: false, reason: "not_found" };
+
+    const row = await prisma.$transaction(async (tx) => {
+        await tx.vaultCollectionCipher.deleteMany({ where: { cipherId } });
+        if (allowed.length > 0) {
+            await tx.vaultCollectionCipher.createMany({
+                data: allowed.map((collectionId) => ({ cipherId, collectionId }))
+            });
+        }
+        return tx.vaultCipher.update({
+            where: { id: cipherId },
+            data: { revisionDate: new Date() },
+            select: CIPHER_SELECT
+        });
+    });
+    await bumpRevision(userId);
+    return { ok: true, cipher: toCipherResponse(row, false) };
+}
+
+/** Every item of one organization this account can see. */
+export async function listOrganizationCiphers(userId: string, organizationId: string) {
+    const filter = await reachableCipherFilter(userId);
+    const rows = await prisma.vaultCipher.findMany({
+        where: { AND: [{ organizationId }, filter] },
+        select: CIPHER_SELECT
+    });
+    return rows.map((row) => toCipherResponse(row, false));
+}
+
+/**
+ * A whole vault arriving at once, from a client's own import screen.
+ *
+ * The folders have to exist before the items can point at them, and the pairing
+ * between the two is positional - which is why this is one function rather than
+ * the client making a call per row: half an import is worse than none, and the
+ * indexes only mean anything while both lists are in hand.
+ *
+ * Personal only. An import that could name an organization would be a way to
+ * push items into somebody else's vault in bulk.
+ */
+export async function importCiphers(
+    userId: string,
+    input: {
+        folders: { name: string }[];
+        ciphers: CipherInput[];
+        folderRelationships: { key: number; value: number }[];
+    }
+): Promise<number> {
+    const folderIds: string[] = [];
+    for (const folder of input.folders) {
+        const row = await prisma.vaultFolder.create({
+            data: { userId, name: folder.name },
+            select: { id: true }
+        });
+        folderIds.push(row.id);
+    }
+    const folderOf = new Map<number, string>();
+    for (const link of input.folderRelationships) {
+        const id = folderIds[link.value];
+        if (id) folderOf.set(link.key, id);
+    }
+
+    let written = 0;
+    for (const [index, cipher] of input.ciphers.entries()) {
+        await prisma.vaultCipher.create({
+            data: {
+                userId,
+                organizationId: null,
+                folderId: folderOf.get(index) ?? null,
+                type: cipher.type,
+                data: toDocument(cipher),
+                reprompt: cipher.reprompt ?? 0
+            }
+        });
+        written += 1;
+    }
+    await bumpRevision(userId);
+    return written;
+}
+
 /** Star an item, or take the star off. Per person, even on a shared item. */
 export async function setFavorite(
     userId: string,

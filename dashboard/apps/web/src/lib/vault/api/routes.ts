@@ -53,6 +53,7 @@ export const VAULT_ROUTES: readonly VaultRoute[] = [
         handle: accounts.getRevisionDate
     },
     { method: "GET", path: "api/accounts/keys", auth: "bearer", handle: accounts.getKeys },
+    { method: "POST", path: "api/accounts/keys", auth: "bearer", handle: accounts.setKeys },
     {
         method: "GET",
         path: "api/users/:id/public-key",
@@ -83,6 +84,21 @@ export const VAULT_ROUTES: readonly VaultRoute[] = [
     { method: "POST", path: "api/settings/domains", auth: "bearer", handle: misc.domains },
 
     // ---- devices -----------------------------------------------------------
+    // Asked before a client has signed in, so it cannot be a bearer route. Both
+    // spellings are live: the extension sends the address in a header, older
+    // desktop builds put it in the path.
+    {
+        method: "GET",
+        path: "api/devices/knowndevice",
+        auth: "none",
+        handle: accounts.knownDevice
+    },
+    {
+        method: "GET",
+        path: "api/devices/knowndevice/:email/:identifier",
+        auth: "none",
+        handle: accounts.knownDevice
+    },
     { method: "GET", path: "api/devices", auth: "bearer", handle: accounts.listDevices },
     {
         method: "GET",
@@ -102,9 +118,27 @@ export const VAULT_ROUTES: readonly VaultRoute[] = [
         auth: "bearer",
         handle: accounts.putDeviceToken
     },
+    {
+        method: "PUT",
+        path: "api/devices/identifier/:identifier/clear-token",
+        auth: "bearer",
+        handle: accounts.clearDeviceToken
+    },
+    {
+        method: "POST",
+        path: "api/devices/identifier/:identifier/clear-token",
+        auth: "bearer",
+        handle: accounts.clearDeviceToken
+    },
+
+    // ---- what a client polls for features Polaris does not run -------------
+    { method: "GET", path: "api/tasks", auth: "bearer", handle: misc.emptyList },
+    { method: "GET", path: "api/auth-requests", auth: "bearer", handle: misc.emptyList },
+    { method: "GET", path: "api/auth-requests/pending", auth: "bearer", handle: misc.emptyList },
 
     // ---- folders -----------------------------------------------------------
     { method: "GET", path: "api/folders", auth: "bearer", handle: items.listFolders },
+    { method: "GET", path: "api/folders/:id", auth: "bearer", handle: items.getFolder },
     { method: "POST", path: "api/folders", auth: "bearer", handle: items.createFolder },
     { method: "PUT", path: "api/folders/:id", auth: "bearer", handle: items.updateFolder },
     { method: "POST", path: "api/folders/:id", auth: "bearer", handle: items.updateFolder },
@@ -112,40 +146,79 @@ export const VAULT_ROUTES: readonly VaultRoute[] = [
     { method: "POST", path: "api/folders/:id/delete", auth: "bearer", handle: items.deleteFolder },
 
     // ---- items -------------------------------------------------------------
+    // The table is scanned in order and the first match wins, so every literal
+    // third segment has to sit ABOVE `api/ciphers/:id`. Listed the other way
+    // round, a bulk delete is read as an edit of an item called "delete" - it
+    // matches, fails to parse, and answers 400 for a request that was correct.
     { method: "GET", path: "api/ciphers", auth: "bearer", handle: items.listCiphers },
     { method: "POST", path: "api/ciphers", auth: "bearer", handle: items.createCipher },
+    { method: "DELETE", path: "api/ciphers", auth: "bearer", handle: items.destroyCiphers },
     {
         method: "POST",
         path: "api/ciphers/create",
         auth: "bearer",
         handle: items.createCipherInCollections
     },
+    {
+        method: "GET",
+        path: "api/ciphers/organization-details",
+        auth: "bearer",
+        handle: items.listOrganizationCiphers
+    },
+    { method: "POST", path: "api/ciphers/import", auth: "bearer", handle: items.importCiphers },
+    { method: "PUT", path: "api/ciphers/delete", auth: "bearer", handle: items.trashCiphers },
+    { method: "POST", path: "api/ciphers/delete", auth: "bearer", handle: items.destroyCiphers },
+    { method: "PUT", path: "api/ciphers/restore", auth: "bearer", handle: items.restoreCiphers },
+    { method: "POST", path: "api/ciphers/move", auth: "bearer", handle: items.moveCiphers },
+    { method: "PUT", path: "api/ciphers/move", auth: "bearer", handle: items.moveCiphers },
+    { method: "POST", path: "api/ciphers/purge", auth: "bearer", handle: items.purge },
+
     { method: "GET", path: "api/ciphers/:id", auth: "bearer", handle: items.getCipher },
     { method: "GET", path: "api/ciphers/:id/details", auth: "bearer", handle: items.getCipher },
     { method: "PUT", path: "api/ciphers/:id", auth: "bearer", handle: items.updateCipher },
     { method: "POST", path: "api/ciphers/:id", auth: "bearer", handle: items.updateCipher },
-    { method: "PUT", path: "api/ciphers/:id/share", auth: "bearer", handle: items.shareCipher },
-    { method: "POST", path: "api/ciphers/:id/share", auth: "bearer", handle: items.shareCipher },
-    { method: "PUT", path: "api/ciphers/:id/delete", auth: "bearer", handle: items.trashCipher },
-    { method: "PUT", path: "api/ciphers/delete", auth: "bearer", handle: items.trashCiphers },
-    { method: "DELETE", path: "api/ciphers/:id", auth: "bearer", handle: items.destroyCipher },
-    { method: "POST", path: "api/ciphers/:id/delete", auth: "bearer", handle: items.destroyCipher },
-    { method: "DELETE", path: "api/ciphers", auth: "bearer", handle: items.destroyCiphers },
-    { method: "PUT", path: "api/ciphers/:id/restore", auth: "bearer", handle: items.restoreCipher },
-    { method: "PUT", path: "api/ciphers/restore", auth: "bearer", handle: items.restoreCiphers },
+    {
+        method: "PUT",
+        path: "api/ciphers/:id/partial",
+        auth: "bearer",
+        handle: items.updateCipherPartial
+    },
     {
         method: "POST",
-        path: "api/ciphers/move",
+        path: "api/ciphers/:id/partial",
         auth: "bearer",
-        handle: items.moveCiphers
+        handle: items.updateCipherPartial
+    },
+    { method: "PUT", path: "api/ciphers/:id/share", auth: "bearer", handle: items.shareCipher },
+    { method: "POST", path: "api/ciphers/:id/share", auth: "bearer", handle: items.shareCipher },
+    {
+        method: "PUT",
+        path: "api/ciphers/:id/collections",
+        auth: "bearer",
+        handle: items.setCipherCollections
+    },
+    {
+        method: "POST",
+        path: "api/ciphers/:id/collections",
+        auth: "bearer",
+        handle: items.setCipherCollections
     },
     {
         method: "PUT",
-        path: "api/ciphers/move",
+        path: "api/ciphers/:id/collections_v2",
         auth: "bearer",
-        handle: items.moveCiphers
+        handle: items.setCipherCollections
     },
-    { method: "POST", path: "api/ciphers/purge", auth: "bearer", handle: items.purge },
+    {
+        method: "POST",
+        path: "api/ciphers/:id/collections_v2",
+        auth: "bearer",
+        handle: items.setCipherCollections
+    },
+    { method: "PUT", path: "api/ciphers/:id/delete", auth: "bearer", handle: items.trashCipher },
+    { method: "DELETE", path: "api/ciphers/:id", auth: "bearer", handle: items.destroyCipher },
+    { method: "POST", path: "api/ciphers/:id/delete", auth: "bearer", handle: items.destroyCipher },
+    { method: "PUT", path: "api/ciphers/:id/restore", auth: "bearer", handle: items.restoreCipher },
 
     // ---- attachments -------------------------------------------------------
     {
@@ -176,6 +249,7 @@ export const VAULT_ROUTES: readonly VaultRoute[] = [
     // ---- sends -------------------------------------------------------------
     { method: "GET", path: "api/sends", auth: "bearer", handle: sends.listSends },
     { method: "POST", path: "api/sends", auth: "bearer", handle: sends.createSend },
+    { method: "GET", path: "api/sends/:id", auth: "bearer", handle: sends.getSend },
     { method: "PUT", path: "api/sends/:id", auth: "bearer", handle: sends.updateSend },
     {
         method: "PUT",
@@ -229,5 +303,11 @@ export const VAULT_ROUTES: readonly VaultRoute[] = [
         path: "api/organizations/:orgId/keys",
         auth: "bearer",
         handle: orgs.getOrganizationKeys
+    },
+    {
+        method: "GET",
+        path: "api/organizations/:orgId/auto-enroll-status",
+        auth: "bearer",
+        handle: misc.autoEnrollStatus
     }
 ];

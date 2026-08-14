@@ -28,6 +28,12 @@ export async function listSends(context: VaultContext): Promise<Response> {
     });
 }
 
+export async function getSend(context: VaultContext): Promise<Response> {
+    const send = await sends.getSend(requirePrincipal(context).userId, context.params.id ?? "");
+    if (!send) return vaultError("Not found", 404);
+    return Response.json(send);
+}
+
 export async function createSend(context: VaultContext): Promise<Response> {
     const principal = requirePrincipal(context);
     const parsed = core.sendSchema.safeParse(await readJsonBody(context.request));

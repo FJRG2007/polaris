@@ -33,6 +33,18 @@ export async function listFolders(userId: string): Promise<Record<string, unknow
     return rows.map(toResponse);
 }
 
+/** One folder of this account's own, or null. */
+export async function getFolder(
+    userId: string,
+    folderId: string
+): Promise<Record<string, unknown> | null> {
+    const row = await prisma.vaultFolder.findFirst({
+        where: { id: folderId, userId },
+        select: { id: true, name: true, revisionDate: true }
+    });
+    return row ? toResponse(row) : null;
+}
+
 export async function createFolder(userId: string, name: string): Promise<Record<string, unknown>> {
     const row = await prisma.vaultFolder.create({
         data: { userId, name },

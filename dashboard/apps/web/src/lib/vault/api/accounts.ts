@@ -11,7 +11,9 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import * as account from "@/lib/vault/account";
+import { rateLimit } from "@/lib/rate-limit-service";
 import { profileFor, syncResponse } from "@/lib/vault/sync";
+import { clientIp, hashForLog } from "@/lib/request-context";
 import { vaultError, type VaultPrincipal } from "@/lib/vault/auth";
 import { readJsonBody, requirePrincipal, type VaultContext } from "@/lib/vault/api/router";
 
@@ -66,6 +68,45 @@ export async function getKeys(context: VaultContext): Promise<Response> {
         select: { publicKey: true, privateKey: true }
     });
     if (!row) return vaultError("This account has no vault.", 404);
+    return Response.json({
+        object: "keys",
+        publicKey: row.publicKey,
+        privateKey: row.privateKey
+    });
+}
+
+/**
+ * Give this vault a key pair, for an account that has none.
+ *
+ * Only ever fills a gap: a vault whose public key already exists would have
+ * items and organization keys wrapped to it, and replacing it would strand
+ * every one of them. So a second call is answered with what is already there
+ * rather than refused, which is what clients expect when they call this on every
+ * unlock to be sure.
+ */
+export async function setKeys(context: VaultContext): Promise<Response> {
+    const principal = requirePrincipal(context);
+    const body = (await readJsonBody(context.request)) as {
+        publicKey?: unknown;
+        encryptedPrivateKey?: unknown;
+    } | null;
+    const publicKey = typeof body?.publicKey === "string" ? body.publicKey : "";
+    const privateKey = typeof body?.encryptedPrivateKey === "string" ? body.encryptedPrivateKey : "";
+    if (!publicKey || !core.isEncString(privateKey)) {
+        return vaultError("Those keys are not usable.", 400);
+    }
+    const row = await prisma.vaultAccount.findUnique({
+        where: { userId: principal.userId },
+        select: { publicKey: true, privateKey: true }
+    });
+    if (!row) return vaultError("This account has no vault.", 404);
+    if (!row.publicKey) {
+        await prisma.vaultAccount.update({
+            where: { userId: principal.userId },
+            data: { publicKey, privateKey }
+        });
+        return Response.json({ object: "keys", publicKey, privateKey });
+    }
     return Response.json({
         object: "keys",
         publicKey: row.publicKey,
@@ -195,6 +236,59 @@ export async function listDevices(context: VaultContext): Promise<Response> {
     });
 }
 
+/** Attempts one address may make at this before it is told to wait. */
+const KNOWN_DEVICE_LIMIT = 30;
+const KNOWN_DEVICE_WINDOW_MS = 5 * 60 * 1000;
+
+/**
+ * Whether this browser or phone has signed in to this address before.
+ *
+ * Asked BEFORE the sign-in, with no token, which is why it exists at all: a
+ * client uses the answer to decide whether it is about to be a new device and to
+ * warn its user accordingly. Newer clients pass the address base64url-encoded in
+ * `X-Request-Email` and the device in `X-Device-Identifier`; older ones put both
+ * in the path, and both spellings are answered because the extension and the
+ * desktop app do not agree on which they use.
+ *
+ * It answers `false` for an address with no vault as readily as for an unknown
+ * device, so it cannot be walked to find out who has an account here - the same
+ * rule prelogin follows. The rate limit is what stops it from being walked for
+ * a known address's devices instead.
+ */
+export async function knownDevice(context: VaultContext): Promise<Response> {
+    const headers = context.request.headers;
+    const encoded = headers.get("x-request-email") ?? "";
+    const email = (context.params.email ?? decodeRequestEmail(encoded)).trim().toLowerCase();
+    const identifier = context.params.identifier ?? headers.get("x-device-identifier") ?? "";
+    if (!email || !identifier) return Response.json(false);
+
+    const limitKey = `vault-known-device:${hashForLog(await clientIp()) ?? "unknown"}`;
+    if (!(await rateLimit(limitKey, KNOWN_DEVICE_LIMIT, KNOWN_DEVICE_WINDOW_MS)).ok) {
+        return vaultError("Too many requests. Try again in a few minutes.", 429);
+    }
+
+    const device = await prisma.vaultDevice.findFirst({
+        where: { identifier, vault: { user: { email } } },
+        select: { id: true }
+    });
+    return Response.json(device !== null);
+}
+
+/**
+ * The address out of `X-Request-Email`, which clients send base64url-encoded and
+ * without padding. An unreadable header is an empty address, not an error: the
+ * endpoint's answer for one it cannot place is `false` either way.
+ */
+function decodeRequestEmail(value: string): string {
+    if (!value) return "";
+    try {
+        const padded = value.replace(/-/g, "+").replace(/_/g, "/");
+        return Buffer.from(padded, "base64").toString("utf8");
+    } catch {
+        return "";
+    }
+}
+
 /** One device by the identifier it gave itself, which is how clients look
  *  themselves up before deciding whether they are known here. */
 export async function getDeviceByIdentifier(context: VaultContext): Promise<Response> {
@@ -228,6 +322,16 @@ export async function putDeviceToken(context: VaultContext): Promise<Response> {
     await prisma.vaultDevice.updateMany({
         where: { userId: principal.userId, identifier: context.params.identifier ?? "" },
         data: { pushToken: token }
+    });
+    return new Response(null, { status: 200 });
+}
+
+/** Forget a device's push token, which is what a client does as it signs out. */
+export async function clearDeviceToken(context: VaultContext): Promise<Response> {
+    const principal = requirePrincipal(context);
+    await prisma.vaultDevice.updateMany({
+        where: { userId: principal.userId, identifier: context.params.identifier ?? "" },
+        data: { pushToken: null }
     });
     return new Response(null, { status: 200 });
 }
