@@ -11,11 +11,7 @@ import { FileText, FolderClosed, RotateCcw, Trash2 } from "lucide-react";
 import { formatBytes } from "@polaris/core";
 import { Button, Card, CardBody } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
-import {
-    deleteTrashForeverAction,
-    emptyTrashAction,
-    restoreTrashAction
-} from "../drive/actions";
+import { deleteTrashForeverAction, emptyTrashAction, restoreTrashAction } from "../drive/actions";
 import { RelativeTime } from "@/components/relative-time";
 
 export interface TrashRow {
@@ -34,29 +30,76 @@ export function TrashView({ items }: { items: TrashRow[] }) {
     const [busy, setBusy] = useState<string | null>(null);
     const [confirm, confirmDialog] = useConfirm();
 
+    /**
+     * A row only leaves the list once the server says it left the bin.
+     *
+     * These actions reach storage that can refuse - a share that has gone away,
+     * a path something else is holding - and dropping the row regardless made a
+     * refusal look like a success until the page was reloaded.
+     */
     function onRestore(id: string) {
         setBusy(id);
         startTransition(async () => {
-            await restoreTrashAction(id);
-            setRows((prev) => prev.filter((row) => row.id !== id));
+            const result = await restoreTrashAction(id);
             setBusy(null);
+            if (result.error) {
+                await confirm({
+                    title: "Could not restore it",
+                    description: result.error,
+                    alert: true
+                });
+                return;
+            }
+            setRows((prev) => prev.filter((row) => row.id !== id));
         });
     }
 
     async function onDelete(id: string) {
-        if (!(await confirm({ title: "Permanently delete this item?", description: "This cannot be undone.", confirmLabel: "Delete", danger: true }))) return;
+        if (
+            !(await confirm({
+                title: "Permanently delete this item?",
+                description: "This cannot be undone.",
+                confirmLabel: "Delete",
+                danger: true
+            }))
+        )
+            return;
         setBusy(id);
         startTransition(async () => {
-            await deleteTrashForeverAction(id);
-            setRows((prev) => prev.filter((row) => row.id !== id));
+            const result = await deleteTrashForeverAction(id);
             setBusy(null);
+            if (result.error) {
+                await confirm({
+                    title: "Could not delete it",
+                    description: result.error,
+                    alert: true
+                });
+                return;
+            }
+            setRows((prev) => prev.filter((row) => row.id !== id));
         });
     }
 
     async function onEmpty() {
-        if (!(await confirm({ title: "Empty the Trash?", description: "Permanently delete everything in the Trash. This cannot be undone.", confirmLabel: "Empty Trash", danger: true }))) return;
+        if (
+            !(await confirm({
+                title: "Empty the Trash?",
+                description: "Permanently delete everything in the Trash. This cannot be undone.",
+                confirmLabel: "Empty Trash",
+                danger: true
+            }))
+        )
+            return;
         startTransition(async () => {
-            await emptyTrashAction();
+            const result = await emptyTrashAction();
+            if (result.error) {
+                await confirm({
+                    title: "Could not empty the bin",
+                    description: result.error,
+                    alert: true
+                });
+                return;
+            }
             setRows([]);
         });
     }
@@ -80,7 +123,9 @@ export function TrashView({ items }: { items: TrashRow[] }) {
 
             {rows.length === 0 ? (
                 <Card>
-                    <CardBody className="p-8 text-center text-sm text-muted-foreground">The Trash is empty.</CardBody>
+                    <CardBody className="p-8 text-center text-sm text-muted-foreground">
+                        The Trash is empty.
+                    </CardBody>
                 </Card>
             ) : (
                 <div className="flex flex-col gap-2">
@@ -97,8 +142,10 @@ export function TrashView({ items }: { items: TrashRow[] }) {
                                         <p className="truncate text-sm font-medium">{row.name}</p>
                                         <p className="truncate text-xs text-muted-foreground">
                                             {row.connectionName} / {row.originalPath || "(root)"}
-                                            {row.kind !== "dir" ? ` - ${formatBytes(BigInt(row.size))}` : ""} - deleted{" "}
-                                            <RelativeTime iso={row.deletedAt} />
+                                            {row.kind !== "dir"
+                                                ? ` - ${formatBytes(BigInt(row.size))}`
+                                                : ""}{" "}
+                                            - deleted <RelativeTime iso={row.deletedAt} />
                                         </p>
                                     </div>
                                 </div>

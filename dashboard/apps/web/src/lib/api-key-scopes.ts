@@ -20,6 +20,9 @@ export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
     "shares.manage": "Manage all share links",
     "requests.create": "Create drop points",
     "requests.manage": "Manage all drop points",
+    "snippets.read": "Read snippets",
+    "snippets.write": "Write snippets",
+    "vault.use": "Use the vault",
     "deploy.read": "Read deployments",
     "deploy.manage": "Manage deployments",
     "games.read": "Read game servers",
@@ -47,6 +50,12 @@ export const SCOPE_HINTS: Readonly<Record<Permission, string>> = {
     "shares.manage": "Edit and revoke share links from anyone.",
     "requests.create": "Open drop points for others to upload to.",
     "requests.manage": "Edit and close drop points from anyone.",
+    "snippets.read": "Read the owner's snippets and their share links.",
+    "snippets.write": "Write snippets, share them by link, and close text drop points.",
+    // A key carries no master key, so it moves the encrypted vault around without
+    // ever being able to read it. Say so, or the scope reads as far broader than
+    // it is.
+    "vault.use": "Sync the vault. The items stay encrypted; a key cannot read them.",
     "deploy.read": "Inspect apps, deployments, and logs.",
     "deploy.manage": "Deploy, restart, and remove apps.",
     "games.read": "See game servers, their addresses, and who is playing.",
@@ -73,9 +82,17 @@ export interface ScopeGroup {
 export const SCOPE_GROUPS: readonly ScopeGroup[] = [
     { title: "Files", scopes: ["drive.read", "drive.write", "drive.delete"] },
     { title: "Storage", scopes: ["connections.manage"] },
-    { title: "Sharing", scopes: ["shares.create", "shares.manage", "requests.create", "requests.manage"] },
+    {
+        title: "Sharing",
+        scopes: ["shares.create", "shares.manage", "requests.create", "requests.manage"]
+    },
+    { title: "Snippets", scopes: ["snippets.read", "snippets.write"] },
+    { title: "Vault", scopes: ["vault.use"] },
     { title: "Deployments", scopes: ["deploy.read", "deploy.manage"] },
-    { title: "Game servers", scopes: ["games.read", "games.moderate", "games.console", "games.manage"] },
+    {
+        title: "Game servers",
+        scopes: ["games.read", "games.moderate", "games.console", "games.manage"]
+    },
     { title: "Tasks", scopes: ["tasks.read", "tasks.manage"] },
     { title: "Inbox", scopes: ["inbox.read", "inbox.manage"] },
     { title: "Administration", scopes: ["users.manage", "settings.manage", "system.manage"] }

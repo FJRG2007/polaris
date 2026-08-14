@@ -15,7 +15,14 @@ const nextConfig = {
     output: "standalone",
     reactStrictMode: true,
     transpilePackages: ["@polaris/ui"],
-    serverExternalPackages: ["@prisma/client", "@polaris/db", "@polaris/docker", "ssh2", "undici", "v9u-smb2"],
+    serverExternalPackages: [
+        "@prisma/client",
+        "@polaris/db",
+        "@polaris/docker",
+        "ssh2",
+        "undici",
+        "v9u-smb2"
+    ],
     // Trace from the monorepo root so the standalone server lands at the path the
     // Docker image expects (apps/web/.next/standalone/apps/web/server.js).
     outputFileTracingRoot: workspaceRoot,
@@ -43,6 +50,27 @@ const nextConfig = {
     redirects: async () => [
         { source: "/notifications", destination: "/account/notifications", permanent: false },
         { source: "/overview", destination: "/home", permanent: false }
+    ],
+    /**
+     * The vault's Bitwarden-compatible surface.
+     *
+     * Official clients are given one server URL and derive the rest from it:
+     * `<base>/api`, `<base>/identity`, `<base>/notifications`, `<base>/icons`,
+     * `<base>/events`. Pointing them at `<origin>/vault` therefore means
+     * answering on those five paths, and they cannot move - a client will not
+     * be told otherwise.
+     *
+     * They are rewritten rather than served from `app/vault/api/...` because
+     * `/vault` is also a page: a route group and a plain folder of the same name
+     * at the same level is exactly the collision Next refuses to build. One
+     * explicit list of prefixes keeps the page and the API from ever meeting.
+     */
+    rewrites: async () => [
+        { source: "/vault/api/:path*", destination: "/api/bw/api/:path*" },
+        { source: "/vault/identity/:path*", destination: "/api/bw/identity/:path*" },
+        { source: "/vault/icons/:path*", destination: "/api/bw/icons/:path*" },
+        { source: "/vault/notifications/:path*", destination: "/api/bw/notifications/:path*" },
+        { source: "/vault/events/:path*", destination: "/api/bw/events/:path*" }
     ],
     webpack: (config) => {
         // @polaris/ui is transpiled from TypeScript source and, like the rest of

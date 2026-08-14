@@ -7,24 +7,33 @@
  * never trust the client to honor its own constraints.
  */
 
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { prisma } from "@polaris/db";
+import { loadEnv } from "@polaris/config";
+import { normalizeRelPath } from "@polaris/core";
 import type { CreateShareInput } from "@polaris/core";
-import { ipAllowed, normalizeRelPath } from "@polaris/core";
-import { geoAllowedForIp } from "@/lib/geo-service";
 import { sharingBaseUrl } from "@/lib/domain-service";
 import { generateToken, hashToken } from "@polaris/core/tokens";
-import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
-import { loadEnv } from "@polaris/config";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
-import { prisma } from "@polaris/db";
+import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
+import {
+    linkGeoAllowed,
+    linkIpAllowed,
+    linkUsability,
+    signUnlock,
+    unlockCookieName,
+    verifyUnlock,
+    type LinkUsability
+} from "@/lib/link-guards";
+
+/** The unlock-cookie namespace shares are signed under. */
+const SHARE_LINK_SCOPE = "share";
 
 /** A share as needed by the public access path. */
 export type ShareRecord = Awaited<ReturnType<typeof resolveShareByToken>>;
 
-/** Why a share cannot currently be used, or `ok`. */
-export type ShareUsability =
-    | { ok: true }
-    | { ok: false; reason: "revoked" | "expired" | "exhausted" };
+/** Why a share cannot currently be used, or `ok`. Shares carry no start date, so
+ *  the `scheduled` verdict a drop point can return never comes back from one. */
+export type ShareUsability = LinkUsability;
 
 /** Create a share and return the one-time raw token to embed in the link. */
 export async function createShare(
@@ -199,26 +208,13 @@ export async function resolveShareByToken(token: string) {
     });
 }
 
-/** Parse a stored JSON string array into a string[] (empty on any error). */
-function parseStringList(json: string): string[] {
-    try {
-        const parsed = JSON.parse(json);
-        return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
-    } catch {
-        return [];
-    }
-}
-
 /**
  * Whether a client IP is permitted by a share's IP/CIDR allowlist. An empty or
  * unparseable rule list means no restriction (anyone with the link). Enforced on
  * every public access before any bytes or listing are served.
  */
 export function shareIpAllowed(allowedCidrsJson: string, ip: string | undefined): boolean {
-    const rules = parseStringList(allowedCidrsJson);
-    if (rules.length === 0) return true;
-    if (!ip) return false;
-    return ipAllowed(ip, rules);
+    return linkIpAllowed(allowedCidrsJson, ip);
 }
 
 /** Whether a client IP passes a share's country/continent allowlist (async: may resolve geo). */
@@ -227,7 +223,7 @@ export async function shareGeoAllowed(
     allowedContinentsJson: string,
     ip: string | undefined
 ): Promise<boolean> {
-    return geoAllowedForIp(ip, parseStringList(allowedCountriesJson), parseStringList(allowedContinentsJson));
+    return linkGeoAllowed(allowedCountriesJson, allowedContinentsJson, ip);
 }
 
 /** Whether a share is currently serveable (not revoked, expired, or exhausted). */
@@ -238,17 +234,22 @@ export function shareUsability(share: {
     downloadCount: number;
     now?: Date;
 }): ShareUsability {
-    const now = share.now ?? new Date();
-    if (share.revokedAt) return { ok: false, reason: "revoked" };
-    if (share.expiresAt && share.expiresAt.getTime() <= now.getTime()) return { ok: false, reason: "expired" };
-    if (share.maxDownloads !== null && share.downloadCount >= share.maxDownloads) {
-        return { ok: false, reason: "exhausted" };
-    }
-    return { ok: true };
+    return linkUsability(
+        {
+            revokedAt: share.revokedAt,
+            expiresAt: share.expiresAt,
+            maxUses: share.maxDownloads,
+            useCount: share.downloadCount
+        },
+        share.now ?? new Date()
+    );
 }
 
 /** Constant-time password check for a share. No password set means always open. */
-export async function verifySharePassword(passwordHash: string | null, presented: string): Promise<boolean> {
+export async function verifySharePassword(
+    passwordHash: string | null,
+    presented: string
+): Promise<boolean> {
     if (!passwordHash) return true;
     return verifyLinkPassword(presented, passwordHash);
 }
@@ -263,7 +264,10 @@ export async function registerDownload(shareId: string): Promise<boolean> {
         where: {
             id: shareId,
             revokedAt: null,
-            OR: [{ maxDownloads: null }, { maxDownloads: { gt: prisma.share.fields.downloadCount } }]
+            OR: [
+                { maxDownloads: null },
+                { maxDownloads: { gt: prisma.share.fields.downloadCount } }
+            ]
         },
         data: { downloadCount: { increment: 1 } }
     });
@@ -297,7 +301,7 @@ export async function logShareAccess(entry: {
 
 /** Cookie name that records a solved password for one share. */
 export function shareUnlockCookie(shareId: string): string {
-    return `polaris_share_${shareId}`;
+    return unlockCookieName(SHARE_LINK_SCOPE, shareId);
 }
 
 /**
@@ -306,16 +310,16 @@ export function shareUnlockCookie(shareId: string): string {
  * a value the download path will accept.
  */
 export function signShareUnlock(shareId: string, secret: string): string {
-    return createHmac("sha256", secret).update(`unlock:${shareId}`).digest("base64url");
+    return signUnlock(SHARE_LINK_SCOPE, shareId, secret);
 }
 
 /** Constant-time check of an unlock cookie value against the expected signature. */
-export function verifyShareUnlock(shareId: string, value: string | undefined, secret: string): boolean {
-    if (!value) return false;
-    const expected = Buffer.from(signShareUnlock(shareId, secret));
-    const presented = Buffer.from(value);
-    if (expected.length !== presented.length) return false;
-    return timingSafeEqual(presented, expected);
+export function verifyShareUnlock(
+    shareId: string,
+    value: string | undefined,
+    secret: string
+): boolean {
+    return verifyUnlock(SHARE_LINK_SCOPE, shareId, value, secret);
 }
 
 /**

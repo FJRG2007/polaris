@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { cidrOrIp } from "./file-request.js";
+import { cidrOrIp } from "./link-rules.js";
 import { normalizeRelPath, UnsafePathError } from "../paths.js";
 
 export const DEPLOY_VOLUME_KINDS = ["volume", "bind", "nas"] as const;
@@ -84,7 +84,10 @@ export const deployVolumeUpdateSchema = z.object({
     source: z.string().trim().min(1).max(1024).optional(),
     connectionId: z.string().uuid().optional(),
     sizeLimit: z
-        .union([z.string().trim().regex(SIZE_LIMIT_RE, "Use a size like 10G, 500M, or 1.5T"), z.literal("")])
+        .union([
+            z.string().trim().regex(SIZE_LIMIT_RE, "Use a size like 10G, 500M, or 1.5T"),
+            z.literal("")
+        ])
         .optional()
 });
 
@@ -175,7 +178,10 @@ export const wafPrincipalRef = z
     .string()
     .trim()
     .max(80)
-    .regex(new RegExp(`^(${WAF_PRINCIPAL_TYPES.join("|")}):[0-9a-zA-Z_-]{1,64}$`), "Not a valid principal");
+    .regex(
+        new RegExp(`^(${WAF_PRINCIPAL_TYPES.join("|")}):[0-9a-zA-Z_-]{1,64}$`),
+        "Not a valid principal"
+    );
 
 /**
  * A moment a grant starts or stops applying, in unix seconds.
@@ -204,15 +210,21 @@ export const wafPrincipalGrantSchema = z
         /** Exclusive. From it on, the entry is spent. */
         until: wafGrantMoment.optional()
     })
-    .refine((grant) => grant.from === undefined || grant.until === undefined || grant.from < grant.until, {
-        message: "The start must come before the expiry",
-        path: ["until"]
-    });
+    .refine(
+        (grant) =>
+            grant.from === undefined || grant.until === undefined || grant.from < grant.until,
+        {
+            message: "The start must come before the expiry",
+            path: ["until"]
+        }
+    );
 
 export type WafPrincipalGrant = z.infer<typeof wafPrincipalGrantSchema>;
 
 /** The principals one scope names, capped like every other list on a rule. */
-const wafPrincipalList = z.array(wafPrincipalGrantSchema).max(WAF_LIST_MAX, `At most ${WAF_LIST_MAX} entries`);
+const wafPrincipalList = z
+    .array(wafPrincipalGrantSchema)
+    .max(WAF_LIST_MAX, `At most ${WAF_LIST_MAX} entries`);
 
 /**
  * What a custom rule can look at. Every one of these is a fact the edge already
@@ -272,7 +284,12 @@ export type WafRuleAction = (typeof WAF_RULE_ACTIONS)[number];
  * deliberately absent - it is checked before any rule runs and a rule that could
  * re-admit a denied address would make the denylist advisory.
  */
-export const WAF_SKIP_COMPONENTS = ["custom_rules", "managed_rules", "injection_checks", "browser_integrity"] as const;
+export const WAF_SKIP_COMPONENTS = [
+    "custom_rules",
+    "managed_rules",
+    "injection_checks",
+    "browser_integrity"
+] as const;
 export type WafSkipComponent = (typeof WAF_SKIP_COMPONENTS)[number];
 
 /** Caps, so the rule set stays something the edge carries in a header. */
@@ -382,7 +399,10 @@ export const wafCustomRuleSchema = z
         conditions: z.array(wafConditionSchema).min(1).max(CONDITIONS_MAX)
     })
     .superRefine((value, ctx) => {
-        const tests = value.conditions.reduce((total, entry) => total + wafConditionTests(entry), 0);
+        const tests = value.conditions.reduce(
+            (total, entry) => total + wafConditionTests(entry),
+            0
+        );
         if (tests > WAF_RULE_TESTS_MAX) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
@@ -491,7 +511,9 @@ export const wafRuleInputSchema = z
         // edge either way, so naming somebody twice is an operator contradicting
         // themselves rather than something that can widen access.
         const deniedPrincipals = new Set(value.loginDenyPrincipals.map((grant) => grant.ref));
-        const namedTwice = value.loginAllowPrincipals.find((grant) => deniedPrincipals.has(grant.ref));
+        const namedTwice = value.loginAllowPrincipals.find((grant) =>
+            deniedPrincipals.has(grant.ref)
+        );
         if (namedTwice) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,

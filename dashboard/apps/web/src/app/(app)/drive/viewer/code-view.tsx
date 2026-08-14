@@ -12,18 +12,15 @@
  */
 
 import { useState } from "react";
+import { Button } from "@polaris/ui";
 import { Pencil } from "lucide-react";
-import { Button, cn } from "@polaris/ui";
-import { CopyButton } from "@/components/copy-button";
-import { useHighlighter } from "@/lib/code-highlight";
-import { languageForFile } from "@/lib/code-language";
-import { EditorActions } from "./editor-actions";
-import { Loading, ViewerError } from "./status";
-import { readOnlyReason, useTextFile } from "./text-file";
 import type { ViewerTarget } from "./types";
-
-/** Metrics both layers of the editor must agree on, to the pixel. */
-const CODE_LAYER = "col-start-1 row-start-1 whitespace-pre p-4 font-mono text-xs leading-relaxed";
+import { Loading, ViewerError } from "./status";
+import { EditorActions } from "./editor-actions";
+import { CopyButton } from "@/components/copy-button";
+import { languageForFile } from "@/lib/code-language";
+import { CodeSurface } from "@/components/code-surface";
+import { readOnlyReason, useTextFile } from "./text-file";
 
 export function CodeView({
     src,
@@ -40,7 +37,6 @@ export function CodeView({
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState("");
     const language = languageForFile(target.name);
-    const highlight = useHighlighter(language?.id ?? null);
 
     if (error) return <ViewerError>This file could not be read.</ViewerError>;
     if (!file) return <Loading />;
@@ -48,8 +44,6 @@ export function CodeView({
     const blocked = readOnlyReason(file);
     const editable = !readOnly && !blocked;
     const code = editing ? draft : file.text;
-    const painted = language && highlight ? highlight(code, language.id) : null;
-    const lines = code.split("\n").length;
 
     /** A copy keeps the draft open; overwriting the original makes it the baseline. */
     function afterSave(name: string) {
@@ -106,50 +100,12 @@ export function CodeView({
                     </>
                 )}
             </div>
-            <div className="min-h-0 flex-1 overflow-auto">
-                <div className="flex min-h-full w-fit min-w-full">
-                    <LineNumbers count={lines} />
-                    <div className="grid flex-1">
-                        {/* The trailing newline gives the last line a box of its own,
-                            so the caret at the end of the file stays visible. */}
-                        <pre className={CODE_LAYER} aria-hidden={editing}>
-                            {painted === null ? (
-                                <code>{`${code}\n`}</code>
-                            ) : (
-                                <code dangerouslySetInnerHTML={{ __html: `${painted}\n` }} />
-                            )}
-                        </pre>
-                        {editing ? (
-                            <textarea
-                                value={draft}
-                                onChange={(event) => setDraft(event.target.value)}
-                                wrap="off"
-                                spellCheck={false}
-                                aria-label={`${target.name} contents`}
-                                className={cn(
-                                    CODE_LAYER,
-                                    "resize-none overflow-hidden border-0 bg-transparent text-transparent caret-foreground outline-none"
-                                )}
-                            />
-                        ) : null}
-                    </div>
-                </div>
-            </div>
+            <CodeSurface
+                code={code}
+                language={language?.id ?? null}
+                ariaLabel={`${target.name} contents`}
+                onChange={editing ? setDraft : undefined}
+            />
         </div>
-    );
-}
-
-/** The gutter. Sticky, so the numbers stay put when a long line scrolls sideways. */
-function LineNumbers({ count }: { count: number }) {
-    const numbers: string[] = [];
-    for (let line = 1; line <= count; line++) numbers.push(String(line));
-
-    return (
-        <pre
-            aria-hidden
-            className="sticky left-0 select-none border-r border-border bg-surface py-4 pl-4 pr-3 text-right font-mono text-xs leading-relaxed text-muted-foreground"
-        >
-            {numbers.join("\n")}
-        </pre>
     );
 }

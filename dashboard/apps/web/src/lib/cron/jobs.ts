@@ -20,6 +20,7 @@ import { sweepDueBackups } from "@/lib/backups/service";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
+import { sweepExpiredSends } from "@/lib/vault/sends";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { sweepGameActivity } from "@/lib/apps/games-activity-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
@@ -52,7 +53,12 @@ async function ownersWithApps(): Promise<string[]> {
     return rows.map((row) => row.ownerId);
 }
 
-async function runFirewall(): Promise<{ servers: number; banned: number; kicked: number; allowed: number }> {
+async function runFirewall(): Promise<{
+    servers: number;
+    banned: number;
+    kicked: number;
+    allowed: number;
+}> {
     let servers = 0;
     let banned = 0;
     let kicked = 0;
@@ -77,7 +83,12 @@ async function runFirewall(): Promise<{ servers: number; banned: number; kicked:
  * somebody else has paid for. Two jobs on the same minute would ask every server
  * twice for the same number.
  */
-async function runGameActivity(): Promise<{ started: number; stopped: number; arrived: number; left: number }> {
+async function runGameActivity(): Promise<{
+    started: number;
+    stopped: number;
+    arrived: number;
+    left: number;
+}> {
     let started = 0;
     let stopped = 0;
     let arrived = 0;
@@ -138,7 +149,9 @@ async function runInventories(): Promise<{ servers: number; snapshots: number; a
         servers += 1;
         const report = await drainQueue(install.ownerId, install.id, online).catch(() => null);
         applied += report?.applied ?? 0;
-        snapshots += await sweepInventorySnapshots(install.ownerId, install.id, online).catch(() => 0);
+        snapshots += await sweepInventorySnapshots(install.ownerId, install.id, online).catch(
+            () => 0
+        );
     }
     return { servers, snapshots, applied };
 }
@@ -223,6 +236,17 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // throttled per connection. This is the pass that catches what nobody
         // browsed.
         run: () => sweepDueDeletions()
+    },
+    {
+        key: "vault-sends",
+        everyMs: 15 * MINUTE,
+        // No lease: deleting what is already past its date is the same work
+        // however many runners do it, and a second one finds nothing left.
+        leaseMs: null,
+        // A Send's deletion date is a promise to whoever made it. Enforcing it
+        // only when somebody opens the link would mean a Send nobody opened
+        // sitting there forever, which is the case it was set for.
+        run: () => sweepExpiredSends()
     }
 ];
 

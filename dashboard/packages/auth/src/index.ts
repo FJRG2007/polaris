@@ -12,12 +12,7 @@ export {
     type Auth,
     type RequestAuth
 } from "./auth.js";
-export {
-    seedDefaultRoles,
-    getUserPermissions,
-    userHasPermission,
-    assignRole
-} from "./roles.js";
+export { seedDefaultRoles, getUserPermissions, userHasPermission, assignRole } from "./roles.js";
 export { provisionUser, hasAnyUser, setUserAdmin, type ProvisionInput } from "./provision.js";
 export {
     updateUserProfile,
@@ -144,6 +139,7 @@ export {
     type UserPhoneView
 } from "./phone.js";
 export { issueStepUpCode, verifyStepUpCode, discardStepUpCode } from "./step-up.js";
+export { verifyTotpForUser } from "./totp.js";
 export {
     listAccessGroups,
     createAccessGroup,

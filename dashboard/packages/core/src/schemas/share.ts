@@ -6,17 +6,10 @@
  */
 
 import { z } from "zod";
-import { isCidr, isIpAddress } from "../cidr.js";
+import { addressRuleFields } from "./link-rules.js";
 
 export const SHARE_KINDS = ["public", "invite"] as const;
 export type ShareKind = (typeof SHARE_KINDS)[number];
-
-const cidrOrIp = z
-    .string()
-    .trim()
-    .refine((value) => isCidr(value) || isIpAddress(value), {
-        message: "Must be an IP address or CIDR range"
-    });
 
 export const createShareSchema = z
     .object({
@@ -47,12 +40,7 @@ export const createShareSchema = z
         allowDownload: z.boolean().default(true),
         /** Allow recipients to preview the file inline in the browser. */
         allowPreview: z.boolean().default(true),
-        /** IP/CIDR allowlist. Empty means anyone with the link may access it. */
-        allowedCidrs: z.array(cidrOrIp).default([]),
-        /** ISO-3166 alpha-2 country allowlist. Empty means no country restriction. */
-        allowedCountries: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)).default([]),
-        /** Continent-code allowlist (AF/AS/EU/NA/SA/OC/AN). Empty means no restriction. */
-        allowedContinents: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)).default([]),
+        ...addressRuleFields,
         /** For invite shares: the users granted access. */
         inviteUserIds: z.array(z.string().min(1)).default([])
     })

@@ -10,20 +10,20 @@
  * happens to be signed in, the chrome adapts with a shortcut back into the app.
  */
 
-import Link from "next/link";
 import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
 import { getSession } from "@/lib/session";
 import { noteActivity } from "@/lib/session-guard";
 import { ShareExplorer } from "./share-explorer";
 import { ShareFileCard } from "./share-file-card";
-import { ArrowUpRight, LogIn } from "lucide-react";
 import { dymoIpAllowed } from "@/lib/dymo-service";
-import { SharePasswordForm } from "./share-password-form";
+import { LinkPasswordForm } from "@/components/link-password-form";
+import { LinkUnavailable, PublicShell } from "@/components/public-shell";
+import { unlockShareAction } from "@/app/(app)/drive/share-actions";
 import { baseName, normalizeRelPath } from "@polaris/core";
 import { getDriverForConnection } from "@/lib/storage-service";
 import { clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
+import { Badge } from "@polaris/ui";
 import {
     logShareAccess,
     resolveShareByToken,
@@ -37,50 +37,6 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function Shell({ children, signedIn }: { children: React.ReactNode; signedIn: boolean }) {
-    return (
-        <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-4 p-6">
-            <header className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                    <PolarisMark className="size-6" />
-                    <span className="text-sm font-medium">Polaris</span>
-                </div>
-                {signedIn ? (
-                    <Button asChild size="sm" variant="ghost">
-                        <Link href="/drive">
-                            Open Polaris
-                            <ArrowUpRight className="size-4" />
-                        </Link>
-                    </Button>
-                ) : (
-                    <Button asChild size="sm" variant="ghost">
-                        <Link href="/oauth/login">
-                            <LogIn className="size-4" />
-                            Sign in
-                        </Link>
-                    </Button>
-                )}
-            </header>
-            {children}
-        </div>
-    );
-}
-
-function Unavailable({ message, signedIn }: { message: string; signedIn: boolean }) {
-    return (
-        <Shell signedIn={signedIn}>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Link unavailable</CardTitle>
-                </CardHeader>
-                <CardBody>
-                    <p className="text-sm text-muted-foreground">{message}</p>
-                </CardBody>
-            </Card>
-        </Shell>
-    );
-}
 
 export default async function SharePage({
     params,
@@ -102,7 +58,13 @@ export default async function SharePage({
     await noteActivity(session?.session?.id);
 
     const share = await resolveShareByToken(token);
-    if (!share) return <Unavailable signedIn={signedIn} message="This link does not exist or has been removed." />;
+    if (!share)
+        return (
+            <LinkUnavailable
+                signedIn={signedIn}
+                message="This link does not exist or has been removed."
+            />
+        );
 
     const usable = shareUsability(share);
     if (!usable.ok) {
@@ -112,26 +74,41 @@ export default async function SharePage({
                 : usable.reason === "exhausted"
                   ? "This link has reached its download limit."
                   : "This link has been revoked.";
-        return <Unavailable signedIn={signedIn} message={message} />;
+        return <LinkUnavailable signedIn={signedIn} message={message} />;
     }
 
     // Same gate order as the token routes so the landing never shows a listing the
     // download endpoints would refuse: IP allowlist, geo, then the fraud check.
     const ip = await clientIp();
     if (!shareIpAllowed(share.allowedCidrs, ip)) {
-        return <Unavailable signedIn={signedIn} message="This link is not available from your network." />;
+        return (
+            <LinkUnavailable
+                signedIn={signedIn}
+                message="This link is not available from your network."
+            />
+        );
     }
     if (!(await shareGeoAllowed(share.allowedCountries, share.allowedContinents, ip))) {
-        return <Unavailable signedIn={signedIn} message="This link is not available from your location." />;
+        return (
+            <LinkUnavailable
+                signedIn={signedIn}
+                message="This link is not available from your location."
+            />
+        );
     }
     if (!(await dymoIpAllowed(ip)).allowed) {
-        return <Unavailable signedIn={signedIn} message="This link is not available from your network." />;
+        return (
+            <LinkUnavailable
+                signedIn={signedIn}
+                message="This link is not available from your network."
+            />
+        );
     }
 
     if (share.passwordHash) {
         const cookieValue = (await cookies()).get(shareUnlockCookie(share.id))?.value;
         if (!verifyShareUnlock(share.id, cookieValue, loadEnv().POLARIS_AUTH_SECRET)) {
-            return <SharePasswordForm token={token} />;
+            return <LinkPasswordForm token={token} unlock={unlockShareAction} />;
         }
     }
 
@@ -158,7 +135,7 @@ export default async function SharePage({
         if (isFile) fileSize = stat.size.toString();
     } catch {
         return (
-            <Unavailable
+            <LinkUnavailable
                 signedIn={signedIn}
                 message="The shared item could not be read. It may have been moved or deleted."
             />
@@ -168,7 +145,7 @@ export default async function SharePage({
     }
 
     return (
-        <Shell signedIn={signedIn}>
+        <PublicShell signedIn={signedIn} className="max-w-6xl">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <h1 className="text-lg font-semibold">Shared with you</h1>
                 {share.maxDownloads !== null ? (
@@ -200,6 +177,6 @@ export default async function SharePage({
                     allowCreateFolder={share.allowCreateFolder}
                 />
             )}
-        </Shell>
+        </PublicShell>
     );
 }

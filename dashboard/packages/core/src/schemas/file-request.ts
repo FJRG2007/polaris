@@ -7,21 +7,10 @@
  */
 
 import { z } from "zod";
-import { isCidr, isIpAddress } from "../cidr.js";
+import { accountIdentityList, addressRuleFields } from "./link-rules.js";
 
 /** One gibibyte, the default per-upload ceiling. */
 const DEFAULT_MAX_SIZE = 1024 * 1024 * 1024;
-
-/** An IP address or CIDR range. Shared by every drop-point schema (create,
- *  update, and templates) so an allowlist entry is validated the same way
- *  everywhere - a malformed rule that slips through fails closed and locks out
- *  every uploader, so all three paths must reject it at save time. */
-export const cidrOrIp = z
-    .string()
-    .trim()
-    .refine((value) => isCidr(value) || isIpAddress(value), {
-        message: "Must be an IP address or CIDR range"
-    });
 
 /** Normalize an extension list to lowercase, dot-less, deduplicated entries. */
 const extensionList = z
@@ -34,81 +23,56 @@ const extensionList = z
     )
     .transform((values) => Array.from(new Set(values)));
 
-export const createFileRequestSchema = z.object({
-    /** Optional; a blank title gets a generated random name at creation. */
-    title: z.string().max(200).optional(),
-    instructions: z.string().max(2000).optional(),
-    destinationConnectionId: z.string().min(1),
-    destinationPath: z.string(),
-    /** When false, anyone with the link may upload without authenticating. */
-    requireLogin: z.boolean().default(false),
-    /** Optional access PIN/password gating the upload page. */
-    password: z.string().min(1).max(256).optional(),
-    /** Hard per-file size ceiling, enforced by aborting the stream when exceeded. */
-    maxSizeBytes: z
-        .number()
-        .int()
-        .positive()
-        .max(Number.MAX_SAFE_INTEGER)
-        .default(DEFAULT_MAX_SIZE),
-    /** Optional per-file minimum size; a smaller file is rejected. */
-    minSizeBytes: z.number().int().nonnegative().optional(),
-    /** Optional cap on how many files may be submitted in total. */
-    maxFiles: z.number().int().positive().optional(),
-    /** Allowed file extensions (without the dot). Empty means any extension. */
-    allowedExtensions: extensionList.default([]),
-    /** Blocked file extensions. Takes precedence over allowedExtensions. */
-    deniedExtensions: extensionList.default([]),
-    /** Allowed MIME types, matched against the sniffed content type. Empty means any. */
-    allowedMimeTypes: z.array(z.string().trim().toLowerCase()).default([]),
-    /**
-     * Allowlist of uploader identities (email or username), lowercased with any
-     * leading "@" removed. Non-empty implies sign-in is required and only these
-     * accounts may upload. Empty means no per-user restriction.
-     */
-    allowedUsers: z
-        .array(z.string().trim().toLowerCase())
-        .transform((values) =>
-            Array.from(new Set(values.map((value) => value.replace(/^@+/, "")).filter(Boolean)))
-        )
-        .default([]),
-    /** IP/CIDR allowlist. Empty means no IP restriction. */
-    allowedCidrs: z.array(cidrOrIp).default([]),
-    /** ISO-3166 alpha-2 country allowlist. Empty means no country restriction. */
-    allowedCountries: z
-        .array(
-            z
-                .string()
-                .trim()
-                .toUpperCase()
-                .regex(/^[A-Z]{2}$/)
-        )
-        .default([]),
-    /** Continent-code allowlist (AF/AS/EU/NA/SA/OC/AN). Empty means no restriction. */
-    allowedContinents: z
-        .array(
-            z
-                .string()
-                .trim()
-                .toUpperCase()
-                .regex(/^[A-Z]{2}$/)
-        )
-        .default([]),
-    /** ISO timestamp before which the request does not yet accept uploads. */
-    startsAt: z.coerce.date().optional(),
-    /** Whether an uploader may delete files they submitted. */
-    allowUploaderDelete: z.boolean().default(false),
-    /**
-     * Whether an upload may replace a file already in the destination folder.
-     * Off by default: uploaders cannot see what is there, so a name that
-     * collides belongs to somebody else and the arrival is numbered instead.
-     */
-    allowOverwrite: z.boolean().default(false),
-    /** When set (and deletes allowed), only within this many seconds of upload. */
-    uploaderDeleteWindowSeconds: z.number().int().nonnegative().optional(),
-    /** ISO timestamp after which the request stops accepting uploads. */
-    expiresAt: z.coerce.date().optional()
-})
+export const createFileRequestSchema = z
+    .object({
+        /** Optional; a blank title gets a generated random name at creation. */
+        title: z.string().max(200).optional(),
+        instructions: z.string().max(2000).optional(),
+        destinationConnectionId: z.string().min(1),
+        destinationPath: z.string(),
+        /** When false, anyone with the link may upload without authenticating. */
+        requireLogin: z.boolean().default(false),
+        /** Optional access PIN/password gating the upload page. */
+        password: z.string().min(1).max(256).optional(),
+        /** Hard per-file size ceiling, enforced by aborting the stream when exceeded. */
+        maxSizeBytes: z
+            .number()
+            .int()
+            .positive()
+            .max(Number.MAX_SAFE_INTEGER)
+            .default(DEFAULT_MAX_SIZE),
+        /** Optional per-file minimum size; a smaller file is rejected. */
+        minSizeBytes: z.number().int().nonnegative().optional(),
+        /** Optional cap on how many files may be submitted in total. */
+        maxFiles: z.number().int().positive().optional(),
+        /** Allowed file extensions (without the dot). Empty means any extension. */
+        allowedExtensions: extensionList.default([]),
+        /** Blocked file extensions. Takes precedence over allowedExtensions. */
+        deniedExtensions: extensionList.default([]),
+        /** Allowed MIME types, matched against the sniffed content type. Empty means any. */
+        allowedMimeTypes: z.array(z.string().trim().toLowerCase()).default([]),
+        /**
+         * Allowlist of uploader identities (email or username), lowercased with any
+         * leading "@" removed. Non-empty implies sign-in is required and only these
+         * accounts may upload. Empty means no per-user restriction.
+         */
+        allowedUsers: accountIdentityList.default([]),
+        ...addressRuleFields,
+        /** ISO timestamp before which the request does not yet accept uploads. */
+        startsAt: z.coerce.date().optional(),
+        /** Whether an uploader may delete files they submitted. */
+        allowUploaderDelete: z.boolean().default(false),
+        /**
+         * Whether an upload may replace a file already in the destination folder.
+         * Off by default: uploaders cannot see what is there, so a name that
+         * collides belongs to somebody else and the arrival is numbered instead.
+         */
+        allowOverwrite: z.boolean().default(false),
+        /** When set (and deletes allowed), only within this many seconds of upload. */
+        uploaderDeleteWindowSeconds: z.number().int().nonnegative().optional(),
+        /** ISO timestamp after which the request stops accepting uploads. */
+        expiresAt: z.coerce.date().optional()
+    })
     .refine(
         (value) => value.minSizeBytes === undefined || value.minSizeBytes <= value.maxSizeBytes,
         { message: "Minimum size cannot exceed the maximum size", path: ["minSizeBytes"] }

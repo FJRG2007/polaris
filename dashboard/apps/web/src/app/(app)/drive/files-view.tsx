@@ -508,15 +508,14 @@ export function FilesView({
     }
 
     /**
-     * Double-clicking the name text renames. The hit area is strictly the text -
-     * the icon, the padding around it and the rest of the row open the item, so a
-     * double-click that misses the label never traps the user in a rename.
+     * Renaming is deliberately NOT on a double click.
+     *
+     * It used to be, on the name text alone, and the hit area was the problem:
+     * the thing people double-click most in a file list is a folder they want to
+     * open, and the name is what their pointer is already on. Opening and
+     * renaming cannot share that gesture, so renaming moved to the two places
+     * that mean it - F2, and Rename in the context menu.
      */
-    function nameDoubleClick(event: MouseEvent, entry: DriveEntry) {
-        event.preventDefault();
-        event.stopPropagation();
-        startRename(entry);
-    }
 
     /** Keyboard: F2 renames, Enter opens, Delete removes, Ctrl+C/X/V copy/cut/paste. */
     function onListKeyDown(event: KeyboardEvent) {
@@ -924,9 +923,7 @@ export function FilesView({
      * pointer was never on.
      */
     function menuTargets(entry: DriveEntry): DriveEntry[] {
-        return selected.has(entry.path) && selectedEntries.length > 1
-            ? selectedEntries
-            : [entry];
+        return selected.has(entry.path) && selectedEntries.length > 1 ? selectedEntries : [entry];
     }
 
     /**
@@ -1031,9 +1028,7 @@ export function FilesView({
                         <span className="ml-auto pl-6 text-xs text-muted-foreground">F2</span>
                     </ContextMenuItem>
                 )}
-                <ContextMenuItem
-                    onSelect={() => setClipboard({ entries: targets, mode: "copy" })}
-                >
+                <ContextMenuItem onSelect={() => setClipboard({ entries: targets, mode: "copy" })}>
                     <Copy className="size-4" />
                     {many ? `Copy ${targets.length} items` : "Copy"}
                     <span className="ml-auto pl-6 text-xs text-muted-foreground">Ctrl+C</span>
@@ -1077,9 +1072,7 @@ export function FilesView({
                         for (const item of targets) onSetFavorite(item, starring);
                     }}
                 >
-                    <Star
-                        className={cn("size-4", !starring && "fill-amber-400 text-amber-400")}
-                    />
+                    <Star className={cn("size-4", !starring && "fill-amber-400 text-amber-400")} />
                     {starring ? "Add to favorites" : "Remove from favorites"}
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => setIconTargets(targets)}>
@@ -2025,16 +2018,8 @@ export function FilesView({
                                                                     ) : (
                                                                         <span className="w-full min-w-0 text-xs">
                                                                             <span
-                                                                                className="inline-block max-w-full cursor-text truncate align-bottom"
+                                                                                className="inline-block max-w-full truncate align-bottom"
                                                                                 title={entry.name}
-                                                                                onDoubleClick={(
-                                                                                    e
-                                                                                ) =>
-                                                                                    nameDoubleClick(
-                                                                                        e,
-                                                                                        entry
-                                                                                    )
-                                                                                }
                                                                             >
                                                                                 {entry.name}
                                                                             </span>
@@ -2237,17 +2222,7 @@ export function FilesView({
                                                                                             entry
                                                                                         }
                                                                                     />
-                                                                                    <span
-                                                                                        className="cursor-text truncate"
-                                                                                        onDoubleClick={(
-                                                                                            e
-                                                                                        ) =>
-                                                                                            nameDoubleClick(
-                                                                                                e,
-                                                                                                entry
-                                                                                            )
-                                                                                        }
-                                                                                    >
+                                                                                    <span className="truncate">
                                                                                         {entry.name}
                                                                                     </span>
                                                                                     {searchScope ===
@@ -2297,17 +2272,7 @@ export function FilesView({
                                                                                             entry
                                                                                         }
                                                                                     />
-                                                                                    <span
-                                                                                        className="cursor-text truncate"
-                                                                                        onDoubleClick={(
-                                                                                            e
-                                                                                        ) =>
-                                                                                            nameDoubleClick(
-                                                                                                e,
-                                                                                                entry
-                                                                                            )
-                                                                                        }
-                                                                                    >
+                                                                                    <span className="truncate">
                                                                                         {entry.name}
                                                                                     </span>
                                                                                     {searchScope ===
@@ -2716,7 +2681,9 @@ export function FilesView({
                                 <button
                                     key={name}
                                     type="button"
-                                    onClick={() => applyIcon(name, iconPreview?.iconColor ?? "primary")}
+                                    onClick={() =>
+                                        applyIcon(name, iconPreview?.iconColor ?? "primary")
+                                    }
                                     className={cn(
                                         "flex items-center justify-center rounded-md border p-2 transition-colors hover:bg-muted",
                                         iconPreview?.icon === name

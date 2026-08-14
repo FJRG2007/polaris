@@ -359,13 +359,20 @@ export async function createFileAction(
     return {};
 }
 
-export async function deleteEntryAction(connectionId: string, path: string): Promise<void> {
+export async function deleteEntryAction(
+    connectionId: string,
+    path: string
+): Promise<{ error?: string }> {
     const user = await requireUser();
-    const driver = await requireDriveDriver(user.id, connectionId, path, "delete");
     try {
-        await deleteDriveEntry(driver, path);
-    } finally {
-        await driver.dispose();
+        const driver = await requireDriveDriver(user.id, connectionId, path, "delete");
+        try {
+            await deleteDriveEntry(driver, path);
+        } finally {
+            await driver.dispose();
+        }
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "That item could not be deleted.") };
     }
     await invalidateFolderSizes(connectionId, normalizeRelPath(path));
     await recordAudit({
@@ -376,6 +383,7 @@ export async function deleteEntryAction(connectionId: string, path: string): Pro
         metadata: { path }
     });
     revalidatePath("/drive");
+    return {};
 }
 
 /**
@@ -531,31 +539,35 @@ export async function emptyFolderAction(
     connectionId: string,
     path: string,
     permanent: boolean
-): Promise<void> {
+): Promise<{ error?: string }> {
     const user = await requireUser();
-    const driver = await requireDriveDriver(user.id, connectionId, path, "delete");
     let children: string[];
     try {
-        const rel = normalizeRelPath(path);
-        const { entries } = await driver.list(rel);
-        // Emptying the root is emptying what the reader can see in it, which is not
-        // what the driver lists: Polaris's own folder is in there and belongs to
-        // nobody's clear-out, permanent or into the bin.
-        children = deletableChildren(entries.map((child) => child.path));
-        if (permanent) {
+        const driver = await requireDriveDriver(user.id, connectionId, path, "delete");
+        try {
+            const rel = normalizeRelPath(path);
+            const { entries } = await driver.list(rel);
+            // Emptying the root is emptying what the reader can see in it, which is
+            // not what the driver lists: Polaris's own folder is in there and
+            // belongs to nobody's clear-out, permanent or into the bin.
+            children = deletableChildren(entries.map((child) => child.path));
+            if (permanent) {
+                for (const child of children) {
+                    await driver.delete(child, { recursive: true });
+                }
+            }
+        } finally {
+            await driver.dispose();
+        }
+        // moveToTrash opens its own driver per item, so it runs after the listing
+        // driver above is disposed.
+        if (!permanent) {
             for (const child of children) {
-                await driver.delete(child, { recursive: true });
+                await moveToTrash(user.id, connectionId, child);
             }
         }
-    } finally {
-        await driver.dispose();
-    }
-    // moveToTrash opens its own driver per item, so it runs after the listing
-    // driver above is disposed.
-    if (!permanent) {
-        for (const child of children) {
-            await moveToTrash(user.id, connectionId, child);
-        }
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "That folder could not be emptied.") };
     }
     await invalidateFolderSizes(connectionId, normalizeRelPath(path));
     await recordAudit({
@@ -567,6 +579,7 @@ export async function emptyFolderAction(
     });
     revalidatePath("/drive");
     if (!permanent) revalidatePath("/trash");
+    return {};
 }
 
 /**
@@ -609,10 +622,17 @@ export async function scheduleDeleteAction(
 }
 
 /** Move an item to the recycle bin (the default "delete" from the browser). */
-export async function moveToTrashAction(connectionId: string, path: string): Promise<void> {
+export async function moveToTrashAction(
+    connectionId: string,
+    path: string
+): Promise<{ error?: string }> {
     const user = await requireUser();
-    await authorizeDrive(user.id, connectionId, path, "delete");
-    await moveToTrash(user.id, connectionId, path);
+    try {
+        await authorizeDrive(user.id, connectionId, path, "delete");
+        await moveToTrash(user.id, connectionId, path);
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "That item could not be moved to the bin.") };
+    }
     await recordAudit({
         actorId: user.id,
         action: "drive.trash",
@@ -622,28 +642,44 @@ export async function moveToTrashAction(connectionId: string, path: string): Pro
     });
     revalidatePath("/drive");
     revalidatePath("/trash");
+    return {};
 }
 
 /** Restore a trashed item to its original location. */
-export async function restoreTrashAction(id: string): Promise<void> {
+export async function restoreTrashAction(id: string): Promise<{ error?: string }> {
     const user = await requirePermission("drive.write");
-    await restoreTrash(user.id, id);
+    try {
+        await restoreTrash(user.id, id);
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "That item could not be restored.") };
+    }
     revalidatePath("/drive");
     revalidatePath("/trash");
+    return {};
 }
 
 /** Permanently delete a single trashed item. */
-export async function deleteTrashForeverAction(id: string): Promise<void> {
+export async function deleteTrashForeverAction(id: string): Promise<{ error?: string }> {
     const user = await requirePermission("drive.delete");
-    await deleteTrashForever(user.id, id);
+    try {
+        await deleteTrashForever(user.id, id);
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "That item could not be deleted.") };
+    }
     revalidatePath("/trash");
+    return {};
 }
 
 /** Permanently empty the recycle bin. */
-export async function emptyTrashAction(): Promise<void> {
+export async function emptyTrashAction(): Promise<{ error?: string }> {
     const user = await requirePermission("drive.delete");
-    await emptyTrash(user.id);
+    try {
+        await emptyTrash(user.id);
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "The bin could not be emptied.") };
+    }
     revalidatePath("/trash");
+    return {};
 }
 
 /** Human message for a Drive authorization/lock failure, else a fallback. */

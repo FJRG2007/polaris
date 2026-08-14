@@ -16,6 +16,9 @@ export const PERMISSIONS = [
     "shares.manage",
     "requests.create",
     "requests.manage",
+    "snippets.read",
+    "snippets.write",
+    "vault.use",
     "deploy.read",
     "deploy.manage",
     "games.read",
@@ -59,6 +62,9 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "connections.manage",
         "shares.create",
         "requests.create",
+        "snippets.read",
+        "snippets.write",
+        "vault.use",
         "deploy.read",
         "deploy.manage",
         "games.read",
@@ -72,7 +78,19 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "inbox.read",
         "inbox.manage"
     ],
-    viewer: ["drive.read", "deploy.read", "games.read", "agents.read", "tasks.read", "inbox.read"],
+    viewer: [
+        "drive.read",
+        "snippets.read",
+        // A vault reaches nothing in Polaris - it is a personal store only its
+        // owner can decrypt - so withholding it from a read-only account would
+        // deny them their own passwords without protecting anything.
+        "vault.use",
+        "deploy.read",
+        "games.read",
+        "agents.read",
+        "tasks.read",
+        "inbox.read"
+    ],
     guest: []
 };
 
@@ -99,6 +117,9 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     "shares.manage": { area: "Sharing", label: "Manage everyone's share links" },
     "requests.create": { area: "Sharing", label: "Create drop points" },
     "requests.manage": { area: "Sharing", label: "Manage everyone's drop points" },
+    "snippets.read": { area: "Snippets", label: "See snippets and open shared ones" },
+    "snippets.write": { area: "Snippets", label: "Write snippets and share them by link" },
+    "vault.use": { area: "Vault", label: "Keep a password vault and connect a client to it" },
     "deploy.read": { area: "Apps", label: "See deployments, servers and containers" },
     "deploy.manage": { area: "Apps", label: "Deploy, restart and configure apps" },
     "games.read": { area: "Game servers", label: "See game servers and who is playing" },
@@ -135,10 +156,17 @@ export const IMPLIED_PERMISSIONS: Readonly<Partial<Record<Permission, readonly P
     "drive.delete": ["drive.read"],
     "shares.manage": ["shares.create"],
     "requests.manage": ["requests.create"],
+    "snippets.write": ["snippets.read"],
     // Whoever may deploy anything on this machine may already run a game server
     // on it, so the game-server grants ride along - which also means an operator
     // who set their roles up before these existed does not have to redo them.
-    "deploy.manage": ["deploy.read", "games.read", "games.moderate", "games.console", "games.manage"],
+    "deploy.manage": [
+        "deploy.read",
+        "games.read",
+        "games.moderate",
+        "games.console",
+        "games.manage"
+    ],
     "deploy.read": ["games.read"],
     "games.moderate": ["games.read"],
     "games.console": ["games.read"],
@@ -174,10 +202,7 @@ export function expandPermissions(granted: Iterable<Permission>): Permission[] {
  * wildcard grant short-circuits to true, which is how the admin role implies
  * everything without enumerating each key.
  */
-export function hasPermission(
-    granted: Iterable<GrantedPermission>,
-    required: Permission
-): boolean {
+export function hasPermission(granted: Iterable<GrantedPermission>, required: Permission): boolean {
     for (const grant of granted) {
         if (grant === ALL_PERMISSIONS || grant === required) return true;
     }

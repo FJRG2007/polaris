@@ -1,23 +1,40 @@
 "use client";
 
 /**
- * PIN gate for a protected drop point. Submits to the unlock action, which sets
- * the httpOnly unlock cookie on success. A localStorage throttle imposes a short
- * local cooldown after repeated failures - instant feedback that also spares the
- * server; the server enforces the real rate limit. Errors are generic so the
- * form cannot be used to probe which links exist.
+ * The password gate in front of a protected public link.
+ *
+ * One form for every kind of link, told which action to submit to: a share, a
+ * drop point, a snippet and a text drop point ask the same question and get the
+ * same deliberately generic answer, so the form cannot be used to work out which
+ * links exist or whether a guess was close.
+ *
+ * The local cooldown after repeated failures is feedback, not a control: it
+ * spares a round trip and says something useful, while the real limit is
+ * enforced per link and per address on the server.
  */
 
-import { useState, useTransition, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { Lock } from "lucide-react";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
-import { unlockFileRequestAction } from "@/app/(app)/drive/request-actions";
+import { useRouter } from "next/navigation";
+import { useState, useTransition, type FormEvent } from "react";
 import { clearAttempts, cooldownRemaining, recordFailure } from "@/lib/attempt-throttle";
+import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
 
-export function RequestPasswordForm({ token, title }: { token: string; title: string }) {
+export function LinkPasswordForm({
+    token,
+    unlock,
+    title = "Password required",
+    description = "This link is protected. Enter its password to continue.",
+    label = "Password"
+}: {
+    token: string;
+    /** The server action that checks it and sets the unlock cookie. */
+    unlock: (token: string, secret: string) => Promise<{ error?: string }>;
+    title?: string;
+    description?: string;
+    label?: string;
+}) {
     const router = useRouter();
-    const [pin, setPin] = useState("");
+    const [secret, setSecret] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
@@ -30,7 +47,7 @@ export function RequestPasswordForm({ token, title }: { token: string; title: st
             return;
         }
         startTransition(async () => {
-            const result = await unlockFileRequestAction(token, pin);
+            const result = await unlock(token, secret);
             if (result.error) {
                 recordFailure(token);
                 setError(result.error);
@@ -56,18 +73,19 @@ export function RequestPasswordForm({ token, title }: { token: string; title: st
                 </CardHeader>
                 <CardBody>
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
-                        <p className="text-sm text-muted-foreground">Enter the PIN to upload to this drop point.</p>
+                        <p className="text-sm text-muted-foreground">{description}</p>
                         <Input
                             type="password"
                             autoFocus
                             required
-                            value={pin}
-                            onChange={(event) => setPin(event.target.value)}
-                            placeholder="PIN"
+                            value={secret}
+                            onChange={(event) => setSecret(event.target.value)}
+                            placeholder={label}
+                            aria-label={label}
                         />
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
-                        <Button type="submit" disabled={pending || !pin}>
-                            {pending ? "Checking..." : "Continue"}
+                        <Button type="submit" disabled={pending || !secret}>
+                            {pending ? "Checking..." : "Unlock"}
                         </Button>
                     </form>
                 </CardBody>

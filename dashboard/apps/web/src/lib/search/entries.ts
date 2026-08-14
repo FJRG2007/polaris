@@ -12,6 +12,7 @@
 import { APP_SECTIONS, APP_SUBAPPS, POLARIS_APPS } from "@/lib/apps";
 import {
     Boxes,
+    Code2,
     Database,
     LayoutGrid,
     Rocket,
@@ -20,7 +21,14 @@ import {
     type LucideIcon
 } from "lucide-react";
 
-export type SearchResourceKind = "project" | "service" | "database" | "server" | "runner" | "installed";
+export type SearchResourceKind =
+    | "project"
+    | "service"
+    | "database"
+    | "server"
+    | "runner"
+    | "installed"
+    | "snippet";
 
 /** A named thing the user owns, as the search endpoint returns it. */
 export interface SearchResource {
@@ -51,7 +59,8 @@ const RESOURCE_ICONS: Record<SearchResourceKind, LucideIcon> = {
     database: Database,
     server: Server,
     runner: Workflow,
-    installed: LayoutGrid
+    installed: LayoutGrid,
+    snippet: Code2
 };
 
 const RESOURCE_GROUPS: Record<SearchResourceKind, string> = {
@@ -60,7 +69,8 @@ const RESOURCE_GROUPS: Record<SearchResourceKind, string> = {
     database: "Deploy",
     server: "Servers",
     runner: "Runners",
-    installed: "Apps"
+    installed: "Apps",
+    snippet: "Snippets"
 };
 
 /**
@@ -112,7 +122,11 @@ export function navigationEntries(isAdmin: boolean, appIds: readonly string[]): 
     // sort of page search exists for.
     for (const subapp of APP_SUBAPPS) {
         // A subject lives inside an app, so it is only findable when that app is.
-        const owner = POLARIS_APPS.find((app) => subapp.base.startsWith(app.href) || app.match?.some((base) => subapp.base.startsWith(base)));
+        const owner = POLARIS_APPS.find(
+            (app) =>
+                subapp.base.startsWith(app.href) ||
+                app.match?.some((base) => subapp.base.startsWith(base))
+        );
         if (owner && !allowed.has(owner.id)) continue;
         for (const section of subapp.sections) {
             if (entries.some((entry) => entry.href === section.href)) continue;

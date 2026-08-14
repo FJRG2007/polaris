@@ -2,8 +2,9 @@
 
 The Polaris web control plane. A minimalist, dark, unifi.ui.com-style dashboard
 that grows app by app behind a top-left app switcher. The first app is an
-advanced **Drive**; future apps (Docker/Kubernetes, servers, VMs, home
-automation, deploys) plug into the same shell.
+advanced **Drive**, alongside a Bitwarden-compatible **Vault** (see
+[`docs/vault.md`](docs/vault.md)); future apps (Docker/Kubernetes, servers, VMs,
+home automation, deploys) plug into the same shell.
 
 This pillar is a self-contained npm-workspaces monorepo living beside the Rust
 plugins. The privileged host daemon that unlocks host access lives in the root

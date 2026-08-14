@@ -9,26 +9,34 @@
  */
 
 import { prisma } from "@polaris/db";
+import { createHash } from "node:crypto";
 import type { CreateFileRequestInput } from "@polaris/core";
 import { getDriverForConnection } from "@/lib/storage-service";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { invalidateFolderSizes } from "@/lib/drive-folder-size";
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
+import { normalizeRelPath, randomDropPointName, userAllowedForRequest } from "@polaris/core";
 import {
-    ipAllowed,
-    normalizeRelPath,
-    randomDropPointName,
-    userAllowedForRequest
-} from "@polaris/core";
+    linkIpAllowed,
+    linkUsability,
+    parseStringList,
+    signMarker,
+    signUnlock,
+    unlockCookieName,
+    verifyMarker,
+    verifyUnlock,
+    type LinkUsability
+} from "@/lib/link-guards";
+
+/** The unlock-cookie namespace drop points are signed under. */
+const DROP_LINK_SCOPE = "drop";
 
 /** A file request as needed by the public upload path. */
 export type FileRequestRecord = Awaited<ReturnType<typeof resolveFileRequestByToken>>;
 
-/** Why a file request cannot currently accept uploads, or `ok`. */
-export type FileRequestUsability =
-    | { ok: true }
-    | { ok: false; reason: "revoked" | "expired" | "scheduled" };
+/** Why a file request cannot currently accept uploads, or `ok`. A drop point has
+ *  no use cap on the row, so the `exhausted` verdict never comes back from one. */
+export type FileRequestUsability = LinkUsability;
 
 /** Create a file request and return the one-time raw token to embed in the link. */
 export async function createFileRequest(
@@ -291,15 +299,18 @@ export function fileRequestUsability(request: {
     startsAt?: Date | null;
     now?: Date;
 }): FileRequestUsability {
-    const now = request.now ?? new Date();
-    if (request.revokedAt) return { ok: false, reason: "revoked" };
-    if (request.startsAt && request.startsAt.getTime() > now.getTime()) {
-        return { ok: false, reason: "scheduled" };
-    }
-    if (request.expiresAt && request.expiresAt.getTime() <= now.getTime()) {
-        return { ok: false, reason: "expired" };
-    }
-    return { ok: true };
+    // A drop point has no use cap of its own - maxFiles is counted against the
+    // submissions table, not a column here - so it is passed as uncapped.
+    return linkUsability(
+        {
+            revokedAt: request.revokedAt,
+            expiresAt: request.expiresAt,
+            startsAt: request.startsAt ?? null,
+            maxUses: null,
+            useCount: 0
+        },
+        request.now ?? new Date()
+    );
 }
 
 /**
@@ -307,17 +318,7 @@ export function fileRequestUsability(request: {
  * unparseable list means no restriction. Enforced before any upload is accepted.
  */
 export function fileRequestIpAllowed(allowedCidrsJson: string, ip: string | undefined): boolean {
-    let rules: string[] = [];
-    try {
-        const parsed = JSON.parse(allowedCidrsJson);
-        if (Array.isArray(parsed))
-            rules = parsed.filter((value): value is string => typeof value === "string");
-    } catch {
-        return true;
-    }
-    if (rules.length === 0) return true;
-    if (!ip) return false;
-    return ipAllowed(ip, rules);
+    return linkIpAllowed(allowedCidrsJson, ip);
 }
 
 /**
@@ -351,12 +352,12 @@ export async function verifyFileRequestPassword(
 
 /** Cookie name recording a solved PIN for one drop point. */
 export function fileRequestUnlockCookie(requestId: string): string {
-    return `polaris_drop_${requestId}`;
+    return unlockCookieName(DROP_LINK_SCOPE, requestId);
 }
 
 /** Sign an unlock marker so the "PIN solved" cookie cannot be forged. */
 export function signFileRequestUnlock(requestId: string, secret: string): string {
-    return createHmac("sha256", secret).update(`drop-unlock:${requestId}`).digest("base64url");
+    return signUnlock(DROP_LINK_SCOPE, requestId, secret);
 }
 
 /** Constant-time check of an unlock cookie against the expected signature. */
@@ -365,23 +366,12 @@ export function verifyFileRequestUnlock(
     value: string | undefined,
     secret: string
 ): boolean {
-    if (!value) return false;
-    const expected = Buffer.from(signFileRequestUnlock(requestId, secret));
-    const presented = Buffer.from(value);
-    if (expected.length !== presented.length) return false;
-    return timingSafeEqual(presented, expected);
+    return verifyUnlock(DROP_LINK_SCOPE, requestId, value, secret);
 }
 
 /** Parse a stored JSON string array back into a string[] (empty on any error). */
 export function parseStringArray(json: string): string[] {
-    try {
-        const parsed = JSON.parse(json);
-        return Array.isArray(parsed)
-            ? parsed.filter((value): value is string => typeof value === "string")
-            : [];
-    } catch {
-        return [];
-    }
+    return parseStringList(json);
 }
 
 /** Count how many files have been submitted to a request (for the maxFiles cap). */
@@ -473,9 +463,14 @@ export async function deleteSubmissionForOwner(
     return deleteSubmission(requestId, submissionId);
 }
 
+/** The marker an anonymous uploader presents to delete a file they submitted. */
+function submissionDeleteMarker(submissionId: string): string {
+    return `drop-del:${submissionId}`;
+}
+
 /** Sign a per-submission delete token so an anonymous uploader can remove their file. */
 export function signSubmissionDelete(submissionId: string, secret: string): string {
-    return createHmac("sha256", secret).update(`drop-del:${submissionId}`).digest("base64url");
+    return signMarker(submissionDeleteMarker(submissionId), secret);
 }
 
 /** Constant-time check of a submission delete token against the expected value. */
@@ -484,11 +479,7 @@ export function verifySubmissionDelete(
     value: string | undefined,
     secret: string
 ): boolean {
-    if (!value) return false;
-    const expected = Buffer.from(signSubmissionDelete(submissionId, secret));
-    const presented = Buffer.from(value);
-    if (expected.length !== presented.length) return false;
-    return timingSafeEqual(presented, expected);
+    return verifyMarker(submissionDeleteMarker(submissionId), value, secret);
 }
 
 /** Cookie grouping a browser's visits/uploads to one drop point (opaque id). */

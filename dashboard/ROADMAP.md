@@ -80,6 +80,35 @@ File requests (upload-in):
 - [ ] Per-request max size, destination, allowed formats, allowed CIDRs, expiry
 - [ ] Anonymous-upload hardening (streamed size limit, sniffed MIME, rate limit)
 
+Snippets & text drop points:
+
+- [x] Snippets: server-side encrypted text (env vars, code, notes) under
+      `POLARIS_MASTER_KEY`, searchable and highlighted because Polaris holds the
+      key; one that must not be server-readable is sealed in the sender's browser
+      instead, and served as ciphertext Polaris cannot open
+- [x] Share a snippet by link: the same token/password/expiry/view-cap/address
+      rules as a Drive share, enforced through the shared `lib/link-guards`
+- [x] Text drop points: a URL that asks somebody for text - the mirror of a
+      snippet link, and the text counterpart of a file drop point. An anonymous
+      submission becomes a snippet owned by whoever opened the drop point
+
+Vault:
+
+- [x] Bitwarden-compatible surface at `/vault` (`/api`, `/identity`,
+      `/notifications`, `/icons`, `/events`), dispatched from one route table -
+      see [`docs/vault.md`](docs/vault.md) for what it does and does not cover
+- [x] Client-side crypto only: the master password never reaches the server, the
+      browser derives the key and wraps the vault's own key, and the server
+      stores ciphertext it cannot open
+- [x] Vault items (logins, notes, cards, identities, SSH keys), folders,
+      organizations (set up in Polaris, used from any client), Sends, and TOTP
+      code generation
+- [x] Sign-in reuses the Polaris account's own second factor rather than a
+      second, vault-only one
+- [ ] Emergency access, push/live sync, organization member management from a
+      client, and the breached-password report - named as not implemented yet in
+      [`docs/vault.md`](docs/vault.md)
+
 Containers app (Docker):
 
 - [x] Secure per-install SSH access provisioning (`install.sh --ssh`, REMOTE hosts only now): unique key, forced-command `docker system dial-stdio`, `restrict` + `from=`, pinned known_hosts
