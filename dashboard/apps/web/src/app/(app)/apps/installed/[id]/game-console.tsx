@@ -237,7 +237,7 @@ export function GameConsole({
                         // the caret has to measure text in a font it does not own,
                         // and being a few pixels wrong there is worse than being
                         // deliberately left-aligned here.
-                        <ul className="absolute bottom-full left-0 z-10 mb-1 max-h-48 w-full max-w-md overflow-y-auto rounded-md border border-border bg-surface py-1 shadow-lg">
+                        <ul className="absolute bottom-full left-0 z-10 mb-1 max-h-48 w-full max-w-md overflow-y-auto rounded-md border border-border-strong bg-surface py-1 shadow-popover">
                             {suggestions.map((option, index) => (
                                 <li key={option}>
                                     <button

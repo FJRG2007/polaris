@@ -26,7 +26,7 @@ export function MobileNav({ children }: { children: ReactNode }) {
                 type="button"
                 onClick={() => setOpen(true)}
                 aria-label="Open navigation"
-                className="-ml-1 grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring md:hidden"
+                className="-ml-1 grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
             >
                 <Menu className="size-5" />
             </button>

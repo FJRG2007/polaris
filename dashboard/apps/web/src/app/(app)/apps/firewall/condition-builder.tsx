@@ -94,7 +94,7 @@ export function ConditionBuilder({
                         setProblem(null);
                     }}
                     onBlur={() => applyDraft(draft)}
-                    className="w-full rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="w-full rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs text-foreground "
                 />
                 <div className="flex items-baseline justify-between gap-2">
                     {problem ? (
@@ -269,7 +269,7 @@ function ConditionGroupBlock({
                         onClick={onRemove}
                         aria-label="Remove this group"
                         title="Remove the group"
-                        className="ml-auto inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="ml-auto inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-danger "
                     >
                         <X className="size-3.5 shrink-0" aria-hidden="true" />
                     </button>
@@ -355,7 +355,7 @@ function ConditionRow({
                             onClick={onRemove}
                             aria-label="Remove this condition"
                             title="Remove"
-                            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-danger "
                         >
                             <X className="size-3.5 shrink-0" aria-hidden="true" />
                         </button>
@@ -411,7 +411,7 @@ function JoinButton({ label, disabled, onClick }: { label: string; disabled: boo
             disabled={disabled}
             onClick={onClick}
             title={disabled ? "A rule cannot nest any deeper" : `Add a condition joined by ${label.toLowerCase()}`}
-            className="inline-flex h-8 items-center rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex h-8 items-center rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-40 "
         >
             {label}
         </button>

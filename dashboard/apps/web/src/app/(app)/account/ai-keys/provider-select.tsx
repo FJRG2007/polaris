@@ -67,7 +67,7 @@ export function ProviderSelect({
                 aria-haspopup="listbox"
                 aria-expanded={open}
                 onClick={() => setOpen((was) => !was)}
-                className="border-input bg-surface flex h-9 w-full items-center gap-2 rounded-md border px-3 py-2 text-sm shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                className="border-border bg-surface flex h-9 w-full items-center gap-2 rounded-md border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
                 {chosen ? <IntegrationLogo slug={chosen.slug} className="size-4 shrink-0" /> : null}
                 <span
@@ -82,7 +82,7 @@ export function ProviderSelect({
                 so that class paints nothing and the menu comes out see-through
                 over whatever is under it. */}
             {open ? (
-                <div className="bg-card absolute z-50 mt-1 w-full rounded-md border border-border shadow-lg">
+                <div className="bg-elevated absolute z-50 mt-1 w-full rounded-md border border-border-strong shadow-popover">
                     <div className="flex items-center gap-2 border-b border-border px-3 py-2">
                         <Search className="text-muted-foreground size-4 shrink-0" />
                         <Input

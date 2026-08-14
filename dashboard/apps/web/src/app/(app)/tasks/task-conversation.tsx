@@ -18,7 +18,7 @@ import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
-import { cn, Input, Button } from "@polaris/ui";
+import { cn, Input, Button, SegmentedControl } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import { RichText } from "@/components/rich-text/rich-text";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -206,23 +206,16 @@ export function ActivityStream({
         <div className="flex min-h-0 flex-1 flex-col">
             <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
                 <h2 className="text-sm font-semibold">Activity</h2>
-                <div className="flex items-center gap-1 rounded-md bg-muted p-0.5 text-[11px]">
-                    {(["all", "comments"] as const).map((option) => (
-                        <button
-                            key={option}
-                            type="button"
-                            onClick={() => setFilter(option)}
-                            className={cn(
-                                "rounded px-2 py-0.5 transition-colors",
-                                filter === option
-                                    ? "bg-background text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            {option === "all" ? "Everything" : "Comments"}
-                        </button>
-                    ))}
-                </div>
+                <SegmentedControl
+                    aria-label="What to show"
+                    size="sm"
+                    value={filter}
+                    onValueChange={setFilter}
+                    options={[
+                        { value: "all", label: "Everything" },
+                        { value: "comments", label: "Comments" }
+                    ]}
+                />
             </header>
 
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">

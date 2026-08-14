@@ -87,7 +87,7 @@ export function GeoPicker({
                         value={query}
                         placeholder="Type a country to add"
                         autoComplete="off"
-                        className="h-9 w-full rounded-md border border-input bg-surface px-3 text-sm"
+                        className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm"
                         onChange={(event) => {
                             setQuery(event.target.value);
                             setOpen(true);
@@ -104,7 +104,7 @@ export function GeoPicker({
                         }}
                     />
                     {open && suggestions.length > 0 ? (
-                        <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-auto rounded-md border border-border bg-surface py-1 shadow-lg">
+                        <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-auto rounded-md border border-border-strong bg-surface py-1 shadow-popover">
                             {suggestions.map((option) => (
                                 <li key={option.code}>
                                     <button

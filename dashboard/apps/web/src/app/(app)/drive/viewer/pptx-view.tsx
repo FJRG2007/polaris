@@ -203,7 +203,7 @@ export function PptxView({ src }: { src: string }) {
         <div className="flex flex-col gap-3 p-4">
             <div
                 ref={frameRef}
-                className="w-full overflow-hidden rounded-md border border-border bg-white shadow-sm"
+                className="w-full overflow-hidden rounded-md border border-border bg-white "
                 style={{ height: scale ? `${deck.height * scale}px` : undefined }}
             >
                 <div

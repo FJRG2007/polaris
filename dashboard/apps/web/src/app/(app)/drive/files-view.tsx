@@ -1891,9 +1891,9 @@ export function FilesView({
                             tabIndex={0}
                             onKeyDown={onListKeyDown}
                             className={cn(
-                                "relative min-w-0 flex-1 rounded-lg focus:outline-none",
+                                "relative min-w-0 flex-1 rounded-lg ",
                                 dragUpload &&
-                                    "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                                    "ring-2 ring-primary ring-offset-2 "
                             )}
                             onDragOver={onUploadDragOver}
                             onDragLeave={() => setDragUpload(false)}
@@ -2710,7 +2710,7 @@ export function FilesView({
                                         applyIcon(iconPreview?.icon ?? "folder", color.id)
                                     }
                                     className={cn(
-                                        "size-6 rounded-full ring-offset-2 ring-offset-background transition",
+                                        "size-6 rounded-full ring-offset-2 transition",
                                         iconPreview?.iconColor === color.id
                                             ? "ring-2 ring-primary"
                                             : ""
@@ -2806,7 +2806,7 @@ export function FilesView({
                             onChange={(event) => setNoteValue(event.target.value)}
                             rows={4}
                             placeholder="Add a note for this item..."
-                            className="rounded-md border border-input bg-surface px-3 py-2 text-sm"
+                            className="rounded-md border border-border bg-surface px-3 py-2 text-sm"
                         />
                         <div className="flex justify-between">
                             <Button

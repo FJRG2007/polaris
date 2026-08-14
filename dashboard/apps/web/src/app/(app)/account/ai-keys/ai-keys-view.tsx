@@ -576,7 +576,7 @@ function KeyDialog({
                     <label className="flex flex-col gap-1 text-sm">
                         Provider
                         {existing ? (
-                            <span className="border-input bg-surface flex h-9 items-center gap-2 rounded-md border px-3 text-sm">
+                            <span className="border-border bg-surface flex h-9 items-center gap-2 rounded-md border px-3 text-sm">
                                 <IntegrationLogo slug={existing.provider} className="size-4 shrink-0" />
                                 <span className="min-w-0 truncate" title={entry?.name ?? existing.provider}>
                                     {entry?.name ?? existing.provider}

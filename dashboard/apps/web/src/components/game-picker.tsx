@@ -94,8 +94,8 @@ export function GamePicker({
                 aria-haspopup="listbox"
                 aria-expanded={open}
                 className={cn(
-                    "flex h-14 w-full items-center gap-3 rounded-md border border-input bg-surface px-3 text-left text-sm shadow-sm transition-colors",
-                    "hover:border-border focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex h-14 w-full items-center gap-3 rounded-md border border-border bg-surface px-3 text-left text-sm transition-colors",
+                    "hover:border-border ",
                     "disabled:cursor-not-allowed disabled:opacity-50"
                 )}
             >
@@ -119,7 +119,7 @@ export function GamePicker({
             </button>
 
             {open && (
-                <div className="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-50 flex max-h-80 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+                <div className="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-50 flex max-h-80 flex-col overflow-hidden rounded-lg border border-border-strong bg-elevated shadow-popover">
                     {searchable && (
                         <div className="relative border-b border-border/60 p-2">
                             <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

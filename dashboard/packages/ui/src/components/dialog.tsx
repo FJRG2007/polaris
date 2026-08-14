@@ -27,14 +27,14 @@ export const DialogContent = forwardRef<
                 // Capping it and letting the content scroll is what keeps a long
                 // one (a confirmation that explains itself, a form with options)
                 // usable on a laptop in a small window and on a phone.
-                "fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-border-strong bg-elevated p-5 shadow-modal focus:outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98]",
+                "fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-border-strong bg-elevated p-5 shadow-modal data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98]",
                 className
             )}
             {...props}
         >
             {children}
             {showClose ? (
-                <RadixDialog.Close className="absolute right-4 top-4 rounded-sm text-muted-foreground transition-colors hover:text-foreground focus:outline-none">
+                <RadixDialog.Close className="absolute right-4 top-4 rounded-sm text-muted-foreground transition-colors hover:text-foreground ">
                     <X className="size-4" />
                     <span className="sr-only">Close</span>
                 </RadixDialog.Close>

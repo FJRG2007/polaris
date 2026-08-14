@@ -199,7 +199,7 @@ export function HostDialog() {
                                     name="privateKey"
                                     required
                                     rows={4}
-                                    className="rounded-md border border-input bg-surface px-3 py-1 text-sm"
+                                    className="rounded-md border border-border bg-surface px-3 py-1 text-sm"
                                 />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
@@ -242,8 +242,10 @@ function ModeTab({
             type="button"
             onClick={onClick}
             aria-pressed={active}
-            className={`flex-1 rounded px-3 py-1.5 text-sm transition-colors ${
-                active ? "bg-surface font-medium text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            className={`flex-1 rounded border px-3 py-1 text-[13px] font-medium transition-colors duration-fast ${
+                active
+                    ? "border-border-strong bg-card-hover text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
         >
             {children}

@@ -224,7 +224,7 @@ function AddressLink({
                 type="button"
                 onClick={() => onInspect(ip)}
                 title={`What ${ip} has been doing`}
-                className="rounded font-mono underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="rounded font-mono underline-offset-2 hover:text-foreground hover:underline "
             >
                 {ip}
             </button>

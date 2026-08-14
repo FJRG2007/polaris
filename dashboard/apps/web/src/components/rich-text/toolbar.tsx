@@ -75,7 +75,7 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
             shouldShow={({ editor: current, from, to }) =>
                 from !== to && !current.isActive("codeBlock") && !current.isActive("markdownBlock")
             }
-            className="flex items-center gap-0.5 rounded-lg border border-border bg-card p-1 shadow-lg"
+            className="flex items-center gap-0.5 rounded-lg border border-border-strong bg-elevated p-1 shadow-popover"
         >
             {linking ? (
                 <form

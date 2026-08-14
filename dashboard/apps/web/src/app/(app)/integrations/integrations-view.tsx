@@ -45,6 +45,7 @@ import {
     DialogTitle,
     DialogHeader,
     DialogContent,
+    SegmentedControl,
     DialogDescription
 } from "@polaris/ui";
 
@@ -1924,28 +1925,16 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
-                    <div className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1 text-sm">
-                        {(
-                            [
-                                ["app", "Create app"],
-                                ["existing", "Existing app"]
-                            ] as const
-                        ).map(([value, label]) => (
-                            <button
-                                key={value}
-                                type="button"
-                                onClick={() => setMethod(value)}
-                                className={cn(
-                                    "rounded px-2 py-1.5 font-medium transition-colors",
-                                    method === value
-                                        ? "bg-surface text-foreground shadow-sm"
-                                        : "text-muted-foreground hover:text-foreground"
-                                )}
-                            >
-                                {label}
-                            </button>
-                        ))}
-                    </div>
+                    <SegmentedControl
+                        aria-label="How to connect"
+                        className="flex w-full"
+                        value={method}
+                        onValueChange={setMethod}
+                        options={[
+                            { value: "app", label: "Create app" },
+                            { value: "existing", label: "Existing app" }
+                        ]}
+                    />
 
                     {method === "app" ? (
                         <div className="flex flex-col gap-3 text-sm">
@@ -1981,7 +1970,7 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                                     onChange={(event) => setPem(event.target.value)}
                                     placeholder="Paste the contents of the app's .pem file"
                                     rows={4}
-                                    className="rounded-md border border-input bg-surface px-3 py-2 font-mono text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs "
                                 />
                             </label>
                             <label className="flex flex-col gap-1">

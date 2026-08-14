@@ -225,7 +225,7 @@ function RowAction({
             aria-label={label}
             title={label}
             className={cn(
-                "rounded p-1 text-muted-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "rounded p-1 text-muted-foreground transition-colors ",
                 className
             )}
         >

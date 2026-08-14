@@ -148,7 +148,7 @@ export function ModelPicker({
                 type="button"
                 disabled={disabled}
                 onClick={() => setOpen((was) => !was)}
-                className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                className="border-border bg-background flex h-9 w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
                 <span className="min-w-0 truncate text-left">
                     {chosen ? chosen.name : (value ?? inheritLabel ?? placeholder)}
@@ -164,7 +164,7 @@ export function ModelPicker({
                 so that class paints nothing and the list comes out see-through
                 over whatever is under it. */}
             {open ? (
-                <div className="bg-card absolute z-50 mt-1 w-full rounded-md border border-border shadow-lg">
+                <div className="bg-elevated absolute z-50 mt-1 w-full rounded-md border border-border-strong shadow-popover">
                     <div className="flex items-center gap-2 border-b px-3 py-2">
                         <Search className="text-muted-foreground size-4 shrink-0" />
                         <Input

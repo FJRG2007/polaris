@@ -27,7 +27,7 @@ export function PageHeader({ title, onBack }: { title: string; onBack: () => voi
                 onClick={onBack}
                 aria-label="Back to the rule list"
                 title="Back"
-                className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground "
             >
                 <ArrowLeft className="size-4 shrink-0" aria-hidden="true" />
             </button>

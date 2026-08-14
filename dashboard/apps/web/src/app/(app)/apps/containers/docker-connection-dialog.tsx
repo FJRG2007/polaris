@@ -169,7 +169,7 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                         <Textarea
                                             name="privateKey"
                                             rows={4}
-                                            className="rounded-md border border-input bg-surface px-3 py-1 text-sm"
+                                            className="rounded-md border border-border bg-surface px-3 py-1 text-sm"
                                         />
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
@@ -209,7 +209,7 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                         <Textarea
                                             name="ca"
                                             rows={3}
-                                            className="rounded-md border border-input bg-surface px-3 py-1 text-sm"
+                                            className="rounded-md border border-border bg-surface px-3 py-1 text-sm"
                                         />
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
@@ -217,7 +217,7 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                         <Textarea
                                             name="cert"
                                             rows={3}
-                                            className="rounded-md border border-input bg-surface px-3 py-1 text-sm"
+                                            className="rounded-md border border-border bg-surface px-3 py-1 text-sm"
                                         />
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
@@ -225,7 +225,7 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                         <Textarea
                                             name="key"
                                             rows={3}
-                                            className="rounded-md border border-input bg-surface px-3 py-1 text-sm"
+                                            className="rounded-md border border-border bg-surface px-3 py-1 text-sm"
                                         />
                                     </label>
                                 </>

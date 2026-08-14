@@ -444,7 +444,7 @@ function Thread({
                         onChange={(event) => setOptionsText(event.target.value)}
                         placeholder={"One option per line"}
                         rows={3}
-                        className="w-full rounded-md border border-input bg-surface p-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="w-full rounded-md border border-border bg-surface p-2 text-sm "
                     />
                 )}
                 <div className="flex items-center gap-2">

@@ -56,7 +56,7 @@ export function popupOpen(state: EditorState): boolean {
 
 /** The popup shell, shared with the block menu so the two match. */
 export const POPUP_CLASS =
-    "max-h-64 w-72 overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-lg";
+    "max-h-64 w-72 overflow-y-auto rounded-lg border border-border-strong bg-elevated p-1 shadow-popover";
 
 /**
  * What the plugin's own element is given once it is mounted.
@@ -116,7 +116,7 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
 
     if (props.searching && items.length === 0) {
         return (
-            <div className="w-72 rounded-lg border border-border bg-card p-2 shadow-lg">
+            <div className="w-72 rounded-lg border border-border-strong bg-elevated p-2 shadow-popover">
                 <Skeleton className="h-6 w-full" />
             </div>
         );

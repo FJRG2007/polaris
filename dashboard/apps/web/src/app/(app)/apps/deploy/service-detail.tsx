@@ -38,6 +38,7 @@ import {
     DropdownMenu,
     DialogContent,
     DropdownMenuItem,
+    SegmentedControl,
     ConfirmDeleteDialog,
     DropdownMenuContent,
     DropdownMenuTrigger,
@@ -1301,25 +1302,16 @@ function VariablesTab({ app }: { app: ProjectApp }) {
 
     return (
         <div className="flex flex-col gap-4 py-2">
-            <div className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1 text-sm">
-                {(
-                    [
-                        ["application", "This service"],
-                        ["environment", "Environment (shared)"]
-                    ] as const
-                ).map(([value, label]) => (
-                    <button
-                        key={value}
-                        type="button"
-                        onClick={() => setScope(value)}
-                        className={`rounded px-3 py-1.5 font-medium transition-colors ${
-                            scope === value ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                        }`}
-                    >
-                        {label}
-                    </button>
-                ))}
-            </div>
+            <SegmentedControl
+                aria-label="Which variables to show"
+                className="flex"
+                value={scope}
+                onValueChange={setScope}
+                options={[
+                    { value: "application", label: "This service" },
+                    { value: "environment", label: "Environment (shared)" }
+                ]}
+            />
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm font-medium">
                     {items ? items.length : 0} {scope === "environment" ? "environment" : "service"} variable
@@ -1345,7 +1337,7 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                         onChange={(event) => setRaw(event.target.value)}
                         rows={6}
                         placeholder={'DATABASE_URL="postgres://user:pass@host:5432/db"\nAPI_KEY=abc123 # inline comment\nexport NODE_ENV=production'}
-                        className="rounded-md border border-input bg-surface px-3 py-2 font-mono text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs "
                     />
                     <div className="flex items-center justify-between gap-2">
                         <label className="cursor-pointer text-xs text-primary hover:underline">

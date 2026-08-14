@@ -119,7 +119,7 @@ export function JsonEditor({
             <div
                 className={cn(
                     "overflow-auto rounded-md border bg-surface",
-                    invalid ? "border-danger" : "border-input",
+                    invalid ? "border-danger" : "border-border",
                     className
                 )}
             >

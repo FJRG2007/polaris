@@ -12,7 +12,7 @@ import { FolderSearch } from "lucide-react";
 import { FolderPicker } from "./folder-picker";
 import { useEffect, useState, useTransition } from "react";
 import { createVolumeAction, updateVolumeAction, listNasConnectionsAction } from "./actions";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
+import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, SegmentedControl, Select } from "@polaris/ui";
 
 type Kind = "volume" | "bind" | "nas";
 type NasConnection = Awaited<ReturnType<typeof listNasConnectionsAction>>[number];
@@ -165,20 +165,17 @@ export function VolumeForm({
                 <p className="text-xs text-muted-foreground">{KIND_LABELS[kind]} - {KIND_HELP[kind]}</p>
             ) : (
                 <>
-                    <div className="grid grid-cols-3 gap-1 rounded-md bg-muted p-1 text-sm">
-                        {(Object.keys(KIND_LABELS) as Kind[]).map((value) => (
-                            <button
-                                key={value}
-                                type="button"
-                                onClick={() => setKind(value)}
-                                className={`rounded px-3 py-1.5 font-medium transition-colors ${
-                                    kind === value ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                                }`}
-                            >
-                                {KIND_LABELS[value]}
-                            </button>
-                        ))}
-                    </div>
+                    <SegmentedControl
+                        aria-label="Kind of storage"
+                        className="flex"
+                        value={kind}
+                        onValueChange={setKind}
+                        options={(Object.keys(KIND_LABELS) as Kind[]).map((value) => ({
+                            value,
+                            label: KIND_LABELS[value],
+                            title: KIND_HELP[value]
+                        }))}
+                    />
                     <p className="text-xs text-muted-foreground">{KIND_HELP[kind]}</p>
                 </>
             )}
@@ -223,20 +220,16 @@ export function VolumeForm({
             {kind !== "volume" && (
                 <div className="flex flex-col gap-2">
                     {!editing && (
-                        <div className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1 text-sm">
-                            {(["auto", "custom"] as const).map((value) => (
-                                <button
-                                    key={value}
-                                    type="button"
-                                    onClick={() => setPathMode(value)}
-                                    className={`rounded px-3 py-1.5 font-medium transition-colors ${
-                                        pathMode === value ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                                    }`}
-                                >
-                                    {value === "auto" ? "Auto" : "Choose folder"}
-                                </button>
-                            ))}
-                        </div>
+                        <SegmentedControl
+                            aria-label="Where the folder lives"
+                            className="flex"
+                            value={pathMode}
+                            onValueChange={setPathMode}
+                            options={[
+                                { value: "auto", label: "Auto" },
+                                { value: "custom", label: "Choose folder" }
+                            ]}
+                        />
                     )}
                     {!usesCustomPath ? (
                         <p className="text-[11px] text-muted-foreground">

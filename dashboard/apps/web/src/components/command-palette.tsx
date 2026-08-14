@@ -474,7 +474,7 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
                 // Below lg the header is already carrying the switcher and a page's
                 // own controls, so the field collapses to its icon rather than
                 // squeezing them.
-                className="flex h-9 w-9 items-center justify-center rounded-md border border-input bg-surface text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground lg:w-full lg:max-w-sm lg:justify-start lg:gap-2 lg:px-3"
+                className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:w-full lg:max-w-sm lg:justify-start lg:gap-2 lg:px-3"
             >
                 <Search className="size-4 shrink-0" aria-hidden="true" />
                 <span className="hidden flex-1 truncate text-left text-sm lg:block">Search</span>

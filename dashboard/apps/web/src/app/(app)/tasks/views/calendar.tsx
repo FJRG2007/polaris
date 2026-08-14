@@ -517,7 +517,7 @@ function TimedEntry({
                 rel="noreferrer noopener"
                 title={`${entry.title} (Google Calendar)`}
                 style={style}
-                className="absolute z-[5] overflow-hidden rounded border border-l-2 border-border bg-card/95 px-1 py-0.5 shadow-sm transition-colors hover:bg-muted"
+                className="absolute z-[5] overflow-hidden rounded border border-l-2 border-border bg-card/95 px-1 py-0.5 transition-colors hover:bg-muted"
             >
                 {body}
             </a>
@@ -531,7 +531,7 @@ function TimedEntry({
                 onClick={() => props.onOpen(entry.task?.id as string)}
                 title={entry.title}
                 style={style}
-                className="absolute z-[5] overflow-hidden rounded border border-l-2 border-border bg-card/95 px-1 py-0.5 text-left shadow-sm transition-colors hover:bg-muted"
+                className="absolute z-[5] overflow-hidden rounded border border-l-2 border-border bg-card/95 px-1 py-0.5 text-left transition-colors hover:bg-muted"
             >
                 {body}
             </button>

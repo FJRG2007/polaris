@@ -334,7 +334,7 @@ export function RequestDialog({
                                 rows={2}
                                 defaultValue={initial?.instructions}
                                 placeholder="What should people upload?"
-                                className="max-h-48 min-h-[2.5rem] resize-y rounded-md border border-input bg-surface px-3 py-2 text-sm"
+                                className="max-h-48 min-h-[2.5rem] resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm"
                             />
                         </label>
 

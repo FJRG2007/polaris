@@ -179,7 +179,7 @@ function KeyFileField({ name, label }: { name: string; label: string }) {
                 rows={3}
                 spellCheck={false}
                 placeholder="Paste your private key (-----BEGIN OPENSSH PRIVATE KEY-----) or upload a file"
-                className="rounded-md border border-input bg-surface px-3 py-2 font-mono text-xs"
+                className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs"
             />
         </>
     );

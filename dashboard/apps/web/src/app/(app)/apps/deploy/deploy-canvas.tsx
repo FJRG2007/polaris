@@ -658,7 +658,7 @@ export function DeployCanvas({
                         const removing = staged.has(node.id);
                         const card = (
                             <div
-                                className={`group absolute flex select-none flex-col border bg-card shadow-sm transition-[border-color,box-shadow] hover:shadow-lg hover:shadow-black/25 ${
+                                className={`group absolute flex select-none flex-col border bg-elevated transition-[border-color,box-shadow] hover:shadow-popover hover:shadow-black/25 ${
                                     node.volume || node.volumes?.length ? "rounded-t-2xl" : "rounded-2xl"
                                 } ${
                                     removing

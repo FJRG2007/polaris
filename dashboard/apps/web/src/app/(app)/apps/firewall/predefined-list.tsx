@@ -94,7 +94,7 @@ export function PredefinedRuleList({
                                     <button
                                         type="button"
                                         onClick={() => onOpen(row.id)}
-                                        className="rounded text-left font-medium underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        className="rounded text-left font-medium underline-offset-2 hover:underline "
                                     >
                                         {row.name}
                                     </button>
@@ -146,7 +146,7 @@ export function PredefinedRuleList({
                                         onClick={() => onOpen(row.id)}
                                         aria-label={`Open ${row.name}`}
                                         title="Open"
-                                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground "
                                     >
                                         <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
                                     </button>

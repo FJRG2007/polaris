@@ -42,7 +42,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({ className, type
                 type="button"
                 tabIndex={-1}
                 onClick={() => setRevealed((value) => !value)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground focus:outline-none"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground "
                 aria-label={revealed ? "Hide password" : "Show password"}
                 title={revealed ? "Hide password" : "Show password"}
             >

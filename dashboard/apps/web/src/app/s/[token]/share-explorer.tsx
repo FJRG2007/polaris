@@ -1172,7 +1172,7 @@ export function ShareExplorer({
 
             {/* Background upload indicator */}
             {uploading ? (
-                <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-border bg-card p-3 text-sm shadow-lg">
+                <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-border-strong bg-elevated p-3 text-sm shadow-popover">
                     <Loader2 className="size-4 animate-spin text-primary" />
                     Uploading...
                 </div>
@@ -1180,7 +1180,7 @@ export function ShareExplorer({
 
             {/* Error toast for a failed write */}
             {opError ? (
-                <div className="fixed bottom-4 right-4 z-50 flex w-80 items-start gap-2 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-danger shadow-lg">
+                <div className="fixed bottom-4 right-4 z-50 flex w-80 items-start gap-2 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-danger shadow-popover">
                     <Info className="mt-0.5 size-4 shrink-0" />
                     <span className="min-w-0 flex-1 break-words">{opError}</span>
                     <button

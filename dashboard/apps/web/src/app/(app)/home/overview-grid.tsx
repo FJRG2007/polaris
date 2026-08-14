@@ -311,7 +311,7 @@ export function OverviewGrid({
                         onClick={refresh}
                         title="Refresh the figures"
                         aria-label="Refresh the figures"
-                        className="grid size-9 place-items-center rounded-md border border-input bg-surface text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+                        className="grid size-9 place-items-center rounded-md border border-border bg-surface text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                         <RefreshCw className={cn("size-4", data === undefined && "animate-spin")} aria-hidden="true" />
                     </button>

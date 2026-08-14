@@ -42,7 +42,6 @@
     --muted: 225 10% 14%;
     --border: 225 10% 16%;
     --border-strong: 225 10% 24%;
-    --input: 225 10% 20%;
     --ring: 258 88% 66%;
 
     /* Accent. One violet, used sparingly; `accent` is its warmer neighbour, for
@@ -96,7 +95,6 @@
     --muted: 225 20% 94%;
     --border: 225 16% 89%;
     --border-strong: 225 16% 78%;
-    --input: 225 16% 84%;
     --ring: 258 78% 56%;
 
     --primary: 258 78% 55%;

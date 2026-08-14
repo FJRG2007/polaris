@@ -151,7 +151,7 @@ function WatchSubjectCard({ card }: { card: WatchCard }) {
     return (
         <Link
             href={card.href}
-            className="group flex flex-col gap-3 rounded-xl border border-border/60 bg-surface/60 p-4 transition-[border-color,box-shadow] hover:border-border hover:shadow-md hover:shadow-black/15"
+            className="group flex flex-col gap-3 rounded-xl border border-border-strong/60 bg-surface/60 p-4 transition-[border-color,box-shadow] hover:border-border-strong hover:shadow-popover hover:shadow-black/15"
         >
             <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2.5">

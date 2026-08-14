@@ -31,7 +31,7 @@ export function ViewAsBanner({ mode, label, actorName }: { mode: "user" | "role"
 
     return (
         <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-3">
-            <div className="pointer-events-auto flex max-w-full items-center gap-3 rounded-full border border-warning/40 bg-warning/15 py-1.5 pl-4 pr-1.5 shadow-lg backdrop-blur">
+            <div className="pointer-events-auto flex max-w-full items-center gap-3 rounded-full border border-warning/40 bg-warning/15 py-1.5 pl-4 pr-1.5 shadow-popover backdrop-blur">
                 <Eye className="size-4 shrink-0 text-warning" aria-hidden="true" />
                 <p className="min-w-0 truncate text-sm">
                     {mode === "user" ? (

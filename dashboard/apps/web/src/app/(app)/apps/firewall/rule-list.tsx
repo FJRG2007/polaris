@@ -290,7 +290,7 @@ function RuleRow({
                 <button
                     type="button"
                     onClick={onEdit}
-                    className="rounded text-left font-medium underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="rounded text-left font-medium underline-offset-2 hover:underline "
                 >
                     {rule.name}
                 </button>
@@ -322,7 +322,7 @@ function RuleRow({
                     <DropdownMenuTrigger
                         aria-label={`Actions for ${rule.name}`}
                         title="Actions"
-                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground "
                     >
                         <span aria-hidden="true">...</span>
                     </DropdownMenuTrigger>

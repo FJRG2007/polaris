@@ -36,7 +36,7 @@ export function AccountMenu({ id, name, email }: { id: string; name: string; ema
         <DropdownMenu>
             <DropdownMenuTrigger
                 aria-label="Your account"
-                className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="rounded-full "
             >
                 <Avatar person={{ id, name }} size={32} />
             </DropdownMenuTrigger>

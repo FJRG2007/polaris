@@ -717,7 +717,7 @@ export function DriveExplorer({
             </section>
 
             {ops.length > 0 ? (
-                <div className="fixed bottom-4 right-4 z-50 flex w-72 flex-col gap-2 rounded-lg border border-border bg-card p-3 shadow-lg">
+                <div className="fixed bottom-4 right-4 z-50 flex w-72 flex-col gap-2 rounded-lg border border-border-strong bg-elevated p-3 shadow-popover">
                     <p className="text-xs font-medium text-muted-foreground">
                         Working in the background
                     </p>
@@ -731,7 +731,7 @@ export function DriveExplorer({
             ) : null}
 
             {opError ? (
-                <div className="fixed bottom-4 right-4 z-50 flex w-80 items-start gap-2 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-danger shadow-lg">
+                <div className="fixed bottom-4 right-4 z-50 flex w-80 items-start gap-2 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-danger shadow-popover">
                     <Info className="mt-0.5 size-4 shrink-0" />
                     <span className="min-w-0 flex-1 break-words">{opError}</span>
                     <button
@@ -1234,7 +1234,7 @@ function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved
                     <label className="flex flex-1 flex-col gap-1 text-sm">
                         Or type a share name
                         <input
-                            className="h-9 rounded-md border border-input bg-surface px-3 text-sm"
+                            className="h-9 rounded-md border border-border bg-surface px-3 text-sm"
                             value={share}
                             onChange={(event) => setShare(event.target.value)}
                             placeholder="e.g. Personal-Drive, data, home"

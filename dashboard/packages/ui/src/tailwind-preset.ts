@@ -28,7 +28,6 @@ const preset: Omit<Config, "content"> = {
                 foreground: { DEFAULT: withAlpha("foreground"), subtle: withAlpha("subtle-foreground") },
                 muted: { DEFAULT: withAlpha("muted"), foreground: withAlpha("muted-foreground") },
                 border: { DEFAULT: withAlpha("border"), strong: withAlpha("border-strong") },
-                input: withAlpha("input"),
                 ring: withAlpha("ring"),
                 primary: { DEFAULT: withAlpha("primary"), foreground: withAlpha("primary-foreground") },
                 accent: { DEFAULT: withAlpha("accent"), foreground: withAlpha("accent-foreground") },

@@ -260,7 +260,7 @@ export function MetricsHistory<T extends { t: number } = Point>({
                             type="datetime-local"
                             value={customFrom}
                             onChange={(event) => setCustomFrom(event.target.value)}
-                            className="rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground"
+                            className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -269,7 +269,7 @@ export function MetricsHistory<T extends { t: number } = Point>({
                             type="datetime-local"
                             value={customTo}
                             onChange={(event) => setCustomTo(event.target.value)}
-                            className="rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground"
+                            className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
                         />
                     </label>
                     <Button variant="outline" onClick={applyCustom}>

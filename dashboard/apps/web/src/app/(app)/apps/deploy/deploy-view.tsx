@@ -283,7 +283,7 @@ function AppCard({
 
     return (
         <div
-            className={`flex flex-col gap-3 rounded-xl border bg-surface/60 p-4 transition-[border-color,box-shadow] hover:shadow-md hover:shadow-black/15 ${
+            className={`flex flex-col gap-3 rounded-xl border bg-surface/60 p-4 transition-[border-color,box-shadow] hover:shadow-popover hover:shadow-black/15 ${
                 staged ? "border-primary/50 ring-1 ring-primary/20" : "border-border/60 hover:border-border"
             }`}
         >
@@ -435,7 +435,7 @@ function DatabaseCard({
 
     return (
         <div
-            className={`flex flex-col gap-3 rounded-xl border bg-surface/60 p-4 transition-[border-color,box-shadow] hover:shadow-md hover:shadow-black/15 ${
+            className={`flex flex-col gap-3 rounded-xl border bg-surface/60 p-4 transition-[border-color,box-shadow] hover:shadow-popover hover:shadow-black/15 ${
                 staged ? "border-primary/50 ring-1 ring-primary/20" : "border-border/60 hover:border-border"
             }`}
         >

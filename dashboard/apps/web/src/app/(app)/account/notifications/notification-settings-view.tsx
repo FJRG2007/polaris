@@ -128,7 +128,7 @@ function SoundCard() {
                         title="Hear it"
                         disabled={!enabled}
                         onClick={playNotificationSound}
-                        className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                        className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
                     >
                         <Volume2 className="size-4" />
                     </button>
@@ -270,7 +270,7 @@ function Chip({
             aria-pressed={on}
             className={cn(
                 "inline-flex max-w-48 items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium transition-colors",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "",
                 on
                     ? "border-transparent bg-primary/15 text-primary"
                     : "border-border bg-muted text-muted-foreground hover:text-foreground",

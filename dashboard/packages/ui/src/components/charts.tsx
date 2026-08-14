@@ -300,7 +300,7 @@ export function TimeSeriesChart({
                                 />
                             )}
                             <div
-                                className="absolute top-1 z-10 flex flex-col whitespace-nowrap rounded-md border border-border bg-card px-2 py-1 text-xs shadow-lg"
+                                className="absolute top-1 z-10 flex flex-col whitespace-nowrap rounded-md border border-border-strong bg-elevated px-2 py-1 text-xs shadow-popover"
                                 style={{ left: `${hoverLeft}%`, transform: readoutShift }}
                             >
                                 <span className="flex items-baseline gap-2">
