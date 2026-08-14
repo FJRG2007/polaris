@@ -21,3 +21,18 @@ const LEGACY_ROOTS = [".polaris-trash", ".polaris-quarantine"];
 export function isReservedRootPath(path: string): boolean {
     return path === POLARIS_DIR || LEGACY_ROOTS.includes(path);
 }
+
+/**
+ * Whether a path is one of the reserved folders or anything inside one.
+ *
+ * Listings only ever ask about the entries of one folder, so matching the name is
+ * enough for them. A caller naming a path outright - a delete, a move - can name
+ * the bin itself, and hiding the folder while allowing ".polaris/trash" through
+ * protects nothing. Only the root's own copies are reserved: a nested
+ * "Archive/.polaris" is somebody's folder that happens to share the name.
+ */
+export function isReservedPath(path: string): boolean {
+    return [POLARIS_DIR, ...LEGACY_ROOTS].some(
+        (root) => path === root || path.startsWith(`${root}/`)
+    );
+}

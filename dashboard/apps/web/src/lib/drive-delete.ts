@@ -15,7 +15,7 @@
  */
 
 import { normalizeRelPath } from "@polaris/core";
-import { isReservedRootPath } from "@/lib/system-paths";
+import { isReservedPath } from "@/lib/system-paths";
 import { StorageError, type StorageDriver } from "@polaris/storage";
 
 /**
@@ -30,8 +30,9 @@ export async function deleteDriveEntry(driver: StorageDriver, path: string): Pro
         throw new StorageError("permission_denied", "The whole connection cannot be deleted at once");
     }
     // Reached by name rather than by recursion, so this is a caller with a bug or a
-    // visitor guessing at the one path the browser never shows them. Neither gets it.
-    if (isReservedRootPath(target)) {
+    // visitor guessing at the one path the browser never shows them. Neither gets it,
+    // and neither does the bin one level inside it.
+    if (isReservedPath(target)) {
         throw new StorageError("permission_denied", "That folder belongs to Polaris");
     }
     await driver.delete(target, { recursive: true });
@@ -40,9 +41,10 @@ export async function deleteDriveEntry(driver: StorageDriver, path: string): Pro
 /**
  * The children of a folder that a delete or a move to the recycle bin may touch.
  *
- * Only the root has anything to filter, and only ever the one folder, but the
- * caller emptying a folder does not know which folder it was handed.
+ * The caller emptying a folder does not know which folder it was handed - the root,
+ * whose listing carries Polaris's own folder, or that folder itself, whose listing
+ * is the bin and the quarantine.
  */
 export function deletableChildren(paths: readonly string[]): string[] {
-    return paths.map((path) => normalizeRelPath(path)).filter((path) => path !== "" && !isReservedRootPath(path));
+    return paths.map((path) => normalizeRelPath(path)).filter((path) => path !== "" && !isReservedPath(path));
 }

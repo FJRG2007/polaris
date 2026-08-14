@@ -3,10 +3,13 @@
 /**
  * Deleting a drop point, and deciding what happens to its files.
  *
- * A drop point is created with a folder of its own, so removing the folder with it
- * is the usual intent and the switch starts on. It is also the only half that
- * cannot be undone, which is why it is a visible choice rather than a footnote:
+ * A drop point is normally created with a folder of its own, so removing the folder
+ * with it is the usual intent and the switch starts on. It is also the only half
+ * that cannot be undone, which is why it is a visible choice rather than a footnote:
  * turning it off keeps everything collected so far and only takes away the link.
+ *
+ * One that collects straight into the connection has no folder of its own, so there
+ * is nothing to offer: the switch is replaced by a line saying where the files stay.
  *
  * Its own dialog rather than the shared confirm(), which has no room for a choice.
  */

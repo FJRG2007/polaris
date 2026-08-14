@@ -315,6 +315,15 @@ export async function deleteFileRequestAction(
     if (!request) return { error: "That drop point no longer exists." };
 
     if (deleteFolder) {
+        // The drop point collects into the connection's own root, so there is no
+        // folder of its own to remove - only every other folder on the connection,
+        // which is not what the choice offered. Answered here rather than from the
+        // refusal the delete would raise, which a read-only backend raises too.
+        if (normalizeRelPath(request.destinationPath) === "") {
+            return {
+                error: "This drop point collects into the whole connection, so there is no folder of its own to delete. Delete it without the folder, or clear the files from Drive."
+            };
+        }
         try {
             await authorizeDrive(
                 user.id,
@@ -337,14 +346,6 @@ export async function deleteFileRequestAction(
                 return { error: "You cannot delete that folder" };
             if (caught instanceof DriveLockedError) return { error: "That folder is locked" };
             const code = caught instanceof StorageError ? caught.code : null;
-            // The drop point collects into the connection's own root, so there is no
-            // folder of its own to remove - only every other folder on the
-            // connection, which is not what the choice offered.
-            if (code === "permission_denied") {
-                return {
-                    error: "This drop point collects into the whole connection, so there is no folder of its own to delete. Delete it without the folder, or clear the files from Drive."
-                };
-            }
             if (code !== "not_found") {
                 return {
                     error:

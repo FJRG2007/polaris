@@ -47,6 +47,21 @@ describe("deleting an entry from a connection", () => {
         expect(remove).not.toHaveBeenCalled();
     });
 
+    it("refuses the bin and the quarantine inside it, named directly", async () => {
+        // The path a share visitor can hand to the public delete route, and the one
+        // worth the most to them: hiding the folder is no protection if its contents
+        // can be asked for by name.
+        const { remove, driver: fake } = driver();
+
+        await expect(deleteDriveEntry(fake, ".polaris/trash")).rejects.toThrow(StorageError);
+        await expect(deleteDriveEntry(fake, ".polaris/quarantine")).rejects.toThrow(StorageError);
+        await expect(deleteDriveEntry(fake, ".polaris/trash/abc-photo.jpg")).rejects.toThrow(
+            StorageError
+        );
+        await expect(deleteDriveEntry(fake, ".polaris-trash/abc")).rejects.toThrow(StorageError);
+        expect(remove).not.toHaveBeenCalled();
+    });
+
     it("reports the refusal as a permission, not as storage having failed", async () => {
         const { driver: fake } = driver();
 
@@ -77,6 +92,10 @@ describe("the children a folder is emptied of", () => {
 
     it("leaves Polaris's own folder in place", () => {
         expect(deletableChildren(["Photos", ".polaris", ".polaris-trash"])).toEqual(["Photos"]);
+    });
+
+    it("leaves what is inside it in place too, when that folder is the one being emptied", () => {
+        expect(deletableChildren([".polaris/trash", ".polaris/quarantine"])).toEqual([]);
     });
 
     it("normalizes what it returns, so a leading slash is not a different path", () => {
