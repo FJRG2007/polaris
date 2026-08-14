@@ -239,6 +239,54 @@ export const SEND_TEXT = 0;
 export const SEND_FILE = 1;
 export type SendType = typeof SEND_TEXT | typeof SEND_FILE;
 
+/**
+ * How long a vault stays open in a browser that is not being used.
+ *
+ * The key never leaves the browser, so this is the whole of the trade: a vault
+ * that locks the moment you look away is the safest and the one people stop
+ * using, because moving between two Polaris screens asks for the master password
+ * twice. The two ends of the scale are named rather than numbered - "when I
+ * close the tab" is not a duration - and everything between is minutes.
+ */
+export const VAULT_LOCK_ON_TAB_CLOSE = -1;
+export const VAULT_LOCK_IMMEDIATELY = 0;
+
+/** The choices offered, in the order they are shown. */
+export const VAULT_UNLOCK_TIMEOUTS = [
+    VAULT_LOCK_IMMEDIATELY,
+    1,
+    5,
+    15,
+    30,
+    60,
+    240,
+    VAULT_LOCK_ON_TAB_CLOSE
+] as const;
+
+/**
+ * Fifteen minutes, which is what Bitwarden's own clients default to. Long
+ * enough that ordinary work does not keep asking, short enough that a machine
+ * left alone is not left open.
+ */
+export const DEFAULT_VAULT_UNLOCK_TIMEOUT = 15;
+
+/** What each choice is called. */
+export const VAULT_UNLOCK_TIMEOUT_LABEL: Readonly<Record<number, string>> = {
+    [VAULT_LOCK_IMMEDIATELY]: "As soon as I leave the vault",
+    1: "After 1 minute idle",
+    5: "After 5 minutes idle",
+    15: "After 15 minutes idle",
+    30: "After 30 minutes idle",
+    60: "After 1 hour idle",
+    240: "After 4 hours idle",
+    [VAULT_LOCK_ON_TAB_CLOSE]: "When I close the tab"
+};
+
+/** Whether a stored timeout is one of the offered choices. */
+export function vaultUnlockTimeoutValid(minutes: number): boolean {
+    return VAULT_UNLOCK_TIMEOUTS.includes(minutes as (typeof VAULT_UNLOCK_TIMEOUTS)[number]);
+}
+
 /** Where an account stands in an organization. */
 export const ORG_USER_INVITED = 0;
 export const ORG_USER_ACCEPTED = 1;

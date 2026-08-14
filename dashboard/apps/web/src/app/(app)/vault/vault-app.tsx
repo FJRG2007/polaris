@@ -3,11 +3,10 @@
 /**
  * The vault, once it is open.
  *
- * The key lives in this component's state and nowhere else - not in
- * localStorage, not in a cookie, not on the server. Reloading the page locks it
- * again, which is the correct trade for something that decrypts every password
- * somebody owns, and it is why the lock button below is a state change rather
- * than a request.
+ * The key is held by the vault session above this screen, never on the server -
+ * see `vault-session.tsx` for where a browser is allowed to keep it and for how
+ * long. This screen only ever reads it, which is why the lock button here is a
+ * call into that session rather than a request.
  *
  * Everything arrives encrypted and is opened here, once, on unlock. Search and
  * filtering then work on the open objects, which is what makes typing in the
@@ -18,8 +17,10 @@ import Link from "next/link";
 import * as core from "@polaris/core";
 import { TotpCode } from "./totp-code";
 import { ItemDialog } from "./item-dialog";
-import { VaultSetup } from "./vault-setup";
-import { VaultUnlock } from "./vault-unlock";
+import { ShareDialog } from "./share-dialog";
+import { FolderDialog } from "./folder-dialog";
+import { useVaultSession } from "./vault-session";
+import * as vaultCrypto from "@/lib/vault/crypto";
 import { useEffect, useMemo, useState } from "react";
 import type { SymmetricKey } from "@/lib/vault/crypto";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -35,10 +36,10 @@ import {
 import {
     deleteItemAction,
     restoreItemAction,
+    saveFolderAction,
     saveItemAction,
     setItemFavoriteAction,
-    vaultContentsAction,
-    type VaultState
+    vaultContentsAction
 } from "./vault-actions";
 import {
     Check,
@@ -47,7 +48,10 @@ import {
     Eye,
     EyeOff,
     FileText,
+    FolderCog,
     Contact,
+    Share2,
+    Building2,
     KeyRound,
     Loader2,
     Lock,
@@ -71,8 +75,8 @@ const TYPE_ICON: Record<number, typeof KeyRound> = {
 /** What the list can be narrowed to. */
 type Filter = "all" | "favorites" | "trash" | `type:${number}` | `folder:${string}`;
 
-export function VaultApp({ state, name }: { state: VaultState; name: string }) {
-    const [key, setKey] = useState<SymmetricKey | null>(null);
+export function VaultApp() {
+    const { key, lock, keyFor, orgKeys, organizations } = useVaultSession();
     const [items, setItems] = useState<VaultItem[]>([]);
     const [folders, setFolders] = useState<VaultFolder[]>([]);
     const [loading, setLoading] = useState(false);
@@ -80,16 +84,30 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
     const [filter, setFilter] = useState<Filter>("all");
     const [selected, setSelected] = useState<string | null>(null);
     const [editing, setEditing] = useState<VaultItem | null>(null);
+    const [managingFolders, setManagingFolders] = useState(false);
+    const [sharing, setSharing] = useState<VaultItem | null>(null);
     const [revealed, setRevealed] = useState(false);
     const [copied, setCopied] = useState<string | null>(null);
     const [confirm, confirmDialog] = useConfirm();
 
-    /** Pull everything and open it. Runs on unlock and after every write. */
+    /**
+     * Pull everything and open it. Runs on unlock and after every write.
+     *
+     * Each item is opened with the key of whoever owns it - this account's, or
+     * an organization's. An item whose key this account does not hold is skipped
+     * rather than shown as a row of empty fields: being on a roster is not the
+     * same as having been vouched for, and a half-drawn item would suggest it is.
+     */
     async function load(withKey: SymmetricKey): Promise<void> {
         setLoading(true);
         const contents = await vaultContentsAction();
         const opened: VaultItem[] = [];
-        for (const raw of contents.ciphers) opened.push(await decryptItem(raw, withKey));
+        for (const raw of contents.ciphers) {
+            const owner = typeof raw.organizationId === "string" ? raw.organizationId : null;
+            const itemKey = owner ? (orgKeys.get(owner) ?? null) : withKey;
+            if (!itemKey) continue;
+            opened.push(await decryptItem(raw, itemKey));
+        }
         setItems(opened.sort((left, right) => left.name.localeCompare(right.name)));
         setFolders(await decryptFolders(contents.folders, withKey));
         setLoading(false);
@@ -97,10 +115,11 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
 
     useEffect(() => {
         if (key) void load(key);
-        // Only when the key changes: a reload on every render would re-derive and
-        // re-decrypt the whole vault for nothing.
+        // The organization keys arrive a beat after the vault key, so this runs
+        // again when they do. Not on every render: that would re-decrypt the
+        // whole vault for nothing.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [key]);
+    }, [key, orgKeys]);
 
     const visible = useMemo(() => {
         const needle = query.trim().toLowerCase();
@@ -119,6 +138,13 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
 
     const current = visible.find((item) => item.id === selected) ?? null;
 
+    /** Whose shared vault an item belongs to, by the id the item carries. */
+    function ownerName(vaultOrgId: string): string {
+        return (
+            organizations.find((org) => org.vaultOrgId === vaultOrgId)?.name ?? "Shared"
+        );
+    }
+
     async function copy(label: string, value: string): Promise<void> {
         await navigator.clipboard.writeText(value);
         setCopied(label);
@@ -127,11 +153,30 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
 
     async function onSave(item: VaultItem): Promise<string | null> {
         if (!key) return "Your vault is locked.";
-        const body = await encryptItem(item, key);
+        // A shared item is written back under its organization's key, never the
+        // personal one - saving it under the wrong key would leave the other
+        // members with an item none of them can open.
+        const itemKey = keyFor(item.organizationId);
+        if (!itemKey) return "You do not hold the key for that organization.";
+        const body = await encryptItem(item, itemKey);
         const result = await saveItemAction(item.id || null, body);
         if (result.error) return result.error;
         await load(key);
         return null;
+    }
+
+    /**
+     * Make a folder from inside the item form, and hand back its id so the item
+     * lands in it. Filing something is when somebody discovers they want a
+     * folder, and sending them to another screen to make one loses the item
+     * they were half-way through writing.
+     */
+    async function onCreateFolder(name: string): Promise<string | null> {
+        if (!key) return null;
+        const result = await saveFolderAction(null, await vaultCrypto.encrypt(name.trim(), key));
+        const id = typeof result.folder?.id === "string" ? result.folder.id : null;
+        if (id) await load(key);
+        return id;
     }
 
     async function onDelete(item: VaultItem): Promise<void> {
@@ -177,20 +222,6 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
         await load(key);
     }
 
-    if (!state.exists) {
-        return <VaultSetup email={state.email} name={name} onCreated={setKey} />;
-    }
-    if (!key) {
-        return (
-            <VaultUnlock
-                email={state.email}
-                kdf={state.kdf}
-                protectedKey={state.protectedKey ?? ""}
-                onUnlocked={setKey}
-            />
-        );
-    }
-
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -208,9 +239,9 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
                         size="sm"
                         variant="secondary"
                         onClick={() => {
-                            setKey(null);
                             setItems([]);
                             setSelected(null);
+                            lock();
                         }}
                     >
                         <Lock className="size-4" />
@@ -252,6 +283,15 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
                         { value: "trash", label: "Trash" }
                     ]}
                 />
+                <Button
+                    size="icon"
+                    variant="secondary"
+                    title="Folders"
+                    aria-label="Manage folders"
+                    onClick={() => setManagingFolders(true)}
+                >
+                    <FolderCog className="size-4" />
+                </Button>
             </div>
 
             {loading ? (
@@ -329,6 +369,12 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
                                             {current.deleted ? (
                                                 <Badge variant="neutral">In the trash</Badge>
                                             ) : null}
+                                            {current.organizationId ? (
+                                                <Badge variant="neutral">
+                                                    <Building2 className="size-3" />
+                                                    {ownerName(current.organizationId)}
+                                                </Badge>
+                                            ) : null}
                                             <Button
                                                 size="sm"
                                                 variant="ghost"
@@ -350,6 +396,24 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
                                                     className={`size-4 ${current.favorite ? "fill-amber-400 text-amber-400" : ""}`}
                                                 />
                                             </Button>
+                                            {/* Only a personal item, and only
+                                                when there is a shared vault to
+                                                put it in: sharing is one-way, so
+                                                offering it where it cannot work
+                                                is worse than not offering it. */}
+                                            {!current.deleted &&
+                                            !current.organizationId &&
+                                            orgKeys.size > 0 ? (
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    title="Share with an organization"
+                                                    aria-label={`Share ${current.name}`}
+                                                    onClick={() => setSharing(current)}
+                                                >
+                                                    <Share2 className="size-4" />
+                                                </Button>
+                                            ) : null}
                                             {current.deleted ? (
                                                 <Button
                                                     size="sm"
@@ -517,6 +581,21 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
                 folders={folders}
                 onClose={() => setEditing(null)}
                 onSave={onSave}
+                onCreateFolder={onCreateFolder}
+            />
+            {key ? (
+                <FolderDialog
+                    open={managingFolders}
+                    folders={folders}
+                    vaultKey={key}
+                    onClose={() => setManagingFolders(false)}
+                    onChanged={() => load(key)}
+                />
+            ) : null}
+            <ShareDialog
+                item={sharing}
+                onClose={() => setSharing(null)}
+                onShared={() => (key ? load(key) : Promise.resolve())}
             />
             {confirmDialog}
         </div>

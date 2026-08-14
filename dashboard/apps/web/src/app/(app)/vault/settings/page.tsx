@@ -1,42 +1,20 @@
 /**
  * Vault settings (/vault/settings).
+ *
+ * Behind the same gate as every other vault screen: exporting decrypts here and
+ * changing the master password re-wraps the key here, so both need the vault
+ * open - and it already is, from wherever it was unlocked.
  */
 
-import Link from "next/link";
+import { VaultGate } from "../vault-session";
 import { VaultSettings } from "./vault-settings";
-import { requirePermission } from "@/lib/session";
-import { vaultStateAction } from "../vault-actions";
-import { Button, Card, CardBody } from "@polaris/ui";
 
 export const dynamic = "force-dynamic";
 
-export default async function VaultSettingsPage() {
-    const user = await requirePermission("vault.use");
-    const state = await vaultStateAction();
-
-    if (!state.exists || !state.protectedKey) {
-        return (
-            <div className="mx-auto max-w-2xl">
-                <Card>
-                    <CardBody className="flex flex-col items-start gap-3 p-6">
-                        <p className="text-sm text-muted-foreground">
-                            There is no vault to configure yet.
-                        </p>
-                        <Button asChild size="sm">
-                            <Link href="/vault">Set up my vault</Link>
-                        </Button>
-                    </CardBody>
-                </Card>
-            </div>
-        );
-    }
-
+export default function VaultSettingsPage() {
     return (
-        <VaultSettings
-            email={state.email}
-            name={user.name}
-            kdf={state.kdf}
-            protectedKey={state.protectedKey}
-        />
+        <VaultGate>
+            <VaultSettings />
+        </VaultGate>
     );
 }

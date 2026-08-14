@@ -78,6 +78,7 @@ export const ORG_PERMISSIONS = [
     "spaces.manage",
     "deploy.manage",
     "domains.manage",
+    "vault.manage",
     "activity.read",
     "settings.manage"
 ] as const;
@@ -101,7 +102,11 @@ export const ORG_PERMISSION_META: Readonly<Record<OrgPermission, { area: string;
     "roles.manage": { area: "People", label: "Define what the organization's roles may do" },
     "spaces.manage": { area: "Work", label: "Create and administer the organization's spaces" },
     "deploy.manage": { area: "Work", label: "Deploy and configure the organization's services" },
-    "domains.manage": { area: "Work", label: "Add and verify the organization's domains" }
+    "domains.manage": { area: "Work", label: "Add and verify the organization's domains" },
+    // Who is in the shared vault and what is in it. NOT the ability to read what
+    // is in it: that needs the organization's key, which only a member somebody
+    // has already vouched for holds, and no permission can hand it over.
+    "vault.manage": { area: "Work", label: "Run the shared vault's collections and members" }
 };
 
 /** The areas in the order the editor draws them. Read off the meta rather than

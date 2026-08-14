@@ -30,7 +30,11 @@ export interface VaultState {
     /** The user's key, wrapped. Useless without the master password. */
     protectedKey: string | null;
     privateKey: string | null;
+    /** The public half, which is what an organization's key is wrapped to. */
+    publicKey: string | null;
     email: string;
+    /** Minutes a browser may keep this vault open while idle. */
+    unlockTimeout: number;
 }
 
 /** Whether there is a vault, and what the browser needs to open it. */
@@ -43,7 +47,9 @@ export async function vaultStateAction(): Promise<VaultState> {
             kdf: core.DEFAULT_KDF_SETTINGS,
             protectedKey: null,
             privateKey: null,
-            email: user.email
+            publicKey: null,
+            email: user.email,
+            unlockTimeout: core.DEFAULT_VAULT_UNLOCK_TIMEOUT
         };
     }
     return {
@@ -56,8 +62,20 @@ export async function vaultStateAction(): Promise<VaultState> {
         },
         protectedKey: row.protectedKey,
         privateKey: row.privateKey,
-        email: user.email
+        publicKey: row.publicKey,
+        email: user.email,
+        unlockTimeout: row.unlockTimeout
     };
+}
+
+/** Change how long a browser may keep this vault open while it is idle. */
+export async function setUnlockTimeoutAction(minutes: number): Promise<{ error?: string }> {
+    const user = await requirePermission("vault.use");
+    if (!(await account.setUnlockTimeout(user.id, minutes))) {
+        return { error: "That is not one of the choices." };
+    }
+    revalidatePath("/vault", "layout");
+    return {};
 }
 
 /** Set a vault up from keys the browser just minted. */

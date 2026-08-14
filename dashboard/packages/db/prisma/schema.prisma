@@ -2136,6 +2136,12 @@ model VaultAccount {
     // session everywhere without hunting for tokens to delete.
     securityStamp String
 
+    // Minutes a browser may keep this vault open while it is idle. 0 locks it
+    // the moment its owner leaves the vault screens; -1 keeps it until the tab
+    // is closed. The key is held by the browser either way - this says how long
+    // it may hold it, not where.
+    unlockTimeout Int @default(15)
+
     // What a client's sync compares against to decide whether to pull.
     revisionDate DateTime @default(now())
     createdAt    DateTime @default(now())

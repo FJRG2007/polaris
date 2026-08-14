@@ -3,12 +3,14 @@
  */
 
 import { SendsView } from "./sends-view";
-import { requirePermission } from "@/lib/session";
-import { vaultStateAction } from "../vault-actions";
+import { VaultGate } from "../vault-session";
 
 export const dynamic = "force-dynamic";
 
-export default async function VaultSendsPage() {
-    await requirePermission("vault.use");
-    return <SendsView state={await vaultStateAction()} />;
+export default function VaultSendsPage() {
+    return (
+        <VaultGate>
+            <SendsView />
+        </VaultGate>
+    );
 }

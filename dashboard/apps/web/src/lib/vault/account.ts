@@ -44,6 +44,22 @@ export async function getVault(userId: string) {
     return prisma.vaultAccount.findUnique({ where: { userId } });
 }
 
+/**
+ * How long this account's browsers may keep the vault open while idle.
+ *
+ * Stored on the server rather than in the browser so it follows the person to
+ * whatever machine they sign in on - and so an account that wants the strict
+ * setting keeps it on a machine it has never been unlocked on before.
+ */
+export async function setUnlockTimeout(userId: string, minutes: number): Promise<boolean> {
+    if (!core.vaultUnlockTimeoutValid(minutes)) return false;
+    const { count } = await prisma.vaultAccount.updateMany({
+        where: { userId },
+        data: { unlockTimeout: minutes }
+    });
+    return count === 1;
+}
+
 /** What a browser hands over when somebody sets a vault up. */
 export interface CreateVaultInput {
     /** The hash the client derived from its master key. Never the password. */

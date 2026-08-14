@@ -13,19 +13,14 @@
  */
 
 import * as crypto from "@/lib/vault/crypto";
-import { VaultUnlock } from "../vault-unlock";
+import { useVaultSession } from "../vault-session";
 import type { SymmetricKey } from "@/lib/vault/crypto";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useEffect, useState, type FormEvent } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import { Check, Copy, Loader2, Plus, SendHorizontal, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardBody, Input, Select, Textarea } from "@polaris/ui";
-import {
-    createSendAction,
-    deleteSendAction,
-    vaultContentsAction,
-    type VaultState
-} from "../vault-actions";
+import { createSendAction, deleteSendAction, vaultContentsAction } from "../vault-actions";
 
 /** How long a Send lasts unless somebody says otherwise. */
 const EXPIRY_OPTIONS = [
@@ -44,9 +39,9 @@ interface SendRow {
     hasPassword: boolean;
 }
 
-export function SendsView({ state }: { state: VaultState }) {
+export function SendsView() {
     const format = useDisplayFormat();
-    const [key, setKey] = useState<SymmetricKey | null>(null);
+    const { key } = useVaultSession();
     const [rows, setRows] = useState<SendRow[]>([]);
     const [loading, setLoading] = useState(false);
     const [creating, setCreating] = useState(false);
@@ -143,26 +138,6 @@ export function SendsView({ state }: { state: VaultState }) {
         if (!confirmed || !key) return;
         await deleteSendAction(row.id);
         await load(key);
-    }
-
-    if (!state.exists) {
-        return (
-            <Card>
-                <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                    Set your vault up first; a send is encrypted with a key from it.
-                </CardBody>
-            </Card>
-        );
-    }
-    if (!key) {
-        return (
-            <VaultUnlock
-                email={state.email}
-                kdf={state.kdf}
-                protectedKey={state.protectedKey ?? ""}
-                onUnlocked={setKey}
-            />
-        );
     }
 
     return (

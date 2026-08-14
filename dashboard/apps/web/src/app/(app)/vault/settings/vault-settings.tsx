@@ -13,17 +13,18 @@
 import * as core from "@polaris/core";
 import * as crypto from "@/lib/vault/crypto";
 import { useState, type FormEvent } from "react";
-import { useConfirm } from "@/components/confirm-dialog";
 import { VaultImport } from "./vault-import";
-import { decryptFolders, decryptItem } from "../vault-model";
+import { VaultExport } from "./vault-export";
+import { useVaultSession } from "../vault-session";
+import { useConfirm } from "@/components/confirm-dialog";
+import { Clock, Loader2, ShieldAlert, Trash2 } from "lucide-react";
 import { usePasswordSafety } from "@/lib/use-password-safety";
-import { Download, KeyRound, Loader2, ShieldAlert, Trash2 } from "lucide-react";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import {
     changeMasterPasswordAction,
     deauthorizeVaultAction,
     deleteVaultAction,
-    vaultContentsAction
+    setUnlockTimeoutAction
 } from "../vault-actions";
 
 const MIN_LENGTH = 12;
@@ -34,17 +35,11 @@ const KDF_OPTIONS = [
     { value: String(core.KDF_ARGON2ID), label: "Argon2id - harder to attack, slower to unlock" }
 ];
 
-export function VaultSettings({
-    email,
-    name,
-    kdf,
-    protectedKey
-}: {
-    email: string;
-    name: string;
-    kdf: core.KdfSettings;
-    protectedKey: string;
-}) {
+export function VaultSettings() {
+    const { state, name, key: vaultKey, lock, unlockTimeout } = useVaultSession();
+    const { email, kdf } = state;
+    const protectedKey = state.protectedKey ?? "";
+    const [lockAfter, setLockAfter] = useState(String(unlockTimeout));
     const [current, setCurrent] = useState("");
     const [next, setNext] = useState("");
     const [confirmValue, setConfirmValue] = useState("");
@@ -52,7 +47,6 @@ export function VaultSettings({
     const [pending, setPending] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [done, setDone] = useState<string | null>(null);
-    const [vaultKey, setVaultKey] = useState<crypto.SymmetricKey | null>(null);
     const [confirm, confirmDialog] = useConfirm();
     const unsafe = usePasswordSafety(next, [email, name, email.split("@")[0]]);
 
@@ -90,8 +84,8 @@ export function VaultSettings({
         try {
             // The vault key does not change - only what it is wrapped under - so
             // nothing inside has to be re-encrypted.
-            const vaultKey = await crypto.unlockVaultKey(current, email, kdf, protectedKey);
-            if (!vaultKey) {
+            const currentKey = await crypto.unlockVaultKey(current, email, kdf, protectedKey);
+            if (!currentKey) {
                 setError("That is not your current master password.");
                 return;
             }
@@ -104,7 +98,7 @@ export function VaultSettings({
                     current
                 ),
                 newMasterPasswordHash: await crypto.masterPasswordHash(masterKey, next),
-                key: await crypto.encryptBytes(crypto.symmetricKeyBytes(vaultKey), stretched),
+                key: await crypto.encryptBytes(crypto.symmetricKeyBytes(currentKey), stretched),
                 kdf: settings.kdf,
                 kdfIterations: settings.kdfIterations,
                 kdfMemory: settings.kdfMemory,
@@ -123,82 +117,6 @@ export function VaultSettings({
         }
     }
 
-    /**
-     * Export, in the plain JSON every password manager reads.
-     *
-     * Deliberately unencrypted and deliberately loud about it: the reason to
-     * export is to get out - to another manager, to a printout in a safe - and a
-     * file only this vault can open would not do that. It is written by the
-     * browser and never touches the server.
-     */
-    async function onExport() {
-        const confirmed = await confirm({
-            title: "Export everything, unencrypted?",
-            description:
-                "The file will hold every password in plain text. Put it somewhere you would put the passwords themselves, and delete it when you are done.",
-            confirmLabel: "Export",
-            danger: true
-        });
-        if (!confirmed) return;
-
-        if (!vaultKey) {
-            setError("Unlock these tools first.");
-            return;
-        }
-        setPending("export");
-        setError(null);
-        try {
-            const contents = await vaultContentsAction();
-            const folders = await decryptFolders(contents.folders, vaultKey);
-            const items = [];
-            for (const raw of contents.ciphers) items.push(await decryptItem(raw, vaultKey));
-
-            const payload = {
-                encrypted: false,
-                folders: folders.map((folder) => ({ id: folder.id, name: folder.name })),
-                items: items
-                    .filter((item) => !item.deleted)
-                    .map((item) => ({
-                        id: item.id,
-                        folderId: item.folderId,
-                        type: item.type,
-                        name: item.name,
-                        notes: item.notes || null,
-                        favorite: item.favorite,
-                        fields: item.fields.map((field) => ({
-                            name: field.name,
-                            value: field.value,
-                            type: field.type
-                        })),
-                        login:
-                            item.type === core.CIPHER_LOGIN
-                                ? {
-                                      username: item.login.username || null,
-                                      password: item.login.password || null,
-                                      totp: item.login.totp || null,
-                                      uris: item.login.uris.map((uri) => ({ uri, match: null }))
-                                  }
-                                : undefined,
-                        card: item.type === core.CIPHER_CARD ? item.card : undefined,
-                        identity: item.type === core.CIPHER_IDENTITY ? item.identity : undefined,
-                        sshKey: item.type === core.CIPHER_SSH_KEY ? item.sshKey : undefined,
-                        secureNote: item.type === core.CIPHER_SECURE_NOTE ? { type: 0 } : undefined
-                    }))
-            };
-
-            const blob = new Blob([JSON.stringify(payload, null, 2)], {
-                type: "application/json"
-            });
-            const url = URL.createObjectURL(blob);
-            const anchor = document.createElement("a");
-            anchor.href = url;
-            anchor.download = "polaris-vault-export.json";
-            anchor.click();
-            URL.revokeObjectURL(url);
-        } finally {
-            setPending(null);
-        }
-    }
 
     async function onDelete() {
         const confirmed = await confirm({
@@ -327,64 +245,49 @@ export function VaultSettings({
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Import and export</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                        <Clock className="size-4" />
+                        How long it stays open
+                    </CardTitle>
                 </CardHeader>
-                <CardBody className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="max-w-md text-sm text-muted-foreground">
-                        Both read and write your items in the clear, so both need the master
-                        password once. It stays in this tab.
+                <CardBody className="flex flex-col gap-3">
+                    <p className="text-sm text-muted-foreground">
+                        Your key is held by this browser, never by the server. This is how long
+                        it may keep it while you are not using the vault.
                     </p>
-                    <Button
-                        variant="secondary"
-                        disabled={vaultKey !== null || current.length === 0 || pending !== null}
-                        onClick={async () => {
+                    <Select
+                        value={lockAfter}
+                        onValueChange={async (value) => {
+                            setLockAfter(value);
                             setError(null);
-                            setPending("unlock");
-                            const key = await crypto.unlockVaultKey(
-                                current,
-                                email,
-                                kdf,
-                                protectedKey
-                            );
-                            setPending(null);
-                            if (!key) {
-                                setError("That is not your master password.");
+                            const result = await setUnlockTimeoutAction(Number(value));
+                            if (result.error) {
+                                setError(result.error);
+                                setLockAfter(String(unlockTimeout));
                                 return;
                             }
-                            setVaultKey(key);
+                            // The session that holds the key was built with the old
+                            // setting; locking is the honest way to move to the new
+                            // one rather than applying it at some unclear moment.
+                            setDone("Saved. Your vault has been locked so the new setting applies.");
+                            lock();
                         }}
-                    >
-                        {pending === "unlock" ? (
-                            <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                            <KeyRound className="size-4" />
-                        )}
-                        {vaultKey ? "Unlocked" : "Unlock these tools"}
-                    </Button>
+                        aria-label="How long the vault stays open"
+                        options={core.VAULT_UNLOCK_TIMEOUTS.map((minutes) => ({
+                            value: String(minutes),
+                            label: core.VAULT_UNLOCK_TIMEOUT_LABEL[minutes] ?? String(minutes)
+                        }))}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        Anything but the first choice keeps the key in this tab&apos;s own storage,
+                        which is cleared when the tab closes. It is never written to disk and never
+                        sent anywhere.
+                    </p>
                 </CardBody>
             </Card>
 
             <VaultImport vaultKey={vaultKey} />
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Export</CardTitle>
-                </CardHeader>
-                <CardBody className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="max-w-md text-sm text-muted-foreground">
-                        A plain JSON file every password manager can read. It holds your passwords
-                        in the clear, which is what makes it portable.
-                    </p>
-                    <Button variant="secondary" onClick={onExport} disabled={pending !== null}>
-                        {pending === "export" ? (
-                            <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                            <Download className="size-4" />
-                        )}
-                        Export
-                    </Button>
-                </CardBody>
-            </Card>
+            <VaultExport vaultKey={vaultKey} confirm={confirm} />
 
             <Card>
                 <CardHeader>

@@ -296,6 +296,19 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
+            label: "Shared vaults",
+            href: "/vault/shared",
+            icon: Building2,
+            keywords: [
+                "organization",
+                "team",
+                "collection",
+                "share passwords",
+                "colleagues",
+                "members"
+            ]
+        },
+        {
             label: "Sends",
             href: "/vault/sends",
             icon: SendHorizontal,
