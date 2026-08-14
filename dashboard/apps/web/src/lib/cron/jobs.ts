@@ -20,6 +20,7 @@ import { sweepDueBackups } from "@/lib/backups/service";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
+import { sweepExpiredSends } from "@/lib/vault/sends";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { sweepGameActivity } from "@/lib/apps/games-activity-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
@@ -223,6 +224,17 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // throttled per connection. This is the pass that catches what nobody
         // browsed.
         run: () => sweepDueDeletions()
+    },
+    {
+        key: "vault-sends",
+        everyMs: 15 * MINUTE,
+        // No lease: deleting what is already past its date is the same work
+        // however many runners do it, and a second one finds nothing left.
+        leaseMs: null,
+        // A Send's deletion date is a promise to whoever made it. Enforcing it
+        // only when somebody opens the link would mean a Send nobody opened
+        // sitting there forever, which is the case it was set for.
+        run: () => sweepExpiredSends()
     }
 ];
 

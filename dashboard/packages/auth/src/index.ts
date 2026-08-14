@@ -144,6 +144,7 @@ export {
     type UserPhoneView
 } from "./phone.js";
 export { issueStepUpCode, verifyStepUpCode, discardStepUpCode } from "./step-up.js";
+export { verifyTotpForUser } from "./totp.js";
 export {
     listAccessGroups,
     createAccessGroup,

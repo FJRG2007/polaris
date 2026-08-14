@@ -88,6 +88,7 @@ model User {
     snippetsSubmitted  Snippet[]              @relation("SnippetSubmitter")
     snippetInvites     SnippetInvite[]
     textRequests       TextRequest[]
+    vault              VaultAccount?
     dropPointVisits   FileRequestVisit[]
     dropPointTemplates DropPointTemplate[]
     uploads           UploadSession[]
@@ -2088,6 +2089,363 @@ model TextRequest {
 }
 
 // ---------------------------------------------------------------------------
+// Vault (a Bitwarden-compatible password manager)
+// ---------------------------------------------------------------------------
+
+// One account's vault.
+//
+// Everything valuable in these tables is opaque: the client derives a key from a
+// master password Polaris never sees, and what is stored is what came back
+// already encrypted. That is not a nicety - it is the whole reason the official
+// Bitwarden clients can be pointed at this and keep their guarantees.
+//
+// So the columns split cleanly in two. `masterPasswordHash` and `securityStamp`
+// are authentication, and Polaris owns them. `protectedKey`, `publicKey` and
+// `privateKey` are key material, and Polaris only moves them: the first is the
+// user's symmetric key wrapped under a key derived from their master password,
+// and losing the password loses the vault, by design.
+//
+// A vault row exists only once somebody sets one up; an account without one is
+// simply an account that has not.
+model VaultAccount {
+    userId         String @id @db.Uuid
+    // How the client turns the master password into a key. Reported by prelogin
+    // BEFORE anybody is authenticated, because a client cannot derive without it.
+    kdf            Int    @default(0)
+    kdfIterations  Int    @default(600000)
+    // Argon2id only; null on PBKDF2.
+    kdfMemory      Int?
+    kdfParallelism Int?
+
+    // The client sends a hash of its master key; this is that hash, stretched
+    // again here with a slow KDF. A dump therefore yields neither the password
+    // nor the value a client would have to present.
+    masterPasswordHash String
+    masterPasswordHint String?
+
+    // The user's symmetric key, wrapped under the stretched master key, and the
+    // RSA pair used to share with organizations. The private key is wrapped
+    // under the symmetric key. All three are stored exactly as the client sent
+    // them: encrypted strings whose contents nothing here can read.
+    protectedKey String
+    publicKey    String?
+    privateKey   String?
+
+    // Bumped whenever the credentials change. Every access token carries the
+    // stamp it was issued under, so changing a master password ends every
+    // session everywhere without hunting for tokens to delete.
+    securityStamp String
+
+    // What a client's sync compares against to decide whether to pull.
+    revisionDate DateTime @default(now())
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    ciphers        VaultCipher[]
+    folders        VaultFolder[]
+    favorites      VaultFavorite[]
+    sends          VaultSend[]
+    devices        VaultDevice[]
+    refreshTokens  VaultRefreshToken[]
+    memberships    VaultOrgUser[]
+    emergencyGiven VaultEmergencyAccess[] @relation("VaultEmergencyGrantor")
+    emergencyHeld  VaultEmergencyAccess[] @relation("VaultEmergencyGrantee")
+}
+
+// One item: a login, a note, a card, an identity, an SSH key.
+//
+// `data` is the whole item as the client encrypted it - name, notes, username,
+// password, every custom field - as one JSON document of encrypted strings. It
+// is deliberately not broken into columns: a schema that had a `username`
+// column would invite something to read it, and there is nothing to read.
+model VaultCipher {
+    id             String    @id @default(uuid(7)) @db.Uuid
+    // Exactly one of these is set: a personal item, or an organization's.
+    userId         String?   @db.Uuid
+    organizationId String?   @db.Uuid
+    folderId       String?   @db.Uuid
+    type           Int
+    data           String
+    // Whether opening it asks for the master password again. A client-side
+    // prompt, so it is stored in the clear - it protects against a shoulder, not
+    // against whoever holds the database.
+    reprompt       Int       @default(0)
+    createdAt      DateTime  @default(now())
+    revisionDate   DateTime  @default(now())
+    // Set while it is in the trash. Clients show and restore these, so a delete
+    // is not a delete until it is emptied.
+    deletedDate    DateTime?
+
+    vault        VaultAccount?           @relation(fields: [userId], references: [userId], onDelete: Cascade)
+    organization VaultOrganization?      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    folder       VaultFolder?            @relation(fields: [folderId], references: [id], onDelete: SetNull)
+    collections  VaultCollectionCipher[]
+    attachments  VaultAttachment[]
+    favorites    VaultFavorite[]
+
+    @@index([userId])
+    @@index([organizationId])
+    @@index([folderId])
+}
+
+// A folder in one person's vault. Its name is encrypted like everything else,
+// which is why folders are personal even for items an organization owns: the
+// name is readable only by whoever made it.
+model VaultFolder {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    userId       String   @db.Uuid
+    name         String
+    revisionDate DateTime @default(now())
+
+    vault   VaultAccount  @relation(fields: [userId], references: [userId], onDelete: Cascade)
+    ciphers VaultCipher[]
+
+    @@index([userId])
+}
+
+// Which items one person starred.
+//
+// Its own table rather than a column, because an item an organization owns is
+// one row seen by everybody in it: a favourite on the row would be one person
+// starring something for the whole team.
+model VaultFavorite {
+    userId   String @db.Uuid
+    cipherId String @db.Uuid
+
+    vault  VaultAccount @relation(fields: [userId], references: [userId], onDelete: Cascade)
+    cipher VaultCipher  @relation(fields: [cipherId], references: [id], onDelete: Cascade)
+
+    @@id([userId, cipherId])
+    @@index([cipherId])
+}
+
+// An organization's vault, hanging off the Polaris organization rather than
+// replacing it: who is in it, and what they may do in Polaris, is already
+// settled elsewhere. What is here is only what that model has no concept of -
+// the keys.
+//
+// The pair is the organization's own. The private key is wrapped under the
+// organization's symmetric key, and each member holds that symmetric key wrapped
+// under their own public key, which is what lets somebody be added without any
+// existing member being online to re-share every item.
+model VaultOrganization {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    organizationId String   @unique @db.Uuid
+    publicKey      String
+    privateKey     String
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+
+    organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    members      VaultOrgUser[]
+    collections  VaultCollection[]
+    ciphers      VaultCipher[]
+}
+
+// One person's place in an organization's vault.
+//
+// Separate from the Polaris roster on purpose: being on the roster says who you
+// are, and this says whether the key has been handed to you. Somebody invited
+// but not yet confirmed holds no key and can decrypt nothing, however many
+// permissions their Polaris role carries.
+model VaultOrgUser {
+    id     String  @id @default(uuid(7)) @db.Uuid
+    orgId  String  @db.Uuid
+    // Null while only an address has been invited and no account has accepted.
+    userId String? @db.Uuid
+    email  String
+    // -1 revoked, 0 invited, 1 accepted, 2 confirmed. Only a confirmed member
+    // has a key.
+    status Int     @default(0)
+    // 0 owner, 1 admin, 2 user, 3 manager, 4 custom.
+    type   Int     @default(2)
+    // The organization's symmetric key, wrapped to this member's public key.
+    // Written when an owner confirms them, which is the step that hands it over.
+    key    String?
+    // Whether they reach every collection without being added to each.
+    accessAll Boolean  @default(false)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    organization VaultOrganization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    vault        VaultAccount?           @relation(fields: [userId], references: [userId], onDelete: SetNull)
+    collections  VaultCollectionAccess[]
+
+    @@unique([orgId, email])
+    @@index([userId])
+}
+
+// A collection: the unit an organization's items are shared by.
+model VaultCollection {
+    id           String  @id @default(uuid(7)) @db.Uuid
+    orgId        String  @db.Uuid
+    name         String
+    // An id from whatever provisioned it, for a directory sync that has to find
+    // the same collection again.
+    externalId   String?
+
+    organization VaultOrganization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    ciphers      VaultCollectionCipher[]
+    members      VaultCollectionAccess[]
+
+    @@index([orgId])
+}
+
+model VaultCollectionCipher {
+    collectionId String @db.Uuid
+    cipherId     String @db.Uuid
+
+    collection VaultCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+    cipher     VaultCipher     @relation(fields: [cipherId], references: [id], onDelete: Cascade)
+
+    @@id([collectionId, cipherId])
+    @@index([cipherId])
+}
+
+model VaultCollectionAccess {
+    collectionId String  @db.Uuid
+    orgUserId    String  @db.Uuid
+    readOnly     Boolean @default(false)
+    // Whether the passwords inside are hidden from them while the rest is not.
+    hidePasswords Boolean @default(false)
+
+    collection VaultCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+    member     VaultOrgUser    @relation(fields: [orgUserId], references: [id], onDelete: Cascade)
+
+    @@id([collectionId, orgUserId])
+    @@index([orgUserId])
+}
+
+// A file attached to an item. The bytes go wherever uploads go; the name and the
+// key to open them are encrypted strings like everything else.
+model VaultAttachment {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    cipherId   String   @db.Uuid
+    fileName   String
+    key        String?
+    size       BigInt
+    // Where the ciphertext landed, in the storage target uploads are configured
+    // to use.
+    storedPath String
+    createdAt  DateTime @default(now())
+
+    cipher VaultCipher @relation(fields: [cipherId], references: [id], onDelete: Cascade)
+
+    @@index([cipherId])
+}
+
+// A Send: something handed to somebody outside the vault, for a while.
+//
+// The key that opens it is not here. It rides in the fragment of the link, which
+// a browser never sends, so a Send is unreadable to Polaris in exactly the way a
+// sealed snippet is - the same trade, reached from the other direction.
+model VaultSend {
+    id             String    @id @default(uuid(7)) @db.Uuid
+    userId         String    @db.Uuid
+    type           Int
+    data           String
+    key            String
+    // Optional password on the link. The client stretches it and sends the
+    // result; this is that value hashed again here.
+    passwordHash   String?
+    maxAccessCount Int?
+    accessCount    Int       @default(0)
+    expirationDate DateTime?
+    // Every Send has an end. Bitwarden's clients require one, and a share with
+    // no expiry is not a Send, it is a publication.
+    deletionDate   DateTime
+    disabled       Boolean   @default(false)
+    hideEmail      Boolean   @default(false)
+    // The id in the public link, separate from the primary key so the URL does
+    // not hand out a database identifier.
+    accessId       String    @unique
+    // For a file Send: where the ciphertext landed, and how big it is.
+    storedPath     String?
+    fileSize       BigInt?
+    createdAt      DateTime  @default(now())
+    revisionDate   DateTime  @default(now())
+
+    vault VaultAccount @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+    @@index([userId])
+}
+
+// A client that has signed in to the vault. Bitwarden clients identify
+// themselves with an id they generate and keep, which is what makes "this phone"
+// a thing an owner can recognize and end.
+model VaultDevice {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    userId       String   @db.Uuid
+    identifier   String
+    name         String
+    type         Int
+    pushToken    String?
+    createdAt    DateTime @default(now())
+    revisionDate DateTime @default(now())
+
+    vault         VaultAccount        @relation(fields: [userId], references: [userId], onDelete: Cascade)
+    refreshTokens VaultRefreshToken[]
+
+    @@unique([userId, identifier])
+    @@index([userId])
+}
+
+// A refresh token, stored as a hash for the same reason a share token is: what
+// is in the database cannot be replayed as a session.
+model VaultRefreshToken {
+    id        String    @id @default(uuid(7)) @db.Uuid
+    userId    String    @db.Uuid
+    deviceId  String?   @db.Uuid
+    tokenHash String    @unique
+    // The stamp the account carried when this was issued. A credential change
+    // moves the stamp and every older token stops being accepted.
+    stamp     String
+    expiresAt DateTime
+    createdAt DateTime  @default(now())
+    revokedAt DateTime?
+
+    vault  VaultAccount @relation(fields: [userId], references: [userId], onDelete: Cascade)
+    device VaultDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+    @@index([userId])
+}
+
+// Somebody trusted to reach a vault if its owner cannot.
+//
+// Polaris already has a successor on the account itself, and this is not that:
+// the successor is about the estate, decided by Polaris, and this is a key
+// handed to a person by the vault, which Polaris cannot mint on anybody's
+// behalf. Both exist because neither can do the other's job.
+model VaultEmergencyAccess {
+    id        String  @id @default(uuid(7)) @db.Uuid
+    grantorId String  @db.Uuid
+    // Null until an invited address is claimed by an account.
+    granteeId String? @db.Uuid
+    email     String
+    // 0 view, 1 takeover.
+    type      Int     @default(0)
+    // 0 invited, 1 accepted, 2 confirmed, 3 recovery initiated, 4 recovery
+    // approved.
+    status    Int     @default(0)
+    // How long the grantor has to refuse after recovery is asked for.
+    waitDays  Int     @default(7)
+    // The grantor's key, wrapped to the grantee's public key. Written when the
+    // grantor confirms them, and it is what makes this real rather than a flag.
+    keyEncrypted String?
+    recoveryInitiatedDate DateTime?
+    lastNotificationDate  DateTime?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    grantor VaultAccount  @relation("VaultEmergencyGrantor", fields: [grantorId], references: [userId], onDelete: Cascade)
+    grantee VaultAccount? @relation("VaultEmergencyGrantee", fields: [granteeId], references: [userId], onDelete: SetNull)
+
+    @@unique([grantorId, email])
+    @@index([granteeId])
+}
+
+// ---------------------------------------------------------------------------
 // Uploads (resumable, both directions)
 // ---------------------------------------------------------------------------
 
@@ -3366,6 +3724,7 @@ model Organization {
     projects Project[]
     domains  OwnerDomain[]
     avatar   OrganizationAvatar?
+    vault    VaultOrganization?
 
     @@index([ownerId])
 }
