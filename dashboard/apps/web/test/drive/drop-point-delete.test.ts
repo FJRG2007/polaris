@@ -35,7 +35,10 @@ vi.mock("@/lib/session", () => ({ requirePermission: async () => ({ id: OWNER })
 vi.mock("@/lib/audit-service", () => ({ recordAudit }));
 vi.mock("@/lib/domain-service", () => ({ sharingBaseUrl: async () => "https://polaris.test" }));
 vi.mock("@/lib/public-reach", () => ({ ensureShareReachability: async () => undefined }));
-vi.mock("@/lib/request-context", () => ({ clientIp: async () => "1.2.3.4", hashForLog: () => "h" }));
+vi.mock("@/lib/request-context", () => ({
+    clientIp: async () => "1.2.3.4",
+    hashForLog: () => "h"
+}));
 vi.mock("@/lib/drive-folder-size", () => ({ invalidateFolderSizes }));
 vi.mock("@/lib/rate-limit-service", () => ({
     rateLimit: async () => ({ ok: true }),
@@ -96,6 +99,18 @@ describe("deleting a drop point", () => {
         expect(recordAudit).not.toHaveBeenCalled();
     });
 
+    it("reports a backend that refuses the delete as the failure it is", async () => {
+        // Read-only credentials, a changed ACL: the folder is real and still full, so
+        // the drop point stays as the only thing still pointing at it.
+        driverDelete.mockRejectedValue(new StorageError("permission_denied", "EACCES"));
+
+        const result = await deleteFileRequestAction(REQUEST, true);
+
+        expect(result.error).toContain("could not be deleted");
+        expect(result.error).not.toContain("no folder of its own");
+        expect(deleteForOwner).not.toHaveBeenCalled();
+    });
+
     it("does not delete anything for someone who may not write there", async () => {
         authorizeDrive.mockRejectedValue(new DriveAccessError("no"));
 
@@ -121,5 +136,38 @@ describe("deleting a drop point", () => {
         });
         expect(driverDelete).not.toHaveBeenCalled();
         expect(deleteForOwner).not.toHaveBeenCalled();
+    });
+});
+
+describe("a drop point that collects into the connection itself", () => {
+    it("deletes the drop point and leaves the connection alone", async () => {
+        getForOwner.mockResolvedValue({
+            id: REQUEST,
+            destinationConnectionId: CONNECTION,
+            destinationPath: ""
+        });
+
+        // The dialog does not offer the folder for one of these, so this is a stale
+        // client asking. There is no folder of its own to take - only every other
+        // folder on the connection, which is not what the choice ever meant.
+        const result = await deleteFileRequestAction(REQUEST, true);
+
+        expect(result.error).toContain("no folder of its own");
+        expect(driverDelete).not.toHaveBeenCalled();
+        // Answered from the destination itself, so no driver is opened to be told.
+        expect(authorizeDrive).not.toHaveBeenCalled();
+        expect(deleteForOwner).not.toHaveBeenCalled();
+    });
+
+    it("deletes cleanly when the folder was not asked for", async () => {
+        getForOwner.mockResolvedValue({
+            id: REQUEST,
+            destinationConnectionId: CONNECTION,
+            destinationPath: ""
+        });
+
+        expect(await deleteFileRequestAction(REQUEST, false)).toEqual({});
+        expect(deleteForOwner).toHaveBeenCalledWith(OWNER, REQUEST);
+        expect(driverDelete).not.toHaveBeenCalled();
     });
 });

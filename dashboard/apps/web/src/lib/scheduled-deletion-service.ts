@@ -12,6 +12,7 @@ import { prisma } from "@polaris/db";
 import { getDriver } from "@/lib/storage-service";
 import { moveToTrash } from "@/lib/trash-service";
 import { recordAudit } from "@/lib/audit-service";
+import { deleteDriveEntry } from "@/lib/drive-delete";
 import { baseName, normalizeRelPath } from "@polaris/core";
 import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 
@@ -86,7 +87,7 @@ export async function sweepDueDeletions(connectionId?: string): Promise<number> 
             if (row.permanent) {
                 const driver = await getDriver(row.connectionId, row.ownerId);
                 try {
-                    await driver.delete(normalizeRelPath(row.path), { recursive: true });
+                    await deleteDriveEntry(driver, row.path);
                 } finally {
                     await driver.dispose();
                 }

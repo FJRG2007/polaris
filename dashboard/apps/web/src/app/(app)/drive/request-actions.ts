@@ -14,6 +14,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { sharingBaseUrl } from "@/lib/domain-service";
+import { deleteDriveEntry } from "@/lib/drive-delete";
 import * as dropPoints from "@/lib/file-request-service";
 import { ensureShareReachability } from "@/lib/public-reach";
 import { clientIp, hashForLog } from "@/lib/request-context";
@@ -22,7 +23,12 @@ import { StorageError, type StorageDriver } from "@polaris/storage";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
 import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
-import { cidrOrIp, createFileRequestSchema, normalizeRelPath, randomDropPointName } from "@polaris/core";
+import {
+    cidrOrIp,
+    createFileRequestSchema,
+    normalizeRelPath,
+    randomDropPointName
+} from "@polaris/core";
 
 /** The shared base folder every drop point's own folder is grouped under. */
 const DROP_POINTS_BASE = "Drop Points";
@@ -144,48 +150,49 @@ export async function createFileRequestAction(
 }
 
 /** Validated shape of an edit to a drop point's guardrails (owner-only). */
-const updateDropPointSchema = z.object({
-    title: z.string().trim().min(1).max(200).optional(),
-    instructions: z.string().trim().max(2000).nullable().optional(),
-    requireLogin: z.boolean().optional(),
-    password: z.string().nullable().optional(),
-    maxSizeBytes: z.number().int().positive().optional(),
-    minSizeBytes: z.number().int().nonnegative().nullable().optional(),
-    maxFiles: z.number().int().positive().nullable().optional(),
-    allowedExtensions: z.array(z.string().trim().toLowerCase()).optional(),
-    deniedExtensions: z.array(z.string().trim().toLowerCase()).optional(),
-    allowedMimeTypes: z.array(z.string().trim()).optional(),
-    allowedCidrs: z.array(cidrOrIp).optional(),
-    allowedCountries: z
-        .array(
-            z
-                .string()
-                .trim()
-                .toUpperCase()
-                .regex(/^[A-Z]{2}$/)
-        )
-        .optional(),
-    allowedContinents: z
-        .array(
-            z
-                .string()
-                .trim()
-                .toUpperCase()
-                .regex(/^[A-Z]{2}$/)
-        )
-        .optional(),
-    allowedUsers: z
-        .array(z.string().trim().toLowerCase())
-        .transform((values) =>
-            Array.from(new Set(values.map((value) => value.replace(/^@+/, "")).filter(Boolean)))
-        )
-        .optional(),
-    startsAt: z.string().nullable().optional(),
-    allowUploaderDelete: z.boolean().optional(),
-    allowOverwrite: z.boolean().optional(),
-    uploaderDeleteWindowSeconds: z.number().int().nonnegative().nullable().optional(),
-    expiresAt: z.string().nullable().optional()
-})
+const updateDropPointSchema = z
+    .object({
+        title: z.string().trim().min(1).max(200).optional(),
+        instructions: z.string().trim().max(2000).nullable().optional(),
+        requireLogin: z.boolean().optional(),
+        password: z.string().nullable().optional(),
+        maxSizeBytes: z.number().int().positive().optional(),
+        minSizeBytes: z.number().int().nonnegative().nullable().optional(),
+        maxFiles: z.number().int().positive().nullable().optional(),
+        allowedExtensions: z.array(z.string().trim().toLowerCase()).optional(),
+        deniedExtensions: z.array(z.string().trim().toLowerCase()).optional(),
+        allowedMimeTypes: z.array(z.string().trim()).optional(),
+        allowedCidrs: z.array(cidrOrIp).optional(),
+        allowedCountries: z
+            .array(
+                z
+                    .string()
+                    .trim()
+                    .toUpperCase()
+                    .regex(/^[A-Z]{2}$/)
+            )
+            .optional(),
+        allowedContinents: z
+            .array(
+                z
+                    .string()
+                    .trim()
+                    .toUpperCase()
+                    .regex(/^[A-Z]{2}$/)
+            )
+            .optional(),
+        allowedUsers: z
+            .array(z.string().trim().toLowerCase())
+            .transform((values) =>
+                Array.from(new Set(values.map((value) => value.replace(/^@+/, "")).filter(Boolean)))
+            )
+            .optional(),
+        startsAt: z.string().nullable().optional(),
+        allowUploaderDelete: z.boolean().optional(),
+        allowOverwrite: z.boolean().optional(),
+        uploaderDeleteWindowSeconds: z.number().int().nonnegative().nullable().optional(),
+        expiresAt: z.string().nullable().optional()
+    })
     .refine(
         (value) =>
             value.minSizeBytes == null ||
@@ -253,7 +260,8 @@ export async function unlockFileRequestAction(
 ): Promise<{ error?: string }> {
     const request = await dropPoints.resolveFileRequestByToken(token);
     if (!request) return { error: "This link is not available." };
-    if (!dropPoints.fileRequestUsability(request).ok) return { error: "This link is no longer available." };
+    if (!dropPoints.fileRequestUsability(request).ok)
+        return { error: "This link is no longer available." };
 
     const limitKey = `drop-unlock:${request.id}:${hashForLog(await clientIp()) ?? "unknown"}`;
     if (!(await rateLimit(limitKey, 10, 15 * 60 * 1000)).ok) {
@@ -314,6 +322,15 @@ export async function deleteFileRequestAction(
     if (!request) return { error: "That drop point no longer exists." };
 
     if (deleteFolder) {
+        // The drop point collects into the connection's own root, so there is no
+        // folder of its own to remove - only every other folder on the connection,
+        // which is not what the choice offered. Answered here rather than from the
+        // refusal the delete would raise, which a read-only backend raises too.
+        if (normalizeRelPath(request.destinationPath) === "") {
+            return {
+                error: "This drop point collects into the whole connection, so there is no folder of its own to delete. Delete it without the folder, or clear the files from Drive."
+            };
+        }
         try {
             await authorizeDrive(
                 user.id,
@@ -323,14 +340,11 @@ export async function deleteFileRequestAction(
             );
             const driver = await getDriverForConnection(request.destinationConnectionId);
             try {
-                await driver.delete(request.destinationPath, { recursive: true });
+                await deleteDriveEntry(driver, request.destinationPath);
             } finally {
                 await driver.dispose();
             }
-            await invalidateFolderSizes(
-                request.destinationConnectionId,
-                request.destinationPath
-            );
+            await invalidateFolderSizes(request.destinationConnectionId, request.destinationPath);
         } catch (caught) {
             if (caught instanceof DriveAccessError)
                 return { error: "You cannot delete that folder" };
@@ -397,8 +411,24 @@ const templateConfigSchema = z
         requireLogin: z.boolean().optional(),
         allowedUsers: z.array(z.string()).optional(),
         allowedCidrs: z.array(cidrOrIp).optional(),
-        allowedCountries: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)).optional(),
-        allowedContinents: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)).optional(),
+        allowedCountries: z
+            .array(
+                z
+                    .string()
+                    .trim()
+                    .toUpperCase()
+                    .regex(/^[A-Z]{2}$/)
+            )
+            .optional(),
+        allowedContinents: z
+            .array(
+                z
+                    .string()
+                    .trim()
+                    .toUpperCase()
+                    .regex(/^[A-Z]{2}$/)
+            )
+            .optional(),
         allowUploaderDelete: z.boolean().optional(),
         allowOverwrite: z.boolean().optional(),
         uploaderDeleteWindowSeconds: z.number().int().nonnegative().nullable().optional()

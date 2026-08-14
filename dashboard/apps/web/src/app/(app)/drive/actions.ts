@@ -16,6 +16,7 @@ import { listConnections } from "@/lib/connections/store";
 import { requirePermission, requireUser } from "@/lib/session";
 import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 import { detectHost, type NasDetection } from "@/lib/nas-detect";
+import { deletableChildren, deleteDriveEntry } from "@/lib/drive-delete";
 import { writeArchiveToDriver, zipSourcesFor } from "@/lib/drive-archive";
 import { createScheduledDeletion } from "@/lib/scheduled-deletion-service";
 import { deleteTrashForever, emptyTrash, moveToTrash, restoreTrash } from "@/lib/trash-service";
@@ -245,7 +246,9 @@ export async function setUnasShareAction(
 }
 
 /** What removing this connection would take with it, for the confirmation dialog. */
-export async function connectionRemovalPlanAction(connectionId: string): Promise<ConnectionRemovalPlan | null> {
+export async function connectionRemovalPlanAction(
+    connectionId: string
+): Promise<ConnectionRemovalPlan | null> {
     const user = await requirePermission("connections.manage");
     return getConnectionRemovalPlan(user.id, connectionId);
 }
@@ -360,7 +363,7 @@ export async function deleteEntryAction(connectionId: string, path: string): Pro
     const user = await requireUser();
     const driver = await requireDriveDriver(user.id, connectionId, path, "delete");
     try {
-        await driver.delete(normalizeRelPath(path), { recursive: true });
+        await deleteDriveEntry(driver, path);
     } finally {
         await driver.dispose();
     }
@@ -535,7 +538,10 @@ export async function emptyFolderAction(
     try {
         const rel = normalizeRelPath(path);
         const { entries } = await driver.list(rel);
-        children = entries.map((child) => normalizeRelPath(child.path));
+        // Emptying the root is emptying what the reader can see in it, which is not
+        // what the driver lists: Polaris's own folder is in there and belongs to
+        // nobody's clear-out, permanent or into the bin.
+        children = deletableChildren(entries.map((child) => child.path));
         if (permanent) {
             for (const child of children) {
                 await driver.delete(child, { recursive: true });
