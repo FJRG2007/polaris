@@ -205,6 +205,14 @@ Tasks (work management):
   read - and every view follows along without one of them needing its own
   payload format. The bus behind it is in-process: every writer is in the same
   server, so a broker would be a dependency to keep working forever for nothing.
+- A task panel's free-text fields (name, description, blocked note, points, and
+  a space's own text/number custom fields) hold each keystroke and write once
+  typing stops, through one `useAutosave` hook per panel: a single serialized
+  write chain so a save can never land after a later one, and every way of
+  leaving - the X, Escape, clicking outside, switching to another task in the
+  same panel - awaits a flush of whatever is held first. A write the server
+  refuses goes back into the held state instead of being dropped, so the panel
+  stays open with the text and the error rather than closing over lost work.
 - An organization is not a second kind of account. Nobody signs in as one - no
   password, no session, no permission set - so the authentication surface never
   learns about it. It owns spaces and holds a roster, and that is all.

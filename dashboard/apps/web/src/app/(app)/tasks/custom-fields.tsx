@@ -41,10 +41,19 @@ export function CustomFieldValue({
         case "progress":
             return <span>{Number(value)}%</span>;
         case "rating":
-            return <span aria-label={`${value} out of ${field.config.max ?? 5}`}>{"*".repeat(Number(value) || 0)}</span>;
+            return (
+                <span aria-label={`${value} out of ${field.config.max ?? 5}`}>
+                    {"*".repeat(Number(value) || 0)}
+                </span>
+            );
         case "url":
             return (
-                <a href={value} target="_blank" rel="noreferrer noopener" className="truncate text-primary hover:underline">
+                <a
+                    href={value}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="truncate text-primary hover:underline"
+                >
                     {value.replace(/^https?:\/\//, "")}
                 </a>
             );
@@ -72,12 +81,18 @@ export function CustomFieldValue({
         }
         case "dropdown":
         case "labels": {
-            const chosen = (field.config.options ?? []).filter((option) => value.split(",").includes(option.id));
+            const chosen = (field.config.options ?? []).filter((option) =>
+                value.split(",").includes(option.id)
+            );
             if (chosen.length === 0) return <span className="text-muted-foreground">-</span>;
             return (
                 <span className="flex flex-wrap items-center gap-1">
                     {chosen.map((option) => (
-                        <span key={option.id} className="inline-flex items-center gap-1 text-xs" style={{ color: option.color }}>
+                        <span
+                            key={option.id}
+                            className="inline-flex items-center gap-1 text-xs"
+                            style={{ color: option.color }}
+                        >
                             <StatusDot color={option.color} />
                             {option.label}
                         </span>
@@ -97,12 +112,16 @@ export function CustomFieldEditor({
     value,
     people,
     disabled,
+    onEdit,
     onChange
 }: {
     field: CustomFieldView;
     value: string;
     people: readonly PersonRef[];
     disabled?: boolean;
+    /** Told on every keystroke of the controls somebody types into, so what was
+     *  typed is not waiting on the blur to exist anywhere but the screen. */
+    onEdit?: (value: string) => void;
     onChange: (value: string) => void;
 }) {
     const [draft, setDraft] = useState(value);
@@ -133,6 +152,7 @@ export function CustomFieldEditor({
                     rows={3}
                     disabled={disabled}
                     aria-label={field.name}
+                    onChange={(event) => onEdit?.(event.target.value)}
                     onBlur={(event) => commit(event.target.value)}
                     className="w-full resize-y rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
                 />
@@ -160,7 +180,11 @@ export function CustomFieldEditor({
                     disabled={disabled}
                     aria-label={field.name}
                     min={field.config.min ?? (field.type === "rating" ? 0 : undefined)}
-                    max={field.config.max ?? (field.type === "rating" ? 5 : field.type === "percent" ? 100 : undefined)}
+                    max={
+                        field.config.max ??
+                        (field.type === "rating" ? 5 : field.type === "percent" ? 100 : undefined)
+                    }
+                    onChange={(event) => onEdit?.(event.target.value.trim())}
                     onBlur={(event) => commit(event.target.value.trim())}
                     className="h-8 w-24 text-xs"
                 />
@@ -227,6 +251,7 @@ export function CustomFieldEditor({
                     defaultValue={draft}
                     disabled={disabled}
                     aria-label={field.name}
+                    onChange={(event) => onEdit?.(event.target.value.trim())}
                     onBlur={(event) => commit(event.target.value.trim())}
                     className="h-8 text-xs"
                 />

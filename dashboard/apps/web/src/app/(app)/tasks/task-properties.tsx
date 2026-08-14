@@ -61,6 +61,7 @@ export function PropertyRows({
     waitingOn,
     timer = true,
     patch,
+    hold,
     onChanged,
     onError,
     onCreateTag
@@ -76,6 +77,10 @@ export function PropertyRows({
      *  list of them is a few rows down under Dependencies. */
     waitingOn: number;
     patch: (input: Record<string, unknown>) => void;
+    /** Hold what is being typed into the two fields here that take words rather than
+     *  a choice, so it is saved without waiting for the caret to leave. Absent while
+     *  a task is still being drafted: there is nothing to save it to yet. */
+    hold?: (input: Record<string, unknown>) => void;
     onChanged: () => void;
     onError: (message: string) => void;
     /** Makes a tag that does not exist yet and returns its id. */
@@ -103,7 +108,9 @@ export function PropertyRows({
                     disabled={disabled}
                     onChange={(assigneeIds) => patch({ assigneeIds })}
                 />
-                {task.assignees.length === 0 && <span className="text-xs text-muted-foreground">Nobody yet</span>}
+                {task.assignees.length === 0 && (
+                    <span className="text-xs text-muted-foreground">Nobody yet</span>
+                )}
             </Property>
 
             <Property icon={<CalendarDays className="size-3.5" />} label="Dates">
@@ -177,10 +184,8 @@ export function PropertyRows({
                         maxLength={200}
                         aria-label="Why this is blocked"
                         placeholder="Why, if it is not a task or a date"
-                        onBlur={(event) => {
-                            const blockedNote = event.target.value.trim();
-                            if (blockedNote !== task.blockedNote) patch({ blockedNote });
-                        }}
+                        onChange={(event) => hold?.({ blockedNote: event.target.value.trim() })}
+                        onBlur={(event) => patch({ blockedNote: event.target.value.trim() })}
                         className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-primary disabled:opacity-50"
                     />
                     {waitingOn > 0 && (
@@ -201,11 +206,8 @@ export function PropertyRows({
                     disabled={disabled}
                     aria-label="Story points"
                     placeholder="Empty"
-                    onBlur={(event) => {
-                        const raw = event.target.value.trim();
-                        const points = raw === "" ? null : Number(raw);
-                        if (points !== task.points) patch({ points });
-                    }}
+                    onChange={(event) => hold?.({ points: pointsOf(event.target.value) })}
+                    onBlur={(event) => patch({ points: pointsOf(event.target.value) })}
                     className="w-20 rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
                 />
             </Property>
@@ -261,6 +263,14 @@ export function PropertyRows({
     );
 }
 
+/** An empty box means the task has not been sized, not that it is worth nothing. */
+function pointsOf(value: string): number | null {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const points = Number(trimmed);
+    return Number.isNaN(points) ? null : points;
+}
+
 /**
  * The space's own fields. Collapsed empties: a field nobody filled in says
  * nothing, and hiding it is what keeps this block from burying the work.
@@ -268,10 +278,14 @@ export function PropertyRows({
 export function FieldsSection({
     task,
     context,
+    hold,
     onChange
 }: {
     task: TaskRow;
     context: SpaceContext;
+    /** Hold what is being typed into a field that takes words or a number, so it is
+     *  saved without waiting for the caret to leave. */
+    hold?: (fieldId: string, value: string) => void;
     onChange: (fieldId: string, value: string) => void;
 }) {
     const [open, setOpen] = useState(true);
@@ -279,9 +293,14 @@ export function FieldsSection({
 
     if (context.fields.length === 0) return null;
 
-    const filled = context.fields.filter((field) => (task.customValues[field.id] ?? "") !== "");
     const empty = context.fields.filter((field) => (task.customValues[field.id] ?? "") === "");
-    const shown = showEmpty ? [...filled, ...empty] : filled;
+    // The space's own order, not filled ones first: these save themselves while
+    // somebody is typing, and an order read off the values reshuffles the moment a
+    // field stops being empty - which moves the box out from under the caret that
+    // is still writing in it.
+    const shown = showEmpty
+        ? context.fields
+        : context.fields.filter((field) => (task.customValues[field.id] ?? "") !== "");
 
     return (
         <section className="flex flex-col gap-1">
@@ -297,12 +316,17 @@ export function FieldsSection({
             {open && (
                 <div className="flex flex-col">
                     {shown.map((field) => (
-                        <Property key={field.id} icon={<span className="inline-block size-3.5" />} label={field.name}>
+                        <Property
+                            key={field.id}
+                            icon={<span className="inline-block size-3.5" />}
+                            label={field.name}
+                        >
                             <CustomFieldEditor
                                 field={field}
                                 value={task.customValues[field.id] ?? ""}
                                 people={context.people}
                                 disabled={!context.canEdit}
+                                onEdit={hold && ((value) => hold(field.id, value))}
                                 onChange={(value) => onChange(field.id, value)}
                             />
                         </Property>
