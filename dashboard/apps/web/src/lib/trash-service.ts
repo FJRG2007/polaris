@@ -7,12 +7,12 @@
  * changing these call sites.
  */
 
-import { randomBytes } from "node:crypto";
-import { baseName, normalizeRelPath } from "@polaris/core";
 import { prisma } from "@polaris/db";
+import { randomBytes } from "node:crypto";
 import { getDriver } from "@/lib/storage-service";
-import { invalidateFolderSizes } from "@/lib/drive-folder-size";
+import { baseName, normalizeRelPath } from "@polaris/core";
 import { POLARIS_DIR, TRASH_DIR } from "@/lib/system-paths";
+import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 
 export { TRASH_DIR };
 
@@ -40,13 +40,44 @@ async function freeDestination(driver: Driver, path: string): Promise<string> {
     return `${dir}${stem}-restored-${randomBytes(3).toString("hex")}${ext}`;
 }
 
+/**
+ * Raised when the bin cannot hold something, which is a fact about where the
+ * item lives rather than about the item.
+ *
+ * The bin is a database row pointing at a moved file, and that row belongs to a
+ * storage connection. A server or a container browsed directly is not one - it
+ * has no row to point at - so trashing there would either fail deep inside
+ * Prisma with a foreign-key error, or move the file somewhere nothing records,
+ * which is worse: the file is gone from where it was and in nobody's bin.
+ */
+export class TrashUnavailableError extends Error {
+    public constructor(message: string) {
+        super(message);
+        this.name = "TrashUnavailableError";
+    }
+}
+
+/** Whether a source is one the bin can record against. */
+function trackable(connectionId: string): boolean {
+    return !connectionId.includes(":");
+}
+
 /** Move an item into the connection's trash folder and record it. */
 export async function moveToTrash(ownerId: string, connectionId: string, path: string): Promise<void> {
     const source = normalizeRelPath(path);
     // Never trash Polaris's own hidden folder (the bin, quarantine, ...).
     if (!source || source === POLARIS_DIR || source.startsWith(`${POLARIS_DIR}/`)) return;
+    if (!trackable(connectionId)) {
+        throw new TrashUnavailableError(
+            "This source has no recycle bin. Use Delete permanently instead."
+        );
+    }
     const driver = await getDriver(connectionId, ownerId);
     try {
+        // Something that is not there any more is already in the state the caller
+        // asked for. Two people pressing Delete on the same row, or a stale
+        // listing, should not produce an error about a file nobody has.
+        if (!(await exists(driver, source))) return;
         const stat = await driver.stat(source);
         const name = baseName(source) || source;
         const trashPath = `${TRASH_DIR}/${randomBytes(6).toString("hex")}-${name}`;

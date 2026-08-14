@@ -508,15 +508,14 @@ export function FilesView({
     }
 
     /**
-     * Double-clicking the name text renames. The hit area is strictly the text -
-     * the icon, the padding around it and the rest of the row open the item, so a
-     * double-click that misses the label never traps the user in a rename.
+     * Renaming is deliberately NOT on a double click.
+     *
+     * It used to be, on the name text alone, and the hit area was the problem:
+     * the thing people double-click most in a file list is a folder they want to
+     * open, and the name is what their pointer is already on. Opening and
+     * renaming cannot share that gesture, so renaming moved to the two places
+     * that mean it - F2, and Rename in the context menu.
      */
-    function nameDoubleClick(event: MouseEvent, entry: DriveEntry) {
-        event.preventDefault();
-        event.stopPropagation();
-        startRename(entry);
-    }
 
     /** Keyboard: F2 renames, Enter opens, Delete removes, Ctrl+C/X/V copy/cut/paste. */
     function onListKeyDown(event: KeyboardEvent) {
@@ -2025,16 +2024,8 @@ export function FilesView({
                                                                     ) : (
                                                                         <span className="w-full min-w-0 text-xs">
                                                                             <span
-                                                                                className="inline-block max-w-full cursor-text truncate align-bottom"
+                                                                                className="inline-block max-w-full truncate align-bottom"
                                                                                 title={entry.name}
-                                                                                onDoubleClick={(
-                                                                                    e
-                                                                                ) =>
-                                                                                    nameDoubleClick(
-                                                                                        e,
-                                                                                        entry
-                                                                                    )
-                                                                                }
                                                                             >
                                                                                 {entry.name}
                                                                             </span>
@@ -2237,17 +2228,7 @@ export function FilesView({
                                                                                             entry
                                                                                         }
                                                                                     />
-                                                                                    <span
-                                                                                        className="cursor-text truncate"
-                                                                                        onDoubleClick={(
-                                                                                            e
-                                                                                        ) =>
-                                                                                            nameDoubleClick(
-                                                                                                e,
-                                                                                                entry
-                                                                                            )
-                                                                                        }
-                                                                                    >
+                                                                                    <span className="truncate">
                                                                                         {entry.name}
                                                                                     </span>
                                                                                     {searchScope ===
@@ -2297,17 +2278,7 @@ export function FilesView({
                                                                                             entry
                                                                                         }
                                                                                     />
-                                                                                    <span
-                                                                                        className="cursor-text truncate"
-                                                                                        onDoubleClick={(
-                                                                                            e
-                                                                                        ) =>
-                                                                                            nameDoubleClick(
-                                                                                                e,
-                                                                                                entry
-                                                                                            )
-                                                                                        }
-                                                                                    >
+                                                                                    <span className="truncate">
                                                                                         {entry.name}
                                                                                     </span>
                                                                                     {searchScope ===

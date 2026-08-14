@@ -427,9 +427,13 @@ export function DriveExplorer({
             targets.length === 1
                 ? `Moving ${targets[0]?.name} to Trash`
                 : `Moving ${targets.length} items to Trash`;
+        // The first refusal stops the run and is what gets reported. Carrying on
+        // would leave the banner naming one failure while others went unmentioned,
+        // and the listing reload in runOp puts back whatever did not move.
         runOp(label, async () => {
             for (const entry of targets) {
-                await driveActions.moveToTrashAction(connectionId, entry.path);
+                const result = await driveActions.moveToTrashAction(connectionId, entry.path);
+                if (result.error) return result;
             }
         });
     }
@@ -446,7 +450,8 @@ export function DriveExplorer({
                 : `Deleting ${targets.length} items permanently`;
         runOp(label, async () => {
             for (const entry of targets) {
-                await driveActions.deleteEntryAction(connectionId, entry.path);
+                const result = await driveActions.deleteEntryAction(connectionId, entry.path);
+                if (result.error) return result;
             }
         });
     }
