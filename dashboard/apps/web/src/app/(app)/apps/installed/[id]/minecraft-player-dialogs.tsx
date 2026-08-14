@@ -29,7 +29,7 @@ import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
 import { PlayerFormDialog, PlayerFormField } from "@/components/player-form-dialog";
 import { Loader2, Locate, MapPin, RefreshCw, TriangleAlert, UserSearch, X } from "lucide-react";
 import { dimensionLabel, formatCoordinates, type PlayerPosition } from "@/lib/apps/minecraft/position";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 
 /** Which of the forms is open, or none. */
 export type PlayerDialog = "teleport" | "timeout" | "inventory" | "location" | "history" | "access";
@@ -139,11 +139,11 @@ export function InventoryDialog({
                     editable={canEdit}
                     onChanged={onChanged}
                 />
-                <div className="flex justify-end">
+                <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
                         Close
                     </Button>
-                </div>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );
@@ -307,7 +307,7 @@ function Reading({
                         {empty}
                     </p>
                 )}
-                <div className="flex justify-end gap-2">
+                <DialogFooter>
                     <Button variant="secondary" onClick={onRefresh} disabled={loading}>
                         <RefreshCw className={loading ? "size-4 animate-spin" : "size-4"} />
                         Refresh
@@ -315,7 +315,7 @@ function Reading({
                     <Button variant="ghost" onClick={onClose}>
                         Close
                     </Button>
-                </div>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );
@@ -423,11 +423,11 @@ export function HistoryDialog({
                         ))}
                     </ul>
                 )}
-                <div className="flex justify-end">
+                <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
                         Close
                     </Button>
-                </div>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

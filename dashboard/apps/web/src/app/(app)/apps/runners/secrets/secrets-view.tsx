@@ -31,6 +31,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     Input,
@@ -275,14 +276,14 @@ function SecretDialog({ pool, onClose }: { pool: PoolSecrets; onClose: () => voi
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
 
-                    <div className="flex justify-end gap-2">
+                    <DialogFooter>
                         <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>
                             Cancel
                         </Button>
                         <Button type="submit" disabled={!ready || pending}>
                             Save
                         </Button>
-                    </div>
+                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>

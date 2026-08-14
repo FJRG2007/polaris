@@ -19,6 +19,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     Input
@@ -181,11 +182,11 @@ export function ConnectChannelDialog({
                             </DialogDescription>
                         </DialogHeader>
                         <DiscordSetupPanel channelId={connectedId} />
-                        <div className="flex justify-end">
+                        <DialogFooter>
                             <Button onClick={() => onConnected(connectedChannel(connectedId))}>
                                 Done
                             </Button>
-                        </div>
+                        </DialogFooter>
                     </>
                 ) : phase === "qr" ? (
                     <>
@@ -218,11 +219,11 @@ export function ConnectChannelDialog({
                                       : "Waiting for the scan..."}
                             </p>
                         </div>
-                        <div className="flex justify-end">
+                        <DialogFooter>
                             <Button variant="ghost" onClick={onClose}>
                                 {qrStatus === "connected" ? "Done" : "Close"}
                             </Button>
-                        </div>
+                        </DialogFooter>
                     </>
                 ) : phase === "platform" ? (
                     <>
@@ -272,11 +273,11 @@ export function ConnectChannelDialog({
                                 );
                             })}
                         </div>
-                        <div className="flex justify-end">
+                        <DialogFooter>
                             <Button variant="ghost" onClick={onClose}>
                                 Cancel
                             </Button>
-                        </div>
+                        </DialogFooter>
                     </>
                 ) : phase === "variant" ? (
                     <>

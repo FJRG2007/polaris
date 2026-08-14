@@ -8,7 +8,7 @@ import { ModelPicker } from "@/components/model-picker";
 import { RepoSettingsFields } from "./repo-settings-fields";
 import { useCallback, useState, useTransition } from "react";
 import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Select } from "@polaris/ui";
+import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Select } from "@polaris/ui";
 import {
     adviseRepoAction,
     agentModelChoices,
@@ -220,14 +220,14 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                     {error ? <p className="text-sm text-red-400">{error}</p> : null}
                 </div>
 
-                <div className="flex justify-end gap-2">
+                <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
                         Cancel
                     </Button>
                     <Button onClick={save} disabled={!repo || !model || loading || pending}>
                         {pending ? "Adding..." : "Add"}
                     </Button>
-                </div>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

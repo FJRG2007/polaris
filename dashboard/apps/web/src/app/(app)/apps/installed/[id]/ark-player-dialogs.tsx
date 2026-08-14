@@ -18,7 +18,7 @@ import * as actions from "./ark-actions";
 import { useEffect, useState, useTransition } from "react";
 import { PlayerRecordPanel } from "@/components/player-history";
 import type { PlayerRecord } from "@/lib/apps/games-activity-service";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 import { isSteamId } from "@/lib/apps/ark/access";
 import { Loader2, UserSearch } from "lucide-react";
 import { AccountInput } from "@/components/account-input";
@@ -251,11 +251,11 @@ export function ArkHistoryDialog({
                     </DialogDescription>
                 </DialogHeader>
                 <PlayerRecordPanel record={record} loading={loading} />
-                <div className="flex justify-end">
+                <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
                         Close
                     </Button>
-                </div>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

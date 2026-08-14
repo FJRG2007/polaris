@@ -6,7 +6,7 @@ import { useEffect, useState, useTransition } from "react";
 import { RepoSettingsFields } from "./repo-settings-fields";
 import type { AgentRepoView } from "@/lib/agents/agent-repo-service";
 import { adviseRepoAction, updateRepoConfigAction } from "../actions";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
+import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
 import {
     AGENT_EFFORTS,
     AGENT_PUSH_POLICIES,
@@ -156,14 +156,14 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                     {error ? <p className="text-sm text-red-400">{error}</p> : null}
                 </div>
 
-                <div className="flex justify-end gap-2">
+                <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
                         Cancel
                     </Button>
                     <Button onClick={save} disabled={pending}>
                         {pending ? "Saving..." : "Save"}
                     </Button>
-                </div>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

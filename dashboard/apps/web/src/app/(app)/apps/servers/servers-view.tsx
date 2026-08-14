@@ -36,6 +36,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     Skeleton
@@ -388,11 +389,11 @@ function ShellDialog({ server, onClose }: { server: ServerRow | null; onClose: (
                 </DialogHeader>
 
                 {server?.sudo ? (
-                    <div className="flex justify-end">
+                    <DialogFooter>
                         <Button size="sm" variant="ghost" onClick={() => setAsRoot((current) => !current)}>
                             {asRoot ? `Back to ${server.detail}` : "Open as root"}
                         </Button>
-                    </div>
+                    </DialogFooter>
                 ) : null}
 
                 {server ? (

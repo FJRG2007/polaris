@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { ArrowUp, Folder, Loader2 } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
+import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@polaris/ui";
 import { listNasFoldersAction } from "./actions";
 
 export function FolderPicker({
@@ -78,7 +78,7 @@ export function FolderPicker({
                         </button>
                     ))}
                 </div>
-                <div className="flex items-center justify-end gap-2">
+                <DialogFooter>
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
                         Cancel
                     </Button>
@@ -91,7 +91,7 @@ export function FolderPicker({
                     >
                         Use this folder
                     </Button>
-                </div>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

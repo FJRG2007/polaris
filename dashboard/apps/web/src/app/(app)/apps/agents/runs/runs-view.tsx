@@ -15,6 +15,7 @@ import {
     CardBody,
     Dialog,
     DialogContent,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     Select,
@@ -257,14 +258,14 @@ function StartRunDialog({ repos, onClose }: { repos: string[]; onClose: () => vo
                     </div>
                     {error ? <p className="text-sm text-red-400">{error}</p> : null}
                 </div>
-                <div className="flex justify-end gap-2">
+                <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
                         Cancel
                     </Button>
                     <Button onClick={start} disabled={!repoFullName || prompt.trim().length === 0 || pending}>
                         {pending ? "Starting..." : "Start"}
                     </Button>
-                </div>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

@@ -30,7 +30,7 @@ import { StepUpFields } from "@/components/step-up-fields";
 import { Feedback, type SettingLock } from "./setting-card";
 import { HeartHandshake, Loader2, Trash2, UserPlus } from "lucide-react";
 import { clearSuccessorAction, setSuccessorAction } from "./successor-actions";
-import { Button, Card, CardBody, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
+import { Button, Card, CardBody, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@polaris/ui";
 
 export interface SuccessorPerson {
     userId: string;
@@ -191,7 +191,7 @@ function SuccessorDialog({
 
                     <Feedback error={error} />
 
-                    <div className="flex justify-end gap-2">
+                    <DialogFooter>
                         <Button type="button" variant="ghost" onClick={close} disabled={busy}>
                             Cancel
                         </Button>
@@ -199,7 +199,7 @@ function SuccessorDialog({
                             {busy && <Loader2 className="size-4 shrink-0 animate-spin" />}
                             {clearing ? "Remove" : current ? "Change successor" : "Add successor"}
                         </Button>
-                    </div>
+                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>

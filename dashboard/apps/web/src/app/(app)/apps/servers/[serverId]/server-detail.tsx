@@ -29,7 +29,7 @@ import { Connect, LocalNote, Reachability, RenameForm } from "../server-panels";
 import { EnvironmentDialog, type EnvironmentTarget } from "../environment-dialog";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
 import { ArrowLeft, Boxes, FolderOpen, MapPin, SquareTerminal, Trash2 } from "lucide-react";
-import { Badge, Button, cn, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
+import { Badge, Button, cn, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@polaris/ui";
 
 /** The same cadence the table polls at - a server going down is worth noticing
  *  while its own page is open. */
@@ -251,11 +251,11 @@ export function ServerDetail({
                         </DialogTitle>
                     </DialogHeader>
                     {server.sudo ? (
-                        <div className="flex justify-end">
+                        <DialogFooter>
                             <Button size="sm" variant="ghost" onClick={() => setAsRoot((current) => !current)}>
                                 {asRoot ? `Back to ${server.detail}` : "Open as root"}
                             </Button>
-                        </div>
+                        </DialogFooter>
                     ) : null}
                     {shellOpen ? (
                         <TerminalPanel

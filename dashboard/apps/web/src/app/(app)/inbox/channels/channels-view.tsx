@@ -47,6 +47,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     Input,
@@ -568,7 +569,7 @@ function ChannelManageDialog({
                             </DialogDescription>
                         </DialogHeader>
                         {error && <p className="text-sm text-danger">{error}</p>}
-                        <div className="flex justify-end gap-2">
+                        <DialogFooter>
                             <Button
                                 variant="ghost"
                                 onClick={() => setConfirming(false)}
@@ -580,7 +581,7 @@ function ChannelManageDialog({
                                 {removing && <Loader2 className="size-4 animate-spin" />}
                                 Remove
                             </Button>
-                        </div>
+                        </DialogFooter>
                     </DialogContent>
                 </Dialog>
             </DialogContent>

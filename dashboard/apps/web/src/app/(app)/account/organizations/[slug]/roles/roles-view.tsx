@@ -39,6 +39,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     Input,
@@ -336,14 +337,14 @@ function NewRoleDialog({
                             {error}
                         </p>
                     )}
-                    <div className="flex justify-end gap-2">
+                    <DialogFooter>
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                             Cancel
                         </Button>
                         <Button type="submit" disabled={busy || !parsed.success}>
                             Create
                         </Button>
-                    </div>
+                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>

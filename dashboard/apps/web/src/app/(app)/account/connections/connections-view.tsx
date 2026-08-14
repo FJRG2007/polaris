@@ -25,6 +25,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     Input
@@ -390,7 +391,7 @@ function TokenDialog({
                     ) : null}
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
-                <div className="flex justify-end gap-2">
+                <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={pending}>
                         Cancel
                     </Button>
@@ -398,7 +399,7 @@ function TokenDialog({
                         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                         Connect
                     </Button>
-                </div>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

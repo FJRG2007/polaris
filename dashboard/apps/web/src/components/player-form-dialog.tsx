@@ -16,7 +16,7 @@
 
 import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@polaris/ui";
 
 export function PlayerFormDialog({
     title,
@@ -60,7 +60,7 @@ export function PlayerFormDialog({
                 >
                     {children}
                     {error && <p className="text-sm text-danger">{error}</p>}
-                    <div className="flex justify-end gap-2">
+                    <DialogFooter>
                         <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>
                             Cancel
                         </Button>
@@ -68,7 +68,7 @@ export function PlayerFormDialog({
                             {pending && <Loader2 className="size-4 animate-spin" />}
                             {confirmLabel}
                         </Button>
-                    </div>
+                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>

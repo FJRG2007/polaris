@@ -12,6 +12,7 @@ import {
     CardBody,
     Dialog,
     DialogContent,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     Input,
@@ -295,14 +296,14 @@ function RuleDialog({
 
                     {error ? <p className="text-sm text-red-400">{error}</p> : null}
                 </div>
-                <div className="flex justify-end gap-2">
+                <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
                         Cancel
                     </Button>
                     <Button onClick={save} disabled={!repoId || pending}>
                         {pending ? "Saving..." : "Save"}
                     </Button>
-                </div>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

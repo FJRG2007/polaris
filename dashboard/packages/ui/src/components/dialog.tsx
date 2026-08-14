@@ -48,6 +48,24 @@ export function DialogHeader({ className, ...props }: ComponentPropsWithoutRef<"
     return <div className={cn("mb-4 flex flex-col gap-1", className)} {...props} />;
 }
 
+/**
+ * The row a dialog's buttons live in.
+ *
+ * `DialogContent` is a plain block, so a footer written as a bare div sits flush
+ * against whatever came before it - which reads as part of the form rather than
+ * as the decision about it, and puts Save one stray click away from the last
+ * field. The top margin here is the separation; it belongs to the footer because
+ * the alternative is every dialog remembering to add it.
+ */
+export function DialogFooter({ className, ...props }: ComponentPropsWithoutRef<"div">) {
+    return (
+        <div
+            className={cn("mt-5 flex flex-wrap items-center justify-end gap-2", className)}
+            {...props}
+        />
+    );
+}
+
 export function DialogTitle({ className, ...props }: ComponentPropsWithoutRef<typeof RadixDialog.Title>) {
     return <RadixDialog.Title className={cn("text-base font-semibold", className)} {...props} />;
 }
