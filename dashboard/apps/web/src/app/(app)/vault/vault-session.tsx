@@ -64,7 +64,9 @@ interface VaultSessionValue {
     key: vaultCrypto.SymmetricKey | null;
     /** Take the key, from an unlock or from a vault that was just created. */
     hold: (key: vaultCrypto.SymmetricKey) => void;
-    lock: () => void;
+    /** Drop the key. The reason, when there is one, is shown on the lock screen -
+     *  a vault that locks itself without saying why reads as a fault. */
+    lock: (reason?: string) => void;
     unlockTimeout: number;
     /** Every organization this account is in, and where it stands in each vault. */
     organizations: VaultOrgView[];
@@ -78,6 +80,8 @@ interface VaultSessionValue {
     keyFor: (vaultOrgId: string | null) => vaultCrypto.SymmetricKey | null;
     /** Pick the organizations up again, after one is created or joined. */
     reloadOrgs: () => Promise<void>;
+    /** Why the vault locked, when something other than the deadline did it. */
+    lockNotice: string | null;
 }
 
 const VaultSessionContext = createContext<VaultSessionValue | null>(null);
@@ -127,6 +131,7 @@ export function VaultSessionProvider({
     const [organizations, setOrganizations] = useState<VaultOrgView[]>([]);
     const [orgKeys, setOrgKeys] = useState<Map<string, vaultCrypto.SymmetricKey>>(new Map());
     const [privateKey, setPrivateKey] = useState<Uint8Array | null>(null);
+    const [lockNotice, setLockNotice] = useState<string | null>(null);
     const keyRef = useRef<vaultCrypto.SymmetricKey | null>(null);
     keyRef.current = key;
 
@@ -153,15 +158,17 @@ export function VaultSessionProvider({
     const hold = useCallback(
         (value: vaultCrypto.SymmetricKey) => {
             setKey(value);
+            setLockNotice(null);
             persist(value);
         },
         [persist]
     );
 
-    const lock = useCallback(() => {
+    const lock = useCallback((reason?: string) => {
         setKey(null);
         setOrgKeys(new Map());
         setPrivateKey(null);
+        setLockNotice(reason ?? null);
         window.sessionStorage.removeItem(STORAGE_KEY);
     }, []);
 
@@ -272,7 +279,8 @@ export function VaultSessionProvider({
             orgKeys,
             privateKey,
             keyFor,
-            reloadOrgs
+            reloadOrgs,
+            lockNotice
         }),
         [
             state,
@@ -285,7 +293,8 @@ export function VaultSessionProvider({
             orgKeys,
             privateKey,
             keyFor,
-            reloadOrgs
+            reloadOrgs,
+            lockNotice
         ]
     );
 
@@ -303,7 +312,7 @@ export function VaultSessionProvider({
  * written once, and so a new vault screen cannot forget to ask.
  */
 export function VaultGate({ children }: { children: ReactNode }) {
-    const { state, name, key, hold } = useVaultSession();
+    const { state, name, key, hold, lockNotice } = useVaultSession();
     if (!state.exists) return <VaultSetup email={state.email} name={name} onCreated={hold} />;
     if (!key) {
         return (
@@ -311,6 +320,7 @@ export function VaultGate({ children }: { children: ReactNode }) {
                 email={state.email}
                 kdf={state.kdf}
                 protectedKey={state.protectedKey ?? ""}
+                notice={lockNotice}
                 onUnlocked={hold}
             />
         );

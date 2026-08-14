@@ -22,11 +22,14 @@ export function VaultUnlock({
     email,
     kdf,
     protectedKey,
+    notice,
     onUnlocked
 }: {
     email: string;
     kdf: KdfSettings;
     protectedKey: string;
+    /** Why it locked, when something other than the deadline did it. */
+    notice?: string | null;
     onUnlocked: (key: SymmetricKey) => void;
 }) {
     const [password, setPassword] = useState("");
@@ -63,6 +66,9 @@ export function VaultUnlock({
                                 <p className="text-xs text-muted-foreground">{email}</p>
                             </div>
                         </div>
+                        {notice ? (
+                            <p className="text-center text-xs text-muted-foreground">{notice}</p>
+                        ) : null}
                         <Input
                             type="password"
                             autoFocus

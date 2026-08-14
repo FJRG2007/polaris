@@ -15,6 +15,7 @@
 import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 import * as vaultCrypto from "@/lib/vault/crypto";
+import { useVaultSession } from "../vault-session";
 import { vaultContentsAction } from "../vault-actions";
 import { decryptFolders, decryptItem, type VaultItem } from "../vault-model";
 import { Button, Card, CardBody, CardHeader, CardTitle, Select } from "@polaris/ui";
@@ -33,9 +34,11 @@ export function VaultExport({
         danger?: boolean;
     }) => Promise<boolean>;
 }) {
+    const { keyFor } = useVaultSession();
     const [format, setFormat] = useState<ExportFormat>("json");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
 
     async function onExport(): Promise<void> {
         if (!vaultKey) {
@@ -53,11 +56,24 @@ export function VaultExport({
 
         setPending(true);
         setError(null);
+        setNotice(null);
         try {
             const contents = await vaultContentsAction();
             const folders = await decryptFolders(contents.folders, vaultKey);
+            // What comes back includes the organizations' items too, and those
+            // are encrypted under their own keys. An item whose key this account
+            // does not hold is left out rather than written as a row of blanks.
             const items: VaultItem[] = [];
-            for (const raw of contents.ciphers) items.push(await decryptItem(raw, vaultKey));
+            let skipped = 0;
+            for (const raw of contents.ciphers) {
+                const owner = typeof raw.organizationId === "string" ? raw.organizationId : null;
+                const itemKey = keyFor(owner);
+                if (!itemKey) {
+                    skipped += 1;
+                    continue;
+                }
+                items.push(await decryptItem(raw, itemKey));
+            }
 
             // The trash is not part of a vault somebody is moving; carrying it
             // would resurrect what they deleted in whatever they move to.
@@ -72,7 +88,14 @@ export function VaultExport({
             anchor.href = url;
             anchor.download = `polaris-vault-export.${file.extension}`;
             anchor.click();
-            URL.revokeObjectURL(url);
+            // Firefox reads the blob after the click returns, so revoking in this
+            // same tick cancels the download.
+            window.setTimeout(() => URL.revokeObjectURL(url), 0);
+            if (skipped > 0) {
+                setNotice(
+                    `${skipped} shared ${skipped === 1 ? "item was" : "items were"} left out: you do not hold the key for ${skipped === 1 ? "it" : "them"} yet.`
+                );
+            }
         } finally {
             setPending(false);
         }
@@ -108,6 +131,7 @@ export function VaultExport({
                         Export
                     </Button>
                 </div>
+                {notice ? <p className="text-sm text-muted-foreground">{notice}</p> : null}
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
             </CardBody>
         </Card>

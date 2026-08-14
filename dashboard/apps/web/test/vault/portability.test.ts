@@ -197,6 +197,25 @@ describe("writeExport", () => {
         expect(read.itemFolder).toEqual([0, -1]);
     });
 
+    it("writes JSON that brings an SSH key back with its key body", () => {
+        const key: VaultItem = {
+            ...emptyItem(core.CIPHER_SSH_KEY),
+            name: "Deploy key",
+            sshKey: {
+                privateKey: "-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END-----",
+                publicKey: "ssh-ed25519 AAAA",
+                keyFingerprint: "SHA256:abc"
+            }
+        };
+        const file = portability.writeExport("json", [key], []);
+        const read = portability.readImportFile("x.json", file.text);
+        expect(read.items[0]).toMatchObject({
+            type: core.CIPHER_SSH_KEY,
+            name: "Deploy key",
+            sshKey: key.sshKey
+        });
+    });
+
     it("writes CSV that survives a round trip, quotes and newlines included", () => {
         const file = portability.writeExport("csv", items, folders);
         expect(file.extension).toBe("csv");

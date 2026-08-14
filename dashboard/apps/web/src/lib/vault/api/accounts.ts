@@ -8,6 +8,7 @@
  * than a value it computes. Refusing a bad one is the whole of its job.
  */
 
+import { z } from "zod";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import * as account from "@/lib/vault/account";
@@ -278,15 +279,16 @@ export async function knownDevice(context: VaultContext): Promise<Response> {
  * The address out of `X-Request-Email`, which clients send base64url-encoded and
  * without padding. An unreadable header is an empty address, not an error: the
  * endpoint's answer for one it cannot place is `false` either way.
+ *
+ * Node's base64 decoder does not throw on rubbish - it skips what it cannot read
+ * and hands back whatever is left - so the check that matters is on the result,
+ * not on the decoding. Anything that is not an address never reaches the query.
  */
 function decodeRequestEmail(value: string): string {
     if (!value) return "";
-    try {
-        const padded = value.replace(/-/g, "+").replace(/_/g, "/");
-        return Buffer.from(padded, "base64").toString("utf8");
-    } catch {
-        return "";
-    }
+    const padded = value.replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = Buffer.from(padded, "base64").toString("utf8").trim();
+    return z.string().email().safeParse(decoded).success ? decoded : "";
 }
 
 /** One device by the identifier it gave itself, which is how clients look
