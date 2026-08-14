@@ -14,6 +14,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { sharingBaseUrl } from "@/lib/domain-service";
+import { deleteDriveEntry } from "@/lib/drive-delete";
 import * as dropPoints from "@/lib/file-request-service";
 import { ensureShareReachability } from "@/lib/public-reach";
 import { clientIp, hashForLog } from "@/lib/request-context";
@@ -323,7 +324,7 @@ export async function deleteFileRequestAction(
             );
             const driver = await getDriverForConnection(request.destinationConnectionId);
             try {
-                await driver.delete(request.destinationPath, { recursive: true });
+                await deleteDriveEntry(driver, request.destinationPath);
             } finally {
                 await driver.dispose();
             }
@@ -336,6 +337,14 @@ export async function deleteFileRequestAction(
                 return { error: "You cannot delete that folder" };
             if (caught instanceof DriveLockedError) return { error: "That folder is locked" };
             const code = caught instanceof StorageError ? caught.code : null;
+            // The drop point collects into the connection's own root, so there is no
+            // folder of its own to remove - only every other folder on the
+            // connection, which is not what the choice offered.
+            if (code === "permission_denied") {
+                return {
+                    error: "This drop point collects into the whole connection, so there is no folder of its own to delete. Delete it without the folder, or clear the files from Drive."
+                };
+            }
             if (code !== "not_found") {
                 return {
                     error:

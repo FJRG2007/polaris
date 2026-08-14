@@ -123,3 +123,34 @@ describe("deleting a drop point", () => {
         expect(deleteForOwner).not.toHaveBeenCalled();
     });
 });
+
+describe("a drop point that collects into the connection itself", () => {
+    it("deletes the drop point and leaves the connection alone", async () => {
+        getForOwner.mockResolvedValue({
+            id: REQUEST,
+            destinationConnectionId: CONNECTION,
+            destinationPath: ""
+        });
+
+        // The dialog does not offer the folder for one of these, so this is a stale
+        // client asking. There is no folder of its own to take - only every other
+        // folder on the connection, which is not what the choice ever meant.
+        const result = await deleteFileRequestAction(REQUEST, true);
+
+        expect(result.error).toContain("no folder of its own");
+        expect(driverDelete).not.toHaveBeenCalled();
+        expect(deleteForOwner).not.toHaveBeenCalled();
+    });
+
+    it("deletes cleanly when the folder was not asked for", async () => {
+        getForOwner.mockResolvedValue({
+            id: REQUEST,
+            destinationConnectionId: CONNECTION,
+            destinationPath: ""
+        });
+
+        expect(await deleteFileRequestAction(REQUEST, false)).toEqual({});
+        expect(deleteForOwner).toHaveBeenCalledWith(OWNER, REQUEST);
+        expect(driverDelete).not.toHaveBeenCalled();
+    });
+});

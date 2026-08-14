@@ -45,11 +45,14 @@ export function DeleteDropPointDialog({
     onConfirm: (deleteFolder: boolean) => void;
 }) {
     const [deleteFolder, setDeleteFolder] = useState(true);
+    // A drop point pointed at the connection itself has no folder of its own, and
+    // "the folder" there is every other folder on it. Nothing to offer.
+    const ownFolder = Boolean(target && target.destinationPath !== "");
 
     // Each drop point is a fresh decision: an operator who kept one folder should
     // not silently keep the next one because the switch remembered.
     useEffect(() => {
-        if (target) setDeleteFolder(true);
+        if (target) setDeleteFolder(target.destinationPath !== "");
     }, [target]);
 
     return (
@@ -62,37 +65,53 @@ export function DeleteDropPointDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex items-start gap-3 rounded-md border border-border p-3">
-                    <Switch
-                        checked={deleteFolder}
-                        aria-label="Delete the folder too"
-                        onChange={setDeleteFolder}
-                    />
-                    <div className="min-w-0 text-sm">
-                        <p className="font-medium">Delete the folder too</p>
-                        <p className="mt-0.5 break-words text-xs text-muted-foreground">
-                            {target ? (
-                                <>
-                                    {target.connectionName} / {target.destinationPath}
-                                    {target.submissionCount > 0
-                                        ? ` - ${target.submissionCount} collected file${
-                                              target.submissionCount === 1 ? "" : "s"
-                                          }`
-                                        : " - empty"}
-                                </>
-                            ) : null}
+                {/* The body carries its own spacing: the dialog is a padded box and
+                    nothing in it is spaced apart on its own, so the choice would sit
+                    flush against the buttons underneath it. */}
+                <div className="flex flex-col gap-4">
+                    {ownFolder ? (
+                        <div className="flex items-start gap-3 rounded-md border border-border p-3">
+                            <Switch
+                                checked={deleteFolder}
+                                aria-label="Delete the folder too"
+                                onChange={setDeleteFolder}
+                            />
+                            <div className="min-w-0 text-sm">
+                                <p className="font-medium">Delete the folder too</p>
+                                <p className="mt-0.5 break-words text-xs text-muted-foreground">
+                                    {target ? (
+                                        <>
+                                            {target.connectionName} / {target.destinationPath}
+                                            {target.submissionCount > 0
+                                                ? ` - ${target.submissionCount} collected file${
+                                                      target.submissionCount === 1 ? "" : "s"
+                                                  }`
+                                                : " - empty"}
+                                        </>
+                                    ) : null}
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="rounded-md border border-border p-3 text-xs text-muted-foreground">
+                            This one collects straight into {target?.connectionName}, so it has no folder of
+                            its own. Whatever was collected stays where it is.
                         </p>
-                    </div>
-                </div>
+                    )}
 
-                <div className="flex justify-end gap-2">
-                    <Button variant="ghost" onClick={onCancel} disabled={busy}>
-                        Cancel
-                    </Button>
-                    <Button variant="danger" onClick={() => onConfirm(deleteFolder)} disabled={busy}>
-                        <Trash2 className="size-4" />
-                        {busy ? "Deleting..." : "Delete"}
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={onCancel} disabled={busy}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="danger"
+                            onClick={() => onConfirm(deleteFolder)}
+                            disabled={busy}
+                        >
+                            <Trash2 className="size-4" />
+                            {busy ? "Deleting..." : "Delete"}
+                        </Button>
+                    </div>
                 </div>
             </DialogContent>
         </Dialog>

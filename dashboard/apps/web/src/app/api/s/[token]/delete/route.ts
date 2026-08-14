@@ -9,10 +9,11 @@
  */
 
 import { normalizeRelPath } from "@polaris/core";
+import { gateShareRequest } from "@/lib/share-access";
+import { deleteDriveEntry } from "@/lib/drive-delete";
 import { getDriverForConnection } from "@/lib/storage-service";
 import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 import { logShareAccess, resolveWithinShare } from "@/lib/share-service";
-import { gateShareRequest } from "@/lib/share-access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,7 +44,9 @@ export async function POST(
 
     const driver = await getDriverForConnection(share.connectionId);
     try {
-        await driver.delete(target, { recursive: true });
+        // A share rooted at the connection's own root has Polaris's hidden folder
+        // inside it, and a visitor naming it by hand is the one caller who would.
+        await deleteDriveEntry(driver, target);
         await invalidateFolderSizes(share.connectionId, target);
         void logShareAccess({ shareId: share.id, action: "delete", ip, ipHash, userAgentHash });
         return Response.json({ ok: true });
