@@ -105,6 +105,11 @@ export function TaskPanel({
     /** A close or a switch is already waiting on the writes; a second Escape must not
      *  start its own. */
     const leaving = useRef(false);
+    /** A write was refused on the way out and the panel stayed. The next attempt to
+     *  leave asks about abandoning it rather than refusing again. */
+    const stuck = useRef(false);
+    /** Where the panel was going when it was asked whether to leave the edit behind. */
+    const [discarding, setDiscarding] = useState<{ next: string | null } | null>(null);
 
     useEffect(() => setOpenId(taskId), [taskId]);
 
@@ -121,6 +126,7 @@ export function TaskPanel({
 
     useEffect(() => {
         wanted.current = openId;
+        stuck.current = false;
         if (!openId) {
             saved.current = null;
             setDetail(null);
@@ -188,19 +194,24 @@ export function TaskPanel({
     const commitField = async (fieldId: string, value: string, settled: boolean): Promise<boolean> => {
         const task = saved.current;
         if (!task || !openId) return true;
-        if ((task.customValues[fieldId] ?? "") === value) return true;
 
-        setError("");
-        const result = await runAction(() => actions.setCustomValueAction(openId, fieldId, value), setError);
-        if (!result || result.error) {
-            if (result?.error) setError(result.error);
-            return false;
+        let row = task;
+        if ((task.customValues[fieldId] ?? "") !== value) {
+            setError("");
+            const result = await runAction(() => actions.setCustomValueAction(openId, fieldId, value), setError);
+            if (!result || result.error) {
+                if (result?.error) setError(result.error);
+                return false;
+            }
+            row = { ...task, customValues: { ...task.customValues, [fieldId]: value } };
+            saved.current = row;
         }
 
-        const customValues = { ...task.customValues, [fieldId]: value };
-        saved.current = { ...task, customValues };
-        paint({ customValues });
+        // Not drawn while it is still being typed into. The box already shows what
+        // was typed, and repainting it is what reshuffles the fields around the one
+        // holding the caret. The keystroke that stopped is the one that draws.
         if (!settled) return true;
+        paint({ customValues: row.customValues });
         if (!leaving.current) load(openId);
         onChanged();
         return true;
@@ -233,23 +244,51 @@ export function TaskPanel({
      *
      * This is where an edit is lost: somebody writes a description and reaches
      * straight for the close button, a keystroke ahead of the save. A refused write
-     * answers false and the panel stays where it is, with the text still in it and
-     * the reason on the screen - going away anyway would be losing it quietly, which
-     * is worse than not going away at all.
+     * answers `refused` and the panel stays where it is, with the text still in it
+     * and the reason on the screen - going away anyway would be losing it quietly,
+     * which is worse than not going away at all.
+     *
+     * `waiting` is a second Escape on a close already under way, and it is not a
+     * refusal: nothing about the edit has been answered yet.
      */
-    const settle = async (): Promise<boolean> => {
-        if (leaving.current) return false;
+    const settle = async (): Promise<"kept" | "refused" | "waiting"> => {
+        if (leaving.current) return "waiting";
         leaving.current = true;
-        blurEdits();
-        const kept = await auto.flush();
-        leaving.current = false;
-        return kept;
+        try {
+            blurEdits();
+            return (await auto.flush()) ? "kept" : "refused";
+        } finally {
+            // A blur handler that throws, or a write that throws where it should have
+            // answered, would otherwise latch this and the panel could never be closed
+            // or switched again.
+            leaving.current = false;
+        }
+    };
+
+    /**
+     * Take the panel where it was going, once what is held has been written.
+     *
+     * A refusal holds it the first time and says why. The second attempt is somebody
+     * telling us the first answer was read and they still want out, so that one
+     * offers to leave the edit behind: a write the server will not take - a lost
+     * connection as much as a rejected value - would otherwise trap the panel for the
+     * rest of the session, with no way to close it and no way to abandon it.
+     */
+    const leave = async (next: string | null) => {
+        const outcome = await settle();
+        if (outcome === "kept") {
+            stuck.current = false;
+            if (next === null) onClose();
+            else setOpenId(next);
+            return;
+        }
+        if (outcome !== "refused") return;
+        if (stuck.current) setDiscarding({ next });
+        else stuck.current = true;
     };
 
     /** Open another task in this same panel, keeping what the current one has open. */
-    const openTask = async (id: string) => {
-        if (await settle()) setOpenId(id);
-    };
+    const openTask = (id: string) => leave(id);
 
     /** A tag born where it is needed - in a picker or a menu - instead of in the
      *  space's settings, which is where the reason for it gets forgotten. */
@@ -271,9 +310,7 @@ export function TaskPanel({
                 // Escape, the close button and a click outside all pull the panel
                 // away with the caret still in a field. The dialog is controlled, so
                 // it goes nowhere until what was typed has been written and taken.
-                void settle().then((kept) => {
-                    if (kept) onClose();
-                });
+                void leave(null);
             }}
         >
             {/* max-w has to be set as well as w: DialogContent's own max-w-lg
@@ -550,6 +587,27 @@ export function TaskPanel({
                             currentUserId={context.currentUserId}
                             open={sharing}
                             onOpenChange={setSharing}
+                        />
+
+                        <ConfirmDeleteDialog
+                            open={discarding !== null}
+                            onOpenChange={(open) => !open && setDiscarding(null)}
+                            name={task.name}
+                            kind="change"
+                            requireTyping={false}
+                            title="Leave the change behind?"
+                            description={error || "The last change could not be saved."}
+                            question="Everything else stays as it was saved. What is still in the boxes goes."
+                            confirmLabel="Leave it behind"
+                            onConfirm={() => {
+                                const next = discarding?.next ?? null;
+                                auto.discard();
+                                stuck.current = false;
+                                setDiscarding(null);
+                                setError("");
+                                if (next === null) onClose();
+                                else setOpenId(next);
+                            }}
                         />
 
                         <ConfirmDeleteDialog

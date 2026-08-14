@@ -291,9 +291,14 @@ export function FieldsSection({
 
     if (context.fields.length === 0) return null;
 
-    const filled = context.fields.filter((field) => (task.customValues[field.id] ?? "") !== "");
     const empty = context.fields.filter((field) => (task.customValues[field.id] ?? "") === "");
-    const shown = showEmpty ? [...filled, ...empty] : filled;
+    // The space's own order, not filled ones first: these save themselves while
+    // somebody is typing, and an order read off the values reshuffles the moment a
+    // field stops being empty - which moves the box out from under the caret that
+    // is still writing in it.
+    const shown = showEmpty
+        ? context.fields
+        : context.fields.filter((field) => (task.customValues[field.id] ?? "") !== "");
 
     return (
         <section className="flex flex-col gap-1">

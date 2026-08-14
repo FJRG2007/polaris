@@ -186,6 +186,28 @@ describe("closing a task that was just edited", () => {
         await vi.waitFor(() => expect(onClose).toHaveBeenCalled());
     });
 
+    it("offers to leave the change behind when the write keeps being refused", async () => {
+        const user = userEvent.setup();
+        vi.mocked(actions.updateTaskAction).mockResolvedValue({ error: "Could not save the task" });
+        const onClose = await openPanel();
+
+        await user.type(screen.getByLabelText("Description"), "Rotate them every 90 days");
+
+        // The first attempt says why and stays, the way it should. Without a way out
+        // of the second one the panel is closed for the rest of the session, and a
+        // dropped connection refuses a write just as flatly as a rejected value does.
+        await user.click(screen.getByRole("button", { name: "Close" }));
+        await screen.findByText("Could not save the task");
+        expect(screen.queryByText("Leave the change behind?")).toBeNull();
+
+        await user.click(screen.getByRole("button", { name: "Close" }));
+        await screen.findByText("Leave the change behind?");
+        expect(onClose).not.toHaveBeenCalled();
+
+        await user.click(screen.getByRole("button", { name: "Leave it behind" }));
+        expect(onClose).toHaveBeenCalled();
+    });
+
     it("closes straight away when there was nothing to save", async () => {
         const user = userEvent.setup();
         const onClose = await openPanel();

@@ -147,6 +147,46 @@ describe("the autosave behind a task", () => {
         expect(written).toEqual(["attempt", "attempt"]);
     });
 
+    it("still waits for the pause when a write is already on its way", async () => {
+        const written: string[] = [];
+        const slow = heldOpen(written, "the first pause");
+        const { result } = renderHook(() => useAutosave(SETTLE_MS));
+
+        act(() => result.current.queue("description", slow.write));
+        await act(async () => void (await vi.advanceTimersByTimeAsync(SETTLE_MS)));
+        expect(written).toEqual(["the first pause: sent"]);
+
+        // Still typing while that one is in flight. Answering it must not become the
+        // signal to send the next keystroke: that is a write, and a line of the task's
+        // history, per round trip rather than per pause.
+        act(() => result.current.queue("description", writer(written, "still typing")));
+        await act(async () => {
+            slow.answer(true);
+            await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(written).toEqual(["the first pause: sent", "the first pause: answered"]);
+
+        await act(async () => void (await vi.advanceTimersByTimeAsync(SETTLE_MS)));
+        expect(written).toEqual(["the first pause: sent", "the first pause: answered", "still typing"]);
+    });
+
+    it("lets go of an edit the caller has decided to abandon", async () => {
+        const written: string[] = [];
+        const { result } = renderHook(() => useAutosave(SETTLE_MS));
+
+        act(() => result.current.queue("description", writer(written, "attempt", false)));
+        await act(async () => void (await result.current.flush()));
+        expect(result.current.busy).toBe(true);
+
+        act(() => result.current.discard());
+
+        // Nothing left to write, nothing left to warn about on the way off the page.
+        expect(result.current.busy).toBe(false);
+        await act(async () => void (await vi.advanceTimersByTimeAsync(SETTLE_MS)));
+        expect(await result.current.flush()).toBe(true);
+        expect(written).toEqual(["attempt"]);
+    });
+
     it("drops what was held for a field the caller has a newer value for", async () => {
         const written: string[] = [];
         const { result } = renderHook(() => useAutosave(SETTLE_MS));

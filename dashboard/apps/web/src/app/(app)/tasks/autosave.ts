@@ -40,6 +40,9 @@ export interface Autosave {
     /** Send everything held and wait for every write still on its way. False when one
      *  of them was refused, which leaves it held for the next attempt. */
     flush: () => Promise<boolean>;
+    /** Let go of what is held without writing it. The only way out of an edit the
+     *  server will not take, so the caller must have asked before calling it. */
+    discard: () => void;
     /** An edit is on its way, or waiting to go. */
     busy: boolean;
 }
@@ -90,35 +93,46 @@ export function useAutosave(settleMs: number = SETTLE_MS): Autosave {
         [sync]
     );
 
+    /** One pass: everything held goes out, in the order it was held. */
+    const dispatch = useCallback(() => {
+        if (held.current.size === 0) return;
+        const writes = [...held.current.entries()];
+        held.current.clear();
+        sync();
+        for (const [field, write] of writes) void send(field, write);
+    }, [send, sync]);
+
     const flush = useCallback(async (): Promise<boolean> => {
         const before = refused.current;
         // Anything typed while these are going out goes with them, so what is
         // waited for is the last keystroke rather than the first.
         while (held.current.size > 0 || going.current > 0) {
             stopTimer();
-            const writes = [...held.current.entries()];
-            held.current.clear();
-            sync();
-            for (const [field, write] of writes) void send(field, write);
+            dispatch();
             await chain.current;
             // A refused write has put itself back. Sending it again from here would
             // be a loop; what to do about it is the caller's decision.
             if (refused.current !== before) return false;
         }
         return true;
-    }, [send, stopTimer, sync]);
+    }, [dispatch, stopTimer]);
 
     const queue = useCallback(
         (field: string, write: Write) => {
             held.current.set(field, write);
             sync();
             stopTimer();
+            // One pass and no waiting on it: the next keystroke arms the timer again.
+            // Looping the way the close does - which has to, because it is waiting for
+            // the last keystroke there will be - would take the timer down again the
+            // moment the write in flight answered, and somebody who keeps typing would
+            // get a write, and a line of history, per round trip instead of per pause.
             timer.current = setTimeout(() => {
                 timer.current = null;
-                void flush();
+                dispatch();
             }, settleMs);
         },
-        [flush, settleMs, stopTimer, sync]
+        [dispatch, settleMs, stopTimer, sync]
     );
 
     const save = useCallback(
@@ -133,6 +147,16 @@ export function useAutosave(settleMs: number = SETTLE_MS): Autosave {
         },
         [send, stopTimer, sync]
     );
+
+    // An edit the server keeps refusing would otherwise be held for as long as the
+    // page lives: every attempt to leave sends it, is refused, and reports false, so
+    // there is no way out of the panel and the page keeps warning on the way out.
+    // Letting go of it is the caller's to ask about and the caller's to offer.
+    const discard = useCallback(() => {
+        stopTimer();
+        held.current.clear();
+        sync();
+    }, [stopTimer, sync]);
 
     // Leaving the page with an edit still held is the one case nothing here can
     // save its way out of, so it is the one case worth interrupting.
@@ -155,5 +179,5 @@ export function useAutosave(settleMs: number = SETTLE_MS): Autosave {
         [send, stopTimer]
     );
 
-    return { queue, save, flush, busy };
+    return { queue, save, flush, discard, busy };
 }
