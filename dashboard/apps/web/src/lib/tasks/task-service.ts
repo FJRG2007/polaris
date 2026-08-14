@@ -18,6 +18,7 @@ import * as core from "@polaris/core";
 import { nextTaskNumber } from "./numbering";
 import { prisma, type Prisma } from "@polaris/db";
 import * as activity from "@/lib/activity/activity";
+import * as follow from "@/lib/follow/follow";
 import * as comments from "@/lib/comments/comments";
 import { notify } from "@/lib/notifications/dispatch";
 import type { PersonRef, TagRef, TaskRow } from "./facts";
@@ -314,8 +315,8 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
     ] = await Promise.all([
             decorate([taskId]),
             listTasks({ parentId: taskId }, { includeArchived: true }),
-            prisma.taskWatcher.findMany({
-                where: { taskId },
+            prisma.follow.findMany({
+                where: { subjectType: "task", subjectId: taskId },
                 select: { user: { select: { id: true, name: true, image: true } } }
             }),
             prisma.taskChecklist.findMany({
@@ -1269,10 +1270,10 @@ export async function deleteTask(taskId: string): Promise<void> {
  *  may write, so this is one statement rather than a loop of them; tracked time,
  *  checklists and the subtasks themselves follow through the schema's cascades.
  *
- *  The history and the discussion do not: both live in one table for every app
- *  and neither has a foreign key to cascade along, so they are dropped here -
- *  for the subtasks as well as for what was asked for, since those are going
- *  too. */
+ *  The history, the discussion and the followers do not: all three live in a
+ *  table shared by every app and none has a foreign key to cascade along, so
+ *  they are dropped here - for the subtasks as well as for what was asked for,
+ *  since those are going too. */
 export async function deleteTasks(taskIds: readonly string[]): Promise<number> {
     if (taskIds.length === 0) return 0;
     const going = await withSubtasks(taskIds);
@@ -1280,6 +1281,7 @@ export async function deleteTasks(taskIds: readonly string[]): Promise<number> {
         const { count } = await tx.task.deleteMany({ where: { id: { in: [...taskIds] } } });
         await activity.forget("task", going, tx);
         await comments.forget("task", going, tx);
+        await follow.forget("task", going, tx);
         return count;
     });
 }

@@ -125,7 +125,7 @@ model User {
     taskSpaceMemberships TaskSpaceMember[]
     taskFolderMemberships TaskFolderMember[]
     taskAssignments     TaskAssignee[]
-    taskWatching        TaskWatcher[]
+    following           Follow[]
     comments            Comment[]
     taskTimeEntries     TaskTimeEntry[]
     taskReminders       TaskReminder[]
@@ -4202,7 +4202,6 @@ model Task {
     status      TaskStatus?            @relation(fields: [statusId], references: [id], onDelete: SetNull)
     sprint      TaskSprint?            @relation(fields: [sprintId], references: [id], onDelete: SetNull)
     assignees   TaskAssignee[]
-    watchers    TaskWatcher[]
     tags        TaskTagLink[]
     fieldValues TaskCustomFieldValue[]
     checklists  TaskChecklist[]
@@ -4238,15 +4237,29 @@ model TaskAssignee {
 }
 
 // Who is told when it changes, without being asked to do it.
-model TaskWatcher {
-    taskId String @db.Uuid
-    userId String @db.Uuid
+// Somebody who wants to hear about something. Any something: a task, a service,
+// a server.
+//
+// Addressed by subject the way Activity and Comment are, and for the same
+// reason - "who hears about this" was a question only a task could answer, so
+// the answer for a service was everybody with the permission, or nobody.
+//
+// `reason` records how they came to be following, which is what lets a screen
+// say "you are following this because you commented" rather than leaving
+// somebody to wonder why they are being told. It has no effect on delivery.
+model Follow {
+    subjectType String
+    subjectId   String   @db.Uuid
+    userId      String   @db.Uuid
+    // explicit | commented | assigned | created
+    reason      String   @default("explicit")
+    createdAt   DateTime @default(now())
 
-    task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@id([taskId, userId])
+    @@id([subjectType, subjectId, userId])
     @@index([userId])
+    @@index([subjectType, subjectId])
 }
 
 model TaskTagLink {

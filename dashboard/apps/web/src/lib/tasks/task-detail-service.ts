@@ -11,6 +11,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { notify } from "@/lib/notifications/dispatch";
+import * as follow from "@/lib/follow/follow";
 import * as comments from "@/lib/comments/comments";
 import { runAutomations } from "./automation-service";
 import { notifyMentions } from "@/lib/rich-text/mention-notify";
@@ -19,14 +20,14 @@ import { notifyMentions } from "@/lib/rich-text/mention-notify";
 // Comments
 // ---------------------------------------------------------------------------
 
-/** Everyone who should hear about activity on a task: its assignees and its
- *  watchers, minus whoever caused it. */
+/** Everyone who should hear about activity on a task: its assignees and whoever
+ *  follows it, minus whoever caused it. */
 async function audience(taskId: string, exceptUserId: string | null): Promise<string[]> {
-    const [assignees, watchers] = await Promise.all([
+    const [assignees, following] = await Promise.all([
         prisma.taskAssignee.findMany({ where: { taskId }, select: { userId: true } }),
-        prisma.taskWatcher.findMany({ where: { taskId }, select: { userId: true } })
+        follow.followers("task", taskId)
     ]);
-    const people = new Set([...assignees, ...watchers].map((entry) => entry.userId));
+    const people = new Set([...assignees.map((entry) => entry.userId), ...following]);
     if (exceptUserId) people.delete(exceptUserId);
     return [...people];
 }
@@ -43,9 +44,9 @@ export async function addComment(actorId: string, input: core.CommentInput): Pro
         body: input.body,
         assignedToId: input.assignedToId
     });
-    await prisma.taskWatcher
-        .create({ data: { taskId: input.taskId, userId: actorId } })
-        .catch(() => undefined);
+    // Having said something, you want to hear the reply - and the screen can say
+    // that is why you are following it.
+    await follow.follow("task", input.taskId, actorId, "commented");
 
     const task = await prisma.task.findUnique({
         where: { id: input.taskId },
@@ -320,11 +321,8 @@ export async function removeDependency(dependencyId: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export async function setWatching(taskId: string, userId: string, watching: boolean): Promise<void> {
-    if (watching) {
-        await prisma.taskWatcher.create({ data: { taskId, userId } }).catch(() => undefined);
-        return;
-    }
-    await prisma.taskWatcher.deleteMany({ where: { taskId, userId } });
+    if (watching) await follow.follow("task", taskId, userId, "explicit");
+    else await follow.unfollow("task", taskId, userId);
 }
 
 // ---------------------------------------------------------------------------

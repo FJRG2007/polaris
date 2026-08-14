@@ -9,6 +9,7 @@
 import { join } from "node:path";
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
+import * as follow from "./follow/follow";
 import { createWriteStream } from "node:fs";
 import { localDialHost } from "./deploy/dial";
 import { appBaseUrl } from "./domain-service";
@@ -1881,6 +1882,28 @@ export async function deleteServiceComment(applicationId: string, ownerId: strin
     // Only the service's owner gets past the check above, and the owner
     // moderates their own service's notes - including the ones a rule left.
     await comments.remove(ownerId, commentId, true);
+}
+
+/**
+ * Whether this reader hears about the service, and changing that.
+ *
+ * The owner is told about a deploy either way; following is for the second
+ * person - the one who spent the afternoon on it, or who wants to know when it
+ * comes back up.
+ */
+export async function isFollowingService(applicationId: string, userId: string): Promise<boolean> {
+    await requireOwnedApplication(applicationId, userId);
+    return follow.isFollowing("service", applicationId, userId);
+}
+
+export async function setFollowingService(
+    applicationId: string,
+    userId: string,
+    following: boolean
+): Promise<void> {
+    await requireOwnedApplication(applicationId, userId);
+    if (following) await follow.follow("service", applicationId, userId);
+    else await follow.unfollow("service", applicationId, userId);
 }
 
 async function requireOwnedApplication(applicationId: string, ownerId: string): Promise<void> {

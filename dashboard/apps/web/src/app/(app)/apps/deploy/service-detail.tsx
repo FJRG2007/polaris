@@ -52,6 +52,8 @@ import {
 } from "@polaris/ui";
 import {
     ArrowUpRight,
+    Bell,
+    BellOff,
     ChartColumn,
     CheckCircle2,
     ChevronDown,
@@ -130,14 +132,17 @@ export function ServiceDetail({
                             Removal pending
                         </span>
                     )}
-                    <button
-                        type="button"
-                        onClick={() => setFull((value) => !value)}
-                        title={full ? "Exit full screen" : "Full screen"}
-                        className="ml-auto mr-8 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    >
-                        {full ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-                    </button>
+                    <div className="ml-auto mr-8 flex shrink-0 items-center gap-1">
+                        <FollowToggle applicationId={app.id} />
+                        <button
+                            type="button"
+                            onClick={() => setFull((value) => !value)}
+                            title={full ? "Exit full screen" : "Full screen"}
+                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            {full ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+                        </button>
+                    </div>
                 </div>
 
                 <div className="no-scrollbar flex items-center gap-1 overflow-x-auto border-b border-border/60 px-5 text-sm">
@@ -610,6 +615,47 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
 
             <ServiceActivity applicationId={app.id} />
         </div>
+    );
+}
+
+/**
+ * Hear about this service, or stop hearing about it.
+ *
+ * The owner is told about a deploy either way - this is for the second person,
+ * who spent the afternoon on it or wants to know when it comes back up. Written
+ * optimistically because the answer is a boolean the server cannot disagree
+ * with, and rolled back if it does.
+ */
+function FollowToggle({ applicationId }: { applicationId: string }) {
+    const [following, setFollowing] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        setFollowing(null);
+        void deployActions.serviceFollowStateAction(applicationId).then((state) => setFollowing(state.following));
+    }, [applicationId]);
+
+    if (following === null) return null;
+
+    const label = following ? "Stop hearing about this service" : "Hear about this service";
+    return (
+        <button
+            type="button"
+            title={label}
+            aria-label={label}
+            aria-pressed={following}
+            onClick={async () => {
+                const next = !following;
+                setFollowing(next);
+                const result = await deployActions.setServiceFollowAction({ applicationId, following: next });
+                if (result.error) setFollowing(!next);
+            }}
+            className={cn(
+                "rounded p-1 transition-colors hover:bg-muted",
+                following ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            )}
+        >
+            {following ? <Bell className="size-4" /> : <BellOff className="size-4" />}
+        </button>
     );
 }
 

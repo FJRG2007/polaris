@@ -19,6 +19,7 @@ import * as core from "@polaris/core";
 import { nextTaskNumber } from "./numbering";
 import { prisma, type Prisma } from "@polaris/db";
 import * as activity from "@/lib/activity/activity";
+import * as follow from "@/lib/follow/follow";
 import * as comments from "@/lib/comments/comments";
 
 export interface AutomationEventInput {
@@ -57,7 +58,6 @@ const FACT_SELECT = {
     updatedAt: true,
     status: { select: { type: true } },
     assignees: { select: { userId: true } },
-    watchers: { select: { userId: true } },
     tags: { select: { tagId: true } },
     fieldValues: { select: { fieldId: true, value: true } }
 } as const;
@@ -89,7 +89,23 @@ async function blockedByDependency(taskIds: readonly string[]): Promise<Set<stri
     return held;
 }
 
-function toFacts(record: FactRecord, blocked: boolean): core.TaskFacts {
+/** Who follows each of these tasks, in one query for the whole batch. */
+async function followersOf(taskIds: readonly string[]): Promise<Map<string, string[]>> {
+    if (taskIds.length === 0) return new Map();
+    const rows = await prisma.follow.findMany({
+        where: { subjectType: "task", subjectId: { in: [...taskIds] } },
+        select: { subjectId: true, userId: true }
+    });
+    const byTask = new Map<string, string[]>();
+    for (const row of rows) {
+        const held = byTask.get(row.subjectId);
+        if (held) held.push(row.userId);
+        else byTask.set(row.subjectId, [row.userId]);
+    }
+    return byTask;
+}
+
+function toFacts(record: FactRecord, blocked: boolean, watcherIds: string[]): core.TaskFacts {
     return {
         id: record.id,
         name: record.name,
@@ -99,7 +115,7 @@ function toFacts(record: FactRecord, blocked: boolean): core.TaskFacts {
         statusType: (record.status?.type as core.TaskStatusType) ?? "open",
         priority: record.priority as core.TaskPriority,
         assigneeIds: record.assignees.map((entry) => entry.userId),
-        watcherIds: record.watchers.map((entry) => entry.userId),
+        watcherIds,
         tagIds: record.tags.map((entry) => entry.tagId),
         createdById: record.createdById,
         startDate: record.startDate,
@@ -206,6 +222,10 @@ export async function runAutomationsFor(event: AutomationBatchInput): Promise<vo
     // nothing reads it, so a wrong value cannot reach a decision.
     const readsBlocked = rules.some((rule) => rule.conditions.conditions.some((one) => one.field === "blocked"));
     const heldUp = readsBlocked ? await blockedByDependency(involved.map((record) => record.id)) : new Set<string>();
+    // Who follows each of these. It used to arrive with the row through a
+    // relation; the table is addressed by subject now, so it is one query for
+    // the batch - the same shape as the dependency lookup above.
+    const watching = await followersOf(involved.map((record) => record.id));
 
     const now = new Date();
     // Counted rather than incremented per run: a rule that fired on forty rows is
@@ -224,7 +244,8 @@ export async function runAutomationsFor(event: AutomationBatchInput): Promise<vo
                     blockedNote: record.blockedNote
                 },
                 now
-            )
+            ),
+            watching.get(record.id) ?? []
         );
         const scoped = perSpace.get(record.spaceId) ?? [];
         const selected = core.selectAutomations(scoped, { trigger: event.trigger, task: facts }, now);
@@ -336,9 +357,7 @@ async function applyAction(
         }
         case "addWatcher": {
             if (!action.targetId) return;
-            await prisma.taskWatcher
-                .create({ data: { taskId, userId: action.targetId } })
-                .catch(() => undefined);
+            await follow.follow("task", taskId, action.targetId, "explicit");
             return;
         }
         case "archive": {

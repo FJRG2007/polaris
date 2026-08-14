@@ -14,6 +14,7 @@ import { normalizeRoot } from "@polaris/deploy";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import * as activity from "@/lib/activity/activity";
+import * as follow from "@/lib/follow/follow";
 import * as comments from "@/lib/comments/comments";
 import * as deployService from "@/lib/deploy-service";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
@@ -440,6 +441,29 @@ export async function serviceHistoryAction(applicationId: string): Promise<activ
     }
 }
 
+/** Whether the reader hears about this service, and changing that. */
+export async function serviceFollowStateAction(applicationId: string): Promise<{ following: boolean }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        return { following: await deployService.isFollowingService(applicationId, user.id) };
+    } catch {
+        return { following: false };
+    }
+}
+
+export async function setServiceFollowAction(input: {
+    applicationId: string;
+    following: boolean;
+}): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await deployService.setFollowingService(input.applicationId, user.id, input.following);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not change that" };
+    }
+}
+
 /** The notes people have left on this service. */
 export async function serviceCommentsAction(applicationId: string): Promise<comments.CommentView[]> {
     const user = await requirePermission("deploy.manage");
@@ -619,6 +643,7 @@ export async function deleteApplicationAction(applicationId: string): Promise<{ 
         // app and have no foreign key to follow.
         await activity.forget("service", applicationId);
         await comments.forget("service", applicationId);
+        await follow.forget("service", applicationId);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {

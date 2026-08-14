@@ -20,6 +20,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { sendAuthEmail } from "@/lib/auth-mail";
 import { generateToken } from "@polaris/core/tokens";
+import * as follow from "@/lib/follow/follow";
 import { notify } from "@/lib/notifications/dispatch";
 import { appBaseUrl, sharingBaseUrl } from "@/lib/domain-service";
 
@@ -314,7 +315,7 @@ export async function sendTaskByEmail(
             failures.push({ recipient: member.name, reason: "They do not have access to this space" });
             continue;
         }
-        await prisma.taskWatcher.create({ data: { taskId: input.taskId, userId: member.id } }).catch(() => undefined);
+        await follow.follow("task", input.taskId, member.id, "explicit");
         await notify({
             userId: member.id,
             event: "tasks.shared",

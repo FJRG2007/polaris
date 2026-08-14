@@ -17,6 +17,7 @@ const automationFindMany = vi.fn(async (_args: unknown) => [] as unknown[]);
 const automationUpdate = vi.fn(async (_args: unknown) => ({}));
 const dependencyFindMany = vi.fn(async (_args: unknown) => [] as unknown[]);
 const activityCreateMany = vi.fn(async (_args: unknown) => ({ count: 0 }));
+const followFindMany = vi.fn(async (_args: unknown) => [] as unknown[]);
 const taskUpdate = vi.fn(async (_args: unknown) => ({}));
 
 vi.mock("@polaris/db", () => ({
@@ -24,7 +25,8 @@ vi.mock("@polaris/db", () => ({
         task: { findMany: taskFindMany, update: taskUpdate },
         taskAutomation: { findMany: automationFindMany, update: automationUpdate },
         taskDependency: { findMany: dependencyFindMany },
-        activity: { createMany: activityCreateMany }
+        activity: { createMany: activityCreateMany },
+        follow: { findMany: followFindMany }
     }
 }));
 

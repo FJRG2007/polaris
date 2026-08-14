@@ -14,6 +14,7 @@
 
 import { notify } from "./dispatch";
 import { prisma } from "@polaris/db";
+import * as follow from "../follow/follow";
 import { dispatchProjectWebhooks } from "../deploy-project-service";
 
 /** What was being deployed, in words, plus where to look at it. */
@@ -98,11 +99,20 @@ export async function notifyDeployFinished(input: {
             ? `${deployable.label} is serving the new release.`
             : summarize(deployment.error);
 
-        // The owner, plus whoever triggered it when that is somebody else - each
-        // by their own rules, so one person's muted webhook does not silence the
-        // other's.
+        // The owner, plus whoever triggered it when that is somebody else, plus
+        // anybody following the service - each by their own rules, so one
+        // person's muted webhook does not silence the other's.
+        //
+        // The followers are why this exists as more than the owner's alert: the
+        // person who spent the afternoon on a service, or who asked to be told
+        // when it came back up, is not necessarily either of the first two.
         const recipients = new Set([input.ownerId]);
         if (deployment.triggeredById) recipients.add(deployment.triggeredById);
+        if (deployment.deployableType === "application") {
+            for (const userId of await follow.followers("service", deployment.deployableId)) {
+                recipients.add(userId);
+            }
+        }
 
         for (const userId of recipients) {
             await notify({
