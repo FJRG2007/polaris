@@ -137,7 +137,8 @@ function readFile(name: string, text: string): VaultItem[] {
     }
     return rows.map((row) => {
         const item = emptyItem(core.CIPHER_LOGIN);
-        item.name = (at.name >= 0 ? row[at.name] : "") || row[at.uri >= 0 ? at.uri : 0] || "Untitled";
+        item.name =
+            (at.name >= 0 ? row[at.name] : "") || row[at.uri >= 0 ? at.uri : 0] || "Untitled";
         item.login.username = at.username >= 0 ? (row[at.username] ?? "") : "";
         item.login.password = at.password >= 0 ? (row[at.password] ?? "") : "";
         item.login.totp = at.totp >= 0 ? (row[at.totp] ?? "") : "";

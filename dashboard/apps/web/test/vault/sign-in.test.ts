@@ -120,7 +120,10 @@ describe("vaultSignIn", () => {
     });
 
     it("refuses a banned account without checking anything else", async () => {
-        findFirst.mockResolvedValueOnce({ ...ACCOUNT, user: { bannedAt: new Date(), twoFactorEnabled: false } });
+        findFirst.mockResolvedValueOnce({
+            ...ACCOUNT,
+            user: { bannedAt: new Date(), twoFactorEnabled: false }
+        });
         expect(await vaultSignIn(INPUT)).toEqual({ ok: false, kind: "invalid" });
         expect(verifyPassword).not.toHaveBeenCalled();
     });
@@ -132,13 +135,19 @@ describe("vaultSignIn", () => {
     });
 
     it("asks for a second factor when the account has one armed", async () => {
-        findFirst.mockResolvedValueOnce({ ...ACCOUNT, user: { bannedAt: null, twoFactorEnabled: true } });
+        findFirst.mockResolvedValueOnce({
+            ...ACCOUNT,
+            user: { bannedAt: null, twoFactorEnabled: true }
+        });
         const result = await vaultSignIn(INPUT);
         expect(result).toMatchObject({ ok: false, kind: "two_factor", providers: [0] });
     });
 
     it("refuses a wrong code the same way it refuses a missing one", async () => {
-        findFirst.mockResolvedValue({ ...ACCOUNT, user: { bannedAt: null, twoFactorEnabled: true } });
+        findFirst.mockResolvedValue({
+            ...ACCOUNT,
+            user: { bannedAt: null, twoFactorEnabled: true }
+        });
         verifyTotp.mockResolvedValueOnce(false);
         const result = await vaultSignIn({ ...INPUT, twoFactorToken: "000000" });
         expect(result).toMatchObject({ ok: false, kind: "two_factor" });
@@ -148,7 +157,10 @@ describe("vaultSignIn", () => {
     it("does not clear the counters for a password that was right but a code that was not", async () => {
         // Otherwise a correct password would buy an unlimited number of guesses
         // at the six digits, which is the whole of the second factor.
-        findFirst.mockResolvedValue({ ...ACCOUNT, user: { bannedAt: null, twoFactorEnabled: true } });
+        findFirst.mockResolvedValue({
+            ...ACCOUNT,
+            user: { bannedAt: null, twoFactorEnabled: true }
+        });
         verifyTotp.mockResolvedValueOnce(false);
         await vaultSignIn({ ...INPUT, twoFactorToken: "000000" });
         expect(resetRateLimit).not.toHaveBeenCalled();
@@ -165,7 +177,10 @@ describe("vaultSignIn", () => {
     });
 
     it("caps the codes one attempt can spend even when the password is right", async () => {
-        findFirst.mockResolvedValue({ ...ACCOUNT, user: { bannedAt: null, twoFactorEnabled: true } });
+        findFirst.mockResolvedValue({
+            ...ACCOUNT,
+            user: { bannedAt: null, twoFactorEnabled: true }
+        });
         rateLimit
             .mockResolvedValueOnce({ ok: true })
             .mockResolvedValueOnce({ ok: true })

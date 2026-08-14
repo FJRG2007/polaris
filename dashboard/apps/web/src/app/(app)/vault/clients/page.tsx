@@ -27,7 +27,8 @@ export default async function VaultClientsPage() {
     // works from inside the house is not one to paste into a phone.
     const base = await sharingBaseUrl();
     const serverUrl = `${base}/vault`;
-    const insecure = !serverUrl.startsWith("https://") && !loadEnv().POLARIS_APP_URL.includes("localhost");
+    const insecure =
+        !serverUrl.startsWith("https://") && !loadEnv().POLARIS_APP_URL.includes("localhost");
 
     return (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
@@ -133,15 +134,29 @@ export default async function VaultClientsPage() {
                     </p>
                     <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 font-mono text-xs">
                         <dt className="text-muted-foreground">Web vault</dt>
-                        <dd className="truncate" title={serverUrl}>{serverUrl}</dd>
+                        <dd className="truncate" title={serverUrl}>
+                            {serverUrl}
+                        </dd>
                         <dt className="text-muted-foreground">API</dt>
-                        <dd className="truncate" title={`${serverUrl}/api`}>{`${serverUrl}/api`}</dd>
+                        <dd
+                            className="truncate"
+                            title={`${serverUrl}/api`}
+                        >{`${serverUrl}/api`}</dd>
                         <dt className="text-muted-foreground">Identity</dt>
-                        <dd className="truncate" title={`${serverUrl}/identity`}>{`${serverUrl}/identity`}</dd>
+                        <dd
+                            className="truncate"
+                            title={`${serverUrl}/identity`}
+                        >{`${serverUrl}/identity`}</dd>
                         <dt className="text-muted-foreground">Icons</dt>
-                        <dd className="truncate" title={`${serverUrl}/icons`}>{`${serverUrl}/icons`}</dd>
+                        <dd
+                            className="truncate"
+                            title={`${serverUrl}/icons`}
+                        >{`${serverUrl}/icons`}</dd>
                         <dt className="text-muted-foreground">Notifications</dt>
-                        <dd className="truncate" title={`${serverUrl}/notifications`}>{`${serverUrl}/notifications`}</dd>
+                        <dd
+                            className="truncate"
+                            title={`${serverUrl}/notifications`}
+                        >{`${serverUrl}/notifications`}</dd>
                     </dl>
                 </CardBody>
             </Card>
@@ -157,12 +172,12 @@ export default async function VaultClientsPage() {
                         one you sign in to Polaris with.
                     </p>
                     <p>
-                        Two-step login uses the authenticator on your Polaris account, so a code from
-                        it is what an app will ask for.
+                        Two-step login uses the authenticator on your Polaris account, so a code
+                        from it is what an app will ask for.
                     </p>
                     <p>
-                        Icons for saved sites are fetched by this server rather than by Bitwarden, so
-                        the list of sites you have accounts on stays here.
+                        Icons for saved sites are fetched by this server rather than by Bitwarden,
+                        so the list of sites you have accounts on stays here.
                     </p>
                     <p className="flex items-center gap-1">
                         <ExternalLink className="size-3" />

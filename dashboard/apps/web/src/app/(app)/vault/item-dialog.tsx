@@ -35,7 +35,10 @@ const TYPE_OPTIONS = core.CIPHER_TYPES.map((type) => ({
 
 /** Turn a field key like `postalCode` into "Postal code". */
 function humanize(field: string): string {
-    const spaced = field.replace(/([A-Z])/g, " $1").toLowerCase().trim();
+    const spaced = field
+        .replace(/([A-Z])/g, " $1")
+        .toLowerCase()
+        .trim();
     return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
@@ -137,7 +140,9 @@ export function ItemDialog({
                                 <Input
                                     value={draft.login.username}
                                     onChange={(event) =>
-                                        patch({ login: { ...draft.login, username: event.target.value } })
+                                        patch({
+                                            login: { ...draft.login, username: event.target.value }
+                                        })
                                     }
                                     autoComplete="off"
                                 />
@@ -150,7 +155,10 @@ export function ItemDialog({
                                         value={draft.login.password}
                                         onChange={(event) =>
                                             patch({
-                                                login: { ...draft.login, password: event.target.value }
+                                                login: {
+                                                    ...draft.login,
+                                                    password: event.target.value
+                                                }
                                             })
                                         }
                                         autoComplete="off"
@@ -161,7 +169,9 @@ export function ItemDialog({
                                         size="icon"
                                         variant="secondary"
                                         title={revealed ? "Hide" : "Show"}
-                                        aria-label={revealed ? "Hide the password" : "Show the password"}
+                                        aria-label={
+                                            revealed ? "Hide the password" : "Show the password"
+                                        }
                                         onClick={() => setRevealed((prev) => !prev)}
                                     >
                                         {revealed ? (
@@ -220,7 +230,9 @@ export function ItemDialog({
                                 <Input
                                     value={draft.login.totp}
                                     onChange={(event) =>
-                                        patch({ login: { ...draft.login, totp: event.target.value } })
+                                        patch({
+                                            login: { ...draft.login, totp: event.target.value }
+                                        })
                                     }
                                     placeholder="The secret, or the whole otpauth:// link"
                                     autoComplete="off"
@@ -232,7 +244,9 @@ export function ItemDialog({
                                 <Input
                                     value={draft.login.uris[0] ?? ""}
                                     onChange={(event) =>
-                                        patch({ login: { ...draft.login, uris: [event.target.value] } })
+                                        patch({
+                                            login: { ...draft.login, uris: [event.target.value] }
+                                        })
                                     }
                                     placeholder="https://example.com"
                                     autoComplete="off"
@@ -248,7 +262,12 @@ export function ItemDialog({
                                 <Input
                                     value={draft.card.cardholderName}
                                     onChange={(event) =>
-                                        patch({ card: { ...draft.card, cardholderName: event.target.value } })
+                                        patch({
+                                            card: {
+                                                ...draft.card,
+                                                cardholderName: event.target.value
+                                            }
+                                        })
                                     }
                                 />
                             </label>
@@ -257,7 +276,9 @@ export function ItemDialog({
                                 <Input
                                     value={draft.card.number}
                                     onChange={(event) =>
-                                        patch({ card: { ...draft.card, number: event.target.value } })
+                                        patch({
+                                            card: { ...draft.card, number: event.target.value }
+                                        })
                                     }
                                     className="font-mono"
                                     autoComplete="off"
@@ -269,7 +290,12 @@ export function ItemDialog({
                                     <Input
                                         value={draft.card.expMonth}
                                         onChange={(event) =>
-                                            patch({ card: { ...draft.card, expMonth: event.target.value } })
+                                            patch({
+                                                card: {
+                                                    ...draft.card,
+                                                    expMonth: event.target.value
+                                                }
+                                            })
                                         }
                                         placeholder="MM"
                                     />
@@ -279,7 +305,9 @@ export function ItemDialog({
                                     <Input
                                         value={draft.card.expYear}
                                         onChange={(event) =>
-                                            patch({ card: { ...draft.card, expYear: event.target.value } })
+                                            patch({
+                                                card: { ...draft.card, expYear: event.target.value }
+                                            })
                                         }
                                         placeholder="YYYY"
                                     />
@@ -290,7 +318,9 @@ export function ItemDialog({
                                         type={revealed ? "text" : "password"}
                                         value={draft.card.code}
                                         onChange={(event) =>
-                                            patch({ card: { ...draft.card, code: event.target.value } })
+                                            patch({
+                                                card: { ...draft.card, code: event.target.value }
+                                            })
                                         }
                                         autoComplete="off"
                                     />
@@ -329,7 +359,12 @@ export function ItemDialog({
                                     rows={6}
                                     value={draft.sshKey.privateKey}
                                     onChange={(event) =>
-                                        patch({ sshKey: { ...draft.sshKey, privateKey: event.target.value } })
+                                        patch({
+                                            sshKey: {
+                                                ...draft.sshKey,
+                                                privateKey: event.target.value
+                                            }
+                                        })
                                     }
                                     spellCheck={false}
                                     className="font-mono text-xs"
@@ -341,7 +376,12 @@ export function ItemDialog({
                                     rows={3}
                                     value={draft.sshKey.publicKey}
                                     onChange={(event) =>
-                                        patch({ sshKey: { ...draft.sshKey, publicKey: event.target.value } })
+                                        patch({
+                                            sshKey: {
+                                                ...draft.sshKey,
+                                                publicKey: event.target.value
+                                            }
+                                        })
                                     }
                                     spellCheck={false}
                                     className="font-mono text-xs"
@@ -387,7 +427,9 @@ export function ItemDialog({
                                     onChange={(event) =>
                                         patch({
                                             fields: draft.fields.map((entry, at) =>
-                                                at === index ? { ...entry, name: event.target.value } : entry
+                                                at === index
+                                                    ? { ...entry, name: event.target.value }
+                                                    : entry
                                             )
                                         })
                                     }
@@ -395,11 +437,17 @@ export function ItemDialog({
                                 <Input
                                     value={field.value}
                                     placeholder="Value"
-                                    type={field.type === core.FIELD_HIDDEN && !revealed ? "password" : "text"}
+                                    type={
+                                        field.type === core.FIELD_HIDDEN && !revealed
+                                            ? "password"
+                                            : "text"
+                                    }
                                     onChange={(event) =>
                                         patch({
                                             fields: draft.fields.map((entry, at) =>
-                                                at === index ? { ...entry, value: event.target.value } : entry
+                                                at === index
+                                                    ? { ...entry, value: event.target.value }
+                                                    : entry
                                             )
                                         })
                                     }
@@ -408,7 +456,9 @@ export function ItemDialog({
                                     type="button"
                                     size="icon"
                                     variant="ghost"
-                                    title={field.type === core.FIELD_HIDDEN ? "Show as text" : "Hide"}
+                                    title={
+                                        field.type === core.FIELD_HIDDEN ? "Show as text" : "Hide"
+                                    }
                                     aria-label="Toggle whether this field is hidden"
                                     onClick={() =>
                                         patch({
@@ -439,7 +489,9 @@ export function ItemDialog({
                                     title="Remove this field"
                                     aria-label="Remove this field"
                                     onClick={() =>
-                                        patch({ fields: draft.fields.filter((_, at) => at !== index) })
+                                        patch({
+                                            fields: draft.fields.filter((_, at) => at !== index)
+                                        })
                                     }
                                 >
                                     <X className="size-4" />

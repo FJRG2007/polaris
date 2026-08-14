@@ -58,7 +58,13 @@ export default async function SharePage({
     await noteActivity(session?.session?.id);
 
     const share = await resolveShareByToken(token);
-    if (!share) return <LinkUnavailable signedIn={signedIn} message="This link does not exist or has been removed." />;
+    if (!share)
+        return (
+            <LinkUnavailable
+                signedIn={signedIn}
+                message="This link does not exist or has been removed."
+            />
+        );
 
     const usable = shareUsability(share);
     if (!usable.ok) {
@@ -75,13 +81,28 @@ export default async function SharePage({
     // download endpoints would refuse: IP allowlist, geo, then the fraud check.
     const ip = await clientIp();
     if (!shareIpAllowed(share.allowedCidrs, ip)) {
-        return <LinkUnavailable signedIn={signedIn} message="This link is not available from your network." />;
+        return (
+            <LinkUnavailable
+                signedIn={signedIn}
+                message="This link is not available from your network."
+            />
+        );
     }
     if (!(await shareGeoAllowed(share.allowedCountries, share.allowedContinents, ip))) {
-        return <LinkUnavailable signedIn={signedIn} message="This link is not available from your location." />;
+        return (
+            <LinkUnavailable
+                signedIn={signedIn}
+                message="This link is not available from your location."
+            />
+        );
     }
     if (!(await dymoIpAllowed(ip)).allowed) {
-        return <LinkUnavailable signedIn={signedIn} message="This link is not available from your network." />;
+        return (
+            <LinkUnavailable
+                signedIn={signedIn}
+                message="This link is not available from your network."
+            />
+        );
     }
 
     if (share.passwordHash) {

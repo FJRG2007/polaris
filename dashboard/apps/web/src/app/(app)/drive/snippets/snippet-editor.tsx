@@ -69,10 +69,7 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
     const [copied, setCopied] = useState(false);
 
     const current = files[active] ?? files[0]!;
-    const used = useMemo(
-        () => files.reduce((total, file) => total + file.body.length, 0),
-        [files]
-    );
+    const used = useMemo(() => files.reduce((total, file) => total + file.body.length, 0), [files]);
 
     function patchFile(index: number, patch: Partial<EditorFile>): void {
         setFiles((prev) => prev.map((file, at) => (at === index ? { ...file, ...patch } : file)));
@@ -327,9 +324,9 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                                 <span>
                                     Seal it in this browser
                                     <span className="block text-xs text-muted-foreground">
-                                        The key goes in the link and never reaches the server. Polaris
-                                        cannot preview, search or recover it, and a lost link is a lost
-                                        snippet.
+                                        The key goes in the link and never reaches the server.
+                                        Polaris cannot preview, search or recover it, and a lost
+                                        link is a lost snippet.
                                     </span>
                                 </span>
                             </label>
@@ -345,7 +342,11 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                     <Link href="/drive/snippets">Cancel</Link>
                 </Button>
                 <Button type="submit" disabled={pending}>
-                    {pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                    {pending ? (
+                        <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                        <Save className="size-4" />
+                    )}
                     {editing ? "Save changes" : "Create snippet"}
                 </Button>
             </div>

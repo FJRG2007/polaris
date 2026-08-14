@@ -28,8 +28,18 @@ const handler = vi.fn(async () => Response.json({ ok: true }));
 
 const ROUTES = [
     { method: "GET" as const, path: "api/sync", auth: "bearer" as const, handle: handler },
-    { method: "POST" as const, path: "identity/connect/token", auth: "none" as const, handle: handler },
-    { method: "GET" as const, path: "api/ciphers/:id/details", auth: "bearer" as const, handle: handler }
+    {
+        method: "POST" as const,
+        path: "identity/connect/token",
+        auth: "none" as const,
+        handle: handler
+    },
+    {
+        method: "GET" as const,
+        path: "api/ciphers/:id/details",
+        auth: "bearer" as const,
+        handle: handler
+    }
 ];
 
 function request(method: string, url = "https://polaris.test/vault/api/sync"): Request {
@@ -68,7 +78,12 @@ describe("dispatchVault", () => {
 
     it("captures the named segments", async () => {
         authenticate.mockResolvedValue({ userId: "user-1" });
-        await router.dispatchVault(ROUTES, request("GET"), ["api", "ciphers", "abc-123", "details"]);
+        await router.dispatchVault(ROUTES, request("GET"), [
+            "api",
+            "ciphers",
+            "abc-123",
+            "details"
+        ]);
         expect(handler.mock.calls[0]?.[0].params).toEqual({ id: "abc-123" });
     });
 
@@ -99,7 +114,11 @@ describe("dispatchVault", () => {
     });
 
     it("does not match a path with the wrong number of segments", async () => {
-        const response = await router.dispatchVault(ROUTES, request("GET"), ["api", "sync", "extra"]);
+        const response = await router.dispatchVault(ROUTES, request("GET"), [
+            "api",
+            "sync",
+            "extra"
+        ]);
         expect(response.status).toBe(404);
     });
 });

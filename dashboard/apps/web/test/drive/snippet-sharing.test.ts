@@ -117,9 +117,16 @@ describe("shareSnippet", () => {
     });
 
     it("mints a token the first time a private snippet is shared", async () => {
-        findFirst.mockResolvedValueOnce({ visibility: "private", tokenHash: null, revokedAt: null });
+        findFirst.mockResolvedValueOnce({
+            visibility: "private",
+            tokenHash: null,
+            revokedAt: null
+        });
         const result = await shareSnippet(OWNER, SNIPPET, { visibility: "link" });
-        expect(result).toEqual({ ok: true, url: expect.stringContaining("https://polaris.test/p/") });
+        expect(result).toEqual({
+            ok: true,
+            url: expect.stringContaining("https://polaris.test/p/")
+        });
         expect(lastUpdate().tokenHash).toEqual(expect.any(String));
     });
 
@@ -159,7 +166,11 @@ describe("shareSnippet", () => {
 
     it("turning burning on overrides a view cap sent with it", async () => {
         findFirst.mockResolvedValueOnce({ visibility: "link", tokenHash: null, revokedAt: null });
-        await shareSnippet(OWNER, SNIPPET, { visibility: "link", burnAfterRead: true, maxViews: 20 });
+        await shareSnippet(OWNER, SNIPPET, {
+            visibility: "link",
+            burnAfterRead: true,
+            maxViews: 20
+        });
         expect(lastUpdate().maxViews).toBe(1);
     });
 

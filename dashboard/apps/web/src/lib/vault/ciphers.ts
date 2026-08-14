@@ -151,7 +151,11 @@ export async function reachableCipherFilter(userId: string) {
                 ? [
                       {
                           collections: {
-                              some: { collection: { members: { some: { orgUserId: { in: memberIds } } } } }
+                              some: {
+                                  collection: {
+                                      members: { some: { orgUserId: { in: memberIds } } }
+                                  }
+                              }
                           }
                       }
                   ]
@@ -178,7 +182,10 @@ const CIPHER_SELECT = {
 /** Every item this account can see, trash included - clients draw the trash. */
 export async function listCiphers(userId: string) {
     const [rows, favorites] = await Promise.all([
-        prisma.vaultCipher.findMany({ where: await reachableCipherFilter(userId), select: CIPHER_SELECT }),
+        prisma.vaultCipher.findMany({
+            where: await reachableCipherFilter(userId),
+            select: CIPHER_SELECT
+        }),
         prisma.vaultFavorite.findMany({ where: { userId }, select: { cipherId: true } })
     ]);
     const starred = new Set(favorites.map((row) => row.cipherId));
@@ -218,7 +225,10 @@ async function mayWrite(userId: string, cipherId: string): Promise<boolean> {
                                   some: {
                                       collection: {
                                           members: {
-                                              some: { orgUserId: { in: memberIds }, readOnly: false }
+                                              some: {
+                                                  orgUserId: { in: memberIds },
+                                                  readOnly: false
+                                              }
                                           }
                                       }
                                   }
@@ -381,9 +391,7 @@ export async function setFavorite(
     favorite: boolean
 ): Promise<void> {
     if (favorite) {
-        await prisma.vaultFavorite
-            .create({ data: { userId, cipherId } })
-            .catch(() => undefined);
+        await prisma.vaultFavorite.create({ data: { userId, cipherId } }).catch(() => undefined);
         return;
     }
     await prisma.vaultFavorite.deleteMany({ where: { userId, cipherId } });

@@ -53,7 +53,11 @@ export async function seal(plaintext: string, rawKey: string): Promise<string> {
     const key = await importKey(rawKey, "encrypt");
     const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
     const sealed = new Uint8Array(
-        await crypto.subtle.encrypt({ name: ALGORITHM, iv }, key, new TextEncoder().encode(plaintext))
+        await crypto.subtle.encrypt(
+            { name: ALGORITHM, iv },
+            key,
+            new TextEncoder().encode(plaintext)
+        )
     );
     const payload = new Uint8Array(iv.length + sealed.length);
     payload.set(iv, 0);

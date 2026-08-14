@@ -18,7 +18,10 @@ import { AccountInput } from "@/components/account-input";
 import { useFormChanged } from "@/lib/use-form-changed";
 import { useDisplayFormat } from "@/components/display-format";
 import { ArrowLeft, Check, Copy, EyeOff, Loader2, Save } from "lucide-react";
-import { revealTextRequestLinkAction, updateTextRequestAction } from "@/app/(app)/drive/drop-points/text-request-actions";
+import {
+    revealTextRequestLinkAction,
+    updateTextRequestAction
+} from "@/app/(app)/drive/drop-points/text-request-actions";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Textarea } from "@polaris/ui";
 
 export interface CollectedRow {
@@ -156,23 +159,35 @@ export function TextDropPointDetail({
                             Drop points
                         </Link>
                     </Button>
-                    <h1 className="truncate text-lg font-semibold" title={request.title}>{request.title}</h1>
+                    <h1 className="truncate text-lg font-semibold" title={request.title}>
+                        {request.title}
+                    </h1>
                     <p className="text-sm text-muted-foreground">
                         {request.submissionCount}
-                        {request.maxSubmissions !== null ? `/${request.maxSubmissions}` : ""} collected
+                        {request.maxSubmissions !== null ? `/${request.maxSubmissions}` : ""}{" "}
+                        collected
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
                     {request.revokedAt ? <Badge variant="neutral">Closed</Badge> : null}
                     <Button size="sm" variant="secondary" onClick={onCopyLink}>
-                        {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+                        {copied ? (
+                            <Check className="size-4 text-success" />
+                        ) : (
+                            <Copy className="size-4" />
+                        )}
                         Copy link
                     </Button>
                 </div>
             </div>
 
             {link ? (
-                <Input readOnly value={link} className="font-mono text-xs" aria-label="Drop point link" />
+                <Input
+                    readOnly
+                    value={link}
+                    className="font-mono text-xs"
+                    aria-label="Drop point link"
+                />
             ) : null}
 
             <Card>
@@ -203,8 +218,8 @@ export function TextDropPointDetail({
                                                 ) : null}
                                             </p>
                                             <p className="truncate text-xs text-muted-foreground">
-                                                {row.from ?? "Anonymous"} - {formatBytes(row.size)} -{" "}
-                                                {format.dateTime(row.at)}
+                                                {row.from ?? "Anonymous"} - {formatBytes(row.size)}{" "}
+                                                - {format.dateTime(row.at)}
                                             </p>
                                         </div>
                                     </Link>
@@ -256,7 +271,9 @@ export function TextDropPointDetail({
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <label className="flex flex-col gap-1 text-sm">
-                                {request.hasPassword ? "Change the password" : "Password (optional)"}
+                                {request.hasPassword
+                                    ? "Change the password"
+                                    : "Password (optional)"}
                                 <Input
                                     name="password"
                                     type="password"
@@ -308,8 +325,8 @@ export function TextDropPointDetail({
                             <span>
                                 Let them seal it in their browser
                                 <span className="block text-xs text-muted-foreground">
-                                    Then Polaris cannot read it either, and they have to send you the
-                                    key separately.
+                                    Then Polaris cannot read it either, and they have to send you
+                                    the key separately.
                                 </span>
                             </span>
                         </label>

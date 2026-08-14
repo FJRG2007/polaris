@@ -182,8 +182,7 @@ export function VaultSettings({
                         card: item.type === core.CIPHER_CARD ? item.card : undefined,
                         identity: item.type === core.CIPHER_IDENTITY ? item.identity : undefined,
                         sshKey: item.type === core.CIPHER_SSH_KEY ? item.sshKey : undefined,
-                        secureNote:
-                            item.type === core.CIPHER_SECURE_NOTE ? { type: 0 } : undefined
+                        secureNote: item.type === core.CIPHER_SECURE_NOTE ? { type: 0 } : undefined
                     }))
             };
 
@@ -291,7 +290,10 @@ export function VaultSettings({
                         {done ? <p className="text-sm text-success">{done}</p> : null}
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <div className="flex justify-end">
-                            <Button type="submit" disabled={pending !== null || current.length === 0}>
+                            <Button
+                                type="submit"
+                                disabled={pending !== null || current.length === 0}
+                            >
                                 {pending === "password" ? (
                                     <Loader2 className="size-4 animate-spin" />
                                 ) : null}
@@ -338,7 +340,12 @@ export function VaultSettings({
                         onClick={async () => {
                             setError(null);
                             setPending("unlock");
-                            const key = await crypto.unlockVaultKey(current, email, kdf, protectedKey);
+                            const key = await crypto.unlockVaultKey(
+                                current,
+                                email,
+                                kdf,
+                                protectedKey
+                            );
                             setPending(null);
                             if (!key) {
                                 setError("That is not your master password.");
@@ -365,8 +372,8 @@ export function VaultSettings({
                 </CardHeader>
                 <CardBody className="flex flex-wrap items-center justify-between gap-3">
                     <p className="max-w-md text-sm text-muted-foreground">
-                        A plain JSON file every password manager can read. It holds your passwords in
-                        the clear, which is what makes it portable.
+                        A plain JSON file every password manager can read. It holds your passwords
+                        in the clear, which is what makes it portable.
                     </p>
                     <Button variant="secondary" onClick={onExport} disabled={pending !== null}>
                         {pending === "export" ? (

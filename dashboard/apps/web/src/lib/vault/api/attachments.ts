@@ -41,7 +41,8 @@ export async function beginUpload(context: VaultContext): Promise<Response> {
     const size = Number(body?.fileSize ?? 0);
 
     if (!isEncString(fileName)) return vaultError("The file name must be encrypted.", 400);
-    if (key !== null && !isEncString(key)) return vaultError("The file key must be encrypted.", 400);
+    if (key !== null && !isEncString(key))
+        return vaultError("The file key must be encrypted.", 400);
     if (!Number.isFinite(size) || size <= 0) return vaultError("Invalid file size", 400);
     if (size > blobs.MAX_BLOB_BYTES) {
         return vaultError("That file is larger than this server accepts.", 413);

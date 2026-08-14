@@ -36,7 +36,15 @@ export const WEBHOOK_FORMATS = ["discord", "slack", "generic"] as const;
 export type WebhookFormat = (typeof WEBHOOK_FORMATS)[number];
 
 /** The groups the settings page renders events under. */
-export const NOTIFICATION_GROUPS = ["deploy", "watch", "tasks", "security", "drive", "network", "system"] as const;
+export const NOTIFICATION_GROUPS = [
+    "deploy",
+    "watch",
+    "tasks",
+    "security",
+    "drive",
+    "network",
+    "system"
+] as const;
 
 export type NotificationGroup = (typeof NOTIFICATION_GROUPS)[number];
 
@@ -64,7 +72,7 @@ export interface NotificationEventInfo {
     /** Always reaches the bell, whatever the rule says. */
     critical?: boolean;
     /** Where the rule starts before anyone changes it. */
-    defaults: { inapp: boolean; email: boolean; };
+    defaults: { inapp: boolean; email: boolean };
 }
 
 export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
@@ -336,7 +344,10 @@ export function defaultRule(event: NotificationEventInfo): NotificationRule {
  * default. A critical event always keeps the bell, so muting one can silence
  * mail and webhooks but never the record itself.
  */
-export function resolveRule(preferences: NotificationPreferences, eventId: string): NotificationRule {
+export function resolveRule(
+    preferences: NotificationPreferences,
+    eventId: string
+): NotificationRule {
     const event = EVENT_BY_ID.get(eventId);
     if (!event) return { inapp: true, email: false, destinations: [] };
     const saved = preferences[eventId];
@@ -352,7 +363,9 @@ export function isMuted(rule: NotificationRule): boolean {
 
 /** Parse the stored JSON blob, tolerating anything that is no longer valid -
  *  a rule naming a deleted event just stops applying. */
-export function parseNotificationPreferences(raw: string | null | undefined): NotificationPreferences {
+export function parseNotificationPreferences(
+    raw: string | null | undefined
+): NotificationPreferences {
     if (!raw) return {};
     try {
         const parsed = notificationPreferencesSchema.safeParse(JSON.parse(raw));
@@ -406,7 +419,8 @@ export function detectWebhookFormat(url: string): WebhookFormat {
     } catch {
         return "generic";
     }
-    if (host === "discord.com" || host.endsWith(".discord.com") || host.endsWith("discordapp.com")) return "discord";
+    if (host === "discord.com" || host.endsWith(".discord.com") || host.endsWith("discordapp.com"))
+        return "discord";
     if (host === "slack.com" || host.endsWith(".slack.com")) return "slack";
     return "generic";
 }
@@ -419,7 +433,12 @@ export function detectWebhookFormat(url: string): WebhookFormat {
 export function maskWebhookUrl(url: string): string {
     try {
         const parsed = new URL(url);
-        const tail = parsed.pathname.replace(/\/+$/, "").split("/").filter(Boolean).slice(0, 2).join("/");
+        const tail = parsed.pathname
+            .replace(/\/+$/, "")
+            .split("/")
+            .filter(Boolean)
+            .slice(0, 2)
+            .join("/");
         return tail ? `${parsed.host}/${tail}/...` : parsed.host;
     } catch {
         return "webhook";

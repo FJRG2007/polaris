@@ -20,7 +20,12 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import { Check, Copy, Loader2, Plus, SendHorizontal, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardBody, Input, Select, Textarea } from "@polaris/ui";
-import { createSendAction, deleteSendAction, vaultContentsAction, type VaultState } from "../vault-actions";
+import {
+    createSendAction,
+    deleteSendAction,
+    vaultContentsAction,
+    type VaultState
+} from "../vault-actions";
 
 /** How long a Send lasts unless somebody says otherwise. */
 const EXPIRY_OPTIONS = [
@@ -117,7 +122,9 @@ export function SendsView({ state }: { state: VaultState }) {
                 setError(result.error ?? "That send could not be created.");
                 return;
             }
-            setLink(`${result.url}#${crypto.toBase64(urlKey).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`);
+            setLink(
+                `${result.url}#${crypto.toBase64(urlKey).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`
+            );
             setCopied(false);
             event.currentTarget.reset();
             await load(key);
@@ -172,8 +179,8 @@ export function SendsView({ state }: { state: VaultState }) {
                 <Card>
                     <CardBody className="flex flex-col gap-2">
                         <p className="text-sm">
-                            Copy this now. It is the only time it is shown, and the part after the
-                            # is what opens it.
+                            Copy this now. It is the only time it is shown, and the part after the #
+                            is what opens it.
                         </p>
                         <div className="flex items-center gap-2">
                             <Input readOnly value={link} className="font-mono text-xs" />
@@ -223,7 +230,12 @@ export function SendsView({ state }: { state: VaultState }) {
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
                                 Max views
-                                <Input name="maxViews" type="number" min="1" placeholder="Unlimited" />
+                                <Input
+                                    name="maxViews"
+                                    type="number"
+                                    min="1"
+                                    placeholder="Unlimited"
+                                />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
                                 Password

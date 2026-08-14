@@ -160,7 +160,13 @@ export const IMPLIED_PERMISSIONS: Readonly<Partial<Record<Permission, readonly P
     // Whoever may deploy anything on this machine may already run a game server
     // on it, so the game-server grants ride along - which also means an operator
     // who set their roles up before these existed does not have to redo them.
-    "deploy.manage": ["deploy.read", "games.read", "games.moderate", "games.console", "games.manage"],
+    "deploy.manage": [
+        "deploy.read",
+        "games.read",
+        "games.moderate",
+        "games.console",
+        "games.manage"
+    ],
     "deploy.read": ["games.read"],
     "games.moderate": ["games.read"],
     "games.console": ["games.read"],
@@ -196,10 +202,7 @@ export function expandPermissions(granted: Iterable<Permission>): Permission[] {
  * wildcard grant short-circuits to true, which is how the admin role implies
  * everything without enumerating each key.
  */
-export function hasPermission(
-    granted: Iterable<GrantedPermission>,
-    required: Permission
-): boolean {
+export function hasPermission(granted: Iterable<GrantedPermission>, required: Permission): boolean {
     for (const grant of granted) {
         if (grant === ALL_PERMISSIONS || grant === required) return true;
     }

@@ -42,7 +42,12 @@ export const snippetFileName = z
     .string()
     .trim()
     .max(MAX_SNIPPET_FILE_NAME)
-    .transform((value) => value.replace(/[\\/]+/g, " ").replace(/\s+/g, " ").trim())
+    .transform((value) =>
+        value
+            .replace(/[\\/]+/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+    )
     .refine((value) => value.length > 0, { message: "A file needs a name" });
 
 export const snippetFileSchema = z.object({
@@ -66,7 +71,8 @@ const snippetFiles = z
     .min(1, "A snippet needs at least one file")
     .max(MAX_SNIPPET_FILES)
     .refine(
-        (files) => files.reduce((total, file) => total + file.body.length, 0) <= MAX_SNIPPET_TOTAL_CHARS,
+        (files) =>
+            files.reduce((total, file) => total + file.body.length, 0) <= MAX_SNIPPET_TOTAL_CHARS,
         { message: "This snippet is too large" }
     );
 

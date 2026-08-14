@@ -923,9 +923,7 @@ export function FilesView({
      * pointer was never on.
      */
     function menuTargets(entry: DriveEntry): DriveEntry[] {
-        return selected.has(entry.path) && selectedEntries.length > 1
-            ? selectedEntries
-            : [entry];
+        return selected.has(entry.path) && selectedEntries.length > 1 ? selectedEntries : [entry];
     }
 
     /**
@@ -1030,9 +1028,7 @@ export function FilesView({
                         <span className="ml-auto pl-6 text-xs text-muted-foreground">F2</span>
                     </ContextMenuItem>
                 )}
-                <ContextMenuItem
-                    onSelect={() => setClipboard({ entries: targets, mode: "copy" })}
-                >
+                <ContextMenuItem onSelect={() => setClipboard({ entries: targets, mode: "copy" })}>
                     <Copy className="size-4" />
                     {many ? `Copy ${targets.length} items` : "Copy"}
                     <span className="ml-auto pl-6 text-xs text-muted-foreground">Ctrl+C</span>
@@ -1076,9 +1072,7 @@ export function FilesView({
                         for (const item of targets) onSetFavorite(item, starring);
                     }}
                 >
-                    <Star
-                        className={cn("size-4", !starring && "fill-amber-400 text-amber-400")}
-                    />
+                    <Star className={cn("size-4", !starring && "fill-amber-400 text-amber-400")} />
                     {starring ? "Add to favorites" : "Remove from favorites"}
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => setIconTargets(targets)}>
@@ -2687,7 +2681,9 @@ export function FilesView({
                                 <button
                                     key={name}
                                     type="button"
-                                    onClick={() => applyIcon(name, iconPreview?.iconColor ?? "primary")}
+                                    onClick={() =>
+                                        applyIcon(name, iconPreview?.iconColor ?? "primary")
+                                    }
                                     className={cn(
                                         "flex items-center justify-center rounded-md border p-2 transition-colors hover:bg-muted",
                                         iconPreview?.icon === name

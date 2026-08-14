@@ -17,7 +17,12 @@ import { readJsonBody, requirePrincipal, type VaultContext } from "@/lib/vault/a
 
 /** The KDF settings out of a request body, or the account's current ones. */
 function kdfFrom(
-    body: { kdf?: number; kdfIterations?: number; kdfMemory?: number | null; kdfParallelism?: number | null },
+    body: {
+        kdf?: number;
+        kdfIterations?: number;
+        kdfMemory?: number | null;
+        kdfParallelism?: number | null;
+    },
     current: core.KdfSettings
 ): core.KdfSettings {
     if (body.kdf === undefined || body.kdfIterations === undefined) return current;
@@ -166,7 +171,14 @@ export async function listDevices(context: VaultContext): Promise<Response> {
     const rows = await prisma.vaultDevice.findMany({
         where: { userId: principal.userId },
         orderBy: { revisionDate: "desc" },
-        select: { id: true, identifier: true, name: true, type: true, createdAt: true, revisionDate: true }
+        select: {
+            id: true,
+            identifier: true,
+            name: true,
+            type: true,
+            createdAt: true,
+            revisionDate: true
+        }
     });
     return Response.json({
         object: "list",

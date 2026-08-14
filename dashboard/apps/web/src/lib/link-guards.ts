@@ -68,7 +68,9 @@ export function linkUsability(limits: LinkLimits, now: Date = new Date()): LinkU
 export function parseStringList(json: string): string[] {
     try {
         const parsed = JSON.parse(json);
-        return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((value): value is string => typeof value === "string")
+            : [];
     } catch {
         return [];
     }
@@ -88,7 +90,11 @@ export async function linkGeoAllowed(
     allowedContinentsJson: string,
     ip: string | undefined
 ): Promise<boolean> {
-    return geoAllowedForIp(ip, parseStringList(allowedCountriesJson), parseStringList(allowedContinentsJson));
+    return geoAllowedForIp(
+        ip,
+        parseStringList(allowedCountriesJson),
+        parseStringList(allowedContinentsJson)
+    );
 }
 
 /** Both address rules in the order the public endpoints apply them, or null. */
@@ -158,6 +164,11 @@ export function signUnlock(scope: string, id: string, secret: string): string {
 }
 
 /** Constant-time check of an unlock cookie value against its signature. */
-export function verifyUnlock(scope: string, id: string, value: string | undefined, secret: string): boolean {
+export function verifyUnlock(
+    scope: string,
+    id: string,
+    value: string | undefined,
+    secret: string
+): boolean {
     return verifyMarker(unlockMessage(scope, id), value, secret);
 }

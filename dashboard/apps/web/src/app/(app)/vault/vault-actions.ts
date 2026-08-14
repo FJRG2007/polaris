@@ -241,7 +241,8 @@ export async function saveFolderAction(
 
 export async function deleteFolderAction(folderId: string): Promise<{ error?: string }> {
     const user = await requirePermission("vault.use");
-    if (!(await folders.deleteFolder(user.id, folderId))) return { error: "That folder is not yours." };
+    if (!(await folders.deleteFolder(user.id, folderId)))
+        return { error: "That folder is not yours." };
     revalidatePath("/vault");
     return {};
 }

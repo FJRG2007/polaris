@@ -85,8 +85,16 @@ export async function PUT(
     if (!(await dymoIpAllowed(ip)).allowed) return new Response("ip_flagged", { status: 403 });
 
     if (fileRequest.passwordHash) {
-        const cookieValue = (await cookies()).get(fileRequests.fileRequestUnlockCookie(fileRequest.id))?.value;
-        if (!fileRequests.verifyFileRequestUnlock(fileRequest.id, cookieValue, loadEnv().POLARIS_AUTH_SECRET)) {
+        const cookieValue = (await cookies()).get(
+            fileRequests.fileRequestUnlockCookie(fileRequest.id)
+        )?.value;
+        if (
+            !fileRequests.verifyFileRequestUnlock(
+                fileRequest.id,
+                cookieValue,
+                loadEnv().POLARIS_AUTH_SECRET
+            )
+        ) {
             return new Response("pin_required", { status: 401 });
         }
     }
@@ -211,9 +219,14 @@ export async function PUT(
         // Fold this upload into the browser's visitor session (the "uploaded?"
         // column), and hand back a per-file delete token so the uploader can
         // remove their own file later when the drop point allows it.
-        const visitorKey = (await cookies()).get(fileRequests.fileRequestVisitCookie(fileRequest.id))?.value;
+        const visitorKey = (await cookies()).get(
+            fileRequests.fileRequestVisitCookie(fileRequest.id)
+        )?.value;
         if (visitorKey) await fileRequests.bumpVisitUpload(fileRequest.id, visitorKey);
-        const deleteToken = fileRequests.signSubmissionDelete(submission.id, loadEnv().POLARIS_AUTH_SECRET);
+        const deleteToken = fileRequests.signSubmissionDelete(
+            submission.id,
+            loadEnv().POLARIS_AUTH_SECRET
+        );
 
         // Tell the owner. A drop point exists to collect something somebody is
         // waiting for, and until this there was nothing to say it had arrived

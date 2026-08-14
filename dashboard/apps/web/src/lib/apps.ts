@@ -251,11 +251,21 @@ const ADMIN_PLATFORM_GROUP = "Platform";
 
 export const APP_SECTIONS: Record<string, AppSection[]> = {
     drive: [
-        { label: "Overview", href: "/drive/overview", icon: LayoutDashboard, keywords: ["usage", "storage"] },
+        {
+            label: "Overview",
+            href: "/drive/overview",
+            icon: LayoutDashboard,
+            keywords: ["usage", "storage"]
+        },
         { label: "Files", href: "/drive", icon: FolderOpen, keywords: ["browse", "folders"] },
         { label: "Favorites", href: "/favorites", icon: Star, keywords: ["starred"] },
         { label: "Recent", href: "/drive/recent", icon: Clock },
-        { label: "Shared links", href: "/drive/shared-links", icon: Link2, keywords: ["shares", "public"] },
+        {
+            label: "Shared links",
+            href: "/drive/shared-links",
+            icon: Link2,
+            keywords: ["shares", "public"]
+        },
         {
             label: "Snippets",
             href: "/drive/snippets",
@@ -275,7 +285,15 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Items",
             href: "/vault",
             icon: KeyRound,
-            keywords: ["passwords", "logins", "notes", "cards", "identities", "ssh keys", "bitwarden"]
+            keywords: [
+                "passwords",
+                "logins",
+                "notes",
+                "cards",
+                "identities",
+                "ssh keys",
+                "bitwarden"
+            ]
         },
         {
             label: "Sends",
@@ -297,8 +315,18 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         }
     ],
     apps: [
-        { label: "Deploy", href: "/apps/deploy", icon: Rocket, keywords: ["projects", "services", "docker"] },
-        { label: "Marketplace", href: "/apps/marketplace", icon: Store, keywords: ["install", "catalog"] },
+        {
+            label: "Deploy",
+            href: "/apps/deploy",
+            icon: Rocket,
+            keywords: ["projects", "services", "docker"]
+        },
+        {
+            label: "Marketplace",
+            href: "/apps/marketplace",
+            icon: Store,
+            keywords: ["install", "catalog"]
+        },
         {
             label: "Game servers",
             href: "/apps/games",
@@ -366,26 +394,101 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         }
     ],
     watch: [
-        { label: "Overview", href: "/watch", icon: LayoutDashboard, keywords: ["monitoring", "health"] },
-        { label: "Servers", href: "/watch/servers", icon: Server, keywords: ["hosts", "machines", "load"] },
-        { label: "Services", href: "/watch/services", icon: Rocket, keywords: ["apps", "deploys", "cpu", "memory"] },
+        {
+            label: "Overview",
+            href: "/watch",
+            icon: LayoutDashboard,
+            keywords: ["monitoring", "health"]
+        },
+        {
+            label: "Servers",
+            href: "/watch/servers",
+            icon: Server,
+            keywords: ["hosts", "machines", "load"]
+        },
+        {
+            label: "Services",
+            href: "/watch/services",
+            icon: Rocket,
+            keywords: ["apps", "deploys", "cpu", "memory"]
+        },
         { label: "Containers", href: "/watch/containers", icon: Container, keywords: ["docker"] },
-        { label: "Alarms", href: "/watch/alarms", icon: Bell, keywords: ["thresholds", "alerts", "events"] },
-        { label: "Webhooks", href: "/watch/webhooks", icon: Webhook, keywords: ["discord", "slack", "endpoints"] }
+        {
+            label: "Alarms",
+            href: "/watch/alarms",
+            icon: Bell,
+            keywords: ["thresholds", "alerts", "events"]
+        },
+        {
+            label: "Webhooks",
+            href: "/watch/webhooks",
+            icon: Webhook,
+            keywords: ["discord", "slack", "endpoints"]
+        }
     ],
     tasks: [
-        { label: "My work", href: "/tasks", icon: ListTodo, keywords: ["home", "assigned", "todo", "my tasks"] },
-        { label: "Everything", href: "/tasks/everything", icon: LayoutGrid, keywords: ["all tasks", "across spaces"] },
-        { label: "Sprints", href: "/tasks/sprints", icon: CalendarRange, keywords: ["agile", "burndown", "iteration"] },
-        { label: "Goals", href: "/tasks/goals", icon: Target, keywords: ["okr", "objectives", "targets"] },
-        { label: "Docs", href: "/tasks/docs", icon: FileText, keywords: ["wiki", "notes", "knowledge"] },
-        { label: "Timesheet", href: "/tasks/time", icon: Timer, keywords: ["time tracking", "hours", "billable"] },
-        { label: "Reporting", href: "/tasks/reports", icon: ChartColumn, keywords: ["dashboard", "workload", "metrics"] }
+        {
+            label: "My work",
+            href: "/tasks",
+            icon: ListTodo,
+            keywords: ["home", "assigned", "todo", "my tasks"]
+        },
+        {
+            label: "Everything",
+            href: "/tasks/everything",
+            icon: LayoutGrid,
+            keywords: ["all tasks", "across spaces"]
+        },
+        {
+            label: "Sprints",
+            href: "/tasks/sprints",
+            icon: CalendarRange,
+            keywords: ["agile", "burndown", "iteration"]
+        },
+        {
+            label: "Goals",
+            href: "/tasks/goals",
+            icon: Target,
+            keywords: ["okr", "objectives", "targets"]
+        },
+        {
+            label: "Docs",
+            href: "/tasks/docs",
+            icon: FileText,
+            keywords: ["wiki", "notes", "knowledge"]
+        },
+        {
+            label: "Timesheet",
+            href: "/tasks/time",
+            icon: Timer,
+            keywords: ["time tracking", "hours", "billable"]
+        },
+        {
+            label: "Reporting",
+            href: "/tasks/reports",
+            icon: ChartColumn,
+            keywords: ["dashboard", "workload", "metrics"]
+        }
     ],
     account: [
-        { label: "Profile", href: "/account", icon: UserCog, keywords: ["name", "email", "avatar"] },
-        { label: "Preferences", href: "/account/preferences", icon: SlidersHorizontal, keywords: ["units", "language", "timezone", "week start", "calendar"] },
-        { label: "Notifications", href: "/account/notifications", icon: Bell, keywords: ["alerts", "email"] },
+        {
+            label: "Profile",
+            href: "/account",
+            icon: UserCog,
+            keywords: ["name", "email", "avatar"]
+        },
+        {
+            label: "Preferences",
+            href: "/account/preferences",
+            icon: SlidersHorizontal,
+            keywords: ["units", "language", "timezone", "week start", "calendar"]
+        },
+        {
+            label: "Notifications",
+            href: "/account/notifications",
+            icon: Bell,
+            keywords: ["alerts", "email"]
+        },
         {
             label: "Notes",
             href: "/account/notes",
@@ -470,13 +573,31 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["ip", "country", "geo"],
             group: "Security"
         },
-        { label: "API keys", href: "/account/api-keys", icon: KeyRound, keywords: ["tokens"], group: "Security" }
+        {
+            label: "API keys",
+            href: "/account/api-keys",
+            icon: KeyRound,
+            keywords: ["tokens"],
+            group: "Security"
+        }
     ],
     admin: [
         { label: "Overview", href: "/admin", icon: LayoutDashboard },
         { label: "Activity", href: "/admin/activity", icon: Activity, keywords: ["audit", "logs"] },
-        { label: "Users", href: "/admin/users", icon: Users, keywords: ["accounts", "invites"], group: ADMIN_PEOPLE_GROUP },
-        { label: "Groups", href: "/admin/groups", icon: UsersRound, keywords: ["teams"], group: ADMIN_PEOPLE_GROUP },
+        {
+            label: "Users",
+            href: "/admin/users",
+            icon: Users,
+            keywords: ["accounts", "invites"],
+            group: ADMIN_PEOPLE_GROUP
+        },
+        {
+            label: "Groups",
+            href: "/admin/groups",
+            icon: UsersRound,
+            keywords: ["teams"],
+            group: ADMIN_PEOPLE_GROUP
+        },
         {
             label: "Organizations",
             href: "/admin/organizations",
@@ -488,7 +609,15 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Roles",
             href: "/admin/roles",
             icon: IdCard,
-            keywords: ["permissions", "member", "viewer", "guest", "what they can do", "capabilities", "view as"],
+            keywords: [
+                "permissions",
+                "member",
+                "viewer",
+                "guest",
+                "what they can do",
+                "capabilities",
+                "view as"
+            ],
             group: ADMIN_ACCESS_GROUP
         },
         {
@@ -519,14 +648,31 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Inbox",
             href: "/inbox",
             icon: MessagesSquare,
-            keywords: ["conversations", "chats", "messages", "whatsapp", "telegram", "slack", "contacts"],
+            keywords: [
+                "conversations",
+                "chats",
+                "messages",
+                "whatsapp",
+                "telegram",
+                "slack",
+                "contacts"
+            ],
             group: ADMIN_COMMUNICATION_GROUP
         },
         {
             label: "Email",
             href: "/admin/email",
             icon: Mail,
-            keywords: ["smtp", "sender", "resend", "brevo", "mailjet", "ses", "outgoing", "account mail"],
+            keywords: [
+                "smtp",
+                "sender",
+                "resend",
+                "brevo",
+                "mailjet",
+                "ses",
+                "outgoing",
+                "account mail"
+            ],
             group: ADMIN_COMMUNICATION_GROUP
         },
         {
@@ -547,14 +693,31 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Agent defaults",
             href: "/admin/agents",
             icon: Bot,
-            keywords: ["agents", "quality gate", "enigma", "public", "private", "pull requests", "issues"],
+            keywords: [
+                "agents",
+                "quality gate",
+                "enigma",
+                "public",
+                "private",
+                "pull requests",
+                "issues"
+            ],
             group: ADMIN_PLATFORM_GROUP
         },
         {
             label: "Uploads",
             href: "/admin/uploads",
             icon: HardDrive,
-            keywords: ["attachments", "files", "storage", "nas", "size limit", "avatars", "profile photos", "gravatar"],
+            keywords: [
+                "attachments",
+                "files",
+                "storage",
+                "nas",
+                "size limit",
+                "avatars",
+                "profile photos",
+                "gravatar"
+            ],
             group: ADMIN_PLATFORM_GROUP
         },
         {
@@ -635,7 +798,12 @@ export const APP_SUBAPPS: AppSubapp[] = [
         parent: { label: "Management", href: "/admin" },
         parentAppId: "admin",
         sections: [
-            { label: "Conversations", href: "/inbox", icon: MessagesSquare, keywords: ["chats", "messages"] },
+            {
+                label: "Conversations",
+                href: "/inbox",
+                icon: MessagesSquare,
+                keywords: ["chats", "messages"]
+            },
             { label: "Contacts", href: "/inbox/contacts", icon: Contact, keywords: ["people"] },
             {
                 label: "Channels",
@@ -663,13 +831,28 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 label: "Repositories",
                 href: "/apps/agents/repos",
                 icon: FolderGit2,
-                keywords: ["repos", "enable", "where it runs", "model", "actions", "runners", "server"]
+                keywords: [
+                    "repos",
+                    "enable",
+                    "where it runs",
+                    "model",
+                    "actions",
+                    "runners",
+                    "server"
+                ]
             },
             {
                 label: "Automations",
                 href: "/apps/agents/automations",
                 icon: Workflow,
-                keywords: ["triggers", "rules", "issue opened", "pull request", "review", "ci failed"]
+                keywords: [
+                    "triggers",
+                    "rules",
+                    "issue opened",
+                    "pull request",
+                    "review",
+                    "ci failed"
+                ]
             },
             {
                 label: "Runs",
@@ -718,7 +901,15 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 label: "Repositories",
                 href: "/apps/runners/repos",
                 icon: FolderGit2,
-                keywords: ["repos", "who can run", "forks", "pull requests", "public", "private", "events"]
+                keywords: [
+                    "repos",
+                    "who can run",
+                    "forks",
+                    "pull requests",
+                    "public",
+                    "private",
+                    "events"
+                ]
             },
             {
                 label: "Runs",
@@ -760,7 +951,11 @@ const ACCESS_GROUP = "Who gets in";
  * gets is decided on the server.
  */
 const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
-    "": { label: "Overview", icon: LayoutDashboard, keywords: ["status", "address", "players online"] },
+    "": {
+        label: "Overview",
+        icon: LayoutDashboard,
+        keywords: ["status", "address", "players online"]
+    },
     console: {
         label: "Console",
         icon: Terminal,
@@ -894,7 +1089,12 @@ export function orgSubapp(slug: string): AppSubapp {
         base,
         parent: { label: "Organizations", href: ORG_BASE },
         sections: [
-            { label: "Overview", href: base, icon: LayoutDashboard, keywords: ["organization", "summary"] },
+            {
+                label: "Overview",
+                href: base,
+                icon: LayoutDashboard,
+                keywords: ["organization", "summary"]
+            },
             {
                 label: "People",
                 href: `${base}/people`,
@@ -959,7 +1159,10 @@ export function orgSlugForPath(pathname: string): string | null {
 export function resolveSubapp(pathname: string): AppSubapp | null {
     const slug = orgSlugForPath(pathname);
     if (slug) return orgSubapp(slug);
-    return APP_SUBAPPS.find((sub) => pathname === sub.base || pathname.startsWith(`${sub.base}/`)) ?? null;
+    return (
+        APP_SUBAPPS.find((sub) => pathname === sub.base || pathname.startsWith(`${sub.base}/`)) ??
+        null
+    );
 }
 
 /** Whether a path belongs to an app: its own subtree, or one of its extra
@@ -990,8 +1193,13 @@ export function resolveActiveApp(pathname: string): AppEntry {
  * `sections` is the app's whole list, hidden entries included - a hidden page
  * still nests under a root and still decides the question.
  */
-export function isSectionActive(pathname: string, href: string, sections: readonly AppSection[]): boolean {
+export function isSectionActive(
+    pathname: string,
+    href: string,
+    sections: readonly AppSection[]
+): boolean {
     if (pathname === href) return true;
-    if (sections.some((section) => section.href !== href && section.href.startsWith(`${href}/`))) return false;
+    if (sections.some((section) => section.href !== href && section.href.startsWith(`${href}/`)))
+        return false;
     return pathname.startsWith(`${href}/`);
 }

@@ -50,17 +50,17 @@ describe("moveToTrash", () => {
     });
 
     it("refuses a source the bin cannot record against, before moving anything", async () => {
-        await expect(moveToTrash(OWNER, "host:018f2b7a-0000-7000-8000-0000000000f1", "a.txt")).rejects.toBeInstanceOf(
-            TrashUnavailableError
-        );
+        await expect(
+            moveToTrash(OWNER, "host:018f2b7a-0000-7000-8000-0000000000f1", "a.txt")
+        ).rejects.toBeInstanceOf(TrashUnavailableError);
         expect(move).not.toHaveBeenCalled();
         expect(create).not.toHaveBeenCalled();
     });
 
     it("says what to do instead rather than only that it failed", async () => {
-        await expect(
-            moveToTrash(OWNER, "container:abc", "a.txt")
-        ).rejects.toThrow(/Delete permanently/);
+        await expect(moveToTrash(OWNER, "container:abc", "a.txt")).rejects.toThrow(
+            /Delete permanently/
+        );
     });
 
     it("treats an item that is already gone as done", async () => {

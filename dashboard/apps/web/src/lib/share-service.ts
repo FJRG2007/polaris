@@ -246,7 +246,10 @@ export function shareUsability(share: {
 }
 
 /** Constant-time password check for a share. No password set means always open. */
-export async function verifySharePassword(passwordHash: string | null, presented: string): Promise<boolean> {
+export async function verifySharePassword(
+    passwordHash: string | null,
+    presented: string
+): Promise<boolean> {
     if (!passwordHash) return true;
     return verifyLinkPassword(presented, passwordHash);
 }
@@ -261,7 +264,10 @@ export async function registerDownload(shareId: string): Promise<boolean> {
         where: {
             id: shareId,
             revokedAt: null,
-            OR: [{ maxDownloads: null }, { maxDownloads: { gt: prisma.share.fields.downloadCount } }]
+            OR: [
+                { maxDownloads: null },
+                { maxDownloads: { gt: prisma.share.fields.downloadCount } }
+            ]
         },
         data: { downloadCount: { increment: 1 } }
     });
@@ -308,7 +314,11 @@ export function signShareUnlock(shareId: string, secret: string): string {
 }
 
 /** Constant-time check of an unlock cookie value against the expected signature. */
-export function verifyShareUnlock(shareId: string, value: string | undefined, secret: string): boolean {
+export function verifyShareUnlock(
+    shareId: string,
+    value: string | undefined,
+    secret: string
+): boolean {
     return verifyUnlock(SHARE_LINK_SCOPE, shareId, value, secret);
 }
 

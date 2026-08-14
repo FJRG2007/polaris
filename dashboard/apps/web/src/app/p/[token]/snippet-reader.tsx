@@ -16,7 +16,10 @@ import { PublicShell } from "@/components/public-shell";
 import { Button, Card, CardBody, cn } from "@polaris/ui";
 import { keyFromFragment, unseal } from "@/lib/browser-seal";
 import { Check, Copy, Download, EyeOff, FileCode, Flame, Loader2 } from "lucide-react";
-import { openBurnSnippetAction, type PublicSnippetFile } from "@/app/(app)/drive/snippets/snippet-actions";
+import {
+    openBurnSnippetAction,
+    type PublicSnippetFile
+} from "@/app/(app)/drive/snippets/snippet-actions";
 
 export function SnippetReader({
     token,

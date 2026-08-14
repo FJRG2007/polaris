@@ -121,7 +121,12 @@ export function PasswordGenerator({ onUse }: { onUse?: (value: string) => void }
     return (
         <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
-                <Input readOnly value={value} className="font-mono text-sm" aria-label="Generated" />
+                <Input
+                    readOnly
+                    value={value}
+                    className="font-mono text-sm"
+                    aria-label="Generated"
+                />
                 <Button
                     type="button"
                     size="icon"
@@ -143,7 +148,11 @@ export function PasswordGenerator({ onUse }: { onUse?: (value: string) => void }
                         setCopied(true);
                     }}
                 >
-                    {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+                    {copied ? (
+                        <Check className="size-4 text-success" />
+                    ) : (
+                        <Copy className="size-4" />
+                    )}
                 </Button>
             </div>
 

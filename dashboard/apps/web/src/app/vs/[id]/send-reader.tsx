@@ -53,13 +53,16 @@ export function SendReader({ accessId }: { accessId: string }) {
                 });
                 return;
             }
-            const response = await fetch(`/vault/api/sends/access/${encodeURIComponent(accessId)}`, {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({
-                    password: secret ? await crypto.sendPasswordHash(secret, urlKey) : null
-                })
-            });
+            const response = await fetch(
+                `/vault/api/sends/access/${encodeURIComponent(accessId)}`,
+                {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({
+                        password: secret ? await crypto.sendPasswordHash(secret, urlKey) : null
+                    })
+                }
+            );
             if (response.status === 401) {
                 setState({ kind: "password" });
                 return;

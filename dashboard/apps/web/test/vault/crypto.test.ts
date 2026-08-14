@@ -45,8 +45,16 @@ describe("deriveMasterKey", () => {
     it("treats the address the way a sign-in form would", async () => {
         // A client that lowercases and one that does not must land on the same
         // key, or the same person cannot open their vault from both.
-        const spaced = await vaultCrypto.deriveMasterKey(PASSWORD, "  ANA@example.com  ", PBKDF2_SETTINGS);
-        const plain = await vaultCrypto.deriveMasterKey(PASSWORD, "ana@example.com", PBKDF2_SETTINGS);
+        const spaced = await vaultCrypto.deriveMasterKey(
+            PASSWORD,
+            "  ANA@example.com  ",
+            PBKDF2_SETTINGS
+        );
+        const plain = await vaultCrypto.deriveMasterKey(
+            PASSWORD,
+            "ana@example.com",
+            PBKDF2_SETTINGS
+        );
         expect(Buffer.from(spaced).equals(Buffer.from(plain))).toBe(true);
     });
 
@@ -114,7 +122,9 @@ describe("encrypt and decrypt", () => {
         const [head, ciphertext, mac] = sealed.split("|") as [string, string, string];
         const bytes = vaultCrypto.fromBase64(ciphertext);
         bytes[0] = bytes[0]! ^ 0xff;
-        expect(await vaultCrypto.decrypt(`${head}|${vaultCrypto.toBase64(bytes)}|${mac}`, key)).toBeNull();
+        expect(
+            await vaultCrypto.decrypt(`${head}|${vaultCrypto.toBase64(bytes)}|${mac}`, key)
+        ).toBeNull();
     });
 
     it("refuses a value with the MAC stripped off it", async () => {
@@ -171,19 +181,34 @@ describe("createVaultKeys and unlockVaultKey", () => {
     });
 
     it("opens with the password it was made with", async () => {
-        const { keys, vaultKey } = await vaultCrypto.createVaultKeys(PASSWORD, EMAIL, PBKDF2_SETTINGS);
-        const unlocked = await vaultCrypto.unlockVaultKey(PASSWORD, EMAIL, PBKDF2_SETTINGS, keys.protectedKey);
+        const { keys, vaultKey } = await vaultCrypto.createVaultKeys(
+            PASSWORD,
+            EMAIL,
+            PBKDF2_SETTINGS
+        );
+        const unlocked = await vaultCrypto.unlockVaultKey(
+            PASSWORD,
+            EMAIL,
+            PBKDF2_SETTINGS,
+            keys.protectedKey
+        );
         expect(unlocked).not.toBeNull();
         expect(Buffer.from(unlocked!.enc).equals(Buffer.from(vaultKey.enc))).toBe(true);
     });
 
     it("returns nothing for a wrong password, without asking anybody", async () => {
         const { keys } = await vaultCrypto.createVaultKeys(PASSWORD, EMAIL, PBKDF2_SETTINGS);
-        expect(await vaultCrypto.unlockVaultKey("wrong", EMAIL, PBKDF2_SETTINGS, keys.protectedKey)).toBeNull();
+        expect(
+            await vaultCrypto.unlockVaultKey("wrong", EMAIL, PBKDF2_SETTINGS, keys.protectedKey)
+        ).toBeNull();
     });
 
     it("wraps the private key under the vault key, not the master key", async () => {
-        const { keys, vaultKey } = await vaultCrypto.createVaultKeys(PASSWORD, EMAIL, PBKDF2_SETTINGS);
+        const { keys, vaultKey } = await vaultCrypto.createVaultKeys(
+            PASSWORD,
+            EMAIL,
+            PBKDF2_SETTINGS
+        );
         // Decrypting it with the vault key is the property clients rely on: the
         // private key must be reachable while unlocked without the password.
         const opened = await vaultCrypto.decryptBytes(keys.encryptedPrivateKey, vaultKey);

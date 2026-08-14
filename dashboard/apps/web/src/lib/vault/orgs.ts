@@ -132,7 +132,13 @@ export async function inviteMember(
     const user = await prisma.user.findUnique({ where: { email: address }, select: { id: true } });
     await prisma.vaultOrgUser.upsert({
         where: { orgId_email: { orgId, email: address } },
-        create: { orgId, email: address, userId: user?.id ?? null, type, status: core.ORG_USER_INVITED },
+        create: {
+            orgId,
+            email: address,
+            userId: user?.id ?? null,
+            type,
+            status: core.ORG_USER_INVITED
+        },
         update: { type }
     });
     return { ok: true };
@@ -235,7 +241,13 @@ export async function createCollection(
         data: { orgId, name, externalId: externalId ?? null },
         select: { id: true, name: true, externalId: true }
     });
-    return { object: "collection", id: row.id, organizationId: orgId, name: row.name, externalId: row.externalId };
+    return {
+        object: "collection",
+        id: row.id,
+        organizationId: orgId,
+        name: row.name,
+        externalId: row.externalId
+    };
 }
 
 export async function updateCollection(

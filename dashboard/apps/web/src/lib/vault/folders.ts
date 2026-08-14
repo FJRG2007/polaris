@@ -11,7 +11,11 @@ import { prisma } from "@polaris/db";
 import { bumpRevision } from "@/lib/vault/account";
 
 /** One folder, in the shape a client reads. */
-function toResponse(row: { id: string; name: string; revisionDate: Date }): Record<string, unknown> {
+function toResponse(row: {
+    id: string;
+    name: string;
+    revisionDate: Date;
+}): Record<string, unknown> {
     return {
         object: "folder",
         id: row.id,

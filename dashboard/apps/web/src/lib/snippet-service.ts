@@ -123,7 +123,11 @@ export async function createSnippet(
             },
             invites:
                 input.visibility === "invite"
-                    ? { create: (await resolveAccounts(input.inviteUsers)).map((userId) => ({ userId })) }
+                    ? {
+                          create: (await resolveAccounts(input.inviteUsers)).map((userId) => ({
+                              userId
+                          }))
+                      }
                     : undefined
         },
         select: { id: true }
@@ -178,7 +182,10 @@ export async function listSnippetsForOwner(ownerId: string) {
             createdAt: true,
             updatedAt: true,
             encryptedToken: true,
-            files: { select: { name: true, language: true, size: true }, orderBy: { position: "asc" } }
+            files: {
+                select: { name: true, language: true, size: true },
+                orderBy: { position: "asc" }
+            }
         }
     });
 }
@@ -368,7 +375,10 @@ export async function shareSnippet(
 }
 
 /** Decrypt and return the link for a snippet the caller owns, or null. */
-export async function revealSnippetLink(ownerId: string, snippetId: string): Promise<string | null> {
+export async function revealSnippetLink(
+    ownerId: string,
+    snippetId: string
+): Promise<string | null> {
     const snippet = await prisma.snippet.findFirst({
         where: { id: snippetId, ownerId },
         select: { encryptedToken: true, tokenNonce: true, tokenKeyId: true }
@@ -490,7 +500,12 @@ export async function burnSnippet(snippetId: string): Promise<void> {
         prisma.snippetFile.deleteMany({ where: { snippetId } }),
         prisma.snippet.update({
             where: { id: snippetId },
-            data: { revokedAt: new Date(), encryptedToken: null, tokenNonce: null, tokenKeyId: null }
+            data: {
+                revokedAt: new Date(),
+                encryptedToken: null,
+                tokenNonce: null,
+                tokenKeyId: null
+            }
         })
     ]);
 }

@@ -43,7 +43,10 @@ export async function listLocks(connectionId: string): Promise<LockInfo[]> {
  * not gated. "Nearest" means the deepest matching ancestor, so a lock on a
  * subfolder takes precedence over one on its parent.
  */
-export async function findLockForPath(connectionId: string, path: string): Promise<LockInfo | null> {
+export async function findLockForPath(
+    connectionId: string,
+    path: string
+): Promise<LockInfo | null> {
     if (!isUuid(connectionId)) return null;
     const locks = await prisma.accessLock.findMany({
         where: { connectionId },
@@ -53,7 +56,8 @@ export async function findLockForPath(connectionId: string, path: string): Promi
     const target = normalizeRelPath(path);
     let best: LockInfo | null = null;
     for (const lock of locks) {
-        const covers = lock.path === "" || target === lock.path || target.startsWith(`${lock.path}/`);
+        const covers =
+            lock.path === "" || target === lock.path || target.startsWith(`${lock.path}/`);
         if (covers && (!best || lock.path.length > best.path.length)) best = lock;
     }
     return best;
@@ -83,7 +87,10 @@ export async function removeLock(connectionId: string, lockId: string): Promise<
 
 /** Constant-time check of a presented password against a lock's stored hash. */
 export async function verifyLockPassword(lockId: string, presented: string): Promise<boolean> {
-    const lock = await prisma.accessLock.findUnique({ where: { id: lockId }, select: { passwordHash: true } });
+    const lock = await prisma.accessLock.findUnique({
+        where: { id: lockId },
+        select: { passwordHash: true }
+    });
     if (!lock) return false;
     return verifyLinkPassword(presented, lock.passwordHash);
 }
@@ -99,6 +106,10 @@ export function signLockUnlock(lockId: string, secret: string): string {
 }
 
 /** Constant-time check of an unlock cookie against the expected signature. */
-export function verifyLockUnlock(lockId: string, value: string | undefined, secret: string): boolean {
+export function verifyLockUnlock(
+    lockId: string,
+    value: string | undefined,
+    secret: string
+): boolean {
     return verifyUnlock(LOCK_LINK_SCOPE, lockId, value, secret);
 }

@@ -82,11 +82,17 @@ export interface ScopeGroup {
 export const SCOPE_GROUPS: readonly ScopeGroup[] = [
     { title: "Files", scopes: ["drive.read", "drive.write", "drive.delete"] },
     { title: "Storage", scopes: ["connections.manage"] },
-    { title: "Sharing", scopes: ["shares.create", "shares.manage", "requests.create", "requests.manage"] },
+    {
+        title: "Sharing",
+        scopes: ["shares.create", "shares.manage", "requests.create", "requests.manage"]
+    },
     { title: "Snippets", scopes: ["snippets.read", "snippets.write"] },
     { title: "Vault", scopes: ["vault.use"] },
     { title: "Deployments", scopes: ["deploy.read", "deploy.manage"] },
-    { title: "Game servers", scopes: ["games.read", "games.moderate", "games.console", "games.manage"] },
+    {
+        title: "Game servers",
+        scopes: ["games.read", "games.moderate", "games.console", "games.manage"]
+    },
     { title: "Tasks", scopes: ["tasks.read", "tasks.manage"] },
     { title: "Inbox", scopes: ["inbox.read", "inbox.manage"] },
     { title: "Administration", scopes: ["users.manage", "settings.manage", "system.manage"] }

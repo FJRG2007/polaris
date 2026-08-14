@@ -6,12 +6,12 @@ extension, the phone, the CLI - work against it.
 
 ## What is encrypted, and by whom
 
-| Thing | Encrypted where | Polaris can read it |
-| --- | --- | --- |
-| Vault items (logins, notes, cards, identities, SSH keys) | The browser or the client | No |
-| Sends | The browser or the client; the key is in the link's fragment | No |
-| Snippets | The server, under `POLARIS_MASTER_KEY` | Yes - which is what lets it highlight and search them |
-| Sealed snippets and sealed drop-point submissions | The browser; the key is in the link's fragment | No |
+| Thing                                                    | Encrypted where                                              | Polaris can read it                                   |
+| -------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------- |
+| Vault items (logins, notes, cards, identities, SSH keys) | The browser or the client                                    | No                                                    |
+| Sends                                                    | The browser or the client; the key is in the link's fragment | No                                                    |
+| Snippets                                                 | The server, under `POLARIS_MASTER_KEY`                       | Yes - which is what lets it highlight and search them |
+| Sealed snippets and sealed drop-point submissions        | The browser; the key is in the link's fragment               | No                                                    |
 
 The master password is never sent. The browser derives a key from it, wraps the
 vault's own key under that, and hands over the wrapping. Losing the master

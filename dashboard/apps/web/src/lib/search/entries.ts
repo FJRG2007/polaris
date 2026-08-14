@@ -122,7 +122,11 @@ export function navigationEntries(isAdmin: boolean, appIds: readonly string[]): 
     // sort of page search exists for.
     for (const subapp of APP_SUBAPPS) {
         // A subject lives inside an app, so it is only findable when that app is.
-        const owner = POLARIS_APPS.find((app) => subapp.base.startsWith(app.href) || app.match?.some((base) => subapp.base.startsWith(base)));
+        const owner = POLARIS_APPS.find(
+            (app) =>
+                subapp.base.startsWith(app.href) ||
+                app.match?.some((base) => subapp.base.startsWith(base))
+        );
         if (owner && !allowed.has(owner.id)) continue;
         for (const section of subapp.sections) {
             if (entries.some((entry) => entry.href === section.href)) continue;

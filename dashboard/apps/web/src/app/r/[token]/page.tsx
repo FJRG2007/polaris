@@ -49,7 +49,12 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
     if (!usable.ok) {
         if (usable.reason === "scheduled") {
             const when = request.startsAt ? format.dateTime(request.startsAt) : "a later date";
-            return <LinkUnavailable title="Not open yet" message={`This drop point opens on ${when}.`} />;
+            return (
+                <LinkUnavailable
+                    title="Not open yet"
+                    message={`This drop point opens on ${when}.`}
+                />
+            );
         }
         return (
             <LinkUnavailable

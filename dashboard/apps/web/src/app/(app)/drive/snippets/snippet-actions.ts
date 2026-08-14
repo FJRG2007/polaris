@@ -145,7 +145,8 @@ export async function revokeSnippetShareAction(snippetId: string): Promise<void>
 /** Delete a snippet and its text (owner-scoped). */
 export async function deleteSnippetAction(snippetId: string): Promise<{ error?: string }> {
     const user = await requirePermission("snippets.write");
-    if (!(await snippetService.deleteSnippet(user.id, snippetId))) return { error: "This snippet is not yours." };
+    if (!(await snippetService.deleteSnippet(user.id, snippetId)))
+        return { error: "This snippet is not yours." };
     await recordAudit({
         actorId: user.id,
         action: "snippet.delete",
@@ -229,7 +230,8 @@ export async function unlockSnippetAction(
 ): Promise<{ error?: string }> {
     const snippet = await snippetService.resolveSnippetByToken(token);
     if (!snippet) return { error: "This link is not available." };
-    if (!snippetService.snippetUsability(snippet).ok) return { error: "This link is no longer available." };
+    if (!snippetService.snippetUsability(snippet).ok)
+        return { error: "This link is no longer available." };
 
     const limitKey = `snippet-unlock:${snippet.id}:${hashForLog(await clientIp()) ?? "unknown"}`;
     if (!(await rateLimit(limitKey, UNLOCK_LIMIT, UNLOCK_WINDOW_MS)).ok) {

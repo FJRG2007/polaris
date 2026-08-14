@@ -146,10 +146,7 @@ export async function deriveMasterKey(
  * the password as the salt - so the value the server sees cannot be turned back
  * into either. The server stretches it again before storing it.
  */
-export async function masterPasswordHash(
-    masterKey: Uint8Array,
-    password: string
-): Promise<string> {
+export async function masterPasswordHash(masterKey: Uint8Array, password: string): Promise<string> {
     return toBase64(await pbkdf2(masterKey, encoder.encode(password), 1, 32));
 }
 
@@ -178,7 +175,10 @@ async function hkdfExpand(prk: Uint8Array, info: string): Promise<Uint8Array> {
 
 /** The master key stretched into a key pair for encrypting and authenticating. */
 export async function stretchMasterKey(masterKey: Uint8Array): Promise<SymmetricKey> {
-    const [enc, mac] = await Promise.all([hkdfExpand(masterKey, "enc"), hkdfExpand(masterKey, "mac")]);
+    const [enc, mac] = await Promise.all([
+        hkdfExpand(masterKey, "enc"),
+        hkdfExpand(masterKey, "mac")
+    ]);
     return { enc, mac };
 }
 
@@ -196,7 +196,11 @@ async function hkdfExpandLong(prk: Uint8Array, info: string, bytes: number): Pro
     let previous = new Uint8Array(0);
     for (let counter = 1, at = 0; at < bytes; counter += 1) {
         previous = new Uint8Array(
-            await crypto.subtle.sign("HMAC", key, concat(previous, infoBytes, new Uint8Array([counter])))
+            await crypto.subtle.sign(
+                "HMAC",
+                key,
+                concat(previous, infoBytes, new Uint8Array([counter]))
+            )
         );
         out.set(previous.subarray(0, Math.min(previous.length, bytes - at)), at);
         at += previous.length;
@@ -248,9 +252,7 @@ const SEND_PASSWORD_ITERATIONS = 100_000;
  * clients is one this can check, and the other way round.
  */
 export async function sendPasswordHash(password: string, urlKey: Uint8Array): Promise<string> {
-    return toBase64(
-        await pbkdf2(encoder.encode(password), urlKey, SEND_PASSWORD_ITERATIONS, 32)
-    );
+    return toBase64(await pbkdf2(encoder.encode(password), urlKey, SEND_PASSWORD_ITERATIONS, 32));
 }
 
 /** A fresh 512-bit vault key: 32 bytes to encrypt with, 32 to authenticate with. */
@@ -323,7 +325,9 @@ export async function decryptBytes(value: string, key: SymmetricKey): Promise<Ui
         const aes = await crypto.subtle.importKey("raw", key.enc, { name: "AES-CBC" }, false, [
             "decrypt"
         ]);
-        return new Uint8Array(await crypto.subtle.decrypt({ name: "AES-CBC", iv }, aes, ciphertext));
+        return new Uint8Array(
+            await crypto.subtle.decrypt({ name: "AES-CBC", iv }, aes, ciphertext)
+        );
     } catch {
         return null;
     }

@@ -231,7 +231,10 @@ export async function submitTextAction(
         }
     }
 
-    if (!(await rateLimit(`textdrop-submit:${ipHash ?? "unknown"}`, SUBMIT_LIMIT, SUBMIT_WINDOW_MS)).ok) {
+    if (
+        !(await rateLimit(`textdrop-submit:${ipHash ?? "unknown"}`, SUBMIT_LIMIT, SUBMIT_WINDOW_MS))
+            .ok
+    ) {
         return { error: "Too many submissions from here. Try again later." };
     }
 

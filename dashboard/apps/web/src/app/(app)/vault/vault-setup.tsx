@@ -50,7 +50,9 @@ export function VaultSetup({
     // A hint that contains the password is a hint that hands it over: it is
     // stored in the clear, and shown to anybody who asks for it at sign-in.
     const hintLeaks =
-        hint.length > 0 && password.length > 0 && hint.toLowerCase().includes(password.toLowerCase());
+        hint.length > 0 &&
+        password.length > 0 &&
+        hint.toLowerCase().includes(password.toLowerCase());
 
     const ready =
         password.length >= MIN_LENGTH &&

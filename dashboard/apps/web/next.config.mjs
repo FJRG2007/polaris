@@ -15,7 +15,14 @@ const nextConfig = {
     output: "standalone",
     reactStrictMode: true,
     transpilePackages: ["@polaris/ui"],
-    serverExternalPackages: ["@prisma/client", "@polaris/db", "@polaris/docker", "ssh2", "undici", "v9u-smb2"],
+    serverExternalPackages: [
+        "@prisma/client",
+        "@polaris/db",
+        "@polaris/docker",
+        "ssh2",
+        "undici",
+        "v9u-smb2"
+    ],
     // Trace from the monorepo root so the standalone server lands at the path the
     // Docker image expects (apps/web/.next/standalone/apps/web/server.js).
     outputFileTracingRoot: workspaceRoot,

@@ -53,7 +53,12 @@ async function ownersWithApps(): Promise<string[]> {
     return rows.map((row) => row.ownerId);
 }
 
-async function runFirewall(): Promise<{ servers: number; banned: number; kicked: number; allowed: number }> {
+async function runFirewall(): Promise<{
+    servers: number;
+    banned: number;
+    kicked: number;
+    allowed: number;
+}> {
     let servers = 0;
     let banned = 0;
     let kicked = 0;
@@ -78,7 +83,12 @@ async function runFirewall(): Promise<{ servers: number; banned: number; kicked:
  * somebody else has paid for. Two jobs on the same minute would ask every server
  * twice for the same number.
  */
-async function runGameActivity(): Promise<{ started: number; stopped: number; arrived: number; left: number }> {
+async function runGameActivity(): Promise<{
+    started: number;
+    stopped: number;
+    arrived: number;
+    left: number;
+}> {
     let started = 0;
     let stopped = 0;
     let arrived = 0;
@@ -139,7 +149,9 @@ async function runInventories(): Promise<{ servers: number; snapshots: number; a
         servers += 1;
         const report = await drainQueue(install.ownerId, install.id, online).catch(() => null);
         applied += report?.applied ?? 0;
-        snapshots += await sweepInventorySnapshots(install.ownerId, install.id, online).catch(() => 0);
+        snapshots += await sweepInventorySnapshots(install.ownerId, install.id, online).catch(
+            () => 0
+        );
     }
     return { servers, snapshots, applied };
 }

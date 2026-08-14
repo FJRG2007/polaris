@@ -19,7 +19,11 @@ import { generateToken, hashToken } from "@polaris/core/tokens";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { randomDropPointName, userAllowedForRequest } from "@polaris/core";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
-import type { CreateTextRequestInput, SubmitTextInput, UpdateTextRequestInput } from "@polaris/core";
+import type {
+    CreateTextRequestInput,
+    SubmitTextInput,
+    UpdateTextRequestInput
+} from "@polaris/core";
 import {
     linkUsability,
     parseStringList,

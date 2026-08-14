@@ -965,7 +965,9 @@ function ConnectionLabel({
     return (
         <>
             <HardDrive className="size-4 text-muted-foreground" />
-            <span className="flex-1 truncate" title={connection.name}>{connection.name}</span>
+            <span className="flex-1 truncate" title={connection.name}>
+                {connection.name}
+            </span>
             {connection.needsRekey ? (
                 <Badge variant="warning" className="gap-1">
                     <AlertTriangle className="size-3" />

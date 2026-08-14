@@ -38,9 +38,7 @@ export function TotpCode({ value }: { value: string }) {
         return (
             <div className="flex flex-col gap-1">
                 <span className="text-xs text-muted-foreground">Authenticator</span>
-                <p className="text-sm text-muted-foreground">
-                    That key is not one this can read.
-                </p>
+                <p className="text-sm text-muted-foreground">That key is not one this can read.</p>
             </div>
         );
     }

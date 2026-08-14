@@ -156,7 +156,10 @@ export function NewTextDropPointButton() {
                         <form onSubmit={onSubmit} className="flex flex-col gap-3">
                             <label className="flex flex-col gap-1 text-sm">
                                 Title
-                                <Input name="title" placeholder="Named for you if you leave it blank" />
+                                <Input
+                                    name="title"
+                                    placeholder="Named for you if you leave it blank"
+                                />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
                                 What to send
@@ -232,8 +235,8 @@ export function NewTextDropPointButton() {
                                 <span>
                                     Let them seal it in their browser
                                     <span className="block text-xs text-muted-foreground">
-                                        Then Polaris cannot read it either, and they have to send you
-                                        the key separately. Off by default.
+                                        Then Polaris cannot read it either, and they have to send
+                                        you the key separately. Off by default.
                                     </span>
                                 </span>
                             </label>

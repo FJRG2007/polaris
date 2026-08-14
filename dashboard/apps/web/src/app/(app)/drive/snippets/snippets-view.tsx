@@ -17,14 +17,18 @@ import { useDisplayFormat } from "@/components/display-format";
 import { Badge, Button, Card, CardBody, Input } from "@polaris/ui";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { ShareSnippetDialog, type SnippetSharing } from "./share-snippet-dialog";
-import { Code2, Copy, Check, EyeOff, Flame, ScrollText, Search, Share2, Trash2 } from "lucide-react";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle
-} from "@polaris/ui";
+    Code2,
+    Copy,
+    Check,
+    EyeOff,
+    Flame,
+    ScrollText,
+    Search,
+    Share2,
+    Trash2
+} from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
 import {
     deleteSnippetAction,
     getSnippetLogsAction,
@@ -48,7 +52,10 @@ export interface SnippetRow {
     files: { name: string; language: string; size: number }[];
 }
 
-function status(snippet: SnippetRow): { label: string; variant: "success" | "neutral" | "warning" } {
+function status(snippet: SnippetRow): {
+    label: string;
+    variant: "success" | "neutral" | "warning";
+} {
     if (snippet.visibility === "private" && !snippet.revokedAt) {
         return { label: "Private", variant: "neutral" };
     }
@@ -59,7 +66,10 @@ function status(snippet: SnippetRow): { label: string; variant: "success" | "neu
     if (snippet.maxViews !== null && snippet.viewCount >= snippet.maxViews) {
         return { label: "Used up", variant: "warning" };
     }
-    return { label: snippet.visibility === "invite" ? "Shared with people" : "Link", variant: "success" };
+    return {
+        label: snippet.visibility === "invite" ? "Shared with people" : "Link",
+        variant: "success"
+    };
 }
 
 /** The line under the title: what is in it, and what limits it is under. */
@@ -134,7 +144,11 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
             const result = await deleteSnippetAction(row.id);
             setBusy(null);
             if (result.error) {
-                await confirm({ title: "Could not delete it", description: result.error, alert: true });
+                await confirm({
+                    title: "Could not delete it",
+                    description: result.error,
+                    alert: true
+                });
                 return;
             }
             setRows((prev) => prev.filter((item) => item.id !== row.id));
@@ -278,7 +292,8 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
                                       ...row,
                                       visibility,
                                       canReveal: visibility !== "private",
-                                      revokedAt: visibility === "private" ? new Date().toISOString() : null
+                                      revokedAt:
+                                          visibility === "private" ? new Date().toISOString() : null
                                   }
                                 : row
                         )
@@ -286,7 +301,10 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
                     setSharing(null);
                 }}
             />
-            <SnippetLogsDialog snippet={logsFor} onOpenChange={(open) => !open && setLogsFor(null)} />
+            <SnippetLogsDialog
+                snippet={logsFor}
+                onOpenChange={(open) => !open && setLogsFor(null)}
+            />
             {confirmDialog}
         </div>
     );

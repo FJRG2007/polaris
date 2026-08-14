@@ -108,9 +108,12 @@ const passwordHistoryEntry = z.object({
  * contents anyway.
  */
 export const cipherSchema = z.object({
-    type: z.number().int().refine((value) => CIPHER_TYPES.includes(value as never), {
-        message: "Unknown item type"
-    }),
+    type: z
+        .number()
+        .int()
+        .refine((value) => CIPHER_TYPES.includes(value as never), {
+            message: "Unknown item type"
+        }),
     organizationId: z.string().uuid().nullish(),
     folderId: z.string().uuid().nullish(),
     name: encString,
@@ -178,16 +181,17 @@ export const cipherMoveSchema = cipherIdsSchema.extend({
 
 /** A Send: something handed to somebody outside the vault. */
 export const sendSchema = z.object({
-    type: z.number().int().refine((value) => value === SEND_TEXT || value === SEND_FILE, {
-        message: "Unknown send type"
-    }),
+    type: z
+        .number()
+        .int()
+        .refine((value) => value === SEND_TEXT || value === SEND_FILE, {
+            message: "Unknown send type"
+        }),
     name: encString,
     notes: optionalEncString,
     /** The Send's own key, wrapped under the user's vault key. */
     key: encString,
-    text: z
-        .object({ text: optionalEncString, hidden: z.boolean().default(false) })
-        .nullish(),
+    text: z.object({ text: optionalEncString, hidden: z.boolean().default(false) }).nullish(),
     file: z.object({ fileName: optionalEncString, size: z.coerce.number().nullish() }).nullish(),
     /** The client stretches a link password and sends the result, never the word. */
     password: z.string().max(512).nullish(),

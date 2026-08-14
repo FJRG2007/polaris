@@ -34,7 +34,10 @@ export interface TextDropPointRow {
     canReveal: boolean;
 }
 
-function status(row: TextDropPointRow): { label: string; variant: "success" | "neutral" | "warning" } {
+function status(row: TextDropPointRow): {
+    label: string;
+    variant: "success" | "neutral" | "warning";
+} {
     if (row.revokedAt) return { label: "Closed", variant: "neutral" };
     if (row.startsAt && new Date(row.startsAt).getTime() > Date.now()) {
         return { label: "Scheduled", variant: "warning" };
@@ -119,7 +122,11 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
             const result = await deleteTextRequestAction(row.id);
             setBusy(null);
             if (result.error) {
-                await confirm({ title: "Could not delete it", description: result.error, alert: true });
+                await confirm({
+                    title: "Could not delete it",
+                    description: result.error,
+                    alert: true
+                });
                 return;
             }
             setRows((prev) => prev.filter((item) => item.id !== row.id));
@@ -159,7 +166,9 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
                                     </p>
                                     <p className="truncate text-xs text-muted-foreground">
                                         {row.submissionCount}
-                                        {row.maxSubmissions !== null ? `/${row.maxSubmissions}` : ""}{" "}
+                                        {row.maxSubmissions !== null
+                                            ? `/${row.maxSubmissions}`
+                                            : ""}{" "}
                                         collected
                                         {scheduled && row.startsAt
                                             ? ` - opens ${format.date(row.startsAt)}`

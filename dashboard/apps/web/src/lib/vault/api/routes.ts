@@ -53,14 +53,24 @@ export const VAULT_ROUTES: readonly VaultRoute[] = [
         handle: accounts.getRevisionDate
     },
     { method: "GET", path: "api/accounts/keys", auth: "bearer", handle: accounts.getKeys },
-    { method: "GET", path: "api/users/:id/public-key", auth: "bearer", handle: accounts.getUserPublicKey },
+    {
+        method: "GET",
+        path: "api/users/:id/public-key",
+        auth: "bearer",
+        handle: accounts.getUserPublicKey
+    },
     {
         method: "POST",
         path: "api/accounts/verify-password",
         auth: "bearer",
         handle: accounts.verifyPassword
     },
-    { method: "POST", path: "api/accounts/password", auth: "bearer", handle: accounts.changePassword },
+    {
+        method: "POST",
+        path: "api/accounts/password",
+        auth: "bearer",
+        handle: accounts.changePassword
+    },
     { method: "POST", path: "api/accounts/kdf", auth: "bearer", handle: accounts.changePassword },
     {
         method: "POST",
@@ -202,7 +212,12 @@ export const VAULT_ROUTES: readonly VaultRoute[] = [
         auth: "bearer",
         handle: orgs.deleteCollection
     },
-    { method: "GET", path: "api/organizations/:orgId", auth: "bearer", handle: orgs.getOrganization },
+    {
+        method: "GET",
+        path: "api/organizations/:orgId",
+        auth: "bearer",
+        handle: orgs.getOrganization
+    },
     {
         method: "GET",
         path: "api/organizations/:orgId/users",

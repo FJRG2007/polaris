@@ -63,7 +63,11 @@ function trackable(connectionId: string): boolean {
 }
 
 /** Move an item into the connection's trash folder and record it. */
-export async function moveToTrash(ownerId: string, connectionId: string, path: string): Promise<void> {
+export async function moveToTrash(
+    ownerId: string,
+    connectionId: string,
+    path: string
+): Promise<void> {
     const source = normalizeRelPath(path);
     // Never trash Polaris's own hidden folder (the bin, quarantine, ...).
     if (!source || source === POLARIS_DIR || source.startsWith(`${POLARIS_DIR}/`)) return;
@@ -88,7 +92,15 @@ export async function moveToTrash(ownerId: string, connectionId: string, path: s
         }
         await driver.move(source, trashPath);
         await prisma.trashItem.create({
-            data: { ownerId, connectionId, name, originalPath: source, trashPath, kind: stat.kind, size: stat.size }
+            data: {
+                ownerId,
+                connectionId,
+                name,
+                originalPath: source,
+                trashPath,
+                kind: stat.kind,
+                size: stat.size
+            }
         });
     } finally {
         await driver.dispose();

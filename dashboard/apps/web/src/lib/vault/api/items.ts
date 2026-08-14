@@ -77,10 +77,7 @@ export async function updateCipher(context: VaultContext): Promise<Response> {
         if (result.reason === "conflict") {
             // 409, not a silent overwrite: two people editing one shared login
             // should be told, and the client offers to reload.
-            return vaultError(
-                "Somebody else changed this item. Refresh and try again.",
-                409
-            );
+            return vaultError("Somebody else changed this item. Refresh and try again.", 409);
         }
         return vaultError("Not found", 404);
     }

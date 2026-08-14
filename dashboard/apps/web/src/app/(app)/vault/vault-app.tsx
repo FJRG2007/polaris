@@ -24,7 +24,14 @@ import { useEffect, useMemo, useState } from "react";
 import type { SymmetricKey } from "@/lib/vault/crypto";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Badge, Button, Card, CardBody, Input, Select } from "@polaris/ui";
-import { decryptFolders, decryptItem, emptyItem, encryptItem, type VaultFolder, type VaultItem } from "./vault-model";
+import {
+    decryptFolders,
+    decryptItem,
+    emptyItem,
+    encryptItem,
+    type VaultFolder,
+    type VaultItem
+} from "./vault-model";
 import {
     deleteItemAction,
     restoreItemAction,
@@ -130,7 +137,9 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
     async function onDelete(item: VaultItem): Promise<void> {
         const permanent = item.deleted;
         const confirmed = await confirm({
-            title: permanent ? `Delete "${item.name}" for good?` : `Move "${item.name}" to the trash?`,
+            title: permanent
+                ? `Delete "${item.name}" for good?`
+                : `Move "${item.name}" to the trash?`,
             description: permanent
                 ? "This cannot be undone."
                 : "You can put it back from the trash.",
@@ -309,7 +318,11 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
                                                 {current.name || "Untitled"}
                                             </h2>
                                             <p className="text-xs text-muted-foreground">
-                                                {core.CIPHER_TYPE_LABEL[current.type as core.CipherType]}
+                                                {
+                                                    core.CIPHER_TYPE_LABEL[
+                                                        current.type as core.CipherType
+                                                    ]
+                                                }
                                             </p>
                                         </div>
                                         <div className="flex items-center gap-1">
@@ -374,14 +387,18 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
                                                 label="Username"
                                                 value={current.login.username}
                                                 copied={copied === "username"}
-                                                onCopy={() => copy("username", current.login.username)}
+                                                onCopy={() =>
+                                                    copy("username", current.login.username)
+                                                }
                                             />
                                             <Field
                                                 label="Password"
                                                 value={current.login.password}
                                                 secret={!revealed}
                                                 copied={copied === "password"}
-                                                onCopy={() => copy("password", current.login.password)}
+                                                onCopy={() =>
+                                                    copy("password", current.login.password)
+                                                }
                                                 onReveal={() => setRevealed((prev) => !prev)}
                                                 revealed={revealed}
                                             />
@@ -396,7 +413,10 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
 
                                     {current.type === core.CIPHER_CARD ? (
                                         <>
-                                            <Field label="Name" value={current.card.cardholderName} />
+                                            <Field
+                                                label="Name"
+                                                value={current.card.cardholderName}
+                                            />
                                             <Field
                                                 label="Number"
                                                 value={current.card.number}
@@ -434,7 +454,9 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
                                                 label="Public key"
                                                 value={current.sshKey.publicKey}
                                                 copied={copied === "public"}
-                                                onCopy={() => copy("public", current.sshKey.publicKey)}
+                                                onCopy={() =>
+                                                    copy("public", current.sshKey.publicKey)
+                                                }
                                             />
                                             <Field
                                                 label="Private key"
@@ -442,7 +464,9 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
                                                 secret={!revealed}
                                                 revealed={revealed}
                                                 copied={copied === "private"}
-                                                onCopy={() => copy("private", current.sshKey.privateKey)}
+                                                onCopy={() =>
+                                                    copy("private", current.sshKey.privateKey)
+                                                }
                                                 onReveal={() => setRevealed((prev) => !prev)}
                                             />
                                         </>
@@ -467,8 +491,12 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
 
                                     {current.notes ? (
                                         <div className="flex flex-col gap-1">
-                                            <span className="text-xs text-muted-foreground">Notes</span>
-                                            <p className="whitespace-pre-wrap text-sm">{current.notes}</p>
+                                            <span className="text-xs text-muted-foreground">
+                                                Notes
+                                            </span>
+                                            <p className="whitespace-pre-wrap text-sm">
+                                                {current.notes}
+                                            </p>
                                         </div>
                                     ) : null}
                                 </CardBody>
@@ -556,10 +584,7 @@ function Field({
                     /* A hidden value has nothing to reveal on hover; a shown one is
                        often a long key or a note, and clipping it with no way back
                        to the whole thing is the defect this guards against. */
-                    <p
-                        className="truncate font-mono text-sm"
-                        title={secret ? undefined : value}
-                    >
+                    <p className="truncate font-mono text-sm" title={secret ? undefined : value}>
                         {secret ? "••••••••••••" : value}
                     </p>
                 )}
@@ -583,7 +608,11 @@ function Field({
                     aria-label={`Copy the ${label}`}
                     onClick={onCopy}
                 >
-                    {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+                    {copied ? (
+                        <Check className="size-4 text-success" />
+                    ) : (
+                        <Copy className="size-4" />
+                    )}
                 </Button>
             ) : null}
         </div>

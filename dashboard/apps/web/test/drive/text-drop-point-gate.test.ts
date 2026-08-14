@@ -42,7 +42,10 @@ vi.mock("@/lib/notifications/dispatch", () => ({ notify }));
 vi.mock("@/lib/dymo-service", () => ({ dymoIpAllowed: dymo }));
 vi.mock("@/lib/link-guards", () => ({ linkAddressDenial: addressDenial }));
 vi.mock("@/lib/public-reach", () => ({ ensureShareReachability: async () => undefined }));
-vi.mock("@/lib/request-context", () => ({ clientIp: async () => "1.2.3.4", hashForLog: () => "h" }));
+vi.mock("@/lib/request-context", () => ({
+    clientIp: async () => "1.2.3.4",
+    hashForLog: () => "h"
+}));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit, resetRateLimit: async () => undefined }));
 vi.mock("@/lib/text-request-service", () => ({
     resolveTextRequestByToken: resolveByToken,
