@@ -18,6 +18,7 @@ import * as core from "@polaris/core";
 import { nextTaskNumber } from "./numbering";
 import { prisma, type Prisma } from "@polaris/db";
 import * as activity from "@/lib/activity/activity";
+import * as comments from "@/lib/comments/comments";
 import { notify } from "@/lib/notifications/dispatch";
 import type { PersonRef, TagRef, TaskRow } from "./facts";
 import { notifyMentions } from "@/lib/rich-text/mention-notify";
@@ -87,7 +88,7 @@ const ROW_SELECT = {
     assignees: { select: { user: { select: { id: true, name: true, image: true } } } },
     tags: { select: { tag: { select: { id: true, name: true, color: true } } } },
     fieldValues: { select: { fieldId: true, value: true } },
-    _count: { select: { subtasks: true, comments: true } }
+    _count: { select: { subtasks: true } }
 } as const;
 
 type TaskRecord = Prisma.TaskGetPayload<{ select: typeof ROW_SELECT }>;
@@ -102,28 +103,40 @@ type TaskRecord = Prisma.TaskGetPayload<{ select: typeof ROW_SELECT }>;
  * are columns on the task itself. `toRow` folds all four into the one answer a
  * card draws.
  */
-async function decorate(ids: string[]): Promise<{ tracked: Map<string, number>; blocked: Set<string> }> {
-    if (ids.length === 0) return { tracked: new Map(), blocked: new Set() };
-    const [entries, dependencies] = await Promise.all([
+async function decorate(
+    ids: string[]
+): Promise<{ tracked: Map<string, number>; blocked: Set<string>; commentCounts: Map<string, number> }> {
+    if (ids.length === 0) return { tracked: new Map(), blocked: new Set(), commentCounts: new Map() };
+    const [entries, dependencies, discussion] = await Promise.all([
         prisma.taskTimeEntry.groupBy({ by: ["taskId"], where: { taskId: { in: ids } }, _sum: { seconds: true } }),
         prisma.taskDependency.findMany({
             where: { blockedId: { in: ids }, type: "blocks" },
             select: { blockedId: true, blocker: { select: { status: { select: { type: true } } } } }
+        }),
+        // A count that used to arrive with the row through a relation. The
+        // discussion table is addressed by subject rather than related, so it is
+        // one grouped query for the batch instead of a join.
+        prisma.comment.groupBy({
+            by: ["subjectId"],
+            where: { subjectType: "task", subjectId: { in: ids } },
+            _count: { _all: true }
         })
     ]);
     const tracked = new Map(entries.map((entry) => [entry.taskId, entry._sum.seconds ?? 0]));
+    const commentCounts = new Map(discussion.map((row) => [row.subjectId, row._count._all]));
     const blocked = new Set(
         dependencies
             .filter((edge) => core.blockerHolds(edge.blocker.status?.type as core.TaskStatusType | undefined))
             .map((edge) => edge.blockedId)
     );
-    return { tracked, blocked };
+    return { tracked, blocked, commentCounts };
 }
 
 function toRow(
     record: NonNullable<TaskRecord>,
     tracked: Map<string, number>,
-    blocked: Set<string>
+    blocked: Set<string>,
+    commentCounts: Map<string, number>
 ): TaskRow {
     const status = record.status;
     return {
@@ -158,7 +171,7 @@ function toRow(
         createdAt: record.createdAt.toISOString(),
         updatedAt: record.updatedAt.toISOString(),
         subtaskCount: record._count.subtasks,
-        commentCount: record._count.comments,
+        commentCount: commentCounts.get(record.id) ?? 0,
         trackedSeconds: tracked.get(record.id) ?? 0,
         blockedUntil: record.blockedUntil?.toISOString() ?? null,
         blockedNote: record.blockedNote,
@@ -217,8 +230,8 @@ export async function listTasks(scope: TaskScope, options: TaskQueryOptions = {}
         select: ROW_SELECT
     });
 
-    const { tracked, blocked } = await decorate(records.map((record) => record.id));
-    return records.map((record) => toRow(record, tracked, blocked));
+    const { tracked, blocked, commentCounts } = await decorate(records.map((record) => record.id));
+    return records.map((record) => toRow(record, tracked, blocked, commentCounts));
 }
 
 export interface ChecklistView {
@@ -232,15 +245,9 @@ export interface ChecklistView {
     }[];
 }
 
-export interface CommentView {
-    readonly id: string;
-    readonly body: string;
-    readonly parentId: string | null;
-    readonly author: PersonRef | null;
-    readonly assignedToId: string | null;
-    readonly resolvedAt: string | null;
-    readonly createdAt: string;
-}
+/** A task's discussion is the shared one. Kept under this name because that is
+ *  what the Tasks screens call it. */
+export type CommentView = comments.CommentView;
 
 export interface DependencyView {
     readonly id: string;
@@ -323,8 +330,8 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
                     }
                 }
             }),
-            prisma.taskComment.findMany({
-                where: { taskId },
+            prisma.comment.findMany({
+                where: { subjectType: "task", subjectId: taskId },
                 orderBy: { createdAt: "asc" },
                 select: {
                     id: true,
@@ -381,7 +388,7 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
     const authorName = new Map(authors.map((author) => [author.id, author.name]));
 
     return {
-        task: toRow(record, decorated.tracked, decorated.blocked),
+        task: toRow(record, decorated.tracked, decorated.blocked, decorated.commentCounts),
         subtasks,
         watchers: watchers.map((watcher) => watcher.user),
         checklists,
@@ -1259,19 +1266,20 @@ export async function deleteTask(taskId: string): Promise<void> {
 }
 
 /** Delete a selection. The ids arrive already narrowed to the tasks the caller
- *  may write, so this is one statement rather than a loop of them; comments,
- *  tracked time and the subtasks themselves follow through the schema's
- *  cascades.
+ *  may write, so this is one statement rather than a loop of them; tracked time,
+ *  checklists and the subtasks themselves follow through the schema's cascades.
  *
- *  History does not: it lives in one table for every app and has no foreign key
- *  to cascade along, so it is dropped here - for the subtasks as well as for
- *  what was asked for, since those are going too. */
+ *  The history and the discussion do not: both live in one table for every app
+ *  and neither has a foreign key to cascade along, so they are dropped here -
+ *  for the subtasks as well as for what was asked for, since those are going
+ *  too. */
 export async function deleteTasks(taskIds: readonly string[]): Promise<number> {
     if (taskIds.length === 0) return 0;
     const going = await withSubtasks(taskIds);
     return prisma.$transaction(async (tx) => {
         const { count } = await tx.task.deleteMany({ where: { id: { in: [...taskIds] } } });
         await activity.forget("task", going, tx);
+        await comments.forget("task", going, tx);
         return count;
     });
 }

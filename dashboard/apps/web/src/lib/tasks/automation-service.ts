@@ -19,6 +19,7 @@ import * as core from "@polaris/core";
 import { nextTaskNumber } from "./numbering";
 import { prisma, type Prisma } from "@polaris/db";
 import * as activity from "@/lib/activity/activity";
+import * as comments from "@/lib/comments/comments";
 
 export interface AutomationEventInput {
     readonly trigger: core.AutomationTrigger;
@@ -330,7 +331,7 @@ async function applyAction(
         }
         case "addComment": {
             if (!action.text) return;
-            await prisma.taskComment.create({ data: { taskId, userId: null, body: action.text } });
+            await comments.post(null, { subjectType: "task", subjectId: taskId, body: action.text });
             return;
         }
         case "addWatcher": {

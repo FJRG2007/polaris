@@ -13,6 +13,7 @@ import { createWriteStream } from "node:fs";
 import { localDialHost } from "./deploy/dial";
 import { appBaseUrl } from "./domain-service";
 import * as activity from "./activity/activity";
+import * as comments from "./comments/comments";
 import { commitUrl } from "./deploy/commit-url";
 import { decryptSecret } from "@polaris/storage";
 import { mkdir, readFile } from "node:fs/promises";
@@ -1852,12 +1853,42 @@ export interface DeploymentSummary {
  * the history of a service says as much about it as the releases do.
  */
 export async function serviceHistory(applicationId: string, ownerId: string): Promise<activity.ActivityLine[]> {
+    await requireOwnedApplication(applicationId, ownerId);
+    return activity.history("service", applicationId, 60);
+}
+
+/**
+ * The notes people have left on a service, and posting one.
+ *
+ * Owner-checked on the way in and on the way out, because a comment id says
+ * nothing about which service it belongs to: without the second check anybody
+ * with `deploy.manage` could post onto somebody else's service by guessing an
+ * id, which is exactly the hole a generic table opens if it is left to the
+ * caller to remember.
+ */
+export async function serviceComments(applicationId: string, ownerId: string): Promise<comments.CommentView[]> {
+    await requireOwnedApplication(applicationId, ownerId);
+    return comments.thread("service", applicationId);
+}
+
+export async function postServiceComment(applicationId: string, ownerId: string, body: string): Promise<void> {
+    await requireOwnedApplication(applicationId, ownerId);
+    await comments.post(ownerId, { subjectType: "service", subjectId: applicationId, body });
+}
+
+export async function deleteServiceComment(applicationId: string, ownerId: string, commentId: string): Promise<void> {
+    await requireOwnedApplication(applicationId, ownerId);
+    // Only the service's owner gets past the check above, and the owner
+    // moderates their own service's notes - including the ones a rule left.
+    await comments.remove(ownerId, commentId, true);
+}
+
+async function requireOwnedApplication(applicationId: string, ownerId: string): Promise<void> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         select: { id: true }
     });
     if (!app) throw new Error("Application not found");
-    return activity.history("service", applicationId, 60);
 }
 
 /** An application's deployment history, most recent first (owner-checked). */

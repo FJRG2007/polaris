@@ -72,6 +72,7 @@ export * from "./schemas/instance-security.js";
 export * from "./schemas/mail.js";
 export * from "./schemas/two-factor.js";
 export * from "./schemas/display.js";
+export * from "./schemas/comments.js";
 export * from "./schemas/notifications.js";
 export * from "./schemas/legal.js";
 export * from "./schemas/sms.js";

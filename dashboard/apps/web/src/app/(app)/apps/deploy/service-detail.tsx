@@ -15,9 +15,11 @@ import { TerminalPanel } from "./terminal-panel";
 import { relativeTime } from "@/lib/relative-time";
 import { LogViewer } from "@/components/log-viewer";
 import type { HttpLogEntry } from "@polaris/deploy";
+import { Discussion } from "@/components/discussion";
 import { isInFlightStatus } from "@/lib/deploy/status";
 import { describeServiceEvent } from "./service-history";
 import { ActivityFeed } from "@/components/activity-feed";
+import type { CommentView } from "@/lib/comments/comments";
 import type { ActivityLine } from "@/lib/activity/activity";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageServiceDeleteAction } from "./project-actions";
@@ -86,7 +88,7 @@ import {
  * Security, sitting here showing the rules while the firewall grew everything
  * around them. So they link out with this service already selected instead.
  */
-const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Volumes", "Settings"] as const;
+const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Volumes", "Notes", "Settings"] as const;
 type Tab = (typeof TABS)[number];
 
 const LINKED_TABS = [
@@ -186,6 +188,7 @@ export function ServiceDetail({
                     )}
                     {tab === "Files" && <FilesPanel applicationId={app.id} />}
                     {tab === "Volumes" && <VolumesTab app={app} />}
+                    {tab === "Notes" && <NotesTab applicationId={app.id} />}
                     {tab === "Settings" && (
                         <SettingsTab app={app} isGit={isGit} staged={staged ?? false} onChanged={onChanged} />
                     )}
@@ -606,6 +609,52 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
             )}
 
             <ServiceActivity applicationId={app.id} />
+        </div>
+    );
+}
+
+/**
+ * What people have written down about this service. The history says what
+ * happened; this is where somebody says why - "restarted, the disk was full",
+ * "do not redeploy until the migration lands".
+ *
+ * Only the service's owner reaches this panel at all, and the server checks that
+ * on every call rather than trusting the id in the request, so the reader
+ * moderates the thread.
+ */
+function NotesTab({ applicationId }: { applicationId: string }) {
+    const [notes, setNotes] = useState<CommentView[] | null>(null);
+    const [error, setError] = useState("");
+    const [busy, setBusy] = useState(false);
+
+    function reload() {
+        void deployActions.serviceCommentsAction(applicationId).then(setNotes);
+    }
+    useEffect(reload, [applicationId]);
+
+    return (
+        <div className="flex flex-col gap-3 py-2">
+            {error ? <p className="text-[13px] text-danger">{error}</p> : null}
+            <Discussion
+                comments={notes}
+                canModerate
+                busy={busy}
+                placeholder="Leave a note about this service"
+                onPost={async (body) => {
+                    setBusy(true);
+                    setError("");
+                    const result = await deployActions.postServiceCommentAction({ applicationId, body });
+                    if (result.error) setError(result.error);
+                    setBusy(false);
+                    reload();
+                }}
+                onDelete={async (commentId) => {
+                    setError("");
+                    const result = await deployActions.deleteServiceCommentAction({ applicationId, commentId });
+                    if (result.error) setError(result.error);
+                    reload();
+                }}
+            />
         </div>
     );
 }

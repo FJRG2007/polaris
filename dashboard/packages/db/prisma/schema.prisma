@@ -126,7 +126,7 @@ model User {
     taskFolderMemberships TaskFolderMember[]
     taskAssignments     TaskAssignee[]
     taskWatching        TaskWatcher[]
-    taskComments        TaskComment[]
+    comments            Comment[]
     taskTimeEntries     TaskTimeEntry[]
     taskReminders       TaskReminder[]
     taskViews           TaskView[]
@@ -4205,7 +4205,6 @@ model Task {
     watchers    TaskWatcher[]
     tags        TaskTagLink[]
     fieldValues TaskCustomFieldValue[]
-    comments    TaskComment[]
     checklists  TaskChecklist[]
     blocking    TaskDependency[]       @relation("TaskBlocker")
     blockedBy   TaskDependency[]       @relation("TaskBlocked")
@@ -4278,9 +4277,18 @@ model TaskCustomFieldValue {
 // A comment, or a reply to one. A comment can be handed to somebody as an action
 // item and resolved when it is dealt with, so feedback does not need a task of
 // its own to be tracked.
-model TaskComment {
+//
+// Addressed by subject the same way Activity is, and for the same reason: a
+// server that keeps failing and a deploy somebody rolled back are things there
+// is something to say about, and a foreign key to a task is what stopped anybody
+// saying it. Nothing cascades from the subject - `lib/comments` has `forget`,
+// and whatever deletes a subject calls it. Replies still cascade from their
+// parent, which is a relation this table does have.
+model Comment {
     id           String    @id @default(uuid(7)) @db.Uuid
-    taskId       String    @db.Uuid
+    // task | service | server | volume - CommentSubject in lib/comments.
+    subjectType  String
+    subjectId    String    @db.Uuid
     parentId     String?   @db.Uuid
     userId       String?   @db.Uuid
     body         String
@@ -4291,12 +4299,11 @@ model TaskComment {
     createdAt    DateTime  @default(now())
     updatedAt    DateTime  @updatedAt
 
-    task    Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
-    user    User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
-    parent  TaskComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-    replies TaskComment[] @relation("CommentReplies")
+    user    User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+    parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+    replies Comment[] @relation("CommentReplies")
 
-    @@index([taskId, createdAt])
+    @@index([subjectType, subjectId, createdAt])
     @@index([parentId])
 }
 

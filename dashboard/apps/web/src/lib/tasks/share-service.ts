@@ -182,8 +182,8 @@ export async function getPublicTask(token: string): Promise<PublicTaskView | nul
 
     const task = share.task;
     const comments = share.showComments
-        ? await prisma.taskComment.findMany({
-              where: { taskId: task.id },
+        ? await prisma.comment.findMany({
+              where: { subjectType: "task", subjectId: task.id },
               orderBy: { createdAt: "asc" },
               take: 200,
               select: { body: true, createdAt: true, user: { select: { name: true } } }

@@ -11,6 +11,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { notify } from "@/lib/notifications/dispatch";
+import * as comments from "@/lib/comments/comments";
 import { runAutomations } from "./automation-service";
 import { notifyMentions } from "@/lib/rich-text/mention-notify";
 
@@ -35,15 +36,12 @@ async function audience(taskId: string, exceptUserId: string | null): Promise<st
  * behaviour people expect: having said something, you want to hear the reply.
  */
 export async function addComment(actorId: string, input: core.CommentInput): Promise<string> {
-    const comment = await prisma.taskComment.create({
-        data: {
-            taskId: input.taskId,
-            parentId: input.parentId,
-            userId: actorId,
-            body: input.body,
-            assignedToId: input.assignedToId
-        },
-        select: { id: true }
+    const commentId = await comments.post(actorId, {
+        subjectType: "task",
+        subjectId: input.taskId,
+        parentId: input.parentId,
+        body: input.body,
+        assignedToId: input.assignedToId
     });
     await prisma.taskWatcher
         .create({ data: { taskId: input.taskId, userId: actorId } })
@@ -78,31 +76,21 @@ export async function addComment(actorId: string, input: core.CommentInput): Pro
         except: [...recipients]
     });
     await runAutomations({ trigger: "task.commentAdded", taskId: input.taskId, actorId });
-    return comment.id;
+    return commentId;
 }
 
 /** Only the author may rewrite what they said. */
 export async function editComment(actorId: string, commentId: string, body: string): Promise<void> {
-    const updated = await prisma.taskComment.updateMany({
-        where: { id: commentId, userId: actorId },
-        data: { body }
-    });
-    if (updated.count === 0) throw new Error("You can only edit your own comments");
+    await comments.edit(actorId, commentId, body);
 }
 
 export async function deleteComment(actorId: string, commentId: string, canModerate: boolean): Promise<void> {
-    const deleted = await prisma.taskComment.deleteMany({
-        where: canModerate ? { id: commentId } : { id: commentId, userId: actorId }
-    });
-    if (deleted.count === 0) throw new Error("You can only delete your own comments");
+    await comments.remove(actorId, commentId, canModerate);
 }
 
 /** Mark a comment dealt with, or reopen it. */
 export async function setCommentResolved(actorId: string, commentId: string, resolved: boolean): Promise<void> {
-    await prisma.taskComment.update({
-        where: { id: commentId },
-        data: { resolvedAt: resolved ? new Date() : null, resolvedById: resolved ? actorId : null }
-    });
+    await comments.setResolved(actorId, commentId, resolved);
 }
 
 // ---------------------------------------------------------------------------

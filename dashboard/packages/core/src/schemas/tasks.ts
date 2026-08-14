@@ -16,6 +16,7 @@
 
 import { z } from "zod";
 import { emailField } from "./auth.js";
+import { commentBody } from "./comments.js";
 
 // ---------------------------------------------------------------------------
 // Shared field primitives
@@ -1091,7 +1092,7 @@ export type TaskSelectionInput = z.infer<typeof taskSelectionSchema>;
 
 export const commentSchema = z.object({
     taskId: uuid,
-    body: z.string().trim().min(1, "Write something first").max(10000),
+    body: commentBody,
     parentId: uuid.nullable().default(null),
     /** A comment can be handed to somebody as an action item. */
     assignedToId: uuid.nullable().default(null)

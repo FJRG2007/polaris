@@ -14,6 +14,7 @@ import { normalizeRoot } from "@polaris/deploy";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import * as activity from "@/lib/activity/activity";
+import * as comments from "@/lib/comments/comments";
 import * as deployService from "@/lib/deploy-service";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { DomainOwner } from "@/lib/owner-domains";
@@ -80,6 +81,7 @@ import {
 } from "@/lib/deploy/named-tunnel-service";
 import {
     canHostMount,
+    subjectCommentSchema,
     databaseCreateSchema,
     DB_ENGINES,
     normalizeRelPath,
@@ -438,6 +440,44 @@ export async function serviceHistoryAction(applicationId: string): Promise<activ
     }
 }
 
+/** The notes people have left on this service. */
+export async function serviceCommentsAction(applicationId: string): Promise<comments.CommentView[]> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        return await deployService.serviceComments(applicationId, user.id);
+    } catch {
+        return [];
+    }
+}
+
+export async function postServiceCommentAction(input: {
+    applicationId: string;
+    body: string;
+}): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    const parsed = subjectCommentSchema.safeParse({ subjectId: input.applicationId, body: input.body });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That note cannot be posted" };
+    try {
+        await deployService.postServiceComment(parsed.data.subjectId, user.id, parsed.data.body);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not post the note" };
+    }
+}
+
+export async function deleteServiceCommentAction(input: {
+    applicationId: string;
+    commentId: string;
+}): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await deployService.deleteServiceComment(input.applicationId, user.id, input.commentId);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not delete the note" };
+    }
+}
+
 export async function deployApplicationAction(applicationId: string): Promise<{ error?: string; deploymentId?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
@@ -574,8 +614,11 @@ export async function deleteApplicationAction(applicationId: string): Promise<{ 
         await deployService.deleteApplication(applicationId, user.id);
         await recordAudit({ actorId: user.id, action: "deploy.app.delete", targetType: "application", targetId: applicationId });
         // The audit row stays - it is the record that somebody deleted this - but
-        // the feed was about a service that no longer exists, so it goes with it.
+        // the feed and the notes were about a service that no longer exists, so
+        // they go with it. Neither cascades; both live in a table shared by every
+        // app and have no foreign key to follow.
         await activity.forget("service", applicationId);
+        await comments.forget("service", applicationId);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
