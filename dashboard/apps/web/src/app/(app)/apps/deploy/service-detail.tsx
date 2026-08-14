@@ -37,6 +37,7 @@ import {
     Switch,
     Checkbox,
     Textarea,
+    EmptyState,
     DialogTitle,
     DropdownMenu,
     DialogContent,
@@ -2773,7 +2774,7 @@ function Loading() {
 }
 
 function Empty({ text }: { text: string }) {
-    return <p className="py-10 text-center text-sm text-muted-foreground">{text}</p>;
+    return <EmptyState bare title={text} />;
 }
 
 /** A masked value placeholder: fixed-width dots, so secrets never render as text. */

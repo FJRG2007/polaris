@@ -27,6 +27,7 @@ const preset: Omit<Config, "content"> = {
                 // step and `foreground.subtle` the third.
                 foreground: { DEFAULT: withAlpha("foreground"), subtle: withAlpha("subtle-foreground") },
                 muted: { DEFAULT: withAlpha("muted"), foreground: withAlpha("muted-foreground") },
+                field: withAlpha("field"),
                 border: { DEFAULT: withAlpha("border"), strong: withAlpha("border-strong") },
                 ring: withAlpha("ring"),
                 primary: { DEFAULT: withAlpha("primary"), foreground: withAlpha("primary-foreground") },

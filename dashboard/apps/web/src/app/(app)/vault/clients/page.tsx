@@ -33,7 +33,7 @@ export default async function VaultClientsPage() {
     return (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-lg font-semibold">Connect an app</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">Connect an app</h1>
                 <p className="text-sm text-muted-foreground">
                     This vault speaks the Bitwarden protocol, so their apps work with it.
                 </p>

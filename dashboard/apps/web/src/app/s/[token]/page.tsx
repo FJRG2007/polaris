@@ -147,7 +147,7 @@ export default async function SharePage({
     return (
         <PublicShell signedIn={signedIn} className="max-w-6xl">
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <h1 className="text-lg font-semibold">Shared with you</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">Shared with you</h1>
                 {share.maxDownloads !== null ? (
                     <Badge variant="neutral">
                         {Math.max(0, share.maxDownloads - share.downloadCount)} download(s) left

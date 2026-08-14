@@ -17,7 +17,7 @@ import { ProgressBar } from "./pickers";
 import { runAction } from "@/lib/run-action";
 import { useDisplayFormat } from "@/components/display-format";
 import { CalendarRange, Plus, Target, Trash2 } from "lucide-react";
-import { Button, Card, CardBody, Input, Select, cn } from "@polaris/ui";
+import { Button, Card, CardBody, EmptyState, Input, Select, cn } from "@polaris/ui";
 import type { GoalView, SprintView } from "@/lib/tasks/planning-service";
 
 // ---------------------------------------------------------------------------
@@ -46,7 +46,7 @@ export function SprintsView({
         <div className="flex min-w-0 flex-1 flex-col gap-5">
             <header className="flex flex-wrap items-center gap-3">
                 <div>
-                    <h1 className="text-xl font-semibold">Sprints</h1>
+                    <h1 className="text-[17px] font-semibold tracking-tight">Sprints</h1>
                     <p className="text-sm text-muted-foreground">Time-boxed runs of work, with what is left each day.</p>
                 </div>
                 <span className="flex-1" />
@@ -135,9 +135,7 @@ export function SprintsView({
             )}
 
             {sprints.length === 0 && !creating && (
-                <p className="rounded-lg border border-dashed border-border px-4 py-12 text-center text-sm text-muted-foreground">
-                    No sprints yet. A sprint groups work into a window without moving it out of its list.
-                </p>
+                <EmptyState title="No sprints yet." description="A sprint groups work into a window without moving it out of its list." />
             )}
 
             <ul className="flex flex-col gap-3">
@@ -265,7 +263,7 @@ export function GoalsView({
         <div className="flex min-w-0 flex-1 flex-col gap-5">
             <header className="flex flex-wrap items-center gap-3">
                 <div>
-                    <h1 className="text-xl font-semibold">Goals</h1>
+                    <h1 className="text-[17px] font-semibold tracking-tight">Goals</h1>
                     <p className="text-sm text-muted-foreground">
                         Objectives measured by targets. A target that watches a list keeps itself current.
                     </p>
@@ -330,9 +328,7 @@ export function GoalsView({
             )}
 
             {goals.length === 0 && !creating && (
-                <p className="rounded-lg border border-dashed border-border px-4 py-12 text-center text-sm text-muted-foreground">
-                    No goals yet. A goal is the outcome; the tasks are how you get there.
-                </p>
+                <EmptyState title="No goals yet." description="A goal is the outcome; the tasks are how you get there." />
             )}
 
             <ul className="grid gap-3 md:grid-cols-2">

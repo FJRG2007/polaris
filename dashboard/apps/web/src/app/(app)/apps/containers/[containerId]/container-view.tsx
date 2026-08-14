@@ -257,7 +257,7 @@ export function ContainerView({
                     </Link>
                     <div className="flex flex-wrap items-center gap-2">
                         <h1
-                            className="truncate text-xl font-semibold"
+                            className="truncate text-[17px] font-semibold tracking-tight"
                             title={detail?.name || containerRef}
                         >
                             {detail?.name || containerRef}

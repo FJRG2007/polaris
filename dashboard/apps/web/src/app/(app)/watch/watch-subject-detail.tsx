@@ -61,7 +61,7 @@ export function WatchSubjectDetail({
                     >
                         <ArrowLeft className="size-3" /> Watch
                     </Link>
-                    <h1 className="mt-1 truncate text-lg font-semibold">{name}</h1>
+                    <h1 className="mt-1 truncate text-[17px] font-semibold tracking-tight">{name}</h1>
                     <p className="truncate text-sm text-muted-foreground">{detail}</p>
                 </div>
                 {serviceHref && (

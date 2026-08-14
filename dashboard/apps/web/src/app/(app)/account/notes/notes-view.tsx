@@ -20,7 +20,7 @@ import { runAction } from "@/lib/run-action";
 import { useEffect, useRef, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
 import { Pin, PinOff, Plus, Search, Trash2 } from "lucide-react";
-import { cn, Button, ConfirmDeleteDialog, Input } from "@polaris/ui";
+import { cn, Button, EmptyState, ConfirmDeleteDialog, Input } from "@polaris/ui";
 import type { NoteSummary, NoteView } from "@/lib/notes/note-service";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 
@@ -145,9 +145,7 @@ export function NotesView({ notes, note }: { notes: readonly NoteSummary[]; note
 
             <div className="flex min-w-0 flex-1 flex-col gap-3">
                 {!note ? (
-                    <p className="rounded-lg border border-dashed border-border px-4 py-12 text-center text-sm text-muted-foreground">
-                        Pick a note, or write a new one. Nobody else can read these.
-                    </p>
+                    <EmptyState title="Pick a note, or write a new one." description="Nobody else can read these." />
                 ) : (
                     <>
                         <div className="flex items-start gap-2">

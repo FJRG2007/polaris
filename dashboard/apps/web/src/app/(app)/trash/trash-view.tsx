@@ -108,7 +108,7 @@ export function TrashView({ items }: { items: TrashRow[] }) {
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h1 className="text-lg font-semibold">Trash</h1>
+                    <h1 className="text-[17px] font-semibold tracking-tight">Trash</h1>
                     <p className="text-sm text-muted-foreground">
                         Deleted items are kept here until you restore or permanently delete them.
                     </p>

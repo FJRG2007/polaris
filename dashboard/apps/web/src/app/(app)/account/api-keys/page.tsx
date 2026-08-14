@@ -22,7 +22,7 @@ export default async function ApiKeysPage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-lg font-semibold">API keys</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">API keys</h1>
                 <p className="text-sm text-muted-foreground">
                     Credentials for scripts and integrations acting as you.
                 </p>

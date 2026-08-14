@@ -178,7 +178,7 @@ export default async function IntegrationsPage() {
     return (
         <div className="mx-auto flex max-w-4xl flex-col gap-6">
             <div>
-                <h1 className="text-lg font-medium">Integrations</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">Integrations</h1>
                 <p className="text-sm text-muted-foreground">
                     Connect Polaris to outside services. Enabled integrations run across the platform. The model
                     providers agents run on are under{" "}

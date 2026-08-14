@@ -119,7 +119,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                 <div className="min-w-0">
                     {resource ? (
                         <>
-                            <h1 className="truncate text-lg font-medium" title={resource.name}>{resource.name}</h1>
+                            <h1 className="truncate text-[17px] font-semibold tracking-tight" title={resource.name}>{resource.name}</h1>
                             <p className="text-xs text-muted-foreground">
                                 {resource.kindLabel}
                                 {resource.planName ? ` - ${resource.planName}` : " - on demand"}

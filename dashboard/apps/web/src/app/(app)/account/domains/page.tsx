@@ -27,7 +27,7 @@ export default async function AccountDomainsPage() {
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-lg font-semibold">Domains</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">Domains</h1>
                 <p className="text-muted-foreground text-sm">
                     Domains you own, so what you deploy here answers on your own name instead of this Polaris&rsquo;s.
                 </p>

@@ -244,7 +244,7 @@ export function VaultApp() {
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h1 className="text-lg font-semibold">Vault</h1>
+                    <h1 className="text-[17px] font-semibold tracking-tight">Vault</h1>
                     <p className="text-sm text-muted-foreground">
                         {items.filter((item) => !item.deleted).length} items, open in this tab only.
                     </p>

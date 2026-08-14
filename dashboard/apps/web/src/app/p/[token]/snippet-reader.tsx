@@ -128,7 +128,7 @@ export function SnippetReader({
         <PublicShell signedIn={signedIn} className="max-w-4xl">
             <div className="flex flex-wrap items-end justify-between gap-2">
                 <div className="min-w-0">
-                    <h1 className="flex items-center gap-2 truncate text-lg font-semibold">
+                    <h1 className="flex items-center gap-2 truncate text-[17px] font-semibold tracking-tight">
                         {title}
                         {sealed ? (
                             <EyeOff className="size-4 text-muted-foreground" aria-label="Sealed" />

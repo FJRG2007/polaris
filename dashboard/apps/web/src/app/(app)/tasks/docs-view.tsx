@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import * as actions from "./actions";
-import { cn, Button } from "@polaris/ui";
+import { cn, Button, EmptyState } from "@polaris/ui";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { RelativeTime } from "@/components/relative-time";
@@ -161,9 +161,7 @@ export function DocsView({
 
             <div className="flex min-w-0 flex-1 flex-col gap-3">
                 {!doc && (
-                    <p className="rounded-lg border border-dashed border-border px-4 py-12 text-center text-sm text-muted-foreground">
-                        Pick a page, or write a new one. Docs live beside the work rather than in another tool.
-                    </p>
+                    <EmptyState title="Pick a page, or write a new one." description="Docs live beside the work rather than in another tool." />
                 )}
 
                 {doc && (

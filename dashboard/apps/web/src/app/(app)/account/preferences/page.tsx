@@ -22,7 +22,7 @@ export default async function PreferencesPage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-lg font-semibold">Preferences</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">Preferences</h1>
                 <p className="text-sm text-muted-foreground">
                     Units and formats used across Polaris for your account.
                 </p>

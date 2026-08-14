@@ -64,7 +64,7 @@ export default async function AiKeysPage() {
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-lg font-semibold">AI provider keys</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">AI provider keys</h1>
                 <p className="text-muted-foreground text-sm">
                     The provider accounts your AI work bills to. A key you add here is used before anything the
                     deployment holds.

@@ -19,7 +19,7 @@ import { Fragment, useMemo, useState } from "react";
 import type { RunningTimer } from "@/lib/tasks/time-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { TaskMenu, type TaskCommands } from "./views/task-actions";
-import { Card, CardBody, ConfirmDeleteDialog, cn } from "@polaris/ui";
+import { Card, CardBody, ConfirmDeleteDialog, EmptyState, cn } from "@polaris/ui";
 import { bulkOverlay, taskOverlay, type TaskOverlay } from "./optimistic";
 import type { TaskBulkEdit, TaskEdit, TaskListRef } from "./views/shared";
 import { CircleAlert, Clock, ListChecks, Play, Square } from "lucide-react";
@@ -189,7 +189,7 @@ export function HomeView({
     return (
         <div className="flex min-w-0 flex-1 flex-col gap-5">
             <div>
-                <h1 className="text-xl font-semibold">My work</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">My work</h1>
                 <p className="text-sm text-muted-foreground">Everything assigned to you, soonest first.</p>
             </div>
 
@@ -230,9 +230,7 @@ export function HomeView({
             )}
 
             {groups.length === 0 && (
-                <p className="rounded-lg border border-dashed border-border px-4 py-12 text-center text-sm text-muted-foreground">
-                    Nothing is assigned to you. Open a list and put your name on something.
-                </p>
+                <EmptyState title="Nothing is assigned to you." description="Open a list and put your name on something." />
             )}
 
             {groups.map((group) => (

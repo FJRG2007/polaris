@@ -68,7 +68,7 @@ export function PublicForm({
         return (
             <Card className="mx-auto w-full max-w-lg">
                 <CardBody className="flex flex-col gap-3 p-8 text-center">
-                    <h1 className="text-lg font-semibold">{name}</h1>
+                    <h1 className="text-[17px] font-semibold tracking-tight">{name}</h1>
                     <p className="text-sm text-muted-foreground">This form is only open to people with an account.</p>
                     <a href="/oauth/login" className="text-sm text-primary hover:underline">
                         Sign in to continue
@@ -82,7 +82,7 @@ export function PublicForm({
         <Card className="mx-auto w-full max-w-lg">
             <CardBody className="flex flex-col gap-4 p-6">
                 <div>
-                    <h1 className="text-lg font-semibold">{name}</h1>
+                    <h1 className="text-[17px] font-semibold tracking-tight">{name}</h1>
                     {intro && <p className="mt-1 text-sm text-muted-foreground">{intro}</p>}
                 </div>
 

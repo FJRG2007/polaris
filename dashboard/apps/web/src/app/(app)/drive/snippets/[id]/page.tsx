@@ -25,7 +25,7 @@ export default async function SnippetPage({ params }: { params: Promise<{ id: st
     return (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-lg font-semibold">{snippet.title}</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">{snippet.title}</h1>
                 <p className="text-sm text-muted-foreground">
                     {snippet.description ??
                         (snippet.requestId

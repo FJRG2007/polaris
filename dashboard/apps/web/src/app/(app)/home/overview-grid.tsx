@@ -298,7 +298,7 @@ export function OverviewGrid({
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <h1 className="text-lg font-semibold tracking-tight">
+                    <h1 className="text-[17px] font-semibold tracking-tight">
                         {greeting ? (hello ? `${hello}, ${name.split(" ")[0]}` : `Welcome back, ${name.split(" ")[0]}`) : "Overview"}
                     </h1>
                     <p className="mt-1 text-sm text-muted-foreground">

@@ -43,7 +43,7 @@ export function TimesheetView({
         <div className="flex min-w-0 flex-1 flex-col gap-4">
             <header className="flex flex-wrap items-center gap-3">
                 <div>
-                    <h1 className="text-xl font-semibold">Timesheet</h1>
+                    <h1 className="text-[17px] font-semibold tracking-tight">Timesheet</h1>
                     <p className="text-sm text-muted-foreground">
                         {format.date(sheet.from)} to {format.date(sheet.to)}
                     </p>

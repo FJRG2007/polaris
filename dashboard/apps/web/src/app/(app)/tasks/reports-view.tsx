@@ -57,7 +57,7 @@ export function ReportsView({
     return (
         <div className="flex min-w-0 flex-1 flex-col gap-5">
             <header>
-                <h1 className="text-xl font-semibold">Reporting</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">Reporting</h1>
                 <p className="text-sm text-muted-foreground">
                     Across every space you can see. Archived work is left out of all of it.
                 </p>

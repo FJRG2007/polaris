@@ -34,7 +34,7 @@ import type { SavedView } from "@/lib/tasks/view-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { holdSelection, shortfallMessage } from "./views/shared";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Button, ConfirmDeleteDialog, Select, cn } from "@polaris/ui";
+import { Button, ConfirmDeleteDialog, EmptyState, Select, cn } from "@polaris/ui";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
 import { readViewPreferences, viewScopeKey, writeViewPreferences } from "./view-preferences";
 import { CalendarDays, GanttChart, LayoutList, Plus, Rows3, Search, Table2, X } from "lucide-react";
@@ -762,7 +762,7 @@ export function ListScreen({
         <div className="flex min-w-0 flex-col gap-4">
             <header className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0">
-                    <h1 className="truncate text-xl font-semibold">{title}</h1>
+                    <h1 className="truncate text-[17px] font-semibold tracking-tight">{title}</h1>
                     {subtitle && (
                         <p className="truncate text-sm text-muted-foreground">{subtitle}</p>
                     )}
@@ -932,9 +932,7 @@ export function ListScreen({
             {viewType === "gantt" && <GanttView {...viewProps} />}
 
             {rows.length === 0 && (
-                <p className="rounded-lg border border-dashed border-border px-4 py-12 text-center text-sm text-muted-foreground">
-                    Nothing here yet. Add the first task and it appears on every view of this list.
-                </p>
+                <EmptyState title="Nothing here yet." description="Add the first task and it appears on every view of this list." />
             )}
 
             <p className="text-[11px] text-muted-foreground">

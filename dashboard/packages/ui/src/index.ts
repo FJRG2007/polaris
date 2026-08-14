@@ -14,6 +14,7 @@ export { Textarea, type TextareaProps } from "./components/textarea";
 export { Badge, type BadgeProps } from "./components/badge";
 export { Card, CardHeader, CardTitle, CardBody } from "./components/card";
 export { Skeleton } from "./components/skeleton";
+export { EmptyState } from "./components/empty-state";
 export { BoneSkeleton, type CapturedLayout, type ResponsiveLayout } from "./components/bone-skeleton";
 export { Checkbox, type CheckboxProps } from "./components/checkbox";
 export { ConfirmDeleteDialog, type ConfirmDeleteDialogProps } from "./components/confirm-delete-dialog";

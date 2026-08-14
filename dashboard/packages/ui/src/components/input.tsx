@@ -18,7 +18,7 @@ export type InputProps = InputHTMLAttributes<HTMLInputElement>;
  * application's one ring (tokens.css), so nothing is restated here.
  */
 const baseClass =
-    "flex h-8 w-full rounded-md border border-border bg-background/60 px-2.5 text-[13px] text-foreground transition-colors duration-fast placeholder:text-foreground-subtle hover:border-border-strong focus:border-border-strong disabled:cursor-not-allowed disabled:opacity-50";
+    "flex h-8 w-full rounded-md border border-border bg-field px-2.5 text-[13px] text-foreground transition-colors duration-fast placeholder:text-foreground-subtle hover:border-border-strong focus:border-border-strong disabled:cursor-not-allowed disabled:opacity-50";
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(({ className, type, ...props }, ref) => {
     const [revealed, setRevealed] = useState(false);

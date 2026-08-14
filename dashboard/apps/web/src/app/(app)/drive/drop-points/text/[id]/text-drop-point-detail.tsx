@@ -159,7 +159,7 @@ export function TextDropPointDetail({
                             Drop points
                         </Link>
                     </Button>
-                    <h1 className="truncate text-lg font-semibold" title={request.title}>
+                    <h1 className="truncate text-[17px] font-semibold tracking-tight" title={request.title}>
                         {request.title}
                     </h1>
                     <p className="text-sm text-muted-foreground">

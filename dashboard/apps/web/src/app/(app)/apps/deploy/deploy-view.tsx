@@ -37,8 +37,6 @@ import {
 import {
     Badge,
     Button,
-    Card,
-    CardBody,
     ConfirmDeleteDialog,
     Dialog,
     DialogContent,
@@ -1516,18 +1514,6 @@ export function dbTone(status: string): "success" | "warning" | "danger" | "idle
     if (["failed", "error", "stopped"].includes(value)) return "danger";
     if (["queued", "provisioning", "deploying", "pending", "building"].includes(value)) return "warning";
     return "idle";
-}
-
-export function EmptyState({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
-    return (
-        <Card>
-            <CardBody className="flex flex-col items-center gap-2 py-12 text-center">
-                <div className="flex size-12 items-center justify-center rounded-full bg-muted">{icon}</div>
-                <h3 className="text-sm font-medium">{title}</h3>
-                <p className="max-w-sm text-sm text-muted-foreground">{description}</p>
-            </CardBody>
-        </Card>
-    );
 }
 
 export function DeploymentLogs({ deploymentId, onDone }: { deploymentId: string; onDone: () => void }) {

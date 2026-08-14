@@ -85,22 +85,51 @@ The interface sets at 13px, not 16px. A control plane is a dense instrument and
 
 | Size     | Used for                                              |
 | -------- | ----------------------------------------------------- |
-| 17px     | The page title. One per screen.                       |
+| 17px     | The page title. One per screen, and one size for it.  |
 | 15px     | A dialog title.                                       |
+| 14px     | A section heading inside a page (`h2`).               |
 | 13px     | Everything: rows, fields, buttons, menus, body copy.  |
 | 11px     | Group headings and badges, uppercase with tracking.   |
+
+A page title is `text-[17px] font-semibold tracking-tight`, whether it comes
+from `PageHeader` or from a screen that writes its own `h1`. It was `text-lg` on
+fifty screens, `text-xl` on seventeen and `text-2xl` on thirteen, which is three
+answers to one question and the fastest way to make a product look assembled
+rather than designed. The public marketing and legal pages are not bound by this
+- they are a different kind of page and set their titles large on purpose.
 
 Numbers that are compared down a column - sizes, durations, counts, chart axes -
 render with `font-variant-numeric: tabular-nums`, which `table` and the
 `.tabular` class turn on.
 
+A column heading is a label rather than a row of data, and `thead th` says so
+once for every table: 11px, uppercase, tracked, subtle. It is a rule rather than
+a class because the tables that most needed it were the ones whose `<thead>`
+carried no class to add to, and its specificity is low enough that any utility
+on the cell still wins - a right-aligned heading keeps its alignment.
+
 ## Controls
 
 Heights come from one scale: 24px (`xs`), 28px (`sm`), 32px (`md`, the default),
-36px (`lg`). A field is 32px and reads as a recess - a slightly darker fill than
-the surface it sits in, with a hairline edge that firms up on hover. A filled
-button carries a hairline top edge, which is what stops a solid fill from
-reading as a rectangle pasted onto the page.
+36px (`lg`). A field is 32px and reads as a recess: `bg-field`, darker than the
+card it sits on in both themes, with a hairline edge that firms up on hover. It
+is its own token rather than an alpha of the page background, which is a recess
+on the dark theme and invisible on the light one - there the page is 97% and the
+card over it is white. A filled button carries a hairline top edge, which is
+what stops a solid fill from reading as a rectangle pasted onto the page.
+
+## Empty states
+
+`EmptyState` from `@polaris/ui`: an optional icon, a short statement of what is
+not there, a sentence about it, and - whenever one exists - the control that
+fixes it. A screen that says "no servers yet" and offers no way to add one has
+told somebody they are stuck.
+
+`bare` drops the dashed frame, for an empty state inside a panel that already
+draws its own edge.
+
+A dashed border does not always mean empty: it also means "drop a file here".
+Those stay as they are.
 
 ## The focus ring
 

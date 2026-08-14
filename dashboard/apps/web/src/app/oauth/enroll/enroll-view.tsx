@@ -95,7 +95,7 @@ export function EnrollView({
         <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center gap-6 p-6">
             <header className="flex flex-col gap-3">
                 <PolarisMark className="size-8" />
-                <h1 className="text-lg font-medium">Add a second step to signing in</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">Add a second step to signing in</h1>
                 <p className="text-sm text-muted-foreground">
                     This Polaris asks every account for one. Your password stays as it is; from now on
                     signing in also asks for a code. You are signed in as {name} ({account}).
@@ -383,7 +383,7 @@ function BackupCodes({ codes, account, onDone }: { codes: string[]; account: str
         <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center gap-6 p-6">
             <header className="flex flex-col gap-3">
                 <ShieldCheck className="size-8 text-primary" />
-                <h1 className="text-lg font-medium">Two-step verification is on</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">Two-step verification is on</h1>
                 <p className="text-sm text-muted-foreground">
                     These are your way back into {account} if you lose the thing that gives you codes. Each
                     one works once. This is the only time they are shown.

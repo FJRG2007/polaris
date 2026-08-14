@@ -38,8 +38,13 @@
     --muted-foreground: 222 10% 66%;
     --subtle-foreground: 222 9% 48%;
 
-    /* Fills and edges. */
+    /* Fills and edges. `field` is what an input is filled with: a recess rather
+       than a raised surface, so it is darker than the card it sits on in both
+       themes. It is its own token because an alpha of the page background is a
+       recess on one theme and invisible on the other - in the light theme the
+       page is 97% and the card over it is white. */
     --muted: 225 10% 14%;
+    --field: 225 12% 4%;
     --border: 225 10% 16%;
     --border-strong: 225 10% 24%;
     --ring: 258 88% 66%;
@@ -93,6 +98,7 @@
     --subtle-foreground: 225 8% 48%;
 
     --muted: 225 20% 94%;
+    --field: 225 20% 95%;
     --border: 225 16% 89%;
     --border-strong: 225 16% 78%;
     --ring: 258 78% 56%;
@@ -134,6 +140,24 @@ body {
 table,
 .tabular {
     font-variant-numeric: tabular-nums;
+}
+
+/* A column heading is a label, not a row of data. Twenty-seven tables had eight
+   different answers to that and eight of them had none at all, so the heading
+   rendered at the size and weight of the values underneath it and the eye had
+   nothing to skip. Written as a rule rather than a class because the tables that
+   most needed it were the ones whose <thead> carried no class to add to.
+
+   Deliberately low specificity: any utility on the cell still wins, which is how
+   a right-aligned or differently weighted heading keeps what it asked for. */
+thead th {
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.5;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: hsl(var(--subtle-foreground));
 }
 
 /* An icon is a fixed size, not slack to be taken up when a row runs out of room.

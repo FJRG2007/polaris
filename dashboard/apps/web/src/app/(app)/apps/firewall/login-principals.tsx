@@ -269,7 +269,7 @@ function GrantRow({
     const window = describeWindow(grant, format.dateTime);
 
     return (
-        <li className="flex flex-col gap-1 rounded-md bg-background/60 px-2 py-1.5">
+        <li className="flex flex-col gap-1 rounded-md bg-muted px-2 py-1.5">
             <div className="flex items-center gap-2">
                 <span
                     className={`inline-flex min-w-0 items-center gap-1.5 text-xs ${

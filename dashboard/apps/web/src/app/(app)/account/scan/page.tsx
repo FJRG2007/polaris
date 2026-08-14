@@ -37,7 +37,7 @@ export default async function ScanPage({
     return (
         <div className="mx-auto flex max-w-xl flex-col gap-4">
             <div>
-                <h1 className="text-lg font-semibold">Scan a code</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">Scan a code</h1>
                 <p className="text-sm text-muted-foreground">
                     Let a sign-in through on a device that cannot ask for your password.
                 </p>

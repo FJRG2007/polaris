@@ -46,7 +46,7 @@ export default async function ModelProvidersPage() {
     return (
         <div className="mx-auto flex max-w-4xl flex-col gap-6">
             <div>
-                <h1 className="text-lg font-medium">AI providers</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">AI providers</h1>
                 <p className="text-sm text-muted-foreground">
                     Your own accounts with the model providers. A key is handed to a run over an authenticated call and
                     never written into a repository, so rotating it here takes effect everywhere at once. Every provider

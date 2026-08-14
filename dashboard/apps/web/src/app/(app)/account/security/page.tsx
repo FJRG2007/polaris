@@ -106,7 +106,7 @@ export default async function SecurityPage() {
     return (
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
             <div>
-                <h1 className="text-lg font-semibold">Security</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">Security</h1>
                 <p className="text-sm text-muted-foreground">
                     How you prove it is you, and how long a session stays open.
                 </p>

@@ -143,7 +143,7 @@ export function SendsView() {
     return (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-lg font-semibold">Sends</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">Sends</h1>
                 <p className="text-sm text-muted-foreground">
                     Hand something to somebody who has no vault. The key rides in the link, so
                     Polaris cannot read it.

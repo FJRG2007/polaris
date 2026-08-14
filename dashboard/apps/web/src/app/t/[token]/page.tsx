@@ -67,7 +67,7 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
         return (
             <Shell signedIn={signedIn}>
                 <div className="flex flex-1 flex-col items-center justify-center text-center">
-                    <h1 className="text-lg font-semibold">This task is not available</h1>
+                    <h1 className="text-[17px] font-semibold tracking-tight">This task is not available</h1>
                     <p className="mt-1 text-sm text-muted-foreground">
                         The link may have been turned off, or the task may have been deleted.
                     </p>

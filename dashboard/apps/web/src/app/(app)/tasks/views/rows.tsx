@@ -9,7 +9,7 @@
  * that reflows is a table you cannot compare rows in.
  */
 
-import { cn } from "@polaris/ui";
+import { cn, EmptyState } from "@polaris/ui";
 import * as core from "@polaris/core";
 import { useMemo, useState } from "react";
 import { toFacts } from "@/lib/tasks/facts";
@@ -289,9 +289,7 @@ export function ListView(props: ViewProps) {
             })}
 
             {groups.length === 0 && (
-                <p className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
-                    No tasks match this view. Change the filters, or add the first one.
-                </p>
+                <EmptyState title="No tasks match this view." description="Change the filters, or add the first one." />
             )}
         </div>
     );

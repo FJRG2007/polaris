@@ -107,7 +107,7 @@ export function ObservabilityView({
         <div className="flex w-full flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <h1 className="text-lg font-semibold">Observability</h1>
+                    <h1 className="text-[17px] font-semibold tracking-tight">Observability</h1>
                     <p className="text-sm text-muted-foreground">
                         Consumption and traffic across {environmentName}. Up to 30 days of history per service.
                     </p>

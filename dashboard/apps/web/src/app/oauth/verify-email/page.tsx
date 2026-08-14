@@ -29,7 +29,7 @@ export default async function VerifyEmailPage({
                 <>
                     <CheckCircle2 className="size-10 text-success" />
                     <div>
-                        <h1 className="text-lg font-semibold">Address confirmed</h1>
+                        <h1 className="text-[17px] font-semibold tracking-tight">Address confirmed</h1>
                         <p className="mt-1 text-sm text-muted-foreground">
                             {verified.email} is verified
                             {verified.primary ? " and is what you sign in with." : " on your account."}
@@ -40,7 +40,7 @@ export default async function VerifyEmailPage({
                 <>
                     <XCircle className="size-10 text-danger" />
                     <div>
-                        <h1 className="text-lg font-semibold">That link did not work</h1>
+                        <h1 className="text-[17px] font-semibold tracking-tight">That link did not work</h1>
                         <p className="mt-1 text-sm text-muted-foreground">
                             It has already been used, it expired, or the address is no longer on the
                             account. Ask for a new one from your profile.

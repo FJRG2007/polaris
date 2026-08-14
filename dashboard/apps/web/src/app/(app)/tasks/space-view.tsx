@@ -21,7 +21,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AutomationsPanel, FormsPanel } from "./automations-panel";
 import type { AutomationView } from "@/lib/tasks/automation-service";
 import { ChevronDown, ChevronUp, Hash, Pencil, Plus, Trash2 } from "lucide-react";
-import { Button, Card, CardBody, ConfirmDeleteDialog, Input, Select, cn } from "@polaris/ui";
+import { Button, Card, CardBody, ConfirmDeleteDialog, EmptyState, Input, Select, cn } from "@polaris/ui";
 import type {
     CustomFieldView,
     ListSummary,
@@ -94,7 +94,7 @@ export function SpaceScreen(props: SpaceScreenProps) {
     return (
         <div className="flex min-w-0 flex-1 flex-col gap-5">
             <header className="flex flex-wrap items-baseline gap-3">
-                <h1 className="text-xl font-semibold">{props.name}</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">{props.name}</h1>
                 <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
                     {props.prefix}
                 </span>
@@ -183,9 +183,7 @@ export function SpaceScreen(props: SpaceScreenProps) {
 function OverviewTab({ lists }: { lists: readonly ListSummary[] }) {
     if (lists.length === 0) {
         return (
-            <p className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
-                No lists yet. Add one from the sidebar and its tasks appear here.
-            </p>
+            <EmptyState title="No lists yet." description="Add one from the sidebar and its tasks appear here." />
         );
     }
     return (

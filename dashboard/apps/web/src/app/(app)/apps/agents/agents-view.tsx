@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { Bot } from "lucide-react";
 import { RunState } from "./run-state";
 import type { AgentRunView } from "@/lib/agents/agent-run-service";
 import type { AgentRepoView } from "@/lib/agents/agent-repo-service";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle, EmptyState } from "@polaris/ui";
 import { AGENT_EXECUTION_LABELS, AGENT_RUN_STATE_LABELS, AGENT_TRIGGER_LABELS } from "@polaris/core";
 
 /**
@@ -84,17 +85,16 @@ export function AgentsOverview({ repos, runs }: { repos: AgentRepoView[]; runs: 
 
 function Empty() {
     return (
-        <Card>
-            <CardBody className="flex flex-col items-start gap-3 py-10">
-                <p className="text-sm text-muted-foreground">
-                    No repository has an agent on it yet. Pick one, choose where its runs should happen, and mention the
-                    app in an issue to try it.
-                </p>
+        <EmptyState
+            icon={<Bot />}
+            title="No repository has an agent on it yet."
+            description="Pick one, choose where its runs should happen, and mention the app in an issue to try it."
+            action={
                 <Button asChild size="sm">
                     <Link href="/apps/agents/setup">Set up</Link>
                 </Button>
-            </CardBody>
-        </Card>
+            }
+        />
     );
 }
 

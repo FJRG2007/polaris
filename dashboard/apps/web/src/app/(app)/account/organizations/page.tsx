@@ -25,7 +25,7 @@ export default async function OrganizationsPage() {
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-lg font-semibold">Organizations</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">Organizations</h1>
                 <p className="text-muted-foreground text-sm">
                     Work that belongs to a group rather than to you. Members reach it through the teams the
                     organization gives its spaces to.

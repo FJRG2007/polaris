@@ -8,9 +8,9 @@
  * and the share/request option grids.
  */
 
+import { cn } from "../lib/cn";
 import { Check, Minus } from "lucide-react";
 import { forwardRef, type InputHTMLAttributes } from "react";
-import { cn } from "../lib/cn";
 
 export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
     /** Render a dash instead of a tick, for a partial (some-selected) state. */
@@ -23,8 +23,12 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
         return (
             <span
                 className={cn(
-                    "relative inline-flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
-                    active ? "border-primary bg-primary text-primary-foreground" : "border-border-strong bg-background/60",
+                    // The real input is transparent and sits on top of this box, and
+                    // an outline on an invisible element is invisible - which left
+                    // the only control in the application with no focus indicator at
+                    // all. The drawn box wears the ring on the input's behalf.
+                    "relative inline-flex size-4 shrink-0 items-center justify-center rounded border transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring",
+                    active ? "border-primary bg-primary text-primary-foreground" : "border-border-strong bg-field",
                     // A locked box still reads as checked, just not as yours to change.
                     props.disabled ? "opacity-60" : null,
                     className

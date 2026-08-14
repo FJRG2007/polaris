@@ -96,7 +96,7 @@ export function ServerDetail({
                     >
                         <ArrowLeft className="size-3" /> Servers
                     </Link>
-                    <h1 className="mt-1 flex flex-wrap items-center gap-2 truncate text-lg font-semibold">
+                    <h1 className="mt-1 flex flex-wrap items-center gap-2 truncate text-[17px] font-semibold tracking-tight">
                         {server.name}
                         {server.kind === "local" ? (
                             <Badge variant="primary">This machine</Badge>

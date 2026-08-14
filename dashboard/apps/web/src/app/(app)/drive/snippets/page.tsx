@@ -44,7 +44,7 @@ export default async function SnippetsPage() {
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
-                    <h1 className="text-lg font-semibold">Snippets</h1>
+                    <h1 className="text-[17px] font-semibold tracking-tight">Snippets</h1>
                     <p className="text-sm text-muted-foreground">
                         Text you can hand out by link, with the same limits as a shared file.
                     </p>
