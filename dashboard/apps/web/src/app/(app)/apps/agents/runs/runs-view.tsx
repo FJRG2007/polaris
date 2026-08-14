@@ -73,17 +73,25 @@ export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[
                 <CardBody className="p-0">
                     {runs.length === 0 ? (
                         <p className="px-4 py-10 text-sm text-muted-foreground">
-                            Nothing has run yet. Mention the app in an issue or a pull request, add an automation, or
-                            start a run here.
+                            Nothing has run yet. Mention the app in an issue or a pull request, add
+                            an automation, or start a run here.
                         </p>
                     ) : (
                         <table className="w-full text-sm">
                             <thead className="text-left text-xs text-muted-foreground">
                                 <tr className="border-b border-white/5">
-                                    <th className="w-full max-w-0 px-4 py-2 font-medium">Repository</th>
-                                    <th className="whitespace-nowrap px-4 py-2 font-medium">Started by</th>
-                                    <th className="whitespace-nowrap px-4 py-2 font-medium">Ran on</th>
-                                    <th className="whitespace-nowrap px-4 py-2 font-medium">State</th>
+                                    <th className="w-full max-w-0 px-4 py-2 font-medium">
+                                        Repository
+                                    </th>
+                                    <th className="whitespace-nowrap px-4 py-2 font-medium">
+                                        Started by
+                                    </th>
+                                    <th className="whitespace-nowrap px-4 py-2 font-medium">
+                                        Ran on
+                                    </th>
+                                    <th className="whitespace-nowrap px-4 py-2 font-medium">
+                                        State
+                                    </th>
                                     <th className="px-4 py-2" />
                                 </tr>
                             </thead>
@@ -99,10 +107,18 @@ export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[
                                                     className="hover:underline"
                                                 >
                                                     {run.repoFullName}
-                                                    {run.prNumber ? ` #${run.prNumber}` : run.issueNumber ? ` #${run.issueNumber}` : ""}
+                                                    {run.prNumber
+                                                        ? ` #${run.prNumber}`
+                                                        : run.issueNumber
+                                                          ? ` #${run.issueNumber}`
+                                                          : ""}
                                                 </a>
                                             </div>
-                                            {run.error ? <p className="mt-1 text-xs text-red-400">{run.error}</p> : null}
+                                            {run.error ? (
+                                                <p className="mt-1 text-xs text-red-400">
+                                                    {run.error}
+                                                </p>
+                                            ) : null}
                                             <GateSteps steps={run.gateSteps} />
                                         </td>
                                         <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
@@ -262,7 +278,10 @@ function StartRunDialog({ repos, onClose }: { repos: string[]; onClose: () => vo
                     <Button variant="ghost" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button onClick={start} disabled={!repoFullName || prompt.trim().length === 0 || pending}>
+                    <Button
+                        onClick={start}
+                        disabled={!repoFullName || prompt.trim().length === 0 || pending}
+                    >
                         {pending ? "Starting..." : "Start"}
                     </Button>
                 </DialogFooter>

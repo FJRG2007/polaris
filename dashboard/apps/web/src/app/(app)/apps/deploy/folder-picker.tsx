@@ -9,7 +9,14 @@
 
 import { useEffect, useState } from "react";
 import { ArrowUp, Folder, Loader2 } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@polaris/ui";
 import { listNasFoldersAction } from "./actions";
 
 export function FolderPicker({
@@ -58,15 +65,25 @@ export function FolderPicker({
                     <DialogTitle>Choose a folder</DialogTitle>
                 </DialogHeader>
                 <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={up} disabled={busy || !path} title="Up">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={up}
+                        disabled={busy || !path}
+                        title="Up"
+                    >
                         <ArrowUp className="size-4" />
                     </Button>
                     <span className="truncate text-xs text-muted-foreground">/{path}</span>
-                    {busy && <Loader2 className="ml-auto size-4 animate-spin text-muted-foreground" />}
+                    {busy && (
+                        <Loader2 className="ml-auto size-4 animate-spin text-muted-foreground" />
+                    )}
                 </div>
                 {error && <p className="text-xs text-red-400">{error}</p>}
                 <div className="max-h-72 overflow-auto rounded-md border border-border/60">
-                    {folders.length === 0 && !busy && <p className="p-3 text-xs text-muted-foreground">No sub-folders here.</p>}
+                    {folders.length === 0 && !busy && (
+                        <p className="p-3 text-xs text-muted-foreground">No sub-folders here.</p>
+                    )}
                     {folders.map((name) => (
                         <button
                             key={name}

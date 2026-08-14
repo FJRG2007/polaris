@@ -29,7 +29,16 @@ import { Connect, LocalNote, Reachability, RenameForm } from "../server-panels";
 import { EnvironmentDialog, type EnvironmentTarget } from "../environment-dialog";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
 import { ArrowLeft, Boxes, FolderOpen, MapPin, SquareTerminal, Trash2 } from "lucide-react";
-import { Badge, Button, cn, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    cn,
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@polaris/ui";
 
 /** The same cadence the table polls at - a server going down is worth noticing
  *  while its own page is open. */
@@ -70,7 +79,8 @@ export function ServerDetail({
         intervalMs: STATUS_POLL_MS,
         select: (body) => body as ServerStatusPayload
     });
-    const status: ServerStatus | null = live?.servers.find((entry) => entry.id === server.id) ?? null;
+    const status: ServerStatus | null =
+        live?.servers.find((entry) => entry.id === server.id) ?? null;
     // Only a machine that answered with a refusal or a timeout is treated as down;
     // one that has not been probed yet keeps its actions.
     const down = status?.state === "down";
@@ -88,14 +98,20 @@ export function ServerDetail({
                     </Link>
                     <h1 className="mt-1 flex flex-wrap items-center gap-2 truncate text-lg font-semibold">
                         {server.name}
-                        {server.kind === "local" ? <Badge variant="primary">This machine</Badge> : null}
+                        {server.kind === "local" ? (
+                            <Badge variant="primary">This machine</Badge>
+                        ) : null}
                         {server.sudo ? <Badge variant="warning">Root</Badge> : null}
                     </h1>
                     <p className="truncate text-sm text-muted-foreground">
                         {server.kind === "local"
                             ? `The machine Polaris runs on${live?.machineName ? `, ${live.machineName}` : ""}`
                             : `${server.detail}@${server.address}${server.port ? `:${server.port}` : ""}`}
-                        {server.os ? <span className="ml-1.5 border-l border-border pl-1.5">{server.os}</span> : null}
+                        {server.os ? (
+                            <span className="ml-1.5 border-l border-border pl-1.5">
+                                {server.os}
+                            </span>
+                        ) : null}
                     </p>
                 </div>
 
@@ -153,7 +169,11 @@ export function ServerDetail({
                         container. It needs a login on the box, so it is offered
                         only where there is one. */}
                     {server.hostId ? (
-                        <ServerUsage key={server.hostId} hostId={server.hostId} initial={initialUsage} />
+                        <ServerUsage
+                            key={server.hostId}
+                            hostId={server.hostId}
+                            initial={initialUsage}
+                        />
                     ) : null}
 
                     <ServerWorkload connectionId={connectionId} />
@@ -165,7 +185,8 @@ export function ServerDetail({
                             metrics={CONSUMPTION_METRICS}
                         />
                         <p className="text-xs text-muted-foreground">
-                            Measured from the containers running on this server, against what the machine has.
+                            Measured from the containers running on this server, against what the
+                            machine has.
                         </p>
                     </section>
                 </div>
@@ -198,20 +219,26 @@ export function ServerDetail({
                             ) : null}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            A home server behind a router and a data-centre box are exposed in different ways, so this
-                            decides how a domain is pointed at it.
+                            A home server behind a router and a data-centre box are exposed in
+                            different ways, so this decides how a domain is pointed at it.
                         </p>
                     </section>
 
                     <section className="flex flex-col gap-2">
                         <h2 className="text-sm font-medium">Reach it yourself</h2>
-                        {server.kind === "local" && !server.hostId ? <LocalNote /> : <Connect server={server} />}
+                        {server.kind === "local" && !server.hostId ? (
+                            <LocalNote />
+                        ) : (
+                            <Connect server={server} />
+                        )}
                     </section>
 
                     {server.hostId ? (
                         <section className="flex flex-col gap-2">
                             <h2 className="text-sm font-medium">
-                                {server.kind === "local" ? "Give up the login" : "Remove this server"}
+                                {server.kind === "local"
+                                    ? "Give up the login"
+                                    : "Remove this server"}
                             </h2>
                             <p className="text-xs text-muted-foreground">
                                 {server.kind === "local"
@@ -222,7 +249,9 @@ export function ServerDetail({
                                 <Button
                                     variant="secondary"
                                     size="sm"
-                                    onClick={() => setRemoving({ id: server.hostId!, name: server.name })}
+                                    onClick={() =>
+                                        setRemoving({ id: server.hostId!, name: server.name })
+                                    }
                                 >
                                     <Trash2 className="size-3.5" />
                                     {server.kind === "local" ? "Give up the login" : "Remove"}
@@ -252,7 +281,11 @@ export function ServerDetail({
                     </DialogHeader>
                     {server.sudo ? (
                         <DialogFooter>
-                            <Button size="sm" variant="ghost" onClick={() => setAsRoot((current) => !current)}>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setAsRoot((current) => !current)}
+                            >
                                 {asRoot ? `Back to ${server.detail}` : "Open as root"}
                             </Button>
                         </DialogFooter>

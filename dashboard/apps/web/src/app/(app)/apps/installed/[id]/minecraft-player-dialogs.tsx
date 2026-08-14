@@ -28,14 +28,28 @@ import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
 import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
 import { PlayerFormDialog, PlayerFormField } from "@/components/player-form-dialog";
 import { Loader2, Locate, MapPin, RefreshCw, TriangleAlert, UserSearch, X } from "lucide-react";
-import { dimensionLabel, formatCoordinates, type PlayerPosition } from "@/lib/apps/minecraft/position";
-import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import {
+    dimensionLabel,
+    formatCoordinates,
+    type PlayerPosition
+} from "@/lib/apps/minecraft/position";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Input
+} from "@polaris/ui";
 
 /** Which of the forms is open, or none. */
 export type PlayerDialog = "teleport" | "timeout" | "inventory" | "location" | "history" | "access";
 
 /** Three coordinates, absolute or `~` relative. */
-const COORDINATES = /^~?-?\d{1,7}(?:\.\d{1,3})?\s+~?-?\d{1,7}(?:\.\d{1,3})?\s+~?-?\d{1,7}(?:\.\d{1,3})?$/;
+const COORDINATES =
+    /^~?-?\d{1,7}(?:\.\d{1,3})?\s+~?-?\d{1,7}(?:\.\d{1,3})?\s+~?-?\d{1,7}(?:\.\d{1,3})?$/;
 
 /** A Java account name, which a teleport destination may also be. */
 const PLAYER_NAME = /^[A-Za-z0-9_]{1,16}$/;
@@ -57,7 +71,10 @@ export function TeleportDialog({
     const [destination, setDestination] = useState("");
     const value = destination.trim();
     const valid = PLAYER_NAME.test(value) || COORDINATES.test(value);
-    const error = value.length > 0 && !valid ? "A player's name, or three coordinates like 100 64 -220" : null;
+    const error =
+        value.length > 0 && !valid
+            ? "A player's name, or three coordinates like 100 64 -220"
+            : null;
 
     return (
         <PlayerFormDialog
@@ -72,7 +89,12 @@ export function TeleportDialog({
             {others.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                     {others.map((name) => (
-                        <Button key={name} size="sm" variant="secondary" onClick={() => setDestination(name)}>
+                        <Button
+                            key={name}
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setDestination(name)}
+                        >
                             {name}
                         </Button>
                     ))}
@@ -200,15 +222,24 @@ function Coordinates({ player, position }: { player: string; position: PlayerPos
                 <dl className="flex gap-4">
                     {(["X", "Y", "Z"] as const).map((axis, index) => (
                         <div key={axis}>
-                            <dt className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">{axis}</dt>
-                            <dd className="font-mono text-lg tabular-nums">{coordinates.split(" ")[index]}</dd>
+                            <dt className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
+                                {axis}
+                            </dt>
+                            <dd className="font-mono text-lg tabular-nums">
+                                {coordinates.split(" ")[index]}
+                            </dd>
                         </div>
                     ))}
                 </dl>
-                <CopyButton value={coordinates} label={`${player}'s coordinates`} className="size-8" />
+                <CopyButton
+                    value={coordinates}
+                    label={`${player}'s coordinates`}
+                    className="size-8"
+                />
             </div>
             <p className="text-xs text-muted-foreground">
-                {position.dimension ? dimensionLabel(position.dimension) : "World not reported"} - exactly{" "}
+                {position.dimension ? dimensionLabel(position.dimension) : "World not reported"} -
+                exactly{" "}
                 <span className="font-mono">
                     {position.x.toFixed(2)} {position.y.toFixed(2)} {position.z.toFixed(2)}
                 </span>
@@ -220,7 +251,9 @@ function Coordinates({ player, position }: { player: string; position: PlayerPos
 /** One read of the running server, with the states a read has, in the shape the
  *  frame below expects. The bag no longer goes through it - a screen that is
  *  written to has to re-read itself, which is the editor's own job. */
-function useServerRead<T extends { error?: string }>(read: () => Promise<T>): {
+function useServerRead<T extends { error?: string }>(
+    read: () => Promise<T>
+): {
     data: T | null;
     error: string | null;
     loading: boolean;
@@ -366,14 +399,15 @@ export function HistoryDialog({
         let live = true;
         void actions.readPlayerRecordAction(installedAppId, player).then((answer) => {
             if (!live) return;
-            setRecord(answer.error ? null : { record: answer.record ?? null, stats: answer.stats ?? null });
+            setRecord(
+                answer.error ? null : { record: answer.record ?? null, stats: answer.stats ?? null }
+            );
             setReading(false);
         });
         return () => {
             live = false;
         };
     }, [installedAppId, player]);
-
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -385,7 +419,11 @@ export function HistoryDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <PlayerRecordPanel record={record?.record ?? null} stats={record?.stats ?? null} loading={reading} />
+                <PlayerRecordPanel
+                    record={record?.record ?? null}
+                    stats={record?.stats ?? null}
+                    loading={reading}
+                />
 
                 {newestFirst.length === 0 ? (
                     <p className="py-8 text-center text-sm text-muted-foreground">
@@ -398,11 +436,19 @@ export function HistoryDialog({
                                 key={`${event.at ?? "unknown"}-${event.kind}-${index}`}
                                 className="flex items-center justify-between gap-3 py-1.5"
                             >
-                                <span className={event.kind === "join" ? "text-success" : "text-muted-foreground"}>
+                                <span
+                                    className={
+                                        event.kind === "join"
+                                            ? "text-success"
+                                            : "text-muted-foreground"
+                                    }
+                                >
                                     {event.kind === "join" ? "Joined" : "Left"}
                                 </span>
                                 <span className="flex items-center gap-3 text-xs text-muted-foreground">
-                                    {event.address && <span className="font-mono">{event.address}</span>}
+                                    {event.address && (
+                                        <span className="font-mono">{event.address}</span>
+                                    )}
                                     {/* The address is right here and the list is
                                         one click away, which is the whole reason
                                         several of them per player is worth having:
@@ -417,7 +463,11 @@ export function HistoryDialog({
                                             Allow this address
                                         </button>
                                     )}
-                                    <span>{event.at ? new Date(event.at).toLocaleString() : "time not logged"}</span>
+                                    <span>
+                                        {event.at
+                                            ? new Date(event.at).toLocaleString()
+                                            : "time not logged"}
+                                    </span>
                                 </span>
                             </li>
                         ))}
@@ -511,14 +561,16 @@ export function PlayerAccessDialog({
     const rule = address.trim();
     // Only the addresses that would change something: one already in the field,
     // or already registered to this player, is not an offer.
-    const offer = suggested.filter((known) => known !== rule && !(player?.addresses ?? []).includes(known));
+    const offer = suggested.filter(
+        (known) => known !== rule && !(player?.addresses ?? []).includes(known)
+    );
     const nameInvalid = name.length > 0 && !isPlayerName(edition, name);
     const addressInvalid = rule.length > 0 && !isAddressRule(rule);
     // Editing without touching the address is how a note is changed; the note is
     // stored against a rule, so the one they already have carries it.
     const noteChanged = editing && note.trim() !== (player.note ?? "");
     const ready = editing
-        ? (isAddressRule(rule) || (rule.length === 0 && noteChanged && player.addresses.length > 0))
+        ? isAddressRule(rule) || (rule.length === 0 && noteChanged && player.addresses.length > 0)
         : isPlayerName(edition, name) && isAddressRule(rule);
 
     function detect(): void {
@@ -582,7 +634,11 @@ export function PlayerAccessDialog({
                             aria-label="Find their Minecraft account"
                             title="Find their Minecraft account"
                         >
-                            {looking ? <Loader2 className="size-4 animate-spin" /> : <UserSearch className="size-4" />}
+                            {looking ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <UserSearch className="size-4" />
+                            )}
                         </Button>
                     </div>
                 </PlayerFormField>
@@ -657,7 +713,11 @@ export function PlayerAccessDialog({
                         aria-label="Use the address you are on now"
                         title="Use the address you are on now"
                     >
-                        {detecting ? <Loader2 className="size-4 animate-spin" /> : <Locate className="size-4" />}
+                        {detecting ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Locate className="size-4" />
+                        )}
                     </Button>
                 </div>
                 {/* Where that account signs in to Polaris from. The operator doing
@@ -680,7 +740,10 @@ export function PlayerAccessDialog({
                 )}
             </PlayerFormField>
 
-            <PlayerFormField label="Note" hint="Who this is, for whoever reads the list next. Only Polaris sees it.">
+            <PlayerFormField
+                label="Note"
+                hint="Who this is, for whoever reads the list next. Only Polaris sees it."
+            >
                 <Input
                     value={note}
                     onChange={(event) => setNote(event.target.value)}

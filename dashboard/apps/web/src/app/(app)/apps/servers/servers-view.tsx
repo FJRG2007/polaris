@@ -29,7 +29,15 @@ import { useLiveResource } from "@/components/use-live-resource";
 import type { RemoveServerResult } from "@/lib/server-removal-service";
 import type { ServerRow, ServerStatus, ServerStatusPayload } from "./types";
 import { EnvironmentDialog, type EnvironmentTarget } from "./environment-dialog";
-import { FolderOpen, MapPin, Server, Settings2, SquareTerminal, Trash2, TriangleAlert } from "lucide-react";
+import {
+    FolderOpen,
+    MapPin,
+    Server,
+    Settings2,
+    SquareTerminal,
+    Trash2,
+    TriangleAlert
+} from "lucide-react";
 import {
     Badge,
     Button,
@@ -88,7 +96,9 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                 already gone by now, so there is nowhere else for this to be said -
                 and "the login is still authorized over there" is exactly the kind
                 of thing that must not be swallowed. */}
-            {outcome ? <RemovalOutcome result={outcome} onDismiss={() => setOutcome(null)} /> : null}
+            {outcome ? (
+                <RemovalOutcome result={outcome} onDismiss={() => setOutcome(null)} />
+            ) : null}
 
             {unset.length > 0 ? (
                 <p className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-muted-foreground">
@@ -99,8 +109,9 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                     ) : (
                         `${unset.length} servers`
                     )}{" "}
-                    {unset.length === 1 ? "lives" : "live"}: a home server behind a router and a data-centre box are
-                    exposed in different ways, so Polaris needs the answer before it can tell you how to point a domain.
+                    {unset.length === 1 ? "lives" : "live"}: a home server behind a router and a
+                    data-centre box are exposed in different ways, so Polaris needs the answer
+                    before it can tell you how to point a domain.
                 </p>
             ) : null}
 
@@ -126,7 +137,10 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                             // has not been probed yet keeps its actions.
                             const down = status?.state === "down";
                             return (
-                                <tr key={server.id} className="border-t border-border hover:bg-card-hover">
+                                <tr
+                                    key={server.id}
+                                    className="border-t border-border hover:bg-card-hover"
+                                >
                                     <td className="px-3 py-2">
                                         <Link
                                             href={`/apps/servers/${server.id}`}
@@ -135,7 +149,9 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                                         >
                                             <Server className="size-4 text-muted-foreground" />
                                             {server.name}
-                                            {server.kind === "local" ? <Badge variant="primary">This machine</Badge> : null}
+                                            {server.kind === "local" ? (
+                                                <Badge variant="primary">This machine</Badge>
+                                            ) : null}
                                         </Link>
                                         <span className="block text-xs text-muted-foreground">
                                             {server.kind === "host" ? (
@@ -151,7 +167,9 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                                                 table already carries six, and a seventh is what makes
                                                 it unreadable on a laptop. */}
                                             {server.os ? (
-                                                <span className="ml-1.5 border-l border-border pl-1.5">{server.os}</span>
+                                                <span className="ml-1.5 border-l border-border pl-1.5">
+                                                    {server.os}
+                                                </span>
                                             ) : null}
                                         </span>
                                     </td>
@@ -163,19 +181,26 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                                         <StatusCell kind={server.kind} status={status} />
                                     </td>
                                     <td className="px-3 py-2">
-                                        <EnvironmentCell server={server} onPick={() => askEnvironment(server)} />
+                                        <EnvironmentCell
+                                            server={server}
+                                            onPick={() => askEnvironment(server)}
+                                        />
                                     </td>
                                     <td className="px-3 py-2">
                                         <div className="flex flex-wrap items-center gap-1">
                                             {server.authMethod ? (
                                                 <Badge variant="neutral">{server.authMethod}</Badge>
                                             ) : (
-                                                <span className="text-xs text-muted-foreground">Local</span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    Local
+                                                </span>
                                             )}
                                             {/* Root is worth its own badge: it is the widest thing a
                                                 server can have granted, and a server that has it should
                                                 never be one anybody has to go and check. */}
-                                            {server.sudo ? <Badge variant="warning">Root</Badge> : null}
+                                            {server.sudo ? (
+                                                <Badge variant="warning">Root</Badge>
+                                            ) : null}
                                         </div>
                                     </td>
                                     <td className="px-3 py-2">
@@ -227,8 +252,13 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                                                 // Polaris reaches its own machine through the container
                                                 // engine only, so a shell there has to be granted the
                                                 // same way any other server grants one.
-                                                <Button size="sm" variant="secondary" onClick={() => setEnrollLocal(true)}>
-                                                    <SquareTerminal className="size-3.5" /> Enable shell and files
+                                                <Button
+                                                    size="sm"
+                                                    variant="secondary"
+                                                    onClick={() => setEnrollLocal(true)}
+                                                >
+                                                    <SquareTerminal className="size-3.5" /> Enable
+                                                    shell and files
                                                 </Button>
                                             ) : null}
                                             <Button size="icon" variant="ghost" asChild>
@@ -253,9 +283,16 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                                                             ? `Stop reaching ${server.name} over SSH`
                                                             : `Remove ${server.name}`
                                                     }
-                                                    title={server.kind === "local" ? "Give up the login" : "Remove"}
+                                                    title={
+                                                        server.kind === "local"
+                                                            ? "Give up the login"
+                                                            : "Remove"
+                                                    }
                                                     onClick={() =>
-                                                        setRemoving({ id: server.hostId ?? server.id, name: server.name })
+                                                        setRemoving({
+                                                            id: server.hostId ?? server.id,
+                                                            name: server.name
+                                                        })
                                                     }
                                                 >
                                                     <Trash2 className="size-4" />
@@ -272,7 +309,8 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
 
             {remotes.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                    Add a server to reach it from Containers (Docker), Drive (SFTP) and a shell here.
+                    Add a server to reach it from Containers (Docker), Drive (SFTP) and a shell
+                    here.
                 </p>
             ) : null}
 
@@ -291,8 +329,8 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                     <DialogHeader>
                         <DialogTitle>Reach this machine</DialogTitle>
                         <DialogDescription>
-                            Run this on the machine Polaris runs on to give it a shell, its files, and a login to
-                            run jobs under.
+                            Run this on the machine Polaris runs on to give it a shell, its files,
+                            and a login to run jobs under.
                         </DialogDescription>
                     </DialogHeader>
                     <QuickEnroll kind="local" onDone={() => setEnrollLocal(false)} />
@@ -309,14 +347,22 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
 
 /** How the removal went, once the server itself is off the list: what moved, and
  *  anything Polaris could not finish on the machine and the operator now owns. */
-function RemovalOutcome({ result, onDismiss }: { result: RemoveServerResult; onDismiss: () => void }) {
+function RemovalOutcome({
+    result,
+    onDismiss
+}: {
+    result: RemoveServerResult;
+    onDismiss: () => void;
+}) {
     const moved = result.moved ?? [];
     const warnings = result.warnings ?? [];
     if (moved.length === 0 && warnings.length === 0) return null;
     return (
         <div
             className={`flex flex-col gap-1.5 rounded-md border px-3 py-2 text-xs ${
-                warnings.length > 0 ? "border-warning/30 bg-warning/5" : "border-border bg-surface/60"
+                warnings.length > 0
+                    ? "border-warning/30 bg-warning/5"
+                    : "border-border bg-surface/60"
             }`}
         >
             <div className="flex items-start justify-between gap-2">
@@ -351,7 +397,11 @@ function StatusCell({ kind, status }: { kind: ServerRow["kind"]; status: ServerS
             </Badge>
         );
     }
-    return <Badge variant="success">{status.latencyMs === null ? "Up" : `${status.latencyMs} ms`}</Badge>;
+    return (
+        <Badge variant="success">
+            {status.latencyMs === null ? "Up" : `${status.latencyMs} ms`}
+        </Badge>
+    );
 }
 
 /**
@@ -390,7 +440,11 @@ function ShellDialog({ server, onClose }: { server: ServerRow | null; onClose: (
 
                 {server?.sudo ? (
                     <DialogFooter>
-                        <Button size="sm" variant="ghost" onClick={() => setAsRoot((current) => !current)}>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setAsRoot((current) => !current)}
+                        >
                             {asRoot ? `Back to ${server.detail}` : "Open as root"}
                         </Button>
                     </DialogFooter>
@@ -429,7 +483,9 @@ function EnvironmentCell({ server, onPick }: { server: ServerRow; onPick: () => 
         >
             <Badge variant={meta.tone}>{meta.label}</Badge>
             {/* Detected but never confirmed: say so rather than pass a guess off as settled. */}
-            {server.confirmed ? null : <span className="text-xs text-muted-foreground">detected</span>}
+            {server.confirmed ? null : (
+                <span className="text-xs text-muted-foreground">detected</span>
+            )}
         </button>
     );
 }

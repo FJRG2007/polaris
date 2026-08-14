@@ -70,7 +70,10 @@ const OUTCOMES: Record<string, { text: string; bad: boolean }> = {
     cancelled: { text: "The authorization was cancelled.", bad: true },
     state_error: { text: "That request did not come from this page. Start it again.", bad: true },
     taken: { text: "That account is already linked to another Polaris account.", bad: true },
-    limit: { text: "You have already linked as many accounts of that service as you are allowed.", bad: true },
+    limit: {
+        text: "You have already linked as many accounts of that service as you are allowed.",
+        bad: true
+    },
     unavailable: { text: "This Polaris cannot connect that service yet.", bad: true },
     // Nothing here is this person's to fix, and the reason lives in a console
     // they cannot open - so the one useful thing to tell them is that the people
@@ -82,7 +85,9 @@ const OUTCOMES: Record<string, { text: string; bad: boolean }> = {
 };
 
 export function ConnectionsView({ providers }: { providers: ConnectionProviderCard[] }) {
-    const [notice, setNotice] = useState<{ provider: string; text: string; bad: boolean } | null>(null);
+    const [notice, setNotice] = useState<{ provider: string; text: string; bad: boolean } | null>(
+        null
+    );
 
     // The callbacks return here with ?provider=&connection=, read once and cleared
     // so a refresh does not keep re-announcing something that happened minutes ago.
@@ -138,7 +143,10 @@ function ProviderCard({
         setError(null);
         setRemoved((current) => [...current, account.id]);
         startTransition(async () => {
-            const result = await runAction(() => disconnectAccountAction(account.id), (message) => setError(message));
+            const result = await runAction(
+                () => disconnectAccountAction(account.id),
+                (message) => setError(message)
+            );
             if (!result || result.error) {
                 setRemoved((current) => current.filter((id) => id !== account.id));
                 if (result?.error) setError(result.error);
@@ -177,18 +185,30 @@ function ProviderCard({
                             >
                                 {account.avatarUrl ? (
                                     // eslint-disable-next-line @next/next/no-img-element -- one remote avatar, no loader needed
-                                    <img src={account.avatarUrl} alt="" className="size-6 shrink-0 rounded-full" />
+                                    <img
+                                        src={account.avatarUrl}
+                                        alt=""
+                                        className="size-6 shrink-0 rounded-full"
+                                    />
                                 ) : (
-                                    <IntegrationLogo slug={provider.slug} className="size-5 shrink-0" />
+                                    <IntegrationLogo
+                                        slug={provider.slug}
+                                        className="size-5 shrink-0"
+                                    />
                                 )}
-                                <span className="min-w-0 flex-1 truncate text-sm">{account.label}</span>
+                                <span className="min-w-0 flex-1 truncate text-sm">
+                                    {account.label}
+                                </span>
                                 {account.signsIn ? (
                                     <Badge variant="neutral" title="This account can sign you in">
                                         Signs you in
                                     </Badge>
                                 ) : null}
                                 {account.method === "token" ? (
-                                    <Badge variant="neutral" title="Connected with a personal access token">
+                                    <Badge
+                                        variant="neutral"
+                                        title="Connected with a personal access token"
+                                    >
                                         Token
                                     </Badge>
                                 ) : null}
@@ -209,7 +229,9 @@ function ProviderCard({
                         ))}
                     </ul>
                 ) : (
-                    <p className="text-sm text-muted-foreground">No {provider.name} account connected.</p>
+                    <p className="text-sm text-muted-foreground">
+                        No {provider.name} account connected.
+                    </p>
                 )}
 
                 <p className="text-xs text-muted-foreground">
@@ -218,7 +240,10 @@ function ProviderCard({
                         <>
                             {" "}
                             An account you connect can also sign you in - choose which under{" "}
-                            <Link href="/account/security" className="underline underline-offset-2 hover:text-foreground">
+                            <Link
+                                href="/account/security"
+                                className="underline underline-offset-2 hover:text-foreground"
+                            >
                                 Security
                             </Link>
                             .
@@ -233,14 +258,21 @@ function ProviderCard({
                                 size="sm"
                                 variant="secondary"
                                 disabled={!canAdd || pending}
-                                onClick={() => router.push(`/api/connections/${provider.slug}/link`)}
+                                onClick={() =>
+                                    router.push(`/api/connections/${provider.slug}/link`)
+                                }
                             >
                                 <Plus className="size-4" />
                                 Connect {provider.name}
                             </Button>
                         ) : null}
                         {provider.acceptsToken ? (
-                            <Button size="sm" variant="ghost" disabled={!canAdd || pending} onClick={() => setTokenOpen(true)}>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={!canAdd || pending}
+                                onClick={() => setTokenOpen(true)}
+                            >
                                 <KeyRound className="size-4" />
                                 Use a token
                             </Button>
@@ -255,14 +287,16 @@ function ProviderCard({
 
                 {!provider.canAuthorize && !provider.acceptsToken ? (
                     <p className="text-sm text-muted-foreground">
-                        Available once whoever administers this Polaris connects {provider.requires} under
-                        Integrations.
+                        Available once whoever administers this Polaris connects {provider.requires}{" "}
+                        under Integrations.
                     </p>
                 ) : null}
 
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
                 {notice ? (
-                    <p className={`text-sm ${notice.bad ? "text-danger" : "text-success"}`}>{notice.text}</p>
+                    <p className={`text-sm ${notice.bad ? "text-danger" : "text-success"}`}>
+                        {notice.text}
+                    </p>
                 ) : null}
             </CardBody>
 
@@ -309,8 +343,9 @@ function DisconnectDialog({
                 <DialogHeader>
                     <DialogTitle>Disconnect {account.label}?</DialogTitle>
                     <DialogDescription>
-                        Polaris stops reaching anything in this {providerName} account. Services that build from its
-                        repositories stop deploying, and any runner pool serving you stops serving them.
+                        Polaris stops reaching anything in this {providerName} account. Services
+                        that build from its repositories stop deploying, and any runner pool serving
+                        you stops serving them.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex justify-end gap-2">
@@ -346,7 +381,10 @@ function TokenDialog({
     function submit() {
         setError(null);
         startTransition(async () => {
-            const result = await runAction(() => connectGithubTokenAction(token), (message) => setError(message));
+            const result = await runAction(
+                () => connectGithubTokenAction(token),
+                (message) => setError(message)
+            );
             if (!result) return;
             if (result.error) {
                 setError(result.error);
@@ -362,7 +400,8 @@ function TokenDialog({
                 <DialogHeader>
                     <DialogTitle>Connect {providerName} with a token</DialogTitle>
                     <DialogDescription>
-                        Polaris checks the token with {providerName} and connects whichever account it belongs to.
+                        Polaris checks the token with {providerName} and connects whichever account
+                        it belongs to.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-2">

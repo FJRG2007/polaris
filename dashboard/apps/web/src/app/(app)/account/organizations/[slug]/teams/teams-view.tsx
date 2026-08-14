@@ -75,7 +75,12 @@ export function TeamsView({
                         </span>
                     </CardTitle>
                     {canManage && (
-                        <Button size="sm" variant="secondary" disabled={full} onClick={() => setCreating(true)}>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={full}
+                            onClick={() => setCreating(true)}
+                        >
                             <Plus className="size-4 shrink-0" /> New team
                         </Button>
                     )}
@@ -91,16 +96,23 @@ export function TeamsView({
                                 key={team.id}
                                 className="hover:bg-muted flex items-center gap-3 rounded-md px-2 py-1.5"
                             >
-                                <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setOpen(team)}>
+                                <button
+                                    type="button"
+                                    className="min-w-0 flex-1 text-left"
+                                    onClick={() => setOpen(team)}
+                                >
                                     <p className="truncate text-sm" title={team.name}>
                                         {team.name}
                                     </p>
                                     <p className="text-muted-foreground truncate text-xs">
-                                        @{team.slug} - {team.memberCount} member{team.memberCount === 1 ? "" : "s"},{" "}
+                                        @{team.slug} - {team.memberCount} member
+                                        {team.memberCount === 1 ? "" : "s"},{" "}
                                         {team.spaceCount + team.folderCount === 0
                                             ? "no access yet"
                                             : `${team.spaceCount + team.folderCount} grant${
-                                                  team.spaceCount + team.folderCount === 1 ? "" : "s"
+                                                  team.spaceCount + team.folderCount === 1
+                                                      ? ""
+                                                      : "s"
                                               }`}
                                     </p>
                                 </button>
@@ -119,7 +131,10 @@ export function TeamsView({
                                                 danger: true
                                             });
                                             if (!ok) return;
-                                            const result = await runAction(() => deleteTeamAction(team.id), setError);
+                                            const result = await runAction(
+                                                () => deleteTeamAction(team.id),
+                                                setError
+                                            );
                                             if (result && !result.error) router.refresh();
                                         }}
                                     >
@@ -195,7 +210,8 @@ function NewTeamDialog({
                 <DialogHeader>
                     <DialogTitle>New team</DialogTitle>
                     <DialogDescription>
-                        Give it people, then give it a space in Tasks. Everybody on it reaches that space.
+                        Give it people, then give it a space in Tasks. Everybody on it reaches that
+                        space.
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -204,7 +220,10 @@ function NewTeamDialog({
                         event.preventDefault();
                         if (!parsed.success) return;
                         setError("");
-                        const result = await runAction(() => createTeamAction(orgId, parsed.data), setError);
+                        const result = await runAction(
+                            () => createTeamAction(orgId, parsed.data),
+                            setError
+                        );
                         if (!result || result.error) {
                             if (result?.error) setError(result.error);
                             return;
@@ -247,7 +266,10 @@ function NewTeamDialog({
                         />
                     </label>
                     {error && (
-                        <p role="alert" className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
+                        <p
+                            role="alert"
+                            className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm"
+                        >
                             {error}
                         </p>
                     )}

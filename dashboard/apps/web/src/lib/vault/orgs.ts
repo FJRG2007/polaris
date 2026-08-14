@@ -18,6 +18,13 @@ import * as core from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
 import { bumpRevision } from "@/lib/vault/account";
 
+/** The one form an address is stored in. `VaultOrgUser` is unique on
+ *  `(orgId, email)`, so a creator stored with different case than an invite
+ *  would be the same person twice. */
+function address(email: string): string {
+    return email.trim().toLowerCase();
+}
+
 /** What somebody may do in an organization's vault. */
 export interface OrgStanding {
     /** The membership row, when there is one. */
@@ -93,7 +100,7 @@ export async function createOrganizationVault(input: {
             members: {
                 create: {
                     userId: input.creatorUserId,
-                    email: input.creatorEmail,
+                    email: address(input.creatorEmail),
                     status: core.ORG_USER_CONFIRMED,
                     type: core.ORG_ROLE_OWNER,
                     key: input.creatorKey,
@@ -122,19 +129,47 @@ export async function vaultOrgFor(organizationId: string) {
     });
 }
 
+/** The same, for a whole list at once, by Polaris organization id. A screen
+ *  asking about a dozen organizations should cost one query, not a dozen. */
+export async function vaultOrgsFor(organizationIds: string[]) {
+    if (organizationIds.length === 0) return new Map<string, { id: string; publicKey: string }>();
+    const rows = await prisma.vaultOrganization.findMany({
+        where: { organizationId: { in: organizationIds } },
+        select: { id: true, organizationId: true, publicKey: true }
+    });
+    return new Map(
+        rows.map((row) => [row.organizationId, { id: row.id, publicKey: row.publicKey }])
+    );
+}
+
+/** This account's membership rows across a set of vault organizations, by the
+ *  vault organization's id. */
+export async function membershipsFor(userId: string, vaultOrgIds: string[]) {
+    if (vaultOrgIds.length === 0) {
+        return new Map<string, { id: string; key: string | null; status: number }>();
+    }
+    const rows = await prisma.vaultOrgUser.findMany({
+        where: { userId, orgId: { in: vaultOrgIds } },
+        select: { id: true, orgId: true, key: true, status: true }
+    });
+    return new Map(
+        rows.map((row) => [row.orgId, { id: row.id, key: row.key, status: row.status }])
+    );
+}
+
 /** Invite somebody by address. They hold no key until they are confirmed. */
 export async function inviteMember(
     orgId: string,
     email: string,
     type: number
 ): Promise<{ ok: boolean }> {
-    const address = email.trim().toLowerCase();
-    const user = await prisma.user.findUnique({ where: { email: address }, select: { id: true } });
+    const stored = address(email);
+    const user = await prisma.user.findUnique({ where: { email: stored }, select: { id: true } });
     await prisma.vaultOrgUser.upsert({
-        where: { orgId_email: { orgId, email: address } },
+        where: { orgId_email: { orgId, email: stored } },
         create: {
             orgId,
-            email: address,
+            email: stored,
             userId: user?.id ?? null,
             type,
             status: core.ORG_USER_INVITED
@@ -151,6 +186,10 @@ export async function inviteMember(
  * public key. Until this runs the member is on the list and can decrypt nothing,
  * which is the correct state for somebody who has been invited but not vouched
  * for.
+ *
+ * Confirming also grants the whole organization, because holding the key already
+ * is the access: per-collection rules exist as rows but have no screen behind
+ * them yet, and a member confirmed without one would reach nothing at all.
  */
 export async function confirmMember(
     orgId: string,
@@ -160,7 +199,7 @@ export async function confirmMember(
     if (!core.isEncString(wrappedKey)) return false;
     const { count } = await prisma.vaultOrgUser.updateMany({
         where: { id: memberId, orgId },
-        data: { key: wrappedKey, status: core.ORG_USER_CONFIRMED }
+        data: { key: wrappedKey, status: core.ORG_USER_CONFIRMED, accessAll: true }
     });
     if (count === 0) return false;
     const member = await prisma.vaultOrgUser.findUnique({

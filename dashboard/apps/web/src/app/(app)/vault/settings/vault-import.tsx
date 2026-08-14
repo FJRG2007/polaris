@@ -17,9 +17,9 @@ import { useState } from "react";
 import { Loader2, Upload } from "lucide-react";
 import * as vaultCrypto from "@/lib/vault/crypto";
 import { readImportFile } from "@/lib/vault/portability";
-import { encryptItem, type VaultItem } from "../vault-model";
-import { saveFolderAction, saveItemAction } from "../vault-actions";
 import { Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
+import { decryptFolders, encryptItem, type VaultItem } from "../vault-model";
+import { saveFolderAction, saveItemAction, vaultContentsAction } from "../vault-actions";
 
 export function VaultImport({ vaultKey }: { vaultKey: vaultCrypto.SymmetricKey | null }) {
     const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -49,14 +49,22 @@ export function VaultImport({ vaultKey }: { vaultKey: vaultCrypto.SymmetricKey |
         setProgress({ done: 0, total: read.items.length });
 
         // Folders first: an item that names one has to have somewhere to land,
-        // and a name that already exists is reused rather than duplicated.
+        // and a name that already exists is reused rather than duplicated. The
+        // matching has to happen here because the names are encrypted - the
+        // server sees ciphertext and cannot tell two "Work" folders apart.
+        const existing = await decryptFolders((await vaultContentsAction()).folders, vaultKey);
+        const byName = new Map(existing.map((folder) => [folder.name, folder.id]));
         const folderIds: (string | null)[] = [];
         for (const name of read.folders) {
-            const result = await saveFolderAction(
-                null,
-                await vaultCrypto.encrypt(name, vaultKey)
-            );
-            folderIds.push(typeof result.folder?.id === "string" ? result.folder.id : null);
+            const known = byName.get(name);
+            if (known) {
+                folderIds.push(known);
+                continue;
+            }
+            const result = await saveFolderAction(null, await vaultCrypto.encrypt(name, vaultKey));
+            const id = typeof result.folder?.id === "string" ? result.folder.id : null;
+            if (id) byName.set(name, id);
+            folderIds.push(id);
         }
 
         let failed = 0;

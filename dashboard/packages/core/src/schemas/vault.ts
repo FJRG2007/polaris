@@ -194,12 +194,21 @@ export const cipherCollectionsSchema = z.object({
  * `folderRelationships` is Bitwarden's way of saying which item goes in which
  * folder without ids that do not exist yet: both arrays are positional, and each
  * relationship pairs an index in one with an index in the other.
+ *
+ * The caps are what keeps one request from becoming an unbounded write. They sit
+ * far above any real vault; somebody past them splits the file.
  */
+export const VAULT_IMPORT_MAX_FOLDERS = 500;
+export const VAULT_IMPORT_MAX_CIPHERS = 10_000;
+
 export const vaultImportSchema = z.object({
-    folders: z.array(vaultFolderSchema).default([]),
-    ciphers: z.array(cipherSchema).default([]),
+    folders: z.array(vaultFolderSchema).max(VAULT_IMPORT_MAX_FOLDERS).default([]),
+    ciphers: z.array(cipherSchema).max(VAULT_IMPORT_MAX_CIPHERS).default([]),
     folderRelationships: z
-        .array(z.object({ key: z.number().int().nonnegative(), value: z.number().int().nonnegative() }))
+        .array(
+            z.object({ key: z.number().int().nonnegative(), value: z.number().int().nonnegative() })
+        )
+        .max(VAULT_IMPORT_MAX_CIPHERS)
         .default([])
 });
 

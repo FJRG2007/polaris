@@ -235,6 +235,14 @@ function readBitwardenJson(text: string): ImportedVault {
         if (card) item.card = { ...item.card, ...card };
         const identity = raw.identity as Record<string, string> | undefined;
         if (identity) item.identity = { ...item.identity, ...identity };
+        const sshKey = raw.sshKey as Record<string, unknown> | undefined;
+        if (sshKey) {
+            item.sshKey = {
+                privateKey: String(sshKey.privateKey ?? ""),
+                publicKey: String(sshKey.publicKey ?? ""),
+                keyFingerprint: String(sshKey.keyFingerprint ?? "")
+            };
+        }
         const fields = Array.isArray(raw.fields) ? raw.fields : [];
         item.fields = fields.map((entry) => {
             const field = entry as Record<string, unknown>;

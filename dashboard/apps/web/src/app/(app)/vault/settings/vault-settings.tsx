@@ -12,13 +12,13 @@
 
 import * as core from "@polaris/core";
 import * as crypto from "@/lib/vault/crypto";
-import { useState, type FormEvent } from "react";
 import { VaultImport } from "./vault-import";
 import { VaultExport } from "./vault-export";
+import { useState, type FormEvent } from "react";
 import { useVaultSession } from "../vault-session";
 import { useConfirm } from "@/components/confirm-dialog";
-import { Clock, Loader2, ShieldAlert, Trash2 } from "lucide-react";
 import { usePasswordSafety } from "@/lib/use-password-safety";
+import { Clock, Loader2, ShieldAlert, Trash2 } from "lucide-react";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import {
     changeMasterPasswordAction,
@@ -116,7 +116,6 @@ export function VaultSettings() {
             setPending(null);
         }
     }
-
 
     async function onDelete() {
         const confirmed = await confirm({
@@ -252,8 +251,8 @@ export function VaultSettings() {
                 </CardHeader>
                 <CardBody className="flex flex-col gap-3">
                     <p className="text-sm text-muted-foreground">
-                        Your key is held by this browser, never by the server. This is how long
-                        it may keep it while you are not using the vault.
+                        Your key is held by this browser, never by the server. This is how long it
+                        may keep it while you are not using the vault.
                     </p>
                     <Select
                         value={lockAfter}
@@ -269,8 +268,9 @@ export function VaultSettings() {
                             // The session that holds the key was built with the old
                             // setting; locking is the honest way to move to the new
                             // one rather than applying it at some unclear moment.
-                            setDone("Saved. Your vault has been locked so the new setting applies.");
-                            lock();
+                            // The reason travels with the lock, because this screen
+                            // unmounts the moment the key goes.
+                            lock("Saved. Your vault was locked so the new setting applies.");
                         }}
                         aria-label="How long the vault stays open"
                         options={core.VAULT_UNLOCK_TIMEOUTS.map((minutes) => ({

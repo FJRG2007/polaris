@@ -179,6 +179,31 @@ const CIPHER_SELECT = {
     attachments: { select: { id: true, fileName: true, key: true, size: true } }
 } as const;
 
+/**
+ * Whether this account starred an item.
+ *
+ * A star is per person and lives in its own table, so it is never on the row a
+ * write returns - every response has to look it up. Answering `false` instead
+ * would make a client apply the response and quietly unstar what it is holding.
+ */
+async function isStarred(userId: string, cipherId: string): Promise<boolean> {
+    const row = await prisma.vaultFavorite.findUnique({
+        where: { userId_cipherId: { userId, cipherId } },
+        select: { userId: true }
+    });
+    return row !== null;
+}
+
+/** The same answer for a list of items, in one query. */
+async function starredIds(userId: string, cipherIds: string[]): Promise<Set<string>> {
+    if (cipherIds.length === 0) return new Set();
+    const rows = await prisma.vaultFavorite.findMany({
+        where: { userId, cipherId: { in: cipherIds } },
+        select: { cipherId: true }
+    });
+    return new Set(rows.map((row) => row.cipherId));
+}
+
 /** Every item this account can see, trash included - clients draw the trash. */
 export async function listCiphers(userId: string) {
     const [rows, favorites] = await Promise.all([
@@ -200,11 +225,7 @@ export async function getCipher(userId: string, cipherId: string) {
         select: CIPHER_SELECT
     });
     if (!row) return null;
-    const favorite = await prisma.vaultFavorite.findUnique({
-        where: { userId_cipherId: { userId, cipherId } },
-        select: { userId: true }
-    });
-    return toCipherResponse(row, favorite !== null);
+    return toCipherResponse(row, await isStarred(userId, cipherId));
 }
 
 /** Whether this account may WRITE an item, which is narrower than seeing it. */
@@ -377,11 +398,7 @@ export async function updateCipher(
         await setFavorite(userId, cipherId, input.favorite);
     }
     await bumpRevision(userId);
-    const favorite = await prisma.vaultFavorite.findUnique({
-        where: { userId_cipherId: { userId, cipherId } },
-        select: { userId: true }
-    });
-    return { ok: true, cipher: toCipherResponse(row, favorite !== null) };
+    return { ok: true, cipher: toCipherResponse(row, await isStarred(userId, cipherId)) };
 }
 
 /**
@@ -413,11 +430,7 @@ export async function updateCipherPartial(
         await setFavorite(userId, cipherId, changes.favorite);
     }
     await bumpRevision(userId);
-    const favorite = await prisma.vaultFavorite.findUnique({
-        where: { userId_cipherId: { userId, cipherId } },
-        select: { userId: true }
-    });
-    return { ok: true, cipher: toCipherResponse(row, favorite !== null) };
+    return { ok: true, cipher: toCipherResponse(row, await isStarred(userId, cipherId)) };
 }
 
 /**
@@ -456,7 +469,7 @@ export async function setCipherCollections(
         });
     });
     await bumpRevision(userId);
-    return { ok: true, cipher: toCipherResponse(row, false) };
+    return { ok: true, cipher: toCipherResponse(row, await isStarred(userId, cipherId)) };
 }
 
 /** Every item of one organization this account can see. */
@@ -466,7 +479,11 @@ export async function listOrganizationCiphers(userId: string, organizationId: st
         where: { AND: [{ organizationId }, filter] },
         select: CIPHER_SELECT
     });
-    return rows.map((row) => toCipherResponse(row, false));
+    const starred = await starredIds(
+        userId,
+        rows.map((row) => row.id)
+    );
+    return rows.map((row) => toCipherResponse(row, starred.has(row.id)));
 }
 
 /**
@@ -476,6 +493,11 @@ export async function listOrganizationCiphers(userId: string, organizationId: st
  * between the two is positional - which is why this is one function rather than
  * the client making a call per row: half an import is worse than none, and the
  * indexes only mean anything while both lists are in hand.
+ *
+ * "Half an import is worse than none" is why the writes are one transaction: a
+ * failure part-way would otherwise leave the folders standing and some of the
+ * items in them, with nothing saying which. The size of that transaction is
+ * bounded by `vaultImportSchema`, which caps both lists.
  *
  * Personal only. An import that could name an organization would be a way to
  * push items into somebody else's vault in bulk.
@@ -488,34 +510,38 @@ export async function importCiphers(
         folderRelationships: { key: number; value: number }[];
     }
 ): Promise<number> {
-    const folderIds: string[] = [];
-    for (const folder of input.folders) {
-        const row = await prisma.vaultFolder.create({
-            data: { userId, name: folder.name },
-            select: { id: true }
-        });
-        folderIds.push(row.id);
-    }
-    const folderOf = new Map<number, string>();
-    for (const link of input.folderRelationships) {
-        const id = folderIds[link.value];
-        if (id) folderOf.set(link.key, id);
-    }
-
-    let written = 0;
-    for (const [index, cipher] of input.ciphers.entries()) {
-        await prisma.vaultCipher.create({
-            data: {
-                userId,
-                organizationId: null,
-                folderId: folderOf.get(index) ?? null,
-                type: cipher.type,
-                data: toDocument(cipher),
-                reprompt: cipher.reprompt ?? 0
+    const written = await prisma.$transaction(
+        async (tx) => {
+            // One create per folder, because the ids are generated on insert and
+            // the relationships below are positional against them.
+            const folderIds: string[] = [];
+            for (const folder of input.folders) {
+                const row = await tx.vaultFolder.create({
+                    data: { userId, name: folder.name },
+                    select: { id: true }
+                });
+                folderIds.push(row.id);
             }
-        });
-        written += 1;
-    }
+            const folderOf = new Map<number, string>();
+            for (const link of input.folderRelationships) {
+                const id = folderIds[link.value];
+                if (id) folderOf.set(link.key, id);
+            }
+
+            const { count } = await tx.vaultCipher.createMany({
+                data: input.ciphers.map((cipher, index) => ({
+                    userId,
+                    organizationId: null,
+                    folderId: folderOf.get(index) ?? null,
+                    type: cipher.type,
+                    data: toDocument(cipher),
+                    reprompt: cipher.reprompt ?? 0
+                }))
+            });
+            return count;
+        },
+        { maxWait: 10_000, timeout: 120_000 }
+    );
     await bumpRevision(userId);
     return written;
 }
@@ -654,7 +680,7 @@ export async function shareCipher(
         });
     });
     await bumpRevision(userId);
-    return { ok: true, cipher: toCipherResponse(row, false) };
+    return { ok: true, cipher: toCipherResponse(row, await isStarred(userId, cipherId)) };
 }
 
 /** Empty a personal vault. Organization items are not the caller's to purge. */

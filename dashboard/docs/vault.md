@@ -24,11 +24,11 @@ The opened key lives in the browser, in a session shared by every vault screen
 password again. How long it may be kept while idle is the account's own setting
 under Vault settings:
 
-| Choice | Where the key is kept |
-| ------ | --------------------- |
-| As soon as I leave the vault | Memory only. Leaving `/vault` drops it. |
-| 1 minute to 4 hours | The tab's `sessionStorage`, with a deadline that moves forward while the vault is used. |
-| When I close the tab | The tab's `sessionStorage`, with no deadline. |
+| Choice                       | Where the key is kept                                                                   |
+| ---------------------------- | --------------------------------------------------------------------------------------- |
+| As soon as I leave the vault | Memory only. Leaving `/vault` drops it.                                                 |
+| 1 minute to 4 hours          | The tab's `sessionStorage`, with a deadline that moves forward while the vault is used. |
+| When I close the tab         | The tab's `sessionStorage`, with no deadline.                                           |
 
 Never `localStorage` and never a cookie: `sessionStorage` is per tab and is gone
 when the tab closes, so nothing survives to disk or to the next browser session.
@@ -146,6 +146,12 @@ is called "Account", a LastPass file whose folder column is called "grouping"
 and a browser's export all read correctly. Folders survive.
 
 Written: the same three. `test/vault/portability.test.ts` round-trips each one.
+An export leaves out any organization item this account does not hold the key
+for, rather than writing it as a row of blanks, and says how many it left out.
+An import is capped at 500 folders and 10,000 items (`VAULT_IMPORT_MAX_FOLDERS`,
+`VAULT_IMPORT_MAX_CIPHERS` in `packages/core/src/schemas/vault.ts`) and lands in
+one transaction, so a failure part-way through never leaves folders standing
+with only some of their items in them.
 
 `lib/vault/crypto.ts` is pinned against Bitwarden's own test vectors in
 `test/vault/crypto.test.ts`. A change there that passes the tests keeps every

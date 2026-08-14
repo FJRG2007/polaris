@@ -33,7 +33,10 @@ export const orgSlugField = z
     .min(3, "At least 3 characters")
     .max(30, "At most 30 characters")
     .regex(/^[a-z0-9_-]+$/, "Use letters, numbers, - or _")
-    .refine((value) => !value.startsWith("-") && !value.endsWith("-"), "Cannot start or end with -");
+    .refine(
+        (value) => !value.startsWith("-") && !value.endsWith("-"),
+        "Cannot start or end with -"
+    );
 
 /**
  * A handle suggested from a name, so somebody typing "Acme Design Co." is
@@ -41,14 +44,16 @@ export const orgSlugField = z
  * is stored is whatever they confirm, put through `orgSlugField`.
  */
 export function suggestSlug(name: string): string {
-    return name
-        .normalize("NFKD")
-        // Drop the accents NFKD just split off, so "Pena" comes out of "Peña".
-        .replace(/[̀-ͯ]/g, "")
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, 30);
+    return (
+        name
+            .normalize("NFKD")
+            // Drop the accents NFKD just split off, so "Pena" comes out of "Peña".
+            .replace(/[̀-ͯ]/g, "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .slice(0, 30)
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -93,21 +98,28 @@ export type GrantedOrgPermission = OrgPermission | typeof ALL_ORG_PERMISSIONS;
 
 /** What each permission is called and where it belongs, so the role editor is
  *  grouped the way the organization's own screens are rather than listing keys. */
-export const ORG_PERMISSION_META: Readonly<Record<OrgPermission, { area: string; label: string }>> = {
-    "org.read": { area: "General", label: "See the organization, its people and its teams" },
-    "settings.manage": { area: "General", label: "Change the name, handle, description and photo" },
-    "activity.read": { area: "General", label: "Read what has been done here" },
-    "people.manage": { area: "People", label: "Add and remove people, and set their role" },
-    "teams.manage": { area: "People", label: "Create teams and run their rosters" },
-    "roles.manage": { area: "People", label: "Define what the organization's roles may do" },
-    "spaces.manage": { area: "Work", label: "Create and administer the organization's spaces" },
-    "deploy.manage": { area: "Work", label: "Deploy and configure the organization's services" },
-    "domains.manage": { area: "Work", label: "Add and verify the organization's domains" },
-    // Who is in the shared vault and what is in it. NOT the ability to read what
-    // is in it: that needs the organization's key, which only a member somebody
-    // has already vouched for holds, and no permission can hand it over.
-    "vault.manage": { area: "Work", label: "Run the shared vault's collections and members" }
-};
+export const ORG_PERMISSION_META: Readonly<Record<OrgPermission, { area: string; label: string }>> =
+    {
+        "org.read": { area: "General", label: "See the organization, its people and its teams" },
+        "settings.manage": {
+            area: "General",
+            label: "Change the name, handle, description and photo"
+        },
+        "activity.read": { area: "General", label: "Read what has been done here" },
+        "people.manage": { area: "People", label: "Add and remove people, and set their role" },
+        "teams.manage": { area: "People", label: "Create teams and run their rosters" },
+        "roles.manage": { area: "People", label: "Define what the organization's roles may do" },
+        "spaces.manage": { area: "Work", label: "Create and administer the organization's spaces" },
+        "deploy.manage": {
+            area: "Work",
+            label: "Deploy and configure the organization's services"
+        },
+        "domains.manage": { area: "Work", label: "Add and verify the organization's domains" },
+        // Who is in the shared vault and what is in it. NOT the ability to read what
+        // is in it: that needs the organization's key, which only a member somebody
+        // has already vouched for holds, and no permission can hand it over.
+        "vault.manage": { area: "Work", label: "Run the shared vault's collections and members" }
+    };
 
 /** The areas in the order the editor draws them. Read off the meta rather than
  *  written twice, so a permission added above cannot go missing from the screen. */
@@ -126,7 +138,10 @@ export const ORG_PERMISSION_AREAS: readonly string[] = [
  * deleted, because a membership row may still name it.
  */
 export const ORG_SYSTEM_ROLES: Readonly<
-    Record<string, { name: string; description: string; permissions: readonly GrantedOrgPermission[] }>
+    Record<
+        string,
+        { name: string; description: string; permissions: readonly GrantedOrgPermission[] }
+    >
 > = {
     admin: {
         name: "Admin",
@@ -163,7 +178,10 @@ export const orgRoleSlugField = z
     .min(2, "At least 2 characters")
     .max(30, "At most 30 characters")
     .regex(/^[a-z0-9-]+$/, "Use letters, numbers or -")
-    .refine((value) => !value.startsWith("-") && !value.endsWith("-"), "Cannot start or end with -");
+    .refine(
+        (value) => !value.startsWith("-") && !value.endsWith("-"),
+        "Cannot start or end with -"
+    );
 
 /**
  * Whether a set of grants carries a permission. The wildcard answers yes to
@@ -178,7 +196,11 @@ export function hasOrgPermission(granted: readonly string[], permission: OrgPerm
  *  only the seeded admin holds it, so nobody can mint a second unrestricted role
  *  and then be surprised by what a future version put inside it. */
 export const orgRoleSchema = z.object({
-    name: z.string().trim().min(1, "Enter a name").max(ORG_ROLE_NAME_MAX, `At most ${ORG_ROLE_NAME_MAX} characters`),
+    name: z
+        .string()
+        .trim()
+        .min(1, "Enter a name")
+        .max(ORG_ROLE_NAME_MAX, `At most ${ORG_ROLE_NAME_MAX} characters`),
     slug: orgRoleSlugField,
     description: z.string().trim().max(200).default(""),
     permissions: z.array(z.enum(ORG_PERMISSIONS)).default([])
@@ -206,7 +228,11 @@ export const TEAM_ROLE_HINTS: Record<TeamRole, string> = {
 // ---------------------------------------------------------------------------
 
 export const organizationSchema = z.object({
-    name: z.string().trim().min(1, "Enter a name").max(ORG_NAME_MAX, `At most ${ORG_NAME_MAX} characters`),
+    name: z
+        .string()
+        .trim()
+        .min(1, "Enter a name")
+        .max(ORG_NAME_MAX, `At most ${ORG_NAME_MAX} characters`),
     slug: orgSlugField,
     description: z.string().trim().max(500).default("")
 });
@@ -220,7 +246,11 @@ export const organizationProfileSchema = organizationSchema.omit({ slug: true })
 export type OrganizationProfileInput = z.infer<typeof organizationProfileSchema>;
 
 export const teamSchema = z.object({
-    name: z.string().trim().min(1, "Enter a name").max(ORG_NAME_MAX, `At most ${ORG_NAME_MAX} characters`),
+    name: z
+        .string()
+        .trim()
+        .min(1, "Enter a name")
+        .max(ORG_NAME_MAX, `At most ${ORG_NAME_MAX} characters`),
     slug: orgSlugField,
     description: z.string().trim().max(500).default("")
 });

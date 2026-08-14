@@ -132,8 +132,8 @@ export function ShareDialog({
 
                 {usable.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                        You are not in a shared vault yet. One has to be set up for an
-                        organization, and somebody already in it has to let you in.
+                        You are not in a shared vault yet. One has to be set up for an organization,
+                        and somebody already in it has to let you in.
                     </p>
                 ) : (
                     <div className="flex flex-col gap-3">

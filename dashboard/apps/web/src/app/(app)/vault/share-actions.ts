@@ -48,33 +48,47 @@ export interface VaultOrgView {
     memberId: string | null;
 }
 
-/** Every organization this account is in, and where it stands in each vault. */
+/**
+ * Every organization this account is in, and where it stands in each vault.
+ *
+ * Batched rather than looped: this runs on every unlock and after every change
+ * to an organization, and asking three questions per organization in turn made
+ * opening the vault cost a round trip per row on the roster.
+ */
 export async function vaultOrganizationsAction(): Promise<VaultOrgView[]> {
     const user = await requirePermission("vault.use");
     const orgs = await listMyOrgs(user.id);
-    const views: VaultOrgView[] = [];
-    for (const org of orgs) {
-        const access = await resolveOrgAccess({ id: user.id, isAdmin: user.isAdmin }, org.id);
-        const vault = await vaultOrgs.vaultOrgFor(org.id);
-        const membership = vault
-            ? await prisma.vaultOrgUser.findFirst({
-                  where: { orgId: vault.id, userId: user.id },
-                  select: { id: true, key: true, status: true }
-              })
-            : null;
-        views.push({
+    if (orgs.length === 0) return [];
+
+    const vaults = await vaultOrgs.vaultOrgsFor(orgs.map((org) => org.id));
+    const [memberships, accesses] = await Promise.all([
+        vaultOrgs.membershipsFor(
+            user.id,
+            [...vaults.values()].map((vault) => vault.id)
+        ),
+        // Not one query: resolving what somebody may do in an organization runs
+        // through the role rules rather than a column. Concurrent is what is
+        // available here, and it is the difference that was being paid for.
+        Promise.all(
+            orgs.map((org) => resolveOrgAccess({ id: user.id, isAdmin: user.isAdmin }, org.id))
+        )
+    ]);
+
+    return orgs.map((org, index) => {
+        const vault = vaults.get(org.id) ?? null;
+        const membership = vault ? (memberships.get(vault.id) ?? null) : null;
+        return {
             organizationId: org.id,
             name: org.name,
             slug: org.slug,
             vaultOrgId: vault?.id ?? null,
-            mayAdminister: orgCan(access, "vault.manage"),
+            mayAdminister: orgCan(accesses[index] ?? null, "vault.manage"),
             wrappedKey: membership?.key ?? null,
             confirmed: membership?.status === core.ORG_USER_CONFIRMED,
             publicKey: vault?.publicKey ?? null,
             memberId: membership?.id ?? null
-        });
-    }
-    return views;
+        };
+    });
 }
 
 /** Give a Polaris organization a vault, from keys a browser just minted. */
@@ -120,10 +134,7 @@ async function administered(
     organizationId: string
 ): Promise<{ ok: true; vaultOrgId: string } | { ok: false; error: string }> {
     const user = await requirePermission("vault.use");
-    const access = await resolveOrgAccess(
-        { id: user.id, isAdmin: user.isAdmin },
-        organizationId
-    );
+    const access = await resolveOrgAccess({ id: user.id, isAdmin: user.isAdmin }, organizationId);
     if (!orgCan(access, "vault.manage")) {
         return { ok: false, error: "You cannot administer that organization's vault." };
     }
@@ -143,7 +154,7 @@ export async function vaultOrgMembersAction(organizationId: string): Promise<{
     if (!gate.ok) return { error: gate.error };
 
     const members = await vaultOrgs.listMembers(gate.vaultOrgId);
-    const invited = new Set(members.map((row) => String(row.email ?? "")));
+    const invited = new Set(members.map((row) => String(row.email ?? "").toLowerCase()));
     const roster = await prisma.organization.findUnique({
         where: { id: organizationId },
         select: {
@@ -162,9 +173,7 @@ export async function vaultOrgMembersAction(organizationId: string): Promise<{
         where: { userId: { in: people.map((person) => person.id) } },
         select: { userId: true, publicKey: true }
     });
-    const keyed = new Set(
-        withVaults.filter((row) => row.publicKey).map((row) => row.userId)
-    );
+    const keyed = new Set(withVaults.filter((row) => row.publicKey).map((row) => row.userId));
     return {
         members,
         candidates: people

@@ -3,8 +3,17 @@
 import { Plus, Trash2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
-import { addDefaultAutomationsAction, removeAutomationAction, saveAutomationAction } from "../actions";
-import { AGENT_TRIGGERS, AGENT_TRIGGER_LABELS, AGENT_TRIGGER_NOTES, type AgentTrigger } from "@polaris/core";
+import {
+    addDefaultAutomationsAction,
+    removeAutomationAction,
+    saveAutomationAction
+} from "../actions";
+import {
+    AGENT_TRIGGERS,
+    AGENT_TRIGGER_LABELS,
+    AGENT_TRIGGER_NOTES,
+    type AgentTrigger
+} from "@polaris/core";
 import {
     Badge,
     Button,
@@ -37,8 +46,14 @@ function parseCondition(raw: string): { labels: string[]; branches: string[]; au
     try {
         const parsed = JSON.parse(raw) as Record<string, unknown>;
         const list = (value: unknown) =>
-            Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
-        return { labels: list(parsed.labels), branches: list(parsed.branches), authors: list(parsed.authors) };
+            Array.isArray(value)
+                ? value.filter((entry): entry is string => typeof entry === "string")
+                : [];
+        return {
+            labels: list(parsed.labels),
+            branches: list(parsed.branches),
+            authors: list(parsed.authors)
+        };
     } catch {
         return { labels: [], branches: [], authors: [] };
     }
@@ -94,8 +109,9 @@ export function AutomationsView({
                     {rules.length === 0 ? (
                         <div className="space-y-3 px-4 py-10">
                             <p className="text-sm text-muted-foreground">
-                                No rules yet, so these repositories only answer when the app is mentioned. A rule is
-                                what makes one act on its own - reply to a new issue, review a new pull request.
+                                No rules yet, so these repositories only answer when the app is
+                                mentioned. A rule is what makes one act on its own - reply to a new
+                                issue, review a new pull request.
                             </p>
                             {/* Repositories added from now on get these already. This is
                                 for the ones added before, and for anybody who cleared
@@ -127,7 +143,9 @@ export function AutomationsView({
                                             className="min-w-0 flex-1 text-left"
                                         >
                                             <p className="truncate text-sm">
-                                                {AGENT_TRIGGER_LABELS[rule.trigger as AgentTrigger] ?? rule.trigger}
+                                                {AGENT_TRIGGER_LABELS[
+                                                    rule.trigger as AgentTrigger
+                                                ] ?? rule.trigger}
                                                 <span className="ml-2 text-xs text-muted-foreground">
                                                     {repo?.name ?? "unknown repository"}
                                                 </span>
@@ -147,7 +165,9 @@ export function AutomationsView({
                                                 </p>
                                             ) : null}
                                         </button>
-                                        {!rule.enabled ? <Badge variant="neutral">Off</Badge> : null}
+                                        {!rule.enabled ? (
+                                            <Badge variant="neutral">Off</Badge>
+                                        ) : null}
                                         <Button
                                             variant="ghost"
                                             size="icon"
@@ -188,9 +208,13 @@ function RuleDialog({
     rule: Rule | null;
     onClose: () => void;
 }) {
-    const existing = rule ? parseCondition(rule.condition) : { labels: [], branches: [], authors: [] };
+    const existing = rule
+        ? parseCondition(rule.condition)
+        : { labels: [], branches: [], authors: [] };
     const [repoId, setRepoId] = useState(rule?.repoId ?? repos[0]?.id ?? "");
-    const [trigger, setTrigger] = useState<AgentTrigger>((rule?.trigger as AgentTrigger) ?? "pr.opened");
+    const [trigger, setTrigger] = useState<AgentTrigger>(
+        (rule?.trigger as AgentTrigger) ?? "pr.opened"
+    );
     const [labels, setLabels] = useState(existing.labels.join(", "));
     const [branches, setBranches] = useState(existing.branches.join(", "));
     const [instructions, setInstructions] = useState(rule?.instructions ?? "");
@@ -214,7 +238,11 @@ function RuleDialog({
                             repoId,
                             automation: {
                                 trigger,
-                                condition: { labels: list(labels), branches: list(branches), authors: [] },
+                                condition: {
+                                    labels: list(labels),
+                                    branches: list(branches),
+                                    authors: []
+                                },
                                 mode: null,
                                 instructions,
                                 enabled
@@ -249,11 +277,13 @@ function RuleDialog({
                         <Select
                             value={trigger}
                             onValueChange={(next) => setTrigger(next as AgentTrigger)}
-                            options={AGENT_TRIGGERS.filter((value) => value !== "manual" && value !== "mention").map(
-                                (value) => ({ value, label: AGENT_TRIGGER_LABELS[value] })
-                            )}
+                            options={AGENT_TRIGGERS.filter(
+                                (value) => value !== "manual" && value !== "mention"
+                            ).map((value) => ({ value, label: AGENT_TRIGGER_LABELS[value] }))}
                         />
-                        <p className="text-xs text-muted-foreground">{AGENT_TRIGGER_NOTES[trigger]}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {AGENT_TRIGGER_NOTES[trigger]}
+                        </p>
                     </div>
 
                     <div className="space-y-1">
@@ -263,7 +293,9 @@ function RuleDialog({
                             onChange={(event) => setLabels(event.target.value)}
                             placeholder="bug, needs-triage"
                         />
-                        <p className="text-xs text-muted-foreground">Comma separated. Leave empty for any label.</p>
+                        <p className="text-xs text-muted-foreground">
+                            Comma separated. Leave empty for any label.
+                        </p>
                     </div>
 
                     <div className="space-y-1">
@@ -273,7 +305,9 @@ function RuleDialog({
                             onChange={(event) => setBranches(event.target.value)}
                             placeholder="main"
                         />
-                        <p className="text-xs text-muted-foreground">Comma separated. Leave empty for any branch.</p>
+                        <p className="text-xs text-muted-foreground">
+                            Comma separated. Leave empty for any branch.
+                        </p>
                     </div>
 
                     <div className="space-y-1">
@@ -285,7 +319,8 @@ function RuleDialog({
                             placeholder="Review for correctness and security. Do not comment on formatting."
                         />
                         <p className="text-xs text-muted-foreground">
-                            Given to the agent alongside what triggered the run. Yours, not the issue author&apos;s.
+                            Given to the agent alongside what triggered the run. Yours, not the
+                            issue author&apos;s.
                         </p>
                     </div>
 

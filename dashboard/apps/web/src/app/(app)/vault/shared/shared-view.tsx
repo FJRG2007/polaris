@@ -21,16 +21,7 @@ import * as vaultCrypto from "@/lib/vault/crypto";
 import { useVaultSession } from "../vault-session";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Building2, Check, FolderPlus, Loader2, Plus, ShieldCheck, Trash2, X } from "lucide-react";
-import {
-    Badge,
-    Button,
-    Card,
-    CardBody,
-    CardHeader,
-    CardTitle,
-    Input,
-    Select
-} from "@polaris/ui";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import * as share from "../share-actions";
 import type { VaultOrgView } from "../share-actions";
 
