@@ -66,7 +66,10 @@ export function DialogFooter({ className, ...props }: ComponentPropsWithoutRef<"
     );
 }
 
-export function DialogTitle({ className, ...props }: ComponentPropsWithoutRef<typeof RadixDialog.Title>) {
+export function DialogTitle({
+    className,
+    ...props
+}: ComponentPropsWithoutRef<typeof RadixDialog.Title>) {
     return <RadixDialog.Title className={cn("text-base font-semibold", className)} {...props} />;
 }
 

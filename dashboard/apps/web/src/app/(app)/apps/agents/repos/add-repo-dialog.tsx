@@ -8,7 +8,15 @@ import { ModelPicker } from "@/components/model-picker";
 import { RepoSettingsFields } from "./repo-settings-fields";
 import { useCallback, useState, useTransition } from "react";
 import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
-import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Select } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Select
+} from "@polaris/ui";
 import {
     adviseRepoAction,
     agentModelChoices,
@@ -68,7 +76,10 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
         setLoading(true);
         setError(null);
         void (async () => {
-            const result = await adviseRepoAction({ repoFullName: picked.fullName, isPrivate: picked.private });
+            const result = await adviseRepoAction({
+                repoFullName: picked.fullName,
+                isPrivate: picked.private
+            });
             setLoading(false);
             if (result.error) {
                 setError(result.error);
@@ -139,9 +150,21 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                         {repo ? (
                             <div className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2">
                                 <GitHubMark className="size-4 shrink-0 text-muted-foreground" />
-                                <span className="min-w-0 flex-1 truncate text-sm" title={repo.fullName}>{repo.fullName}</span>
-                                {repo.private && <Lock className="size-3.5 shrink-0 text-muted-foreground" />}
-                                <Button type="button" variant="ghost" size="sm" onClick={() => setRepo(null)}>
+                                <span
+                                    className="min-w-0 flex-1 truncate text-sm"
+                                    title={repo.fullName}
+                                >
+                                    {repo.fullName}
+                                </span>
+                                {repo.private && (
+                                    <Lock className="size-3.5 shrink-0 text-muted-foreground" />
+                                )}
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setRepo(null)}
+                                >
                                     Change
                                 </Button>
                             </div>
@@ -158,8 +181,9 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
 
                     {excluded ? (
                         <p className="text-xs text-amber-400">
-                            {repo?.private ? "Private" : "Public"} repositories are turned off for this account. Turn
-                            them back on under Agents settings, or the agent will never run here.
+                            {repo?.private ? "Private" : "Public"} repositories are turned off for
+                            this account. Turn them back on under Agents settings, or the agent will
+                            never run here.
                         </p>
                     ) : null}
 
@@ -182,7 +206,11 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                                     onChange={(next) => setModel(next ?? "")}
                                     load={agentModelChoices}
                                     inheritLabel={null}
-                                    placeholder={providers.length === 0 ? "No provider connected" : "Pick a model"}
+                                    placeholder={
+                                        providers.length === 0
+                                            ? "No provider connected"
+                                            : "Pick a model"
+                                    }
                                 />
                                 {providers.length === 0 ? (
                                     <p className="text-xs text-amber-400">
@@ -196,7 +224,10 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                                 <Select
                                     value={effort}
                                     onValueChange={setEffort}
-                                    options={AGENT_EFFORTS.map((value) => ({ value, label: value }))}
+                                    options={AGENT_EFFORTS.map((value) => ({
+                                        value,
+                                        label: value
+                                    }))}
                                 />
                             </div>
 
@@ -211,8 +242,9 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                             />
 
                             <p className="text-xs text-muted-foreground">
-                                The agent starts on feature branches only and cannot push to the default branch. Change
-                                that, and the rules that start it, from the repository&apos;s settings afterwards.
+                                The agent starts on feature branches only and cannot push to the
+                                default branch. Change that, and the rules that start it, from the
+                                repository&apos;s settings afterwards.
                             </p>
                         </>
                     ) : null}

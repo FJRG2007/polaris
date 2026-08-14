@@ -18,7 +18,16 @@ import * as actions from "./ark-actions";
 import { useEffect, useState, useTransition } from "react";
 import { PlayerRecordPanel } from "@/components/player-history";
 import type { PlayerRecord } from "@/lib/apps/games-activity-service";
-import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Input
+} from "@polaris/ui";
 import { isSteamId } from "@/lib/apps/ark/access";
 import { Loader2, UserSearch } from "lucide-react";
 import { AccountInput } from "@/components/account-input";
@@ -26,7 +35,8 @@ import type { ArkAllowedPlayer } from "@/lib/apps/ark/access";
 import { PlayerFormDialog, PlayerFormField } from "@/components/player-form-dialog";
 
 /** What the id has to look like, said the way it is refused. */
-const STEAM_ID_HINT = "17 digits, starting 7656119. In Steam: Profile, then the number at the end of the URL.";
+const STEAM_ID_HINT =
+    "17 digits, starting 7656119. In Steam: Profile, then the number at the end of the URL.";
 
 export function ArkPlayerDialog({
     player,
@@ -54,7 +64,9 @@ export function ArkPlayerDialog({
     // The label falls back to the id itself when nobody gave one, and showing that
     // back as the name to edit would have somebody "renaming" a player to the
     // number they already are.
-    const [label, setLabel] = useState(player && player.label !== player.steamId ? player.label : "");
+    const [label, setLabel] = useState(
+        player && player.label !== player.steamId ? player.label : ""
+    );
 
     const [person, setPerson] = useState("");
     const [lookUpError, setLookUpError] = useState<string | null>(null);
@@ -127,7 +139,11 @@ export function ArkPlayerDialog({
                             aria-label="Find their Steam account"
                             title="Find their Steam account"
                         >
-                            {looking ? <Loader2 className="size-4 animate-spin" /> : <UserSearch className="size-4" />}
+                            {looking ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <UserSearch className="size-4" />
+                            )}
                         </Button>
                     </div>
                 </PlayerFormField>

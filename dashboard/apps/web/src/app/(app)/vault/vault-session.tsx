@@ -146,9 +146,7 @@ export function VaultSessionProvider({
             const held: HeldSession = {
                 key: vaultCrypto.toBase64(vaultCrypto.symmetricKeyBytes(value)),
                 until:
-                    timeout === core.VAULT_LOCK_ON_TAB_CLOSE
-                        ? null
-                        : Date.now() + timeout * 60_000
+                    timeout === core.VAULT_LOCK_ON_TAB_CLOSE ? null : Date.now() + timeout * 60_000
             };
             window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(held));
         },

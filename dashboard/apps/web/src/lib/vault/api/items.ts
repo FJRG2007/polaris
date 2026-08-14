@@ -255,7 +255,10 @@ export async function listFolders(context: VaultContext): Promise<Response> {
 }
 
 export async function getFolder(context: VaultContext): Promise<Response> {
-    const folder = await folders.getFolder(requirePrincipal(context).userId, context.params.id ?? "");
+    const folder = await folders.getFolder(
+        requirePrincipal(context).userId,
+        context.params.id ?? ""
+    );
     if (!folder) return vaultError("Not found", 404);
     return Response.json(folder);
 }

@@ -30,7 +30,16 @@ import { StepUpFields } from "@/components/step-up-fields";
 import { Feedback, type SettingLock } from "./setting-card";
 import { HeartHandshake, Loader2, Trash2, UserPlus } from "lucide-react";
 import { clearSuccessorAction, setSuccessorAction } from "./successor-actions";
-import { Button, Card, CardBody, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@polaris/ui";
 
 export interface SuccessorPerson {
     userId: string;
@@ -41,7 +50,13 @@ export interface SuccessorPerson {
 /** Which of the two things the dialog is open for. Null is closed. */
 type Mode = "set" | "clear" | null;
 
-export function SuccessorCard({ successor, lock }: { successor: SuccessorPerson | null; lock?: SettingLock }) {
+export function SuccessorCard({
+    successor,
+    lock
+}: {
+    successor: SuccessorPerson | null;
+    lock?: SettingLock;
+}) {
     const [mode, setMode] = useState<Mode>(null);
 
     return (
@@ -53,8 +68,9 @@ export function SuccessorCard({ successor, lock }: { successor: SuccessorPerson 
                             <HeartHandshake className="size-4 shrink-0" /> Successor
                         </h2>
                         <p className="text-muted-foreground text-xs">
-                            Somebody who can close the organizations you own if you die. They get nothing else: not
-                            your work, not your sessions, not a way to sign in as you.
+                            Somebody who can close the organizations you own if you die. They get
+                            nothing else: not your work, not your sessions, not a way to sign in as
+                            you.
                         </p>
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -62,7 +78,11 @@ export function SuccessorCard({ successor, lock }: { successor: SuccessorPerson 
                             <span className="text-muted-foreground text-xs">{lock.reason}</span>
                         ) : (
                             <>
-                                <Button size="sm" variant="secondary" onClick={() => setMode("set")}>
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => setMode("set")}
+                                >
                                     <UserPlus className="size-4 shrink-0" />
                                     {successor ? "Change" : "Add successor"}
                                 </Button>
@@ -86,8 +106,15 @@ export function SuccessorCard({ successor, lock }: { successor: SuccessorPerson 
                     <div className="border-border flex items-center gap-3 rounded-md border px-3 py-2">
                         <Avatar person={{ id: successor.userId, name: successor.name }} size={32} />
                         <div className="min-w-0">
-                            <p className="truncate text-sm" title={successor.name}>{successor.name}</p>
-                            <p className="text-muted-foreground truncate text-xs" title={successor.email}>{successor.email}</p>
+                            <p className="truncate text-sm" title={successor.name}>
+                                {successor.name}
+                            </p>
+                            <p
+                                className="text-muted-foreground truncate text-xs"
+                                title={successor.email}
+                            >
+                                {successor.email}
+                            </p>
                         </div>
                     </div>
                 ) : (
@@ -149,7 +176,11 @@ function SuccessorDialog({
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle>
-                        {clearing ? "Remove your successor" : current ? "Change your successor" : "Add a successor"}
+                        {clearing
+                            ? "Remove your successor"
+                            : current
+                              ? "Change your successor"
+                              : "Add a successor"}
                     </DialogTitle>
                 </DialogHeader>
                 <form
@@ -161,8 +192,8 @@ function SuccessorDialog({
                 >
                     {clearing ? (
                         <p className="text-muted-foreground text-sm">
-                            {current?.name} stops being able to close the organizations you own. You can name somebody
-                            again at any time.
+                            {current?.name} stops being able to close the organizations you own. You
+                            can name somebody again at any time.
                         </p>
                     ) : (
                         <label className="text-muted-foreground flex flex-col gap-1 text-xs">
@@ -182,10 +213,10 @@ function SuccessorDialog({
 
                     {!clearing && (
                         <p className="text-muted-foreground text-xs">
-                            By adding a successor you acknowledge that you own this account, and you authorize Polaris
-                            to let the person named above close the organizations you own in the event of your death.
-                            This does not override next-of-kin rules or estate law where you live, and it is not a
-                            will.
+                            By adding a successor you acknowledge that you own this account, and you
+                            authorize Polaris to let the person named above close the organizations
+                            you own in the event of your death. This does not override next-of-kin
+                            rules or estate law where you live, and it is not a will.
                         </p>
                     )}
 
@@ -195,7 +226,11 @@ function SuccessorDialog({
                         <Button type="button" variant="ghost" onClick={close} disabled={busy}>
                             Cancel
                         </Button>
-                        <Button type="submit" variant={clearing ? "danger" : "primary"} disabled={busy || !ready}>
+                        <Button
+                            type="submit"
+                            variant={clearing ? "danger" : "primary"}
+                            disabled={busy || !ready}
+                        >
                             {busy && <Loader2 className="size-4 shrink-0 animate-spin" />}
                             {clearing ? "Remove" : current ? "Change successor" : "Add successor"}
                         </Button>

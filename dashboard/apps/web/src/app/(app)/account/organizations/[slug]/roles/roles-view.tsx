@@ -54,7 +54,9 @@ const GRANTABLE = core.ORG_PERMISSIONS.filter((permission) => permission !== "or
  *  empty. */
 const AREAS = core.ORG_PERMISSION_AREAS.map((area) => ({
     area,
-    permissions: GRANTABLE.filter((permission) => core.ORG_PERMISSION_META[permission].area === area)
+    permissions: GRANTABLE.filter(
+        (permission) => core.ORG_PERMISSION_META[permission].area === area
+    )
 })).filter((group) => group.permissions.length > 0);
 
 function sameSet(held: Set<string>, saved: readonly string[]): boolean {
@@ -62,15 +64,27 @@ function sameSet(held: Set<string>, saved: readonly string[]): boolean {
     return held.size === relevant.length && relevant.every((permission) => held.has(permission));
 }
 
-export function RolesView({ orgId, orgSlug, roles }: { orgId: string; orgSlug: string; roles: OrgRoleView[] }) {
+export function RolesView({
+    orgId,
+    orgSlug,
+    roles
+}: {
+    orgId: string;
+    orgSlug: string;
+    roles: OrgRoleView[];
+}) {
     const [creating, setCreating] = useState(false);
 
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-muted-foreground text-sm">
-                    A role decides what somebody may do across this organization. Who holds which is set under{" "}
-                    <a href={`/account/organizations/${orgSlug}/people`} className="hover:text-foreground underline">
+                    A role decides what somebody may do across this organization. Who holds which is
+                    set under{" "}
+                    <a
+                        href={`/account/organizations/${orgSlug}/people`}
+                        className="hover:text-foreground underline"
+                    >
                         People
                     </a>
                     .
@@ -98,7 +112,9 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
 
-    const locked = role.slug === core.UNEDITABLE_ORG_ROLE || role.permissions.includes(core.ALL_ORG_PERMISSIONS);
+    const locked =
+        role.slug === core.UNEDITABLE_ORG_ROLE ||
+        role.permissions.includes(core.ALL_ORG_PERMISSIONS);
     const dirty = useMemo(() => !sameSet(held, role.permissions), [held, role.permissions]);
 
     const run = async (work: () => Promise<{ error?: string }>) => {
@@ -141,7 +157,9 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
                                     role.memberCount === 0
                                         ? "Nobody holds it, so nobody loses anything."
                                         : `${role.memberCount} ${
-                                              role.memberCount === 1 ? "person becomes" : "people become"
+                                              role.memberCount === 1
+                                                  ? "person becomes"
+                                                  : "people become"
                                           } a Member, and lose whatever this role gave them.`,
                                 confirmLabel: "Delete role",
                                 danger: true
@@ -154,11 +172,14 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
                 )}
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
-                {role.description && <p className="text-muted-foreground text-sm">{role.description}</p>}
+                {role.description && (
+                    <p className="text-muted-foreground text-sm">{role.description}</p>
+                )}
                 {locked ? (
                     <p className="text-muted-foreground text-sm">
-                        Holds everything here, including anything a later version of Polaris adds. This is the role
-                        that keeps the organization runnable, so it cannot be narrowed.
+                        Holds everything here, including anything a later version of Polaris adds.
+                        This is the role that keeps the organization runnable, so it cannot be
+                        narrowed.
                     </p>
                 ) : (
                     <>
@@ -213,7 +234,10 @@ function PermissionGrid({
                 <div key={area} className="flex flex-col gap-1.5">
                     <p className="text-muted-foreground text-xs font-medium">{area}</p>
                     {permissions.map((permission) => (
-                        <label key={permission} className="flex cursor-pointer items-start gap-2 text-sm">
+                        <label
+                            key={permission}
+                            className="flex cursor-pointer items-start gap-2 text-sm"
+                        >
                             <Checkbox
                                 className="mt-0.5"
                                 checked={held.has(permission)}
@@ -226,7 +250,9 @@ function PermissionGrid({
                                     onChange(next);
                                 }}
                             />
-                            <span className="min-w-0">{core.ORG_PERMISSION_META[permission].label}</span>
+                            <span className="min-w-0">
+                                {core.ORG_PERMISSION_META[permission].label}
+                            </span>
                         </label>
                     ))}
                 </div>
@@ -253,7 +279,12 @@ function NewRoleDialog({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
 
-    const parsed = core.orgRoleSchema.safeParse({ name, slug, description, permissions: [...held] });
+    const parsed = core.orgRoleSchema.safeParse({
+        name,
+        slug,
+        description,
+        permissions: [...held]
+    });
 
     const reset = () => {
         setName("");
@@ -276,8 +307,8 @@ function NewRoleDialog({
                 <DialogHeader>
                     <DialogTitle>New role</DialogTitle>
                     <DialogDescription>
-                        Name it after the job people actually do here. Everybody who holds it sees the organization;
-                        what else it reaches is up to you.
+                        Name it after the job people actually do here. Everybody who holds it sees
+                        the organization; what else it reaches is up to you.
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -286,7 +317,10 @@ function NewRoleDialog({
                         event.preventDefault();
                         if (!parsed.success) return;
                         setBusy(true);
-                        const result = await runAction(() => createOrgRoleAction(orgId, parsed.data), setError);
+                        const result = await runAction(
+                            () => createOrgRoleAction(orgId, parsed.data),
+                            setError
+                        );
                         setBusy(false);
                         if (!result || result.error) {
                             if (result?.error) setError(result.error);
@@ -333,7 +367,10 @@ function NewRoleDialog({
                     </label>
                     <PermissionGrid held={held} disabled={busy} onChange={setHeld} />
                     {error && (
-                        <p role="alert" className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
+                        <p
+                            role="alert"
+                            className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm"
+                        >
                             {error}
                         </p>
                     )}

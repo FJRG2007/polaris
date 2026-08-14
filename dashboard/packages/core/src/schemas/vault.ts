@@ -205,7 +205,9 @@ export const vaultImportSchema = z.object({
     folders: z.array(vaultFolderSchema).max(VAULT_IMPORT_MAX_FOLDERS).default([]),
     ciphers: z.array(cipherSchema).max(VAULT_IMPORT_MAX_CIPHERS).default([]),
     folderRelationships: z
-        .array(z.object({ key: z.number().int().nonnegative(), value: z.number().int().nonnegative() }))
+        .array(
+            z.object({ key: z.number().int().nonnegative(), value: z.number().int().nonnegative() })
+        )
         .max(VAULT_IMPORT_MAX_CIPHERS)
         .default([])
 });

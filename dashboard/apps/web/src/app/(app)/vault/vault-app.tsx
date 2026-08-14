@@ -140,9 +140,7 @@ export function VaultApp() {
 
     /** Whose shared vault an item belongs to, by the id the item carries. */
     function ownerName(vaultOrgId: string): string {
-        return (
-            organizations.find((org) => org.vaultOrgId === vaultOrgId)?.name ?? "Shared"
-        );
+        return organizations.find((org) => org.vaultOrgId === vaultOrgId)?.name ?? "Shared";
     }
 
     async function copy(label: string, value: string): Promise<void> {

@@ -24,11 +24,11 @@ The opened key lives in the browser, in a session shared by every vault screen
 password again. How long it may be kept while idle is the account's own setting
 under Vault settings:
 
-| Choice | Where the key is kept |
-| ------ | --------------------- |
-| As soon as I leave the vault | Memory only. Leaving `/vault` drops it. |
-| 1 minute to 4 hours | The tab's `sessionStorage`, with a deadline that moves forward while the vault is used. |
-| When I close the tab | The tab's `sessionStorage`, with no deadline. |
+| Choice                       | Where the key is kept                                                                   |
+| ---------------------------- | --------------------------------------------------------------------------------------- |
+| As soon as I leave the vault | Memory only. Leaving `/vault` drops it.                                                 |
+| 1 minute to 4 hours          | The tab's `sessionStorage`, with a deadline that moves forward while the vault is used. |
+| When I close the tab         | The tab's `sessionStorage`, with no deadline.                                           |
 
 Never `localStorage` and never a cookie: `sessionStorage` is per tab and is gone
 when the tab closes, so nothing survives to disk or to the next browser session.

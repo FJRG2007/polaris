@@ -19,7 +19,11 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Eye, EyeOff, KeyRound, Plus, Trash2 } from "lucide-react";
 import type { RunnerSecretView } from "@/lib/runners/runner-secrets";
-import { deleteRunnerSecretAction, revealRunnerSecretAction, setRunnerSecretAction } from "./actions";
+import {
+    deleteRunnerSecretAction,
+    revealRunnerSecretAction,
+    setRunnerSecretAction
+} from "./actions";
 import {
     Badge,
     Button,
@@ -53,7 +57,8 @@ export function SecretsView({ pools }: { pools: PoolSecrets[] }) {
                 <CardBody className="flex flex-col items-start gap-2">
                     <p className="text-sm">There is no pool to give secrets to yet.</p>
                     <p className="max-w-lg text-xs text-muted-foreground">
-                        Secrets belong to a pool, because a pool is what starts the runners that carry them.
+                        Secrets belong to a pool, because a pool is what starts the runners that
+                        carry them.
                     </p>
                     <Button asChild size="sm" variant="ghost">
                         <Link href="/apps/runners">Add a pool</Link>
@@ -66,9 +71,10 @@ export function SecretsView({ pools }: { pools: PoolSecrets[] }) {
     return (
         <div className="flex flex-col gap-4">
             <p className="max-w-2xl text-xs text-muted-foreground">
-                These arrive as environment variables, so a step reads one as <code>$NAME</code>. They are separate
-                from GitHub&apos;s own secrets, which only GitHub can put in <code>{"${{ secrets.NAME }}"}</code>. A
-                repository that has secrets turned off under Repositories gets none of these.
+                These arrive as environment variables, so a step reads one as <code>$NAME</code>.
+                They are separate from GitHub&apos;s own secrets, which only GitHub can put in{" "}
+                <code>{"${{ secrets.NAME }}"}</code>. A repository that has secrets turned off under
+                Repositories gets none of these.
             </p>
             {pools.map((pool) => (
                 <PoolCard key={pool.id} pool={pool} />
@@ -92,7 +98,8 @@ function PoolCard({ pool }: { pool: PoolSecrets }) {
             <CardBody className="flex flex-col gap-2">
                 {pool.secrets.length === 0 ? (
                     <p className="text-xs text-muted-foreground">
-                        Nothing yet. A registry login or an internal endpoint is the usual first one.
+                        Nothing yet. A registry login or an internal endpoint is the usual first
+                        one.
                     </p>
                 ) : (
                     <ul className="flex flex-col">
@@ -126,7 +133,9 @@ function SecretRow({ secret }: { secret: RunnerSecretView }) {
                         <Badge variant="neutral">Every repository</Badge>
                     )}
                 </span>
-                {shown ? <code className="truncate pl-5 text-xs text-muted-foreground">{shown}</code> : null}
+                {shown ? (
+                    <code className="truncate pl-5 text-xs text-muted-foreground">{shown}</code>
+                ) : null}
                 {error ? <span className="pl-5 text-xs text-danger">{error}</span> : null}
             </span>
             <span className="flex shrink-0 items-center gap-1">
@@ -194,11 +203,12 @@ function SecretDialog({ pool, onClose }: { pool: PoolSecrets; onClose: () => voi
 
     // The same rules the server holds, so the form refuses before a round trip
     // rather than after one. The server checks them again regardless.
-    const nameProblem = key.trim() && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key.trim())
-        ? "Letters, digits and underscores only, and not starting with a digit"
-        : /^(GITHUB_|RUNNER_|ACTIONS_)/i.test(key.trim())
-          ? "That prefix belongs to the runner"
-          : null;
+    const nameProblem =
+        key.trim() && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key.trim())
+            ? "Letters, digits and underscores only, and not starting with a digit"
+            : /^(GITHUB_|RUNNER_|ACTIONS_)/i.test(key.trim())
+              ? "That prefix belongs to the runner"
+              : null;
     const valueProblem = /[\r\n]/.test(value)
         ? "A value has to be one line. Store a key as base64 and decode it in the step that needs it."
         : null;
@@ -243,7 +253,9 @@ function SecretDialog({ pool, onClose }: { pool: PoolSecrets; onClose: () => voi
                             placeholder="REGISTRY_TOKEN"
                             autoFocus
                         />
-                        {nameProblem ? <span className="text-xs text-danger">{nameProblem}</span> : null}
+                        {nameProblem ? (
+                            <span className="text-xs text-danger">{nameProblem}</span>
+                        ) : null}
                     </label>
 
                     <label className="flex flex-col gap-1 text-sm">
@@ -254,7 +266,9 @@ function SecretDialog({ pool, onClose }: { pool: PoolSecrets; onClose: () => voi
                             onChange={(event) => setValue(event.target.value)}
                             autoComplete="off"
                         />
-                        {valueProblem ? <span className="text-xs text-danger">{valueProblem}</span> : null}
+                        {valueProblem ? (
+                            <span className="text-xs text-danger">{valueProblem}</span>
+                        ) : null}
                     </label>
 
                     {pool.perRepo && pool.targets.length > 0 ? (
@@ -265,7 +279,10 @@ function SecretDialog({ pool, onClose }: { pool: PoolSecrets; onClose: () => voi
                                 onValueChange={setScope}
                                 options={[
                                     { value: "", label: "Every repository this pool serves" },
-                                    ...pool.targets.map((target) => ({ value: target, label: target }))
+                                    ...pool.targets.map((target) => ({
+                                        value: target,
+                                        label: target
+                                    }))
                                 ]}
                             />
                             <span className="text-xs text-muted-foreground">

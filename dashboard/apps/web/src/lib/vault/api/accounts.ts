@@ -92,7 +92,8 @@ export async function setKeys(context: VaultContext): Promise<Response> {
         encryptedPrivateKey?: unknown;
     } | null;
     const publicKey = typeof body?.publicKey === "string" ? body.publicKey : "";
-    const privateKey = typeof body?.encryptedPrivateKey === "string" ? body.encryptedPrivateKey : "";
+    const privateKey =
+        typeof body?.encryptedPrivateKey === "string" ? body.encryptedPrivateKey : "";
     if (!publicKey || !core.isEncString(privateKey)) {
         return vaultError("Those keys are not usable.", 400);
     }

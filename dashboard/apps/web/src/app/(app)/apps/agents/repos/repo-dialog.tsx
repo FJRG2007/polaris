@@ -6,7 +6,16 @@ import { useEffect, useState, useTransition } from "react";
 import { RepoSettingsFields } from "./repo-settings-fields";
 import type { AgentRepoView } from "@/lib/agents/agent-repo-service";
 import { adviseRepoAction, updateRepoConfigAction } from "../actions";
-import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select
+} from "@polaris/ui";
 import {
     AGENT_EFFORTS,
     AGENT_PUSH_POLICIES,
@@ -43,7 +52,10 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
 
     useEffect(() => {
         void (async () => {
-            const result = await adviseRepoAction({ repoFullName: repo.repoFullName, isPrivate: repo.isPrivate });
+            const result = await adviseRepoAction({
+                repoFullName: repo.repoFullName,
+                isPrivate: repo.isPrivate
+            });
             setAdvice(result.advice ?? null);
             setPools(result.pools ?? []);
             setAllPools(result.allPools ?? []);
@@ -121,7 +133,9 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                                 label: AGENT_PUSH_POLICY_LABELS[value]
                             }))}
                         />
-                        <p className="text-xs text-muted-foreground">{AGENT_PUSH_POLICY_NOTES[push]}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {AGENT_PUSH_POLICY_NOTES[push]}
+                        </p>
                     </div>
 
                     <div className="space-y-1">
@@ -134,11 +148,14 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                                 label: AGENT_SHELL_POLICY_LABELS[value]
                             }))}
                         />
-                        <p className="text-xs text-muted-foreground">{AGENT_SHELL_POLICY_NOTES[shell]}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {AGENT_SHELL_POLICY_NOTES[shell]}
+                        </p>
                         {!repo.isPrivate && shell === "enabled" ? (
                             <p className="text-xs text-amber-400">
-                                This repository is public, so anybody can open a pull request the agent then reads. A
-                                full shell hands whatever it runs the provider keys in its environment.
+                                This repository is public, so anybody can open a pull request the
+                                agent then reads. A full shell hands whatever it runs the provider
+                                keys in its environment.
                             </p>
                         ) : null}
                     </div>

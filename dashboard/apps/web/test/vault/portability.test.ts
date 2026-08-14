@@ -230,10 +230,7 @@ describe("writeExport", () => {
     it("writes KeePass XML that parses, with a group per folder", () => {
         const file = portability.writeExport("keepass", items, folders);
         const read = portability.readImportFile("x.xml", file.text);
-        expect(read.items.map((item) => item.name).sort()).toEqual([
-            "Loose",
-            'Odd "name" & <tag>'
-        ]);
+        expect(read.items.map((item) => item.name).sort()).toEqual(["Loose", 'Odd "name" & <tag>']);
         // The name carried characters that end an XML tag; if they were not
         // escaped the file would not have parsed at all.
         expect(file.text).toContain("&amp;");

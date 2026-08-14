@@ -14,21 +14,30 @@ const ENC = "2.AAAA|BBBB|CCCC";
 const vaultOrganizationFindUnique = vi.fn(async (_args: unknown) => null as unknown);
 const vaultOrganizationCreate = vi.fn(async (_args: unknown) => ({ id: "vorg-1" }));
 const vaultOrgUserUpdateMany = vi.fn(async (_args: unknown) => ({ count: 1 }));
-const vaultOrgUserFindUnique = vi.fn(async (_args: unknown) => null as { userId: string | null } | null);
-const vaultOrgUserFindFirst = vi.fn(async (_args: unknown) => null as { userId: string | null } | null);
+const vaultOrgUserFindUnique = vi.fn(
+    async (_args: unknown) => null as { userId: string | null } | null
+);
+const vaultOrgUserFindFirst = vi.fn(
+    async (_args: unknown) => null as { userId: string | null } | null
+);
 const vaultOrgUserDelete = vi.fn(async (_args: unknown) => undefined);
-const vaultCollectionCreate = vi.fn(async (args: { data: { orgId: string; name: string; externalId: string | null } }) => ({
-    id: "col-1",
-    name: args.data.name,
-    externalId: args.data.externalId
-}));
+const vaultCollectionCreate = vi.fn(
+    async (args: { data: { orgId: string; name: string; externalId: string | null } }) => ({
+        id: "col-1",
+        name: args.data.name,
+        externalId: args.data.externalId
+    })
+);
 const vaultCollectionUpdateMany = vi.fn(async (_args: unknown) => ({ count: 1 }));
 const vaultCollectionDeleteMany = vi.fn(async (_args: unknown) => ({ count: 1 }));
 const vaultCollectionAccessUpsert = vi.fn(async (_args: unknown) => undefined);
 
 vi.mock("@polaris/db", () => ({
     prisma: {
-        vaultOrganization: { findUnique: vaultOrganizationFindUnique, create: vaultOrganizationCreate },
+        vaultOrganization: {
+            findUnique: vaultOrganizationFindUnique,
+            create: vaultOrganizationCreate
+        },
         vaultOrgUser: {
             updateMany: vaultOrgUserUpdateMany,
             findUnique: vaultOrgUserFindUnique,
@@ -76,7 +85,10 @@ describe("createOrganizationVault", () => {
     };
 
     it("refuses keys that are not encrypted values", async () => {
-        const result = await orgs.createOrganizationVault({ ...input, creatorKey: "not-encrypted" });
+        const result = await orgs.createOrganizationVault({
+            ...input,
+            creatorKey: "not-encrypted"
+        });
         expect(result).toEqual({ ok: false, reason: "keys" });
         expect(vaultOrganizationCreate).not.toHaveBeenCalled();
     });
@@ -112,7 +124,11 @@ describe("createOrganizationVault", () => {
             select: { id: true }
         });
         expect(recordAudit).toHaveBeenCalledWith(
-            expect.objectContaining({ actorId: "u1", action: "vault.org.create", targetId: "org-1" })
+            expect.objectContaining({
+                actorId: "u1",
+                action: "vault.org.create",
+                targetId: "org-1"
+            })
         );
         expect(bumpRevision).toHaveBeenCalledWith("u1");
     });
@@ -121,19 +137,31 @@ describe("createOrganizationVault", () => {
 describe("mayAdminister", () => {
     it("is false for an unconfirmed member regardless of role", () => {
         expect(
-            orgs.mayAdminister({ memberId: "m1", type: core.ORG_ROLE_OWNER, accessAll: true, confirmed: false })
+            orgs.mayAdminister({
+                memberId: "m1",
+                type: core.ORG_ROLE_OWNER,
+                accessAll: true,
+                confirmed: false
+            })
         ).toBe(false);
     });
 
     it("is false for a confirmed plain member", () => {
         expect(
-            orgs.mayAdminister({ memberId: "m1", type: core.ORG_ROLE_USER, accessAll: true, confirmed: true })
+            orgs.mayAdminister({
+                memberId: "m1",
+                type: core.ORG_ROLE_USER,
+                accessAll: true,
+                confirmed: true
+            })
         ).toBe(false);
     });
 
     it("is true for a confirmed owner, admin, or manager", () => {
         for (const type of [core.ORG_ROLE_OWNER, core.ORG_ROLE_ADMIN, core.ORG_ROLE_MANAGER]) {
-            expect(orgs.mayAdminister({ memberId: "m1", type, accessAll: true, confirmed: true })).toBe(true);
+            expect(
+                orgs.mayAdminister({ memberId: "m1", type, accessAll: true, confirmed: true })
+            ).toBe(true);
         }
     });
 
@@ -191,7 +219,13 @@ describe("collections", () => {
 
     it("creates a collection scoped to the organization", async () => {
         const collection = await orgs.createCollection("vorg-1", ENC);
-        expect(collection).toEqual({ object: "collection", id: "col-1", organizationId: "vorg-1", name: ENC, externalId: null });
+        expect(collection).toEqual({
+            object: "collection",
+            id: "col-1",
+            organizationId: "vorg-1",
+            name: ENC,
+            externalId: null
+        });
         expect(vaultCollectionCreate).toHaveBeenCalledWith({
             data: { orgId: "vorg-1", name: ENC, externalId: null },
             select: { id: true, name: true, externalId: true }
@@ -211,7 +245,9 @@ describe("collections", () => {
 
     it("deletes a collection that is scoped to this organization", async () => {
         expect(await orgs.deleteCollection("vorg-1", "col-1")).toBe(true);
-        expect(vaultCollectionDeleteMany).toHaveBeenCalledWith({ where: { id: "col-1", orgId: "vorg-1" } });
+        expect(vaultCollectionDeleteMany).toHaveBeenCalledWith({
+            where: { id: "col-1", orgId: "vorg-1" }
+        });
     });
 });
 
@@ -221,7 +257,12 @@ describe("setCollectionAccess", () => {
         await orgs.setCollectionAccess("col-1", "m1", { readOnly: true, hidePasswords: false });
         expect(vaultCollectionAccessUpsert).toHaveBeenCalledWith({
             where: { collectionId_orgUserId: { collectionId: "col-1", orgUserId: "m1" } },
-            create: { collectionId: "col-1", orgUserId: "m1", readOnly: true, hidePasswords: false },
+            create: {
+                collectionId: "col-1",
+                orgUserId: "m1",
+                readOnly: true,
+                hidePasswords: false
+            },
             update: { readOnly: true, hidePasswords: false }
         });
         expect(bumpRevision).toHaveBeenCalledWith("u2");

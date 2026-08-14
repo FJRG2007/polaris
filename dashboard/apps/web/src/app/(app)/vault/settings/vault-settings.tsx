@@ -251,8 +251,8 @@ export function VaultSettings() {
                 </CardHeader>
                 <CardBody className="flex flex-col gap-3">
                     <p className="text-sm text-muted-foreground">
-                        Your key is held by this browser, never by the server. This is how long
-                        it may keep it while you are not using the vault.
+                        Your key is held by this browser, never by the server. This is how long it
+                        may keep it while you are not using the vault.
                     </p>
                     <Select
                         value={lockAfter}

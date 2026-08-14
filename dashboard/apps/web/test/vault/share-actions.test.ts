@@ -14,12 +14,17 @@ const ENC = "2.AAAA|BBBB|CCCC";
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const VAULT_ORG_ID = "vorg-1";
 
-const requirePermission = vi.fn(async () => ({ id: "u1", email: "ana@example.com", isAdmin: false }) as {
-    id: string;
-    email: string;
-    isAdmin: boolean;
-});
-vi.mock("@/lib/session", () => ({ requirePermission: (...args: unknown[]) => requirePermission(...args) }));
+const requirePermission = vi.fn(
+    async () =>
+        ({ id: "u1", email: "ana@example.com", isAdmin: false }) as {
+            id: string;
+            email: string;
+            isAdmin: boolean;
+        }
+);
+vi.mock("@/lib/session", () => ({
+    requirePermission: (...args: unknown[]) => requirePermission(...args)
+}));
 
 const resolveOrgAccess = vi.fn(async () => null as unknown);
 const orgCan = vi.fn((_access: unknown, _permission: string) => false);
@@ -30,10 +35,15 @@ vi.mock("@/lib/orgs/org-service", () => ({
     listMyOrgs: (...args: unknown[]) => listMyOrgs(...args)
 }));
 
-const vaultOrgFor = vi.fn(async () => null as { id: string; publicKey: string; privateKey: string } | null);
-const createOrganizationVault = vi.fn(async () => ({ ok: true, id: VAULT_ORG_ID }) as
-    | { ok: true; id: string }
-    | { ok: false; reason: "exists" | "keys" });
+const vaultOrgFor = vi.fn(
+    async () => null as { id: string; publicKey: string; privateKey: string } | null
+);
+const createOrganizationVault = vi.fn(
+    async () =>
+        ({ ok: true, id: VAULT_ORG_ID }) as
+            | { ok: true; id: string }
+            | { ok: false; reason: "exists" | "keys" }
+);
 vi.mock("@/lib/vault/orgs", () => ({
     vaultOrgFor: (...args: unknown[]) => vaultOrgFor(...args),
     createOrganizationVault: (...args: unknown[]) => createOrganizationVault(...args),
@@ -52,7 +62,9 @@ vi.mock("@/lib/vault/orgs", () => ({
 }));
 
 const shareCipher = vi.fn(async () => ({ ok: true }) as { ok: boolean });
-vi.mock("@/lib/vault/ciphers", () => ({ shareCipher: (...args: unknown[]) => shareCipher(...args) }));
+vi.mock("@/lib/vault/ciphers", () => ({
+    shareCipher: (...args: unknown[]) => shareCipher(...args)
+}));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -109,7 +121,9 @@ describe("createOrganizationVaultAction", () => {
     };
 
     it("rejects a payload that fails the schema before touching permissions", async () => {
-        const result = await actions.createOrganizationVaultAction({ organizationId: "not-a-uuid" });
+        const result = await actions.createOrganizationVaultAction({
+            organizationId: "not-a-uuid"
+        });
         expect(result.error).toBeTruthy();
         expect(resolveOrgAccess).not.toHaveBeenCalled();
         expect(createOrganizationVault).not.toHaveBeenCalled();
@@ -128,7 +142,11 @@ describe("createOrganizationVaultAction", () => {
         const result = await actions.createOrganizationVaultAction(validInput);
         expect(result).toEqual({});
         expect(createOrganizationVault).toHaveBeenCalledWith(
-            expect.objectContaining({ organizationId: ORG_ID, creatorUserId: "u1", creatorEmail: "ana@example.com" })
+            expect.objectContaining({
+                organizationId: ORG_ID,
+                creatorUserId: "u1",
+                creatorEmail: "ana@example.com"
+            })
         );
         expect(revalidatePath).toHaveBeenCalledWith("/vault", "layout");
     });
@@ -166,10 +184,12 @@ describe("shareItemAction", () => {
         shareCipher.mockResolvedValue({ ok: true });
         const result = await actions.shareItemAction("item-1", validCipher, ["col-1", "col-2"]);
         expect(result).toEqual({});
-        expect(shareCipher).toHaveBeenCalledWith("u1", "item-1", expect.objectContaining({ type: 2 }), [
-            "col-1",
-            "col-2"
-        ]);
+        expect(shareCipher).toHaveBeenCalledWith(
+            "u1",
+            "item-1",
+            expect.objectContaining({ type: 2 }),
+            ["col-1", "col-2"]
+        );
         expect(revalidatePath).toHaveBeenCalledWith("/vault");
     });
 });

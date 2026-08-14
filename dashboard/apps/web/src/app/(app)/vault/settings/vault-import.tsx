@@ -61,10 +61,7 @@ export function VaultImport({ vaultKey }: { vaultKey: vaultCrypto.SymmetricKey |
                 folderIds.push(known);
                 continue;
             }
-            const result = await saveFolderAction(
-                null,
-                await vaultCrypto.encrypt(name, vaultKey)
-            );
+            const result = await saveFolderAction(null, await vaultCrypto.encrypt(name, vaultKey));
             const id = typeof result.folder?.id === "string" ? result.folder.id : null;
             if (id) byName.set(name, id);
             folderIds.push(id);

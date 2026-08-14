@@ -134,10 +134,7 @@ async function administered(
     organizationId: string
 ): Promise<{ ok: true; vaultOrgId: string } | { ok: false; error: string }> {
     const user = await requirePermission("vault.use");
-    const access = await resolveOrgAccess(
-        { id: user.id, isAdmin: user.isAdmin },
-        organizationId
-    );
+    const access = await resolveOrgAccess({ id: user.id, isAdmin: user.isAdmin }, organizationId);
     if (!orgCan(access, "vault.manage")) {
         return { ok: false, error: "You cannot administer that organization's vault." };
     }
@@ -176,9 +173,7 @@ export async function vaultOrgMembersAction(organizationId: string): Promise<{
         where: { userId: { in: people.map((person) => person.id) } },
         select: { userId: true, publicKey: true }
     });
-    const keyed = new Set(
-        withVaults.filter((row) => row.publicKey).map((row) => row.userId)
-    );
+    const keyed = new Set(withVaults.filter((row) => row.publicKey).map((row) => row.userId));
     return {
         members,
         candidates: people

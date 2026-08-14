@@ -171,7 +171,10 @@ export function ConnectChannelDialog({
                             <DialogTitle className="flex items-center gap-2">
                                 <span
                                     className="grid size-7 shrink-0 place-items-center rounded"
-                                    style={{ color: meta.color, backgroundColor: `${meta.color}1a` }}
+                                    style={{
+                                        color: meta.color,
+                                        backgroundColor: `${meta.color}1a`
+                                    }}
                                 >
                                     <meta.Logo className="size-4" />
                                 </span>
@@ -296,7 +299,9 @@ export function ConnectChannelDialog({
                                 )}
                                 Connect {group?.name}
                             </DialogTitle>
-                            <DialogDescription>Pick how to connect {group?.name}.</DialogDescription>
+                            <DialogDescription>
+                                Pick how to connect {group?.name}.
+                            </DialogDescription>
                         </DialogHeader>
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                             {(group?.variants ?? []).map((variantKind) => {
