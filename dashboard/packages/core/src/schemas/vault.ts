@@ -170,6 +170,12 @@ export const collectionSchema = z.object({
 /** Items being moved between folders, or emptied out of the trash. */
 export const cipherIdsSchema = z.object({ ids: z.array(z.string().uuid()).min(1) });
 
+/** A bulk move. The destination rides in the body beside the items, and a null
+ *  or absent folder is "no folder" rather than a missing field. */
+export const cipherMoveSchema = cipherIdsSchema.extend({
+    folderId: z.string().uuid().nullish()
+});
+
 /** A Send: something handed to somebody outside the vault. */
 export const sendSchema = z.object({
     type: z.number().int().refine((value) => value === SEND_TEXT || value === SEND_FILE, {

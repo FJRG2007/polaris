@@ -179,6 +179,7 @@ export async function saveItemAction(
     }
     if (!itemId) {
         const item = await ciphers.createCipher(user.id, parsed.data);
+        if (!item) return { error: "You are not a member of that organization." };
         revalidatePath("/vault");
         return { item };
     }

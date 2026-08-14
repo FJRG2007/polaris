@@ -16,6 +16,7 @@
 
 import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { normalizeRelPath } from "@polaris/core";
 import {
     Button,
     Dialog,
@@ -50,12 +51,16 @@ export function DeleteDropPointDialog({
     const [deleteFolder, setDeleteFolder] = useState(true);
     // A drop point pointed at the connection itself has no folder of its own, and
     // "the folder" there is every other folder on it. Nothing to offer.
-    const ownFolder = Boolean(target && target.destinationPath !== "");
+    //
+    // Normalized rather than compared to "", because that is what the server does
+    // before it refuses: a destination stored as "/" or "." is the same root, and
+    // the two sides disagreeing shows the switch on and then fails the delete.
+    const ownFolder = Boolean(target && normalizeRelPath(target.destinationPath) !== "");
 
     // Each drop point is a fresh decision: an operator who kept one folder should
     // not silently keep the next one because the switch remembered.
     useEffect(() => {
-        if (target) setDeleteFolder(target.destinationPath !== "");
+        if (target) setDeleteFolder(normalizeRelPath(target.destinationPath) !== "");
     }, [target]);
 
     return (

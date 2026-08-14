@@ -9,13 +9,20 @@
 
 import { loadEnv } from "@polaris/config";
 import { vaultError } from "@/lib/vault/auth";
-import { fetchSiteIcon } from "@/lib/vault/icons";
 import { domainsResponse } from "@/lib/vault/sync";
+import { rateLimit } from "@/lib/rate-limit-service";
 import { configResponse } from "@/lib/vault/api/identity";
 import { type VaultContext } from "@/lib/vault/api/router";
+import { clientIp, hashForLog } from "@/lib/request-context";
+import { cachedSiteIcon, fetchSiteIcon } from "@/lib/vault/icons";
 
 /** The Polaris version reported to clients, read once at module load. */
 const VERSION = process.env.npm_package_version ?? "2026.8.0";
+
+/** Icons one address may send this server out for, and the window. Only a miss
+ *  is counted: a cached icon costs nothing to hand back. */
+const ICON_LIMIT = 120;
+const ICON_WINDOW_MS = 5 * 60 * 1000;
 
 export async function config(): Promise<Response> {
     return Response.json(configResponse(loadEnv().POLARIS_APP_URL, VERSION));
@@ -45,10 +52,24 @@ export async function domains(): Promise<Response> {
  * Fetched and cached by Polaris rather than proxied to Bitwarden's service,
  * which is the point: a client asking a third party for an icon per saved login
  * is a client telling a third party which sites somebody has accounts on.
+ *
+ * Reachable without a token, like everything else clients ask before they have
+ * one, and the only one of those that answers by making a request of its own -
+ * so it caps how often it will do that for one address. What is capped is the
+ * going out, not the answering: a domain already in the cache is served either
+ * way, and a caller that has run out is told to come back rather than handed a
+ * missing icon it would remember as missing.
  */
 export async function icon(context: VaultContext): Promise<Response> {
     const domain = context.params.domain ?? "";
-    const icon = await fetchSiteIcon(domain);
+    let icon = cachedSiteIcon(domain);
+    if (icon === undefined) {
+        const limitKey = `vault-icon:${hashForLog(await clientIp()) ?? "unknown"}`;
+        if (!(await rateLimit(limitKey, ICON_LIMIT, ICON_WINDOW_MS)).ok) {
+            return vaultError("Too many icon lookups. Try again in a few minutes.", 429);
+        }
+        icon = await fetchSiteIcon(domain);
+    }
     if (!icon) return vaultError("Not found", 404);
     return new Response(new Uint8Array(icon.bytes), {
         headers: {

@@ -12,9 +12,9 @@
 
 import * as core from "@polaris/core";
 import { vaultError } from "@/lib/vault/auth";
-import { verifyMasterPassword } from "@/lib/vault/account";
 import * as ciphers from "@/lib/vault/ciphers";
 import * as folders from "@/lib/vault/folders";
+import { verifyMasterPassword } from "@/lib/vault/account";
 import { readJsonBody, requirePrincipal, type VaultContext } from "@/lib/vault/api/router";
 
 /** A list in the envelope clients unwrap. */
@@ -41,7 +41,9 @@ export async function createCipher(context: VaultContext): Promise<Response> {
     if (!parsed.success) {
         return vaultError(parsed.error.issues[0]?.message ?? "Invalid item", 400);
     }
-    return Response.json(await ciphers.createCipher(principal.userId, parsed.data));
+    const cipher = await ciphers.createCipher(principal.userId, parsed.data);
+    if (!cipher) return vaultError("Not found", 404);
+    return Response.json(cipher);
 }
 
 /** Creating an item straight into an organization's collections. */
@@ -51,9 +53,13 @@ export async function createCipherInCollections(context: VaultContext): Promise<
     if (!parsed.success) {
         return vaultError(parsed.error.issues[0]?.message ?? "Invalid item", 400);
     }
-    return Response.json(
-        await ciphers.createCipher(principal.userId, parsed.data.cipher, parsed.data.collectionIds)
+    const cipher = await ciphers.createCipher(
+        principal.userId,
+        parsed.data.cipher,
+        parsed.data.collectionIds
     );
+    if (!cipher) return vaultError("Not found", 404);
+    return Response.json(cipher);
 }
 
 export async function updateCipher(context: VaultContext): Promise<Response> {
@@ -152,14 +158,18 @@ export async function restoreCiphers(context: VaultContext): Promise<Response> {
     return list(await ciphers.listCiphers(principal.userId));
 }
 
-/** Move items between folders. */
+/**
+ * Move items between folders.
+ *
+ * Both the items and the folder they land in come from the body: the path this
+ * is registered on carries no destination, and reading one off it would send
+ * every move to "no folder".
+ */
 export async function moveCiphers(context: VaultContext): Promise<Response> {
     const principal = requirePrincipal(context);
-    const body = (await readJsonBody(context.request)) as { ids?: unknown } | null;
-    const ids = Array.isArray(body?.ids) ? body.ids.filter((id): id is string => typeof id === "string") : [];
-    if (ids.length === 0) return vaultError("Invalid request", 400);
-    const folderId = context.params.folderId ?? "";
-    await ciphers.moveCiphers(principal.userId, ids, folderId === "" ? null : folderId);
+    const parsed = core.cipherMoveSchema.safeParse(await readJsonBody(context.request));
+    if (!parsed.success) return vaultError("Invalid request", 400);
+    await ciphers.moveCiphers(principal.userId, parsed.data.ids, parsed.data.folderId ?? null);
     return new Response(null, { status: 200 });
 }
 

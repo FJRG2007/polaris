@@ -10,6 +10,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
+import { deleteVaultBlob } from "@/lib/vault/blobs";
 import { hashVaultPassword, newSecurityStamp, verifyVaultPassword } from "@/lib/vault/password";
 
 /** What a client is told before it has authenticated. */
@@ -241,9 +242,22 @@ export async function deauthorizeSessions(userId: string): Promise<void> {
  * Deliberately not reachable from a client's "delete account" - that would take
  * the whole Polaris account with it. Removing the vault is its own decision, and
  * an irreversible one: the wrapped key goes with it.
+ *
+ * The row cascades every item, attachment and Send, but a cascade only reaches
+ * rows. The ciphertext behind them sits on whatever storage uploads go to, and
+ * bytes left there with nothing naming them can never be reclaimed - so the
+ * paths are read first and the blobs dropped after.
  */
 export async function deleteVault(userId: string): Promise<void> {
+    const [attachments, sends] = await Promise.all([
+        prisma.vaultAttachment.findMany({
+            where: { cipher: { userId } },
+            select: { storedPath: true }
+        }),
+        prisma.vaultSend.findMany({ where: { userId }, select: { storedPath: true } })
+    ]);
     await prisma.vaultAccount.deleteMany({ where: { userId } });
+    for (const row of [...attachments, ...sends]) await deleteVaultBlob(row.storedPath);
     await recordAudit({
         actorId: userId,
         action: "vault.delete",

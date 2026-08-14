@@ -18,10 +18,10 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { loadEnv } from "@polaris/config";
 import * as tokens from "@/lib/vault/tokens";
-import { recordAudit } from "@/lib/audit-service";
 import { hashToken } from "@polaris/core/tokens";
-import { userHasPermission, verifyTotpForUser } from "@polaris/auth";
+import { recordAudit } from "@/lib/audit-service";
 import { verifyVaultPassword } from "@/lib/vault/password";
+import { userHasPermission, verifyTotpForUser } from "@polaris/auth";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 
 /** Failures allowed from one address before it is turned away, and the window. */
@@ -229,6 +229,11 @@ export async function vaultSignIn(input: SignInInput): Promise<SignInResult> {
  * refresh token copied off a machine stops working the moment the real client
  * uses its own. The stamp is re-checked too, which is what makes a password
  * change end a session that was only ever going to refresh.
+ *
+ * So are the two things sign-in checks that are not properties of the token: the
+ * account can be banned, and the role behind it can lose `vault.use`. Either one
+ * has to end the credential here as well, or a session already open keeps
+ * rotating - and each rotation hands back the wrapped keys - for a month.
  */
 export async function vaultRefresh(refreshToken: string): Promise<SignInResult> {
     const row = await prisma.vaultRefreshToken.findUnique({
@@ -241,13 +246,17 @@ export async function vaultRefresh(refreshToken: string): Promise<SignInResult> 
             expiresAt: true,
             revokedAt: true,
             device: { select: { identifier: true } },
-            vault: { select: { securityStamp: true } }
+            vault: { select: { securityStamp: true, user: { select: { bannedAt: true } } } }
         }
     });
     if (!row || row.revokedAt || row.expiresAt.getTime() <= Date.now()) {
         return { ok: false, kind: "invalid" };
     }
     if (row.stamp !== row.vault.securityStamp) return { ok: false, kind: "invalid" };
+    if (row.vault.user.bannedAt) return { ok: false, kind: "invalid" };
+    if (!(await userHasPermission(row.userId, "vault.use"))) {
+        return { ok: false, kind: "invalid" };
+    }
 
     await prisma.vaultRefreshToken.update({
         where: { id: row.id },

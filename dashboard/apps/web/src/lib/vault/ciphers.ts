@@ -15,6 +15,7 @@ import { prisma } from "@polaris/db";
 import type { CipherInput } from "@polaris/core";
 import { bumpRevision } from "@/lib/vault/account";
 import { ORG_USER_CONFIRMED } from "@polaris/core";
+import { deleteVaultBlob } from "@/lib/vault/blobs";
 
 /** The parts of an item that live inside the encrypted document. */
 interface CipherDocument {
@@ -232,25 +233,89 @@ async function mayWrite(userId: string, cipherId: string): Promise<boolean> {
     return row !== null;
 }
 
-/** Create an item, personal or straight into an organization's collections. */
+/**
+ * The folder an item is filed under, kept to the caller's own.
+ *
+ * Folders are personal, so a client naming somebody else's is either confused or
+ * probing: the item is theirs either way, and the id would only point at a row
+ * neither side can draw it under. Null - "no folder" - is the honest answer.
+ */
+async function ownFolderId(
+    userId: string,
+    folderId: string | null | undefined
+): Promise<string | null> {
+    if (!folderId) return null;
+    const row = await prisma.vaultFolder.findFirst({
+        where: { id: folderId, userId },
+        select: { id: true }
+    });
+    return row?.id ?? null;
+}
+
+/**
+ * The collections of one organization this account may file an item into, or
+ * null when it is not a confirmed member of that organization at all.
+ *
+ * Both halves matter and they are different questions. Membership decides
+ * whether an item may be handed to the organization; the collections decide
+ * where inside it the item lands, and a client naming a collection of some other
+ * organization - or one it was never put in - has that collection dropped rather
+ * than the item filed somewhere its owner cannot see.
+ */
+async function writableCollections(
+    userId: string,
+    organizationId: string,
+    collectionIds: string[]
+): Promise<string[] | null> {
+    const membership = (await confirmedMemberships(userId)).find(
+        (row) => row.orgId === organizationId
+    );
+    if (!membership) return null;
+    if (collectionIds.length === 0) return [];
+    const rows = await prisma.vaultCollection.findMany({
+        where: {
+            id: { in: collectionIds },
+            orgId: organizationId,
+            ...(membership.accessAll
+                ? {}
+                : { members: { some: { orgUserId: membership.id, readOnly: false } } })
+        },
+        select: { id: true }
+    });
+    return rows.map((row) => row.id);
+}
+
+/**
+ * Create an item, personal or straight into an organization's collections.
+ *
+ * Null when the client asked for an organization it is not a confirmed member
+ * of: being able to name an organization is not the same as belonging to it, and
+ * this is the one write that would otherwise take the name on trust.
+ */
 export async function createCipher(
     userId: string,
     input: CipherInput,
     collectionIds: string[] = []
-): Promise<Record<string, unknown>> {
+): Promise<Record<string, unknown> | null> {
     const organizationId = input.organizationId ?? null;
+    let collections: string[] = [];
+    if (organizationId) {
+        const allowed = await writableCollections(userId, organizationId, collectionIds);
+        if (allowed === null) return null;
+        collections = allowed;
+    }
     const row = await prisma.vaultCipher.create({
         data: {
             // An item belongs to a person or to an organization, never both: the
             // key it is encrypted under is one or the other.
             userId: organizationId ? null : userId,
             organizationId,
-            folderId: input.folderId ?? null,
+            folderId: await ownFolderId(userId, input.folderId),
             type: input.type,
             data: toDocument(input),
             reprompt: input.reprompt ?? 0,
-            ...(organizationId && collectionIds.length > 0
-                ? { collections: { create: collectionIds.map((collectionId) => ({ collectionId })) } }
+            ...(collections.length > 0
+                ? { collections: { create: collections.map((collectionId) => ({ collectionId })) } }
                 : {})
         },
         select: CIPHER_SELECT
@@ -290,7 +355,7 @@ export async function updateCipher(
     const row = await prisma.vaultCipher.update({
         where: { id: cipherId },
         data: {
-            folderId: input.folderId ?? null,
+            folderId: await ownFolderId(userId, input.folderId),
             type: input.type,
             data: toDocument(input),
             reprompt: input.reprompt ?? 0,
@@ -325,10 +390,27 @@ export async function setFavorite(
 }
 
 /**
+ * Where the ciphertext of a set of items' attachments is stored.
+ *
+ * Read before the items go, never after: the attachment rows cascade with them,
+ * and once they are gone nothing names the bytes any more.
+ */
+async function attachmentPaths(cipherIds: string[]): Promise<string[]> {
+    if (cipherIds.length === 0) return [];
+    const rows = await prisma.vaultAttachment.findMany({
+        where: { cipherId: { in: cipherIds } },
+        select: { storedPath: true }
+    });
+    return rows.map((row) => row.storedPath);
+}
+
+/**
  * Send items to the trash, or take them out for good.
  *
  * Soft by default because clients draw a trash and expect restore to work; the
- * hard delete is what emptying it does.
+ * hard delete is what emptying it does - and a hard delete takes the attachment
+ * bytes with it, because a cascade only reaches rows and ciphertext left on a
+ * share with nothing pointing at it is unreclaimable.
  */
 export async function deleteCiphers(
     userId: string,
@@ -340,12 +422,17 @@ export async function deleteCiphers(
         if (await mayWrite(userId, id)) writable.push(id);
     }
     if (writable.length === 0) return 0;
-    const { count } = soft
-        ? await prisma.vaultCipher.updateMany({
-              where: { id: { in: writable } },
-              data: { deletedDate: new Date(), revisionDate: new Date() }
-          })
-        : await prisma.vaultCipher.deleteMany({ where: { id: { in: writable } } });
+    if (soft) {
+        const { count } = await prisma.vaultCipher.updateMany({
+            where: { id: { in: writable } },
+            data: { deletedDate: new Date(), revisionDate: new Date() }
+        });
+        await bumpRevision(userId);
+        return count;
+    }
+    const paths = await attachmentPaths(writable);
+    const { count } = await prisma.vaultCipher.deleteMany({ where: { id: { in: writable } } });
+    for (const path of paths) await deleteVaultBlob(path);
     await bumpRevision(userId);
     return count;
 }
@@ -377,7 +464,7 @@ export async function moveCiphers(
 ): Promise<void> {
     await prisma.vaultCipher.updateMany({
         where: { id: { in: cipherIds }, userId },
-        data: { folderId, revisionDate: new Date() }
+        data: { folderId: await ownFolderId(userId, folderId), revisionDate: new Date() }
     });
     await bumpRevision(userId);
 }
@@ -400,6 +487,11 @@ export async function shareCipher(
         select: { id: true }
     });
     if (!owned || !input.organizationId) return { ok: false, reason: "not_found" };
+    // Owning the item says it may leave; standing in the organization says it may
+    // arrive. Without the second, anybody could push an item into a vault they
+    // are not in and every member of it would sync a copy.
+    const collections = await writableCollections(userId, input.organizationId, collectionIds);
+    if (collections === null || collections.length === 0) return { ok: false, reason: "not_found" };
 
     const row = await prisma.$transaction(async (tx) => {
         await tx.vaultCollectionCipher.deleteMany({ where: { cipherId } });
@@ -412,7 +504,7 @@ export async function shareCipher(
                 type: input.type,
                 reprompt: input.reprompt ?? 0,
                 revisionDate: new Date(),
-                collections: { create: collectionIds.map((collectionId) => ({ collectionId })) }
+                collections: { create: collections.map((collectionId) => ({ collectionId })) }
             },
             select: CIPHER_SELECT
         });
@@ -423,9 +515,12 @@ export async function shareCipher(
 
 /** Empty a personal vault. Organization items are not the caller's to purge. */
 export async function purgeCiphers(userId: string): Promise<void> {
+    const owned = await prisma.vaultCipher.findMany({ where: { userId }, select: { id: true } });
+    const paths = await attachmentPaths(owned.map((row) => row.id));
     await prisma.$transaction([
         prisma.vaultCipher.deleteMany({ where: { userId } }),
         prisma.vaultFolder.deleteMany({ where: { userId } })
     ]);
+    for (const path of paths) await deleteVaultBlob(path);
     await bumpRevision(userId);
 }

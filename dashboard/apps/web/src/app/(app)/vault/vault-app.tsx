@@ -138,8 +138,33 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
             danger: true
         });
         if (!confirmed || !key) return;
-        await deleteItemAction(item.id, !permanent);
+        // A refusal here is real - an organization item in a read-only collection
+        // is one - and dropping it made the item come back on the next load with
+        // nothing said about why.
+        const result = await deleteItemAction(item.id, !permanent);
+        if (result.error) {
+            await confirm({
+                title: permanent ? "Could not delete it" : "Could not move it to the trash",
+                description: result.error,
+                alert: true
+            });
+            return;
+        }
         setSelected(null);
+        await load(key);
+    }
+
+    async function onRestore(item: VaultItem): Promise<void> {
+        if (!key) return;
+        const result = await restoreItemAction(item.id);
+        if (result.error) {
+            await confirm({
+                title: "Could not put it back",
+                description: result.error,
+                alert: true
+            });
+            return;
+        }
         await load(key);
     }
 
@@ -318,10 +343,7 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
                                                     variant="ghost"
                                                     title="Put it back"
                                                     aria-label={`Restore ${current.name}`}
-                                                    onClick={async () => {
-                                                        await restoreItemAction(current.id);
-                                                        if (key) await load(key);
-                                                    }}
+                                                    onClick={() => onRestore(current)}
                                                 >
                                                     <RotateCcw className="size-4" />
                                                 </Button>
@@ -473,6 +495,27 @@ export function VaultApp({ state, name }: { state: VaultState; name: string }) {
     );
 }
 
+/**
+ * A website field turned into something safe to put in an `href`, or null.
+ *
+ * The value decrypted a moment ago on the one screen that holds the vault key in
+ * memory, and it did not have to be written here: an item can arrive from an
+ * organization or from an imported CSV. A `javascript:` URI in that href would
+ * run against exactly that page, so only ordinary web navigation is linked and
+ * everything else falls back to being read as text.
+ *
+ * A bare host is completed rather than refused - `example.com` in a saved login
+ * means the site, not a path relative to the dashboard.
+ */
+function webLink(value: string): string | null {
+    try {
+        const url = new URL(/^[a-z][a-z0-9+.-]*:/i.test(value) ? value : `https://${value}`);
+        return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+    } catch {
+        return null;
+    }
+}
+
 /** One labelled value, with the affordances that value deserves. */
 function Field({
     label,
@@ -494,13 +537,14 @@ function Field({
     onReveal?: () => void;
 }) {
     if (!value) return null;
+    const href = link ? webLink(value) : null;
     return (
         <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
                 <span className="text-xs capitalize text-muted-foreground">{label}</span>
-                {link ? (
+                {href ? (
                     <a
-                        href={value}
+                        href={href}
                         target="_blank"
                         rel="noreferrer noopener"
                         title={value}

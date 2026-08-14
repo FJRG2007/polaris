@@ -17,6 +17,7 @@ import { isEncString } from "@polaris/core";
 import { vaultError } from "@/lib/vault/auth";
 import { getCipher } from "@/lib/vault/ciphers";
 import { bumpRevision } from "@/lib/vault/account";
+import { pipeThenDispose } from "@/lib/drive-stream";
 import { readJsonBody, requirePrincipal, type VaultContext } from "@/lib/vault/api/router";
 
 /** Whether this account may write to the item an attachment belongs to. */
@@ -130,20 +131,23 @@ export async function download(context: VaultContext): Promise<Response> {
     if (!attachment) return vaultError("Not found", 404);
 
     const driver = await blobs.vaultBlobDriver();
+    let stream;
     try {
-        const stream = await driver.readStream(attachment.storedPath);
-        return new Response(stream as unknown as BodyInit, {
-            headers: {
-                "content-type": "application/octet-stream",
-                "content-length": attachment.size.toString(),
-                "cache-control": "no-store"
-            }
-        });
+        stream = await driver.readStream(attachment.storedPath);
     } catch {
-        return vaultError("That file could not be read.", 404);
-    } finally {
         await driver.dispose();
+        return vaultError("That file could not be read.", 404);
     }
+    // The bytes leave long after this returns, so the driver's lifetime belongs
+    // to the body rather than to the handler: disposing here would end the
+    // session under the transfer.
+    return new Response(pipeThenDispose(stream, driver) as unknown as BodyInit, {
+        headers: {
+            "content-type": "application/octet-stream",
+            "content-length": attachment.size.toString(),
+            "cache-control": "no-store"
+        }
+    });
 }
 
 /** Remove an attachment and its bytes. */
