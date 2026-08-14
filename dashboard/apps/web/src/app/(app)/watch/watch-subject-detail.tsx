@@ -61,8 +61,12 @@ export function WatchSubjectDetail({
                     >
                         <ArrowLeft className="size-3" /> Watch
                     </Link>
-                    <h1 className="mt-1 truncate text-[17px] font-semibold tracking-tight">{name}</h1>
-                    <p className="truncate text-sm text-muted-foreground">{detail}</p>
+                    <h1 title={name} className="mt-1 truncate text-[17px] font-semibold tracking-tight">
+                        {name}
+                    </h1>
+                    <p title={detail} className="truncate text-sm text-muted-foreground">
+                        {detail}
+                    </p>
                 </div>
                 {serviceHref && (
                     <Button asChild variant="ghost" size="sm">

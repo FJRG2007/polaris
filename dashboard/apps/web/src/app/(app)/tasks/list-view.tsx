@@ -762,9 +762,13 @@ export function ListScreen({
         <div className="flex min-w-0 flex-col gap-4">
             <header className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0">
-                    <h1 className="truncate text-[17px] font-semibold tracking-tight">{title}</h1>
+                    <h1 title={title} className="truncate text-[17px] font-semibold tracking-tight">
+                        {title}
+                    </h1>
                     {subtitle && (
-                        <p className="truncate text-sm text-muted-foreground">{subtitle}</p>
+                        <p title={subtitle} className="truncate text-sm text-muted-foreground">
+                            {subtitle}
+                        </p>
                     )}
                 </div>
                 <span className="flex-1" />

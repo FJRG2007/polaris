@@ -285,11 +285,17 @@ export function DropPointDetail({
                 <div className="flex min-w-0 items-center gap-3">
                     <Inbox className="size-5 shrink-0 text-primary" />
                     <div className="min-w-0">
-                        <h1 className="flex items-center gap-2 truncate text-[17px] font-semibold tracking-tight">
+                        <h1
+                            title={config.title}
+                            className="flex items-center gap-2 truncate text-[17px] font-semibold tracking-tight"
+                        >
                             {config.title}
                             <Badge variant={state.variant}>{state.label}</Badge>
                         </h1>
-                        <p className="truncate text-sm text-muted-foreground">
+                        <p
+                            title={`${config.connectionName}${config.destinationPath ? ` / ${config.destinationPath}` : ""}`}
+                            className="truncate text-sm text-muted-foreground"
+                        >
                             {config.connectionName}
                             {config.destinationPath ? ` / ${config.destinationPath}` : ""}
                         </p>

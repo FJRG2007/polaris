@@ -89,6 +89,12 @@ export function ServerDetail({
     // one that has not been probed yet keeps its actions.
     const down = status?.state === "down";
     const meta = ENVIRONMENT_META[server.environment];
+    // How to reach it, said once: the paragraph under the name draws it, and the
+    // same string is what the tooltip hands back when that paragraph clips.
+    const reach =
+        server.kind === "local"
+            ? `The machine Polaris runs on${live?.machineName ? `, ${live.machineName}` : ""}`
+            : `${server.detail}@${server.address}${server.port ? `:${server.port}` : ""}`;
 
     return (
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
@@ -100,17 +106,21 @@ export function ServerDetail({
                     >
                         <ArrowLeft className="size-3" /> Servers
                     </Link>
-                    <h1 className="mt-1 flex flex-wrap items-center gap-2 truncate text-[17px] font-semibold tracking-tight">
+                    <h1
+                        title={server.name}
+                        className="mt-1 flex flex-wrap items-center gap-2 truncate text-[17px] font-semibold tracking-tight"
+                    >
                         {server.name}
                         {server.kind === "local" ? (
                             <Badge variant="primary">This machine</Badge>
                         ) : null}
                         {server.sudo ? <Badge variant="warning">Root</Badge> : null}
                     </h1>
-                    <p className="truncate text-sm text-muted-foreground">
-                        {server.kind === "local"
-                            ? `The machine Polaris runs on${live?.machineName ? `, ${live.machineName}` : ""}`
-                            : `${server.detail}@${server.address}${server.port ? `:${server.port}` : ""}`}
+                    <p
+                        title={server.os ? `${reach} - ${server.os}` : reach}
+                        className="truncate text-sm text-muted-foreground"
+                    >
+                        {reach}
                         {server.os ? (
                             <span className="ml-1.5 border-l border-border pl-1.5">
                                 {server.os}
