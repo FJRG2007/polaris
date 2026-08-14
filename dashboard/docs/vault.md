@@ -146,6 +146,12 @@ is called "Account", a LastPass file whose folder column is called "grouping"
 and a browser's export all read correctly. Folders survive.
 
 Written: the same three. `test/vault/portability.test.ts` round-trips each one.
+An export leaves out any organization item this account does not hold the key
+for, rather than writing it as a row of blanks, and says how many it left out.
+An import is capped at 500 folders and 10,000 items (`VAULT_IMPORT_MAX_FOLDERS`,
+`VAULT_IMPORT_MAX_CIPHERS` in `packages/core/src/schemas/vault.ts`) and lands in
+one transaction, so a failure part-way through never leaves folders standing
+with only some of their items in them.
 
 `lib/vault/crypto.ts` is pinned against Bitwarden's own test vectors in
 `test/vault/crypto.test.ts`. A change there that passes the tests keeps every

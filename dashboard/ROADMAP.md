@@ -103,6 +103,11 @@ Vault:
 - [x] Vault items (logins, notes, cards, identities, SSH keys), folders,
       organizations (set up in Polaris, used from any client), Sends, and TOTP
       code generation
+- [x] One unlocked-vault session shared across every `/vault` screen with a
+      per-account idle timeout, folder create/rename/delete (including from the
+      item form), and organization vaults/collections/member confirmation/item
+      sharing from `/vault/shared` - see [`docs/vault.md`](docs/vault.md)
+- [x] Import and export in the browser: Bitwarden JSON, KeePass 2 XML, and CSV
 - [x] Sign-in reuses the Polaris account's own second factor rather than a
       second, vault-only one
 - [ ] Emergency access, push/live sync, organization member management from a
