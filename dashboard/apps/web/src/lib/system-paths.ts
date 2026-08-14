@@ -5,6 +5,11 @@
  * search / zip / recent walks so they never surface as user content. Older
  * installs used sibling ".polaris-trash" / ".polaris-quarantine" folders; those
  * are still treated as reserved so anything left behind stays hidden too.
+ *
+ * `isReservedRootPath` is for those read-side listings, which only ever ask about
+ * one folder's own entries. Anything that deletes or moves by path - see
+ * `isReservedPath` and `@/lib/drive-delete` - needs the stricter check, since a
+ * caller can name the bin itself instead of merely listing past it.
  */
 
 /** The one hidden folder that holds all of Polaris's per-connection data. */
