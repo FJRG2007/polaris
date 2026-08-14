@@ -35,7 +35,7 @@ export const SelectTrigger = forwardRef<
         className={cn(
             // The value renders as a flex row (icon beside label), which is why the
             // label carries the truncation: `line-clamp` cannot apply to a flex box.
-            "group flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-surface px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground hover:border-border focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-muted-foreground [&>span]:flex [&>span]:min-w-0 [&>span]:items-center [&>span]:gap-2",
+            "group flex h-8 w-full items-center justify-between gap-2 rounded-md border border-border bg-background/60 px-2.5 text-[13px] transition-colors duration-fast placeholder:text-foreground-subtle hover:border-border-strong disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-foreground-subtle data-[state=open]:border-border-strong [&>span]:flex [&>span]:min-w-0 [&>span]:items-center [&>span]:gap-2",
             className
         )}
         {...props}
@@ -58,7 +58,7 @@ export const SelectContent = forwardRef<
             position={position}
             sideOffset={position === "popper" ? 6 : undefined}
             className={cn(
-                "relative z-50 max-h-[--radix-select-content-available-height] min-w-[8rem] overflow-hidden rounded-md border border-border bg-card text-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+                "relative z-50 max-h-[--radix-select-content-available-height] min-w-[8rem] overflow-hidden rounded-lg border border-border-strong bg-elevated text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
                 // The menu starts at the trigger's width but is allowed to grow
                 // past it: a narrow trigger must not clip the option it names.
                 // Capped to the viewport so a long option cannot push it off screen.
@@ -81,7 +81,10 @@ export const SelectLabel = forwardRef<
 >(({ className, ...props }, ref) => (
     <RadixSelect.Label
         ref={ref}
-        className={cn("px-2 py-1.5 text-xs font-medium text-muted-foreground", className)}
+        className={cn(
+            "px-2 py-1 text-[11px] font-medium uppercase tracking-wider text-foreground-subtle",
+            className
+        )}
         {...props}
     />
 ));
@@ -94,7 +97,7 @@ export const SelectItem = forwardRef<
     <RadixSelect.Item
         ref={ref}
         className={cn(
-            "relative flex w-full cursor-pointer select-none items-center gap-2 whitespace-nowrap rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none transition-colors focus:bg-muted data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:text-foreground",
+            "relative flex w-full cursor-pointer select-none items-center gap-2 whitespace-nowrap rounded py-1.5 pl-2 pr-8 text-[13px] outline-none transition-colors duration-fast focus:bg-card-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:text-foreground",
             className
         )}
         {...props}

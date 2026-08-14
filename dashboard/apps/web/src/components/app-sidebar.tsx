@@ -97,8 +97,8 @@ export function AppSidebar({ appIds = [] }: { appIds?: string[] }) {
                 </Link>
             ) : null}
             {groups.map((group, index) => (
-                <div key={group.label} className={cn("flex flex-col gap-1", index > 0 && "mt-3")}>
-                    <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <div key={group.label} className={cn("flex flex-col gap-0.5", index > 0 && "mt-4")}>
+                    <p className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wider text-foreground-subtle">
                         {group.label}
                     </p>
                     {group.items.map((item) => (
@@ -131,16 +131,20 @@ function RailLink({
 }) {
     const active = nav.isSectionActive(pathname, item.href, sections);
     const Icon = item.icon;
+    // The active row is the one place the rail spends colour: a faint accent fill
+    // and an accent icon. Everything else is a hover away and stays neutral, so
+    // where you are is readable at a glance rather than hunted for.
     return (
         <Link
             href={item.href}
+            aria-current={active ? "page" : undefined}
             className={cn(
-                "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted",
-                active && "bg-muted font-medium"
+                "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] leading-5 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground",
+                active && "bg-primary/15 font-medium text-foreground hover:bg-primary/15"
             )}
         >
-            <Icon className="size-4 text-muted-foreground" />
-            {item.label}
+            <Icon className={cn("size-4", active ? "text-primary" : "text-foreground-subtle")} />
+            <span className="truncate" title={item.label}>{item.label}</span>
         </Link>
     );
 }

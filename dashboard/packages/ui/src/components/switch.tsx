@@ -28,7 +28,7 @@ export function Switch({
             disabled={disabled}
             onClick={() => onChange(!checked)}
             className={cn(
-                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-fast disabled:cursor-not-allowed disabled:opacity-50",
                 checked ? "bg-primary" : "bg-muted"
             )}
         >

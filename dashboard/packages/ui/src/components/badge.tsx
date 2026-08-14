@@ -1,11 +1,13 @@
 /** Small status pill used for edition, capability, and share-state labels. */
 
-import { cva, type VariantProps } from "class-variance-authority";
-import type { HTMLAttributes } from "react";
 import { cn } from "../lib/cn";
+import type { HTMLAttributes } from "react";
+import { cva, type VariantProps } from "class-variance-authority";
 
+// A squared-off tag rather than a pill: it sits in tables and beside titles next
+// to square-cornered controls, and a capsule among them reads as a sticker.
 const badgeVariants = cva(
-    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium",
+    "inline-flex items-center gap-1 rounded border px-1.5 py-px text-[11px] font-medium leading-[18px]",
     {
         variants: {
             variant: {

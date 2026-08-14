@@ -1,58 +1,116 @@
 /*
- * Polaris design tokens. A deep, focused control-plane aesthetic: near-black
- * surfaces carrying a faint violet cast, hairline borders, and a confident
- * violet-to-magenta accent - the palette a deployment platform would wear.
- * Dark is the default; the .light class flips to a bright theme. Colors are HSL
- * channels so Tailwind utilities can compose them with alpha via
- * hsl(var(--token) / <alpha>).
+ * Polaris design tokens.
+ *
+ * A control plane is read for hours at a time, so the surfaces are quiet and the
+ * colour is spent where it carries meaning: the active section, the primary
+ * action, focus, and status. Neutrals carry a faint cool cast rather than a
+ * violet one - a wash of hue across every surface is what makes an interface
+ * read as decoration rather than instrumentation - and the violet is kept for
+ * the few places that earn it.
+ *
+ * Four things every screen is built from, and all four are tokens rather than
+ * choices made per component:
+ *
+ *   Depth      background -> surface -> card -> elevated. Each step is lighter
+ *              in the dark theme and gains a border; a popover must sit above a
+ *              card it opens over, which is what `elevated` exists for.
+ *   Text       foreground -> muted-foreground -> subtle-foreground. Three steps,
+ *              because a table has a value, a label and a hint, and collapsing
+ *              the last two into one grey is what makes a dense screen unreadable.
+ *   Radius     4/6/8/12px. Tight enough to look drawn rather than defaulted.
+ *   Motion     one easing curve and two durations, so nothing animates on its
+ *              own timing.
+ *
+ * Dark is the default; the .light class flips it. Colours are HSL channels so
+ * Tailwind utilities can compose them with alpha via hsl(var(--token) / <alpha>).
  */
 
 :root {
-    --background: 250 22% 6%;
-    --surface: 250 18% 8%;
-    --card: 250 16% 10%;
-    --card-hover: 250 16% 13%;
-    --foreground: 250 16% 93%;
-    --muted: 250 13% 15%;
-    --muted-foreground: 250 9% 62%;
-    --border: 250 13% 17%;
-    --input: 250 13% 20%;
-    --ring: 262 90% 68%;
+    /* Depth. */
+    --background: 225 12% 5%;
+    --surface: 225 11% 7%;
+    --card: 225 11% 9%;
+    --card-hover: 225 11% 12%;
+    --elevated: 225 12% 13%;
 
-    --primary: 262 88% 64%;
+    /* Text, brightest to faintest. */
+    --foreground: 220 14% 96%;
+    --muted-foreground: 222 10% 66%;
+    --subtle-foreground: 222 9% 48%;
+
+    /* Fills and edges. */
+    --muted: 225 10% 14%;
+    --border: 225 10% 16%;
+    --border-strong: 225 10% 24%;
+    --input: 225 10% 20%;
+    --ring: 258 88% 66%;
+
+    /* Accent. One violet, used sparingly; `accent` is its warmer neighbour, for
+       the rare place two related hues are needed rather than one. */
+    --primary: 258 82% 62%;
     --primary-foreground: 0 0% 100%;
-    --accent: 288 82% 66%;
+    --accent: 275 70% 62%;
     --accent-foreground: 0 0% 100%;
 
-    --success: 152 60% 45%;
-    --warning: 38 92% 55%;
-    --danger: 358 72% 58%;
+    /* Status. */
+    --success: 152 52% 44%;
+    --warning: 38 88% 54%;
+    --danger: 356 68% 57%;
     --danger-foreground: 0 0% 100%;
 
-    --radius: 0.75rem;
+    /* Radius. --radius stays the name Tailwind's scale is derived from. */
+    --radius: 0.5rem;
+
+    /* The chrome's own height. Anything pinned under the top bar - the navigation
+       rail, Drive's detail pane - measures itself against this rather than
+       repeating the number, which is how a bar that changed height once left a
+       gap under one aside and not the other. */
+    --header-height: 3rem;
+
+    /* Elevation. A popover reads as lifted; a modal reads as detached. */
+    --shadow-popover: 0 8px 24px -6px hsl(225 30% 2% / 0.55), 0 2px 6px -2px hsl(225 30% 2% / 0.45);
+    --shadow-modal: 0 24px 56px -12px hsl(225 30% 2% / 0.7), 0 8px 20px -8px hsl(225 30% 2% / 0.5);
+
+    /* Motion. Everything that moves uses these. */
+    --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    --duration-fast: 120ms;
+    --duration: 180ms;
+
+    /* Typography. Overridden by the app that loads a webfont; the stack behind
+       it is what renders before the font arrives and if it never does. */
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
 }
 
 :root.light {
-    --background: 250 40% 98%;
+    --background: 225 24% 97%;
     --surface: 0 0% 100%;
     --card: 0 0% 100%;
-    --card-hover: 250 30% 96%;
-    --foreground: 250 24% 14%;
-    --muted: 250 24% 95%;
-    --muted-foreground: 250 10% 40%;
-    --border: 250 20% 89%;
-    --input: 250 20% 86%;
-    --ring: 262 83% 58%;
+    --card-hover: 225 20% 96%;
+    --elevated: 0 0% 100%;
 
-    --primary: 262 83% 56%;
+    --foreground: 225 22% 12%;
+    --muted-foreground: 225 10% 40%;
+    --subtle-foreground: 225 8% 48%;
+
+    --muted: 225 20% 94%;
+    --border: 225 16% 89%;
+    --border-strong: 225 16% 78%;
+    --input: 225 16% 84%;
+    --ring: 258 78% 56%;
+
+    --primary: 258 78% 55%;
     --primary-foreground: 0 0% 100%;
-    --accent: 288 76% 52%;
+    --accent: 275 68% 52%;
     --accent-foreground: 0 0% 100%;
 
-    --success: 152 55% 38%;
-    --warning: 34 90% 46%;
-    --danger: 358 66% 50%;
+    --success: 152 50% 34%;
+    --warning: 34 88% 44%;
+    --danger: 356 64% 48%;
     --danger-foreground: 0 0% 100%;
+
+    --shadow-popover: 0 8px 24px -6px hsl(225 30% 20% / 0.14), 0 2px 6px -2px hsl(225 30% 20% / 0.1);
+    --shadow-modal: 0 24px 56px -12px hsl(225 30% 20% / 0.2), 0 8px 20px -8px hsl(225 30% 20% / 0.12);
 }
 
 * {
@@ -62,7 +120,22 @@
 body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-family: var(--font-sans);
+    /* IBM Plex ships a straight-sided single-storey `a` and a plain `g` among its
+       alternates; the defaults are the ones drawn for running text, so nothing is
+       substituted here. Kerning and contextual alternates stay on. */
+    font-feature-settings: "kern", "calt";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+/* Tabular figures wherever numbers are compared down a column rather than read
+   in a sentence: a table of sizes, a chart axis, a duration, a byte count. A
+   proportional digit set makes those columns wobble. */
+table,
+.tabular {
+    font-variant-numeric: tabular-nums;
 }
 
 /* An icon is a fixed size, not slack to be taken up when a row runs out of room.
@@ -78,16 +151,16 @@ body {
 
 /* Themed scrollbars everywhere, so scroll regions match the surface instead of
    showing the platform default. Firefox uses the standard properties; WebKit and
-   Chromium use the pseudo-elements. The thumb is a low-chroma neutral that lifts
-   slightly on hover. */
+   Chromium use the pseudo-elements. Thin and low-contrast: a scrollbar is a
+   position indicator, not a control that needs to be seen from across the room. */
 * {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.28) transparent;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.24) transparent;
 }
 
 ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -95,14 +168,14 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--muted-foreground) / 0.25);
+    background-color: hsl(var(--muted-foreground) / 0.22);
     border: 2px solid transparent;
     border-radius: 9999px;
     background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background-color: hsl(var(--muted-foreground) / 0.45);
+    background-color: hsl(var(--muted-foreground) / 0.42);
     background-clip: padding-box;
 }
 
@@ -118,4 +191,25 @@ body {
 
 .no-scrollbar::-webkit-scrollbar {
     display: none;
+}
+
+/* One focus ring for the whole application, on the token that names it, drawn
+   outside the element so it never changes the layout of the row it is in.
+   Keyboard only: a mouse press already tells the user what it hit. */
+:where(a, button, [role="button"], input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+}
+
+/* Nothing animates for somebody who asked for less motion. Kept as one rule
+   rather than a prop threaded through every component. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }

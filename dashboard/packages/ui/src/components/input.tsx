@@ -6,14 +6,19 @@
  * free just by using <Input type="password" />.
  */
 
+import { cn } from "../lib/cn";
 import { Eye, EyeOff } from "lucide-react";
 import { forwardRef, useState, type InputHTMLAttributes } from "react";
-import { cn } from "../lib/cn";
 
 export type InputProps = InputHTMLAttributes<HTMLInputElement>;
 
+/**
+ * A field reads as a recess in the surface rather than a raised card: a slightly
+ * darker fill and a hairline edge that firms up on hover. The focus ring is the
+ * application's one ring (tokens.css), so nothing is restated here.
+ */
 const baseClass =
-    "flex h-9 w-full rounded-md border border-input bg-surface px-3 py-1 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
+    "flex h-8 w-full rounded-md border border-border bg-background/60 px-2.5 text-[13px] text-foreground transition-colors duration-fast placeholder:text-foreground-subtle hover:border-border-strong focus:border-border-strong disabled:cursor-not-allowed disabled:opacity-50";
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(({ className, type, ...props }, ref) => {
     const [revealed, setRevealed] = useState(false);

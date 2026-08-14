@@ -30,13 +30,7 @@ export function AppShell({
 }) {
     return (
         <div className="relative flex min-h-screen flex-col bg-background">
-            {/* Ambient accent glow: a soft violet wash at the top gives every screen
-                atmospheric depth without competing with the content below. */}
-            <div
-                className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px]"
-                style={{ background: "radial-gradient(60% 100% at 50% 0%, hsl(var(--primary) / 0.16), transparent 70%)" }}
-            />
-            <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-surface/80 px-3 backdrop-blur sm:gap-4 sm:px-4">
+            <header className="sticky top-0 z-40 flex h-header shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 sm:gap-4 sm:px-4">
                 <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
                     {navButton}
                     <PolarisMark className="shrink-0" nameClassName="hidden sm:inline" />
@@ -56,32 +50,35 @@ export function AppShell({
                     // stays reachable however far down the content the user is. An app
                     // with no sections renders nothing, and `empty:hidden` keeps that
                     // from leaving a bare column beside the content.
-                    <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-60 shrink-0 self-start overflow-y-auto border-r border-border bg-surface/40 p-3 empty:hidden md:block">
+                    <aside className="sticky top-header hidden h-below-header w-56 shrink-0 self-start overflow-y-auto border-r border-border bg-surface p-2 empty:hidden md:block">
                         {sidebar}
                     </aside>
                 ) : null}
-                <main className="min-w-0 flex-1 p-3 sm:p-4 md:p-6">{children}</main>
+                <main className="min-w-0 flex-1 p-3 sm:p-4 md:px-6 md:py-5">{children}</main>
             </div>
         </div>
     );
 }
 
-/** The Polaris wordmark: a compact star glyph plus the name. `nameClassName`
- *  lets a cramped bar drop the name and keep the glyph. */
+/** The Polaris wordmark: the star glyph plus the name. `nameClassName` lets a
+ *  cramped bar drop the name and keep the glyph.
+ *
+ *  The glyph is drawn in the accent colour rather than set on a gradient tile:
+ *  the star IS the mark, and a coloured square behind every logo is the house
+ *  style of no house in particular. */
 export function PolarisMark({ className, nameClassName }: { className?: string; nameClassName?: string }) {
     return (
         <span className={cn("flex items-center gap-2", className)}>
-            <span className="grid size-7 shrink-0 place-items-center rounded-md bg-gradient-to-br from-primary to-accent text-primary-foreground">
-                <svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden="true">
-                    <path d="M12 2l1.9 6.6L20 10l-6.1 1.4L12 18l-1.9-6.6L4 10l6.1-1.4L12 2z" />
-                </svg>
-            </span>
-            <span className={cn("text-sm font-semibold tracking-tight", nameClassName)}>Polaris</span>
+            <svg viewBox="0 0 24 24" className="size-[18px] shrink-0 text-primary" fill="currentColor" aria-hidden="true">
+                <path d="M12 2l1.9 6.6L20 10l-6.1 1.4L12 18l-1.9-6.6L4 10l6.1-1.4L12 2z" />
+            </svg>
+            <span className={cn("text-[13px] font-semibold tracking-tight", nameClassName)}>Polaris</span>
         </span>
     );
 }
 
-/** A page heading block for content areas. */
+/** A page heading block for content areas. The title is the largest thing on the
+ *  screen and the only one at that size; everything under it is body text. */
 export function PageHeader({
     title,
     description,
@@ -92,11 +89,11 @@ export function PageHeader({
     actions?: ReactNode;
 }) {
     return (
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-            <div>
-                <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+                <h1 className="text-[17px] font-semibold leading-tight tracking-tight">{title}</h1>
                 {description ? (
-                    <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+                    <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{description}</p>
                 ) : null}
             </div>
             {actions ? <div className="flex items-center gap-2">{actions}</div> : null}

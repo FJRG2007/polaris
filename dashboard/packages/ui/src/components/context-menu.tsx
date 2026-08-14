@@ -79,7 +79,7 @@ export const ContextMenuContent = forwardRef<
         <RadixMenu.Content
             ref={ref}
             className={cn(
-                "z-50 min-w-[11rem] overflow-hidden rounded-md border border-border bg-card p-1 text-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+                "z-50 min-w-[11rem] overflow-hidden rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                 className
             )}
             {...props}
@@ -98,7 +98,7 @@ export const ContextMenuItem = forwardRef<
     <RadixMenu.Item
         ref={ref}
         className={cn(
-            "relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-muted data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+            "relative flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-[13px] outline-none transition-colors duration-fast focus:bg-card-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
             variant === "danger" && "text-danger focus:bg-danger/10",
             className
         )}
@@ -122,7 +122,7 @@ export const ContextMenuSubTrigger = forwardRef<
         <RadixMenu.SubTrigger
             ref={ref}
             className={cn(
-                "relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-muted data-[state=open]:bg-muted data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+                "relative flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-[13px] outline-none transition-colors duration-fast focus:bg-card-hover data-[state=open]:bg-card-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
                 className
             )}
             {...props}
@@ -170,7 +170,7 @@ export const ContextMenuSubContent = forwardRef<
                 ref={ref}
                 forceMount={kept || undefined}
                 className={cn(
-                    "z-50 min-w-[11rem] overflow-hidden rounded-md border border-border bg-card p-1 text-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+                    "z-50 min-w-[11rem] overflow-hidden rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                     className,
                     kept && "data-[state=closed]:hidden"
                 )}
