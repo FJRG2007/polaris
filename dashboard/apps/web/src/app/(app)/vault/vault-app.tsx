@@ -503,12 +503,21 @@ function Field({
                         href={value}
                         target="_blank"
                         rel="noreferrer noopener"
+                        title={value}
                         className="block truncate text-sm text-primary hover:underline"
                     >
                         {value}
                     </a>
                 ) : (
-                    <p className="truncate font-mono text-sm">{secret ? "••••••••••••" : value}</p>
+                    /* A hidden value has nothing to reveal on hover; a shown one is
+                       often a long key or a note, and clipping it with no way back
+                       to the whole thing is the defect this guards against. */
+                    <p
+                        className="truncate font-mono text-sm"
+                        title={secret ? undefined : value}
+                    >
+                        {secret ? "••••••••••••" : value}
+                    </p>
                 )}
             </div>
             {onReveal ? (

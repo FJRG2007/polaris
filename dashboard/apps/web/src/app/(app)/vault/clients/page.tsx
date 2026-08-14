@@ -135,13 +135,13 @@ export default async function VaultClientsPage() {
                         <dt className="text-muted-foreground">Web vault</dt>
                         <dd className="truncate" title={serverUrl}>{serverUrl}</dd>
                         <dt className="text-muted-foreground">API</dt>
-                        <dd className="truncate">{serverUrl}/api</dd>
+                        <dd className="truncate" title={`${serverUrl}/api`}>{`${serverUrl}/api`}</dd>
                         <dt className="text-muted-foreground">Identity</dt>
-                        <dd className="truncate">{serverUrl}/identity</dd>
+                        <dd className="truncate" title={`${serverUrl}/identity`}>{`${serverUrl}/identity`}</dd>
                         <dt className="text-muted-foreground">Icons</dt>
-                        <dd className="truncate">{serverUrl}/icons</dd>
+                        <dd className="truncate" title={`${serverUrl}/icons`}>{`${serverUrl}/icons`}</dd>
                         <dt className="text-muted-foreground">Notifications</dt>
-                        <dd className="truncate">{serverUrl}/notifications</dd>
+                        <dd className="truncate" title={`${serverUrl}/notifications`}>{`${serverUrl}/notifications`}</dd>
                     </dl>
                 </CardBody>
             </Card>
