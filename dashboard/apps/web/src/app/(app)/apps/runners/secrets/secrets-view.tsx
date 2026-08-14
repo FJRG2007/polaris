@@ -134,7 +134,10 @@ function SecretRow({ secret }: { secret: RunnerSecretView }) {
                     )}
                 </span>
                 {shown ? (
-                    <code className="truncate pl-5 text-xs text-muted-foreground">{shown}</code>
+                    /* Wraps rather than clips: the only reason to press Show is
+                       to read or copy the whole secret, and a token has no word
+                       boundaries to break on - so it breaks anywhere. */
+                    <code className="break-all pl-5 text-xs text-muted-foreground">{shown}</code>
                 ) : null}
                 {error ? <span className="pl-5 text-xs text-danger">{error}</span> : null}
             </span>
