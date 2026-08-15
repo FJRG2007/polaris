@@ -14,13 +14,12 @@
  * wearing one name.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
-import { Loader2, UserMinus, UserPlus, X } from "lucide-react";
+import { Loader2, Search, UserMinus, UserPlus, X } from "lucide-react";
 import type { FriendRequestView, FriendView } from "@/lib/friends-service";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
-import { PeoplePicker, type PickedPerson } from "@/app/(app)/chat/people-picker";
 import {
     removeFriendAction,
     requestFriendAction,
@@ -28,6 +27,13 @@ import {
     respondToRequestAction,
     searchForFriendAction
 } from "../privacy/actions";
+
+/** Below this nothing is asked at all - the floor the server keeps, said here
+ *  too so the request is never made. */
+const SHORTEST = 2;
+
+/** How long the field sits still before it asks. */
+const SEARCH_AFTER = 220;
 
 export function FriendsView({
     friends,
@@ -59,19 +65,10 @@ function FriendsCard({
     return (
         <Card>
             <CardBody className="flex flex-col gap-4 p-4">
-                <PeoplePicker
-                    label="Ask somebody"
-                    picked={[]}
-                    max={1}
-                    onChange={(picked: readonly PickedPerson[]) => {
-                        const person = picked.at(-1);
-                        if (person) void act(() => requestFriendAction(person.id));
-                    }}
+                <AddFriend
                     exclude={friends.map((friend) => friend.id)}
-                    search={searchForFriendAction}
+                    onAsk={(run) => void act(run)}
                 />
-
-                <ByUsername onDone={setError} />
 
                 {requests.length > 0 && (
                     <ul className="flex flex-col gap-1">
@@ -164,64 +161,123 @@ function FriendsCard({
 }
 
 /**
- * Asking somebody who cannot be searched for.
+ * One box.
  *
- * The other half of "nobody can find me": a username is handed out on purpose,
- * one person at a time, and this is what it is handed out for. The answer is the
- * same sentence whether or not anybody was there - anything else would be a way
- * to find out which usernames exist by typing them one after another.
+ * There were two, and the second was the tell: a search that only finds people
+ * who allow themselves to be found, and beside it a field for the ones who do
+ * not. Both of them "add somebody", and nobody arriving at this screen could
+ * have said which was which.
+ *
+ * So it is one field and one question - name, email or username. What matches is
+ * offered as it is typed; what does not can still be asked for by the exact
+ * handle, which is the only thing somebody who has hidden themselves ever hands
+ * out. The answer to that one is deliberately the same sentence whether or not
+ * anybody was there: a different reply for a hit and a miss is a way to discover
+ * which usernames exist by typing them one after another.
  */
-function ByUsername({ onDone }: { onDone: (message: string) => void }) {
-    const [username, setUsername] = useState("");
+function AddFriend({
+    exclude,
+    onAsk
+}: {
+    exclude: readonly string[];
+    onAsk: (run: () => Promise<{ error?: string }>) => void;
+}) {
+    const [query, setQuery] = useState("");
+    const [found, setFound] = useState<readonly { id: string; name: string }[]>([]);
+    const [looking, setLooking] = useState(false);
     const [said, setSaid] = useState("");
-    const [busy, setBusy] = useState(false);
+    const asked = useRef(0);
 
-    const ask = async () => {
-        if (!username.trim()) return;
-        setBusy(true);
-        onDone("");
-        const result = await runAction(() => requestFriendByUsernameAction(username), onDone);
-        setBusy(false);
+    useEffect(() => {
+        const term = query.trim();
+        const mine = ++asked.current;
+        if (term.length < SHORTEST) {
+            setFound([]);
+            setLooking(false);
+            return;
+        }
+        setLooking(true);
+        const timer = setTimeout(async () => {
+            const result = await searchForFriendAction(term);
+            if (mine !== asked.current) return;
+            setFound(result.results ?? []);
+            setLooking(false);
+        }, SEARCH_AFTER);
+        return () => clearTimeout(timer);
+    }, [query]);
+
+    const offered = found.filter((person) => !exclude.includes(person.id));
+
+    const askByHandle = async () => {
+        const handle = query.trim();
+        if (!handle) return;
+        const result = await runAction(() => requestFriendByUsernameAction(handle), setSaid);
         if (result?.said) {
             setSaid(result.said);
-            setUsername("");
+            setQuery("");
         }
     };
 
     return (
-        <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-muted-foreground">
-                Somebody who keeps themselves out of the search can still be asked, if they have
-                given you their username.
-            </span>
+        <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
-                <Input
-                    value={username}
-                    onChange={(event) => {
-                        setUsername(event.target.value);
-                        setSaid("");
-                    }}
-                    onKeyDown={(event) => {
-                        if (event.key === "Enter") {
+                <div className="relative min-w-0 flex-1">
+                    <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        value={query}
+                        onChange={(event) => {
+                            setQuery(event.target.value);
+                            setSaid("");
+                        }}
+                        onKeyDown={(event) => {
+                            if (event.key !== "Enter") return;
                             event.preventDefault();
-                            void ask();
-                        }
-                    }}
-                    placeholder="username"
-                    aria-label="Ask by username"
-                    className="max-w-xs font-mono text-xs"
-                />
+                            void askByHandle();
+                        }}
+                        placeholder="Name, email or username"
+                        aria-label="Add somebody"
+                        className="pl-7"
+                    />
+                    {looking && (
+                        <Loader2 className="absolute right-2 top-1/2 size-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
+                    )}
+                </div>
                 <Button
-                    size="sm"
                     variant="secondary"
-                    disabled={busy || !username.trim()}
-                    onClick={() => void ask()}
+                    disabled={!query.trim()}
+                    onClick={() => void askByHandle()}
+                    title="Ask by exact username"
                 >
-                    {busy && <Loader2 className="size-4 animate-spin" />}
                     Ask
                 </Button>
             </div>
-            {said && <span className="text-xs text-muted-foreground">{said}</span>}
+
+            {offered.length > 0 && (
+                <ul className="flex flex-col">
+                    {offered.map((person) => (
+                        <li key={person.id}>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setQuery("");
+                                    setSaid("");
+                                    onAsk(() => requestFriendAction(person.id));
+                                }}
+                                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
+                            >
+                                <Avatar person={person} size={20} />
+                                <span className="min-w-0 flex-1 truncate">{person.name}</span>
+                                <UserPlus className="size-3.5 shrink-0 text-muted-foreground" />
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            <span className="text-xs text-muted-foreground">
+                {said ||
+                    "Somebody who keeps themselves out of the search can still be asked, if they have given you their exact username."}
+            </span>
         </div>
     );
 }
