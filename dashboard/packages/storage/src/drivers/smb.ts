@@ -17,6 +17,7 @@
 
 import SMB2 from "v9u-smb2";
 import { Readable } from "node:stream";
+import { pipeAndClose } from "../driver";
 import type { Writable } from "node:stream";
 import { baseName, normalizeRelPath, withTimeout } from "@polaris/core";
 import {
@@ -134,9 +135,16 @@ export async function openSmbSession(options: Omit<SmbConnectOptions, "id">): Pr
     return client;
 }
 
-/** How long a finished write waits for the file handle to be closed before
- *  carrying on without it. Long enough for a server on a LAN to answer, short
- *  enough that a client which never sends `close` costs a quarter of a second. */
+/**
+ * How long a finished write waits for the file handle to be closed before
+ * carrying on without it.
+ *
+ * This is the one that mattered: `finish` says the bytes have gone, `close` says
+ * the server has let go. Returning on the first and hanging up the session
+ * leaves an orphaned handle, and an SMB server holds a lock on one for as long
+ * as it takes to reap the session - during which the file is there, stats at the
+ * right size, and every read is refused.
+ */
 const CLOSE_GRACE_MS = 250;
 
 export class SmbDriver implements StorageDriver {
@@ -246,43 +254,11 @@ export class SmbDriver implements StorageDriver {
         const rel = normalizeRelPath(path);
         await this.mkdirp(parentOf(rel));
         const out = await this.c().createWriteStream(this.smbPath(rel));
-        await new Promise<void>((resolve, reject) => {
-            let settled = false;
-            const done = () => {
-                if (settled) return;
-                settled = true;
-                clearTimeout(grace);
-                resolve();
-            };
-            let grace: ReturnType<typeof setTimeout>;
-
-            /**
-             * Wait for the handle to be closed, not merely for the bytes to be
-             * written.
-             *
-             * `finish` says this end has flushed; `close` says the server has
-             * let go of the file. Returning on the first and then hanging up the
-             * session leaves the handle open on the other side, and an SMB
-             * server holds a lock on an orphaned handle for as long as it takes
-             * to reap the session - during which the file is there, it stats
-             * correctly, and every attempt to READ it is refused. Which is
-             * exactly what an attachment that uploads cleanly and then will not
-             * open looks like.
-             *
-             * The grace exists because not every writable implementation emits
-             * `close`, and waiting forever for an event that is not coming would
-             * be a worse bug than the one this fixes.
-             */
-            out.on("close", done);
-            out.on("finish", () => {
-                grace = setTimeout(done, CLOSE_GRACE_MS);
-            });
-            out.on("error", reject);
-
-            const source = Readable.fromWeb(body as import("node:stream/web").ReadableStream);
-            source.on("error", reject);
-            source.pipe(out);
-        });
+        await pipeAndClose(
+            Readable.fromWeb(body as import("node:stream/web").ReadableStream),
+            out,
+            CLOSE_GRACE_MS
+        );
         return this.stat(rel);
     }
 

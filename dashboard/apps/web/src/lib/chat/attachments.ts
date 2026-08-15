@@ -271,34 +271,50 @@ export async function readAttachment(attachmentId: string): Promise<{
     });
     if (!row) return null;
 
-    const driver = await driverForTarget(row.connectionId ?? LOCAL_TARGET, LOCAL_FOLDER);
-    try {
-        const stream = await driver.readStream(row.path);
-        // Read through the reader rather than `for await`: a web ReadableStream
-        // is only async-iterable in some runtimes, and the driver's return type
-        // is the web one.
-        const reader = stream.getReader();
-        const chunks: Buffer[] = [];
-        for (;;) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            if (value) chunks.push(Buffer.from(value));
+    // Twice, with a fresh session the second time.
+    //
+    // A read can fail for a reason that has nothing to do with the file: a
+    // handle another request left open a second ago, a session the server has
+    // just reaped, a share reconnecting. One retry turns most of those into a
+    // pause nobody notices, and the ones it does not are answered honestly
+    // rather than papered over - two attempts, then the truth.
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        const driver = await driverForTarget(row.connectionId ?? LOCAL_TARGET, LOCAL_FOLDER).catch(
+            () => null
+        );
+        if (!driver) continue;
+        try {
+            const stream = await driver.readStream(row.path);
+            // Read through the reader rather than `for await`: a web
+            // ReadableStream is only async-iterable in some runtimes, and the
+            // driver's return type is the web one.
+            const reader = stream.getReader();
+            const chunks: Buffer[] = [];
+            for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                if (value) chunks.push(Buffer.from(value));
+            }
+            return { name: row.name, contentType: row.contentType, bytes: Buffer.concat(chunks) };
+        } catch (error) {
+            // A swept file, a storage target that moved, a NAS that is not
+            // answering. The caller turns this into a 410 rather than a 500:
+            // from the reader's side those are the same thing.
+            //
+            // Said out loud on the last attempt. Silently, this is a message
+            // with a file on it that nobody can open and nothing anywhere
+            // saying why.
+            if (attempt === 1) {
+                console.error(
+                    `chat: could not read attachment ${attachmentId} at ${row.path}:`,
+                    error
+                );
+            }
+        } finally {
+            await driver.dispose().catch(() => undefined);
         }
-        return { name: row.name, contentType: row.contentType, bytes: Buffer.concat(chunks) };
-    } catch (error) {
-        // A swept file, a storage target that moved, a NAS that is not answering.
-        // The caller turns this into a 404 rather than a 500: from the reader's
-        // side those are the same thing.
-        //
-        // Said out loud, though. Silently, this is a message with a file on it
-        // that nobody can open and nothing anywhere saying why - which is a
-        // afternoon of guessing at the client for something that happened on a
-        // disk.
-        console.error(`chat: could not read attachment ${attachmentId} at ${row.path}:`, error);
-        return null;
-    } finally {
-        await driver.dispose().catch(() => undefined);
     }
+    return null;
 }
 
 /**

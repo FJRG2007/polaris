@@ -14,6 +14,7 @@
  */
 
 import { Readable } from "node:stream";
+import { pipeAndClose } from "../driver";
 import type { Client, SFTPWrapper } from "ssh2";
 import { openSftp, openSshClient } from "@polaris/ssh";
 import { baseName, joinUnderRoot, normalizeRelPath } from "@polaris/core";
@@ -202,12 +203,10 @@ export class SftpDriver implements StorageDriver {
                 ? { flags: "r+" as const, start: options.offset }
                 : { flags: "w" as const };
         const out = this.channel().createWriteStream(abs, writeOptions);
-        await new Promise<void>((resolve, reject) => {
-            Readable.fromWeb(body as import("node:stream/web").ReadableStream)
-                .pipe(out)
-                .on("finish", resolve)
-                .on("error", reject);
-        });
+        await pipeAndClose(
+            Readable.fromWeb(body as import("node:stream/web").ReadableStream),
+            out
+        );
         return this.stat(rel);
     }
 

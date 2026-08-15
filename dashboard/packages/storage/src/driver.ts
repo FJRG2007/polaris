@@ -14,6 +14,8 @@
  * editions depend on it, so breaking it breaks everything downstream.
  */
 
+import type { Readable } from "node:stream";
+
 import type { StorageProviderKind } from "@polaris/core";
 
 export interface StorageDriverCapabilities {
@@ -118,3 +120,40 @@ export type StorageErrorCode =
     | "capability_required"
     | "connection_failed"
     | "io_error";
+
+/**
+ * Wait for the handle to be closed, not merely for the bytes to be written.
+ *
+ * `finish` says this end has flushed; `close` says the other end has let go of
+ * the file. A write that returns on the first leaves the handle open, and a
+ * server that is then hung up on holds a lock on an orphaned handle - the file
+ * is there, it stats at the right size, and every read of it is refused. That is
+ * what an upload that verifies and then will not open looks like, and it is
+ * exactly as possible over SFTP as it is over SMB.
+ *
+ * The grace exists because not every writable emits `close`, and waiting forever
+ * for an event that is not coming would be a worse bug than the one this avoids.
+ */
+export function pipeAndClose(
+    source: Readable,
+    out: NodeJS.WritableStream,
+    graceMs = 250
+): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+        let settled = false;
+        let grace: ReturnType<typeof setTimeout> | undefined;
+        const done = () => {
+            if (settled) return;
+            settled = true;
+            if (grace) clearTimeout(grace);
+            resolve();
+        };
+        out.on("close", done);
+        out.on("finish", () => {
+            grace = setTimeout(done, graceMs);
+        });
+        out.on("error", reject);
+        source.on("error", reject);
+        source.pipe(out);
+    });
+}

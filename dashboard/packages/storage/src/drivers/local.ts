@@ -9,6 +9,7 @@
 import { createReadStream, createWriteStream } from "node:fs";
 import { mkdir, readdir, rename, rm, stat, statfs } from "node:fs/promises";
 import { Readable } from "node:stream";
+import { pipeAndClose } from "../driver";
 import { joinUnderRoot, normalizeRelPath, baseName } from "@polaris/core";
 import {
     StorageError,
@@ -144,12 +145,10 @@ export class LocalDriver implements StorageDriver {
                 ? { flags: "r+", start: options.offset }
                 : { flags: "w" };
         const out = createWriteStream(abs, writeOptions);
-        await new Promise<void>((resolve, reject) => {
-            Readable.fromWeb(body as import("node:stream/web").ReadableStream)
-                .pipe(out)
-                .on("finish", resolve)
-                .on("error", reject);
-        });
+        await pipeAndClose(
+            Readable.fromWeb(body as import("node:stream/web").ReadableStream),
+            out
+        );
         return this.stat(rel);
     }
 
