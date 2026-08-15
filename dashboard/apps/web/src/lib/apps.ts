@@ -25,6 +25,7 @@ import {
     FolderGit2,
     FolderOpen,
     Gamepad2,
+    GitPullRequest,
     Globe,
     HardDrive,
     History,
@@ -397,6 +398,21 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/apps/agents",
             icon: Bot,
             keywords: ["coding agent", "ai", "review", "pull requests", "issues", "github"]
+        },
+        {
+            label: "Code",
+            href: "/apps/code",
+            icon: GitPullRequest,
+            keywords: [
+                "pull requests",
+                "prs",
+                "issues",
+                "review",
+                "merge",
+                "github",
+                "waiting on me",
+                "assigned to me"
+            ]
         },
         {
             label: "Firewall",

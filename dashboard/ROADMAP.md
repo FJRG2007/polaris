@@ -260,6 +260,25 @@ Chat (talking to the people here):
 - [ ] Attachments, screen sharing, recording, scheduled meetings, presence dots,
       unfurled links, and search across conversations
 
+Code (pull requests and issues):
+
+- [x] `/apps/code`: pull requests and issues across every GitHub account the
+      reader has linked, filtered by the questions people arrive with - waiting
+      on my review, assigned to me, opened by me, I was mentioned
+- [x] One of them opened: description, the conversation with reviews and
+      comments merged into one thread, and the three verbs somebody would
+      otherwise leave Polaris for - comment, close or reopen, and merge
+- [x] Merging asks which of the three ways rather than just "are you sure": the
+      mistake people make is the method, not the intent
+- [x] Read live rather than mirrored. A copy of somebody else's tracker is a
+      sync problem with no winning end state; the remote is the truth and
+      Polaris is the window, the same choice Drive makes about files
+- [x] Every call is made as the person asking, with a token from an account they
+      linked. No instance-credential fallback anywhere - that is how one
+      operator's token ends up listing their private repositories to everybody
+- [ ] Linking a GitHub issue to a Polaris task, review comments on a diff, and
+      opening a pull request from here
+
 ## Notes / deliberate decisions
 
 - Polaris is a control plane, not a file mirror: the browser lists remote trees
