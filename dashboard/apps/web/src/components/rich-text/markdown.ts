@@ -289,6 +289,36 @@ export function docToMarkdown(doc: JSONContent | null | undefined): string {
     return renderBlocks(doc.content).trim();
 }
 
+/**
+ * Whether there is anything in this text to send.
+ *
+ * Not `markdown.trim()`, which is what it was and what let a message through
+ * that read as a single backslash: Markdown carries punctuation of its own, so
+ * a run of spaces and line breaks does not necessarily serialize to an empty
+ * string. The question is about the document rather than the source, so it is
+ * asked of the parse - the same one that draws the message.
+ *
+ * A picture, a mention, a rule or a code block counts even with no words in it.
+ * An empty code fence is somebody's deliberate empty code fence.
+ */
+export function isBlankMarkdown(markdown: string): boolean {
+    // A backslash at the end of a line is a hard break, not a character - and a
+    // run of them with nothing but whitespace around is the exact text this
+    // exists to catch. One somebody actually typed is stored escaped, as two, so
+    // taking off the trailing one still leaves the character behind.
+    if (!(markdown ?? "").replace(/\\(?=\n|$)/g, "").trim()) return true;
+
+    const solid = (node: JSONContent): boolean => {
+        if (node.type === "text") return (node.text ?? "").trim().length > 0;
+        if (node.type === "hardBreak") return false;
+        if (node.type === "image" || node.type === REFERENCE) return true;
+        if (node.type === "horizontalRule" || node.type === "codeBlock") return true;
+        if (node.type === MARKDOWN_BLOCK) return (node.content ?? []).length > 0;
+        return (node.content ?? []).some(solid);
+    };
+    return !solid(markdownToDoc(markdown ?? ""));
+}
+
 /** The block types a list can nest, which are the ones that follow their
  *  parent's text on the very next line rather than after a blank one. */
 const NESTED_LISTS = ["bulletList", "orderedList", "taskList"];
@@ -316,7 +346,13 @@ function renderBlock(node: JSONContent): string {
             return `${"#".repeat(level)} ${renderInline(node.content)}`.trimEnd();
         }
         case "paragraph":
-            return renderInline(node.content);
+            // Trailing line breaks are dropped rather than written out. A hard
+            // break is a backslash at the end of a line, and one with nothing
+            // after it is not a break - it is a literal backslash, which is what
+            // somebody got when they pressed shift-enter a few times and sent
+            // it. The blank lines they were making cannot be stored in Markdown
+            // anyway, so nothing is lost by not pretending otherwise.
+            return renderInline(node.content).replace(/(?:\\\n|[ \t\n])+$/, "");
         case "codeBlock": {
             const language = typeof node.attrs?.language === "string" ? node.attrs.language : "";
             return `\`\`\`${language}\n${plainText(node)}\n\`\`\``;

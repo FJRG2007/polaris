@@ -90,10 +90,15 @@ export async function follow(
                 cache: "no-store",
                 signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
                 headers: {
-                    // Named honestly. A server that does not want to be fetched
-                    // by us can then say so, and the one that blocks us is not
-                    // left guessing what we were.
-                    "user-agent": "PolarisBot/1.0 (+link preview)",
+                    // Named honestly, in the form crawlers are conventionally
+                    // named: `Mozilla/5.0 (compatible; <name>)`, the same shape
+                    // Googlebot and every link-preview bot uses. A server that
+                    // does not want to be fetched by us can still say so, and
+                    // the one that blocks us is not left guessing what we were -
+                    // but a bare product name gets served a cut-down page by the
+                    // large sites, which is how a YouTube link ended up with no
+                    // thumbnail and no channel on the card.
+                    "user-agent": "Mozilla/5.0 (compatible; PolarisBot/1.0; +link preview)",
                     accept
                 }
             });
@@ -146,6 +151,41 @@ export async function readCapped(response: Response, maxBytes: number): Promise<
         at += chunk.length;
     }
     return bytes;
+}
+
+/**
+ * Read up to `maxBytes` and keep what arrived, rather than refusing the lot.
+ *
+ * For a document that is being read for its head, a cut-off copy is still the
+ * answer - the ceiling is there to bound what a link can cost us, not to say the
+ * page was too long to look at. `readCapped` is the other rule and the right one
+ * for a picture or a JSON document, where half the bytes are not half the thing.
+ */
+export async function readAtMost(response: Response, maxBytes: number): Promise<Uint8Array | null> {
+    const reader = response.body?.getReader();
+    if (!reader) return null;
+
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!value) continue;
+        chunks.push(value);
+        total += value.length;
+        if (total >= maxBytes) {
+            await reader.cancel().catch(() => undefined);
+            break;
+        }
+    }
+
+    const bytes = new Uint8Array(total);
+    let at = 0;
+    for (const chunk of chunks) {
+        bytes.set(chunk, at);
+        at += chunk.length;
+    }
+    return bytes.subarray(0, maxBytes);
 }
 
 /** A picture fetched from an address somebody gave us, or null when there is

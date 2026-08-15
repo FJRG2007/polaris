@@ -21,8 +21,9 @@
 import * as actions from "./actions";
 import { Avatar } from "@/components/avatar";
 import { MessageMenu } from "./message-menu";
-import { embedFor } from "@/lib/chat/embeds";
+import { usableAccent } from "@/lib/chat/accent";
 import { useEffect, useRef, useState } from "react";
+import { autoplaying, embedFor } from "@/lib/chat/embeds";
 import { EditHistoryDialog } from "./edit-history-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
@@ -614,11 +615,15 @@ function LinkArea({ message }: { message: ChatMessageView }) {
 
     useEffect(() => {
         setFound(message.preview);
-        if (message.preview || !message.previewPending) return;
+        if (!message.previewPending) return;
 
+        // The card already on screen stays on screen while this runs. A stale
+        // one is asked about too - a look that came back with nothing, or one
+        // taken before Polaris knew to read the channel and the colour - and
+        // blanking it first would make a refresh look like a failure.
         let live = true;
         void actions.linkPreviewAction(message.id).then((result) => {
-            if (live) setFound(result.preview);
+            if (live && result.preview) setFound(result.preview);
         });
         return () => {
             live = false;
@@ -638,9 +643,11 @@ function LinkArea({ message }: { message: ChatMessageView }) {
                     id: "",
                     url: message.link,
                     title: "",
-                    description: "",
+                    author: "",
+                    accent: null,
                     siteName: hostOf(message.link),
-                    hasImage: false
+                    hasImage: false,
+                    description: ""
                 }}
             />
         );
@@ -670,17 +677,26 @@ function LinkCard({ preview }: { preview: NonNullable<ChatMessageView["preview"]
     const embed = embedFor(preview.url);
     const [playing, setPlaying] = useState(false);
 
+    // The edge takes the site's own colour when it has published a usable one,
+    // so a video reads as YouTube at a glance. Everything else keeps Polaris'
+    // accent.
+    const accent = usableAccent(preview.accent);
+    const edge = accent ? { borderLeftColor: accent } : undefined;
+
     const details = (
         <span className="flex min-w-0 flex-col gap-0.5">
-            {preview.siteName && (
+            {(preview.siteName || preview.author) && (
                 <span className="truncate text-[11px] text-muted-foreground">
-                    {preview.siteName}
+                    {[preview.siteName, preview.author].filter(Boolean).join(" - ")}
                 </span>
             )}
             <span className="truncate text-xs font-medium text-foreground">
                 {preview.title || preview.url}
             </span>
-            {preview.description && (
+            {/* A video's own description is a wall of links and sponsorships,
+                and the card already says the three things somebody wants: the
+                site, who made it, and what it is called. */}
+            {preview.description && !embed && (
                 <span className="line-clamp-2 text-xs text-muted-foreground">
                     {preview.description}
                 </span>
@@ -693,7 +709,10 @@ function LinkCard({ preview }: { preview: NonNullable<ChatMessageView["preview"]
     // same promise the picture already keeps.
     if (embed) {
         return (
-            <div className="mt-1 flex max-w-lg flex-col gap-2 rounded-md border border-border border-l-2 border-l-primary bg-card p-2">
+            <div
+                style={edge}
+                className="mt-1 flex max-w-lg flex-col gap-2 rounded-md border border-border border-l-2 border-l-primary bg-card p-2"
+            >
                 <a
                     href={preview.url}
                     target="_blank"
@@ -704,7 +723,11 @@ function LinkCard({ preview }: { preview: NonNullable<ChatMessageView["preview"]
                 </a>
                 {playing ? (
                     <iframe
-                        src={embed.url}
+                        // Starts on its own. Pressing play in Polaris and then
+                        // having to press play again in somebody else's player
+                        // is one press too many, and the press that has already
+                        // happened is what the site needs to allow the sound.
+                        src={autoplaying(embed.url)}
                         title={preview.title || embed.provider}
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture"
                         allowFullScreen
@@ -748,6 +771,7 @@ function LinkCard({ preview }: { preview: NonNullable<ChatMessageView["preview"]
     return (
         <a
             href={preview.url}
+            style={edge}
             target="_blank"
             rel="noreferrer noopener"
             className="mt-1 flex max-w-lg gap-3 rounded-md border border-border border-l-2 border-l-primary bg-card p-2 transition-colors hover:bg-card-hover"

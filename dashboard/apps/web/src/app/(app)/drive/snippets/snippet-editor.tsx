@@ -39,11 +39,26 @@ export interface EditorSnippet {
     files: EditorFile[];
 }
 
-/** "Detect from the name" plus every grammar, for the per-file picker. */
-const LANGUAGE_OPTIONS = [
-    { value: "", label: "Plain text" },
-    ...CODE_LANGUAGES.map((language) => ({ value: language.id, label: language.label }))
-];
+/**
+ * What the picker means by "work it out yourself", which is what it is set to
+ * until somebody says otherwise.
+ *
+ * Stored as the empty string because that is what "no language chosen" already
+ * meant everywhere else. The name is the thing to read: a file called
+ * `snippet.py` is Python, and asking somebody to say so twice - once in the name
+ * and once in a dropdown - is asking them to do the computer's job.
+ */
+const AUTO = "";
+
+/** No highlighting at all, said deliberately. It has to be a value of its own:
+ *  without one, "leave this as plain text" and "have a look at the name" are the
+ *  same answer, and a file called `notes.py` cannot be left alone. */
+const PLAIN = "text";
+
+const GRAMMARS = CODE_LANGUAGES.map((language) => ({
+    value: language.id,
+    label: language.label
+}));
 
 const VISIBILITY_OPTIONS = [
     { value: "private", label: "Private - only you" },
@@ -51,7 +66,13 @@ const VISIBILITY_OPTIONS = [
 ];
 
 function emptyFile(index: number): EditorFile {
-    return { name: index === 0 ? "snippet.txt" : `file-${index + 1}.txt`, language: "", body: "" };
+    return { name: index === 0 ? "snippet.txt" : `file-${index + 1}.txt`, language: AUTO, body: "" };
+}
+
+/** The grammar a file ends up in: what was picked, or what its name says. */
+function resolvedLanguage(file: EditorFile): string {
+    if (file.language !== AUTO) return file.language;
+    return languageForFile(file.name)?.id ?? PLAIN;
 }
 
 export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
@@ -89,13 +110,31 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
     }
 
     /**
-     * The language a file is painted in: what was picked, or what its name
-     * suggests. Guessing from the name is what makes pasting an .env into a file
-     * called `.env` do the right thing without a second decision.
+     * The language a file is painted in. Guessing from the name is what makes
+     * pasting an .env into a file called `.env` do the right thing without a
+     * second decision.
      */
     function languageOf(file: EditorFile): string {
-        return file.language || (languageForFile(file.name)?.id ?? "");
+        const language = resolvedLanguage(file);
+        return language === PLAIN ? "" : language;
     }
+
+    /**
+     * The picker, with the automatic answer saying what it worked out.
+     *
+     * "Auto" alone would leave somebody looking at a `.py` file wondering
+     * whether anything happened, so the option carries the answer: renaming the
+     * file to `snippet.py` turns it into "Auto - Python" as the letters are
+     * typed.
+     */
+    const languageOptions = useMemo(() => {
+        const detected = languageForFile(current.name);
+        return [
+            { value: AUTO, label: detected ? `Auto - ${detected.label}` : "Auto - plain text" },
+            { value: PLAIN, label: "Plain text" },
+            ...GRAMMARS
+        ];
+    }, [current.name]);
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -123,7 +162,11 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                       body: await seal(file.body, key)
                   }))
               )
-            : files.map((file) => ({ ...file, language: languageOf(file) }));
+            // What was worked out is what is stored, so the snippet is painted
+            // the same way for everybody who opens it - and so re-opening it
+            // shows the language rather than guessing again from a name that may
+            // have been changed since.
+            : files.map((file) => ({ ...file, language: resolvedLanguage(file) }));
 
         if (editing) {
             const result = await updateSnippetAction(snippet.id, {
@@ -278,7 +321,7 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                         <Select
                             value={current.language}
                             onValueChange={(value) => patchFile(active, { language: value })}
-                            options={LANGUAGE_OPTIONS}
+                            options={languageOptions}
                             aria-label="Language"
                             className="max-w-[12rem]"
                         />

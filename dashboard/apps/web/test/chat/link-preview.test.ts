@@ -35,7 +35,16 @@ vi.mock("node:dns/promises", () => ({
     }
 }));
 
-const stored: { url: string; ok: boolean; title: string; imageUrl: string | null }[] = [];
+interface Stored {
+    url: string;
+    ok: boolean;
+    title: string;
+    author: string;
+    accent: string | null;
+    imageUrl: string | null;
+}
+
+const stored: Stored[] = [];
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -47,7 +56,7 @@ vi.mock("@polaris/db", () => ({
                 create
             }: {
                 where: { url: string };
-                create: { ok: boolean; title: string; imageUrl: string | null };
+                create: Omit<Stored, "url">;
             }) => {
                 stored.push({ url: where.url, ...create });
                 return create;
@@ -221,10 +230,24 @@ describe("a site that will not describe its own page", () => {
         expect(stored[0]?.imageUrl).toBe("https://i.ytimg.com/vi/abc/hqdefault.jpg");
     });
 
-    it("is not asked when the page described itself perfectly well", async () => {
+    it("is asked as well as the page, for the one thing a page does not say", async () => {
+        // Who made it. YouTube's own markup describes the video and not the
+        // channel, and the channel is the second line of the card - so both are
+        // asked and the page wins wherever they overlap.
         responses.set("https://www.youtube.com/watch?v=abc", page("The page said it"));
+        responses.set(
+            "https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dabc&format=json",
+            oembed({ title: "The site said it", author_name: "A channel" })
+        );
         await unfurl("https://www.youtube.com/watch?v=abc");
-        expect(fetched).toEqual(["https://www.youtube.com/watch?v=abc"]);
+        expect(stored[0]?.title).toBe("The page said it");
+        expect(stored[0]?.author).toBe("A channel");
+    });
+
+    it("is not asked for a page whose site has no such endpoint", async () => {
+        responses.set("http://example.com/", page("A page"));
+        await unfurl("http://example.com/");
+        expect(fetched).toEqual(["http://example.com/"]);
     });
 
     it("is not asked for a site that has no such endpoint", async () => {
@@ -250,6 +273,46 @@ describe("a site that will not describe its own page", () => {
         );
         await unfurl("https://www.youtube.com/watch?v=abc");
         expect(stored[0]?.ok).toBe(false);
+    });
+});
+
+describe("the colour a site says it is", () => {
+    const html = (head: string) => ({
+        status: 200,
+        headers: { "content-type": "text/html" },
+        body: `<html><head><title>A page</title>${head}</head></html>`
+    });
+
+    it("takes the one in the site's own manifest", async () => {
+        // The one that matters: YouTube's page says its theme colour is white,
+        // because the page is white, and its manifest says red.
+        const white = '<meta name="theme-color" content="rgba(255, 255, 255, 0.98)">';
+        responses.set(
+            "http://example.com/",
+            html(`${white}<link rel="manifest" href="/app.webmanifest">`)
+        );
+        responses.set("http://example.com/app.webmanifest", {
+            status: 200,
+            headers: { "content-type": "application/manifest+json" },
+            body: JSON.stringify({ theme_color: "#FF0033" })
+        });
+        await unfurl("http://example.com/");
+        expect(stored[0]?.accent).toBe("#ff0033");
+    });
+
+    it("falls back to the tag when there is no manifest", async () => {
+        responses.set("http://example.com/", html('<meta name="theme-color" content="#1E2327">'));
+        await unfurl("http://example.com/");
+        expect(stored[0]?.accent).toBe("#1e2327");
+    });
+
+    it("takes nothing it could not put in a style attribute", async () => {
+        responses.set(
+            "http://example.com/",
+            html('<meta name="theme-color" content="red; background: url(x)">')
+        );
+        await unfurl("http://example.com/");
+        expect(stored[0]?.accent).toBeNull();
     });
 });
 

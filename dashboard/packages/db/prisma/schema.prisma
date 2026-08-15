@@ -5911,7 +5911,14 @@ model LinkPreview {
     url         String   @unique
     title       String   @default("")
     description String   @default("")
+    // Who made the thing, when the site says so: the channel behind a video, the
+    // byline on an article.
+    author      String   @default("")
     siteName    String   @default("")
+    // The colour the site declares for itself, as `#rrggbb`. Written by the edge
+    // of the card, so a video reads as the site it is on before it is read at
+    // all.
+    accent      String?
     // Where the picture is, as that site addresses it. Never handed to a
     // browser: it is fetched back through Polaris, so reading a message does not
     // announce the reader to a third party.

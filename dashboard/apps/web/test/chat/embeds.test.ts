@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { embedFor } from "../../src/lib/chat/embeds";
+import { autoplaying, embedFor } from "../../src/lib/chat/embeds";
 
 describe("YouTube", () => {
     it("plays a watch link", () => {
@@ -94,5 +94,21 @@ describe("everything else", () => {
         // A scheme that is not the web is not something to frame.
         expect(embedFor("javascript:alert(1)")).toBeNull();
         expect(embedFor("data:text/html,<script>alert(1)</script>")).toBeNull();
+    });
+});
+
+describe("pressing play", () => {
+    it("starts the player it builds", () => {
+        // Pressing play in Polaris and then again inside somebody else's player
+        // is one press too many.
+        expect(autoplaying("https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ")).toBe(
+            "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1"
+        );
+    });
+
+    it("keeps the moment the link was posted at", () => {
+        expect(autoplaying("https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=42")).toBe(
+            "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=42&autoplay=1"
+        );
     });
 });

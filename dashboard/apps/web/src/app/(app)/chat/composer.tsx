@@ -25,9 +25,10 @@ import * as core from "@polaris/core";
 import { Button, cn } from "@polaris/ui";
 import { typingAction } from "./actions";
 import { EmojiPicker } from "./emoji-picker";
-import { useEffect, useRef, useState } from "react";
 import type { ChatMessageView } from "@/lib/chat/messages";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
+import { isBlankMarkdown } from "@/components/rich-text/markdown";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { CornerUpLeft, Paperclip, SendHorizontal, X } from "lucide-react";
 
@@ -129,8 +130,13 @@ export function Composer({
     const tooLong = typed > rules.maxMessageLength;
     const maxBytes = rules.maxAttachmentMib * 1024 * 1024;
 
+    // Whether there is anything here to send, asked of the written text rather
+    // than of the stored source. Spaces and line breaks alone are not a message,
+    // and they do not always serialize to an empty string.
+    const blank = useMemo(() => isBlankMarkdown(body), [body]);
+
     const submit = async (value: string) => {
-        const text = value.trim();
+        const text = isBlankMarkdown(value) ? "" : value.trim();
         // A message that is only a file is a message. Making somebody type
         // "here" before they can send a screenshot is a tax on the common case.
         if (disabled || tooLong || (!text && files.length === 0)) return;
@@ -336,14 +342,18 @@ export function Composer({
                                 <Button size="xs" variant="ghost" onClick={onCancelEdit}>
                                     Cancel
                                 </Button>
-                                <Button size="xs" disabled={tooLong} onClick={() => void submit(body)}>
+                                <Button
+                                    size="xs"
+                                    disabled={tooLong || (blank && files.length === 0)}
+                                    onClick={() => void submit(body)}
+                                >
                                     Save
                                 </Button>
                             </>
                         ) : (
                             <button
                                 type="button"
-                                disabled={disabled || tooLong || (!body.trim() && files.length === 0)}
+                                disabled={disabled || tooLong || (blank && files.length === 0)}
                                 onClick={() => void submit(body)}
                                 aria-label="Send"
                                 title="Send"

@@ -7,7 +7,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { docToMarkdown, markdownToDoc } from "@/components/rich-text/markdown";
+import type { JSONContent } from "@tiptap/core";
+import { docToMarkdown, isBlankMarkdown, markdownToDoc } from "@/components/rich-text/markdown";
 
 /** What the editor would store after loading `source` and saving it untouched. */
 function roundTrip(source: string): string {
@@ -96,5 +97,59 @@ describe("references", () => {
     it("ignores an address whose id is not one", () => {
         const source = "[not a mention](polaris:user/whoever)";
         expect(roundTrip(source)).toBe(source);
+    });
+});
+
+/**
+ * A message that is only whitespace.
+ *
+ * The one that got out: a few spaces, shift-enter, a few more spaces. Every
+ * guard in the way asked whether the *source* was empty, and the source was a
+ * lone backslash - the hard break at the end of the last line, with nothing
+ * after it to break. So a message reading `\` landed in the room.
+ */
+describe("nothing to send", () => {
+    const doc = (content: JSONContent[]): JSONContent => ({
+        type: "doc",
+        content: [{ type: "paragraph", content }]
+    });
+
+    it("writes no trailing break for a line with nothing after it", () => {
+        expect(
+            docToMarkdown(
+                doc([{ type: "text", text: "   " }, { type: "hardBreak" }, { type: "text", text: "  " }])
+            )
+        ).toBe("");
+    });
+
+    it("keeps a break that has something after it", () => {
+        expect(
+            docToMarkdown(
+                doc([{ type: "text", text: "one" }, { type: "hardBreak" }, { type: "text", text: "two" }])
+            )
+        ).toBe("one\\\ntwo");
+    });
+
+    it("keeps a backslash somebody typed", () => {
+        expect(isBlankMarkdown(docToMarkdown(doc([{ type: "text", text: "\\" }])))).toBe(false);
+    });
+
+    it.each([
+        ["nothing at all", ""],
+        ["spaces", "   "],
+        ["a stray hard break", "\\"],
+        ["several", "\\\n\\\n  \\"],
+        ["blank lines", "\n\n\n"]
+    ])("refuses %s", (_case, source) => {
+        expect(isBlankMarkdown(source)).toBe(true);
+    });
+
+    it.each([
+        ["a word", "hello"],
+        ["a picture", "![](https://example.com/a.png)"],
+        ["a mention", "[@Javier](polaris:user/018f0000-0000-7000-8000-000000000000)"],
+        ["an empty code fence", "```\n\n```"]
+    ])("allows %s", (_case, source) => {
+        expect(isBlankMarkdown(source)).toBe(false);
     });
 });

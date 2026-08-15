@@ -16,14 +16,39 @@
 import { prisma } from "@polaris/db";
 import { oembedFor } from "./embeds";
 import * as core from "@polaris/core";
-import { follow, readCapped, safeUrl } from "@/lib/safe-fetch";
+import { follow, readAtMost, readCapped, safeUrl } from "@/lib/safe-fetch";
 
-/** How much of a page is read before deciding. The metadata is in the head; a
- *  site that has not said what it is by here is not going to. */
+/**
+ * How much of a page is read before deciding.
+ *
+ * Generous, and measured rather than guessed: YouTube puts its `og:` tags 690 KB
+ * into a watch page, behind the script that draws the player. At half a megabyte
+ * the read stopped just short of them, which is why a video came back with a
+ * thumbnail from its site's oEmbed and nothing else. What is read is truncated
+ * rather than refused - a page too long to finish is still a page whose head we
+ * have.
+ */
+const MAX_PAGE_BYTES = 1024 * 1024;
+
+/** How much of a small document - an oEmbed answer, a manifest - is read. These
+ *  are kilobytes; anything at this size is not one. */
 const MAX_BYTES = 512 * 1024;
+
+/** How much of a picture is read. A video thumbnail at full width is a couple of
+ *  hundred kilobytes, and the ceiling above would have refused it - which is a
+ *  card with a play button and no picture behind it. */
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
 /** How long a look is trusted before the page is asked again. */
 const FRESH_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** How long a look that came back with nothing is trusted for.
+ *
+ *  Much shorter, because "nothing" is as often about us as about the page: a
+ *  site that was slow, a network that was down, or a way of asking that has
+ *  since been improved. Trusting a failure for a week means one bad afternoon
+ *  keeps a link blank until the following Tuesday. */
+const RETRY_MS = 60 * 60 * 1000;
 
 /** What a message's link resolved to, as the card draws it. */
 export interface LinkPreviewView {
@@ -31,7 +56,14 @@ export interface LinkPreviewView {
     readonly url: string;
     readonly title: string;
     readonly description: string;
+    /** Who made the thing, when the site says: the channel behind a video, the
+     *  byline on an article. Separate from the description because it is a name
+     *  and reads as one - "YouTube / BaityLive" over the title. */
+    readonly author: string;
     readonly siteName: string;
+    /** The colour the site says it is, as `#rrggbb`, or null when it does not
+     *  say or says something unusable. */
+    readonly accent: string | null;
     /** Whether there is a picture to ask Polaris for. The address itself never
      *  leaves the server. */
     readonly hasImage: boolean;
@@ -48,6 +80,10 @@ export interface LinkPreviewView {
 export interface KnownPreview {
     /** Whether the look produced something worth drawing. */
     readonly ok: boolean;
+    /** Whether what is stored is old enough to be worth asking again. The card
+     *  that is already there keeps being drawn meanwhile - a refresh is not a
+     *  reason to blank a message. */
+    readonly askAgain: boolean;
     /** The card, when it did. */
     readonly view: LinkPreviewView | null;
 }
@@ -67,24 +103,31 @@ export async function knownPreviews(
             ok: true,
             url: true,
             title: true,
-            description: true,
+            author: true,
+            accent: true,
             siteName: true,
-            imageUrl: true
+            imageUrl: true,
+            fetchedAt: true,
+            description: true
         }
     });
+    const now = Date.now();
     return new Map(
         rows.map((row) => [
             row.url,
             {
                 ok: row.ok,
+                askAgain: now - row.fetchedAt.getTime() > (row.ok ? FRESH_MS : RETRY_MS),
                 view: row.ok
                     ? {
                           id: row.id,
                           url: row.url,
                           title: row.title,
-                          description: row.description,
+                          author: row.author,
+                          accent: row.accent,
                           siteName: row.siteName,
-                          hasImage: row.imageUrl !== null
+                          hasImage: row.imageUrl !== null,
+                          description: row.description
                       }
                     : null
             }
@@ -98,7 +141,7 @@ export async function knownPreviews(
  * Called after a message lands and never awaited by the send: an unfurl is worth
  * a card under a message and is not worth the message being slower to appear.
  * Every failure is recorded rather than thrown, so a dead link is asked about
- * once a week instead of on every render.
+ * once an hour instead of on every render.
  */
 export async function unfurl(address: string): Promise<void> {
     const url = safeUrl(address);
@@ -106,16 +149,19 @@ export async function unfurl(address: string): Promise<void> {
 
     const existing = await prisma.linkPreview.findUnique({
         where: { url: url.href },
-        select: { fetchedAt: true }
+        select: { ok: true, fetchedAt: true }
     });
-    if (existing && Date.now() - existing.fetchedAt.getTime() < FRESH_MS) return;
+    const age = existing ? Date.now() - existing.fetchedAt.getTime() : Infinity;
+    if (existing && age < (existing.ok ? FRESH_MS : RETRY_MS)) return;
 
     const found = await describe(url);
     const data = {
         title: found?.title ?? "",
-        description: found?.description ?? "",
+        author: found?.author ?? "",
+        accent: found?.accent ?? null,
         siteName: found?.siteName ?? "",
         imageUrl: found?.imageUrl ?? null,
+        description: found?.description ?? "",
         // A page with no title and no description is a page there is nothing to
         // say about, and a card saying nothing is worse than no card.
         ok: Boolean(found && (found.title || found.description)),
@@ -146,13 +192,13 @@ export async function previewImage(
     const url = safeUrl(row.imageUrl);
     if (!url) return null;
 
-    const response = await follow(url);
+    const response = await follow(url, "image/*");
     if (!response?.ok) return null;
 
     const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim();
     if (!contentType.startsWith("image/")) return null;
 
-    const bytes = await readCapped(response, MAX_BYTES);
+    const bytes = await readCapped(response, MAX_IMAGE_BYTES);
     return bytes ? { bytes, contentType } : null;
 }
 
@@ -162,17 +208,35 @@ export async function previewImage(
 
 interface Described {
     title: string;
-    description: string;
+    author: string;
+    accent: string | null;
     siteName: string;
     imageUrl: string | null;
+    description: string;
 }
 
-/** What one page says about itself, or what its site says about it when the page
- *  itself says nothing. */
+/**
+ * What one page says about itself, and what its site says about it.
+ *
+ * Both are asked at once, for the two different things they know. The page
+ * carries the description and the picture; the site's own oEmbed carries the one
+ * thing a page never states plainly, which is who made the thing - the channel
+ * behind a video is the second line of the card, and reading it off the HTML
+ * would mean guessing at a different shape of markup per site.
+ *
+ * The page wins wherever both answer, since it is the thing that was linked.
+ */
 async function describe(url: URL): Promise<Described | null> {
-    const fromPage = await describePage(url);
-    if (fromPage && (fromPage.title || fromPage.description)) return fromPage;
-    return (await describeByOembed(url)) ?? fromPage;
+    const [fromPage, fromSite] = await Promise.all([describePage(url), describeByOembed(url)]);
+    if (!fromPage && !fromSite) return null;
+    return {
+        title: fromPage?.title || fromSite?.title || "",
+        author: fromSite?.author || fromPage?.author || "",
+        accent: fromPage?.accent ?? null,
+        siteName: fromPage?.siteName || fromSite?.siteName || "",
+        imageUrl: fromPage?.imageUrl ?? fromSite?.imageUrl ?? null,
+        description: fromPage?.description || ""
+    };
 }
 
 /**
@@ -194,19 +258,8 @@ async function describeByOembed(url: URL): Promise<Described | null> {
     const asked = safeUrl(endpoint);
     if (!asked) return null;
 
-    const response = await follow(asked, "application/json");
-    if (!response?.ok) return null;
-    if (!(response.headers.get("content-type") ?? "").toLowerCase().includes("json")) return null;
-
-    const bytes = await readCapped(response, MAX_BYTES);
-    if (!bytes) return null;
-
-    let payload: { title?: unknown; author_name?: unknown; provider_name?: unknown; thumbnail_url?: unknown };
-    try {
-        payload = JSON.parse(new TextDecoder("utf-8", { fatal: false }).decode(bytes));
-    } catch {
-        return null;
-    }
+    const payload = await readJson(asked, "application/json");
+    if (!payload) return null;
 
     const text = (value: unknown): string => (typeof value === "string" ? value : "");
     const title = text(payload.title).slice(0, 200);
@@ -216,10 +269,33 @@ async function describeByOembed(url: URL): Promise<Described | null> {
         title,
         // The uploader, which is what a video card is actually asked: who made
         // this. There is no description in an oEmbed answer.
-        description: text(payload.author_name).slice(0, 400),
+        author: text(payload.author_name).slice(0, 100),
+        accent: null,
         siteName: (text(payload.provider_name) || url.hostname).slice(0, 100),
-        imageUrl: absolute(text(payload.thumbnail_url), url)
+        imageUrl: absolute(text(payload.thumbnail_url), url),
+        description: ""
     };
+}
+
+/** One small JSON document from an address already checked, or null when what
+ *  came back was not one. */
+async function readJson(
+    url: URL,
+    accept: string
+): Promise<Record<string, unknown> | null> {
+    const response = await follow(url, accept);
+    if (!response?.ok) return null;
+    if (!(response.headers.get("content-type") ?? "").toLowerCase().includes("json")) return null;
+
+    const bytes = await readCapped(response, MAX_BYTES);
+    if (!bytes) return null;
+
+    try {
+        const parsed: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: false }).decode(bytes));
+        return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+    } catch {
+        return null;
+    }
 }
 
 /** What one page says about itself. */
@@ -232,22 +308,57 @@ async function describePage(url: URL): Promise<Described | null> {
     // reading one to find that out is bytes spent to learn nothing.
     if (!contentType.includes("html")) return null;
 
-    const bytes = await readCapped(response, MAX_BYTES);
+    const bytes = await readAtMost(response, MAX_PAGE_BYTES);
     if (!bytes) return null;
     const html = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
 
     const image = meta(html, "og:image") ?? meta(html, "twitter:image");
     return {
         title: (meta(html, "og:title") ?? titleTag(html) ?? "").slice(0, 200),
+        author: (meta(html, "article:author") ?? meta(html, "author") ?? "").slice(0, 100),
+        accent: await accentOf(html, url),
+        siteName: (meta(html, "og:site_name") ?? url.hostname).slice(0, 100),
+        imageUrl: image ? absolute(image, url) : null,
         description: (
             meta(html, "og:description") ??
             meta(html, "description") ??
             meta(html, "twitter:description") ??
             ""
-        ).slice(0, 400),
-        siteName: (meta(html, "og:site_name") ?? url.hostname).slice(0, 100),
-        imageUrl: image ? absolute(image, url) : null
+        ).slice(0, 400)
     };
+}
+
+/**
+ * The colour a site says it is.
+ *
+ * The web app manifest first. `theme-color` in the page is the tint for the
+ * browser's chrome around the page *as it is drawn now* - YouTube's says white,
+ * because the page is white - while the manifest is where a site writes down
+ * what it looks like as a thing, and YouTube's says red. The meta tag is the
+ * fallback for the many sites that publish no manifest.
+ *
+ * Only `#rgb` and `#rrggbb` are taken. `rgba(255, 255, 255, .98)` and the named
+ * colours are perfectly valid CSS and would go straight into a style attribute,
+ * so the answer is narrowed to the one shape that cannot be anything else.
+ */
+async function accentOf(html: string, url: URL): Promise<string | null> {
+    const link = /<link[^>]+rel\s*=\s*["'][^"']*\bmanifest\b[^"']*["'][^>]*>/i.exec(html)?.[0];
+    const href = link ? /href\s*=\s*["']([^"']+)["']/i.exec(link)?.[1] : null;
+    const address = href ? absolute(decode(href.trim()), url) : null;
+    const asked = address ? safeUrl(address) : null;
+    if (asked) {
+        const manifest = await readJson(asked, "application/manifest+json,application/json");
+        const declared = hexColour(manifest?.theme_color);
+        if (declared) return declared;
+    }
+    return hexColour(meta(html, "theme-color"));
+}
+
+/** A colour written the one way it is allowed to be written here. */
+function hexColour(value: unknown): string | null {
+    if (typeof value !== "string") return null;
+    const hex = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.exec(value.trim())?.[0];
+    return hex ? hex.toLowerCase() : null;
 }
 
 /**

@@ -107,6 +107,20 @@ export function embedFor(address: string): Embed | null {
 }
 
 /**
+ * The same player, asked to start.
+ *
+ * Used the moment somebody presses play in Polaris: the frame does not exist
+ * until then, so it is built already running rather than handing over a second
+ * play button to press. The press that has already happened is also what lets a
+ * site play with the sound on - a player built without one is muted by the
+ * browser, which is the other half of why this parameter is set here and never
+ * stored.
+ */
+export function autoplaying(url: string): string {
+    return `${url}${url.includes("?") ? "&" : "?"}autoplay=1`;
+}
+
+/**
  * Where to ask a site what one of its links is, when the page itself will not
  * say.
  *

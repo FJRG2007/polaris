@@ -18,6 +18,7 @@ import { publishChatChange } from "./live";
 import { announceRoomMention } from "./room-mentions";
 import { receiptsBetween } from "@/lib/privacy-service";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
+import { isBlankMarkdown } from "@/components/rich-text/markdown";
 import { discardAttachments, isInlineImage, type StoredAttachment } from "./attachments";
 import { knownPreviews, unfurl, type KnownPreview, type LinkPreviewView } from "./link-preview";
 import {
@@ -240,6 +241,15 @@ export async function send(
     await requirePostable(actor, input.channelId);
     await requireSendable(actor, input.channelId, input.body);
 
+    // Nothing but whitespace, whatever punctuation it serialized into. The
+    // schema refuses an empty string and the composer refuses a blank one, and
+    // this is the same question asked of the written text: a few spaces and some
+    // shift-enters come out of the editor as a lone backslash, which is a
+    // message that passes both and reads as a mistake to the whole room.
+    if (attachments.length === 0 && isBlankMarkdown(input.body)) {
+        throw new ChatRuleError("Write something first");
+    }
+
     if (input.parentId) {
         const parent = await prisma.chatMessage.findUnique({
             where: { id: input.parentId },
@@ -381,6 +391,8 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
         throw new ChatAccessError("You can only edit your own messages");
     if (message.deletedAt) throw new ChatAccessError("That message was deleted");
     await requireSendable(actor, message.channelId, input.body);
+    // Emptying a message is deleting it, and there is a delete for that.
+    if (isBlankMarkdown(input.body)) throw new ChatRuleError("Write something first");
 
     const rules = await rulesForChannel(message.channelId);
     if (!core.withinEditWindow(rules, message.createdAt)) {
@@ -980,17 +992,24 @@ function previewOf(
     return link ? (previews.get(link)?.view ?? null) : null;
 }
 
-/** Whether this message's link is one nobody has looked up yet. A link that was
- *  looked up and came back with nothing is not pending: asking again every time
- *  the conversation is opened would be a request per render for a page that has
- *  already said it has nothing to say. */
+/**
+ * Whether this message's link is one worth asking about.
+ *
+ * Either nobody has looked yet, or what was found has gone stale - a page that
+ * said nothing an hour ago is worth one more try, since "nothing" is as often
+ * about a slow site or a network that was down as about the page. What is not
+ * done is asking on every render: that would be a request per drawn card for a
+ * page that has already answered.
+ */
 function pendingOf(
     row: Row,
     links: ReadonlyMap<string, string>,
     previews: ReadonlyMap<string, KnownPreview>
 ): boolean {
     const link = links.get(row.id);
-    return link !== undefined && !previews.has(link);
+    if (link === undefined) return false;
+    const known = previews.get(link);
+    return known === undefined || known.askAgain;
 }
 
 /** The quote line for one message, or null when it stands alone. */
