@@ -65,7 +65,7 @@ const REFERENCE_QUERY = /^([a-z]+)?-?(\d+)$/i;
  * "ana" and being shown nothing because the account is called "Ana" is the whole
  * reason this is not just `{ contains }`.
  */
-function like(term: string) {
+export function like(term: string) {
     return loadEnv().POLARIS_DB_PROVIDER === "sqlite"
         ? { contains: term }
         : { contains: term, mode: "insensitive" as const };

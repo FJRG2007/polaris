@@ -26,7 +26,6 @@ import { requirePermission } from "@/lib/session";
 import { storeAttachment } from "@/lib/chat/attachments";
 import type { SavedMediaView } from "@/lib/chat/saved-media";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
-import { searchAccounts } from "@/lib/rich-text/mention-service";
 import type { ChatMessageView, ChatPage } from "@/lib/chat/messages";
 import { messageToasts, type MessageToast } from "@/lib/chat/toasts";
 import { searchMessages, type ChatSearchHit } from "@/lib/chat/search";
@@ -35,9 +34,9 @@ import type { ChatInviteOffer, ChatInviteView } from "@/lib/chat/invites";
 import { fetchRemoteMedia, searchTenor, tenorConfigured, type TenorResult } from "@/lib/chat/tenor";
 import {
     ChatAccessError,
-    messageable,
     reachableChannelIds,
-    requirePostable
+    requirePostable,
+    searchForConversation
 } from "@/lib/chat/access";
 import type {
     ChatCategoryView,
@@ -146,20 +145,12 @@ export async function searchPeopleAction(
     query: string
 ): Promise<{ results?: { id: string; name: string }[]; withheld?: number; error?: string }> {
     const me = await actor();
-    const found = await searchAccounts({ id: me.id, isAdmin: false }, String(query ?? ""), 24);
-    const allowed = await messageable(found.map((person) => person.id));
-    return {
-        results: found
-            .filter((person) => allowed.has(person.id))
-            .slice(0, 8)
-            .map((person) => ({ id: person.id, name: person.name })),
-        // How many matched and were left out because they do not have Chat. A
-        // count and nothing else: the picker needs to say why it is empty, and
-        // "no results" for somebody the searcher just typed the name of reads as
-        // a broken search rather than as an account that cannot receive a
-        // message. Naming them would say more than the search was asked.
-        withheld: found.filter((person) => !allowed.has(person.id)).length
-    };
+    const found = await searchForConversation(me, String(query ?? ""));
+    // The count of who was left out travels with the results: "no results" for
+    // somebody whose name has just been typed reads as a broken search rather
+    // than as an account that cannot receive a message. A number and nothing
+    // else - naming them would say more than the search was asked.
+    return { results: found.people, withheld: found.withheld };
 }
 
 /**

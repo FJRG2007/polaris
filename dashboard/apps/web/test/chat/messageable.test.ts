@@ -21,8 +21,37 @@ vi.mock("@polaris/auth", () => ({
 
 vi.mock("@/lib/orgs/org-service", () => ({ memberOrgIds: async () => [] }));
 
+vi.mock("@/lib/rich-text/mention-service", () => ({ like: (term: string) => ({ contains: term }) }));
+
+/** Everybody on this pretend instance. The point of the search test is that the
+ *  query is over accounts and not over who shares a Tasks space with whom, so
+ *  none of these share anything. */
+const accounts = [
+    { id: "ada", name: "Ada Lovelace", email: "ada@example.com", username: "ada", bannedAt: null },
+    { id: "grace", name: "Grace Hopper", email: "grace@example.com", username: "g1203", bannedAt: null },
+    { id: "turing", name: "Alan Turing", email: "alan@example.com", username: "alan", bannedAt: null },
+    { id: "gone", name: "Banned Person", email: "gone@example.com", username: "gone", bannedAt: new Date() }
+];
+
+/** Just enough of the query this test cares about: the exclusions in the `where`
+ *  and a "contains" over the three identity columns. */
+function findUsers({ where }: { where: Record<string, unknown> }) {
+    const not = (where.id as { not?: string } | undefined)?.not;
+    const term = ((where.OR as { name?: { contains: string } }[] | undefined)?.[0]?.name?.contains ?? "")
+        .toLowerCase();
+    return accounts.filter((person) => {
+        if (person.id === not) return false;
+        if (where.bannedAt === null && person.bannedAt !== null) return false;
+        if (!term) return true;
+        return [person.name, person.email, person.username].some((field) =>
+            field.toLowerCase().includes(term)
+        );
+    });
+}
+
 vi.mock("@polaris/db", () => ({
     prisma: {
+        user: { findMany: async (args: { where: Record<string, unknown> }) => findUsers(args) },
         chatSpace: { findUnique: async () => null, findMany: async () => [] },
         chatSpaceMember: { findUnique: async () => null },
         chatChannel: { findUnique: async () => null, findMany: async () => [] },
@@ -62,5 +91,51 @@ describe("who can be messaged", () => {
         // What switching it on from the admin profile does.
         withChat.add("turing");
         expect((await access.messageable(["turing"])).has("turing")).toBe(true);
+    });
+});
+
+/**
+ * Who the picker offers.
+ *
+ * The bug: it borrowed the account search written for a drop point's allowlist,
+ * whose reach is "people you already share a Tasks space or an organization
+ * with". So a colleague on the same instance came back as "Nobody else to add",
+ * and switching their chat on changed nothing, because they were never in the
+ * search. An internal messenger reaches everybody signed in here who has the
+ * chat, and nobody else.
+ */
+describe("finding somebody to talk to", () => {
+    it("finds anybody on the instance, not only people you share work with", async () => {
+        const found = await access.searchForConversation({ id: "ada" }, "grace");
+        expect(found.people.map((person) => person.id)).toEqual(["grace"]);
+    });
+
+    it("finds them by their username, which is what a list of people shows", async () => {
+        const found = await access.searchForConversation({ id: "ada" }, "g1203");
+        expect(found.people.map((person) => person.id)).toEqual(["grace"]);
+    });
+
+    it("leaves out somebody without the chat, and says how many", async () => {
+        const found = await access.searchForConversation({ id: "ada" }, "alan");
+        expect(found.people).toEqual([]);
+        // The count is what lets the picker say why it is empty instead of
+        // implying the account does not exist.
+        expect(found.withheld).toBe(1);
+
+        withChat.add("turing");
+        const again = await access.searchForConversation({ id: "ada" }, "alan");
+        expect(again.people.map((person) => person.id)).toEqual(["turing"]);
+        expect(again.withheld).toBe(0);
+    });
+
+    it("never offers you yourself", async () => {
+        const found = await access.searchForConversation({ id: "ada" }, "ada");
+        expect(found.people).toEqual([]);
+    });
+
+    it("never offers a banned account", async () => {
+        withChat.add("gone");
+        const found = await access.searchForConversation({ id: "ada" }, "banned");
+        expect(found.people).toEqual([]);
     });
 });
