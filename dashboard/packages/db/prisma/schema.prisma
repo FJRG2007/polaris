@@ -74,6 +74,7 @@ model User {
     sessions     Session[]
     accounts     Account[]
     roles        UserRole[]
+    permissionOverrides UserPermission[]
     groups       GroupMember[]
     invitesSent  Invite[]                @relation("InviteInviter")
     connections       StorageConnection[]
@@ -5806,4 +5807,38 @@ model MeetingParticipant {
 
     @@index([meetingId, leftAt])
     @@index([meetingId, admission])
+}
+// One capability switched on or off for one account, regardless of their role.
+//
+// Roles answer "what does somebody like this do", and that is the right question
+// almost always. This is the exception: one person who needs the chat and whose
+// role does not carry it, one person who must not have it and whose role does.
+// Making a role for each of those is how an instance ends up with nine roles and
+// nobody able to say what any of them means.
+//
+// It is a statement source like a role or a policy, not a field that shadows
+// them: `effect` is allow or deny, and the same engine resolves it, so an
+// explicit deny beats every allow underneath it exactly as it does anywhere
+// else. An account with no row for a permission simply falls through to whatever
+// their role and policies say, which is why absence is not the same as deny and
+// the screen has three states rather than a checkbox.
+model UserPermission {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    userId     String   @db.Uuid
+    // A key from PERMISSIONS in @polaris/core. Stored as text rather than an
+    // enum for the same reason every other permission column is: the list grows,
+    // and a migration per capability is a tax on adding one.
+    permission String
+    // allow | deny
+    effect     String
+    // Who set it and when. An override is an exception to the rules the instance
+    // otherwise runs on, so it is worth being able to ask who made it.
+    setById    String?  @db.Uuid
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, permission])
+    @@index([userId])
 }

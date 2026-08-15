@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { PeoplePicker, type PickedPerson } from "./people-picker";
-import { addChannelMembersAction, listMembersAction } from "./actions";
+import { addChannelMembersAction, listMembersAction, searchPeopleAction } from "./actions";
 import {
     Button,
     Dialog,
@@ -77,7 +77,12 @@ export function AddPeopleDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <PeoplePicker picked={picked} onChange={setPicked} exclude={already} />
+                <PeoplePicker
+                    picked={picked}
+                    onChange={setPicked}
+                    exclude={already}
+                    search={searchPeopleAction}
+                />
 
                 {error && (
                     <p role="alert" className="text-sm text-destructive">

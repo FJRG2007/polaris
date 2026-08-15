@@ -14,6 +14,7 @@ import { prisma, type Prisma } from "@polaris/db";
 import {
     ChatAccessError,
     channelAccess,
+    messageable,
     reachableSpaceIds,
     requireChannel,
     requireSpace,
@@ -69,6 +70,10 @@ export interface ChatMemberView {
 /** How many unread messages a badge counts up to before it says "more". Reading
  *  past this is somebody scrolling, not somebody catching up on a number. */
 const UNREAD_CAP = 99;
+
+/** Said the same way wherever it is refused, because it is one situation and the
+ *  next step is the same: an administrator switches the chat on for them. */
+const NO_CHAT = "Somebody there does not have the chat turned on";
 
 // ---------------------------------------------------------------------------
 // Spaces
@@ -419,6 +424,12 @@ export async function addChannelMembers(
 
     const wanted = [...new Set(userIds)];
     if (wanted.length === 0) return;
+    // Somebody without the chat has no screen this channel could appear on, so
+    // putting them in it would be adding a member who can never hear anybody.
+    const reachable = await messageable(wanted);
+    const missing = wanted.filter((userId) => !reachable.has(userId));
+    if (missing.length > 0) throw new ChatAccessError(NO_CHAT);
+
     await prisma.chatChannelMember.createMany({
         data: wanted.map((userId) => ({ channelId, userId })),
         skipDuplicates: true
@@ -470,6 +481,11 @@ export async function openDirect(actor: ChatActor, userIds: readonly string[]): 
     });
     if (present.length !== others.length)
         throw new ChatAccessError("Somebody there no longer has an account");
+
+    // The same rule the picker applies, applied again here: a picker is a
+    // convenience and this is the check.
+    const reachable = await messageable(others);
+    if (reachable.size !== others.length) throw new ChatAccessError(NO_CHAT);
 
     const everyone = [actor.id, ...others];
     if (others.length === 1) {

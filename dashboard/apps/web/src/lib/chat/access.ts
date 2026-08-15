@@ -19,6 +19,7 @@
  * passed and answers the narrower question.
  */
 
+import { can } from "@polaris/auth";
 import { prisma } from "@polaris/db";
 import { memberOrgIds } from "@/lib/orgs/org-service";
 
@@ -202,6 +203,30 @@ export async function reachableChannelIds(actor: ChatActor): Promise<Set<string>
         : [];
 
     return new Set([...direct.map((row) => row.channelId), ...open.map((row) => row.id)]);
+}
+
+/**
+ * Which of these accounts can be talked to at all.
+ *
+ * Somebody whose `chat.use` has been taken away does not have the app: no rail,
+ * no conversations, nothing that would show them a message. Putting them in one
+ * anyway would be a room where somebody is spoken to and never hears it, and the
+ * person doing the speaking would have no way to know. So they are not offered
+ * in a picker and they are refused at the write.
+ *
+ * One resolution per account rather than a single query, because whether
+ * somebody holds a capability is a policy evaluation and not a column - roles,
+ * policies, groups and the override on the account all get a say. The sets here
+ * are a popup's worth or a group's worth, so the cost is bounded by the shape of
+ * the thing asking.
+ */
+export async function messageable(userIds: readonly string[]): Promise<Set<string>> {
+    const unique = [...new Set(userIds)];
+    if (unique.length === 0) return new Set();
+    const verdicts = await Promise.all(
+        unique.map(async (userId) => [userId, await can(userId, "chat.use")] as const)
+    );
+    return new Set(verdicts.filter(([, allowed]) => allowed).map(([userId]) => userId));
 }
 
 /** Every space this actor can reach, by the three ways in. */

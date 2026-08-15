@@ -1,10 +1,11 @@
 /**
  * The authorization decision point for global capabilities. A user's effective
  * permissions come from three sources folded into one statement list: the roles
- * they hold (each role permission becomes an allow over every resource), and the
- * policies attached to them, their groups, and their roles. The pure engine in
- * @polaris/core then resolves the request with deny-by-default and
- * explicit-deny-override. Admins short-circuit to allow.
+ * they hold (each role permission becomes an allow over every resource), the
+ * policies attached to them, their groups, and their roles, and the overrides
+ * set on the account itself. The pure engine in @polaris/core then resolves the
+ * request with deny-by-default and explicit-deny-override. Admins short-circuit
+ * to allow.
  *
  * Per-file Drive access is a separate, resource-scoped decision that also needs
  * ownership and ACL rows from the web app's database context, so it is composed
@@ -59,21 +60,45 @@ async function roleStatements(userId: string): Promise<PolicyStatement[]> {
 }
 
 /**
+ * One capability switched on or off for one account, as statements.
+ *
+ * Last in the list it is folded into, which changes nothing about the outcome -
+ * the engine resolves deny-over-allow regardless of order - and everything about
+ * reading it: an override is the exception written on top of the rules, and it
+ * reads that way in a list too.
+ */
+async function overrideStatements(userId: string): Promise<PolicyStatement[]> {
+    const rows = await prisma.userPermission.findMany({
+        where: { userId },
+        select: { permission: true, effect: true }
+    });
+    return rows.map((row) => ({
+        effect: row.effect === "deny" ? ("deny" as const) : ("allow" as const),
+        actions: [row.permission],
+        resources: ["*"]
+    }));
+}
+
+/**
  * The full set of statements that decide a user's global capabilities: their role
- * grants plus every policy attached to them, their groups, and their roles.
+ * grants, every policy attached to them, their groups and their roles, and the
+ * overrides set on the account itself.
  */
 export async function resolveGlobalStatements(userId: string): Promise<PolicyStatement[]> {
-    const [roles, policies] = await Promise.all([
+    const [roles, policies, overrides] = await Promise.all([
         roleStatements(userId),
-        resolvePrincipalPolicyStatements(userId)
+        resolvePrincipalPolicyStatements(userId),
+        overrideStatements(userId)
     ]);
-    return [...roles, ...policies];
+    return [...roles, ...policies, ...overrides];
 }
 
 /** Where a statement came from, for the screen that has to explain an answer
  *  rather than only give one. */
 export type StatementSource =
     | { readonly kind: "role"; readonly id: string; readonly name: string }
+    /** Set on the account itself, from their profile. */
+    | { readonly kind: "account"; readonly id: string; readonly name: string }
     | {
           readonly kind: "policy";
           readonly id: string;
@@ -95,12 +120,16 @@ export interface SourcedStatements {
  * decision would not.
  */
 export async function resolveGlobalStatementsBySource(userId: string): Promise<SourcedStatements[]> {
-    const [roles, policies] = await Promise.all([
+    const [roles, policies, overrides] = await Promise.all([
         prisma.userRole.findMany({
             where: { userId },
             select: { role: { select: { id: true, name: true, permissions: true } } }
         }),
-        resolvePrincipalPolicyStatementsBySource(userId)
+        resolvePrincipalPolicyStatementsBySource(userId),
+        prisma.userPermission.findMany({
+            where: { userId },
+            select: { id: true, permission: true, effect: true }
+        })
     ]);
     const fromRoles: SourcedStatements[] = roles.map((row) => ({
         source: { kind: "role", id: row.role.id, name: row.role.name },
@@ -120,7 +149,17 @@ export async function resolveGlobalStatementsBySource(userId: string): Promise<S
         },
         statements: entry.statements
     }));
-    return [...fromRoles, ...fromPolicies];
+    const fromOverrides: SourcedStatements[] = overrides.map((row) => ({
+        source: { kind: "account", id: row.id, name: row.permission },
+        statements: [
+            {
+                effect: row.effect === "deny" ? ("deny" as const) : ("allow" as const),
+                actions: [row.permission],
+                resources: ["*"]
+            }
+        ]
+    }));
+    return [...fromRoles, ...fromPolicies, ...fromOverrides];
 }
 
 /** Whether a user holds a global capability. Admins are allowed everything. */

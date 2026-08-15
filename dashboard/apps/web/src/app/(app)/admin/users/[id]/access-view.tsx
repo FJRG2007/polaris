@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { setUserRoleAction } from "../actions";
+import { CapabilitiesCard } from "./capabilities-card";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useDisplayFormat } from "@/components/display-format";
 import { ArrowLeft, ExternalLink, Loader2, Trash2 } from "lucide-react";
@@ -85,6 +86,7 @@ export function UserAccessView({
             {error && <p className="text-sm text-danger">{error}</p>}
 
             <RoleCard userId={userId} role={role} roles={roles} onSaved={load} />
+            <CapabilitiesCard userId={userId} onSaved={load} />
             <MembershipCard
                 title="Groups"
                 hint="Membership only. What a group may do comes from the policies attached to it."

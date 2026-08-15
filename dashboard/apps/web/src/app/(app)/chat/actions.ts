@@ -19,7 +19,8 @@ import { revalidatePath } from "next/cache";
 import * as chat from "@/lib/chat/chat-service";
 import * as messages from "@/lib/chat/messages";
 import { requirePermission } from "@/lib/session";
-import { ChatAccessError } from "@/lib/chat/access";
+import { searchAccounts } from "@/lib/rich-text/mention-service";
+import { ChatAccessError, messageable } from "@/lib/chat/access";
 import type { ChatMessageView, ChatPage } from "@/lib/chat/messages";
 import type { ChatChannelView, ChatMemberView, ChatSpaceView } from "@/lib/chat/chat-service";
 
@@ -85,6 +86,30 @@ export async function readThreadAction(
     const me = await actor();
     const result = await guard(() => messages.readThread(me, messageId));
     return result.error ? { error: result.error } : { messages: result.value };
+}
+
+/**
+ * The people this picker may offer.
+ *
+ * The instance-wide account search, narrowed to those who actually have the
+ * chat. Offering somebody who would then be refused is the worst version of
+ * this: the refusal arrives after the group has been assembled and named, and
+ * it does not say which of the six is the problem.
+ *
+ * Asked wider than it answers, so filtering a few out still fills the popup.
+ */
+export async function searchPeopleAction(
+    query: string
+): Promise<{ results?: { id: string; name: string }[]; error?: string }> {
+    const me = await actor();
+    const found = await searchAccounts({ id: me.id, isAdmin: false }, String(query ?? ""), 24);
+    const allowed = await messageable(found.map((person) => person.id));
+    return {
+        results: found
+            .filter((person) => allowed.has(person.id))
+            .slice(0, 8)
+            .map((person) => ({ id: person.id, name: person.name }))
+    };
 }
 
 export async function listMembersAction(

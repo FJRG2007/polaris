@@ -14,7 +14,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useChat } from "./chat-context";
 import { useRouter } from "next/navigation";
-import { openDirectAction } from "./actions";
+import { openDirectAction, searchPeopleAction } from "./actions";
 import { runAction } from "@/lib/run-action";
 import { PeoplePicker, type PickedPerson } from "./people-picker";
 import {
@@ -64,6 +64,7 @@ export function NewDirectDialog({
                 </DialogHeader>
 
                 <PeoplePicker
+                    search={searchPeopleAction}
                     picked={picked}
                     onChange={setPicked}
                     // Messaging yourself is not what anybody means by this, and

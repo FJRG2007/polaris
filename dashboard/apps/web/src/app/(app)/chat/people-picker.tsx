@@ -16,7 +16,6 @@ import { cn } from "@polaris/ui";
 import { Avatar } from "@/components/avatar";
 import { Loader2, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { searchAccountsAction } from "../mention-actions";
 
 export interface PickedPerson {
     readonly id: string;
@@ -32,7 +31,8 @@ export function PeoplePicker({
     onChange,
     exclude = [],
     max,
-    label = "Add people"
+    label = "Add people",
+    search
 }: {
     picked: readonly PickedPerson[];
     onChange: (picked: readonly PickedPerson[]) => void;
@@ -41,6 +41,9 @@ export function PeoplePicker({
     exclude?: readonly string[];
     max?: number;
     label?: string;
+    /** Who may be offered. Chat passes its own, which leaves out anybody whose
+     *  chat is switched off - they have no screen a message could arrive on. */
+    search: (query: string) => Promise<{ results?: { id: string; name: string }[] }>;
 }) {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<readonly PickedPerson[]>([]);
@@ -53,13 +56,13 @@ export function PeoplePicker({
         const mine = ++asked.current;
         setSearching(true);
         const timer = setTimeout(async () => {
-            const result = await searchAccountsAction({ query: term });
+            const result = await search(term);
             if (mine !== asked.current) return;
             setResults(result.results ?? []);
             setSearching(false);
         }, SEARCH_AFTER);
         return () => clearTimeout(timer);
-    }, [query]);
+    }, [query, search]);
 
     const taken = new Set([...exclude, ...picked.map((person) => person.id)]);
     const offered = results.filter((person) => !taken.has(person.id));

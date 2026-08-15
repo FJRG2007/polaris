@@ -94,6 +94,11 @@ async function principalLabels(
 /** How a statement source reads on the page, and where to go to change it. */
 function describe(source: auth.StatementSource): { label: string; href: string } {
     if (source.kind === "role") return { label: `their ${source.name} role`, href: "/admin/roles" };
+    // An override names the capability rather than a document, because that is
+    // what somebody would go looking for: "chat, switched on for this account".
+    if (source.kind === "account") {
+        return { label: `${source.name}, set on this account`, href: "/admin/users" };
+    }
     const via =
         source.principalType === "user"
             ? "attached to them"
