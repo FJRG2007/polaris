@@ -8,6 +8,7 @@
 import type { OrgPermission, Permission } from "@polaris/core";
 import {
     Activity,
+    Archive,
     Bell,
     Bot,
     Blocks,
@@ -157,6 +158,14 @@ export const POLARIS_APPS: AppEntry[] = [
         icon: SquareCheckBig,
         href: "/tasks",
         permission: "tasks.read"
+    },
+    {
+        id: "notes",
+        label: "Notes",
+        description: "Write things down, nested the way a notebook is",
+        icon: NotebookPen,
+        href: "/notes",
+        permission: "notes.use"
     },
     {
         id: "watch",
@@ -486,6 +495,20 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["dashboard", "workload", "metrics"]
         }
     ],
+    notes: [
+        {
+            label: "Notes",
+            href: "/notes",
+            icon: NotebookPen,
+            keywords: ["notepad", "scratch", "jot", "personal", "private", "markdown", "writing"]
+        },
+        {
+            label: "Archive",
+            href: "/notes/archive",
+            icon: Archive,
+            keywords: ["archived", "put away", "old notes", "restore"]
+        }
+    ],
     account: [
         {
             label: "Profile",
@@ -504,12 +527,6 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/account/notifications",
             icon: Bell,
             keywords: ["alerts", "email"]
-        },
-        {
-            label: "Notes",
-            href: "/account/notes",
-            icon: NotebookPen,
-            keywords: ["notepad", "scratch", "jot", "personal", "private", "markdown", "writing"]
         },
         {
             label: "Connected accounts",

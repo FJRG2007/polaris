@@ -37,6 +37,10 @@ const ADDRESS = /^polaris:(user|team|task|doc|note)\/([0-9a-f-]{36})$/i;
 const ROUTES: readonly { readonly kind: ReferenceKind; readonly match: RegExp }[] = [
     { kind: "task", match: /^\/tasks\/t\/([0-9a-f-]{36})/i },
     { kind: "doc", match: /^\/tasks\/docs\?(?:.*&)?doc=([0-9a-f-]{36})/i },
+    { kind: "note", match: /^\/notes\?(?:.*&)?note=([0-9a-f-]{36})/i },
+    // Where notes lived before they were an app of their own. Kept because the
+    // links people already pasted into documents say this, and a paste that
+    // stopped becoming a chip would be a silent regression.
     { kind: "note", match: /^\/account\/notes\?(?:.*&)?note=([0-9a-f-]{36})/i }
 ];
 
@@ -60,7 +64,7 @@ export function parseReferenceAddress(href: string): { kind: ReferenceKind; id: 
 export function referenceHref(kind: ReferenceKind, id: string): string | null {
     if (kind === "task") return `/tasks/t/${id}`;
     if (kind === "doc") return `/tasks/docs?doc=${id}`;
-    if (kind === "note") return `/account/notes?note=${id}`;
+    if (kind === "note") return `/notes?note=${id}`;
     return null;
 }
 

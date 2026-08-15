@@ -207,6 +207,25 @@ Tasks (work management):
 - [ ] Whiteboards, mind maps, clips, AI, email-in, proofing, map and workload
       views, portfolios - out of scope for this pillar
 
+Notes (personal writing):
+
+- [x] An app of its own at `/notes`, beside Tasks rather than under the account:
+      somewhere you sit and work, not a setting you change and leave. The old
+      `/account/notes` path redirects and still resolves as a pasted reference
+- [x] Notes nest as deep as five levels - any note can hold others, so there is
+      no separate folder to create. The sidebar is a tree with collapse
+      remembered per browser, and searching flattens it so a match two levels
+      down is never hidden by a folded parent
+- [x] Moving one refuses what would cut it off: into itself, into its own
+      subtree, or deeper than the tree goes. Deleting one frees what is under it
+      instead of taking it along, and says how much before it does
+- [x] Archive with a screen behind it, so putting something away is not a delete
+      with extra steps
+- [x] The same Markdown, mentions and Polaris references as everywhere else, and
+      the same privacy as before: only the author reads them, an instance
+      administrator included
+- [ ] Shared notebooks, and a note handed to somebody else
+
 ## Notes / deliberate decisions
 
 - Polaris is a control plane, not a file mirror: the browser lists remote trees

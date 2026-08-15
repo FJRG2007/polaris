@@ -199,15 +199,28 @@ model Note {
     title     String   @default("Untitled")
     // Markdown, stored as written so it stays portable out of Polaris.
     body      String   @default("")
+    // The note this one sits under, or null at the top level. Notes nest because
+    // a page of notes is a filing problem the moment there are thirty of them,
+    // and the shape people reach for is the one a notebook already has: a few
+    // subjects, each with pages under it. There is no separate folder to create
+    // and keep in step - any note can hold others.
+    parentId  String?  @db.Uuid
     // Kept at the top of the list, for the few that are read every day.
     pinned    Boolean  @default(false)
     archived  Boolean  @default(false)
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
-    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    // Deleting a note frees its children rather than taking them with it: the
+    // text under a heading is not owned by the heading, and a delete that
+    // silently removed a subtree would be the one destructive action in Polaris
+    // that never said how much it was about to destroy.
+    parent   Note?  @relation("NoteTree", fields: [parentId], references: [id], onDelete: SetNull)
+    children Note[] @relation("NoteTree")
 
     @@index([userId, archived, updatedAt])
+    @@index([userId, parentId])
 }
 
 // The account somebody named to take over their own if they die.

@@ -1,42 +1,20 @@
 /**
- * Notes (/account/notes): what somebody writes down for themselves.
+ * Where notes used to live.
  *
- * It sits under the account rather than inside Tasks because that is what it
- * belongs to. A note is not work in a space somebody could be removed from, and
- * it does not go with the organization whose shelf happens to be open - it goes
- * with the person, and it goes when the account does.
+ * They are an app of their own now (/notes). This stays because links to a note
+ * are written into other notes, into tasks, and into whatever somebody pasted
+ * into a chat months ago, and a reference that stops resolving is worse than a
+ * hop. The query is carried across, so a link to one particular note still opens
+ * that note.
  */
 
-import { requireUser } from "@/lib/session";
-import { NewNoteButton, NotesView } from "./notes-view";
-import { getNote, listNotes } from "@/lib/notes/note-service";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default async function NotesPage({
+export default async function MovedNotesPage({
     searchParams
 }: {
     searchParams: Promise<{ note?: string }>;
 }) {
-    const user = await requireUser();
-    const wanted = (await searchParams).note ?? null;
-    const [notes, note] = await Promise.all([
-        listNotes(user.id),
-        wanted ? getNote(user.id, wanted) : Promise.resolve(null)
-    ]);
-
-    return (
-        <div className="flex w-full flex-col gap-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                    <h1 className="text-[17px] font-semibold tracking-tight">Notes</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Yours alone. Mention people and tasks the way you would anywhere else in Polaris.
-                    </p>
-                </div>
-                <NewNoteButton />
-            </div>
-            <NotesView notes={notes} note={note} />
-        </div>
-    );
+    const wanted = (await searchParams).note;
+    redirect(wanted ? `/notes?note=${encodeURIComponent(wanted)}` : "/notes");
 }
