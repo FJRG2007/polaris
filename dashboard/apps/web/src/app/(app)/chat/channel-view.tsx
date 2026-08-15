@@ -68,6 +68,10 @@ export function ChannelView({ channelId }: { channelId: string }) {
     // whether one is running: somebody can watch a channel with a call in it
     // without joining, and must not have their camera opened for them.
     const [inCall, setInCall] = useState<string | null>(null);
+    // Whether this browser opened its camera on the way in. An audio call is not
+    // a different kind of call - it is the same room joined with the camera shut
+    // - so it is remembered here rather than anywhere the server can see.
+    const [callVideo, setCallVideo] = useState(true);
 
     const scroller = useRef<HTMLDivElement>(null);
     const following = useRef(true);
@@ -319,12 +323,13 @@ export function ChannelView({ channelId }: { channelId: string }) {
                     channel={channel}
                     onChanged={refresh}
                     call={live}
-                    onStartCall={async () => {
+                    onStartCall={async (withVideo) => {
                         const result = await calls.startCallAction(channelId);
                         if (result.error) {
                             setError(result.error);
                             return;
                         }
+                        setCallVideo(withVideo);
                         if (result.meetingId) setInCall(result.meetingId);
                         checkCall();
                     }}
@@ -334,6 +339,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
                     <div className="flex max-h-[60%] min-h-0 shrink-0 flex-col border-b border-border">
                         <CallRoom
                             meetingId={inCall}
+                            withVideo={callVideo}
                             viewerId={viewerId}
                             onLeave={() => {
                                 setInCall(null);

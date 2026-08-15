@@ -26,6 +26,7 @@ import {
     Hash,
     Lock,
     MoreHorizontal,
+    Phone,
     Trash2,
     UserPlus,
     Users,
@@ -51,7 +52,10 @@ export function ChannelHeader({
     /** The call running in this conversation, if there is one, so somebody who
      *  arrives late can see it rather than start a second one. */
     call: { meetingId: string; count: number } | null;
-    onStartCall: () => void;
+    /** Start or join. The flag is whether to open the camera - two buttons
+     *  rather than one, because deciding afterwards means everybody in the room
+     *  has already seen you. */
+    onStartCall: (withVideo: boolean) => void;
 }) {
     const router = useRouter();
     const [adding, setAdding] = useState(false);
@@ -94,20 +98,41 @@ export function ChannelHeader({
                 )}
 
                 <div className="ml-auto flex shrink-0 items-center gap-0.5">
-                    <button
-                        type="button"
-                        onClick={onStartCall}
-                        aria-label={call ? "Join the call" : "Start a call"}
-                        title={call ? "Join the call" : "Start a call"}
-                        className={
-                            call
-                                ? "flex items-center gap-1.5 rounded-md bg-primary/15 px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-primary/25"
-                                : "rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                        }
-                    >
-                        <Video className="size-4" />
-                        {call && <span>{call.count}</span>}
-                    </button>
+                    {call ? (
+                        // One button once a call is running: joining is joining,
+                        // and the camera is a switch inside the room.
+                        <button
+                            type="button"
+                            onClick={() => onStartCall(true)}
+                            aria-label="Join the call"
+                            title="Join the call"
+                            className="flex items-center gap-1.5 rounded-md bg-primary/15 px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-primary/25"
+                        >
+                            <Video className="size-4" />
+                            <span>{call.count}</span>
+                        </button>
+                    ) : (
+                        <>
+                            <button
+                                type="button"
+                                onClick={() => onStartCall(false)}
+                                aria-label="Start a call"
+                                title="Start a call"
+                                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                                <Phone className="size-4" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => onStartCall(true)}
+                                aria-label="Start a video call"
+                                title="Start a video call"
+                                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                                <Video className="size-4" />
+                            </button>
+                        </>
+                    )}
                     {named && (
                         <button
                             type="button"

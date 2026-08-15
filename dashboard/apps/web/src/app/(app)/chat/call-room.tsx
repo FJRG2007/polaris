@@ -11,17 +11,39 @@
  * The grid is columns rather than a layout engine: with eight people at the very
  * most, the number of columns is a lookup, and a measured layout would be
  * cleverness paid for on every frame of every call.
+ *
+ * The control bar is the set everybody already knows: microphone, camera,
+ * screen, and deafen. Each button carries the state it is in rather than the
+ * action it performs, because a row of buttons that all say what they will do
+ * cannot be read at a glance to find out what is currently on.
  */
 
 import { useCall } from "./use-call";
-import { Button, cn } from "@polaris/ui";
 import * as actions from "./meeting-actions";
 import { useEffect, useRef, useState } from "react";
-import { Check, Link2, Mic, MicOff, PhoneOff, Video, VideoOff, X } from "lucide-react";
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, cn } from "@polaris/ui";
+import {
+    Check,
+    ChevronUp,
+    Headphones,
+    HeadphoneOff,
+    Link2,
+    Mic,
+    MicOff,
+    MonitorUp,
+    MonitorX,
+    PhoneOff,
+    Video,
+    VideoOff,
+    X
+} from "lucide-react";
 
 export function CallRoom({
     meetingId,
     onLeave,
+    /** Whether this browser opened its camera on the way in. False for somebody
+     *  who pressed the audio button, who can still turn it on from here. */
+    withVideo = true,
     /** Whoever is watching, when they have an account. The guest link is the
      *  host's to open and nobody else's, so the control is drawn from who the
      *  call says its host is rather than from who opened this screen - offering
@@ -30,9 +52,10 @@ export function CallRoom({
 }: {
     meetingId: string;
     onLeave: () => void;
+    withVideo?: boolean;
     viewerId?: string;
 }) {
-    const call = useCall(meetingId);
+    const call = useCall(meetingId, { video: withVideo });
     const [guestLink, setGuestLink] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [shareError, setShareError] = useState("");
@@ -108,7 +131,13 @@ export function CallRoom({
             )}
 
             <div className={cn("grid min-h-0 flex-1 gap-2", columns)}>
-                <Tile stream={call.localStream} name="You" muted cameraOff={!call.cameraOn} />
+                <Tile
+                    stream={call.localStream}
+                    name="You"
+                    muted
+                    cameraOff={!call.cameraOn && !call.sharing}
+                    sharing={call.sharing}
+                />
                 {(admitted ?? [])
                     .filter((person) => person.id !== call.participantId)
                     .map((person) => (
@@ -117,28 +146,75 @@ export function CallRoom({
                             stream={call.remote.get(person.id) ?? null}
                             name={person.name}
                             guest={person.guest}
+                            // Deafening is done here rather than at the
+                            // connection: the audio still arrives, it simply is
+                            // not played, so undeafening is instant and nobody
+                            // is renegotiated at.
+                            muted={call.deafened}
                         />
                     ))}
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-2">
-                <Button
-                    size="sm"
-                    variant={call.micOn ? "secondary" : "danger"}
+                <Split
+                    label={call.micOn ? "Mute" : "Unmute"}
+                    icon={call.micOn ? <Mic className="size-4" /> : <MicOff className="size-4" />}
+                    danger={!call.micOn}
                     onClick={call.toggleMic}
-                    aria-pressed={!call.micOn}
-                >
-                    {call.micOn ? <Mic className="size-4" /> : <MicOff className="size-4" />}
-                    {call.micOn ? "Mute" : "Unmute"}
-                </Button>
+                    devices={call.microphones}
+                    chosenId={call.microphoneId}
+                    devicesLabel="Microphone"
+                    onChoose={call.chooseMicrophone}
+                />
+
+                <Split
+                    label={call.cameraOn ? "Stop video" : "Start video"}
+                    icon={
+                        call.cameraOn ? (
+                            <Video className="size-4" />
+                        ) : (
+                            <VideoOff className="size-4" />
+                        )
+                    }
+                    danger={!call.cameraOn}
+                    onClick={call.toggleCamera}
+                    devices={call.cameras}
+                    chosenId={call.cameraId}
+                    devicesLabel="Camera"
+                    onChoose={call.chooseCamera}
+                />
+
                 <Button
                     size="sm"
-                    variant={call.cameraOn ? "secondary" : "danger"}
-                    onClick={call.toggleCamera}
-                    aria-pressed={!call.cameraOn}
+                    variant={call.sharing ? "primary" : "secondary"}
+                    onClick={call.toggleShare}
+                    aria-pressed={call.sharing}
                 >
-                    {call.cameraOn ? <Video className="size-4" /> : <VideoOff className="size-4" />}
-                    {call.cameraOn ? "Stop video" : "Start video"}
+                    {call.sharing ? (
+                        <MonitorX className="size-4" />
+                    ) : (
+                        <MonitorUp className="size-4" />
+                    )}
+                    {call.sharing ? "Stop sharing" : "Share screen"}
+                </Button>
+
+                <Button
+                    size="sm"
+                    variant={call.deafened ? "danger" : "secondary"}
+                    onClick={call.toggleDeafen}
+                    aria-pressed={call.deafened}
+                    title={
+                        call.deafened
+                            ? "You cannot hear anybody, and nobody can hear you"
+                            : "Silence everybody, and yourself with them"
+                    }
+                >
+                    {call.deafened ? (
+                        <HeadphoneOff className="size-4" />
+                    ) : (
+                        <Headphones className="size-4" />
+                    )}
+                    {call.deafened ? "Undeafen" : "Deafen"}
                 </Button>
 
                 {canShare && (
@@ -183,19 +259,99 @@ export function CallRoom({
     );
 }
 
+/**
+ * A control with the device picker attached to it.
+ *
+ * The button does the thing and the chevron beside it chooses which thing -
+ * which is how every call client draws this, because "mute" and "use the other
+ * microphone" are wanted at completely different moments and one menu holding
+ * both makes the common one slower.
+ */
+function Split({
+    label,
+    icon,
+    danger,
+    onClick,
+    devices,
+    chosenId,
+    devicesLabel,
+    onChoose
+}: {
+    label: string;
+    icon: React.ReactNode;
+    danger: boolean;
+    onClick: () => void;
+    devices: readonly { id: string; label: string }[];
+    chosenId: string | null;
+    devicesLabel: string;
+    onChoose: (deviceId: string) => void;
+}) {
+    return (
+        <span className="flex items-center">
+            <Button
+                size="sm"
+                variant={danger ? "danger" : "secondary"}
+                onClick={onClick}
+                aria-pressed={danger}
+                className={devices.length > 1 ? "rounded-r-none" : undefined}
+            >
+                {icon}
+                {label}
+            </Button>
+            {devices.length > 1 && (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            size="sm"
+                            variant={danger ? "danger" : "secondary"}
+                            aria-label={`Choose a ${devicesLabel.toLowerCase()}`}
+                            className="rounded-l-none border-l border-border-strong px-1.5"
+                        >
+                            <ChevronUp className="size-3.5" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="center" side="top" className="max-w-72">
+                        <DropdownMenuLabel>{devicesLabel}</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {devices.map((device) => (
+                            <DropdownMenuItem
+                                key={device.id}
+                                onSelect={() => onChoose(device.id)}
+                            >
+                                <Check
+                                    className={cn(
+                                        "size-3.5 shrink-0",
+                                        device.id === chosenId ? "opacity-100" : "opacity-0"
+                                    )}
+                                />
+                                <span className="truncate" title={device.label}>
+                                    {device.label}
+                                </span>
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            )}
+        </span>
+    );
+}
+
 function Tile({
     stream,
     name,
     muted = false,
     guest = false,
-    cameraOff = false
+    cameraOff = false,
+    sharing = false
 }: {
     stream: MediaStream | null;
     name: string;
-    /** Own video only. Playing your own microphone back is an echo. */
+    /** Own video only, or every tile while deafened. Playing your own
+     *  microphone back is an echo. */
     muted?: boolean;
     guest?: boolean;
     cameraOff?: boolean;
+    sharing?: boolean;
 }) {
     const video = useRef<HTMLVideoElement>(null);
 
@@ -210,7 +366,14 @@ function Tile({
                 autoPlay
                 playsInline
                 muted={muted}
-                className={cn("size-full object-cover", cameraOff && "invisible")}
+                className={cn(
+                    "size-full",
+                    // A shared screen is letterboxed rather than cropped: the
+                    // edges of somebody's window are usually where the thing
+                    // they are pointing at is.
+                    sharing ? "object-contain" : "object-cover",
+                    cameraOff && "invisible"
+                )}
             />
             {(!stream || cameraOff) && (
                 <span className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
@@ -220,6 +383,7 @@ function Tile({
             <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[11px]">
                 {name}
                 {guest && <span className="text-muted-foreground">guest</span>}
+                {sharing && <span className="text-primary">sharing</span>}
             </span>
         </div>
     );

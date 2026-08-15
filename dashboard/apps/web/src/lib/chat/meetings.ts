@@ -40,6 +40,20 @@ export const MAX_IN_CALL = 8;
  *  browser refreshes this while the call is on screen; a closed laptop stops. */
 export const PARTICIPANT_TTL_MS = 30_000;
 
+/**
+ * How long somebody may sit in a one-to-one call on their own before it ends
+ * itself.
+ *
+ * A call nobody answered, or one the other person walked out of, otherwise runs
+ * until the tab is closed - holding a camera light on, a connection open and a
+ * guest link live. Three minutes is long enough to step away and come back and
+ * short enough that a forgotten call is not an afternoon of it.
+ *
+ * Only in a direct message. A channel call is a room people drop into, and the
+ * first person to arrive being thrown out for being early is exactly wrong.
+ */
+export const ALONE_TTL_MS = 3 * 60_000;
+
 export interface MeetingParticipantView {
     readonly id: string;
     readonly userId: string | null;
@@ -191,12 +205,21 @@ export async function decideAdmission(
     publishMeetingEvent({ meetingId: seat.meetingId, kind: "roster" });
 }
 
-/** Still here. Called on a heartbeat from the browser showing the call. */
+/**
+ * Still here. Called on a heartbeat from the browser showing the call.
+ *
+ * The heartbeat is also where a lone call is closed, and deliberately: the
+ * person sitting on their own is the one whose browser is beating, so the room
+ * they are alone in is shut by the only party still paying for it. Nowhere that
+ * somebody *joins* runs that check, or a call the host has been waiting in would
+ * end in the instant the other person arrives.
+ */
 export async function keepSeat(seat: { meetingId: string; participantId: string }): Promise<void> {
     await prisma.meetingParticipant.updateMany({
         where: { id: seat.participantId, meetingId: seat.meetingId, leftAt: null },
         data: { lastSeenAt: new Date() }
     });
+    await endIfAlone(seat.meetingId);
 }
 
 /** Leave. The last one out ends the call, so a room is never left running with
@@ -494,6 +517,43 @@ async function sweep(meetingId: string): Promise<void> {
         },
         data: { leftAt: new Date() }
     });
+}
+
+/**
+ * End a one-to-one call somebody has been sitting in on their own.
+ *
+ * "On their own since" is worked out rather than stored: it is the moment the
+ * last other person left, or the moment the call started when nobody ever
+ * answered. A column would be a second copy of a fact these rows already carry,
+ * and one that has to be kept right on every join and every sweep.
+ */
+async function endIfAlone(meetingId: string): Promise<void> {
+    const meeting = await prisma.meeting.findUnique({
+        where: { id: meetingId },
+        select: {
+            endedAt: true,
+            startedAt: true,
+            channel: { select: { kind: true } }
+        }
+    });
+    if (!meeting || meeting.endedAt) return;
+    if (meeting.channel?.kind !== "dm") return;
+
+    const inside = await prisma.meetingParticipant.count({
+        where: { meetingId, leftAt: null, admission: "admitted" }
+    });
+    // Nobody at all is `endIfEmpty`'s job, and two people is a call.
+    if (inside !== 1) return;
+
+    const lastOut = await prisma.meetingParticipant.findFirst({
+        where: { meetingId, leftAt: { not: null } },
+        orderBy: { leftAt: "desc" },
+        select: { leftAt: true }
+    });
+    const since = lastOut?.leftAt ?? meeting.startedAt;
+    if (Date.now() - since.getTime() < ALONE_TTL_MS) return;
+
+    await closeMeeting(meetingId);
 }
 
 async function endIfEmpty(meetingId: string): Promise<void> {
