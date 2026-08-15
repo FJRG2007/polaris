@@ -19,6 +19,7 @@ export { BoneSkeleton, type CapturedLayout, type ResponsiveLayout } from "./comp
 export { Checkbox, type CheckboxProps } from "./components/checkbox";
 export { ConfirmDeleteDialog, type ConfirmDeleteDialogProps } from "./components/confirm-delete-dialog";
 export { Switch } from "./components/switch";
+export { ToastProvider, useToast, type Toast } from "./components/toast";
 export {
     Select,
     SelectRoot,

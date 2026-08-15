@@ -48,6 +48,42 @@ export function plainExcerpt(markdown: string, max = 120): string {
     return `${(lastSpace > max / 2 ? cut.slice(0, lastSpace) : cut).trimEnd()}...`;
 }
 
+/**
+ * A whole message as plain text, for taking somewhere else.
+ *
+ * The same walk as the excerpt, and for the same reason - what is stored is
+ * Markdown, and Markdown carries escapes. Copying the source hands somebody
+ * `print\("test"\)` for a line that reads `print("test")`, and pasting that
+ * into a terminal is somebody's afternoon. Lines are kept, so a code block
+ * arrives as code rather than as one long line.
+ */
+export function plainText(markdown: string): string {
+    return blocksOf(markdownToDoc(markdown ?? ""))
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+}
+
+/** The block-level nodes whose children are separate lines. Everything else is
+ *  inline and runs together. */
+const STACKED = new Set(["doc", "bulletList", "orderedList", "listItem", "blockquote", "taskList", "taskItem"]);
+
+function blocksOf(node: JSONContent): string {
+    if (node.type === "text") return node.text ?? "";
+    if (node.type === REFERENCE) {
+        return chipLabel(node.attrs?.kind as ReferenceKind, String(node.attrs?.label ?? ""));
+    }
+    if (node.type === "hardBreak") return "\n";
+    if (node.type === IMAGE) return String(node.attrs?.alt ?? "").trim() || IMAGE;
+    // Code holds its source as one text node, newlines and all. Kept exactly,
+    // because the whole point of copying a code block is that it runs.
+    if (node.type === "codeBlock" || node.type === MARKDOWN_BLOCK) {
+        return (node.content ?? []).map((child) => child.text ?? "").join("");
+    }
+    const parts = (node.content ?? []).map(blocksOf);
+    return STACKED.has(node.type ?? "") ? parts.join("\n") : parts.join("");
+}
+
 /** Every run of whitespace becomes one space, so a fence spanning eight lines
  *  becomes one line rather than eight squeezed into a row. */
 function collapse(text: string): string {

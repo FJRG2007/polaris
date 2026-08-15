@@ -38,6 +38,8 @@ coverage/
 dashboard/apps/web/public/pdfjs/
 # Minecraft item icons, staged into public/ at build time from resources/mcicons
 dashboard/apps/web/public/mcicons/
+# Noise-suppression worklets and models, staged into public/ at build time
+dashboard/apps/web/public/audio/
 # Prisma generated client + local dev database
 dashboard/packages/db/generated/
 dashboard/packages/db/prisma/schema.sqlite.prisma

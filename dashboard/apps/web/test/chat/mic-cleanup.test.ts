@@ -1,11 +1,14 @@
 /**
- * What is asked of a microphone when a call opens one.
+ * How much is done to a microphone when a call opens one.
  *
- * The three flags are the whole of the noise handling: they are the browser's
- * own echo canceller, noise suppressor and gain control, which cost nothing
- * because they are already running for every other call. Left unasked - which is
- * what `audio: true` does - what somebody gets depends on their browser's
- * defaults, and there is nothing for a person in a noisy room to turn on.
+ * A ladder rather than a switch: off, the browser's own processors, and a model
+ * on top of them. What is asserted here is the bottom two rungs, which are the
+ * constraints handed to `getUserMedia` - the model is a graph and is tested by
+ * whether it builds, not by what it returns.
+ *
+ * The case that matters most is "off". Leaving the three flags OUT rather than
+ * setting them false would let the browser apply its own defaults, and the
+ * setting would quietly do nothing - the failure that looks like it works.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,51 +24,58 @@ vi.stubGlobal("window", {
     dispatchEvent: () => true
 });
 
-const { applyMicCleanup, micCleanupOn, micConstraints, setMicCleanup } = await import(
+const { applyMicCleanup, micCleanup, micConstraints, setMicCleanup } = await import(
     "@/app/(app)/chat/mic-cleanup"
 );
+
+const ALL_ON = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+const ALL_OFF = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
 
 beforeEach(() => {
     store.clear();
 });
 
 describe("the setting", () => {
-    it("is on for somebody who has never touched it", () => {
-        expect(micCleanupOn()).toBe(true);
+    it("is the browser's own handling for somebody who has never touched it", () => {
+        expect(micCleanup()).toBe("standard");
     });
 
-    it("is off once turned off, and on again after", () => {
-        setMicCleanup(false);
-        expect(micCleanupOn()).toBe(false);
-        setMicCleanup(true);
-        expect(micCleanupOn()).toBe(true);
+    it("remembers each rung", () => {
+        for (const level of ["off", "enhanced", "licensed", "standard"] as const) {
+            setMicCleanup(level);
+            expect(micCleanup()).toBe(level);
+        }
     });
 
     it("stores nothing for the default, so it is not a value to migrate later", () => {
-        setMicCleanup(false);
-        setMicCleanup(true);
+        setMicCleanup("enhanced");
+        setMicCleanup("standard");
         expect(store.size).toBe(0);
+    });
+
+    it("treats anything else as unset", () => {
+        // Local storage belongs to whoever owns the browser, and a filter chosen
+        // by editing it is a filter nobody wrote.
+        store.set("polaris.call.mic-cleanup", "krisp-please");
+        expect(micCleanup()).toBe("standard");
     });
 });
 
 describe("what is asked of the microphone", () => {
-    it("asks for all three", () => {
-        expect(micConstraints()).toEqual({
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-        });
+    it("asks for all three at the standard setting", () => {
+        expect(micConstraints()).toEqual(ALL_ON);
     });
 
-    it("asks for none of them once turned off, rather than leaving them out", () => {
-        // Left out, the browser applies its own default and the setting does
-        // nothing - which is the failure that looks like it works.
-        setMicCleanup(false);
-        expect(micConstraints()).toEqual({
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false
-        });
+    it("asks for all three under a model as well", () => {
+        // A model works on what the browser hands it. Handing it the raw room
+        // means handing it the echo of everybody else in the call.
+        setMicCleanup("enhanced");
+        expect(micConstraints()).toEqual(ALL_ON);
+    });
+
+    it("asks for none of them when off, rather than leaving them out", () => {
+        setMicCleanup("off");
+        expect(micConstraints()).toEqual(ALL_OFF);
     });
 
     it("keeps the chosen device beside them", () => {
@@ -81,9 +91,7 @@ describe("applying it to a microphone already open", () => {
                 applied.push(constraints);
             }
         } as unknown as MediaStreamTrack);
-        expect(applied).toEqual([
-            { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-        ]);
+        expect(applied).toEqual([ALL_ON]);
     });
 
     it("says nothing when the device cannot do it", async () => {

@@ -5741,6 +5741,11 @@ model ChatChannelMember {
     // the screen can say which one is on. A lapsed row is cleared on the next
     // read rather than by a job: nothing else has to run for it to be right.
     mutedUntil        DateTime?
+    // Held at the top of this person's list, and nobody else's: a conversation
+    // being important to one person says nothing about the others in it. The
+    // time rather than a flag, so several pinned conversations keep the order
+    // they were pinned in instead of an arbitrary one.
+    pinnedAt          DateTime?
     createdAt         DateTime  @default(now())
 
     channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)

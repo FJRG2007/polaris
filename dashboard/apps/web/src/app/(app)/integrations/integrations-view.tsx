@@ -114,6 +114,8 @@ export interface IntegrationCard {
     failure?: ConnectionFailure;
     /** The gateway's endpoint settings. Set for that card only. */
     gateway?: GatewayConfig;
+    /** Where a licensed call filter is served from. Set for that card only. */
+    filterModuleUrl?: string;
     /** Whether a linked account of this service may sign anybody in here, for the
      *  services people link an account of. Undefined for the rest. */
     signInAllowed?: boolean;
@@ -136,6 +138,7 @@ export function dialogFor(card: IntegrationCard): ComponentType<IntegrationDialo
     if (card.slug === "duckdns") return DuckDnsDialog;
     if (card.slug === "steam") return SteamDialog;
     if (card.slug === "tenor") return TenorDialog;
+    if (card.slug === "krisp") return LicensedFilterDialog;
     if (OAUTH_APPS[card.slug]) return OAuthAppDialog;
     // The gateway asks for an endpoint rather than a provider key, so it is told
     // apart by carrying those settings and not by its slug.
@@ -686,6 +689,113 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                             Enable {card.name}
                         </span>
                         <Switch checked={enabled} onChange={setEnabled} aria-label={`Enable ${card.name}`} />
+                    </div>
+
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button type="button" onClick={onSave} disabled={saving}>
+                            {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/**
+ * Point calls at a licensed noise filter.
+ *
+ * Two fields and a switch, and the dialog is honest about both of them: the
+ * address is loaded as code by every browser in a call, and the token goes with
+ * it. There is no arrangement where a filter running on somebody's microphone
+ * does not hold its own credential in the page.
+ */
+function LicensedFilterDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const [enabled, setEnabled] = useState(card.filterModuleUrl ? card.enabled : true);
+    const [moduleUrl, setModuleUrl] = useState(card.filterModuleUrl ?? "");
+    const [token, setToken] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [saving, startSave] = useTransition();
+
+    function onSave() {
+        setError(null);
+        startSave(async () => {
+            const result = await runAction(
+                () =>
+                    integrationActions.saveLicensedFilterAction({
+                        enabled,
+                        moduleUrl,
+                        token
+                    }),
+                setError
+            );
+            if (!result) return;
+            if (result.error) setError(result.error);
+            else onClose();
+        });
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <IntegrationLogo slug={card.slug} className="size-5" />
+                        {card.name}
+                    </DialogTitle>
+                    <DialogDescription>{card.description}</DialogDescription>
+                </DialogHeader>
+
+                <div className="flex flex-col gap-4">
+                    <SetupSteps links={card.setupLinks} values={card.setupValues} />
+
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">Where the filter is served from</span>
+                        <Input
+                            value={moduleUrl}
+                            autoComplete="off"
+                            placeholder="https://files.example.com/krisp/filter.js"
+                            onChange={(event) => setModuleUrl(event.target.value)}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                            A module exporting <code>createNode(context, options)</code>, which
+                            returns the audio node the microphone is played through. Polaris loads
+                            it in the call and sends whatever comes out.
+                        </span>
+                    </label>
+
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">{card.apiKeyLabel ?? "Token"}</span>
+                        <Input
+                            type="password"
+                            autoComplete="off"
+                            value={token}
+                            onChange={(event) => setToken(event.target.value)}
+                            placeholder={
+                                card.hasSecret ? "Saved - enter a new one to replace it" : "Optional"
+                            }
+                        />
+                        <span className="text-xs text-muted-foreground">
+                            Handed to the filter in the browser, and only to a browser sitting in a
+                            call. A filter runs on the microphone, so there is nowhere else for it
+                            to go.
+                        </span>
+                    </label>
+
+                    <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                        <span>
+                            <span className="font-medium">Use it in calls</span>
+                            <span className="block text-xs text-muted-foreground">
+                                Adds it to the noise setting in a call, beside the two free models.
+                                Anyone whose browser cannot load it gets the free one.
+                            </span>
+                        </span>
+                        <Switch checked={enabled} onChange={setEnabled} aria-label="Use it in calls" />
                     </div>
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}

@@ -45,6 +45,19 @@ const frameSchema = z.discriminatedUnion("kind", [
 
 export type ChatFrame = z.infer<typeof frameSchema>;
 
+/** What else is true about a frame besides what it says. */
+export interface FrameContext {
+    /**
+     * Whether this tab took the frame off the wire rather than being handed it
+     * by another tab on the same device.
+     *
+     * Anything that belongs to the device rather than to a screen - a sound, a
+     * notification the operating system draws - is the owner's to do, or five
+     * open tabs ring five times.
+     */
+    readonly owner: boolean;
+}
+
 /**
  * Call `onFrame` for every frame this device receives.
  *
@@ -52,7 +65,7 @@ export type ChatFrame = z.infer<typeof frameSchema>;
  * re-subscribing on every render - a subscription that tore down and reopened
  * per keystroke would spend its life reconnecting.
  */
-export function useChatStream(onFrame: (frame: ChatFrame) => void): void {
+export function useChatStream(onFrame: (frame: ChatFrame, context: FrameContext) => void): void {
     const scope = useSessionScope();
     const handler = useRef(onFrame);
     handler.current = onFrame;
@@ -66,7 +79,7 @@ export function useChatStream(onFrame: (frame: ChatFrame) => void): void {
                 return;
             }
             const frame = frameSchema.safeParse(parsed);
-            if (frame.success) handler.current(frame.data);
+            if (frame.success) handler.current(frame.data, { owner: event.owner });
         });
     }, [scope]);
 }

@@ -245,6 +245,56 @@ export async function saveSteamAction(input: { enabled: boolean; apiKey?: string
 }
 
 /**
+ * Point calls at a licensed noise filter.
+ *
+ * The address is checked here rather than trusted: it is loaded as code by every
+ * browser in a call, so an http address on a page served over https would be
+ * blocked by the browser anyway, and anything that is not a URL at all would
+ * fail silently in a call somebody is already in.
+ */
+export async function saveLicensedFilterAction(input: {
+    enabled: boolean;
+    moduleUrl: string;
+    token?: string;
+}): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    const moduleUrl = input.moduleUrl.trim();
+
+    if (input.enabled) {
+        let parsed: URL;
+        try {
+            parsed = new URL(moduleUrl);
+        } catch {
+            return { error: "That is not an address" };
+        }
+        if (parsed.protocol !== "https:") return { error: "The address has to be https" };
+    }
+
+    try {
+        await upsertIntegration("krisp", {
+            enabled: input.enabled,
+            config: { moduleUrl },
+            secret: input.token?.trim() ? input.token.trim() : undefined,
+            installedById: user.id
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "integration.configure",
+            targetType: "integration",
+            targetId: "krisp",
+            metadata: { enabled: input.enabled }
+        });
+    } catch (caught) {
+        return {
+            error: caught instanceof Error ? caught.message : "That could not be saved"
+        };
+    }
+
+    revalidatePath("/integrations");
+    return {};
+}
+
+/**
  * Turn the GIF and sticker search on, with the key it runs on.
  *
  * Nothing else in Polaris changes when this is off: the picker still offers

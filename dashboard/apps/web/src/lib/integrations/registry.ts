@@ -412,6 +412,25 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         apiKeyHelp: "The secret's value, not its id. Shown once when it is created."
     },
     {
+        slug: "krisp",
+        name: "Krisp",
+        category: "Productivity",
+        summary: "Use a licensed noise filter in calls instead of the free one.",
+        description:
+            "Calls already remove background noise with two free models that run in the browser and cost nothing. This is for an operator who has licensed a better one - Krisp being the one people ask for, since it is what Discord runs. Krisp does not publish its browser SDK for anyone to install, so what goes here is your own build of it: the address it is served from and the token it authenticates with. Both reach the browser, because that is where a filter on a microphone runs, and only ever a browser sitting in a call.",
+        docsUrl: "https://krisp.ai/developers/",
+        setupLinks: [
+            {
+                label: "Get the SDK and a licence",
+                url: "https://krisp.ai/developers/",
+                help: "Krisp licenses per seat and hands over a build to host yourself. Any filter published as a module with the same shape works here - it does not have to be theirs."
+            }
+        ],
+        requiresApiKey: true,
+        apiKeyLabel: "Token",
+        apiKeyHelp: "Whatever the filter authenticates with. Leave blank if yours needs none."
+    },
+    {
         slug: "tenor",
         name: "Tenor",
         category: "Productivity",

@@ -168,3 +168,20 @@ export async function iceServersAction(meetingId: string): Promise<RTCIceServer[
     if (!seat || seat.admission !== "admitted") return [];
     return meetings.iceServers() as RTCIceServer[];
 }
+
+/**
+ * The licensed noise filter an administrator connected, if there is one.
+ *
+ * Both halves of it reach the browser, because that is where a filter on a
+ * microphone runs - there is no arrangement in which the page does not hold
+ * them. So the gate is the same one the TURN credential has: a seat in this
+ * call, admitted. That is the most that can be true of something a browser has
+ * to be given, and the dialog that stores it says so.
+ */
+export async function licensedFilterAction(
+    meetingId: string
+): Promise<{ moduleUrl: string; token: string } | null> {
+    const seat = await resolveSeat(meetingId);
+    if (!seat || seat.admission !== "admitted") return null;
+    return await meetings.licensedFilter();
+}

@@ -43,6 +43,8 @@ import {
     Link2,
     Lock,
     MessageSquarePlus,
+    Pin,
+    PinOff,
     Plus,
     Settings2,
     Star,
@@ -121,12 +123,17 @@ export function ChatSidebar() {
         if (channel) setActiveSpaceId(channel.spaceId);
     }, [open, channels, setActiveSpaceId]);
 
+    // Pinned first, then whatever happened most recently. Pinning is why the
+    // list is not simply sorted by time: the point of it is a conversation that
+    // stays where somebody put it even on a day nobody says anything in it.
     const directs = useMemo(
         () =>
             channels
                 .filter((channel) => channel.spaceId === null)
-                .sort((left, right) =>
-                    (right.lastMessageAt ?? "").localeCompare(left.lastMessageAt ?? "")
+                .sort(
+                    (left, right) =>
+                        Number(right.pinned) - Number(left.pinned) ||
+                        (right.lastMessageAt ?? "").localeCompare(left.lastMessageAt ?? "")
                 ),
         [channels]
     );
@@ -273,18 +280,20 @@ export function ChatSidebar() {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-                {space === null && (
-                    <Link
-                        href="/chat/saved"
-                        className={cn(
-                            "mb-3 flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover",
-                            saved ? "bg-card-hover text-foreground" : "text-muted-foreground"
-                        )}
-                    >
-                        <Star className="size-3.5 shrink-0" />
-                        <span>Saved</span>
-                    </Link>
-                )}
+                {/* In every rail rather than only above the direct messages.
+                    What somebody kept is theirs, not a space's, and a list that
+                    disappears when you walk into a server is a list people
+                    conclude does not exist. */}
+                <Link
+                    href="/chat/saved"
+                    className={cn(
+                        "mb-3 flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover",
+                        saved ? "bg-card-hover text-foreground" : "text-muted-foreground"
+                    )}
+                >
+                    <Star className="size-3.5 shrink-0" />
+                    <span>Saved messages</span>
+                </Link>
 
                 {error && (
                     <p role="alert" className="px-1 pb-2 text-xs text-danger">
@@ -697,6 +706,11 @@ function Row({
             <span className="min-w-0 flex-1 truncate" title={label}>
                 {label}
             </span>
+            {/* Said quietly, and only because a row that sits above a newer
+                conversation with nothing to explain it reads as a bug. */}
+            {channel?.pinned && (
+                <Pin className="size-3 shrink-0 text-foreground-subtle" aria-label="Pinned" />
+            )}
             {unread > 0 && (
                 <span
                     className={cn(
@@ -745,6 +759,21 @@ function RowMenu({
         <ContextMenu>
             <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
             <ContextMenuContent className="w-48">
+                {/* Kept for this reader and nobody else, which is why it sits
+                    beside muting rather than in the channel's settings. */}
+                <ContextMenuItem
+                    onSelect={async () => {
+                        await actions.setPinnedAction(channel.id, !channel.pinned);
+                        refresh();
+                    }}
+                >
+                    {channel.pinned ? (
+                        <PinOff className="size-3.5" />
+                    ) : (
+                        <Pin className="size-3.5" />
+                    )}
+                    {channel.pinned ? "Unpin" : "Pin to the top"}
+                </ContextMenuItem>
                 <ContextMenuItem
                     onSelect={() => void copyText(channelLink(baseUrl, channel.id))}
                 >

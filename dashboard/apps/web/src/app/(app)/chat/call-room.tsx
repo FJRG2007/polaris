@@ -31,6 +31,7 @@ import * as actions from "./meeting-actions";
 import { Avatar } from "@/components/avatar";
 import { playCallSound } from "@/lib/call-sounds";
 import { useEffect, useRef, useState } from "react";
+import type { FilteredMic, MicFilter } from "./mic-filter";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
 import {
     Check,
@@ -219,6 +220,8 @@ export function CallRoom({
                     onChoose={call.chooseMicrophone}
                     cleanMic={call.cleanMic}
                     onCleanMic={call.setCleanMic}
+                    filterRunning={call.micFilter}
+                    licensedOffered={call.licensedFilter}
                 />
 
                 <Split
@@ -338,7 +341,9 @@ function Split({
     devicesLabel,
     onChoose,
     cleanMic,
-    onCleanMic
+    onCleanMic,
+    filterRunning,
+    licensedOffered
 }: {
     label: string;
     icon: React.ReactNode;
@@ -348,11 +353,16 @@ function Split({
     chosenId: string | null;
     devicesLabel: string;
     onChoose: (deviceId: string) => void;
-    /** Microphone only: whether the browser is cleaning up what it hears. It
-     *  belongs in this menu, beside the input it applies to, which is where
-     *  every call client puts it. */
-    cleanMic?: boolean;
-    onCleanMic?: (on: boolean) => void;
+    /** Microphone only: how much is being done to what it hears. It belongs in
+     *  this menu, beside the input it applies to, which is where every call
+     *  client puts it. */
+    cleanMic?: MicFilter;
+    onCleanMic?: (level: MicFilter) => void;
+    /** What is actually running, which is how somebody finds out their machine
+     *  fell back to the lighter model rather than wondering. */
+    filterRunning?: FilteredMic["using"] | null;
+    /** Whether this instance has a licensed filter to offer. */
+    licensedOffered?: boolean;
 }) {
     // Worth a menu for the setting alone: a machine with one microphone still
     // sits in a room with a fan in it.
@@ -385,24 +395,45 @@ function Split({
                     <DropdownMenuContent align="center" side="top" className="max-w-72">
                         {onCleanMic && (
                             <>
-                                <DropdownMenuLabel>Sound</DropdownMenuLabel>
+                                <DropdownMenuLabel>Background noise</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onSelect={() => onCleanMic(!cleanMic)}>
-                                    <Check
-                                        className={cn(
-                                            "size-3.5 shrink-0",
-                                            cleanMic ? "opacity-100" : "opacity-0"
-                                        )}
-                                    />
-                                    <span className="flex min-w-0 flex-col">
-                                        <span>Clean up my microphone</span>
-                                        <span className="text-xs text-muted-foreground">
-                                            Removes echo and background noise, and evens out how
-                                            loud you are. Turn it off to send exactly what the
-                                            microphone hears.
+                                {NOISE_LEVELS.filter(
+                                    (level) => level.value !== "licensed" || licensedOffered
+                                ).map((level) => (
+                                    <DropdownMenuItem
+                                        key={level.value}
+                                        onSelect={() => onCleanMic(level.value)}
+                                    >
+                                        <Check
+                                            className={cn(
+                                                "size-3.5 shrink-0",
+                                                cleanMic === level.value
+                                                    ? "opacity-100"
+                                                    : "opacity-0"
+                                            )}
+                                        />
+                                        <span className="flex min-w-0 flex-col">
+                                            <span>{level.label}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                                {level.help}
+                                            </span>
                                         </span>
-                                    </span>
-                                </DropdownMenuItem>
+                                    </DropdownMenuItem>
+                                ))}
+                                {/* Said only when it differs from what was asked
+                                    for. A line confirming that the thing you
+                                    chose is the thing running is noise. */}
+                                {cleanMic === "enhanced" && filterRunning === "light" && (
+                                    <p className="px-2 pb-1 text-xs text-muted-foreground">
+                                        This machine is running the lighter model.
+                                    </p>
+                                )}
+                                {cleanMic === "licensed" && filterRunning !== "licensed" && (
+                                    <p className="px-2 pb-1 text-xs text-muted-foreground">
+                                        The licensed filter did not start. Running the free one
+                                        instead.
+                                    </p>
+                                )}
                             </>
                         )}
                         {devices.length > 1 && <DropdownMenuLabel>{devicesLabel}</DropdownMenuLabel>}
@@ -433,6 +464,31 @@ function Split({
 /** How big the face in an empty tile is. One size for every tile: a grid where
  *  the faces are different sizes reads as a mistake. */
 const AVATAR_SIZE = 72;
+
+/**
+ * How much is done to the microphone, in the order somebody would consider it.
+ *
+ * Written as what each one does to the room rather than as what it is: nobody
+ * choosing a microphone setting wants to be told the name of a model.
+ */
+const NOISE_LEVELS: readonly { value: MicFilter; label: string; help: string }[] = [
+    {
+        value: "enhanced",
+        label: "Remove background noise",
+        help: "Keeps your voice and takes out the rest - typing, a fan, a dog, somebody talking behind you. Costs a little battery."
+    },
+    {
+        value: "standard",
+        label: "Standard",
+        help: "The browser's own echo and noise handling. Enough for a quiet room."
+    },
+    {
+        value: "licensed",
+        label: "Enhanced (licensed)",
+        help: "The filter your administrator connected."
+    },
+    { value: "off", label: "Off", help: "Send exactly what the microphone hears." }
+];
 
 function Tile({
     stream,

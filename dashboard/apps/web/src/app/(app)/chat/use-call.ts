@@ -39,7 +39,8 @@ import * as actions from "./meeting-actions";
 import { playCallSound } from "@/lib/call-sounds";
 import type { MeetingView } from "@/lib/chat/meetings";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { applyMicCleanup, micConstraints, useMicCleanup } from "./mic-cleanup";
+import { filterMic, type FilteredMic, type MicFilter } from "./mic-filter";
+import { applyMicCleanup, micCleanup, micConstraints, useMicCleanup } from "./mic-cleanup";
 
 /** How often the server is told this browser is still on the call. Comfortably
  *  inside the window it sweeps on. */
@@ -122,9 +123,14 @@ export interface CallState {
     readonly cameras: readonly CallDevice[];
     readonly microphoneId: string | null;
     readonly cameraId: string | null;
-    /** Whether the browser is cleaning up what the microphone hears. */
-    readonly cleanMic: boolean;
-    setCleanMic: (on: boolean) => void;
+    /** How much is being done to what the microphone hears. */
+    readonly cleanMic: MicFilter;
+    setCleanMic: (level: MicFilter) => void;
+    /** Which filter is actually running, or null for none. Not always the one
+     *  asked for: a model can fail to start, and a licence can fail to load. */
+    readonly micFilter: FilteredMic["using"] | null;
+    /** Whether this instance has a licensed filter connected at all. */
+    readonly licensedFilter: boolean;
     toggleMic: () => void;
     toggleCamera: () => void;
     toggleShare: () => void;
@@ -152,6 +158,13 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
     const [cameras, setCameras] = useState<readonly CallDevice[]>([]);
     const [microphoneId, setMicrophoneId] = useState<string | null>(null);
     const [cameraId, setCameraId] = useState<string | null>(null);
+    // Which filter is actually running, which is not always the one asked for:
+    // the better model can fail to start, and a licence can fail to load.
+    const [micFilter, setMicFilter] = useState<FilteredMic["using"] | null>(null);
+    // Whether this instance has a licensed filter at all, which is what decides
+    // if the menu offers it. Nobody should be shown a setting for something an
+    // administrator has not bought.
+    const [licensedFilter, setLicensedFilter] = useState(false);
 
     const peers = useRef(new Map<string, Peer>());
     const ice = useRef<RTCIceServer[]>([]);
@@ -162,6 +175,13 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
     const mic = useRef<MediaStreamTrack | null>(null);
     const camera = useRef<MediaStreamTrack | null>(null);
     const screen = useRef<MediaStreamTrack | null>(null);
+    // The microphone with a model between it and the call, when one is running.
+    // A different track to the one above, and both matter: that one is the
+    // device - muting, its id, stopping it - and this one is what goes out.
+    const filtered = useRef<FilteredMic | null>(null);
+    // The filter an administrator connected, read once per call from the server
+    // rather than held in the page: it is instance configuration.
+    const licensed = useRef<{ moduleUrl: string; token: string } | null>(null);
     const me = useRef<string | null>(null);
     // Candidates that arrived before the description they belong to, which is
     // ordinary rather than exceptional - the two travel over different requests.
@@ -170,6 +190,26 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
     // track event: a track added without a stream arrives with none attached,
     // and a tile pointed at nothing shows nothing.
     const inbound = useRef(new Map<string, MediaStream>());
+
+    /** What the call sends as this browser's voice: the filtered track when a
+     *  model is running, and the microphone itself otherwise. */
+    const outgoingMic = useCallback(
+        (): MediaStreamTrack | null => filtered.current?.track ?? mic.current,
+        []
+    );
+
+    /**
+     * Turn this browser's voice on or off.
+     *
+     * Both tracks, because there are two: the device track going quiet is what
+     * stops the filter having anything to work on, and the sent track going
+     * quiet is what stops the packets. Muting only the first would keep sending
+     * a stream of processed silence.
+     */
+    const setVoiceEnabled = useCallback((on: boolean) => {
+        if (mic.current) mic.current.enabled = on;
+        if (filtered.current) filtered.current.track.enabled = on;
+    }, []);
 
     /** The stream the local tile shows: whatever is going out right now. */
     const publishLocalPreview = useCallback(() => {
@@ -259,10 +299,11 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
             // it is the slot a camera turned on later goes into. `addTransceiver`
             // rather than `addTrack` in both cases, so the reference is the
             // return value rather than something to go looking for.
+            const voice = outgoingMic();
             const audio = connection.addTransceiver("audio", {
-                direction: mic.current ? "sendrecv" : "recvonly"
+                direction: voice ? "sendrecv" : "recvonly"
             });
-            if (mic.current) void audio.sender.replaceTrack(mic.current).catch(() => undefined);
+            if (voice) void audio.sender.replaceTrack(voice).catch(() => undefined);
 
             const outgoing = screen.current ?? camera.current;
             const video = connection.addTransceiver("video", {
@@ -329,6 +370,34 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
         [send]
     );
 
+    /**
+     * Put the chosen filter between the microphone and the call, or take away
+     * the one that was there.
+     *
+     * Rebuilt rather than reconfigured whenever the setting or the device
+     * changes: the graph is three nodes and a wasm module, and a filter that
+     * tried to survive a device swap is a filter reading from a track that has
+     * been stopped.
+     */
+    const startFilter = useCallback(async () => {
+        await filtered.current?.stop();
+        filtered.current = null;
+        setMicFilter(null);
+
+        const track = mic.current;
+        if (!track) return;
+
+        // The browser's own processors first, whatever comes after them.
+        await applyMicCleanup(track);
+
+        const built = await filterMic(track, micCleanup(), licensed.current);
+        if (!built) return;
+        // The microphone may have been muted while the model was loading.
+        built.track.enabled = track.enabled;
+        filtered.current = built;
+        setMicFilter(built.using);
+    }, []);
+
     /** Open the microphone and camera, then the stream, then the connections. */
     useEffect(() => {
         let stopped = false;
@@ -337,6 +406,8 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
 
         async function start(): Promise<void> {
             ice.current = await actions.iceServersAction(meetingId).catch(() => []);
+            licensed.current = await actions.licensedFilterAction(meetingId).catch(() => null);
+            setLicensedFilter(licensed.current !== null);
 
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -357,6 +428,10 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
                 setCameraId(camera.current?.getSettings().deviceId ?? null);
                 publishLocalPreview();
                 void listDevices();
+                // Built before the connections are, so the first offer already
+                // carries the filtered track and nobody hears the raw room for
+                // the second it would take to swap.
+                await startFilter();
             } catch {
                 // A call with no camera is still a call: the connections are made
                 // either way and this browser simply sends nothing.
@@ -473,13 +548,18 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
             source?.close();
             for (const peer of peers.current.values()) peer.connection.close();
             peers.current.clear();
+            // The filter first: it reads from the microphone, and a graph left
+            // running over a stopped track is a wasm module and an audio thread
+            // nobody ever closes.
+            void filtered.current?.stop();
+            filtered.current = null;
             for (const track of [mic.current, camera.current, screen.current]) track?.stop();
             mic.current = null;
             camera.current = null;
             screen.current = null;
             void actions.leaveCallAction(meetingId);
         };
-    }, [listDevices, meetingId, peerFor, publishLocalPreview, refresh, send, withVideo]);
+    }, [listDevices, meetingId, peerFor, publishLocalPreview, refresh, send, startFilter, withVideo]);
 
     /**
      * Open a connection to everybody new whose id is bigger than ours.
@@ -520,9 +600,9 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
     const toggleMic = useCallback(() => {
         const track = mic.current;
         if (!track) return;
-        track.enabled = !track.enabled;
+        setVoiceEnabled(!track.enabled);
         setMicOn(track.enabled);
-    }, []);
+    }, [setVoiceEnabled]);
 
     /**
      * Turn the camera on or off.
@@ -607,14 +687,13 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
     const toggleDeafen = useCallback(() => {
         setDeafened((current) => {
             const next = !current;
-            const track = mic.current;
-            if (track) {
-                track.enabled = !next;
-                setMicOn(track.enabled);
+            if (mic.current) {
+                setVoiceEnabled(!next);
+                setMicOn(mic.current.enabled);
             }
             return next;
         });
-    }, []);
+    }, [setVoiceEnabled]);
 
     /** Swap one input for another, mid-call, without dropping the connections. */
     const chooseDevice = useCallback(
@@ -625,7 +704,7 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
                     : { video: { deviceId: { exact: deviceId } } };
             void navigator.mediaDevices
                 .getUserMedia(constraints)
-                .then((stream) => {
+                .then(async (stream) => {
                     const track =
                         kind === "audio" ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];
                     if (!track) return;
@@ -635,7 +714,10 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
                         track.enabled = !deafened && micOn;
                         mic.current = track;
                         setMicrophoneId(deviceId);
-                        publishTrack("audio", track);
+                        // Rebuilt against the new device: the old graph was
+                        // reading from the track just stopped.
+                        await startFilter();
+                        publishTrack("audio", outgoingMic());
                     } else {
                         track.enabled = cameraOn;
                         camera.current = track;
@@ -648,7 +730,7 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
                 })
                 .catch(() => setError("Polaris could not open that device."));
         },
-        [cameraOn, deafened, micOn, publishLocalPreview, publishTrack]
+        [cameraOn, deafened, micOn, outgoingMic, publishLocalPreview, publishTrack, startFilter]
     );
 
     /**
@@ -692,16 +774,25 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
         [chooseDevice]
     );
 
-    // Applied to the open track rather than reopening the microphone: turning
-    // the noise suppression off mid-sentence should not drop the audio for the
-    // second it takes to acquire the device again.
+    /**
+     * Change how much is done to the microphone, mid-call.
+     *
+     * The device is never reopened: the browser's three processors move on the
+     * track that is already open, and the model is a graph built beside it. What
+     * the call sends is then swapped with `replaceTrack`, so nobody is
+     * renegotiated at and nothing pauses.
+     */
     const [cleanMic, rememberCleanMic] = useMicCleanup();
     const setCleanMic = useCallback(
-        (on: boolean) => {
-            rememberCleanMic(on);
-            void applyMicCleanup(mic.current);
+        (level: MicFilter) => {
+            rememberCleanMic(level);
+            void (async () => {
+                await startFilter();
+                publishTrack("audio", outgoingMic());
+                publishLocalPreview();
+            })();
         },
-        [rememberCleanMic]
+        [outgoingMic, publishLocalPreview, publishTrack, rememberCleanMic, startFilter]
     );
     const chooseCamera = useCallback(
         (deviceId: string) => chooseDevice("video", deviceId),
@@ -716,6 +807,8 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
         speaking,
         cleanMic,
         setCleanMic,
+        micFilter,
+        licensedFilter,
         micOn,
         cameraOn,
         hasCamera,

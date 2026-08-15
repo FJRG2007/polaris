@@ -29,6 +29,7 @@ import { prisma, type Prisma } from "@polaris/db";
 import { publishMeetingEvent } from "./meeting-signal";
 import { publishChatChange, type CallState } from "./live";
 import { ChatAccessError, requireChannel, type ChatActor } from "./access";
+import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
 /** How many browsers one call holds.
  *
@@ -112,6 +113,33 @@ export function iceServers(): { urls: string[]; username?: string; credential?: 
     }
     return servers;
 }
+
+/**
+ * The licensed noise filter this instance was given, if any.
+ *
+ * Polaris ships two free models and neither costs anybody anything. This is for
+ * the operator who has paid for a better one - Krisp being the one people ask
+ * for, because it is what Discord runs - and it is a URL and a token rather than
+ * an integration with that vendor: their build is theirs to host, and nothing
+ * here knows or cares whose model it is.
+ *
+ * Both halves end up in a browser, which is unavoidable for something that
+ * filters a microphone, so this is only ever answered to somebody sitting in a
+ * call.
+ */
+export async function licensedFilter(): Promise<{ moduleUrl: string; token: string } | null> {
+    const state = await getIntegrationState(LICENSED_FILTER).catch(() => null);
+    if (!state?.enabled) return null;
+
+    const moduleUrl = typeof state.config.moduleUrl === "string" ? state.config.moduleUrl : "";
+    if (!moduleUrl) return null;
+
+    const token = (await getIntegrationSecret(LICENSED_FILTER).catch(() => null)) ?? "";
+    return { moduleUrl, token };
+}
+
+/** The integration slug behind `licensedFilter`. */
+export const LICENSED_FILTER = "krisp";
 
 /**
  * Start a call in a conversation, or join the one already running in it.

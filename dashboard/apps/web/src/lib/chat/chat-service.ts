@@ -61,6 +61,9 @@ export interface ChatChannelView {
      *  never opened and nothing has happened in. */
     readonly unread: number;
     readonly muted: boolean;
+    /** Whether this reader keeps it at the top of their list. Theirs alone -
+     *  pinning a conversation says nothing to the other people in it. */
+    readonly pinned: boolean;
     /** When the quiet ends, or null when it does not - either because the
      *  conversation is not muted or because it was muted with no end. */
     readonly mutedUntil: string | null;
@@ -307,6 +310,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
                 lastReadAt: true,
                 muted: true,
                 mutedUntil: true,
+                pinnedAt: true,
                 role: true
             }
         }),
@@ -361,6 +365,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             // not a mute, and nothing runs to clear the flag.
             muted: membership ? core.muteInForce(membership) : false,
             mutedUntil: membership?.mutedUntil?.toISOString() ?? null,
+            pinned: membership?.pinnedAt !== null && membership?.pinnedAt !== undefined,
             mayAdminister: Boolean(
                 channel.spaceId &&
                     (administered.has(channel.spaceId) || mine.get(channel.id)?.role === "admin")
@@ -719,6 +724,30 @@ export async function setMuted(
     });
     // The rail draws the bell, and the tab that pressed it is not the only one
     // showing this conversation.
+    publishChatChange({ channelId, kind: "channels", actorId: actor.id, audience: [actor.id] });
+}
+
+/**
+ * Keep a conversation at the top of your own list, or stop.
+ *
+ * A membership row, like the mute beside it: it is one person's ordering of
+ * their own rail and is invisible to everybody else in the room. The upsert is
+ * what lets somebody pin a channel in a space they can reach but have never been
+ * added to - reading it is enough to want it near the top.
+ */
+export async function setPinned(
+    actor: ChatActor,
+    channelId: string,
+    pinned: boolean
+): Promise<void> {
+    await requireChannel(actor, channelId);
+    const pinnedAt = pinned ? new Date() : null;
+    await prisma.chatChannelMember.upsert({
+        where: { channelId_userId: { channelId, userId: actor.id } },
+        update: { pinnedAt },
+        create: { channelId, userId: actor.id, pinnedAt }
+    });
+    // Their other tabs are showing the same rail in the old order.
     publishChatChange({ channelId, kind: "channels", actorId: actor.id, audience: [actor.id] });
 }
 

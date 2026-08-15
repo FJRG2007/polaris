@@ -110,8 +110,19 @@ export function SavedView() {
                                                 aria-label="Remove from saved"
                                                 title="Remove from saved"
                                                 onClick={async () => {
+                                                    // Taken off the list here
+                                                    // rather than by asking for
+                                                    // the whole list again: a
+                                                    // reload replaces every row
+                                                    // and throws the page back
+                                                    // to the top.
+                                                    setMessages(
+                                                        (current) =>
+                                                            current?.filter(
+                                                                (entry) => entry.id !== message.id
+                                                            ) ?? current
+                                                    );
                                                     await starAction(message.id);
-                                                    load();
                                                 }}
                                                 className="rounded p-1 text-primary transition-colors hover:bg-muted"
                                             >

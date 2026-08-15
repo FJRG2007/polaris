@@ -292,9 +292,28 @@ export function ChannelView({
         void actions.markReadAction({ channelId, messageId: newest.id }).then(refresh);
     }, [messages, channelId, refresh]);
 
+    /**
+     * Keep a message, or stop keeping it.
+     *
+     * Changed in place rather than by reloading the conversation. Reloading it
+     * replaced every message on screen, and the list follows the bottom when the
+     * reader is at it - so pressing the star threw the reader down the page,
+     * away from the message they had just kept. A star is one boolean on one
+     * row; nothing else about the conversation changed.
+     */
     const star = async (message: ChatMessageView) => {
-        await runAction(() => actions.starAction(message.id), setError);
-        await load();
+        const mark = (starred: boolean) =>
+            setMessages(
+                (current) =>
+                    current?.map((entry) =>
+                        entry.id === message.id ? { ...entry, starred } : entry
+                    ) ?? current
+            );
+
+        mark(!message.starred);
+        const result = await runAction(() => actions.starAction(message.id), setError);
+        // Put it back if the server disagreed, or said nothing at all.
+        mark(result?.on ?? message.starred);
     };
 
     /**

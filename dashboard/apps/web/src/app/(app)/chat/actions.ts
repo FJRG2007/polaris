@@ -28,6 +28,7 @@ import type { SavedMediaView } from "@/lib/chat/saved-media";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
 import { searchAccounts } from "@/lib/rich-text/mention-service";
 import type { ChatMessageView, ChatPage } from "@/lib/chat/messages";
+import { messageToasts, type MessageToast } from "@/lib/chat/toasts";
 import { searchMessages, type ChatSearchHit } from "@/lib/chat/search";
 import { voicePresence, type VoicePresence } from "@/lib/chat/meetings";
 import type { ChatInviteOffer, ChatInviteView } from "@/lib/chat/invites";
@@ -276,6 +277,22 @@ export async function linkPreviewAction(
     return { preview: result.value ?? null };
 }
 
+/**
+ * What just arrived in these conversations, for the note that appears in the
+ * corner.
+ *
+ * Deliberately not written anywhere: a message is not a notification. The bell
+ * is a list somebody comes back to and clears, and fifty messages an afternoon
+ * would bury the four things in it that mattered.
+ */
+export async function messageToastsAction(
+    channelIds: string[]
+): Promise<{ toasts: MessageToast[] }> {
+    const me = await actor();
+    const asked = Array.isArray(channelIds) ? channelIds.map(String) : [];
+    return { toasts: await messageToasts(me, asked) };
+}
+
 /** Whether the GIF and sticker tabs have anything behind them. */
 export async function tenorReadyAction(): Promise<boolean> {
     await actor();
@@ -522,6 +539,18 @@ export async function setMutedAction(
 ): Promise<{ error?: string }> {
     const me = await actor();
     const result = await guard(() => chat.setMuted(me, channelId, minutes));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result;
+}
+
+/** Keep a conversation at the top of your own list, or stop. Yours alone: the
+ *  other people in it are told nothing and their rail does not move. */
+export async function setPinnedAction(
+    channelId: string,
+    pinned: boolean
+): Promise<{ error?: string }> {
+    const me = await actor();
+    const result = await guard(() => chat.setPinned(me, channelId, pinned));
     if (!result.error) revalidatePath(CHAT_PATH);
     return result;
 }

@@ -15,6 +15,7 @@
 import type { ReactNode } from "react";
 import { copyText, messageLink } from "./links";
 import { useAppUrl } from "@/components/app-url";
+import { plainText } from "@/components/rich-text/excerpt";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import {
     Copy,
@@ -96,8 +97,11 @@ export function MessageMenu({
                     <Link2 className="size-3.5" />
                     Copy link
                 </ContextMenuItem>
+                {/* What it reads as, not what it is stored as. Markdown escapes
+                    its punctuation, so copying the source hands back a line full
+                    of backslashes for one that reads perfectly well on screen. */}
                 {!message.deleted && (
-                    <ContextMenuItem onSelect={() => void copyText(message.body)}>
+                    <ContextMenuItem onSelect={() => void copyText(plainText(message.body))}>
                         <Copy className="size-3.5" />
                         Copy text
                     </ContextMenuItem>

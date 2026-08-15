@@ -14,7 +14,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { plainExcerpt } from "../../src/components/rich-text/excerpt";
+import { plainExcerpt, plainText } from "../../src/components/rich-text/excerpt";
 
 describe("a code block", () => {
     it("is the code, without the fence around it", () => {
@@ -78,5 +78,44 @@ describe("nothing", () => {
     it("is nothing", () => {
         expect(plainExcerpt("")).toBe("");
         expect(plainExcerpt("   \n  ")).toBe("");
+    });
+});
+
+/**
+ * Taking a whole message somewhere else.
+ *
+ * Copy is not the excerpt: it keeps the lines, because the thing people copy out
+ * of a chat most often is a block of code and a block of code that arrives as
+ * one line does not run. What it shares with the excerpt is the reason it exists
+ * - the stored Markdown escapes its punctuation, so copying the source hands
+ * back a line full of backslashes.
+ */
+describe("copying a message", () => {
+    it("keeps a code block's lines", () => {
+        expect(plainText("```js\nconst a = 1\nconst b = 2\n```")).toBe("const a = 1\nconst b = 2");
+    });
+
+    it("has no fence and no language tag in it", () => {
+        expect(plainText('```py\nprint("test")\n```')).toBe('print("test")');
+    });
+
+    it("undoes the escaping the source carries", () => {
+        // What a message reads as, which is the only thing worth pasting.
+        expect(plainText('print\("test"\)')).toBe('print("test")');
+        expect(plainText("a \* b \_ c")).toBe("a * b _ c");
+    });
+
+    it("keeps separate paragraphs apart", () => {
+        expect(plainText("one\n\ntwo")).toBe("one\ntwo");
+    });
+
+    it("is the words rather than the marks", () => {
+        expect(plainText("**bold** and [the docs](https://example.com)")).toBe(
+            "bold and the docs"
+        );
+    });
+
+    it("is empty for an empty message", () => {
+        expect(plainText("")).toBe("");
     });
 });

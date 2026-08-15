@@ -166,6 +166,12 @@ export default async function IntegrationsPage() {
             // the services somebody links an account of, and only where there is
             // an application to prove - Steam has none.
             proven: connection && entry.slug !== "steam" ? proven.get(entry.slug) ?? false : undefined,
+            // Where the licensed call filter is served from. Not a secret - the
+            // token beside it is - so it is read back into the dialog.
+            filterModuleUrl:
+                entry.slug === "krisp" && typeof state?.config.moduleUrl === "string"
+                    ? state.config.moduleUrl
+                    : undefined,
             accountLimit:
                 entry.slug === "github"
                     ? githubLimit
