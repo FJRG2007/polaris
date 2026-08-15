@@ -109,11 +109,12 @@ export function VoiceNote({
                 .then(async (response) => {
                     if (response.ok) return;
                     const said: unknown = await response.json().catch(() => null);
-                    const detail =
-                        typeof said === "object" && said !== null && "error" in said
-                            ? String((said as { error: unknown }).error)
-                            : "";
-                    if (detail) setBroken(detail);
+                    const body = (said ?? {}) as { error?: unknown; detail?: unknown };
+                    const sentence = typeof body.error === "string" ? body.error : "";
+                    // The second half is only ever sent to an administrator, and
+                    // is the part that names the disk.
+                    const detail = typeof body.detail === "string" ? body.detail : "";
+                    if (sentence) setBroken(detail ? `${sentence} ${detail}` : sentence);
                 })
                 .catch(() => undefined);
         };

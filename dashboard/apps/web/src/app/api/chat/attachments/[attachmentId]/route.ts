@@ -21,6 +21,7 @@ import { requirePermission } from "@/lib/session";
 import { channelAccess } from "@/lib/chat/access";
 import {
     channelOfAttachment,
+    diagnoseAttachment,
     isInlineImage,
     isPlayableMedia,
     readAttachment
@@ -63,9 +64,15 @@ export async function GET(
     // writes to did not give it back" sends them to the disk, which is where it
     // is.
     if (!file) {
+        // Asked at the moment somebody hits it, and answered to their face when
+        // they are the one who can act on it. An operator should not have to go
+        // and find a log to learn which disk lost their files.
+        const detail = user.isAdmin ? await diagnoseAttachment(attachmentId) : "";
+        console.error(`chat: attachment ${attachmentId} is gone - ${detail || "(not diagnosed)"}`);
         return Response.json(
             {
-                error: "This file is not on the storage Polaris keeps uploads on. It was written and is no longer there."
+                error: "This file is not on the storage Polaris keeps uploads on. It was written and is no longer there.",
+                detail
             },
             { status: 410 }
         );

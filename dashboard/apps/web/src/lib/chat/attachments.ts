@@ -5,11 +5,12 @@
  * targets a profile photo uses - Polaris already knows how to reach a NAS, and
  * nothing that accepts a file needs a second way of writing bytes.
  *
- * The default is deliberately "wherever avatars go" rather than "auto". An
- * operator who has already answered "where do uploads live on this box" has
- * answered it for this too, and making them answer the same question again for
- * every kind of upload is how the two end up disagreeing. Setting the chat's own
- * target overrides it, and from then on the two are independent.
+ * Where they go is this app's own setting, and "work it out" is the default.
+ * It used to follow whatever profile photos were set to, which read as one
+ * fewer decision and was really a second, invisible one: a screen that says
+ * "same as profile photos" makes somebody go and look at another screen to find
+ * out what this one does, and moving the photos moved every file in every
+ * conversation with them.
  *
  * Which storage a file went to is recorded on the row, not read back from the
  * setting: pointing chat at a NAS next month must not break every file already
@@ -31,10 +32,6 @@ import {
 
 /** Where the chat's own choice is stored. Absent means "follow avatars". */
 export const CHAT_TARGET_KEY = "chat.attachments.target";
-
-/** The key the answer falls back to, which is the one most instances have
- *  already answered. */
-const AVATAR_TARGET_KEY = "avatars.target";
 
 /** Under POLARIS_DATA_DIR, when the target is this server. */
 const LOCAL_FOLDER = "chat";
@@ -106,32 +103,29 @@ function baseType(contentType: string): string {
 }
 
 export interface ChatStorageSettings {
-    /** What is stored: a connection id, `local`, `auto`, or absent for "follow
-     *  whatever profile photos use". */
-    readonly choice: string | null;
+    /** What is stored: a connection id, `local`, or `auto`. */
+    readonly choice: string;
     readonly resolved: UploadTarget;
-    /** True when the answer came from the avatars setting rather than this one. */
-    readonly followingAvatars: boolean;
     readonly options: TargetOption[];
 }
 
 /** What the admin screen shows and edits. */
 export async function chatStorageSettings(): Promise<ChatStorageSettings> {
-    const choice = await getSetting(CHAT_TARGET_KEY);
-    const [resolved, options] = await Promise.all([chatTarget(), storageTargetOptions()]);
-    return { choice, resolved, followingAvatars: choice === null, options };
+    const [choice, resolved, options] = await Promise.all([
+        getSetting(CHAT_TARGET_KEY),
+        chatTarget(),
+        storageTargetOptions()
+    ]);
+    return { choice: choice || AUTOMATIC_TARGET, resolved, options };
 }
 
-export async function setChatStorageTarget(target: string | null): Promise<void> {
-    await setSetting(CHAT_TARGET_KEY, target ?? "");
+export async function setChatStorageTarget(target: string): Promise<void> {
+    await setSetting(CHAT_TARGET_KEY, target);
 }
 
-/** Where a file written right now would go. */
+/** Where a file written right now would go. Unset means "work it out", which is
+ *  a NAS if the instance has one and this server otherwise. */
 export async function chatTarget(): Promise<UploadTarget> {
-    const choice = await getSetting(CHAT_TARGET_KEY);
-    // An empty string is what "follow avatars" is stored as, because the setting
-    // store holds strings and deleting a key is not something it offers.
-    if (!choice) return resolveStorageTarget(AVATAR_TARGET_KEY);
     return resolveStorageTarget(CHAT_TARGET_KEY);
 }
 
@@ -354,6 +348,58 @@ export async function channelOfAttachment(attachmentId: string): Promise<string 
         select: { message: { select: { channelId: true } } }
     });
     return row?.message.channelId ?? null;
+}
+
+/**
+ * Why one attachment could not be read, for an administrator.
+ *
+ * Asked at the moment somebody hits the failure rather than left in a log they
+ * would have to go and find. It answers the question the row cannot: the file
+ * was written - a message exists and it was verified on the way in - so what is
+ * different now.
+ *
+ * The two answers it is really looking for:
+ *
+ * - the folder is empty, or missing. The bytes went somewhere that does not keep
+ *   them: a directory inside a container that a deploy replaced, or a second
+ *   copy of Polaris whose disk is not this one - an upload served by one and
+ *   asked for from the other looks exactly like this.
+ * - the file is there and the read failed anyway: permissions, or storage that
+ *   answers a stat and not a read.
+ *
+ * The host is in it because it is what tells those two apart when there is more
+ * than one process answering.
+ */
+export async function diagnoseAttachment(attachmentId: string): Promise<string> {
+    const row = await prisma.chatAttachment.findUnique({
+        where: { id: attachmentId },
+        select: { connectionId: true, path: true, size: true, createdAt: true }
+    });
+    if (!row) return "There is no row for that attachment.";
+
+    const { hostname } = await import("node:os");
+    const where = row.connectionId ? `connection ${row.connectionId}` : "this server";
+    const head = `${row.path} (${row.size} bytes, written ${row.createdAt.toISOString()}) on ${where}, asked for by ${hostname()}`;
+
+    const driver = await driverForTarget(row.connectionId ?? LOCAL_TARGET, LOCAL_FOLDER).catch(
+        () => null
+    );
+    if (!driver) return `${head}: that storage could not be opened at all.`;
+
+    try {
+        const folder = row.path.slice(0, row.path.lastIndexOf("/"));
+        const listed = await driver.list(folder).catch(() => null);
+        if (!listed) {
+            return `${head}: its folder is not there. Whatever was written to this storage is not on it any more - a directory inside a container that a deploy replaced, or a second copy of Polaris whose disk is not this one.`;
+        }
+        const held = listed.entries.length;
+        const stat = await driver.stat(row.path).catch((error: unknown) => reason(error));
+        return typeof stat === "string"
+            ? `${head}: the folder holds ${held} file(s) and this one is not readable: ${stat}`
+            : `${head}: the file is there (${Number(stat.size)} bytes) and the read still failed.`;
+    } finally {
+        await driver.dispose().catch(() => undefined);
+    }
 }
 
 /** Whatever a driver threw, as a line somebody can act on. */

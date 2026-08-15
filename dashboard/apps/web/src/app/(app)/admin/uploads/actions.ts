@@ -73,21 +73,16 @@ export async function setAvatarSettingsAction(input: unknown): Promise<{ error?:
     }
 }
 
-/**
- * Where chat attachments go.
- *
- * `follow-avatars` is stored as no choice at all, which is what makes it a
- * living default rather than a copy: pointing profile photos at a NAS moves chat
- * with them, until somebody answers this question separately.
- */
+/** Where chat attachments go. Its own answer, like every other kind of upload:
+ *  "same as profile photos" made this screen describe itself by pointing at
+ *  another one, and moved every file in every conversation whenever the photos
+ *  moved. */
 export async function setChatStorageTargetAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
-    const parsed = z.object({ target: z.union([target, z.literal("follow-avatars")]) }).safeParse(input);
+    const parsed = z.object({ target }).safeParse(input);
     if (!parsed.success) return { error: "Check the settings and try again" };
     try {
-        await setChatStorageTarget(
-            parsed.data.target === "follow-avatars" ? null : parsed.data.target
-        );
+        await setChatStorageTarget(parsed.data.target);
         await recordAudit({
             actorId: admin.id,
             action: "settings.chat.uploads.update",

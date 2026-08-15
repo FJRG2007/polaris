@@ -26,10 +26,6 @@ import {
     type StorageCheck
 } from "./actions";
 
-/** The chat's way of saying "whichever disk the photos are on". Not a storage
- *  target, so it is its own value rather than one of theirs. */
-const FOLLOW_AVATARS = "follow-avatars";
-
 /** Megabytes are what people think in; the setting is stored in bytes. */
 function toMegabytes(bytes: number): number {
     return Math.round(bytes / (1024 * 1024));
@@ -278,7 +274,7 @@ function PhotosCard({ settings }: { settings: AvatarSettings }) {
 }
 
 function ChatCard({ settings }: { settings: ChatStorageSettings }) {
-    const initial = settings.followingAvatars ? FOLLOW_AVATARS : settings.choice!;
+    const initial = settings.choice;
     const [target, setTarget] = useState(initial);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
@@ -321,7 +317,6 @@ function ChatCard({ settings }: { settings: ChatStorageSettings }) {
                     value={target}
                     options={settings.options}
                     resolvedName={settings.resolved.name}
-                    lead={{ value: FOLLOW_AVATARS, label: "Same as profile photos" }}
                     onChange={(value) => {
                         setTarget(value);
                         setSaved(false);
