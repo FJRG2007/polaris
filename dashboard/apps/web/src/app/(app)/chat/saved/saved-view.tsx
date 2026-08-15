@@ -97,7 +97,10 @@ export function SavedView() {
                                                     ) : (
                                                         <Users className="size-3" />
                                                     )}
-                                                    <span className="max-w-[12rem] truncate">
+                                                    <span
+                                                        title={channel.name}
+                                                        className="max-w-[12rem] truncate"
+                                                    >
                                                         {channel.name}
                                                     </span>
                                                 </Link>

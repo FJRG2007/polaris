@@ -9,14 +9,15 @@
  * that reflows is a table you cannot compare rows in.
  */
 
-import { cn, EmptyState } from "@polaris/ui";
 import * as core from "@polaris/core";
 import { useMemo, useState } from "react";
 import { toFacts } from "@/lib/tasks/facts";
+import { useRowCursor } from "./row-cursor";
+import { cn, EmptyState } from "@polaris/ui";
 import { CustomFieldValue } from "../custom-fields";
+import { PriorityFlag } from "@/components/priority-flag";
 import { useDisplayFormat } from "@/components/display-format";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
-import { useRowCursor } from "./row-cursor";
 import { clickMode, type SelectMode, type ViewProps } from "./shared";
 import {
     commandsFor,
@@ -25,7 +26,6 @@ import {
     TaskStatusMarker,
     type TaskCommands
 } from "./task-actions";
-import { PriorityFlag } from "@/components/priority-flag";
 import {
     AssigneePicker,
     AvatarStack,
@@ -138,6 +138,7 @@ function TaskLine({
                             {task.reference}
                         </span>
                         <span
+                            title={task.name}
                             className={cn(
                                 "truncate text-sm",
                                 core.isFinishedStatus(task.statusType) && "text-muted-foreground"
@@ -440,7 +441,9 @@ export function TableView(props: ViewProps) {
                                             <span className="font-mono text-[11px] text-muted-foreground">
                                                 {task.reference}
                                             </span>
-                                            <span className="truncate">{task.name}</span>
+                                            <span className="truncate" title={task.name}>
+                                                {task.name}
+                                            </span>
                                         </button>
                                         {props.showLocation && <TaskLocation task={task} />}
                                     </td>

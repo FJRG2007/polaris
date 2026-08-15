@@ -259,6 +259,7 @@ export function NotesView({
                                     <span key={step.id} className="flex items-center gap-1">
                                         <button
                                             type="button"
+                                            title={step.title}
                                             onClick={() => open(step.id)}
                                             className="max-w-[14rem] truncate rounded px-1 py-0.5 transition-colors hover:bg-muted hover:text-foreground"
                                         >

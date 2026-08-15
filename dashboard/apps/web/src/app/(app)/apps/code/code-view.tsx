@@ -190,7 +190,9 @@ function WorkRow({ item }: { item: CodeItem }) {
                     {item.title}
                 </Link>
                 <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                    <span className="truncate">{item.repo}</span>
+                    <span className="truncate" title={item.repo}>
+                        {item.repo}
+                    </span>
                     <span>#{item.number}</span>
                     <span>
                         by {item.authorLogin}, updated <RelativeTime iso={item.updatedAt} />
