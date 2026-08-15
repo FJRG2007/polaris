@@ -188,7 +188,47 @@ export async function checkStorageTarget(
         await driver.dispose().catch(() => undefined);
     }
 
-    return { ok: true, detail: "Wrote a file, read it back and removed it." };
+    return { ok: true, detail: `Wrote a file, read it back and removed it. ${await keeps(targetId, localFolder)}` };
+}
+
+/**
+ * Whether what is written here will still be here next week.
+ *
+ * The check above proves the storage works *now*, and there is a way for that to
+ * be true and for every file to disappear anyway: a folder inside the container
+ * is replaced wholesale by the next deploy. The database survives it, so the
+ * rows stay and point at bytes that are gone - which reaches somebody as an
+ * attachment that opened yesterday and 404s today, with nothing broken anywhere
+ * to find.
+ *
+ * Answered by asking the kernel: a path that is not on a mount of its own, in a
+ * container, is on the container's own filesystem.
+ */
+async function keeps(targetId: string, localFolder: string): Promise<string> {
+    if (targetId !== LOCAL_TARGET) return "";
+    const root = `${loadEnv().POLARIS_DATA_DIR}/${localFolder}`;
+
+    try {
+        const { readFile } = await import("node:fs/promises");
+        const inContainer = await readFile("/proc/1/cgroup", "utf8")
+            .then((text) => /docker|containerd|kubepods/.test(text))
+            .catch(() => false);
+        if (!inContainer) return `Kept at ${root}.`;
+
+        const mounts = await readFile("/proc/self/mountinfo", "utf8");
+        const points = mounts
+            .split(/\r?\n/)
+            .map((line) => line.split(" ")[4] ?? "")
+            .filter((point) => point && point !== "/");
+        const onAVolume = points.some((point) => root === point || root.startsWith(`${point}/`));
+        return onAVolume
+            ? `Kept at ${root}, on a volume.`
+            : `Kept at ${root}, which is inside the container: everything written here is lost the next time Polaris is deployed. Mount a volume there, or point this at a storage connection.`;
+    } catch {
+        // Not Linux, or a kernel that does not answer. The check above still
+        // stands; this part simply has nothing to add.
+        return `Kept at ${root}.`;
+    }
 }
 
 /** Whatever a driver threw, as a line somebody can act on. */

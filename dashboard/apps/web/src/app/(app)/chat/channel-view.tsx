@@ -27,7 +27,7 @@ import { Composer } from "./composer";
 import { CallRoom } from "./call-room";
 import { useChat } from "./chat-context";
 import * as calls from "./meeting-actions";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ThreadPanel } from "./thread-panel";
 import { SearchPanel } from "./search-panel";
 import { MessageList } from "./message-list";
@@ -73,6 +73,10 @@ const MAX_WINDOW = 200;
  *  it arrives before the reader gets there rather than after. */
 const NEAR_EDGE = 600;
 
+/** How long a freshly opened conversation keeps putting itself at the bottom
+ *  while everything late finishes arriving. */
+const SETTLE_MS = 1200;
+
 export function ChannelView({
     channelId,
     messageId = null
@@ -83,6 +87,7 @@ export function ChannelView({
     messageId?: string | null;
 }) {
     const router = useRouter();
+    const params = useSearchParams();
     const { viewerId, channels, refresh, rulesFor } = useChat();
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
     const [pending, setPending] = useState<readonly ChatMessageView[]>([]);
@@ -113,7 +118,19 @@ export function ChannelView({
     const [callVideo, setCallVideo] = useState(true);
 
     const scroller = useRef<HTMLDivElement>(null);
+    // The end of the list, scrolled to rather than computed. `scrollTop =
+    // scrollHeight` is arithmetic over a height that is still changing; an
+    // element at the bottom is the bottom whatever the height turns out to be,
+    // which is what a phone needs - its address bar, its keyboard and its safe
+    // areas all resize the viewport after the first paint.
+    const foot = useRef<HTMLDivElement>(null);
     const following = useRef(true);
+    // How long the list insists on the bottom after a conversation opens.
+    // Everything that lands late - pictures, link cards, players, a font - grows
+    // it, and the browser's own scroll anchoring moves the position while that
+    // happens. Inside this window a scroll that is not somebody's finger does
+    // not count as them choosing to read further up.
+    const settling = useRef(0);
     const marked = useRef("");
     // Which message each optimistic draft turned into. Reconciling on the id the
     // server gave back rather than on the text is what keeps two people saying
@@ -215,6 +232,8 @@ export function ChannelView({
             return;
         }
         const page = result.page?.messages ?? [];
+        following.current = true;
+        settling.current = Date.now() + SETTLE_MS;
         show(page);
         olderThanRef.current = result.page?.olderThan ?? null;
         newerThanRef.current = null;
@@ -372,6 +391,27 @@ export function ChannelView({
         [loadOlder]
     );
 
+    /**
+     * Arrived by answering a call.
+     *
+     * The card outside the conversation carries the answer in the address rather
+     * than joining from where it stands: one place opens a microphone, and it is
+     * this one. Taken out of the address as soon as it is acted on, or a reload
+     * an hour later would put somebody back into a room they had left.
+     */
+    const answering = params.get("answer");
+    const answered = useRef<string | null>(null);
+    useEffect(() => {
+        if (!answering || answered.current === answering) return;
+        answered.current = answering;
+        router.replace(`/chat/c/${channelId}`, { scroll: false });
+        setCallVideo(false);
+        void runAction(() => calls.startCallAction(channelId), setError).then((result) => {
+            if (result?.meetingId) setInCall(result.meetingId);
+            checkCall();
+        });
+    }, [answering, channelId, router, checkCall]);
+
     // A link straight to a message. Waits for the first page rather than racing
     // it: the message may well be on it, and walking backwards from an empty
     // list would ask for pages that are already on the way.
@@ -431,6 +471,17 @@ export function ChannelView({
 
     const shown = useMemo(() => [...(messages ?? []), ...pending], [messages, pending]);
 
+    /** Put the newest message on screen. */
+    const stick = useCallback(() => {
+        const element = scroller.current;
+        if (!element) return;
+        element.scrollTop = element.scrollHeight;
+        // Twice, and the second one is the one that works on a phone: the block
+        // above is right for a list that has finished laying itself out, and
+        // this is right for one that has not.
+        foot.current?.scrollIntoView({ block: "end" });
+    }, []);
+
     /**
      * Where the reader ends up after the list changes shape.
      *
@@ -450,8 +501,8 @@ export function ChannelView({
             anchor.current = null;
             return;
         }
-        if (following.current) element.scrollTop = element.scrollHeight;
-    }, [shown]);
+        if (following.current) stick();
+    }, [shown, stick]);
 
     /**
      * Stay at the bottom while the conversation is still settling.
@@ -466,13 +517,32 @@ export function ChannelView({
         const element = scroller.current;
         if (!element || typeof ResizeObserver === "undefined") return;
         const watcher = new ResizeObserver(() => {
-            if (following.current && anchor.current === null) {
-                element.scrollTop = element.scrollHeight;
-            }
+            if (following.current && anchor.current === null) stick();
         });
         for (const child of element.children) watcher.observe(child);
         return () => watcher.disconnect();
-    }, [messages === null]);
+    }, [messages === null, stick]);
+
+    /**
+     * Insist, for the first second of a conversation.
+     *
+     * A phone lays a conversation out several times before it settles - the
+     * address bar retracts, a font swaps, every picture arrives - and each of
+     * those is height appearing under a list that was already scrolled. One
+     * scroll at render is not enough there, which is why it opened part way up.
+     */
+    useEffect(() => {
+        if (messages === null) return;
+        let frame = 0;
+        const until = settling.current;
+        const again = () => {
+            if (Date.now() > until || !following.current) return;
+            stick();
+            frame = requestAnimationFrame(again);
+        };
+        frame = requestAnimationFrame(again);
+        return () => cancelAnimationFrame(frame);
+    }, [messages, stick]);
 
     // Catching up on what is actually on screen.
     useEffect(() => {
@@ -753,14 +823,19 @@ export function ChannelView({
                     onScroll={(event) => {
                         const element = event.currentTarget;
                         const below = element.scrollHeight - element.scrollTop - element.clientHeight;
-                        following.current = below < AT_BOTTOM_SLACK;
+                        // At the bottom is always "following along". Away from
+                        // it only counts once the list has settled: until then
+                        // the movement is the page growing under itself, not
+                        // somebody deciding to read further up.
+                        if (below < AT_BOTTOM_SLACK) following.current = true;
+                        else if (Date.now() > settling.current) following.current = false;
                         // Both edges, because the window moves in both
                         // directions: up into the history, and back down out of
                         // it. Each is a no-op when there is no page that way.
                         if (element.scrollTop < NEAR_EDGE) void loadOlder();
                         else if (below < NEAR_EDGE) void loadNewer();
                     }}
-                    className="min-h-0 flex-1 overflow-y-auto py-2"
+                    className="min-h-0 flex-1 overflow-y-auto py-2 [overflow-anchor:none]"
                 >
                     {olderThan && (
                         // A line rather than a button. Scrolling is what loads
@@ -820,6 +895,11 @@ export function ChannelView({
                             </button>
                         </div>
                     )}
+
+                    {/* The end of the list, and what "the bottom" means to
+                        everything above. Last, after the sticky button, since a
+                        sticky element still takes its place in the flow. */}
+                    <div ref={foot} aria-hidden="true" />
                 </div>
 
                 <TypingLine typists={typists} viewerId={viewerId} />

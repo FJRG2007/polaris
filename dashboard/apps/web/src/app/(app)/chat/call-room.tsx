@@ -90,6 +90,27 @@ export function CallRoom({
     const [shareError, setShareError] = useState("");
 
     const canShare = Boolean(viewerId) && call.meeting?.hostId === viewerId;
+    /**
+     * The two keys every voice application has: F9 mutes, F10 deafens.
+     *
+     * Bound while the room is on screen and nowhere else, and taken from the
+     * browser rather than left to it - F10 opens a menu bar in some of them, and
+     * a shortcut that sometimes opens a menu instead of muting you is worse than
+     * no shortcut. Function keys type nothing, so this is safe over a composer
+     * somebody is writing in.
+     */
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => {
+            if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+            if (event.key !== "F9" && event.key !== "F10") return;
+            event.preventDefault();
+            if (event.key === "F9") call.toggleMic();
+            else call.toggleDeafen();
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [call]);
+
     const admitted = call.meeting?.participants.filter((person) => person.admission === "admitted");
     // This browser's own seat, which is where its own face comes from: a guest
     // has no account to draw one from, and the signed-in id is not on the seat.
@@ -525,6 +546,48 @@ function Tile({
         if (video.current && stream) video.current.srcObject = stream;
     }, [stream]);
 
+    /**
+     * Whether there is a picture in this stream at all.
+     *
+     * Asked of the stream rather than taken from a prop, because for everybody
+     * except yourself there is no prop to take it from: a call with the cameras
+     * off still has a stream, so the tile drew a black rectangle over the face
+     * it was supposed to be showing - no picture, no initials, nothing. A remote
+     * video track also starts out muted and unmutes when media arrives, which is
+     * the same question asked a moment later.
+     */
+    const [hasVideo, setHasVideo] = useState(false);
+    useEffect(() => {
+        if (!stream) {
+            setHasVideo(false);
+            return;
+        }
+        const look = () =>
+            setHasVideo(
+                stream.getVideoTracks().some((track) => track.readyState === "live" && !track.muted)
+            );
+        look();
+        const tracks = stream.getVideoTracks();
+        stream.addEventListener("addtrack", look);
+        stream.addEventListener("removetrack", look);
+        for (const track of tracks) {
+            track.addEventListener("mute", look);
+            track.addEventListener("unmute", look);
+            track.addEventListener("ended", look);
+        }
+        return () => {
+            stream.removeEventListener("addtrack", look);
+            stream.removeEventListener("removetrack", look);
+            for (const track of tracks) {
+                track.removeEventListener("mute", look);
+                track.removeEventListener("unmute", look);
+                track.removeEventListener("ended", look);
+            }
+        };
+    }, [stream]);
+
+    const blank = !stream || cameraOff || !hasVideo;
+
     // Applied to the element rather than to the connection: the audio still
     // arrives and is simply played quieter, so a change lands on the next frame
     // and nobody is renegotiated at.
@@ -553,10 +616,10 @@ function Tile({
                     // edges of somebody's window are usually where the thing
                     // they are pointing at is.
                     sharing ? "object-contain" : "object-cover",
-                    cameraOff && "invisible"
+                    blank && "invisible"
                 )}
             />
-            {(!stream || cameraOff) && (
+            {blank && (
                 // A face rather than a name in the middle of an empty rectangle.
                 // Most of a call is spent with the cameras off, so this is what
                 // a call actually looks like - and a picture is read across a

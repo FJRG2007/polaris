@@ -13,9 +13,10 @@
  * and it is refused rather than played on a tab the reader has never touched,
  * which is every browser's rule and not one worth fighting.
  *
- * Answering is a navigation, not a join: the conversation's own screen is where
- * a call is joined, and having two places that can put somebody into a room is
- * how one of them ends up with a camera nobody turned off.
+ * Answering navigates and joins: the conversation's own screen is still the one
+ * place that puts anybody into a room - it carries the answer in the address and
+ * the screen acts on it - because two places that can open a microphone is how
+ * one of them ends up with a camera nobody turned on.
  */
 
 import Link from "next/link";
@@ -187,7 +188,13 @@ export function IncomingCalls() {
                             className="flex-1"
                             onClick={() => dismiss(entry.meetingId)}
                         >
-                            <Link href={`/chat/c/${entry.channelId}`}>
+                            {/* Answering answers. The conversation is still
+                                where the room is drawn, but arriving there and
+                                having to press Join is a second decision nobody
+                                made - they pressed the green button. The
+                                microphone only: a camera is never opened by
+                                anything but a press that says so. */}
+                            <Link href={`/chat/c/${entry.channelId}?answer=${entry.meetingId}`}>
                                 <Phone className="size-4" />
                                 Answer
                             </Link>
