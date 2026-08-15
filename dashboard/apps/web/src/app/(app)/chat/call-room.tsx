@@ -564,7 +564,7 @@ function Tile({
                 <span className="absolute inset-0 flex items-center justify-center">
                     <Avatar
                         size={AVATAR_SIZE}
-                        person={{ id: personId ?? name, name }}
+                        person={{ id: personId ?? null, name }}
                         className={cn(
                             "transition-shadow duration-fast",
                             speaking && "ring-2 ring-success"

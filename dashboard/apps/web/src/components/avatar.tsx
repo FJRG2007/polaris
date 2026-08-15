@@ -20,7 +20,14 @@ import { useState } from "react";
 import { avatarUrl, orgAvatarUrl } from "@/lib/avatar-url";
 
 export interface AvatarPerson {
-    readonly id: string;
+    /**
+     * The account this face belongs to, or null for somebody who has none - a
+     * guest in a call, who has a name and nothing else. Null draws the initials
+     * and asks for no picture: the tile used to pass the name in place of the
+     * id, and every one of those became a request for the photo of an account
+     * that does not exist.
+     */
+    readonly id: string | null;
     readonly name: string;
     /** A picture from somewhere else (a linked GitHub account). Left unset for
      *  an ordinary Polaris account, whose picture is resolved from its id. */
@@ -81,8 +88,8 @@ const requested = new Set<string>();
 export function preloadAvatars(people: readonly AvatarPerson[]): void {
     if (typeof window === "undefined") return;
     for (const person of people) {
-        const source = person.image ?? avatarUrl(person.id);
-        if (requested.has(source)) continue;
+        const source = person.image ?? (person.id ? avatarUrl(person.id) : null);
+        if (!source || requested.has(source)) continue;
         requested.add(source);
         const picture = new window.Image();
         picture.src = source;
@@ -103,7 +110,7 @@ export function Avatar({
      *  tells them apart before either name is read. */
     square?: boolean;
 }) {
-    const source = person.image ?? avatarUrl(person.id);
+    const source = person.image ?? (person.id ? avatarUrl(person.id) : null);
     // A 404 is the ordinary answer for somebody with no picture anywhere, so it
     // is not an error state - it just means the initials underneath stay.
     const [failed, setFailed] = useState(false);
@@ -121,11 +128,11 @@ export function Avatar({
                 width: size,
                 height: size,
                 fontSize: Math.max(9, Math.round(size * 0.4)),
-                backgroundColor: tintFor(person.id)
+                backgroundColor: tintFor(person.id ?? person.name)
             }}
         >
             {initials(person.name)}
-            {!failed && (
+            {source && !failed && (
                 // eslint-disable-next-line @next/next/no-img-element -- one small image per person, no loader wanted
                 <img
                     src={source}

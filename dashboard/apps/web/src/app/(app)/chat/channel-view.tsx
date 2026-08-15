@@ -690,13 +690,19 @@ export function ChannelView({
                     onChanged={refresh}
                     call={live}
                     onStartCall={async (withVideo) => {
-                        const result = await calls.startCallAction(channelId);
-                        if (result.error) {
-                            setError(result.error);
-                            return;
-                        }
+                        // Through `runAction`, which is the difference between a
+                        // button that says what went wrong and one that appears
+                        // to do nothing: an action that throws rather than
+                        // returning an error would otherwise reject into
+                        // nowhere, and pressing Join would be silence.
+                        const result = await runAction(
+                            () => calls.startCallAction(channelId),
+                            setError
+                        );
+                        if (!result || result.error) return;
                         setCallVideo(withVideo);
                         if (result.meetingId) setInCall(result.meetingId);
+                        else setError("That call could not be joined. Try again.");
                         checkCall();
                     }}
                     onSearch={() => setSearching((current) => !current)}
@@ -715,12 +721,13 @@ export function ChannelView({
                         count={live?.count ?? 0}
                         onJoin={(video) => {
                             setCallVideo(video);
-                            void calls.startCallAction(channelId).then((result) => {
-                                if (result.error) {
-                                    setError(result.error);
-                                    return;
-                                }
+                            void runAction(
+                                () => calls.startCallAction(channelId),
+                                setError
+                            ).then((result) => {
+                                if (!result || result.error) return;
                                 if (result.meetingId) setInCall(result.meetingId);
+                                else setError("That call could not be joined. Try again.");
                                 checkCall();
                             });
                         }}

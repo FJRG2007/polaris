@@ -156,6 +156,12 @@ export async function startOrJoin(
 ): Promise<MeetingSeat> {
     await requireChannel(actor, channelId);
     const meetingId = await liveMeetingId(actor, channelId);
+    // Swept first, and this is the line the whole thing turned on: a browser
+    // that was closed mid-call leaves its seat behind, and a room with a seat
+    // in it is not empty. So the next call into that conversation announced
+    // itself as somebody *joining* an existing call - and nobody's telephone
+    // rang, once, ever again, for as long as the abandoned seat sat there.
+    await sweep(meetingId);
     // Asked before the seat is taken, so "was anybody already here" is a
     // question about the room rather than about the room plus the person now
     // walking into it. An empty room is a call starting, which is what makes
