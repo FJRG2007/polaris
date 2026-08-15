@@ -216,37 +216,36 @@ export async function storeAttachment(
     const folder = `${ATTACHMENT_ROOT}/${safe(channelId)}`;
     const path = `${folder}/${crypto.randomUUID()}`;
 
+    let written: { size: bigint | number };
     try {
         await driver.mkdir(folder).catch(() => undefined);
-        await driver.writeStream(path, streamOf(file.bytes), {
+        /**
+         * The write, and its own answer about what is now on the disk.
+         *
+         * Every driver ends a write by stat'ing what it wrote, so this is the
+         * read-back check and costs nothing extra: a write that returns without
+         * complaining proves nothing on its own - a share that has gone away, a
+         * mount that accepts writes into nothing and a folder inside a container
+         * the next deploy replaces all accept files and lose them.
+         */
+        written = await driver.writeStream(path, streamOf(file.bytes), {
             mime: file.type || "application/octet-stream",
             size: BigInt(file.bytes.length)
         });
-
-        /**
-         * Asked for straight back, before a row is written that says it is
-         * there.
-         *
-         * A write that returns without complaining is not proof of anything -
-         * a share that has gone away, a mount that accepts writes into nothing
-         * and a folder inside a container the next deploy replaces all accept
-         * files and lose them. Without this the message lands, the attachment
-         * row lands, and the failure surfaces days later as a download that
-         * 404s with nothing anywhere saying why. One stat is a very cheap way
-         * to be told now instead.
-         */
-        const written = await driver.stat(path).catch((error: unknown) => {
-            throw new AttachmentStorageError(
-                `The file was written to ${target.name} but could not be found again: ${reason(error)}`
-            );
-        });
-        if (Number(written.size) !== file.bytes.length) {
-            throw new AttachmentStorageError(
-                `${target.name} kept ${Number(written.size)} bytes of ${file.bytes.length}.`
-            );
-        }
+    } catch (error) {
+        // Anything the storage throws is a fact about the storage, and it is
+        // said as one. Left to escape, it arrives as "that could not be sent",
+        // which sends whoever reads it looking at the browser, at the network
+        // and at the message - anywhere but at the disk.
+        throw new AttachmentStorageError(`${target.name} refused the file: ${reason(error)}`);
     } finally {
         await driver.dispose().catch(() => undefined);
+    }
+
+    if (Number(written.size) !== file.bytes.length) {
+        throw new AttachmentStorageError(
+            `${target.name} kept ${Number(written.size)} bytes of ${file.bytes.length}.`
+        );
     }
 
     return {

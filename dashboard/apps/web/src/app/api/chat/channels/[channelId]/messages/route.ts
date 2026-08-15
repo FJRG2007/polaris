@@ -175,7 +175,15 @@ export async function POST(
             return Response.json({ error: caught.message }, { status: 502 });
         }
         console.error(caught);
-        return Response.json({ error: "That could not be sent" }, { status: 500 });
+        // To an administrator, what actually threw. "That could not be sent" is
+        // the right thing to tell somebody who cannot act on it and the wrong
+        // thing to tell the one person who can - it is their instance, and the
+        // sentence they need is in a log they should not have to go and find.
+        const detail = caught instanceof Error ? caught.message : String(caught);
+        return Response.json(
+            { error: user.isAdmin ? `That could not be sent: ${detail}` : "That could not be sent" },
+            { status: 500 }
+        );
     }
 }
 
