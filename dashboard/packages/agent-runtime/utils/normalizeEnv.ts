@@ -1,5 +1,5 @@
-import * as core from "@actions/core";
 import { log } from "./cli.ts";
+import * as core from "@actions/core";
 import { isSensitiveEnvName } from "./secrets.ts";
 
 /**
@@ -63,9 +63,13 @@ export function normalizeEnv(): void {
     if (keys.length === 1) {
       const key = keys[0];
       if (key !== upperKey) {
-        // single key, just needs uppercasing
-        process.env[upperKey] = process.env[key];
+        // single key, just needs uppercasing. delete before set: on
+        // case-insensitive env stores (Windows), `key` and `upperKey`
+        // address the same underlying slot, so setting then deleting
+        // would clobber the value we just wrote.
+        const value = process.env[key];
         delete process.env[key];
+        process.env[upperKey] = value;
       }
       continue;
     }

@@ -1,8 +1,8 @@
-import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resolveAgent, resolveModel } from "./agent.ts";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { cleanupVertexCredentials, materializeVertexCredentials } from "./vertex.ts";
 
 const savedEnv = { ...process.env };
@@ -189,7 +189,12 @@ describe("materializeVertexCredentials", () => {
       expect(readFileSync(credentials.credentialsPath, "utf8")).toBe(
         process.env.VERTEX_SERVICE_ACCOUNT_JSON
       );
-      expect(statSync(credentials.credentialsPath).mode & 0o777).toBe(0o600);
+      // this runtime only ever runs in a GitHub Actions job / Polaris runner
+      // (both POSIX); NTFS has no POSIX permission bits, so writeFileSync's
+      // mode is not honored on Windows and this assertion is meaningless there.
+      if (process.platform !== "win32") {
+        expect(statSync(credentials.credentialsPath).mode & 0o777).toBe(0o600);
+      }
       cleanupVertexCredentials(credentials);
     } finally {
       rmSync(dir, { recursive: true, force: true });

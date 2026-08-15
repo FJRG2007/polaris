@@ -49,35 +49,42 @@ describe("spawn error path", () => {
     expect(afterHandles).toBeLessThanOrEqual(beforeHandles);
   });
 
-  it("killGroup: true propagates SIGKILL to grandchildren so close fires promptly", async () => {
-    // regression: node_modules/opencode-ai/bin/opencode is a Node shim that
-    // spawnSyncs the native binary with stdio:"inherit". without killGroup,
-    // child.kill("SIGKILL") hit only the shim - the native binary was
-    // reparented to PID 1, kept holding our stdout pipe via the inherited
-    // fds, and `child.on("close")` never fired (because pipes stayed open).
-    // a 5-min outer safety-net timer eventually rejected the agent promise,
-    // but the grandchild kept running until the GitHub Actions job-level
-    // timeout. this test replicates the shape with bash + a backgrounded
-    // sleep grandchild: with killGroup, close fires promptly after SIGKILL;
-    // without it, the parent would wait for sleep to exit (30s).
-    //
-    // the activity-check interval is fixed at 5s so the earliest the kill
-    // can fire is ~5s after start. budget 15s end-to-end.
-    const before = performance.now();
-    const result = await spawn({
-      cmd: "bash",
-      args: ["-c", "sleep 30 & wait"],
-      env: { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "" },
-      activityTimeout: 1000,
-      killGroup: true,
-    }).catch((err) => err);
-    const elapsed = performance.now() - before;
+  // this runtime only ever runs in a GitHub Actions job / Polaris runner
+  // (both POSIX); `process.kill(-pid, ...)` process-group semantics do not
+  // exist on Windows.
+  it.skipIf(process.platform === "win32")(
+    "killGroup: true propagates SIGKILL to grandchildren so close fires promptly",
+    async () => {
+      // regression: node_modules/opencode-ai/bin/opencode is a Node shim that
+      // spawnSyncs the native binary with stdio:"inherit". without killGroup,
+      // child.kill("SIGKILL") hit only the shim - the native binary was
+      // reparented to PID 1, kept holding our stdout pipe via the inherited
+      // fds, and `child.on("close")` never fired (because pipes stayed open).
+      // a 5-min outer safety-net timer eventually rejected the agent promise,
+      // but the grandchild kept running until the GitHub Actions job-level
+      // timeout. this test replicates the shape with bash + a backgrounded
+      // sleep grandchild: with killGroup, close fires promptly after SIGKILL;
+      // without it, the parent would wait for sleep to exit (30s).
+      //
+      // the activity-check interval is fixed at 5s so the earliest the kill
+      // can fire is ~5s after start. budget 15s end-to-end.
+      const before = performance.now();
+      const result = await spawn({
+        cmd: "bash",
+        args: ["-c", "sleep 30 & wait"],
+        env: { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "" },
+        activityTimeout: 1000,
+        killGroup: true,
+      }).catch((err) => err);
+      const elapsed = performance.now() - before;
 
-    expect(result).toBeInstanceOf(Error);
-    // 10s ceiling: 5s activity-check tick + signal delivery. a regression
-    // here (no killGroup) would hang for the full 30s sleep.
-    expect(elapsed).toBeLessThan(10_000);
-  }, 20_000);
+      expect(result).toBeInstanceOf(Error);
+      // 10s ceiling: 5s activity-check tick + signal delivery. a regression
+      // here (no killGroup) would hang for the full 30s sleep.
+      expect(elapsed).toBeLessThan(10_000);
+    },
+    20_000
+  );
 
   it('retain:"tail" caps stderr at maxRetainedBytes and prepends a truncation sentinel', async () => {
     // regression for issue #680: unbounded `stderrBuffer += chunk` previously
@@ -149,22 +156,28 @@ describe("spawn error path", () => {
     expect(buf.toString()).toContain("56789abcde");
   });
 
-  it("reports signal-killed subprocesses as failures, not success", async () => {
-    // regression: before the fix, `child.on("close", (exitCode) => ...)`
-    // discarded the signal parameter and `exitCode || 0` coerced the
-    // node-delivered null to 0. lifecycle hooks killed by OOM, segfault,
-    // or external SIGTERM were silently reported as exit code 0, and
-    // lifecycle.ts's `if (result.exitCode !== 0)` skipped the warning -
-    // so callers proceeded as if setup/post-checkout/prepush had succeeded.
-    const result = await spawn({
-      cmd: "bash",
-      args: ["-c", "kill -KILL $$"],
-      env: { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "" },
-      activityTimeout: 0,
-    });
+  // this runtime only ever runs in a GitHub Actions job / Polaris runner
+  // (both POSIX); Node does not surface a POSIX kill signal through
+  // child.on("close") on Windows, so this is not observable there.
+  it.skipIf(process.platform === "win32")(
+    "reports signal-killed subprocesses as failures, not success",
+    async () => {
+      // regression: before the fix, `child.on("close", (exitCode) => ...)`
+      // discarded the signal parameter and `exitCode || 0` coerced the
+      // node-delivered null to 0. lifecycle hooks killed by OOM, segfault,
+      // or external SIGTERM were silently reported as exit code 0, and
+      // lifecycle.ts's `if (result.exitCode !== 0)` skipped the warning -
+      // so callers proceeded as if setup/post-checkout/prepush had succeeded.
+      const result = await spawn({
+        cmd: "bash",
+        args: ["-c", "kill -KILL $$"],
+        env: { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "" },
+        activityTimeout: 0,
+      });
 
-    expect(result.exitCode).not.toBe(0);
-    expect(result.stderr).toMatch(/killed by signal/i);
-    expect(result.stderr).toMatch(/SIGKILL/);
-  });
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toMatch(/killed by signal/i);
+      expect(result.stderr).toMatch(/SIGKILL/);
+    }
+  );
 });

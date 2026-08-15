@@ -1,9 +1,9 @@
-import { execSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { execSync } from "node:child_process";
 import { removeIncludeIfEntries } from "./setup.ts";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 
 describe("removeIncludeIfEntries", () => {
   let repoDir: string;
@@ -85,32 +85,37 @@ describe("removeIncludeIfEntries", () => {
     expect(existsSync(proof)).toBe(false);
   });
 
-  it("handles keys containing whitespace in the subsection name", () => {
-    // the old split-on-space approach truncated keys at the first space, so
-    // subsections with internal whitespace survived cleanup. the -z path
-    // reads keys whole.
-    const configPath = join(repoDir, ".git", "config");
-    writeFileSync(
-      configPath,
-      [
-        "[core]",
-        "\trepositoryformatversion = 0",
-        '[includeIf "gitdir:/a b c"]',
-        "\tpath = /tmp/unused",
-        "",
-      ].join("\n")
-    );
+  // this runtime only ever runs in a GitHub Actions job / Polaris runner
+  // (both POSIX); the `/bin/bash` shell path is not resolvable on Windows.
+  it.skipIf(process.platform === "win32")(
+    "handles keys containing whitespace in the subsection name",
+    () => {
+      // the old split-on-space approach truncated keys at the first space, so
+      // subsections with internal whitespace survived cleanup. the -z path
+      // reads keys whole.
+      const configPath = join(repoDir, ".git", "config");
+      writeFileSync(
+        configPath,
+        [
+          "[core]",
+          "\trepositoryformatversion = 0",
+          '[includeIf "gitdir:/a b c"]',
+          "\tpath = /tmp/unused",
+          "",
+        ].join("\n")
+      );
 
-    removeIncludeIfEntries(repoDir);
+      removeIncludeIfEntries(repoDir);
 
-    const remaining = execSync("git config --local --get-regexp ^includeif\\. || true", {
-      cwd: repoDir,
-      encoding: "utf-8",
-      shell: "/bin/bash",
-      env: cleanEnv,
-    });
-    expect(remaining.trim()).toBe("");
-  });
+      const remaining = execSync("git config --local --get-regexp ^includeif\\. || true", {
+        cwd: repoDir,
+        encoding: "utf-8",
+        shell: "/bin/bash",
+        env: cleanEnv,
+      });
+      expect(remaining.trim()).toBe("");
+    }
+  );
 
   it("is a no-op when no includeIf entries exist", () => {
     expect(() => removeIncludeIfEntries(repoDir)).not.toThrow();

@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { normalizeEnv, sanitizeSecret } from "./normalizeEnv.ts";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 /**
  * These tests pin the load-bearing invariants of secret sanitisation:
@@ -54,7 +54,13 @@ describe("normalizeEnv: process.env state contract", () => {
     process.env.anthropic_api_key = "sk-ant-lowercase\n";
     normalizeEnv();
     expect(process.env.ANTHROPIC_API_KEY).toBe("sk-ant-lowercase");
-    expect(process.env.anthropic_api_key).toBeUndefined();
+    // this runtime only ever runs in a GitHub Actions job / Polaris runner
+    // (both POSIX, case-sensitive env); on Windows, process.env is
+    // case-insensitive, so `anthropic_api_key` and `ANTHROPIC_API_KEY`
+    // are the same slot and this assertion is not meaningful there.
+    if (process.platform !== "win32") {
+      expect(process.env.anthropic_api_key).toBeUndefined();
+    }
   });
 
   it("preserves whitespace-only values rather than silently zeroing them", () => {
