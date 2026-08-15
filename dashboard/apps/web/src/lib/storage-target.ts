@@ -102,6 +102,62 @@ export async function driverForTarget(targetId: string, localFolder: string): Pr
     return getDriverForConnection(targetId);
 }
 
+/** A storage that is open and ready to be written to, and where that turned out
+ *  to be. */
+export interface WritableTarget {
+    readonly driver: StorageDriver;
+    /** Where the bytes will actually land: a connection id, or `local`. Record
+     *  THIS on the row, never the target that was asked for. */
+    readonly targetId: string;
+    /** What to call it. */
+    readonly name: string;
+    /** The storage that was chosen, when it is not the one that opened. */
+    readonly fellBackFrom: string | null;
+}
+
+/**
+ * Open the storage an upload should go to, or the next best thing.
+ *
+ * Reaching a storage connection is a TCP connect, a login and a tree connect
+ * against a box somebody may have unplugged, and it throws when that box is not
+ * there. Every upload in Polaris used to let that throw escape, which is how an
+ * unplugged NAS became "that could not be sent" on a voice message, a profile
+ * photo that would not save and a task attachment that failed to upload - three
+ * screens, three bug reports, one unplugged NAS.
+ *
+ * None of those is worth losing what somebody just made. The disk Polaris runs
+ * on is always reachable, because Polaris is running, so that is where the bytes
+ * go instead - loudly, because an operator has a share to go and fix, and
+ * recorded, because what is read back later must follow where the file went
+ * rather than where the setting points by then.
+ *
+ * The caller therefore has to store `targetId`. A caller that cannot - one whose
+ * rows do not record a storage - must not use this, because for it a fallback
+ * would write the file somewhere it will later look for it in vain.
+ */
+export async function openForWriting(
+    target: UploadTarget,
+    localFolder: string
+): Promise<WritableTarget> {
+    try {
+        return {
+            driver: await driverForTarget(target.id, localFolder),
+            targetId: target.id,
+            name: target.name,
+            fellBackFrom: null
+        };
+    } catch (error) {
+        if (target.id === LOCAL_TARGET) throw error;
+        console.error(`storage: ${target.name} could not be opened for writing:`, error);
+        return {
+            driver: await driverForTarget(LOCAL_TARGET, localFolder),
+            targetId: LOCAL_TARGET,
+            name: "this server",
+            fellBackFrom: target.name
+        };
+    }
+}
+
 /**
  * A file name that is safe on every backend Polaris writes to.
  *

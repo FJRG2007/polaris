@@ -17,6 +17,7 @@ import {
     AUTOMATIC_TARGET,
     driverForTarget,
     LOCAL_TARGET,
+    openForWriting,
     resolveStorageTarget,
     safeName,
     storageTargetOptions,
@@ -152,8 +153,11 @@ export async function storeAttachment(input: {
     size: number;
     body: ReadableStream<Uint8Array>;
 }): Promise<AttachmentView> {
-    const target = await resolveUploadTarget();
-    const driver = await driverFor(target.id);
+    // The storage uploads are sent to, or this server when that one cannot be
+    // opened. A share that is away must not be the reason somebody cannot
+    // attach a file to their work; the row records where it really went.
+    const target = await openForWriting(await resolveUploadTarget(), LOCAL_FOLDER);
+    const driver = target.driver;
     const folder = taskFolder(input.taskId);
     // A name of its own, so two people uploading "screenshot.png" to the same
     // task do not overwrite each other, and so a name cannot escape the folder.
@@ -169,7 +173,7 @@ export async function storeAttachment(input: {
                 name: safeName(input.name),
                 mime: input.mime,
                 size,
-                connectionId: target.id === LOCAL_TARGET ? null : target.id,
+                connectionId: target.targetId === LOCAL_TARGET ? null : target.targetId,
                 path: stored,
                 uploadedById: input.uploadedById
             },

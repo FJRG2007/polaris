@@ -27,6 +27,7 @@ import {
     AUTOMATIC_TARGET,
     driverForTarget,
     LOCAL_TARGET,
+    openForWriting,
     resolveStorageTarget,
     safeName,
     storageTargetOptions,
@@ -157,8 +158,11 @@ export async function storeAvatar(owner: AvatarOwner, bytes: Uint8Array, mime: s
     if (!extension) throw new Error("That kind of image is not accepted");
 
     const previous = await readRow(owner);
-    const target = await resolveStorageTarget(AVATAR_TARGET_KEY);
-    const driver = await driverForTarget(target.id, LOCAL_FOLDER);
+    // Wherever photos are sent, or this server when that storage is not
+    // answering - a share somebody unplugged is not a reason a person cannot
+    // change their picture. Where it lands is what gets recorded.
+    const target = await openForWriting(await resolveStorageTarget(AVATAR_TARGET_KEY), LOCAL_FOLDER);
+    const driver = target.driver;
     // A name of its own rather than the owner's id: a photo replaced while
     // another browser still has the old one cached must not be served the new
     // bytes under the old name, and a name cannot escape the folder this way
@@ -173,7 +177,7 @@ export async function storeAvatar(owner: AvatarOwner, bytes: Uint8Array, mime: s
     }
 
     const stored = {
-        connectionId: target.id === LOCAL_TARGET ? null : target.id,
+        connectionId: target.targetId === LOCAL_TARGET ? null : target.targetId,
         path,
         mime,
         size: bytes.length
@@ -258,7 +262,18 @@ async function uploadedAvatar(owner: AvatarOwner): Promise<AvatarRef | null> {
         etag: `"u${row.updatedAt.getTime()}"`,
         mime: row.mime,
         load: async () => {
-            const driver = await driverForTarget(row.connectionId ?? LOCAL_TARGET, LOCAL_FOLDER);
+            // Opening the storage is itself a thing that fails - a session
+            // against a box that is off - and it used to fail out here, past
+            // every catch. That is a face that goes from initials to a broken
+            // image the moment a share goes away, everywhere at once.
+            const driver = await driverForTarget(
+                row.connectionId ?? LOCAL_TARGET,
+                LOCAL_FOLDER
+            ).catch((error: unknown) => {
+                console.error(`avatars: could not open the storage for ${row.path}:`, error);
+                return null;
+            });
+            if (!driver) return null;
             try {
                 return await drain(await driver.readStream(row.path));
             } catch (error) {

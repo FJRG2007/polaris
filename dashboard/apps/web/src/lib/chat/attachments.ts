@@ -19,10 +19,12 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import type { StorageDriver } from "@polaris/storage";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import {
     AUTOMATIC_TARGET,
     LOCAL_TARGET,
+    openForWriting,
     driverForTarget,
     resolveStorageTarget,
     storageTargetOptions,
@@ -211,52 +213,149 @@ export async function storeAttachment(
 ): Promise<StoredAttachment> {
     if (file.bytes.length > MAX_ATTACHMENT_BYTES) throw new Error("That file is too big");
 
-    const target = await chatTarget();
-    const driver = await driverForTarget(target.id, LOCAL_FOLDER);
     const folder = `${ATTACHMENT_ROOT}/${safe(channelId)}`;
     const path = `${folder}/${crypto.randomUUID()}`;
 
-    let written: { size: bigint | number };
+    // Where the instance sends uploads, or - if that storage cannot be opened at
+    // all - this server, which is where `openForWriting` lands when a share is
+    // away. Either way the bytes are on something.
+    const chosen = await openForWriting(await chatTarget(), LOCAL_FOLDER);
+    const attempt = await putThrough(chosen, folder, path, file);
+    if (attempt.ok) return stored(chosen.targetId, path, file, sound);
+
+    // It answered and still would not keep the file. Worth knowing, worth
+    // fixing, and not worth losing a message over: somebody recording a voice
+    // note has no idea a NAS exists, and a conversation that stops working
+    // because a share is full or read-only is a conversation nobody can rely on.
+    if (chosen.targetId === LOCAL_TARGET) {
+        throw new AttachmentStorageError(
+            `${chosen.name} could not take the file: ${attempt.detail}`
+        );
+    }
+    console.warn(
+        `chat: ${chosen.name} could not take an attachment (${attempt.detail}); writing it to this server instead.`
+    );
+
+    const here = await openForWriting(
+        { id: LOCAL_TARGET, name: "this server", automatic: true },
+        LOCAL_FOLDER
+    );
+    const local = await putThrough(here, folder, path, file);
+    if (local.ok) return stored(LOCAL_TARGET, path, file, sound);
+    throw new AttachmentStorageError(
+        `${chosen.name} could not take the file (${attempt.detail}), and neither could this server (${local.detail}).`
+    );
+}
+
+/**
+ * How long a single attachment may take to be written and opened again.
+ *
+ * A storage that refuses is a failure this handles; a storage that says nothing
+ * at all is one it used to sit inside until the platform gave up on the request,
+ * which reaches somebody as a send button that spins and then a message that
+ * never appeared. Generous by an order of magnitude for the largest file a
+ * conversation accepts over a local network, and short enough that a share which
+ * has stopped answering falls through to this server while somebody is still
+ * looking at the screen.
+ */
+const WRITE_TIMEOUT_MS = 60_000;
+
+/** How a write went, and in its own words when it did not go. */
+interface WriteOutcome {
+    readonly ok: boolean;
+    readonly detail: string;
+}
+
+/**
+ * Put the bytes on one open storage and prove they are readable.
+ *
+ * Two things have to hold beyond "the write returned":
+ *
+ * - it kept every byte. Drivers end a write by stat'ing what they wrote, so the
+ *   size is free to check and a truncated file is caught here rather than by
+ *   whoever plays it.
+ * - it gives them back. A share that has gone away, a mount that accepts writes
+ *   into nothing and a handle still held open all stat perfectly and refuse the
+ *   read - so the file is opened once, now, while there is still something to be
+ *   done about it. One chunk is enough: what fails, fails at open.
+ *
+ * A write that got part-way leaves nothing behind - the message it belonged to
+ * is not going to exist, and an orphan on a NAS is somebody's disk quietly
+ * filling up.
+ */
+async function putThrough(
+    opened: { driver: StorageDriver },
+    folder: string,
+    path: string,
+    file: { name: string; type: string; bytes: Uint8Array }
+): Promise<WriteOutcome> {
+    const driver = opened.driver;
     try {
         await driver.mkdir(folder).catch(() => undefined);
-        /**
-         * The write, and its own answer about what is now on the disk.
-         *
-         * Every driver ends a write by stat'ing what it wrote, so this is the
-         * read-back check and costs nothing extra: a write that returns without
-         * complaining proves nothing on its own - a share that has gone away, a
-         * mount that accepts writes into nothing and a folder inside a container
-         * the next deploy replaces all accept files and lose them.
-         */
-        written = await driver.writeStream(path, streamOf(file.bytes), {
-            mime: file.type || "application/octet-stream",
-            size: BigInt(file.bytes.length)
-        });
+        const written = await core.withTimeout(
+            driver.writeStream(path, streamOf(file.bytes), {
+                mime: file.type || "application/octet-stream",
+                size: BigInt(file.bytes.length)
+            }),
+            WRITE_TIMEOUT_MS,
+            "it stopped answering part-way through the file"
+        );
+        if (Number(written.size) !== file.bytes.length) {
+            await driver.delete(path).catch(() => undefined);
+            return {
+                ok: false,
+                detail: `it kept ${Number(written.size)} bytes of ${file.bytes.length}`
+            };
+        }
+
+        const stream = await core.withTimeout(
+            driver.readStream(path),
+            WRITE_TIMEOUT_MS,
+            "it would not open the file it had just taken"
+        );
+        const reader = stream.getReader();
+        try {
+            const { done, value } = await core.withTimeout(
+                reader.read(),
+                WRITE_TIMEOUT_MS,
+                "it opened the file and then said nothing"
+            );
+            if (file.bytes.length > 0 && (done || !value?.length)) {
+                await driver.delete(path).catch(() => undefined);
+                return { ok: false, detail: "it took the file and gave back nothing" };
+            }
+        } finally {
+            await reader.cancel().catch(() => undefined);
+        }
+        return { ok: true, detail: "" };
     } catch (error) {
-        // Anything the storage throws is a fact about the storage, and it is
-        // said as one. Left to escape, it arrives as "that could not be sent",
-        // which sends whoever reads it looking at the browser, at the network
-        // and at the message - anywhere but at the disk.
-        throw new AttachmentStorageError(`${target.name} refused the file: ${reason(error)}`);
+        await driver.delete(path).catch(() => undefined);
+        return { ok: false, detail: reason(error) };
     } finally {
         await driver.dispose().catch(() => undefined);
     }
+}
 
-    if (Number(written.size) !== file.bytes.length) {
-        throw new AttachmentStorageError(
-            `${target.name} kept ${Number(written.size)} bytes of ${file.bytes.length}.`
-        );
-    }
-
+/** The row, once the bytes are known to be on `targetId`. */
+function stored(
+    targetId: string,
+    path: string,
+    file: { name: string; type: string; bytes: Uint8Array },
+    sound: SoundDetail | undefined
+): StoredAttachment {
     return {
         name: file.name.slice(0, 200) || "file",
         size: file.bytes.length,
         contentType: file.type || "application/octet-stream",
-        connectionId: target.id === LOCAL_TARGET ? null : target.id,
+        connectionId: targetId === LOCAL_TARGET ? null : targetId,
         path,
         ...soundOf(sound)
     };
 }
+
+/** How long one chunk of a download may take before the storage is treated as
+ *  gone. Somebody is waiting on a player, so it is shorter than the write. */
+const READ_TIMEOUT_MS = 20_000;
 
 /** Read one back, for the download route. Null when the bytes are gone. */
 export async function readAttachment(attachmentId: string): Promise<{
@@ -279,18 +378,41 @@ export async function readAttachment(attachmentId: string): Promise<{
     // rather than papered over - two attempts, then the truth.
     for (let attempt = 0; attempt < 2; attempt += 1) {
         const driver = await driverForTarget(row.connectionId ?? LOCAL_TARGET, LOCAL_FOLDER).catch(
-            () => null
+            (error: unknown) => {
+                // The storage did not answer, which is a different thing from
+                // the file being gone and the only one of the two anybody can
+                // do something about.
+                if (attempt === 1) {
+                    console.error(
+                        `chat: the storage holding attachment ${attachmentId} could not be opened:`,
+                        error
+                    );
+                }
+                return null;
+            }
         );
         if (!driver) continue;
         try {
-            const stream = await driver.readStream(row.path);
+            // Bounded, like the write. A storage that refuses is answered with a
+            // 410 in a moment; a storage that goes quiet would otherwise hold
+            // the request until the platform gives up on it, which is a player
+            // that spins forever with nothing anywhere saying why.
+            const stream = await core.withTimeout(
+                driver.readStream(row.path),
+                READ_TIMEOUT_MS,
+                "the storage did not open the file"
+            );
             // Read through the reader rather than `for await`: a web
             // ReadableStream is only async-iterable in some runtimes, and the
             // driver's return type is the web one.
             const reader = stream.getReader();
             const chunks: Buffer[] = [];
             for (;;) {
-                const { done, value } = await reader.read();
+                const { done, value } = await core.withTimeout(
+                    reader.read(),
+                    READ_TIMEOUT_MS,
+                    "the storage stopped part-way through the file"
+                );
                 if (done) break;
                 if (value) chunks.push(Buffer.from(value));
             }
