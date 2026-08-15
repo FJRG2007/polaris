@@ -27,6 +27,7 @@ import {
     Lock,
     MoreHorizontal,
     Phone,
+    Search,
     Trash2,
     UserPlus,
     Users,
@@ -45,7 +46,8 @@ export function ChannelHeader({
     channel,
     onChanged,
     call,
-    onStartCall
+    onStartCall,
+    onSearch
 }: {
     channel: ChatChannelView;
     onChanged: () => void;
@@ -56,6 +58,7 @@ export function ChannelHeader({
      *  rather than one, because deciding afterwards means everybody in the room
      *  has already seen you. */
     onStartCall: (withVideo: boolean) => void;
+    onSearch: () => void;
 }) {
     const router = useRouter();
     const [adding, setAdding] = useState(false);
@@ -98,6 +101,15 @@ export function ChannelHeader({
                 )}
 
                 <div className="ml-auto flex shrink-0 items-center gap-0.5">
+                    <button
+                        type="button"
+                        onClick={onSearch}
+                        aria-label="Search messages"
+                        title="Search messages"
+                        className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                        <Search className="size-4" />
+                    </button>
                     {call ? (
                         // One button once a call is running: joining is joining,
                         // and the camera is a switch inside the room.

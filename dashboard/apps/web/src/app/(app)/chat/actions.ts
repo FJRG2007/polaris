@@ -19,6 +19,7 @@ import { revalidatePath } from "next/cache";
 import * as chat from "@/lib/chat/chat-service";
 import * as messages from "@/lib/chat/messages";
 import { allChatRules } from "@/lib/chat/rules";
+import { searchMessages, type ChatSearchHit } from "@/lib/chat/search";
 import { requirePermission } from "@/lib/session";
 import { storeAttachment } from "@/lib/chat/attachments";
 import { searchAccounts } from "@/lib/rich-text/mention-service";
@@ -113,6 +114,23 @@ export async function searchPeopleAction(
             .slice(0, 8)
             .map((person) => ({ id: person.id, name: person.name }))
     };
+}
+
+/**
+ * Look for something somebody said.
+ *
+ * The filters narrow; what they narrow is the set of conversations this reader
+ * can reach, which the service resolves for itself. A malformed filter comes
+ * back as no results rather than an error: a search box that refuses to search
+ * is worse than one that finds nothing.
+ */
+export async function searchMessagesAction(
+    input: unknown
+): Promise<{ hits: readonly ChatSearchHit[] }> {
+    const me = await actor();
+    const parsed = core.chatSearchSchema.safeParse(input);
+    if (!parsed.success) return { hits: [] };
+    return { hits: await searchMessages(me, parsed.data) };
 }
 
 export async function listMembersAction(

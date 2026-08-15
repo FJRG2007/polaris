@@ -68,6 +68,9 @@ export interface MessageListProps {
     onForward: (message: ChatMessageView) => void;
     onEdit: (message: ChatMessageView) => void;
     onDelete: (message: ChatMessageView) => void;
+    /** A message to point at, after arriving from a search result. It fades on
+     *  its own: a highlight that stays is a highlight somebody has to dismiss. */
+    highlightId?: string | null;
 }
 
 export function MessageList({
@@ -75,6 +78,7 @@ export function MessageList({
     viewerId,
     canPost,
     canModerate,
+    highlightId,
     onOpenThread,
     onReact,
     onStar,
@@ -98,7 +102,15 @@ export function MessageList({
                     withinWindow(previous.createdAt, message.createdAt);
 
                 return (
-                    <li key={message.id}>
+                    <li
+                        key={message.id}
+                        // Addressable, so a search result can be scrolled to.
+                        id={`message-${message.id}`}
+                        className={cn(
+                            "transition-colors duration-500",
+                            message.id === highlightId && "bg-primary/10"
+                        )}
+                    >
                         {newDay && <DaySeparator iso={message.createdAt} />}
                         <Message
                             message={message}

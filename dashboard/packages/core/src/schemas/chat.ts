@@ -222,3 +222,62 @@ export const chatMembersSchema = z.object({
 });
 
 export type ChatMembersInput = z.infer<typeof chatMembersSchema>;
+
+/**
+ * Looking for something somebody said.
+ *
+ * Every field narrows and none of them widens: the reader's own reachable
+ * conversations are the outer bound and are decided by the service, never by
+ * anything in here. A filter that could reach further than the rail can would be
+ * a way to read a room you are not in.
+ *
+ * A search with no term is a real search - "every file Ada put in this channel"
+ * is a question - so the term is optional and the filters stand on their own.
+ */
+export const CHAT_SEARCH_ATTACHMENTS = ["any", "file", "image", "link"] as const;
+
+export type ChatSearchAttachment = (typeof CHAT_SEARCH_ATTACHMENTS)[number];
+
+export const CHAT_SEARCH_ATTACHMENT_LABELS: Record<ChatSearchAttachment, string> = {
+    any: "Anything",
+    file: "With a file",
+    image: "With an image",
+    link: "With a link"
+};
+
+/** How many hits one search comes back with. Past this the answer is a better
+ *  filter, not a longer list nobody scrolls. */
+export const CHAT_SEARCH_LIMIT = 50;
+
+/** A calendar day, as a date field hands one over. */
+const isoDay = z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "That is not a date")
+    .nullable()
+    .default(null);
+
+export const chatSearchSchema = z.object({
+    term: z.string().trim().max(200).default(""),
+    /** One conversation, or null for everywhere this reader can reach. */
+    channelId: z.string().uuid().nullable().default(null),
+    authorId: z.string().uuid().nullable().default(null),
+    has: z.enum(CHAT_SEARCH_ATTACHMENTS).default("any"),
+    /** Inclusive, and read as whole days in the reader's own reckoning: "after
+     *  the 3rd" meaning "not including the 3rd" is nobody's understanding of it. */
+    after: isoDay,
+    before: isoDay
+});
+
+export type ChatSearchInput = z.infer<typeof chatSearchSchema>;
+
+/** Whether a search would narrow anything at all. An empty one is a request for
+ *  the whole archive, and the screen says so instead of fetching it. */
+export function chatSearchIsEmpty(input: ChatSearchInput): boolean {
+    return (
+        input.term.length === 0 &&
+        input.authorId === null &&
+        input.has === "any" &&
+        input.after === null &&
+        input.before === null
+    );
+}

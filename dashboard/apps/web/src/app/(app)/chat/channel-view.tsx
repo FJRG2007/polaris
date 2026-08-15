@@ -30,6 +30,7 @@ import { useChat } from "./chat-context";
 import * as calls from "./meeting-actions";
 import { useRouter } from "next/navigation";
 import { ThreadPanel } from "./thread-panel";
+import { SearchPanel } from "./search-panel";
 import { MessageList } from "./message-list";
 import { runAction } from "@/lib/run-action";
 import { MessageCircle } from "lucide-react";
@@ -47,6 +48,14 @@ const AT_BOTTOM_SLACK = 60;
  *  longer than the interval the composer sends them at. */
 const TYPING_TTL_MS = 4000;
 
+/** How many pages back a jump to a search hit will walk. Fifty messages a page,
+ *  so this reaches a long way without letting one click pull a year of a busy
+ *  channel into the browser. */
+const JUMP_PAGES = 20;
+
+/** How long the message a search led to stays lit. */
+const HIGHLIGHT_MS = 2500;
+
 export function ChannelView({ channelId }: { channelId: string }) {
     const router = useRouter();
     const { viewerId, channels, refresh, rulesFor } = useChat();
@@ -56,6 +65,8 @@ export function ChannelView({ channelId }: { channelId: string }) {
     const [loadingOlder, setLoadingOlder] = useState(false);
     const [error, setError] = useState("");
     const [thread, setThread] = useState<ChatMessageView | null>(null);
+    const [searching, setSearching] = useState(false);
+    const [highlight, setHighlight] = useState<string | null>(null);
     const [editing, setEditing] = useState<ChatMessageView | null>(null);
     const [deleting, setDeleting] = useState<ChatMessageView | null>(null);
     const [replyingTo, setReplyingTo] = useState<ChatMessageView | null>(null);
@@ -81,6 +92,10 @@ export function ChannelView({ channelId }: { channelId: string }) {
     // "ok" from cancelling each other's draft off the screen.
     const drafts = useRef(0);
     const sent = useRef(new Map<string, string>());
+    // The same cursor as `olderThan`, kept as a ref because a jump loads several
+    // pages inside one tick and state would still hold the one from before the
+    // first of them.
+    const olderThanRef = useRef<string | null>(null);
 
     const channel = useMemo(
         () => channels.find((entry) => entry.id === channelId) ?? null,
@@ -106,6 +121,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
         setInCall(null);
         marked.current = "";
         following.current = true;
+        olderThanRef.current = null;
         sent.current.clear();
     }, [channelId]);
 
@@ -130,7 +146,8 @@ export function ChannelView({ channelId }: { channelId: string }) {
         }
         const page = result.page?.messages ?? [];
         setMessages(page);
-        setOlderThan(result.page?.olderThan ?? null);
+        olderThanRef.current = result.page?.olderThan ?? null;
+        setOlderThan(olderThanRef.current);
         // Anything optimistic that the server has now confirmed is dropped, so
         // a message is never on screen twice.
         setPending((current) =>
@@ -144,6 +161,52 @@ export function ChannelView({ channelId }: { channelId: string }) {
     useEffect(() => {
         void load();
     }, [load]);
+
+    /** Pull in the page above the oldest message on screen. Returns whether
+     *  there is still more above it. */
+    const loadOlder = useCallback(async (): Promise<boolean> => {
+        let more = false;
+        setLoadingOlder(true);
+        const cursor = olderThanRef.current;
+        if (!cursor) {
+            setLoadingOlder(false);
+            return false;
+        }
+        const result = await actions.readChannelAction(channelId, cursor);
+        setLoadingOlder(false);
+        if (!result.page) return false;
+        setMessages((current) => [...result.page!.messages, ...(current ?? [])]);
+        olderThanRef.current = result.page.olderThan;
+        setOlderThan(result.page.olderThan);
+        more = result.page.olderThan !== null;
+        return more;
+    }, [channelId]);
+
+    /**
+     * Scroll to a message, fetching backwards until it is there.
+     *
+     * A search hit is usually older than the screenful the channel opened on, so
+     * "scroll to it" means "load until it exists". Bounded, because a hit from
+     * two years ago would otherwise walk the whole conversation into the browser
+     * one page at a time.
+     */
+    const jumpTo = useCallback(
+        async (messageId: string) => {
+            for (let attempt = 0; attempt < JUMP_PAGES; attempt += 1) {
+                const element = document.getElementById(`message-${messageId}`);
+                if (element) {
+                    following.current = false;
+                    element.scrollIntoView({ block: "center" });
+                    setHighlight(messageId);
+                    setTimeout(() => setHighlight(null), HIGHLIGHT_MS);
+                    return;
+                }
+                if (!(await loadOlder())) break;
+            }
+            setError("That message is further back than this can reach.");
+        },
+        [loadOlder]
+    );
 
     useChatStream(
         useCallback(
@@ -333,6 +396,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
                         if (result.meetingId) setInCall(result.meetingId);
                         checkCall();
                     }}
+                    onSearch={() => setSearching((current) => !current)}
                 />
 
                 {inCall && (
@@ -364,20 +428,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
                             <button
                                 type="button"
                                 disabled={loadingOlder}
-                                onClick={async () => {
-                                    setLoadingOlder(true);
-                                    const result = await actions.readChannelAction(
-                                        channelId,
-                                        olderThan
-                                    );
-                                    setLoadingOlder(false);
-                                    if (!result.page) return;
-                                    setMessages((current) => [
-                                        ...result.page!.messages,
-                                        ...(current ?? [])
-                                    ]);
-                                    setOlderThan(result.page.olderThan);
-                                }}
+                                onClick={() => void loadOlder()}
                                 className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted disabled:opacity-60"
                             >
                                 {loadingOlder ? "Loading" : "Load earlier messages"}
@@ -404,6 +455,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
                             viewerId={viewerId}
                             canPost={canPost}
                             canModerate={canModerate}
+                            highlightId={highlight}
                             onOpenThread={setThread}
                             onReact={react}
                             onStar={star}
@@ -455,6 +507,21 @@ export function ChannelView({ channelId }: { channelId: string }) {
                     }}
                 />
             </div>
+
+            {searching && !thread && (
+                <SearchPanel
+                    channelId={channelId}
+                    channelName={channel.name}
+                    onClose={() => setSearching(false)}
+                    onOpen={(hit) => {
+                        // A hit in another conversation is a navigation; one in
+                        // this conversation is already on screen behind the
+                        // panel, and scrolling to it is what a reader expects.
+                        if (hit.channelId !== channelId) router.push(`/chat/c/${hit.channelId}`);
+                        else void jumpTo(hit.message.id);
+                    }}
+                />
+            )}
 
             {thread && (
                 <ThreadPanel

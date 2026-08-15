@@ -134,7 +134,7 @@ export async function readChannel(
 
     const page = rows.slice(0, PAGE).reverse();
     return {
-        messages: await decorate(actor, page),
+        messages: await decorateMessages(actor, page),
         olderThan: rows.length > PAGE ? (page[0]?.id ?? null) : null
     };
 }
@@ -165,7 +165,7 @@ export async function readThread(
         orderBy: { createdAt: "asc" },
         select: MESSAGE_SELECT
     });
-    return decorate(actor, rows);
+    return decorateMessages(actor, rows);
 }
 
 /** Messages posted since a given id, for a screen catching up after a frame. */
@@ -192,7 +192,7 @@ export async function readSince(
         take: PAGE,
         select: MESSAGE_SELECT
     });
-    return decorate(actor, rows);
+    return decorateMessages(actor, rows);
 }
 
 /**
@@ -633,7 +633,7 @@ export async function starred(actor: ChatActor, limit = 100): Promise<ChatMessag
     const rows = stars
         .map((entry) => entry.message)
         .filter((row) => reachable.has(row.channelId) && row.deletedAt === null);
-    return decorate(actor, rows);
+    return decorateMessages(actor, rows);
 }
 
 /** Say that somebody is composing. Nothing is stored: it is true for a few
@@ -682,13 +682,17 @@ interface Row {
  * Fill in the two things a message row does not carry: who wrote it and what is
  * on it.
  *
+ * Exported because search builds the same views from rows it selected itself,
+ * and a second copy of this would be a second place for a message to be drawn
+ * without its reactions.
+ *
  * Both in one query for the whole page rather than per message. Author names are
  * looked up rather than joined - `authorId` is deliberately not a foreign key,
  * so a join would drop every message written by somebody who has since deleted
  * their account, which is the opposite of what a record of a conversation is
  * for.
  */
-async function decorate(actor: ChatActor, rows: readonly Row[]): Promise<ChatMessageView[]> {
+export async function decorateMessages(actor: ChatActor, rows: readonly Row[]): Promise<ChatMessageView[]> {
     if (rows.length === 0) return [];
 
     const authorIds = [
