@@ -39,6 +39,7 @@ import * as actions from "./meeting-actions";
 import { playCallSound } from "@/lib/call-sounds";
 import type { MeetingView } from "@/lib/chat/meetings";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { applyMicCleanup, micConstraints, useMicCleanup } from "./mic-cleanup";
 
 /** How often the server is told this browser is still on the call. Comfortably
  *  inside the window it sweeps on. */
@@ -121,6 +122,9 @@ export interface CallState {
     readonly cameras: readonly CallDevice[];
     readonly microphoneId: string | null;
     readonly cameraId: string | null;
+    /** Whether the browser is cleaning up what the microphone hears. */
+    readonly cleanMic: boolean;
+    setCleanMic: (on: boolean) => void;
     toggleMic: () => void;
     toggleCamera: () => void;
     toggleShare: () => void;
@@ -336,7 +340,10 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
 
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: true,
+                    // Echo, background noise and a level that keeps somebody
+                    // audible from across the room, all handled by the browser
+                    // before anything is sent - see `mic-cleanup`.
+                    audio: micConstraints(),
                     video: withVideo
                 });
                 if (stopped) {
@@ -614,7 +621,7 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
         (kind: "audio" | "video", deviceId: string) => {
             const constraints: MediaStreamConstraints =
                 kind === "audio"
-                    ? { audio: { deviceId: { exact: deviceId } } }
+                    ? { audio: micConstraints(deviceId) }
                     : { video: { deviceId: { exact: deviceId } } };
             void navigator.mediaDevices
                 .getUserMedia(constraints)
@@ -684,6 +691,18 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
         (deviceId: string) => chooseDevice("audio", deviceId),
         [chooseDevice]
     );
+
+    // Applied to the open track rather than reopening the microphone: turning
+    // the noise suppression off mid-sentence should not drop the audio for the
+    // second it takes to acquire the device again.
+    const [cleanMic, rememberCleanMic] = useMicCleanup();
+    const setCleanMic = useCallback(
+        (on: boolean) => {
+            rememberCleanMic(on);
+            void applyMicCleanup(mic.current);
+        },
+        [rememberCleanMic]
+    );
     const chooseCamera = useCallback(
         (deviceId: string) => chooseDevice("video", deviceId),
         [chooseDevice]
@@ -695,6 +714,8 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
         localStream,
         remote,
         speaking,
+        cleanMic,
+        setCleanMic,
         micOn,
         cameraOn,
         hasCamera,

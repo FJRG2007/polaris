@@ -135,6 +135,7 @@ export function dialogFor(card: IntegrationCard): ComponentType<IntegrationDialo
     if (card.slug === "cloudflare" || card.slug === "ngrok") return TunnelDialog;
     if (card.slug === "duckdns") return DuckDnsDialog;
     if (card.slug === "steam") return SteamDialog;
+    if (card.slug === "tenor") return TenorDialog;
     if (OAUTH_APPS[card.slug]) return OAuthAppDialog;
     // The gateway asks for an endpoint rather than a provider key, so it is told
     // apart by carrying those settings and not by its slug.
@@ -685,6 +686,90 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                             Enable {card.name}
                         </span>
                         <Switch checked={enabled} onChange={setEnabled} aria-label={`Enable ${card.name}`} />
+                    </div>
+
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button type="button" onClick={onSave} disabled={saving}>
+                            {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/**
+ * Turn the GIF and sticker search on, with the key it runs on.
+ *
+ * A key and a switch, because that is the whole of it: nothing else in Polaris
+ * changes when it is off, and the picker in Chat keeps working without it.
+ */
+function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    // Nobody pastes a key meaning to leave it unused.
+    const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
+    const [apiKey, setApiKey] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [saving, startSave] = useTransition();
+
+    function onSave() {
+        setError(null);
+        startSave(async () => {
+            const result = await runAction(
+                () => integrationActions.saveTenorAction({ enabled, apiKey }),
+                setError
+            );
+            if (!result) return;
+            if (result.error) setError(result.error);
+            else onClose();
+        });
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <IntegrationLogo slug={card.slug} className="size-5" />
+                        {card.name}
+                    </DialogTitle>
+                    <DialogDescription>{card.description}</DialogDescription>
+                </DialogHeader>
+
+                <div className="flex flex-col gap-4">
+                    <SetupSteps links={card.setupLinks} values={card.setupValues} />
+
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">{card.apiKeyLabel ?? "API key"}</span>
+                        <Input
+                            type="password"
+                            autoComplete="off"
+                            value={apiKey}
+                            onChange={(event) => setApiKey(event.target.value)}
+                            placeholder={
+                                card.hasSecret ? "Saved - enter a new key to replace it" : "Paste your key"
+                            }
+                        />
+                        {card.apiKeyHelp ? (
+                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                        ) : null}
+                    </label>
+
+                    <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                        <span>
+                            <span className="font-medium">Search for GIFs and stickers</span>
+                            <span className="block text-xs text-muted-foreground">
+                                Adds the search to the picker in Chat. A chosen GIF is stored here
+                                like any other attachment, so nobody reading a conversation is
+                                announced to anyone.
+                            </span>
+                        </span>
+                        <Switch checked={enabled} onChange={setEnabled} aria-label="Search for GIFs and stickers" />
                     </div>
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}

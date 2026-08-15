@@ -245,6 +245,46 @@ export async function saveSteamAction(input: { enabled: boolean; apiKey?: string
 }
 
 /**
+ * Turn the GIF and sticker search on, with the key it runs on.
+ *
+ * Nothing else in Polaris changes when this is off: the picker still offers
+ * emoji, what each person has kept, and anything sent by its address. This is
+ * one tab in one popover, which is why it is a key and a switch and no settings.
+ */
+export async function saveTenorAction(input: {
+    enabled: boolean;
+    apiKey?: string;
+}): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    const apiKey = input.apiKey?.trim() ? input.apiKey.trim() : undefined;
+    try {
+        const existing = await getIntegrationState("tenor");
+        if (input.enabled && !apiKey && !existing?.hasSecret) {
+            return { error: "Add the API key before turning it on" };
+        }
+        await upsertIntegration("tenor", {
+            enabled: input.enabled,
+            secret: apiKey,
+            installedById: user.id
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "integration.configure",
+            targetType: "integration",
+            targetId: "tenor",
+            metadata: { enabled: input.enabled }
+        });
+    } catch (caught) {
+        return {
+            error: caught instanceof Error ? caught.message : "That could not be saved"
+        };
+    }
+
+    revalidatePath("/integrations");
+    return {};
+}
+
+/**
  * Configure a tunnel provider (cloudflare/ngrok). Enabling one runs the tunnel
  * container; only one runs per server, so enabling a provider disables the other.
  * The token is tri-state (a value replaces it, blank keeps it).

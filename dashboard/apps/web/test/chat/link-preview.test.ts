@@ -185,6 +185,74 @@ describe("what it reads back", () => {
     });
 });
 
+describe("a site that will not describe its own page", () => {
+    // The case that mattered and was missing: youtube.com hands a plain fetch a
+    // consent wall with no metadata in it, so the most posted link there is got
+    // no card at all. oEmbed answers the same question, with no key.
+    beforeEach(() => {
+        dns.set("www.youtube.com", ["142.250.185.14"]);
+    });
+
+    const oembed = (body: unknown) => ({
+        status: 200,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body)
+    });
+
+    it("asks the site instead, and takes what it says", async () => {
+        responses.set("https://www.youtube.com/watch?v=abc", {
+            status: 200,
+            headers: { "content-type": "text/html" },
+            body: "<html><head></head></html>"
+        });
+        responses.set(
+            "https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dabc&format=json",
+            oembed({
+                title: "A video",
+                author_name: "Somebody",
+                provider_name: "YouTube",
+                thumbnail_url: "https://i.ytimg.com/vi/abc/hqdefault.jpg"
+            })
+        );
+
+        await unfurl("https://www.youtube.com/watch?v=abc");
+        expect(stored[0]?.ok).toBe(true);
+        expect(stored[0]?.title).toBe("A video");
+        expect(stored[0]?.imageUrl).toBe("https://i.ytimg.com/vi/abc/hqdefault.jpg");
+    });
+
+    it("is not asked when the page described itself perfectly well", async () => {
+        responses.set("https://www.youtube.com/watch?v=abc", page("The page said it"));
+        await unfurl("https://www.youtube.com/watch?v=abc");
+        expect(fetched).toEqual(["https://www.youtube.com/watch?v=abc"]);
+    });
+
+    it("is not asked for a site that has no such endpoint", async () => {
+        responses.set("http://example.com/", {
+            status: 200,
+            headers: { "content-type": "text/html" },
+            body: "<html><head></head></html>"
+        });
+        await unfurl("http://example.com/");
+        expect(fetched).toEqual(["http://example.com/"]);
+        expect(stored[0]?.ok).toBe(false);
+    });
+
+    it("takes nothing from an answer with no title in it", async () => {
+        responses.set("https://www.youtube.com/watch?v=abc", {
+            status: 200,
+            headers: { "content-type": "text/html" },
+            body: "<html></html>"
+        });
+        responses.set(
+            "https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dabc&format=json",
+            oembed({ author_name: "Somebody" })
+        );
+        await unfurl("https://www.youtube.com/watch?v=abc");
+        expect(stored[0]?.ok).toBe(false);
+    });
+});
+
 describe("finding the link in the first place", () => {
     it("takes the first one", () => {
         expect(firstLink("see https://example.com and https://other.com")).toBe(

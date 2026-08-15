@@ -28,6 +28,7 @@
 
 import { useCall } from "./use-call";
 import * as actions from "./meeting-actions";
+import { Avatar } from "@/components/avatar";
 import { playCallSound } from "@/lib/call-sounds";
 import { useEffect, useRef, useState } from "react";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
@@ -89,6 +90,9 @@ export function CallRoom({
 
     const canShare = Boolean(viewerId) && call.meeting?.hostId === viewerId;
     const admitted = call.meeting?.participants.filter((person) => person.admission === "admitted");
+    // This browser's own seat, which is where its own face comes from: a guest
+    // has no account to draw one from, and the signed-in id is not on the seat.
+    const mine = admitted?.find((person) => person.id === call.participantId);
     const waiting = call.meeting?.participants.filter((person) => person.admission === "waiting");
     const columns = gridColumns((admitted?.length ?? 1) || 1);
 
@@ -170,6 +174,7 @@ export function CallRoom({
                 <Tile
                     stream={call.localStream}
                     name="You"
+                    personId={mine?.userId ?? viewerId ?? null}
                     muted
                     speaking={
                         call.participantId !== null &&
@@ -186,6 +191,7 @@ export function CallRoom({
                             key={person.id}
                             stream={call.remote.get(person.id) ?? null}
                             name={person.name}
+                            personId={person.userId ?? null}
                             guest={person.guest}
                             speaking={call.speaking.has(person.id)}
                             // Their account where they have one, so turning
@@ -211,6 +217,8 @@ export function CallRoom({
                     chosenId={call.microphoneId}
                     devicesLabel="Microphone"
                     onChoose={call.chooseMicrophone}
+                    cleanMic={call.cleanMic}
+                    onCleanMic={call.setCleanMic}
                 />
 
                 <Split
@@ -328,7 +336,9 @@ function Split({
     devices,
     chosenId,
     devicesLabel,
-    onChoose
+    onChoose,
+    cleanMic,
+    onCleanMic
 }: {
     label: string;
     icon: React.ReactNode;
@@ -338,7 +348,16 @@ function Split({
     chosenId: string | null;
     devicesLabel: string;
     onChoose: (deviceId: string) => void;
+    /** Microphone only: whether the browser is cleaning up what it hears. It
+     *  belongs in this menu, beside the input it applies to, which is where
+     *  every call client puts it. */
+    cleanMic?: boolean;
+    onCleanMic?: (on: boolean) => void;
 }) {
+    // Worth a menu for the setting alone: a machine with one microphone still
+    // sits in a room with a fan in it.
+    const hasMenu = devices.length > 1 || onCleanMic !== undefined;
+
     return (
         <span className="flex items-center">
             <Button
@@ -346,26 +365,48 @@ function Split({
                 variant={danger ? "danger" : "secondary"}
                 onClick={onClick}
                 aria-pressed={danger}
-                className={devices.length > 1 ? "rounded-r-none" : undefined}
+                className={hasMenu ? "rounded-r-none" : undefined}
             >
                 {icon}
                 {label}
             </Button>
-            {devices.length > 1 && (
+            {hasMenu && (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button
                             size="sm"
                             variant={danger ? "danger" : "secondary"}
-                            aria-label={`Choose a ${devicesLabel.toLowerCase()}`}
+                            aria-label={`${devicesLabel} settings`}
                             className="rounded-l-none border-l border-border-strong px-1.5"
                         >
                             <ChevronUp className="size-3.5" />
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="center" side="top" className="max-w-72">
-                        <DropdownMenuLabel>{devicesLabel}</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
+                        {onCleanMic && (
+                            <>
+                                <DropdownMenuLabel>Sound</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onSelect={() => onCleanMic(!cleanMic)}>
+                                    <Check
+                                        className={cn(
+                                            "size-3.5 shrink-0",
+                                            cleanMic ? "opacity-100" : "opacity-0"
+                                        )}
+                                    />
+                                    <span className="flex min-w-0 flex-col">
+                                        <span>Clean up my microphone</span>
+                                        <span className="text-xs text-muted-foreground">
+                                            Removes echo and background noise, and evens out how
+                                            loud you are. Turn it off to send exactly what the
+                                            microphone hears.
+                                        </span>
+                                    </span>
+                                </DropdownMenuItem>
+                            </>
+                        )}
+                        {devices.length > 1 && <DropdownMenuLabel>{devicesLabel}</DropdownMenuLabel>}
+                        {devices.length > 1 && <DropdownMenuSeparator />}
                         {devices.map((device) => (
                             <DropdownMenuItem
                                 key={device.id}
@@ -389,9 +430,14 @@ function Split({
     );
 }
 
+/** How big the face in an empty tile is. One size for every tile: a grid where
+ *  the faces are different sizes reads as a mistake. */
+const AVATAR_SIZE = 72;
+
 function Tile({
     stream,
     name,
+    personId,
     muted = false,
     guest = false,
     cameraOff = false,
@@ -401,6 +447,10 @@ function Tile({
 }: {
     stream: MediaStream | null;
     name: string;
+    /** Whose picture to draw while there is no video. Their account where they
+     *  have one; a guest falls back to initials, which is all there is of
+     *  somebody who arrived on a link. */
+    personId?: string | null;
     /** Own video only, or every tile while deafened. Playing your own
      *  microphone back is an echo. */
     muted?: boolean;
@@ -451,8 +501,19 @@ function Tile({
                 )}
             />
             {(!stream || cameraOff) && (
-                <span className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-                    {name}
+                // A face rather than a name in the middle of an empty rectangle.
+                // Most of a call is spent with the cameras off, so this is what
+                // a call actually looks like - and a picture is read across a
+                // grid of eight far faster than eight names are.
+                <span className="absolute inset-0 flex items-center justify-center">
+                    <Avatar
+                        size={AVATAR_SIZE}
+                        person={{ id: personId ?? name, name }}
+                        className={cn(
+                            "transition-shadow duration-fast",
+                            speaking && "ring-2 ring-success"
+                        )}
+                    />
                 </span>
             )}
             <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[11px]">

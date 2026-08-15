@@ -335,7 +335,7 @@ function Message({
                     </div>
                 )}
 
-                {message.preview && <LinkCard preview={message.preview} />}
+                <LinkArea message={message} />
 
                 {message.attachments.length > 0 && (
                     <ul className="mt-1 flex flex-col gap-1">
@@ -593,6 +593,68 @@ function Ticks({ receipt }: { receipt: NonNullable<ChatMessageView["receipt"]> }
             )}
         </span>
     );
+}
+
+/**
+ * The card under a message with a link in it, once there is one to draw.
+ *
+ * Three states, and the middle one is the reason this exists. Polaris may
+ * already know what the link is; it may never have looked, in which case this
+ * asks and the card appears a moment later; or the site may have refused to
+ * describe itself, which for most links means no card - but not for a video
+ * Polaris knows how to play, which plays regardless of what the page said.
+ *
+ * Asking from here rather than waiting to be told is deliberate. A background
+ * look-up finishes just after the conversation has reloaded, and nothing reloads
+ * it again until somebody speaks - so the last message in a conversation, the
+ * one actually being read, never got its card.
+ */
+function LinkArea({ message }: { message: ChatMessageView }) {
+    const [found, setFound] = useState(message.preview);
+
+    useEffect(() => {
+        setFound(message.preview);
+        if (message.preview || !message.previewPending) return;
+
+        let live = true;
+        void actions.linkPreviewAction(message.id).then((result) => {
+            if (live) setFound(result.preview);
+        });
+        return () => {
+            live = false;
+        };
+    }, [message.id, message.preview, message.previewPending]);
+
+    if (found) return <LinkCard preview={found} />;
+
+    // Nothing came back, but this is something with a player. YouTube and its
+    // like routinely refuse to describe themselves to anything that is not a
+    // browser, and "the site said nothing" is no reason not to offer the video
+    // somebody posted.
+    if (message.link && embedFor(message.link)) {
+        return (
+            <LinkCard
+                preview={{
+                    id: "",
+                    url: message.link,
+                    title: "",
+                    description: "",
+                    siteName: hostOf(message.link),
+                    hasImage: false
+                }}
+            />
+        );
+    }
+    return null;
+}
+
+/** The site a link is on, for a card that has nothing else to say about it. */
+function hostOf(address: string): string {
+    try {
+        return new URL(address).hostname.replace(/^www\./, "");
+    } catch {
+        return "";
+    }
 }
 
 /**

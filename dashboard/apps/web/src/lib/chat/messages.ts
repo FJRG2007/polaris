@@ -18,8 +18,8 @@ import { publishChatChange } from "./live";
 import { announceRoomMention } from "./room-mentions";
 import { receiptsBetween } from "@/lib/privacy-service";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
-import { knownPreviews, unfurl, type LinkPreviewView } from "./link-preview";
 import { discardAttachments, isInlineImage, type StoredAttachment } from "./attachments";
+import { knownPreviews, unfurl, type KnownPreview, type LinkPreviewView } from "./link-preview";
 import {
     ChatAccessError,
     ChatRuleError,
@@ -53,10 +53,16 @@ export interface ChatMessageView {
     /** Whether this reader kept it. Private to them - starring is a bookmark,
      *  not a signal to the room. */
     readonly starred: boolean;
-    /** What the first link in it turned out to be, when Polaris has already
-     *  looked. Null until it has, which is why a card appears a moment after the
-     *  message rather than with it. */
+    /** The first web address in it, whatever came of looking it up. The list
+     *  needs it even when nothing did: a video Polaris knows how to play still
+     *  plays when the site refused to describe itself. */
+    readonly link: string | null;
+    /** What that link turned out to be, when Polaris has already looked. */
     readonly preview: LinkPreviewView | null;
+    /** True when nobody has looked yet, which is the screen's cue to ask. A card
+     *  that waited for a background job to finish and then for something else to
+     *  wake the screen was a card that never appeared. */
+    readonly previewPending: boolean;
     /**
      * How far this message got, for the ticks under it.
      *
@@ -310,7 +316,7 @@ export async function send(
 
     publishChatChange({ channelId: input.channelId, kind: "posted", actorId: actor.id });
 
-    unfurlLater(input.channelId, input.body);
+    unfurlLater(input.body);
     // Not awaited, and never allowed to fail the send: a message going out
     // matters more than the notification about it.
     void announceRoomMention(input.channelId, actor.id, input.body, id).catch(() => undefined);
@@ -398,35 +404,54 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
     publishChatChange({ channelId: message.channelId, kind: "posted", actorId: actor.id });
 
     // An edit can put a link in a message that did not have one.
-    unfurlLater(message.channelId, input.body);
+    unfurlLater(input.body);
 }
 
 /**
- * Look up the link in a message, after the message itself has gone out, and tell
- * the conversation once there is something to draw.
+ * Start looking the link up, without the message waiting for it.
  *
- * Not awaited by the send: a message appearing is worth more than the card under
- * it, and waiting on somebody else's server before showing what you typed is the
- * wrong trade every time.
+ * A warm-up, not the mechanism: by the time the conversation reloads the answer
+ * is usually already stored, so the card is there on the first draw. What
+ * guarantees it appears at all is `linkPreviewFor` below, which the list asks
+ * for any link nobody has looked at yet.
  *
- * The announcement afterwards is the part that was missing, and without it the
- * card simply never appeared. Nothing else was going to wake the screens: the
- * unfurl finishes a second or two after the reload that followed the send, and
- * the next reload only comes when somebody says something else. So the last
- * message in every conversation - which is the one being looked at - had no card
- * until the conversation moved on.
+ * Leaving this to a background job alone is what kept cards from ever showing:
+ * it finishes a second or two after the reload that followed the send, and
+ * nothing was going to reload again until somebody else said something - so the
+ * last message in a conversation, which is the one being read, never got one.
  */
-function unfurlLater(channelId: string, body: string): void {
+function unfurlLater(body: string): void {
     const link = core.firstLink(body);
-    if (!link) return;
-    void unfurl(link)
-        .then(() => {
-            // No actor: this is not anybody's write, and a frame attributed to
-            // the sender would be filtered out of the sender's own tab, which is
-            // the one tab certain to be looking at the message.
-            publishChatChange({ channelId, kind: "posted", actorId: "" });
-        })
-        .catch(() => undefined);
+    if (link) void unfurl(link).catch(() => undefined);
+}
+
+/**
+ * Look up the link in one message and answer with the card, for a reader who is
+ * looking at it now.
+ *
+ * Addressed by message rather than by URL on purpose. An action that took an
+ * address would let anybody signed in point this server at anything it can
+ * reach; taking a message id means the only addresses ever fetched are ones
+ * somebody already posted into a conversation this reader is in.
+ *
+ * Awaited, unlike the warm-up: the caller is a card with nothing in it yet.
+ */
+export async function linkPreviewFor(
+    actor: ChatActor,
+    messageId: string
+): Promise<LinkPreviewView | null> {
+    const message = await prisma.chatMessage.findUnique({
+        where: { id: messageId },
+        select: { channelId: true, body: true, deletedAt: true }
+    });
+    if (!message || message.deletedAt) return null;
+    await requireChannel(actor, message.channelId);
+
+    const link = core.firstLink(message.body);
+    if (!link) return null;
+
+    await unfurl(link);
+    return (await knownPreviews([link])).get(link)?.view ?? null;
 }
 
 /** One version of a message, as the history dialog draws it. */
@@ -878,7 +903,9 @@ export async function decorateMessages(actor: ChatActor, rows: readonly Row[]): 
         attachments: onMessageFiles.get(row.id) ?? [],
         quote: quoteViewOf(row, quotes, names),
         starred: kept.has(row.id),
+        link: links.get(row.id) ?? null,
         preview: previewOf(row, links, previews),
+        previewPending: pendingOf(row, links, previews),
         receipt: receiptFor(row, actor, receipts),
         createdAt: row.createdAt.toISOString()
     }));
@@ -947,10 +974,23 @@ function receiptFor(
 function previewOf(
     row: Row,
     links: ReadonlyMap<string, string>,
-    previews: ReadonlyMap<string, LinkPreviewView>
+    previews: ReadonlyMap<string, KnownPreview>
 ): LinkPreviewView | null {
     const link = links.get(row.id);
-    return link ? (previews.get(link) ?? null) : null;
+    return link ? (previews.get(link)?.view ?? null) : null;
+}
+
+/** Whether this message's link is one nobody has looked up yet. A link that was
+ *  looked up and came back with nothing is not pending: asking again every time
+ *  the conversation is opened would be a request per render for a page that has
+ *  already said it has nothing to say. */
+function pendingOf(
+    row: Row,
+    links: ReadonlyMap<string, string>,
+    previews: ReadonlyMap<string, KnownPreview>
+): boolean {
+    const link = links.get(row.id);
+    return link !== undefined && !previews.has(link);
 }
 
 /** The quote line for one message, or null when it stands alone. */

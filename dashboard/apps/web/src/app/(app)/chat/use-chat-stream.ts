@@ -38,6 +38,7 @@ const frameSchema = z.discriminatedUnion("kind", [
         meetingId: z.string(),
         state: z.enum(["ringing", "moved", "ended"]),
         count: z.number(),
+        userId: z.string(),
         name: z.string()
     })
 ]);

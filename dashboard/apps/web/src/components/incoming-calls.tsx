@@ -19,6 +19,7 @@
  */
 
 import Link from "next/link";
+import { Avatar } from "./avatar";
 import { Button } from "@polaris/ui";
 import { usePathname } from "next/navigation";
 import { Phone, PhoneOff } from "lucide-react";
@@ -32,6 +33,10 @@ interface Ringing {
     /** Who started it. Empty where the server had no name to give, which is
      *  every case except a person pressing the button. */
     readonly name: string;
+    /** Their account, for the face on the card. A name on its own is read; a
+     *  face is recognised, which is the whole of what somebody deciding whether
+     *  to answer is doing. */
+    readonly userId: string;
     readonly at: number;
 }
 
@@ -53,6 +58,7 @@ export function IncomingCalls() {
                                       channelId: frame.channelId,
                                       meetingId: frame.meetingId,
                                       name: frame.name,
+                                      userId: frame.userId,
                                       at: Date.now()
                                   }
                               ]
@@ -107,11 +113,15 @@ export function IncomingCalls() {
                     role="alert"
                     className="pointer-events-auto flex w-72 flex-col gap-3 rounded-lg border border-border-strong bg-elevated p-3 shadow-modal"
                 >
-                    <span className="flex items-center gap-2">
-                        <Phone className="size-4 animate-pulse text-success" />
+                    <span className="flex items-center gap-2.5">
+                        <Avatar
+                            size={36}
+                            person={{ id: entry.userId, name: entry.name || "Somebody" }}
+                        />
                         <span className="min-w-0 flex-1 truncate text-sm font-medium">
                             {entry.name || "Somebody"} is calling
                         </span>
+                        <Phone className="size-4 shrink-0 animate-pulse text-success" />
                     </span>
                     <span className="flex items-center gap-2">
                         <Button

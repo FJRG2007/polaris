@@ -152,6 +152,7 @@ export async function GET(request: Request): Promise<Response> {
                                 meetingId: change.call.meetingId,
                                 state: change.call.state,
                                 count: change.call.count,
+                                userId: change.actorId,
                                 name: change.actorName ?? ""
                             });
                         }

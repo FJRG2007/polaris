@@ -23,11 +23,14 @@ import * as chat from "@/lib/chat/chat-service";
 import * as messages from "@/lib/chat/messages";
 import { allChatRules } from "@/lib/chat/rules";
 import { requirePermission } from "@/lib/session";
-import { voicePresence } from "@/lib/chat/meetings";
 import { storeAttachment } from "@/lib/chat/attachments";
+import type { SavedMediaView } from "@/lib/chat/saved-media";
+import type { LinkPreviewView } from "@/lib/chat/link-preview";
 import { searchAccounts } from "@/lib/rich-text/mention-service";
 import type { ChatMessageView, ChatPage } from "@/lib/chat/messages";
 import { searchMessages, type ChatSearchHit } from "@/lib/chat/search";
+import { voicePresence, type VoicePresence } from "@/lib/chat/meetings";
+import type { ChatInviteOffer, ChatInviteView } from "@/lib/chat/invites";
 import { fetchRemoteMedia, searchTenor, tenorConfigured, type TenorResult } from "@/lib/chat/tenor";
 import {
     ChatAccessError,
@@ -35,8 +38,6 @@ import {
     reachableChannelIds,
     requirePostable
 } from "@/lib/chat/access";
-import type { ChatInviteOffer, ChatInviteView } from "@/lib/chat/invites";
-import type { SavedMediaView } from "@/lib/chat/saved-media";
 import type {
     ChatCategoryView,
     ChatChannelView,
@@ -96,7 +97,7 @@ export async function listCategoriesAction(): Promise<{ categories: ChatCategory
  */
 export async function voicePresenceAction(
     channelIds: string[]
-): Promise<{ inRoom: Record<string, { id: string; name: string }[]> }> {
+): Promise<{ inRoom: Record<string, VoicePresence[]> }> {
     const me = await actor();
     const reachable = await reachableChannelIds(me);
     const asked = (Array.isArray(channelIds) ? channelIds : []).filter((id) => reachable.has(id));
@@ -259,10 +260,26 @@ export async function reactAction(input: unknown): Promise<{ on?: boolean; error
     return result.error ? { error: result.error } : { on: result.value };
 }
 
+/**
+ * What the link in one message is, looked up now if nobody has yet.
+ *
+ * The list asks for this the moment it draws a message whose link has never been
+ * looked at, which is what makes a card appear under a link that was just sent.
+ * A failure is null rather than a sentence: a card that says a page could not be
+ * described is worse than no card.
+ */
+export async function linkPreviewAction(
+    messageId: string
+): Promise<{ preview: LinkPreviewView | null }> {
+    const me = await actor();
+    const result = await guard(() => messages.linkPreviewFor(me, messageId));
+    return { preview: result.value ?? null };
+}
+
 /** Whether the GIF and sticker tabs have anything behind them. */
 export async function tenorReadyAction(): Promise<boolean> {
     await actor();
-    return tenorConfigured();
+    return await tenorConfigured();
 }
 
 /** What the GIF or sticker tab shows. */

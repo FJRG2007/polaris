@@ -5,6 +5,10 @@
  * key is instance configuration and must not reach a browser, where it would be
  * one view-source away from being somebody else's quota.
  *
+ * The key is an integration an administrator connects, like every other outside
+ * service. An environment variable is still read as a fallback, so an instance
+ * that set one before this screen existed keeps working.
+ *
  * Nothing is stored here. What comes back is a list of addresses the picker
  * draws; choosing one is what stores something, and what it stores is an
  * ordinary attachment - see `fetchRemoteMedia`. That is deliberate: a message
@@ -13,6 +17,8 @@
  */
 
 import { loadEnv } from "@polaris/config";
+import { fetchImage } from "@/lib/safe-fetch";
+import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
 /** One result, as the picker draws it. */
 export interface TenorResult {
@@ -37,15 +43,19 @@ const PAGE = 24;
  *  under this; the cap is here because the address is theirs, not ours. */
 export const MAX_MEDIA_BYTES = 8 * 1024 * 1024;
 
-/** The hosts a chosen result may actually be fetched from.
- *
- *  Without this the "send this address" call is an open fetch proxy with a
- *  Polaris login in front of it - hand it any URL and the server retrieves it,
- *  which reaches anything on the network Polaris is on. */
-const ALLOWED_HOSTS = new Set(["media.tenor.com", "media1.tenor.com", "c.tenor.com", "tenor.com"]);
+/** The key an administrator connected, or the one this instance was started
+ *  with. Empty when the search is simply not switched on here. */
+async function tenorKey(): Promise<string> {
+    const state = await getIntegrationState("tenor").catch(() => null);
+    if (state?.enabled) {
+        const secret = await getIntegrationSecret("tenor").catch(() => null);
+        if (secret) return secret;
+    }
+    return loadEnv().POLARIS_TENOR_KEY ?? "";
+}
 
-export function tenorConfigured(): boolean {
-    return Boolean(loadEnv().POLARIS_TENOR_KEY);
+export async function tenorConfigured(): Promise<boolean> {
+    return (await tenorKey()) !== "";
 }
 
 /**
@@ -56,7 +66,7 @@ export function tenorConfigured(): boolean {
  * not be an error somebody has to dismiss to carry on typing.
  */
 export async function searchTenor(query: string, kind: TenorKind): Promise<TenorResult[]> {
-    const key = loadEnv().POLARIS_TENOR_KEY;
+    const key = await tenorKey();
     if (!key) return [];
 
     const term = query.trim();
@@ -83,43 +93,26 @@ export async function searchTenor(query: string, kind: TenorKind): Promise<Tenor
 }
 
 /**
- * Pull one chosen result down, so it can be stored like any other attachment.
+ * Pull a picture down from an address, so it can be stored like any other
+ * attachment.
  *
- * The host is checked against the list above rather than trusted, because the
- * address arrives from a browser and a server that fetches whatever it is told
- * to is a way into the network it runs on.
+ * Used for a GIF chosen in the picker and for one somebody pasted the address
+ * of, which is the same act: a picture that lives somewhere else and is about to
+ * live here instead.
+ *
+ * This once accepted only Tenor's own hosts, which was the wrong shape of
+ * defence - it protected the network by refusing every other site, so a picture
+ * kept from a link could not be sent again and an instance with no Tenor key
+ * could not send one at all. The network is protected by `safe-fetch`, which
+ * refuses private addresses at every redirect hop; the caps below are what keep
+ * this from being a way to fill a disk.
  */
 export async function fetchRemoteMedia(
     address: string
 ): Promise<{ name: string; type: string; bytes: Uint8Array } | null> {
-    let url: URL;
-    try {
-        url = new URL(address);
-    } catch {
-        return null;
-    }
-    if (url.protocol !== "https:" || !ALLOWED_HOSTS.has(url.hostname)) return null;
-
-    try {
-        const response = await fetch(url, { cache: "no-store" });
-        if (!response.ok) return null;
-
-        const declared = response.headers.get("content-length");
-        if (declared && Number(declared) > MAX_MEDIA_BYTES) return null;
-
-        const bytes = new Uint8Array(await response.arrayBuffer());
-        // Checked again after the fact: a missing or lying content-length is not
-        // a reason to hold however much they decided to send.
-        if (bytes.length > MAX_MEDIA_BYTES) return null;
-
-        const type = response.headers.get("content-type") ?? "image/gif";
-        if (!type.startsWith("image/")) return null;
-
-        const name = url.pathname.split("/").pop() || "animation.gif";
-        return { name, type: type.split(";")[0]!.trim(), bytes };
-    } catch {
-        return null;
-    }
+    const found = await fetchImage(address, MAX_MEDIA_BYTES);
+    if (!found) return null;
+    return { name: found.name || "animation.gif", type: found.contentType, bytes: found.bytes };
 }
 
 interface RawFormat {

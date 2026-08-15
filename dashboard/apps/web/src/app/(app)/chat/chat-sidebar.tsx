@@ -30,6 +30,7 @@ import { useAppUrl } from "@/components/app-url";
 import { NewDirectDialog } from "./new-direct-dialog";
 import { NewChannelDialog } from "./new-channel-dialog";
 import { useParams, usePathname } from "next/navigation";
+import type { VoicePresence } from "@/lib/chat/meetings";
 import { MuteOptions, type MenuParts } from "./mute-menu";
 import { ChannelSettingsDialog } from "./channel-settings-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -104,7 +105,7 @@ export function ChatSidebar() {
     const [categoryName, setCategoryName] = useState("");
     const [error, setError] = useState("");
     const [managing, setManaging] = useState<ChatChannelView | null>(null);
-    const [inRoom, setInRoom] = useState<Record<string, { id: string; name: string }[]>>({});
+    const [inRoom, setInRoom] = useState<Record<string, VoicePresence[]>>({});
 
     const space = useMemo(
         () => spaces.find((entry) => entry.id === activeSpaceId) ?? null,
@@ -502,7 +503,7 @@ function ChannelRows({
 }: {
     channels: readonly ChatChannelView[];
     open: string | null;
-    inRoom: Record<string, { id: string; name: string }[]>;
+    inRoom: Record<string, VoicePresence[]>;
     /** Absent in the direct-message list, which has no order to arrange. */
     drag?: ReturnType<typeof useRailDrag>;
     manages?: boolean;
@@ -577,10 +578,21 @@ function ChannelRows({
                                 {inside.map((person) => (
                                     <li
                                         key={person.id}
-                                        className="truncate text-xs text-muted-foreground"
+                                        className="flex items-center gap-1.5 text-xs text-muted-foreground"
                                         title={person.name}
                                     >
-                                        {person.name}
+                                        <Avatar
+                                            size={16}
+                                            person={{
+                                                // A guest has no account behind
+                                                // them; their seat is who they
+                                                // are, and the initials of the
+                                                // name they gave is all there is.
+                                                id: person.userId ?? person.id,
+                                                name: person.name
+                                            }}
+                                        />
+                                        <span className="truncate" title={person.name}>{person.name}</span>
                                     </li>
                                 ))}
                             </ul>

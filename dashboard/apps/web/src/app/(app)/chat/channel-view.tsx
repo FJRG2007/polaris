@@ -351,9 +351,12 @@ export function ChannelView({
             attachments: [],
             quote: null,
             starred: false,
-            // The server has not looked at any link in it yet, and the card
-            // arrives with the message the reload brings back.
+            // The server has not looked at any link in it yet. Left as settled
+            // rather than pending on purpose: this draft is replaced by the real
+            // message a moment later, and that one asks.
+            link: null,
             preview: null,
+            previewPending: false,
             // Nothing has happened to it yet, not even leaving. The first tick
             // arrives with the message the reload brings back.
             receipt: null,

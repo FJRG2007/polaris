@@ -88,11 +88,39 @@ export function Composer({
     const [generation, setGeneration] = useState(0);
     const lastAnnounced = useRef(0);
 
+    // What is being written changes when the message being rewritten changes,
+    // and not when the same message arrives again: a reload that replaced the
+    // object would otherwise wipe what has been typed into it. Backing out of an
+    // edit empties the box rather than leaving the old text in it as a draft.
+    const editingId = editing?.id ?? null;
     useEffect(() => {
-        if (!editing) return;
-        setBody(editing.body);
+        setBody(editing?.body ?? "");
         setGeneration((current) => current + 1);
-    }, [editing]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately the id
+    }, [editingId]);
+
+    /**
+     * Escape backs out.
+     *
+     * The edit first, then the reply, because that is the order they were
+     * entered. Bound to the page rather than to the box so it works wherever the
+     * pointer went; a dialog or a menu that is open owns the key first, and
+     * closing that is what somebody pressing it meant.
+     */
+    useEffect(() => {
+        if (!editing && !replyingTo) return;
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key !== "Escape") return;
+            if (document.querySelector("[data-state='open'][role='dialog'], [data-state='open'][role='menu']")) {
+                return;
+            }
+            event.preventDefault();
+            if (editing) onCancelEdit?.();
+            else onCancelReply?.();
+        };
+        document.addEventListener("keydown", onKey);
+        return () => document.removeEventListener("keydown", onKey);
+    }, [editing, replyingTo, onCancelEdit, onCancelReply]);
 
     // Code points rather than length, so the count matches the one the server
     // makes: an emoji is one character to the person typing it and two to
@@ -197,7 +225,12 @@ export function Composer({
 
             {editing && (
                 <div className="mb-2 flex items-center justify-between gap-2 rounded-md bg-muted px-2 py-1 text-xs">
-                    <span className="text-muted-foreground">Editing a message</span>
+                    <span className="text-muted-foreground">
+                        Editing a message
+                        <span className="hidden text-foreground-subtle sm:inline">
+                            {" - escape to cancel"}
+                        </span>
+                    </span>
                     <button
                         type="button"
                         aria-label="Stop editing"

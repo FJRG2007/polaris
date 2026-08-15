@@ -402,6 +402,15 @@ export async function liveIn(channelId: string): Promise<{ id: string; count: nu
     return { id: meeting.id, count };
 }
 
+/** Somebody sitting in a voice room, as the rail draws them. The seat and the
+ *  account are both here: the seat is what makes the row unique, the account is
+ *  whose face goes beside it, and a guest has only the first. */
+export interface VoicePresence {
+    readonly id: string;
+    readonly name: string;
+    readonly userId: string | null;
+}
+
 /**
  * Who is sitting in each voice channel of a space.
  *
@@ -414,7 +423,7 @@ export async function liveIn(channelId: string): Promise<{ id: string; count: nu
  */
 export async function voicePresence(
     channelIds: readonly string[]
-): Promise<Map<string, { id: string; name: string }[]>> {
+): Promise<Map<string, VoicePresence[]>> {
     if (channelIds.length === 0) return new Map();
 
     const meetings = await prisma.meeting.findMany({
@@ -431,12 +440,12 @@ export async function voicePresence(
                     lastSeenAt: { gte: new Date(Date.now() - PARTICIPANT_TTL_MS) }
                 },
                 orderBy: { joinedAt: "asc" },
-                select: { id: true, name: true }
+                select: { id: true, name: true, userId: true }
             }
         }
     });
 
-    const byChannel = new Map<string, { id: string; name: string }[]>();
+    const byChannel = new Map<string, VoicePresence[]>();
     for (const meeting of meetings) {
         if (!meeting.channelId || meeting.participants.length === 0) continue;
         byChannel.set(meeting.channelId, meeting.participants);

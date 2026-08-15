@@ -106,6 +106,44 @@ export function embedFor(address: string): Embed | null {
     return null;
 }
 
+/**
+ * Where to ask a site what one of its links is, when the page itself will not
+ * say.
+ *
+ * YouTube, and most sites with a player, hand a plain fetch a consent wall or a
+ * script and nothing else - so the ordinary look at the page comes back with no
+ * title, no description and no picture, and the link gets no card. Each of these
+ * publishes the same answer over oEmbed, openly and with no account, key or
+ * quota behind it.
+ *
+ * The address is only ever passed as a query parameter to the provider's own
+ * fixed host, so this reaches nowhere the caller chooses.
+ */
+export function oembedFor(address: string): string | null {
+    let url: URL;
+    try {
+        url = new URL(address);
+    } catch {
+        return null;
+    }
+    const host = url.hostname.replace(/^www\./, "").toLowerCase();
+
+    const endpoint =
+        host === "youtu.be" || host.endsWith("youtube.com")
+            ? "https://www.youtube.com/oembed"
+            : host === "vimeo.com" || host === "player.vimeo.com"
+              ? "https://vimeo.com/api/oembed.json"
+              : host === "open.spotify.com"
+                ? "https://open.spotify.com/oembed"
+                : null;
+    if (!endpoint) return null;
+
+    const asked = new URL(endpoint);
+    asked.searchParams.set("url", url.href);
+    asked.searchParams.set("format", "json");
+    return asked.href;
+}
+
 /** A YouTube player, keeping the start time when the address carried one - a
  *  link posted at a moment was posted at that moment on purpose. */
 function youtube(id: string, url: URL): Embed {

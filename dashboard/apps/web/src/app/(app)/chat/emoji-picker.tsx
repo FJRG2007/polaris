@@ -8,9 +8,11 @@
  * separate popovers beside each other is three things to aim at.
  *
  * Emoji come from a written list in the browser, so that tab works on an
- * instance with no internet and no configuration. GIFs and stickers come from
- * Tenor through the server, which is where the key lives; without one those two
- * tabs say so rather than sitting there empty and looking broken.
+ * instance with no internet and no configuration. Searching for GIFs and
+ * stickers needs a service an administrator connects, and the key for it stays
+ * on the server. Where none is connected those two tabs still do something: they
+ * take the address of a picture, which is how a GIF is sent anywhere that has no
+ * search, rather than sitting there empty and looking broken.
  *
  * Choosing an emoji types it into the message. Choosing a GIF sends it as its
  * own message, the way every chat client does - a GIF is the message.
@@ -257,8 +259,8 @@ export function EmojiPicker({
                             autoFocus
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
-                            placeholder={tab === "emoji" ? "Search emoji" : "Search Tenor"}
-                            aria-label={tab === "emoji" ? "Search emoji" : "Search Tenor"}
+                            placeholder={tab === "emoji" ? "Search emoji" : tab === "sticker" ? "Search stickers" : "Search GIFs"}
+                            aria-label={tab === "emoji" ? "Search emoji" : tab === "sticker" ? "Search stickers" : "Search GIFs"}
                             className="h-7 w-full rounded-md border border-border bg-background pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
                         />
                     </div>
@@ -332,10 +334,18 @@ export function EmojiPicker({
                                 </ul>
                             )
                         ) : tenorReady === false ? (
-                            <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-                                GIFs and stickers need a Tenor key. An administrator sets
-                                POLARIS_TENOR_KEY.
-                            </p>
+                            <div className="flex flex-col gap-3 px-2 py-4">
+                                <p className="text-center text-xs text-muted-foreground">
+                                    Searching for GIFs and stickers is switched off here. An
+                                    administrator can turn it on.
+                                </p>
+                                <ByLink
+                                    onSend={(address) => {
+                                        onMedia(address);
+                                        setOpen(false);
+                                    }}
+                                />
+                            </div>
                         ) : searching || tenorReady === null ? (
                             <p className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground">
                                 <Loader2 className="size-3.5 animate-spin" />
@@ -346,7 +356,7 @@ export function EmojiPicker({
                                 Nothing came back for that.
                             </p>
                         ) : (
-                            <ul className="grid grid-cols-2 gap-1">
+                            <ul className="grid grid-cols-2 gap-1 pb-1">
                                 {results.map((result) => (
                                     <li key={result.id}>
                                         <button
@@ -374,6 +384,50 @@ export function EmojiPicker({
                 document.body
             )}
         </>
+    );
+}
+
+/**
+ * Sending a picture by its address.
+ *
+ * What the picker offers when the search is not switched on, and it is not a
+ * consolation prize: every GIF anybody sends comes from a page they found it on,
+ * and pasting that address is how it gets here without an account with anybody.
+ * The picture is fetched once by the server and stored like any other
+ * attachment, so the conversation never asks the other site for it.
+ */
+function ByLink({ onSend }: { onSend: (address: string) => void }) {
+    const [address, setAddress] = useState("");
+    const usable = /^https?:\/\/\S+$/i.test(address.trim());
+
+    return (
+        <form
+            onSubmit={(event) => {
+                event.preventDefault();
+                if (usable) onSend(address.trim());
+            }}
+            className="flex flex-col gap-1.5"
+        >
+            <label htmlFor="picker-link" className="text-xs text-muted-foreground">
+                Send a picture or GIF by its address
+            </label>
+            <span className="flex gap-1.5">
+                <input
+                    id="picker-link"
+                    value={address}
+                    onChange={(event) => setAddress(event.target.value)}
+                    placeholder="https://"
+                    className="h-7 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs hover:border-border-strong focus:border-border-strong"
+                />
+                <button
+                    type="submit"
+                    disabled={!usable}
+                    className="rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground transition-opacity disabled:opacity-40"
+                >
+                    Send
+                </button>
+            </span>
+        </form>
     );
 }
 

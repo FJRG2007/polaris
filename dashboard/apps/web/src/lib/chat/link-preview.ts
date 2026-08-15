@@ -1,21 +1,11 @@
 /**
  * What a link posted in a conversation turns out to be.
  *
- * **This module fetches a URL somebody typed, which is the most dangerous thing
- * a server can be asked to do.** Polaris runs on a machine with a LAN around it
- * and, on a hosted box, a metadata service one address away. A naive unfurl is a
- * request forgery with a login page in front of it: post a link, and the server
- * fetches whatever is behind it from inside the network and hands the result
- * back. Everything below is shaped by that.
- *
- * - Only http and https, and never a hostname that resolves to anything but a
- *   public address. Every address it resolves to is checked, not just the first:
- *   a name with two A records is a name that can answer differently next time.
- * - Redirects are followed by hand, one hop at a time, re-checking the address
- *   at every hop. Following them automatically is the classic way past a check
- *   like this - the first hop is example.com and the second is 169.254.169.254.
- * - A timeout, a byte ceiling and a content-type check, so a link to a
- *   ten-gigabyte file is a failed unfurl rather than a full disk.
+ * **This module fetches a URL somebody typed**, which is the most dangerous
+ * thing a server can be asked to do - so it does not do it itself. Every request
+ * goes through `safe-fetch`, which refuses private addresses, re-checks every
+ * redirect hop, and caps how long and how much. That is where the reasoning
+ * behind those rules is written down.
  *
  * The picture is not handed to the browser as the site's own address. Reading a
  * message would then tell whoever runs that page who read it and when, which is
@@ -24,19 +14,13 @@
  */
 
 import { prisma } from "@polaris/db";
+import { oembedFor } from "./embeds";
 import * as core from "@polaris/core";
-import { lookup } from "node:dns/promises";
-
-/** How long Polaris waits for a page before giving up on it. */
-const TIMEOUT_MS = 5000;
+import { follow, readCapped, safeUrl } from "@/lib/safe-fetch";
 
 /** How much of a page is read before deciding. The metadata is in the head; a
  *  site that has not said what it is by here is not going to. */
 const MAX_BYTES = 512 * 1024;
-
-/** How many redirects are followed. Enough for the ordinary http-to-https and a
- *  canonical host, and not enough to be walked around a network. */
-const MAX_HOPS = 3;
 
 /** How long a look is trusted before the page is asked again. */
 const FRESH_MS = 7 * 24 * 60 * 60 * 1000;
@@ -53,18 +37,34 @@ export interface LinkPreviewView {
     readonly hasImage: boolean;
 }
 
-/** The previews already known for these addresses. Never fetches: a read path
- *  that could fetch is a read path that hangs on somebody else's server. */
+/**
+ * What is known about one address.
+ *
+ * The distinction between "looked and there was nothing" and "never looked" is
+ * the whole point of this shape. Without it the screen cannot tell a link with
+ * no card from a link nobody has got to yet, so it either asks forever or never
+ * asks at all - and never asking is why cards did not appear.
+ */
+export interface KnownPreview {
+    /** Whether the look produced something worth drawing. */
+    readonly ok: boolean;
+    /** The card, when it did. */
+    readonly view: LinkPreviewView | null;
+}
+
+/** What is already known for these addresses. Never fetches: a read path that
+ *  could fetch is a read path that hangs on somebody else's server. */
 export async function knownPreviews(
     urls: readonly string[]
-): Promise<Map<string, LinkPreviewView>> {
+): Promise<Map<string, KnownPreview>> {
     const wanted = [...new Set(urls)];
     if (wanted.length === 0) return new Map();
 
     const rows = await prisma.linkPreview.findMany({
-        where: { url: { in: wanted }, ok: true },
+        where: { url: { in: wanted } },
         select: {
             id: true,
+            ok: true,
             url: true,
             title: true,
             description: true,
@@ -76,12 +76,17 @@ export async function knownPreviews(
         rows.map((row) => [
             row.url,
             {
-                id: row.id,
-                url: row.url,
-                title: row.title,
-                description: row.description,
-                siteName: row.siteName,
-                hasImage: row.imageUrl !== null
+                ok: row.ok,
+                view: row.ok
+                    ? {
+                          id: row.id,
+                          url: row.url,
+                          title: row.title,
+                          description: row.description,
+                          siteName: row.siteName,
+                          hasImage: row.imageUrl !== null
+                      }
+                    : null
             }
         ])
     );
@@ -147,123 +152,13 @@ export async function previewImage(
     const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim();
     if (!contentType.startsWith("image/")) return null;
 
-    const bytes = await readCapped(response);
+    const bytes = await readCapped(response, MAX_BYTES);
     return bytes ? { bytes, contentType } : null;
 }
 
 // ---------------------------------------------------------------------------
 // Internals
 // ---------------------------------------------------------------------------
-
-/** An address Polaris is willing to consider at all. */
-function safeUrl(address: string): URL | null {
-    if (address.length > core.MAX_LINK_LENGTH) return null;
-    let url: URL;
-    try {
-        url = new URL(address);
-    } catch {
-        return null;
-    }
-    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-    // Credentials in a link being fetched by the server are somebody's password
-    // being handed to whatever is on the other end.
-    if (url.username || url.password) return null;
-    return url;
-}
-
-/**
- * Whether a hostname points anywhere Polaris is allowed to go.
- *
- * Every resolved address has to be public, not merely the first: a name with an
- * A record for a real host and another for 127.0.0.1 would otherwise pass and
- * then connect to whichever the stack picked.
- */
-async function reachable(hostname: string): Promise<boolean> {
-    const bare = hostname.replace(/^\[|\]$/g, "");
-    if (core.isIpAddress(bare)) return !core.isPrivateIp(bare);
-
-    try {
-        const addresses = await lookup(bare, { all: true });
-        if (addresses.length === 0) return false;
-        return addresses.every((entry) => !core.isPrivateIp(entry.address));
-    } catch {
-        // A name that does not resolve is a name not to fetch. On a machine with
-        // no resolver at all this refuses everything, which is the right way to
-        // be wrong.
-        return false;
-    }
-}
-
-/** Fetch, following redirects by hand and re-checking every hop. */
-async function follow(start: URL): Promise<Response | null> {
-    let url = start;
-    for (let hop = 0; hop <= MAX_HOPS; hop += 1) {
-        if (!(await reachable(url.hostname))) return null;
-
-        let response: Response;
-        try {
-            response = await fetch(url, {
-                redirect: "manual",
-                cache: "no-store",
-                signal: AbortSignal.timeout(TIMEOUT_MS),
-                headers: {
-                    // Named honestly. A server that does not want to be unfurled
-                    // can then say so, and the one that blocks us is not left
-                    // guessing what we were.
-                    "user-agent": "PolarisBot/1.0 (+link preview)",
-                    accept: "text/html,application/xhtml+xml"
-                }
-            });
-        } catch {
-            return null;
-        }
-
-        if (response.status < 300 || response.status >= 400) return response;
-
-        const next = response.headers.get("location");
-        if (!next) return response;
-        try {
-            url = new URL(next, url);
-        } catch {
-            return null;
-        }
-        const checked = safeUrl(url.href);
-        if (!checked) return null;
-        url = checked;
-    }
-    return null;
-}
-
-/** Read at most `MAX_BYTES`, whatever the other end says it is sending. */
-async function readCapped(response: Response): Promise<Uint8Array | null> {
-    const declared = response.headers.get("content-length");
-    if (declared && Number(declared) > MAX_BYTES) return null;
-
-    const reader = response.body?.getReader();
-    if (!reader) return null;
-
-    const chunks: Uint8Array[] = [];
-    let total = 0;
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (!value) continue;
-        total += value.length;
-        if (total > MAX_BYTES) {
-            await reader.cancel().catch(() => undefined);
-            return null;
-        }
-        chunks.push(value);
-    }
-
-    const bytes = new Uint8Array(total);
-    let at = 0;
-    for (const chunk of chunks) {
-        bytes.set(chunk, at);
-        at += chunk.length;
-    }
-    return bytes;
-}
 
 interface Described {
     title: string;
@@ -272,8 +167,63 @@ interface Described {
     imageUrl: string | null;
 }
 
-/** What one page says about itself. */
+/** What one page says about itself, or what its site says about it when the page
+ *  itself says nothing. */
 async function describe(url: URL): Promise<Described | null> {
+    const fromPage = await describePage(url);
+    if (fromPage && (fromPage.title || fromPage.description)) return fromPage;
+    return (await describeByOembed(url)) ?? fromPage;
+}
+
+/**
+ * What a site says about one of its own links, over oEmbed.
+ *
+ * The reason this exists: a YouTube link is the single most posted link there
+ * is, and asking youtube.com for the page gets a consent wall with no metadata
+ * in it - so the message that mattered most got no card at all. oEmbed answers
+ * the same question in one small JSON document, with no key and no account.
+ *
+ * Only the fixed endpoints in `oembedFor` are ever asked, and the answer is
+ * treated as text: a title, a name and a picture address, all of them checked
+ * before anything is done with them.
+ */
+async function describeByOembed(url: URL): Promise<Described | null> {
+    const endpoint = oembedFor(url.href);
+    if (!endpoint) return null;
+
+    const asked = safeUrl(endpoint);
+    if (!asked) return null;
+
+    const response = await follow(asked, "application/json");
+    if (!response?.ok) return null;
+    if (!(response.headers.get("content-type") ?? "").toLowerCase().includes("json")) return null;
+
+    const bytes = await readCapped(response, MAX_BYTES);
+    if (!bytes) return null;
+
+    let payload: { title?: unknown; author_name?: unknown; provider_name?: unknown; thumbnail_url?: unknown };
+    try {
+        payload = JSON.parse(new TextDecoder("utf-8", { fatal: false }).decode(bytes));
+    } catch {
+        return null;
+    }
+
+    const text = (value: unknown): string => (typeof value === "string" ? value : "");
+    const title = text(payload.title).slice(0, 200);
+    if (!title) return null;
+
+    return {
+        title,
+        // The uploader, which is what a video card is actually asked: who made
+        // this. There is no description in an oEmbed answer.
+        description: text(payload.author_name).slice(0, 400),
+        siteName: (text(payload.provider_name) || url.hostname).slice(0, 100),
+        imageUrl: absolute(text(payload.thumbnail_url), url)
+    };
+}
+
+/** What one page says about itself. */
+async function describePage(url: URL): Promise<Described | null> {
     const response = await follow(url);
     if (!response?.ok) return null;
 
@@ -282,7 +232,7 @@ async function describe(url: URL): Promise<Described | null> {
     // reading one to find that out is bytes spent to learn nothing.
     if (!contentType.includes("html")) return null;
 
-    const bytes = await readCapped(response);
+    const bytes = await readCapped(response, MAX_BYTES);
     if (!bytes) return null;
     const html = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
 
@@ -338,6 +288,9 @@ function decode(value: string): string {
 }
 
 function absolute(address: string, base: URL): string | null {
+    // An empty one would resolve to the page itself, which is how a card ends up
+    // with an HTML document where its picture should be.
+    if (!address) return null;
     try {
         const resolved = new URL(address, base);
         return resolved.protocol === "http:" || resolved.protocol === "https:"

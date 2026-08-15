@@ -1,0 +1,173 @@
+/**
+ * Fetching an address somebody typed, which is the most dangerous thing a server
+ * can be asked to do.
+ *
+ * Polaris runs on a machine with a LAN around it and, on a hosted box, a
+ * metadata service one address away. A naive fetch of a person-supplied URL is a
+ * request forgery with a login page in front of it: hand it a link and the
+ * server retrieves whatever is behind it from inside the network and hands the
+ * result back. Everything here exists because of that:
+ *
+ * - only http and https, and never a link carrying credentials;
+ * - never a hostname that resolves to anything but a public address, and every
+ *   address it resolves to is checked, not just the first: a name with two A
+ *   records is a name that can answer differently next time;
+ * - redirects are followed by hand, one hop at a time, re-checking the address
+ *   at every hop. Following them automatically is the classic way past a check
+ *   like this - the first hop is example.com and the second is 169.254.169.254;
+ * - a timeout and a byte ceiling, so a link to a ten-gigabyte file is a failed
+ *   fetch rather than a full disk.
+ *
+ * This lives on its own rather than inside the link previews it was written for
+ * because it is not about link previews: everything that reaches out to an
+ * address a person gave us - a preview, a picture posted as a link, a GIF from
+ * somewhere else - has to pass exactly these checks, and a second copy of them
+ * is a second place for one of them to be missing.
+ */
+
+import * as core from "@polaris/core";
+import { lookup } from "node:dns/promises";
+
+/** How long Polaris waits for an answer before giving up. */
+export const FETCH_TIMEOUT_MS = 5000;
+
+/** How many redirects are followed. Enough for the ordinary http-to-https and a
+ *  canonical host, and not enough to be walked around a network. */
+const MAX_HOPS = 3;
+
+/** An address Polaris is willing to consider at all. */
+export function safeUrl(address: string): URL | null {
+    if (address.length > core.MAX_LINK_LENGTH) return null;
+    let url: URL;
+    try {
+        url = new URL(address);
+    } catch {
+        return null;
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    // Credentials in a link being fetched by the server are somebody's password
+    // being handed to whatever is on the other end.
+    if (url.username || url.password) return null;
+    return url;
+}
+
+/**
+ * Whether a hostname points anywhere Polaris is allowed to go.
+ *
+ * Every resolved address has to be public, not merely the first: a name with an
+ * A record for a real host and another for 127.0.0.1 would otherwise pass and
+ * then connect to whichever the stack picked.
+ */
+export async function reachable(hostname: string): Promise<boolean> {
+    const bare = hostname.replace(/^\[|\]$/g, "");
+    if (core.isIpAddress(bare)) return !core.isPrivateIp(bare);
+
+    try {
+        const addresses = await lookup(bare, { all: true });
+        if (addresses.length === 0) return false;
+        return addresses.every((entry) => !core.isPrivateIp(entry.address));
+    } catch {
+        // A name that does not resolve is a name not to fetch. On a machine with
+        // no resolver at all this refuses everything, which is the right way to
+        // be wrong.
+        return false;
+    }
+}
+
+/** Fetch, following redirects by hand and re-checking every hop. */
+export async function follow(
+    start: URL,
+    accept = "text/html,application/xhtml+xml"
+): Promise<Response | null> {
+    let url = start;
+    for (let hop = 0; hop <= MAX_HOPS; hop += 1) {
+        if (!(await reachable(url.hostname))) return null;
+
+        let response: Response;
+        try {
+            response = await fetch(url, {
+                redirect: "manual",
+                cache: "no-store",
+                signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+                headers: {
+                    // Named honestly. A server that does not want to be fetched
+                    // by us can then say so, and the one that blocks us is not
+                    // left guessing what we were.
+                    "user-agent": "PolarisBot/1.0 (+link preview)",
+                    accept
+                }
+            });
+        } catch {
+            return null;
+        }
+
+        if (response.status < 300 || response.status >= 400) return response;
+
+        const next = response.headers.get("location");
+        if (!next) return response;
+        try {
+            url = new URL(next, url);
+        } catch {
+            return null;
+        }
+        const checked = safeUrl(url.href);
+        if (!checked) return null;
+        url = checked;
+    }
+    return null;
+}
+
+/** Read at most `maxBytes`, whatever the other end says it is sending. */
+export async function readCapped(response: Response, maxBytes: number): Promise<Uint8Array | null> {
+    const declared = response.headers.get("content-length");
+    if (declared && Number(declared) > maxBytes) return null;
+
+    const reader = response.body?.getReader();
+    if (!reader) return null;
+
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!value) continue;
+        total += value.length;
+        if (total > maxBytes) {
+            await reader.cancel().catch(() => undefined);
+            return null;
+        }
+        chunks.push(value);
+    }
+
+    const bytes = new Uint8Array(total);
+    let at = 0;
+    for (const chunk of chunks) {
+        bytes.set(chunk, at);
+        at += chunk.length;
+    }
+    return bytes;
+}
+
+/** A picture fetched from an address somebody gave us, or null when there is
+ *  nothing there, it is not a picture, or it is bigger than allowed. */
+export async function fetchImage(
+    address: string,
+    maxBytes: number
+): Promise<{ name: string; contentType: string; bytes: Uint8Array } | null> {
+    const url = safeUrl(address);
+    if (!url) return null;
+
+    const response = await follow(url, "image/*");
+    if (!response?.ok) return null;
+
+    const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim();
+    if (!contentType.startsWith("image/")) return null;
+
+    const bytes = await readCapped(response, maxBytes);
+    if (!bytes) return null;
+
+    // The last part of the path, when there is one worth having. A name is only
+    // a label on a file here; the type above is what decides how it is treated.
+    const name = url.pathname.split("/").pop() || "picture";
+    return { name: name.slice(0, 120), contentType, bytes };
+}

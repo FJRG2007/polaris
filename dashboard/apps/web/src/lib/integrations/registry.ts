@@ -412,6 +412,25 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         apiKeyHelp: "The secret's value, not its id. Shown once when it is created."
     },
     {
+        slug: "tenor",
+        name: "Tenor",
+        category: "Productivity",
+        summary: "Search GIFs and stickers from the chat composer.",
+        description:
+            "Adds a GIF and sticker search to the picker in Chat. Without it the picker still works - emoji, the pictures each person has kept, and anything sent by pasting its address - and only the search tab is missing. A chosen GIF is fetched once and stored here like any other attachment, so a conversation never asks Tenor for anything and nobody is told who read what.",
+        docsUrl: "https://developers.google.com/tenor/guides/quickstart",
+        setupLinks: [
+            {
+                label: "Create an API key",
+                url: "https://console.cloud.google.com/apis/credentials",
+                help: "Tenor is a Google API, so the key is an ordinary Google Cloud API key. Enable the Tenor API on the project first."
+            }
+        ],
+        requiresApiKey: true,
+        apiKeyLabel: "API key",
+        apiKeyHelp: "A Google Cloud API key with the Tenor API enabled on its project."
+    },
+    {
         slug: "cloudflare",
         name: "Cloudflare",
         category: "Automation",
