@@ -226,6 +226,29 @@ Notes (personal writing):
       administrator included
 - [ ] Shared notebooks, and a note handed to somebody else
 
+Chat (talking to the people here):
+
+- [x] Spaces with channels in them, and direct messages that belong to no space.
+      A space can belong to an organization, and then `internal` means that
+      roster rather than the whole instance
+- [x] Channels: public or private, named, with a topic, archived rather than
+      deleted where the history matters. Names are normalized as you type
+      (`Release Planning` -> `release-planning`) with the stored form shown
+- [x] Direct messages between two people are keyed by the pair, so two tabs
+      cannot open two conversations with the same person; three or more is a
+      group, where asking twice does make two
+- [x] Threads one level deep, reactions, editing your own, and deleting with a
+      tombstone so replies under a removed message still make sense
+- [x] Unread counts from a read mark rather than a stored counter, own messages
+      excluded, and a mark that never moves backwards between two open tabs
+- [x] Live: messages, membership changes and typing over one connection per
+      device, filtered server-side to the conversations the reader is in. Frames
+      carry ids, never message text - the tab pulls through the same access check
+      that drew the screen
+- [x] Reached by being in it. No administrator override, no instance-wide read
+- [ ] Attachments, calls, presence dots, unfurled links, and search across
+      conversations
+
 ## Notes / deliberate decisions
 
 - Polaris is a control plane, not a file mirror: the browser lists remote trees

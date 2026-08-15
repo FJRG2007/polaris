@@ -36,6 +36,7 @@ import {
     Link2,
     ListTodo,
     Mail,
+    MessageCircle,
     MessagesSquare,
     MonitorSmartphone,
     Network,
@@ -158,6 +159,14 @@ export const POLARIS_APPS: AppEntry[] = [
         icon: SquareCheckBig,
         href: "/tasks",
         permission: "tasks.read"
+    },
+    {
+        id: "chat",
+        label: "Chat",
+        description: "Channels, direct messages and calls with the people here",
+        icon: MessageCircle,
+        href: "/chat",
+        permission: "chat.use"
     },
     {
         id: "notes",

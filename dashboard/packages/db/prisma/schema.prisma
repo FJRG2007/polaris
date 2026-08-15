@@ -138,6 +138,9 @@ model User {
     successor           AccountSuccessor?    @relation("AccountSuccessorHolder")
     successorTo         AccountSuccessor[]   @relation("AccountSuccessorHeir")
     notes               Note[]
+    chatSpaces          ChatSpace[]
+    chatSpaceMemberships ChatSpaceMember[]
+    chatChannelMemberships ChatChannelMember[]
     searches            SearchHistory[]
     backupDestinations  BackupDestination[]
     backupPlans         BackupPlan[]
@@ -3757,6 +3760,7 @@ model Organization {
     teams    Team[]
     roles    OrgRole[]
     spaces   TaskSpace[]
+    chatSpaces ChatSpace[]
     projects Project[]
     domains  OwnerDomain[]
     avatar   OrganizationAvatar?
@@ -5519,4 +5523,206 @@ model BackupJob {
     @@index([ownerId, startedAt])
     @@index([resourceId, startedAt])
     @@index([status])
+}
+// ---------------------------------------------------------------------------
+// Chat (internal conversation)
+// ---------------------------------------------------------------------------
+
+// A place with channels in it - what Discord calls a server and Slack calls a
+// workspace.
+//
+// Deliberately not the Organization: an organization is who somebody works for
+// and answers a permission question, while a chat space is who somebody talks
+// to, and the two are not the same set. A space can belong to an organization,
+// and then the roster is the organization's; one that belongs to nobody in
+// particular is its owner's, and people are added to it by hand. The shape is
+// TaskSpace's on purpose - the same question was already answered there, and two
+// answers to "who owns a container of work" is a thing somebody has to learn
+// twice.
+model ChatSpace {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    ownerId     String   @db.Uuid
+    // The organization this space belongs to, or null for a personal one.
+    orgId       String?  @db.Uuid
+    name        String
+    description String   @default("")
+    // The dot beside the name in the rail. Free-form hex, like a task space's.
+    color       String   @default("#7c5cff")
+    // private | internal - the same two words a task space uses, and the same
+    // meanings: private is the roster, internal is everybody who can see the
+    // owner (the instance, or the organization when there is one).
+    visibility  String   @default("private")
+    archived    Boolean  @default(false)
+    order       Float    @default(1024)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    owner    User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    org      Organization?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    members  ChatSpaceMember[]
+    channels ChatChannel[]
+
+    @@index([ownerId])
+    @@index([orgId])
+}
+
+// Somebody other than the owner who may reach a space. The owner is never a row
+// here, so removing every member cannot lock the space away from its creator.
+model ChatSpaceMember {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    spaceId   String   @db.Uuid
+    userId    String   @db.Uuid
+    // member | admin - an admin may add channels and people, a member may talk.
+    role      String   @default("member")
+    createdAt DateTime @default(now())
+
+    space ChatSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([spaceId, userId])
+    @@index([userId])
+}
+
+// One conversation: a channel in a space, or a direct message that belongs to no
+// space at all.
+//
+// Both are the same row because everything downstream of them is identical - the
+// messages, the threads, the reactions, the unread mark, the call - and a second
+// table would have meant a second copy of each. What separates them is `kind`
+// and whether `spaceId` is set.
+//
+// `dmKey` is what stops two people opening two different direct messages with
+// each other from two tabs: it is the participants' ids sorted and joined, so
+// the pair itself is the unique key. Group messages and channels leave it null,
+// where the uniqueness does not apply.
+model ChatChannel {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    spaceId       String?   @db.Uuid
+    // text | dm | group
+    kind          String    @default("text")
+    name          String
+    topic         String    @default("")
+    // A channel only its members see. Always true for dm and group, and the
+    // reason the flag exists rather than being read off `kind`.
+    private       Boolean   @default(false)
+    dmKey         String?   @unique
+    createdById   String?   @db.Uuid
+    // Denormalized so the rail can sort conversations by what is happening
+    // without reading every message table.
+    lastMessageAt DateTime?
+    order         Float     @default(1024)
+    archived      Boolean   @default(false)
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    space    ChatSpace?          @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    members  ChatChannelMember[]
+    messages ChatMessage[]
+
+    @@index([spaceId, order])
+    @@index([lastMessageAt])
+}
+
+// Who is in a channel, and how much of it they have read.
+//
+// The read mark lives here rather than in a table of its own because it is one
+// row per person per channel either way, and keeping it beside the membership
+// means catching up is one write and leaving a channel takes the mark with it.
+model ChatChannelMember {
+    id                String    @id @default(uuid(7)) @db.Uuid
+    channelId         String    @db.Uuid
+    userId            String    @db.Uuid
+    // member | admin
+    role              String    @default("member")
+    // The last message this person has seen. Null before they have read any.
+    lastReadMessageId String?   @db.Uuid
+    lastReadAt        DateTime?
+    // No badge, and no notification, without leaving the channel.
+    muted             Boolean   @default(false)
+    createdAt         DateTime  @default(now())
+
+    channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+    user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([channelId, userId])
+    @@index([userId])
+}
+
+// One message.
+//
+// The body is the same Markdown everything else in Polaris is written in, so a
+// mention of a person or a task is the same address here as it is in a note or a
+// comment, and pasting between them keeps the chips.
+//
+// A thread is a message with `parentId` set, and only one level deep: a reply to
+// a reply belongs to the same thread rather than starting another. `replyCount`
+// and `lastReplyAt` are kept on the root so a channel can be drawn without
+// reading every thread it holds.
+//
+// `deletedAt` rather than a delete: a removed message leaves a tombstone, which
+// is what keeps the replies under it from becoming orphans and what stops the
+// message above it from silently absorbing its meaning.
+model ChatMessage {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    channelId   String    @db.Uuid
+    // Null for the ones Polaris writes itself: somebody joined, a call started.
+    // Not a foreign key, so a message survives the account that wrote it - what
+    // was said stays said, and the name resolves to nobody.
+    authorId    String?   @db.Uuid
+    // text | system | call
+    kind        String    @default("text")
+    body        String    @default("")
+    parentId    String?   @db.Uuid
+    replyCount  Int       @default(0)
+    lastReplyAt DateTime?
+    editedAt    DateTime?
+    deletedAt   DateTime?
+    createdAt   DateTime  @default(now())
+
+    channel     ChatChannel      @relation(fields: [channelId], references: [id], onDelete: Cascade)
+    parent      ChatMessage?     @relation("ChatThread", fields: [parentId], references: [id], onDelete: Cascade)
+    replies     ChatMessage[]    @relation("ChatThread")
+    reactions   ChatReaction[]
+    attachments ChatAttachment[]
+
+    @@index([channelId, createdAt])
+    @@index([parentId, createdAt])
+}
+
+// An emoji somebody put on a message. One row per person per emoji per message,
+// so the count is the row count and pressing it twice takes it back off.
+model ChatReaction {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    messageId String   @db.Uuid
+    userId    String   @db.Uuid
+    // The emoji itself rather than a shortcode: what was pressed is what is
+    // stored, and no table has to be kept in step to draw it back.
+    emoji     String
+    createdAt DateTime @default(now())
+
+    message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+    @@unique([messageId, userId, emoji])
+    @@index([messageId])
+}
+
+// A file on a message.
+//
+// The bytes go wherever uploads go on this instance - the same destination
+// avatars and task attachments use - and this row is the reference. Deleting the
+// message takes the row; sweeping the bytes is the upload layer's job, the same
+// as everywhere else.
+model ChatAttachment {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    messageId   String   @db.Uuid
+    name        String
+    size        BigInt   @default(0)
+    contentType String   @default("application/octet-stream")
+    // Where it landed, as the storage layer addresses it.
+    path        String
+    createdAt   DateTime @default(now())
+
+    message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+    @@index([messageId])
 }

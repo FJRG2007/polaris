@@ -114,6 +114,33 @@ export function isViewing(userId: string, href: string | null | undefined, now =
     return false;
 }
 
+/**
+ * Every account with a tab open and on screen right now.
+ *
+ * The same reports the rule above is built from, asked a different question:
+ * not "are they watching this page" but "are they here at all". Chat draws its
+ * online dots from this rather than from a second mechanism, which means the dot
+ * is honest for free - it is on exactly when a tab of theirs is in front of
+ * somebody, and off within the TTL of it not being.
+ *
+ * It follows that this only knows about the process it lives in, and that being
+ * wrong means showing somebody as away who is not. That is the right direction:
+ * an away dot is a smaller lie than an online one.
+ */
+export function onlineUserIds(now = Date.now()): Set<string> {
+    sweep(now);
+    const online = new Set<string>();
+    for (const [userId, held] of viewers) {
+        for (const viewer of held.values()) {
+            if (now - viewer.at <= PRESENCE_TTL_MS) {
+                online.add(userId);
+                break;
+            }
+        }
+    }
+    return online;
+}
+
 /** Drop every report. Exists for tests, which must not inherit each other's state. */
 export function resetPresence(): void {
     viewers.clear();

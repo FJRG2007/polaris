@@ -1,0 +1,135 @@
+"use client";
+
+/**
+ * A thread, beside the channel rather than inside it.
+ *
+ * The point of a thread is that a side conversation does not push the main one
+ * off the screen, which only works if both are visible at once. A thread that
+ * replaced the channel would be a channel with extra steps.
+ *
+ * One level deep. A reply to a reply joins this same thread, which the service
+ * enforces - so there is no second panel, no breadcrumb, and no way to get lost
+ * three levels down a conversation nobody can find again.
+ */
+
+import { X } from "lucide-react";
+import * as actions from "./actions";
+import { Composer } from "./composer";
+import { Skeleton } from "@polaris/ui";
+import { MessageList } from "./message-list";
+import { runAction } from "@/lib/run-action";
+import { useChatStream } from "./use-chat-stream";
+import { useCallback, useEffect, useState } from "react";
+import type { ChatMessageView } from "@/lib/chat/messages";
+
+export function ThreadPanel({
+    root,
+    viewerId,
+    canPost,
+    onClose,
+    onChanged
+}: {
+    root: ChatMessageView;
+    viewerId: string;
+    canPost: boolean;
+    onClose: () => void;
+    /** Called after a write, so the channel behind can update the reply count
+     *  on the message this thread hangs off. */
+    onChanged: () => void;
+}) {
+    const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
+    const [error, setError] = useState("");
+
+    const load = useCallback(async () => {
+        const result = await actions.readThreadAction(root.id);
+        if (result.error) {
+            setError(result.error);
+            setMessages([]);
+            return;
+        }
+        setMessages(result.messages ?? []);
+    }, [root.id]);
+
+    useEffect(() => {
+        setMessages(null);
+        void load();
+    }, [load]);
+
+    useChatStream(
+        useCallback(
+            (frame) => {
+                if (frame.kind === "posted" && frame.channels.includes(root.channelId)) void load();
+            },
+            [root.channelId, load]
+        )
+    );
+
+    return (
+        <aside className="flex w-full max-w-sm shrink-0 flex-col border-l border-border">
+            <div className="flex h-header shrink-0 items-center justify-between gap-2 border-b border-border px-3">
+                <span className="text-sm font-semibold">Thread</span>
+                <button
+                    type="button"
+                    aria-label="Close the thread"
+                    onClick={onClose}
+                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                    <X className="size-4" />
+                </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto py-2">
+                {messages === null ? (
+                    <div className="flex flex-col gap-3 p-4" aria-hidden="true">
+                        {[0, 1].map((row) => (
+                            <Skeleton key={row} className="h-8 w-2/3" />
+                        ))}
+                    </div>
+                ) : (
+                    <MessageList
+                        messages={messages}
+                        viewerId={viewerId}
+                        canPost={canPost}
+                        canModerate={false}
+                        onReact={async (messageId, emoji) => {
+                            await runAction(() => actions.reactAction({ messageId, emoji }), setError);
+                            await load();
+                        }}
+                        onEdit={() => {
+                            // Editing happens in the channel's own composer, which
+                            // is the one place a message is rewritten.
+                        }}
+                        onDelete={async (message) => {
+                            await runAction(
+                                () => actions.deleteMessageAction(message.id),
+                                setError
+                            );
+                            await load();
+                            onChanged();
+                        }}
+                    />
+                )}
+            </div>
+
+            {error && (
+                <p role="alert" className="px-3 pb-1 text-xs text-destructive">
+                    {error}
+                </p>
+            )}
+
+            <Composer
+                channelId={root.channelId}
+                disabled={!canPost}
+                placeholder="Reply in this thread"
+                onSend={async (body) => {
+                    await runAction(
+                        () => actions.sendAction({ channelId: root.channelId, body, parentId: root.id }),
+                        setError
+                    );
+                    await load();
+                    onChanged();
+                }}
+            />
+        </aside>
+    );
+}

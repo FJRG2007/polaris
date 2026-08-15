@@ -80,6 +80,7 @@ export * from "./schemas/updates.js";
 export * from "./schemas/analytics.js";
 export * from "./schemas/tasks.js";
 export * from "./schemas/notes.js";
+export * from "./schemas/chat.js";
 export * from "./schemas/search.js";
 export * from "./schemas/overview.js";
 export * from "./schemas/organizations.js";

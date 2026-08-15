@@ -20,6 +20,7 @@ export const PERMISSIONS = [
     "snippets.write",
     "vault.use",
     "notes.use",
+    "chat.use",
     "deploy.read",
     "deploy.manage",
     "games.read",
@@ -67,6 +68,7 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "snippets.write",
         "vault.use",
         "notes.use",
+        "chat.use",
         "deploy.read",
         "deploy.manage",
         "games.read",
@@ -90,6 +92,7 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         // The same reasoning: notes are the account's own and nobody else reads
         // them, so read-only has nothing to say about them.
         "notes.use",
+        "chat.use",
         "deploy.read",
         "games.read",
         "agents.read",
@@ -126,6 +129,7 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     "snippets.write": { area: "Snippets", label: "Write snippets and share them by link" },
     "vault.use": { area: "Vault", label: "Keep a password vault and connect a client to it" },
     "notes.use": { area: "Notes", label: "Keep private notes" },
+    "chat.use": { area: "Chat", label: "Talk in channels and direct messages" },
     "deploy.read": { area: "Apps", label: "See deployments, servers and containers" },
     "deploy.manage": { area: "Apps", label: "Deploy, restart and configure apps" },
     "games.read": { area: "Game servers", label: "See game servers and who is playing" },
