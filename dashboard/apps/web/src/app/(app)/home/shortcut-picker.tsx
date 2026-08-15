@@ -103,7 +103,8 @@ export function ShortcutPicker({
                         autoCapitalize="none"
                         autoCorrect="off"
                         spellCheck={false}
-                        className="h-12 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                        bare
+                            className="h-12"
                     />
                 </div>
                 <div className="max-h-[min(60vh,24rem)] overflow-y-auto overscroll-contain p-2">

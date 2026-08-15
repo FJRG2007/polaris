@@ -190,7 +190,7 @@ export function NotesView({
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder="Find a note"
                             aria-label="Find a note"
-                            className="h-8 w-full rounded-md border border-border bg-background pl-7 pr-2 text-xs outline-none focus:border-primary"
+                            className="h-8 w-full rounded-md border border-border bg-background pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
                         />
                     </div>
                     <button
@@ -276,7 +276,8 @@ export function NotesView({
                                 aria-label="Note title"
                                 placeholder="Untitled"
                                 onChange={(event) => setTitle(event.target.value)}
-                                className="h-auto flex-1 border-0 bg-transparent px-0 text-2xl font-semibold focus:border-0 focus-visible:ring-0"
+                                bare
+                                className="h-auto flex-1 text-2xl font-semibold"
                             />
                             <button
                                 type="button"

@@ -106,7 +106,7 @@ export function PublicForm({
                                     aria-invalid={invalid}
                                     onChange={(event) => set(event.target.value)}
                                     onBlur={() => setTouched((current) => ({ ...current, [field.id]: true }))}
-                                    className="w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                                    className="w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm hover:border-border-strong focus:border-border-strong"
                                 />
                             ) : field.type === "dropdown" ? (
                                 <Select

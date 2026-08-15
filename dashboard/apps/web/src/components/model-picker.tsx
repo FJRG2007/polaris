@@ -172,7 +172,8 @@ export function ModelPicker({
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder={placeholder}
-                            className="h-7 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                            bare
+                            className="h-7"
                         />
                         {loading ? (
                             <Loader2 className="text-muted-foreground size-4 shrink-0 animate-spin" />

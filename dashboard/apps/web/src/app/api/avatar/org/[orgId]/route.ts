@@ -23,6 +23,7 @@ import {
     sniffImageMime,
     storeAvatar
 } from "@/lib/avatar-service";
+import { BLANK_AVATAR_ETAG, blankAvatarResponse } from "@/lib/avatar-blank";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,8 +40,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
 
     const picture = await resolveOrgAvatar(orgId);
     // Cached too: an organization with no picture is the common case, and
-    // without this every one of them is asked for again on every screen.
-    if (!picture) return new Response(null, { status: 404, headers: { "Cache-Control": CACHE } });
+    // without this every one of them is asked for again on every screen. A
+    // transparent pixel rather than a 404, for the same reason an account's
+    // face is - see lib/avatar-blank.
+    if (!picture) {
+        if (request.headers.get("if-none-match") === BLANK_AVATAR_ETAG) {
+            return new Response(null, {
+                status: 304,
+                headers: { ETag: BLANK_AVATAR_ETAG, "Cache-Control": CACHE }
+            });
+        }
+        return blankAvatarResponse(CACHE);
+    }
 
     // Answered before the bytes are fetched, which is the point of the split:
     // most requests for a face are a browser checking the one it already has.
@@ -49,7 +60,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
     }
 
     const bytes = await picture.load();
-    if (!bytes) return new Response(null, { status: 404, headers: { "Cache-Control": CACHE } });
+    if (!bytes) return blankAvatarResponse(CACHE);
 
     return new Response(bytes as BodyInit, {
         headers: {

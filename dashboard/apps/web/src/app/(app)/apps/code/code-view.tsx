@@ -117,7 +117,7 @@ export function CodeView() {
                         onChange={(event) => setQuery(event.target.value)}
                         placeholder="Narrow it: repo:owner/name, label:bug"
                         aria-label="Narrow the list"
-                        className="h-8 w-full rounded-md border border-border bg-background pl-7 pr-2 text-xs outline-none focus:border-primary"
+                        className="h-8 w-full rounded-md border border-border bg-background pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
                     />
                 </div>
             </div>

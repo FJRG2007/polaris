@@ -54,11 +54,33 @@ export function AppShell({
                         {sidebar}
                     </aside>
                 ) : null}
-                <main className="min-w-0 flex-1 p-3 sm:p-4 md:px-6 md:py-5">{children}</main>
+                {/* `--page-inset` is main's own vertical padding, published so a
+                    page that wants to fill the viewport can subtract it without
+                    hard-coding numbers that live here. See PAGE_FILL. */}
+                <main className="min-w-0 flex-1 p-3 [--page-inset:1.5rem] sm:p-4 sm:[--page-inset:2rem] md:px-6 md:py-5 md:[--page-inset:2.5rem]">
+                    {children}
+                </main>
             </div>
         </div>
     );
 }
+
+/**
+ * A screen that fills what is left of the window and scrolls inside itself.
+ *
+ * For the handful of screens that are a workspace rather than a document - a
+ * conversation with its composer pinned at the bottom, a terminal, a file
+ * browser with its own panes. Everything else scrolls the page, which is right
+ * for a page.
+ *
+ * The height is the viewport less the header less main's own padding, and that
+ * last term is why this lives here: a page that did the arithmetic itself would
+ * be silently a few pixels too tall the day the shell's padding changed, and the
+ * symptom - a composer just below the fold, a scrollbar on the window as well as
+ * on the list - reads as a layout bug in the page rather than as the coupling it
+ * is.
+ */
+export const PAGE_FILL = "flex h-[calc(100vh-var(--header-height)-var(--page-inset))] flex-col overflow-hidden";
 
 /** The Polaris wordmark: the star glyph plus the name. `nameClassName` lets a
  *  cramped bar drop the name and keep the glyph.

@@ -14,16 +14,23 @@
  * FormData and would otherwise all have to grow a piece of state. Picking a name
  * writes through the DOM and fires the same input event a keystroke would, which
  * is what a Save button watching the form for edits is listening for.
+ *
+ * The list is drawn in a portal, anchored to the field. It has to be: half these
+ * fields are inside a dialog, and a dialog scrolls its own content, which means
+ * an absolutely positioned list inside one is clipped by it - the suggestions
+ * end up below the fold of the dialog, and the field reads as having no
+ * autocomplete at all. Fixed positioning is outside every ancestor's clip.
  */
 
 import { cn, Input } from "@polaris/ui";
+import { createPortal } from "react-dom";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { TOKEN_SEPARATOR, tokenAt } from "@/lib/token-field";
 import { searchAccountsAction } from "@/app/(app)/mention-actions";
 import type { AccountCandidate } from "@/lib/rich-text/mention-service";
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { POPUP_CLASS, POPUP_ITEM_CLASS } from "@/components/rich-text/suggestion";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 
 /** Long enough that the list is not rewritten on every letter, short enough that
  *  it still feels like it is answering the one being typed. */
@@ -100,6 +107,9 @@ export function AccountInput({
 }: AccountInputProps) {
     const listId = useId();
     const field = useRef<HTMLInputElement | null>(null);
+    /** Where to draw the list. Null before the first measurement, and while the
+     *  list is shut. */
+    const [anchor, setAnchor] = useState<{ left: number; top: number; width: number } | null>(null);
     const [results, setResults] = useState<AccountCandidate[]>([]);
     const [open, setOpen] = useState(false);
     const [active, setActive] = useState(0);
@@ -116,6 +126,36 @@ export function AccountInput({
     useEffect(() => () => {
         if (timer.current) clearTimeout(timer.current);
     }, []);
+
+    const showing = open && results.length > 0;
+
+    /**
+     * Follow the field.
+     *
+     * Measured on a layout effect so the list is never painted at the previous
+     * position, and re-measured on any scroll - `true` for the capture phase,
+     * because the thing that scrolls is usually an ancestor rather than the
+     * window, and a listener on the window alone would never hear it.
+     */
+    useLayoutEffect(() => {
+        if (!showing) {
+            setAnchor(null);
+            return;
+        }
+        const measure = (): void => {
+            const node = field.current;
+            if (!node) return;
+            const box = node.getBoundingClientRect();
+            setAnchor({ left: box.left, top: box.bottom + 4, width: box.width });
+        };
+        measure();
+        window.addEventListener("scroll", measure, true);
+        window.addEventListener("resize", measure);
+        return () => {
+            window.removeEventListener("scroll", measure, true);
+            window.removeEventListener("resize", measure);
+        };
+    }, [showing]);
 
     /** Look the token under the caret up, after the typing has paused. */
     function refresh(): void {
@@ -259,11 +299,14 @@ export function AccountInput({
                 onBlur={() => setOpen(false)}
                 onKeyDown={onKeyDown}
             />
-            {open && results.length > 0 ? (
+            {showing && anchor
+                ? createPortal(
                 <ul
                     id={listId}
                     role="listbox"
-                    className={cn(POPUP_CLASS, "absolute left-0 top-full z-50 mt-1")}
+                    // Above the dialog it is usually inside, which sits at z-50.
+                    style={{ left: anchor.left, top: anchor.top, width: anchor.width }}
+                    className={cn(POPUP_CLASS, "fixed z-[60]")}
                 >
                     {results.map((account, index) => {
                         const identity = identityOf(account);
@@ -303,8 +346,10 @@ export function AccountInput({
                             </li>
                         );
                     })}
-                </ul>
-            ) : null}
+                </ul>,
+                document.body
+              )
+                : null}
         </div>
     );
 }

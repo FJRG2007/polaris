@@ -90,7 +90,8 @@ export function ProviderSelect({
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder="Search providers"
-                            className="h-7 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                            bare
+                            className="h-7"
                         />
                     </div>
                     <div className="max-h-64 overflow-y-auto p-1" role="listbox">

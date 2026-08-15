@@ -238,7 +238,7 @@ export function SharedVariablesSection({
                                 rows={6}
                                 spellCheck={false}
                                 placeholder={"DATABASE_URL=postgres://...\nAPI_TOKEN=..."}
-                                className="w-full rounded-md border border-border bg-transparent px-3 py-2 font-mono text-xs outline-none focus:border-primary"
+                                className="w-full rounded-md border border-border bg-transparent px-3 py-2 font-mono text-xs hover:border-border-strong focus:border-border-strong"
                             />
                             <label className="flex items-center gap-2 text-sm">
                                 <Checkbox checked={secret} onChange={(event) => setSecret(event.target.checked)} />

@@ -659,7 +659,7 @@ export function DateField({
                 disabled={disabled}
                 value={toDateInput(value, timed)}
                 onChange={(event) => onChange(fromDateInput(event.target.value))}
-                className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-primary disabled:opacity-50"
+                className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground hover:border-border-strong focus:border-border-strong disabled:opacity-50"
             />
             {value && !disabled && (
                 <button
@@ -858,7 +858,7 @@ export function DuePicker({
                         aria-label="Due date"
                         value={toDateInput(dueDate, timed)}
                         onChange={(event) => onChange(fromDateInput(event.target.value))}
-                        className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-primary"
+                        className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground hover:border-border-strong focus:border-border-strong"
                     />
                     {dueDate && (
                         <button

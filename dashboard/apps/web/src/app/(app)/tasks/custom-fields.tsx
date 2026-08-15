@@ -154,7 +154,7 @@ export function CustomFieldEditor({
                     aria-label={field.name}
                     onChange={(event) => onEdit?.(event.target.value)}
                     onBlur={(event) => commit(event.target.value)}
-                    className="w-full resize-y rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
+                    className="w-full resize-y rounded-md border border-border bg-background px-2 py-1 text-xs hover:border-border-strong focus:border-border-strong"
                 />
             );
         case "date":
@@ -165,7 +165,7 @@ export function CustomFieldEditor({
                     disabled={disabled}
                     aria-label={field.name}
                     onChange={(event) => commit(event.target.value)}
-                    className="rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
+                    className="rounded-md border border-border bg-background px-2 py-1 text-xs hover:border-border-strong focus:border-border-strong"
                 />
             );
         case "number":

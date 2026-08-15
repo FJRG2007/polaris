@@ -151,7 +151,7 @@ function ColumnEditor({
                     if (event.key === "Escape") onCancel();
                     if (event.key === "Enter") void submit();
                 }}
-                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
+                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm hover:border-border-strong focus:border-border-strong"
             />
             {/* The kind is not decoration: it is what decides whether work in
                 this column counts as finished, so it is asked for rather than

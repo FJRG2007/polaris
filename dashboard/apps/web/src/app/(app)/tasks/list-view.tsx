@@ -861,7 +861,7 @@ export function ListScreen({
                         onChange={(event) => setSearch(event.target.value)}
                         placeholder="Search tasks"
                         aria-label="Search tasks"
-                        className="h-8 w-44 rounded-md border border-border bg-background pl-7 pr-2 text-xs outline-none focus:border-primary"
+                        className="h-8 w-44 rounded-md border border-border bg-background pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
                     />
                 </div>
 

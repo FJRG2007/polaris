@@ -342,7 +342,7 @@ function MotdCard({
                     rows={mc.MOTD_MAX_LINES}
                     aria-label={raw ? "Server description, with its formatting codes" : "Server description"}
                     spellCheck={false}
-                    className="w-full resize-none rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm outline-none focus:border-primary"
+                    className="w-full resize-none rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm hover:border-border-strong focus:border-border-strong"
                 />
 
                 <div className="flex items-center justify-between gap-2">

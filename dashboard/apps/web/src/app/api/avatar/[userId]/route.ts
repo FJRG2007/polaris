@@ -2,8 +2,10 @@
  * The face for one account.
  *
  * One URL whatever the answer turns out to be - the photo they uploaded, their
- * Gravatar, or nothing - so no screen has to know which. Nothing is a 404, which
- * is what tells the browser to leave the initials the component already drew.
+ * Gravatar, or nothing - so no screen has to know which. Nothing is a
+ * transparent pixel rather than a 404: the initials the component drew show
+ * through it, and the dashboard stops looking like it is failing to load an
+ * image for every account that has not set one. See lib/avatar-blank.
  *
  * Signed in only. Confirming that a given account exists, and handing over the
  * photo attached to it, is not something to serve to whoever asks; a profile
@@ -12,6 +14,7 @@
 
 import { requireUser } from "@/lib/session";
 import { resolveAvatar } from "@/lib/avatar-service";
+import { BLANK_AVATAR_ETAG, blankAvatarResponse } from "@/lib/avatar-blank";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +37,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
     const picture = await resolveAvatar(userId);
     // Cached too: an account with no picture is the common case, and without
     // this every one of them is asked for again on every screen.
-    if (!picture) return new Response(null, { status: 404, headers: { "Cache-Control": CACHE } });
+    if (!picture) {
+        if (request.headers.get("if-none-match") === BLANK_AVATAR_ETAG) {
+            return new Response(null, {
+                status: 304,
+                headers: { ETag: BLANK_AVATAR_ETAG, "Cache-Control": CACHE }
+            });
+        }
+        return blankAvatarResponse(CACHE);
+    }
 
     // Answered before the bytes are fetched, which is the point of the split:
     // most requests for a face are a browser checking the one it already has.
@@ -43,7 +54,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
     }
 
     const bytes = await picture.load();
-    if (!bytes) return new Response(null, { status: 404, headers: { "Cache-Control": CACHE } });
+    // The row said there was a picture and the bytes are gone - a swept upload,
+    // a storage target that moved. Same answer as having none: the screen wants
+    // initials, not a broken image.
+    if (!bytes) return blankAvatarResponse(CACHE);
 
     return new Response(bytes as BodyInit, {
         headers: {

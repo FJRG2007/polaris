@@ -16,6 +16,7 @@
  * a 4rem message column helps nobody.
  */
 
+import { PAGE_FILL } from "@polaris/ui";
 import { ChatSidebar } from "./chat-sidebar";
 import { usePathname } from "next/navigation";
 import { useChatStream } from "./use-chat-stream";
@@ -64,14 +65,14 @@ function ChatColumns({ children }: { children: ReactNode }) {
     );
 
     return (
-        <div className="flex h-below-header w-full overflow-hidden">
+        <div className={`${PAGE_FILL} w-full flex-row`}>
             <div
-                className={`${inConversation ? "hidden md:flex" : "flex"} w-full shrink-0 flex-col border-r border-border md:w-64`}
+                className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 w-full shrink-0 flex-col border-r border-border md:w-64`}
             >
                 <ChatSidebar />
             </div>
             <div
-                className={`${inConversation ? "flex" : "hidden md:flex"} min-w-0 flex-1 flex-col`}
+                className={`${inConversation ? "flex" : "hidden md:flex"} min-h-0 min-w-0 flex-1 flex-col`}
             >
                 {children}
             </div>

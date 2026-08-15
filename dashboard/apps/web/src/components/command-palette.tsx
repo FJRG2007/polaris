@@ -525,7 +525,8 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
                             aria-autocomplete="list"
                             aria-activedescendant={rows[active] ? rowElementId(rows[active]!) : undefined}
                             aria-controls="polaris-search-results"
-                            className="h-12 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                            bare
+                            className="h-12"
                         />
                         {loading || searching ? (
                             <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" aria-hidden="true" />

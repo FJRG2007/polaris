@@ -100,7 +100,7 @@ export function PeoplePicker({
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder={full ? "That is as many as this holds" : "Search by name or email"}
                     aria-label={label}
-                    className="h-8 w-full rounded-md border border-border bg-background pl-7 pr-7 text-sm outline-none focus:border-primary disabled:opacity-60"
+                    className="h-8 w-full rounded-md border border-border bg-background pl-7 pr-7 text-sm hover:border-border-strong focus:border-border-strong disabled:opacity-60"
                 />
                 {searching && (
                     <Loader2 className="absolute right-2 top-1/2 size-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
