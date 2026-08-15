@@ -22,17 +22,22 @@ import { Check, Link2, Mic, MicOff, PhoneOff, Video, VideoOff, X } from "lucide-
 export function CallRoom({
     meetingId,
     onLeave,
-    /** Shown to whoever started the call: the link for people with no account. */
-    canShare = false
+    /** Whoever is watching, when they have an account. The guest link is the
+     *  host's to open and nobody else's, so the control is drawn from who the
+     *  call says its host is rather than from who opened this screen - offering
+     *  a button that the server will refuse is worse than not offering it. */
+    viewerId
 }: {
     meetingId: string;
     onLeave: () => void;
-    canShare?: boolean;
+    viewerId?: string;
 }) {
     const call = useCall(meetingId);
     const [guestLink, setGuestLink] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
+    const [shareError, setShareError] = useState("");
 
+    const canShare = Boolean(viewerId) && call.meeting?.hostId === viewerId;
     const admitted = call.meeting?.participants.filter(
         (person) => person.admission === "admitted"
     );
@@ -57,9 +62,9 @@ export function CallRoom({
 
     return (
         <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
-            {call.error && (
+            {(call.error || shareError) && (
                 <p role="alert" className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-                    {call.error}
+                    {call.error || shareError}
                 </p>
             )}
 
@@ -152,6 +157,7 @@ export function CallRoom({
                                 return;
                             }
                             const result = await actions.setGuestLinkAction(meetingId, true, true);
+                            setShareError(result.error ?? "");
                             if (result.token) {
                                 setGuestLink(`${window.location.origin}/m/${result.token}`);
                             }

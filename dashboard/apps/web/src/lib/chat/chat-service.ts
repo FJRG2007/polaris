@@ -51,6 +51,10 @@ export interface ChatChannelView {
      *  never opened and nothing has happened in. */
     readonly unread: number;
     readonly muted: boolean;
+    /** Whether this reader administers the conversation, which is what decides
+     *  whether the screen offers them anything only a moderator may do. Always
+     *  false in a direct message, where everybody in one is equal in it. */
+    readonly mayAdminister: boolean;
     /** The other people in a direct message, for the avatars beside it. Empty
      *  for a named channel, where the name is the whole label. */
     readonly others: readonly { id: string; name: string }[];
@@ -268,10 +272,13 @@ export async function removeSpaceMember(
  */
 export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]> {
     const spaces = await reachableSpaceIds(actor);
-    const memberships = await prisma.chatChannelMember.findMany({
-        where: { userId: actor.id },
-        select: { channelId: true, lastReadAt: true, muted: true }
-    });
+    const [memberships, administered] = await Promise.all([
+        prisma.chatChannelMember.findMany({
+            where: { userId: actor.id },
+            select: { channelId: true, lastReadAt: true, muted: true, role: true }
+        }),
+        administeredSpaceIds(actor)
+    ]);
     const mine = new Map(memberships.map((row) => [row.channelId, row]));
 
     const channels = await prisma.chatChannel.findMany({
@@ -313,20 +320,28 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             lastMessageAt: channel.lastMessageAt?.toISOString() ?? null,
             unread: unread.get(channel.id) ?? 0,
             muted: mine.get(channel.id)?.muted ?? false,
+            mayAdminister: Boolean(
+                channel.spaceId &&
+                    (administered.has(channel.spaceId) ||
+                        mine.get(channel.id)?.role === "admin")
+            ),
             others: channel.spaceId ? [] : others
         };
     });
 }
 
-/** One conversation, or null when it is not this reader's to open. */
-export async function getChannel(
-    actor: ChatActor,
-    channelId: string
-): Promise<ChatChannelView | null> {
-    const access = await channelAccess(actor, channelId);
-    if (!access) return null;
-    const channels = await listChannels(actor);
-    return channels.find((channel) => channel.id === channelId) ?? null;
+/** The spaces this actor administers, by either of the two ways of doing so.
+ *  The same rule `channelAccess` applies one channel at a time, asked once for
+ *  a whole rail. */
+async function administeredSpaceIds(actor: ChatActor): Promise<Set<string>> {
+    const [owned, admin] = await Promise.all([
+        prisma.chatSpace.findMany({ where: { ownerId: actor.id }, select: { id: true } }),
+        prisma.chatSpaceMember.findMany({
+            where: { userId: actor.id, role: "admin" },
+            select: { spaceId: true }
+        })
+    ]);
+    return new Set([...owned.map((row) => row.id), ...admin.map((row) => row.spaceId)]);
 }
 
 export async function createChannel(

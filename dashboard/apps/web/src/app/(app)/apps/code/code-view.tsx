@@ -18,11 +18,17 @@
 
 import Link from "next/link";
 import { listWorkAction } from "./actions";
-import { useEffect, useMemo, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cn, EmptyState, SegmentedControl, Skeleton } from "@polaris/ui";
 import type { CodeItem, CodeKind, CodeScope, CodeState } from "@/lib/code/code-service";
 import { CircleDot, CircleSlash, ExternalLink, GitMerge, GitPullRequest, GitPullRequestDraft, MessageSquare, Search } from "lucide-react";
+
+/** How long typing pauses before the list is asked again. GitHub's search takes
+ *  thirty requests a minute and a qualifier is thirty keystrokes, so a request
+ *  per keystroke spends the whole allowance on one line of typing. Only typing
+ *  waits: arriving and pressing a filter are one request each and go at once. */
+const SEARCH_AFTER = 300;
 
 /** The filters, in the order somebody reaches for them. */
 const SCOPES: { value: CodeScope; label: string }[] = [
@@ -40,27 +46,28 @@ export function CodeView() {
     const [query, setQuery] = useState("");
     const [items, setItems] = useState<readonly CodeItem[] | null>(null);
     const [error, setError] = useState("");
+    // Answers can come back out of order; only the newest one may win.
+    const asked = useRef(0);
 
     // Issues have no review to wait on, so the filter that makes no sense for
     // them is corrected rather than left to return nothing forever.
     const effectiveScope: CodeScope = kind === "issue" && scope === "review" ? "assigned" : scope;
 
     useEffect(() => {
-        let stale = false;
+        const mine = ++asked.current;
         setItems(null);
         setError("");
-        void listWorkAction({ kind, scope: effectiveScope, state, query }).then((result) => {
-            if (stale) return;
+        const timer = setTimeout(async () => {
+            const result = await listWorkAction({ kind, scope: effectiveScope, state, query });
+            if (mine !== asked.current) return;
             if (result.error) {
                 setError(result.error);
                 setItems([]);
                 return;
             }
             setItems(result.items ?? []);
-        });
-        return () => {
-            stale = true;
-        };
+        }, query.trim() ? SEARCH_AFTER : 0);
+        return () => clearTimeout(timer);
     }, [kind, effectiveScope, state, query]);
 
     const scopes = useMemo(

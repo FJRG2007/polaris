@@ -9,9 +9,13 @@
  * to a token that cannot see it, and this layer passes that through as the
  * sentence it deserves rather than treating it as an error.
  *
- * `agents.read` is the gate. It is the permission that already means "may see
- * the repositories this instance is connected to", and inventing a second one
- * for the same subject would only mean two switches an operator has to find.
+ * The gates are the pair this subject already has, and no third one is invented
+ * for it: `agents.read` means "may see the repositories this instance is
+ * connected to", and `agents.manage` means "may act on them". Reading a pull
+ * request and merging one are not the same act - a merge cannot be taken back
+ * and a comment appears on GitHub under the caller's own name - and `agents.read`
+ * is in the read-only role, so putting a write behind it would hand every viewer
+ * a verb nobody meant to give them.
  */
 
 import { z } from "zod";
@@ -89,7 +93,7 @@ export async function readConversationAction(
 }
 
 export async function commentAction(input: unknown): Promise<{ error?: string }> {
-    const user = await requirePermission("agents.read");
+    const user = await requirePermission("agents.manage");
     const parsed = targetSchema
         .extend({ body: z.string().trim().min(1, "Write something first").max(60000) })
         .safeParse(input);
@@ -109,7 +113,7 @@ export async function commentAction(input: unknown): Promise<{ error?: string }>
 }
 
 export async function setStateAction(input: unknown): Promise<{ error?: string }> {
-    const user = await requirePermission("agents.read");
+    const user = await requirePermission("agents.manage");
     const parsed = targetSchema.extend({ state: z.enum(["open", "closed"]) }).safeParse(input);
     if (!parsed.success) return { error: "That could not be changed" };
 
@@ -125,7 +129,7 @@ export async function setStateAction(input: unknown): Promise<{ error?: string }
 }
 
 export async function mergeAction(input: unknown): Promise<{ error?: string }> {
-    const user = await requirePermission("agents.read");
+    const user = await requirePermission("agents.manage");
     const parsed = targetSchema
         .extend({ method: z.enum(["merge", "squash", "rebase"]) })
         .safeParse(input);

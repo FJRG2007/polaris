@@ -7,8 +7,8 @@
  * it cannot open exists.
  */
 
-import { requirePermission } from "@/lib/session";
 import { WorkDetail } from "@/app/(app)/apps/code/work-detail";
+import { requirePermission, userHasManage } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +17,15 @@ export default async function CodeItemPage({
 }: {
     params: Promise<{ owner: string; repo: string; number: string }>;
 }) {
-    await requirePermission("agents.read");
+    const user = await requirePermission("agents.read");
     const { owner, repo, number } = await params;
 
-    return <WorkDetail owner={owner} repo={repo} number={Number(number)} />;
+    return (
+        <WorkDetail
+            owner={owner}
+            repo={repo}
+            number={Number(number)}
+            canWrite={await userHasManage(user, "agents.manage")}
+        />
+    );
 }

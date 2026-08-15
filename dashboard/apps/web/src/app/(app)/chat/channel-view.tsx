@@ -22,10 +22,10 @@
  */
 
 import * as actions from "./actions";
-import * as calls from "./meeting-actions";
-import { CallRoom } from "./call-room";
 import { Composer } from "./composer";
+import { CallRoom } from "./call-room";
 import { useChat } from "./chat-context";
+import * as calls from "./meeting-actions";
 import { useRouter } from "next/navigation";
 import { ThreadPanel } from "./thread-panel";
 import { MessageList } from "./message-list";
@@ -66,12 +66,18 @@ export function ChannelView({ channelId }: { channelId: string }) {
     const scroller = useRef<HTMLDivElement>(null);
     const following = useRef(true);
     const marked = useRef("");
+    // Which message each optimistic draft turned into. Reconciling on the id the
+    // server gave back rather than on the text is what keeps two people saying
+    // "ok" from cancelling each other's draft off the screen.
+    const drafts = useRef(0);
+    const sent = useRef(new Map<string, string>());
 
     const channel = useMemo(
         () => channels.find((entry) => entry.id === channelId) ?? null,
         [channels, channelId]
     );
     const canPost = channel ? !channel.archived : true;
+    const canModerate = channel?.mayAdminister ?? false;
 
     // Everything about this screen is about one id; a different one is a
     // different conversation and none of the previous state belongs to it.
@@ -84,6 +90,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
         setInCall(null);
         marked.current = "";
         following.current = true;
+        sent.current.clear();
     }, [channelId]);
 
     // Whether there is a call to join, asked on arrival and again whenever
@@ -105,14 +112,16 @@ export function ChannelView({ channelId }: { channelId: string }) {
             setMessages([]);
             return;
         }
-        setMessages(result.page?.messages ?? []);
+        const page = result.page?.messages ?? [];
+        setMessages(page);
         setOlderThan(result.page?.olderThan ?? null);
         // Anything optimistic that the server has now confirmed is dropped, so
         // a message is never on screen twice.
         setPending((current) =>
-            current.filter(
-                (entry) => !(result.page?.messages ?? []).some((real) => real.body === entry.body)
-            )
+            current.filter((entry) => {
+                const real = sent.current.get(entry.id);
+                return !real || !page.some((message) => message.id === real);
+            })
         );
     }, [channelId]);
 
@@ -171,7 +180,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
 
     const send = async (body: string) => {
         const draft: ChatMessageView = {
-            id: `pending:${body}`,
+            id: `pending:${++drafts.current}`,
             channelId,
             authorId: viewerId,
             authorName: null,
@@ -189,10 +198,11 @@ export function ChannelView({ channelId }: { channelId: string }) {
         following.current = true;
 
         const result = await runAction(() => actions.sendAction({ channelId, body }), setError);
-        if (result?.error) {
+        if (result?.error || !result?.id) {
             setPending((current) => current.filter((entry) => entry.id !== draft.id));
             return;
         }
+        sent.current.set(draft.id, result.id);
         await load();
         refresh();
     };
@@ -257,7 +267,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
                     <div className="flex max-h-[60%] min-h-0 shrink-0 flex-col border-b border-border">
                         <CallRoom
                             meetingId={inCall}
-                            canShare
+                            viewerId={viewerId}
                             onLeave={() => {
                                 setInCall(null);
                                 checkCall();
@@ -320,7 +330,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
                             messages={shown}
                             viewerId={viewerId}
                             canPost={canPost}
-                            canModerate={false}
+                            canModerate={canModerate}
                             onOpenThread={setThread}
                             onReact={react}
                             onEdit={setEditing}
@@ -361,6 +371,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
                     root={thread}
                     viewerId={viewerId}
                     canPost={canPost}
+                    canModerate={canModerate}
                     onClose={() => setThread(null)}
                     onChanged={() => void load()}
                 />

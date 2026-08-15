@@ -164,7 +164,7 @@ export function useCall(meetingId: string): CallState {
         let beat: ReturnType<typeof setInterval> | null = null;
 
         async function start(): Promise<void> {
-            ice.current = await actions.iceServersAction().catch(() => []);
+            ice.current = await actions.iceServersAction(meetingId).catch(() => []);
 
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
