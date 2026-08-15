@@ -23,6 +23,15 @@ vi.mock("@/lib/orgs/org-service", () => ({ memberOrgIds: async () => [] }));
 
 vi.mock("@/lib/rich-text/mention-service", () => ({ like: (term: string) => ({ contains: term }) }));
 
+/** Who has hidden themselves, and from whom. Everybody else is on the default,
+ *  which is findable. */
+let hidden = new Set<string>();
+
+vi.mock("@/lib/privacy-service", () => ({
+    discoverableBy: async (_viewer: { id: string }, userIds: readonly string[]) =>
+        new Set(userIds.filter((id) => !hidden.has(id)))
+}));
+
 /** Everybody on this pretend instance. The point of the search test is that the
  *  query is over accounts and not over who shares a Tasks space with whom, so
  *  none of these share anything. */
@@ -63,6 +72,7 @@ const access = await import("../../src/lib/chat/access");
 
 beforeEach(() => {
     withChat = new Set(["ada", "grace"]);
+    hidden = new Set();
 });
 
 describe("who can be messaged", () => {
@@ -137,5 +147,39 @@ describe("finding somebody to talk to", () => {
         withChat.add("gone");
         const found = await access.searchForConversation({ id: "ada" }, "banned");
         expect(found.people).toEqual([]);
+    });
+});
+
+/**
+ * What a picker is not.
+ *
+ * An instance is not always a company where everybody may know everybody, so
+ * nothing here enumerates: an empty box and a single letter both answer with
+ * nothing, and somebody who has taken themselves out of the search is not in it
+ * - not as a result, and not as a number in a line saying how many were left
+ * out.
+ */
+describe("what it refuses to list", () => {
+    it("answers an empty box with an empty list", async () => {
+        const found = await access.searchForConversation({ id: "ada" }, "");
+        expect(found).toEqual({ people: [], withheld: 0 });
+    });
+
+    it("answers one letter the same way", async () => {
+        // A single letter is the first page of a directory, not a search.
+        const found = await access.searchForConversation({ id: "ada" }, "g");
+        expect(found.people).toEqual([]);
+    });
+
+    it("leaves out somebody who has hidden themselves", async () => {
+        hidden.add("grace");
+        const found = await access.searchForConversation({ id: "ada" }, "grace");
+        expect(found.people).toEqual([]);
+    });
+
+    it("does not count them either, since counting them says they exist", async () => {
+        hidden.add("turing");
+        const found = await access.searchForConversation({ id: "ada" }, "alan");
+        expect(found).toEqual({ people: [], withheld: 0 });
     });
 });

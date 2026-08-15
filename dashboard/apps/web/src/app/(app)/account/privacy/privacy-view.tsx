@@ -19,12 +19,13 @@ import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { searchPeopleAction } from "@/app/(app)/chat/actions";
 import { Loader2, UserMinus, UserPlus, X } from "lucide-react";
-import { Button, Card, CardBody, SegmentedControl } from "@polaris/ui";
 import type { FriendRequestView, FriendView } from "@/lib/friends-service";
+import { Button, Card, CardBody, Input, SegmentedControl } from "@polaris/ui";
 import { PeoplePicker, type PickedPerson } from "@/app/(app)/chat/people-picker";
 import {
     removeFriendAction,
     requestFriendAction,
+    requestFriendByUsernameAction,
     respondToRequestAction,
     savePrivacyAction
 } from "./actions";
@@ -55,7 +56,7 @@ export function PrivacyView({
         <div className="flex flex-col gap-4">
             <Card>
                 <CardBody className="flex flex-col gap-5 p-4">
-                    {(["lastSeen", "readReceipts", "avatar"] as const).map((field) => (
+                    {(["discoverable", "lastSeen", "readReceipts", "avatar"] as const).map((field) => (
                         <div key={field} className="flex flex-col gap-1.5">
                             <span className="text-sm font-medium">
                                 {core.PRIVACY_FIELD_LABELS[field]}
@@ -145,6 +146,8 @@ function FriendsCard({
                     search={searchPeopleAction}
                 />
 
+                <ByUsername onDone={setError} />
+
                 {requests.length > 0 && (
                     <ul className="flex flex-col gap-1">
                         {requests.map((request) => (
@@ -232,5 +235,68 @@ function FriendsCard({
                 )}
             </CardBody>
         </Card>
+    );
+}
+
+/**
+ * Asking somebody who cannot be searched for.
+ *
+ * The other half of "nobody can find me": a username is handed out on purpose,
+ * one person at a time, and this is what it is handed out for. The answer is the
+ * same sentence whether or not anybody was there - anything else would be a way
+ * to find out which usernames exist by typing them one after another.
+ */
+function ByUsername({ onDone }: { onDone: (message: string) => void }) {
+    const [username, setUsername] = useState("");
+    const [said, setSaid] = useState("");
+    const [busy, setBusy] = useState(false);
+
+    const ask = async () => {
+        if (!username.trim()) return;
+        setBusy(true);
+        onDone("");
+        const result = await runAction(() => requestFriendByUsernameAction(username), onDone);
+        setBusy(false);
+        if (result?.said) {
+            setSaid(result.said);
+            setUsername("");
+        }
+    };
+
+    return (
+        <div className="flex flex-col gap-1.5">
+            <span className="text-xs text-muted-foreground">
+                Somebody who keeps themselves out of the search can still be asked, if they have
+                given you their username.
+            </span>
+            <div className="flex items-center gap-2">
+                <Input
+                    value={username}
+                    onChange={(event) => {
+                        setUsername(event.target.value);
+                        setSaid("");
+                    }}
+                    onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                            event.preventDefault();
+                            void ask();
+                        }
+                    }}
+                    placeholder="username"
+                    aria-label="Ask by username"
+                    className="max-w-xs font-mono text-xs"
+                />
+                <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy || !username.trim()}
+                    onClick={() => void ask()}
+                >
+                    {busy && <Loader2 className="size-4 animate-spin" />}
+                    Ask
+                </Button>
+            </div>
+            {said && <span className="text-xs text-muted-foreground">{said}</span>}
+        </div>
     );
 }

@@ -39,12 +39,15 @@ export const PRIVACY_AUDIENCE_LABELS: Record<PrivacyAudience, string> = {
 
 /** What each setting is, said once, so the screen and this file cannot drift. */
 export const PRIVACY_FIELD_LABELS = {
+    discoverable: "Whether people can find you",
     lastSeen: "When you were last here",
     readReceipts: "That you have read a message",
     avatar: "Your photo"
 } as const;
 
 export const PRIVACY_FIELD_NOTES = {
+    discoverable:
+        "Who finds your account when they look for somebody. Anybody who cannot has to know your exact username to ask to be added, and is never told whether it exists.",
     lastSeen: "Whether other people can see that you are here now, or when you last were.",
     readReceipts:
         "The ticks under a message in a direct conversation. Turning this down also stops you seeing anybody else's.",
@@ -52,6 +55,20 @@ export const PRIVACY_FIELD_NOTES = {
 } as const;
 
 export const privacySettingsSchema = z.object({
+    /**
+     * Whether an account turns up when somebody searches for people.
+     *
+     * The one setting here that is not about a detail of somebody's presence but
+     * about the account itself, and the reason it exists: an instance is not
+     * always a company where everybody may know everybody. Two people who use the
+     * same Polaris and should not know of each other must not find each other by
+     * typing a letter into a picker.
+     *
+     * `friends` is the useful middle: invisible to a search, reachable by
+     * somebody who was given the exact username - which is a thing a person
+     * hands out deliberately, one at a time.
+     */
+    discoverable: z.enum(PRIVACY_AUDIENCES).default("everyone"),
     lastSeen: z.enum(PRIVACY_AUDIENCES).default("everyone"),
     readReceipts: z.enum(PRIVACY_AUDIENCES).default("everyone"),
     avatar: z.enum(PRIVACY_AUDIENCES).default("everyone")

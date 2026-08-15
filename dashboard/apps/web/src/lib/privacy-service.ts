@@ -17,16 +17,58 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
-import { areFriends } from "@/lib/friends-service";
+import { areFriends, friendIds } from "@/lib/friends-service";
 
 export async function privacyFor(userId: string): Promise<core.PrivacySettings> {
     const row = await prisma.userPrivacy.findUnique({
         where: { userId },
-        select: { lastSeen: true, readReceipts: true, avatar: true }
+        select: { discoverable: true, lastSeen: true, readReceipts: true, avatar: true }
     });
     if (!row) return core.DEFAULT_PRIVACY;
     const parsed = core.privacySettingsSchema.safeParse(row);
     return parsed.success ? parsed.data : core.DEFAULT_PRIVACY;
+}
+
+/**
+ * Which of these accounts this viewer is allowed to find.
+ *
+ * Asked of a set rather than one at a time because it is asked by a search: one
+ * query for the settings, one for the friendships, and the rule itself is the
+ * same pure function everything else here uses.
+ *
+ * Absence is the open answer, as everywhere else: an account that has never
+ * opened the screen has not asked to be hidden.
+ */
+export async function discoverableBy(
+    viewer: PrivacyViewer,
+    userIds: readonly string[]
+): Promise<Set<string>> {
+    const wanted = [...new Set(userIds)];
+    if (wanted.length === 0) return new Set();
+
+    const rows = await prisma.userPrivacy.findMany({
+        where: { userId: { in: wanted } },
+        select: { userId: true, discoverable: true }
+    });
+    const settings = new Map(rows.map((row) => [row.userId, row.discoverable]));
+
+    // Only looked up when somebody's answer actually turns on it, which is the
+    // uncommon case.
+    const needsFriends = wanted.some((userId) => settings.get(userId) === "friends");
+    const friends = needsFriends ? await friendIds(viewer.id) : new Set<string>();
+
+    return new Set(
+        wanted.filter((userId) => {
+            const audience = core.privacySettingsSchema.shape.discoverable.safeParse(
+                settings.get(userId)
+            );
+            return core.audienceAllows(audience.success ? audience.data : "everyone", {
+                self: userId === viewer.id,
+                friends: friends.has(userId),
+                viewerIsAdmin: viewer.isAdmin
+            });
+        })
+    );
 }
 
 export async function setPrivacy(

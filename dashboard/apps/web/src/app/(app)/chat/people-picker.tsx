@@ -3,9 +3,11 @@
 /**
  * Picking people, wherever Chat needs some.
  *
- * The same search the @ picker uses, so who can be found here is the same set as
- * everywhere else in Polaris and scoped by the same rule - somebody who cannot
- * be mentioned cannot be quietly added to a room either.
+ * **It lists nobody.** An empty box shows an empty list, and so does a single
+ * letter: a picker that fills itself with everybody on the instance the moment
+ * it opens is a user directory, and nobody signed up to be in one. What it
+ * offers is what the search allowed - which leaves out anybody who has taken
+ * themselves out of it, and anybody without the chat.
  *
  * Chosen people become chips above the field rather than checkmarks in a list,
  * because the question at the end is "who did I pick", and answering it by
@@ -106,7 +108,9 @@ export function PeoplePicker({
                     value={query}
                     disabled={full}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder={full ? "That is as many as this holds" : "Search by name or email"}
+                    placeholder={
+                        full ? "That is as many as this holds" : "Name, email or username"
+                    }
                     aria-label={label}
                     className="h-8 w-full rounded-md border border-border bg-background pl-7 pr-7 text-sm hover:border-border-strong focus:border-border-strong disabled:opacity-60"
                 />
@@ -119,7 +123,7 @@ export function PeoplePicker({
                 who has just typed a colleague's name and been told "nobody"
                 reads it as a broken search; the account is real, it simply
                 cannot receive a message. */}
-            {!searching && withheld > 0 && (
+            {!searching && withheld > 0 && query.trim().length >= 2 && (
                 <p className="px-2 text-xs text-muted-foreground">
                     {withheld === 1
                         ? "One account matches but does not have Chat."
@@ -131,7 +135,11 @@ export function PeoplePicker({
             <ul className="max-h-48 overflow-y-auto">
                 {offered.length === 0 ? (
                     <li className="px-2 py-2 text-xs text-muted-foreground">
-                        {searching ? "Looking" : "Nobody else to add."}
+                        {query.trim().length < 2
+                            ? "Type a name, an email or a username."
+                            : searching
+                              ? "Looking"
+                              : "Nobody found."}
                     </li>
                 ) : (
                     offered.map((person) => (

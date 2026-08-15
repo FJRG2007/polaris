@@ -5949,6 +5949,12 @@ model LinkPreview {
 model UserPrivacy {
     userId String @id @db.Uuid
     // everyone | friends | nobody
+    //
+    // Whether the account turns up when somebody searches for people. Not a
+    // detail of their presence like the three below it but a fact about the
+    // account, and the one setting here that decides whether two people who
+    // share an instance can find each other at all.
+    discoverable String   @default("everyone")
     lastSeen     String   @default("everyone")
     readReceipts String   @default("everyone")
     avatar       String   @default("everyone")

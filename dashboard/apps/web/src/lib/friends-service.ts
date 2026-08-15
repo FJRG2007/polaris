@@ -148,6 +148,39 @@ export async function requestFriend(userId: string, otherId: string): Promise<vo
 }
 
 /**
+ * Ask somebody whose username you were given.
+ *
+ * The way in for an account that has taken itself out of every search. It has to
+ * exist, because "you cannot be found" and "you cannot be reached" are different
+ * settings and only the first is `friends`: a username is a thing a person hands
+ * out deliberately, one at a time, and this is what makes handing it out mean
+ * something.
+ *
+ * **The answer never says whether the account exists.** A different reply for a
+ * hit and a miss turns this into a way to test names one at a time until one
+ * lands, which is the whole thing the setting exists to prevent. So the caller
+ * gets one sentence either way, and a request is only actually stored when there
+ * was somebody to store it against.
+ *
+ * Exact, and case-insensitively so, since usernames are stored lowercase and
+ * somebody typing one from a note may capitalise it.
+ */
+export async function requestFriendByUsername(userId: string, username: string): Promise<void> {
+    const handle = username.trim().replace(/^@/, "").toLowerCase();
+    if (!handle) return;
+
+    const other = await prisma.user.findFirst({
+        where: { username: handle, bannedAt: null },
+        select: { id: true }
+    });
+    // Nothing to say and nothing to do. Deliberately indistinguishable from the
+    // case below, from the outside.
+    if (!other || other.id === userId) return;
+
+    await requestFriend(userId, other.id);
+}
+
+/**
  * Answer a request.
  *
  * Only the person who was asked may accept. Turning one down deletes the row

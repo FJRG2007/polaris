@@ -16,6 +16,7 @@ import {
     FriendError,
     removeFriend,
     requestFriend,
+    requestFriendByUsername,
     respondToRequest
 } from "@/lib/friends-service";
 
@@ -45,6 +46,23 @@ export async function savePrivacyAction(input: unknown): Promise<{ error?: strin
 export async function requestFriendAction(userId: string): Promise<{ error?: string }> {
     const user = await requireUser();
     return guard(() => requestFriend(user.id, String(userId)));
+}
+
+/**
+ * Ask somebody by the username they gave you.
+ *
+ * Answers the same way whether or not there was anybody there. A reply that
+ * distinguished the two would let anybody find out which usernames exist by
+ * typing them one at a time, which is the exact thing "nobody can find me" is
+ * for.
+ */
+export async function requestFriendByUsernameAction(
+    username: string
+): Promise<{ said: string; error?: string }> {
+    const user = await requireUser();
+    const result = await guard(() => requestFriendByUsername(user.id, String(username ?? "")));
+    if (result.error) return { said: "", error: result.error };
+    return { said: "If that account exists, it has been asked." };
 }
 
 export async function respondToRequestAction(
