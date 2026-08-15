@@ -120,6 +120,24 @@ export function Composer({
     }, [editingId]);
 
     /**
+     * The caret goes where the writing is about to happen.
+     *
+     * Pressing reply on a message and then having to click the box is a step
+     * nobody means to take - the press was the decision to write. The same for
+     * an edit, where the text is already there and the cursor was not.
+     *
+     * On the ids and nothing else. The objects are replaced whenever the
+     * conversation reloads, and focusing on that would put the caret back at the
+     * end of the line every time somebody else said something.
+     */
+    const replyingToId = replyingTo?.id ?? null;
+    const [focusAt, setFocusAt] = useState(0);
+    useEffect(() => {
+        if (!editingId && !replyingToId) return;
+        setFocusAt((current) => current + 1);
+    }, [editingId, replyingToId]);
+
+    /**
      * Escape backs out.
      *
      * The edit first, then the reply, because that is the order they were
@@ -389,6 +407,7 @@ export function Composer({
                     <RichTextEditor
                         key={generation}
                         value={body}
+                        focusAt={focusAt}
                         disabled={disabled}
                         placeholder={placeholder}
                         onChange={(next) => {

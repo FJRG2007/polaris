@@ -40,6 +40,15 @@ export interface RichTextEditorProps {
     placeholder?: string;
     disabled?: boolean;
     autoFocus?: boolean;
+    /**
+     * Bumped by the caller to put the caret in here.
+     *
+     * `autoFocus` only fires when the editor is built, and the surfaces that
+     * need this - answering a message, starting an edit - happen to an editor
+     * that is already on screen. Any changed value focuses; the number itself
+     * means nothing.
+     */
+    focusAt?: number;
     /** Draw the border and background of a form field. Off by default: a
      *  description should read as part of the panel, not as an input. */
     bordered?: boolean;
@@ -57,6 +66,7 @@ export function RichTextEditor({
     placeholder = "Write something",
     disabled = false,
     autoFocus = false,
+    focusAt = 0,
     bordered = false,
     className
 }: RichTextEditorProps) {
@@ -158,6 +168,14 @@ export function RichTextEditor({
     useEffect(() => {
         editor?.setEditable(!disabled);
     }, [editor, disabled]);
+
+    // At the end of whatever is already written: somebody answering a message
+    // wants to type, and somebody editing one wants to carry on from where the
+    // sentence stopped rather than from in front of it.
+    useEffect(() => {
+        if (!focusAt || !editor || disabled) return;
+        editor.commands.focus("end");
+    }, [focusAt, editor, disabled]);
 
     if (!editor) {
         // The same box, before the view exists, so nothing jumps when it does.

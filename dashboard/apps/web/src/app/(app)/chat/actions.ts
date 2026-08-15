@@ -26,24 +26,24 @@ import { requirePermission } from "@/lib/session";
 import { storeAttachment } from "@/lib/chat/attachments";
 import type { SavedMediaView } from "@/lib/chat/saved-media";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
-import type { ChatMessageView, ChatPage } from "@/lib/chat/messages";
 import { messageToasts, type MessageToast } from "@/lib/chat/toasts";
 import { searchMessages, type ChatSearchHit } from "@/lib/chat/search";
 import { voicePresence, type VoicePresence } from "@/lib/chat/meetings";
 import type { ChatInviteOffer, ChatInviteView } from "@/lib/chat/invites";
+import type { ChatMessageView, ChatNewerPage, ChatPage } from "@/lib/chat/messages";
 import { fetchRemoteMedia, searchTenor, tenorConfigured, type TenorResult } from "@/lib/chat/tenor";
-import {
-    ChatAccessError,
-    reachableChannelIds,
-    requirePostable,
-    searchForConversation
-} from "@/lib/chat/access";
 import type {
     ChatCategoryView,
     ChatChannelView,
     ChatMemberView,
     ChatSpaceView
 } from "@/lib/chat/chat-service";
+import {
+    ChatAccessError,
+    reachableChannelIds,
+    requirePostable,
+    searchForConversation
+} from "@/lib/chat/access";
 
 const CHAT_PATH = "/chat";
 
@@ -117,10 +117,10 @@ export async function readChannelAction(
 export async function readSinceAction(
     channelId: string,
     afterId: string | null
-): Promise<{ messages?: readonly ChatMessageView[]; error?: string }> {
+): Promise<{ page?: ChatNewerPage; error?: string }> {
     const me = await actor();
     const result = await guard(() => messages.readSince(me, channelId, afterId));
-    return result.error ? { error: result.error } : { messages: result.value };
+    return result.error ? { error: result.error } : { page: result.value };
 }
 
 export async function readThreadAction(

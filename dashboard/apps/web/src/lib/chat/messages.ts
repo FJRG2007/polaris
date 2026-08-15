@@ -124,6 +124,14 @@ export interface ChatPage {
     readonly olderThan: string | null;
 }
 
+/** A page of what was said after something, for reading downwards. */
+export interface ChatNewerPage {
+    readonly messages: readonly ChatMessageView[];
+    /** The cursor for the page below this one, or null when this reaches the
+     *  live end of the conversation. */
+    readonly newerThan: string | null;
+}
+
 /** How many messages one page holds. A screenful and a bit, so scrolling up
  *  fetches before it runs out rather than after. */
 const PAGE = 50;
@@ -197,12 +205,21 @@ export async function readThread(
     return decorateMessages(actor, rows);
 }
 
-/** Messages posted since a given id, for a screen catching up after a frame. */
+/**
+ * The page below the newest message on screen: what has been said since, for a
+ * screen catching up after a frame - and for one scrolling back down out of the
+ * history it walked up into.
+ *
+ * `newerThan` is the mirror of `olderThan`: the id to ask from next when there
+ * is more below, null once the reader is holding the live end of the
+ * conversation. Both exist so a screen can keep a window over a long channel
+ * rather than the whole of it.
+ */
 export async function readSince(
     actor: ChatActor,
     channelId: string,
     afterId: string | null
-): Promise<readonly ChatMessageView[]> {
+): Promise<ChatNewerPage> {
     await requireChannel(actor, channelId);
     await markDelivered(actor, channelId);
     const cursor = afterId
@@ -219,10 +236,15 @@ export async function readSince(
             ...(cursor ? { createdAt: { gt: cursor.createdAt } } : {})
         },
         orderBy: { createdAt: "asc" },
-        take: PAGE,
+        take: PAGE + 1,
         select: MESSAGE_SELECT
     });
-    return decorateMessages(actor, rows);
+
+    const page = rows.slice(0, PAGE);
+    return {
+        messages: await decorateMessages(actor, page),
+        newerThan: rows.length > PAGE ? (page[page.length - 1]?.id ?? null) : null
+    };
 }
 
 /**

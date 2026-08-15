@@ -39,8 +39,8 @@ import type { RecordedSound } from "./voice-recorder";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { MessageCircle, Mic, Video, Volume2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, ConfirmDeleteDialog, EmptyState, Skeleton } from "@polaris/ui";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 /** How close to the bottom still counts as "following along". A few pixels of
  *  slack, because a trackpad rarely lands exactly on zero. */
@@ -58,6 +58,21 @@ const JUMP_PAGES = 20;
 /** How long the message a search led to stays lit. */
 const HIGHLIGHT_MS = 2500;
 
+/**
+ * The most messages held at once - four pages.
+ *
+ * A conversation is read by scrolling, and scrolling far enough would otherwise
+ * put the whole of it in the browser: every avatar, every preview card, every
+ * player, all still mounted a thousand messages later. So the window moves
+ * instead of growing. Four pages is enough that the two edges are well off
+ * screen and a fetch is never one flick of a trackpad away.
+ */
+const MAX_WINDOW = 200;
+
+/** How close to an edge starts the next page loading. Roughly a screenful, so
+ *  it arrives before the reader gets there rather than after. */
+const NEAR_EDGE = 600;
+
 export function ChannelView({
     channelId,
     messageId = null
@@ -73,6 +88,9 @@ export function ChannelView({
     const [pending, setPending] = useState<readonly ChatMessageView[]>([]);
     const [olderThan, setOlderThan] = useState<string | null>(null);
     const [loadingOlder, setLoadingOlder] = useState(false);
+    // Whether there is a page below the window too, which there is only after
+    // scrolling far enough up that the newest messages were dropped.
+    const [newerThan, setNewerThan] = useState<string | null>(null);
     const [error, setError] = useState("");
     const [thread, setThread] = useState<ChatMessageView | null>(null);
     const [searching, setSearching] = useState(false);
@@ -102,10 +120,24 @@ export function ChannelView({
     // "ok" from cancelling each other's draft off the screen.
     const drafts = useRef(0);
     const sent = useRef(new Map<string, string>());
-    // The same cursor as `olderThan`, kept as a ref because a jump loads several
-    // pages inside one tick and state would still hold the one from before the
-    // first of them.
+    // The same cursors as `olderThan` and `newerThan`, kept as refs because a
+    // jump loads several pages inside one tick and state would still hold the
+    // one from before the first of them.
     const olderThanRef = useRef<string | null>(null);
+    const newerThanRef = useRef<string | null>(null);
+    // What is on screen, as of now rather than as of the last render. The
+    // fetches below do arithmetic on the window - what to keep, what to let go
+    // of, which id to ask from next - and a state value read inside an awaited
+    // function is the one from before the await.
+    const held = useRef<readonly ChatMessageView[]>([]);
+    // Set just before a page is added above the window, so the layout effect
+    // below can put the reader back where they were reading: prepending changes
+    // the height of everything above them, and without this the conversation
+    // jumps by exactly one page every time it loads one.
+    const anchor = useRef<number | null>(null);
+    // One fetch at a time in each direction. A trackpad fires scroll events far
+    // faster than a round trip.
+    const fetching = useRef(false);
     // The message a link asked for, once it has been walked back to. Kept so a
     // reload of the list - one arrives with every message anybody sends - does
     // not drag the reader back to it over and over.
@@ -136,8 +168,11 @@ export function ChannelView({
         marked.current = "";
         following.current = true;
         olderThanRef.current = null;
+        newerThanRef.current = null;
+        anchor.current = null;
         landed.current = null;
         sent.current.clear();
+        setNewerThan(null);
     }, [channelId]);
 
     // Whether there is a call to join, asked on arrival and again whenever
@@ -152,50 +187,164 @@ export function ChannelView({
 
     useEffect(checkCall, [checkCall]);
 
+    /** Drop everything the server has now confirmed, so a message is never on
+     *  screen twice. */
+    const settle = useCallback((arrived: readonly ChatMessageView[]) => {
+        setPending((current) =>
+            current.filter((entry) => {
+                const real = sent.current.get(entry.id);
+                return !real || !arrived.some((message) => message.id === real);
+            })
+        );
+    }, []);
+
+    /** The window, written in one place so the fetches below can do their
+     *  arithmetic on what is actually on screen without waiting for a render. */
+    const show = useCallback((next: readonly ChatMessageView[]) => {
+        held.current = next;
+        setMessages(next);
+    }, []);
+
+    /** Back to the live end of the conversation: the newest page and nothing
+     *  else. What opening a channel does. */
     const load = useCallback(async () => {
         const result = await actions.readChannelAction(channelId);
         if (result.error) {
             setError(result.error);
-            setMessages([]);
+            show([]);
             return;
         }
         const page = result.page?.messages ?? [];
-        setMessages(page);
+        show(page);
         olderThanRef.current = result.page?.olderThan ?? null;
+        newerThanRef.current = null;
         setOlderThan(olderThanRef.current);
-        // Anything optimistic that the server has now confirmed is dropped, so
-        // a message is never on screen twice.
-        setPending((current) =>
-            current.filter((entry) => {
-                const real = sent.current.get(entry.id);
-                return !real || !page.some((message) => message.id === real);
-            })
-        );
-    }, [channelId]);
+        setNewerThan(null);
+        settle(page);
+    }, [channelId, settle, show]);
 
     useEffect(() => {
         void load();
     }, [load]);
 
-    /** Pull in the page above the oldest message on screen. Returns whether
-     *  there is still more above it. */
+    /**
+     * Pull in the page above the oldest message on screen, and let go of as much
+     * from the bottom.
+     *
+     * The letting go is the point. A conversation somebody reads back through
+     * for ten minutes would otherwise hold every message it ever had, each with
+     * its avatar, its preview card and its player - which is how a chat tab ends
+     * up using a gigabyte on a machine that also has to run everything else.
+     * What is dropped is remembered as a cursor, so coming back down brings it
+     * straight back.
+     *
+     * Nothing is trimmed while the reader is at the bottom: dropping what is
+     * under somebody's eyes to save memory is the wrong trade in the one place
+     * the memory is being spent well.
+     *
+     * Returns whether there is still more above.
+     */
     const loadOlder = useCallback(async (): Promise<boolean> => {
-        let more = false;
-        setLoadingOlder(true);
         const cursor = olderThanRef.current;
-        if (!cursor) {
-            setLoadingOlder(false);
-            return false;
-        }
+        if (!cursor || fetching.current) return false;
+        fetching.current = true;
+        setLoadingOlder(true);
+
         const result = await actions.readChannelAction(channelId, cursor);
         setLoadingOlder(false);
+        fetching.current = false;
         if (!result.page) return false;
-        setMessages((current) => [...result.page!.messages, ...(current ?? [])]);
+
         olderThanRef.current = result.page.olderThan;
         setOlderThan(result.page.olderThan);
-        more = result.page.olderThan !== null;
-        return more;
-    }, [channelId]);
+
+        // Taken before the list grows above them, so the reader can be put back
+        // where they were reading: prepending a page changes the height of
+        // everything above, and without this the conversation jumps by exactly
+        // one page every time it loads one.
+        anchor.current = scroller.current?.scrollHeight ?? null;
+
+        const window = [...result.page.messages, ...held.current];
+        if (window.length > MAX_WINDOW && !following.current) {
+            const kept = window.slice(0, MAX_WINDOW);
+            // What was let go of, so the way back down is one fetch rather than
+            // a reload of the whole conversation.
+            newerThanRef.current = kept[kept.length - 1]?.id ?? null;
+            setNewerThan(newerThanRef.current);
+            show(kept);
+        } else {
+            show(window);
+        }
+        return result.page.olderThan !== null;
+    }, [channelId, show]);
+
+    /**
+     * The page below the window, for a reader coming back down out of the
+     * history. The mirror of the above, trim included: what falls off the top
+     * becomes the cursor for going up again.
+     */
+    const loadNewer = useCallback(async (): Promise<void> => {
+        const cursor = newerThanRef.current;
+        if (!cursor || fetching.current) return;
+        fetching.current = true;
+
+        const result = await actions.readSinceAction(channelId, cursor);
+        fetching.current = false;
+        if (!result.page) return;
+
+        newerThanRef.current = result.page.newerThan;
+        setNewerThan(result.page.newerThan);
+
+        const window = [...held.current, ...result.page.messages];
+        if (window.length > MAX_WINDOW) {
+            anchor.current = scroller.current?.scrollHeight ?? null;
+            const kept = window.slice(window.length - MAX_WINDOW);
+            olderThanRef.current = kept[0]?.id ?? null;
+            setOlderThan(olderThanRef.current);
+            show(kept);
+        } else {
+            show(window);
+        }
+        settle(result.page.messages);
+    }, [channelId, settle, show]);
+
+    /**
+     * What has been said since the newest message on screen.
+     *
+     * Used when a frame says somebody posted. An append rather than a reload:
+     * reloading replaces the window with the newest page alone, which throws
+     * away the history a reader had walked up into and moves them somewhere they
+     * did not ask to be. A reader who is not at the live end is not caught up at
+     * all - what arrived is below their window, and it comes back with the rest
+     * when they scroll down.
+     */
+    const catchUp = useCallback(async () => {
+        if (newerThanRef.current || fetching.current) return;
+        const newest = held.current[held.current.length - 1]?.id ?? null;
+        if (!newest) {
+            await load();
+            return;
+        }
+
+        fetching.current = true;
+        const result = await actions.readSinceAction(channelId, newest);
+        fetching.current = false;
+        const arrived = result.page?.messages ?? [];
+        if (arrived.length === 0) return;
+
+        const window = [...held.current, ...arrived];
+        if (window.length > MAX_WINDOW && following.current) {
+            // Following along, so the top is what gives: the reader is at the
+            // bottom and the oldest of it is far off screen.
+            const kept = window.slice(window.length - MAX_WINDOW);
+            olderThanRef.current = kept[0]?.id ?? null;
+            setOlderThan(olderThanRef.current);
+            show(kept);
+        } else {
+            show(window);
+        }
+        settle(arrived);
+    }, [channelId, load, settle, show]);
 
     /**
      * Scroll to a message, fetching backwards until it is there.
@@ -236,7 +385,7 @@ export function ChannelView({
         useCallback(
             (frame) => {
                 if (frame.kind === "posted" && frame.channels.includes(channelId)) {
-                    void load();
+                    void catchUp();
                     checkCall();
                 }
                 // The count beside the call button, kept honest. Nothing is
@@ -258,7 +407,7 @@ export function ChannelView({
                     ]);
                 }
             },
-            [channelId, load, checkCall]
+            [channelId, catchUp, checkCall]
         )
     );
 
@@ -274,15 +423,56 @@ export function ChannelView({
         return () => clearInterval(timer);
     }, [typists.length]);
 
+    // The patches - a star, a reaction, an edit, a delete - change the window
+    // without going through `show`, so this is what keeps the two in step.
+    useEffect(() => {
+        held.current = messages ?? [];
+    }, [messages]);
+
     const shown = useMemo(() => [...(messages ?? []), ...pending], [messages, pending]);
 
-    // Follow the bottom when the reader was already there. Layout effect timing
-    // is not needed: the list is not measured, only scrolled.
+    /**
+     * Where the reader ends up after the list changes shape.
+     *
+     * Two cases, and they are opposites. A page added above (or dropped from
+     * above) moves everything under it by its own height, so the reader is put
+     * back on the line they were reading - that is what `anchor` holds. Anything
+     * else, for a reader who was at the bottom, means following the bottom.
+     *
+     * A layout effect rather than an ordinary one: this runs before the browser
+     * paints, so nobody sees the list at the wrong offset first.
+     */
+    useLayoutEffect(() => {
+        const element = scroller.current;
+        if (!element) return;
+        if (anchor.current !== null) {
+            element.scrollTop += element.scrollHeight - anchor.current;
+            anchor.current = null;
+            return;
+        }
+        if (following.current) element.scrollTop = element.scrollHeight;
+    }, [shown]);
+
+    /**
+     * Stay at the bottom while the conversation is still settling.
+     *
+     * The reason a reload did not land at the newest message: the list is
+     * scrolled the moment it renders, and then the pictures, the link cards and
+     * the players finish loading and push it taller. Every one of those is
+     * height that appears after the scroll. So while the reader is at the
+     * bottom, the bottom is followed as the content grows.
+     */
     useEffect(() => {
         const element = scroller.current;
-        if (!element || !following.current) return;
-        element.scrollTop = element.scrollHeight;
-    }, [shown]);
+        if (!element || typeof ResizeObserver === "undefined") return;
+        const watcher = new ResizeObserver(() => {
+            if (following.current && anchor.current === null) {
+                element.scrollTop = element.scrollHeight;
+            }
+        });
+        for (const child of element.children) watcher.observe(child);
+        return () => watcher.disconnect();
+    }, [messages === null]);
 
     // Catching up on what is actually on screen.
     useEffect(() => {
@@ -411,9 +601,50 @@ export function ChannelView({
         refresh();
     };
 
+    /**
+     * React, in place.
+     *
+     * Reloading the conversation for one emoji was the same defect the star had:
+     * it replaces every message on screen and, now that the screen holds a
+     * window rather than the whole channel, it also throws a reader who is up in
+     * the history back down to the newest message. The change is one reaction on
+     * one row.
+     */
+    const patchReaction = (messageId: string, emoji: string, mine: boolean) => {
+        const apply = (entry: ChatMessageView): ChatMessageView => {
+            const existing = entry.reactions.find((entry) => entry.emoji === emoji);
+            if ((existing?.mine ?? false) === mine) return entry;
+            if (!existing) return { ...entry, reactions: [...entry.reactions, { emoji, count: 1, mine }] };
+            const count = existing.count + (mine ? 1 : -1);
+            return {
+                ...entry,
+                reactions: entry.reactions
+                    .map((entry) => (entry.emoji === emoji ? { ...entry, count, mine } : entry))
+                    .filter((entry) => entry.count > 0)
+            };
+        };
+        setMessages((current) => current?.map((entry) => (entry.id === messageId ? apply(entry) : entry)) ?? current);
+    };
+
     const react = async (messageId: string, emoji: string) => {
-        await runAction(() => actions.reactAction({ messageId, emoji }), setError);
-        await load();
+        const before =
+            held.current
+                .find((entry) => entry.id === messageId)
+                ?.reactions.find((entry) => entry.emoji === emoji)?.mine ?? false;
+        // Said deterministically rather than as a nudge up or down, so putting
+        // it back is the same call with the other answer.
+        patchReaction(messageId, emoji, !before);
+        const result = await runAction(() => actions.reactAction({ messageId, emoji }), setError);
+        patchReaction(messageId, emoji, result?.on ?? before);
+    };
+
+    /** Change one message on screen, for the things that happen to one message
+     *  and must not move anybody's place in the conversation. */
+    const patchMessage = (messageId: string, patch: Partial<ChatMessageView>) => {
+        setMessages(
+            (current) =>
+                current?.map((entry) => (entry.id === messageId ? { ...entry, ...patch } : entry)) ?? current
+        );
     };
 
     if (!channel && messages === null) {
@@ -514,23 +745,24 @@ export function ChannelView({
                     ref={scroller}
                     onScroll={(event) => {
                         const element = event.currentTarget;
-                        following.current =
-                            element.scrollHeight - element.scrollTop - element.clientHeight <
-                            AT_BOTTOM_SLACK;
+                        const below = element.scrollHeight - element.scrollTop - element.clientHeight;
+                        following.current = below < AT_BOTTOM_SLACK;
+                        // Both edges, because the window moves in both
+                        // directions: up into the history, and back down out of
+                        // it. Each is a no-op when there is no page that way.
+                        if (element.scrollTop < NEAR_EDGE) void loadOlder();
+                        else if (below < NEAR_EDGE) void loadNewer();
                     }}
                     className="min-h-0 flex-1 overflow-y-auto py-2"
                 >
                     {olderThan && (
-                        <div className="flex justify-center py-2">
-                            <button
-                                type="button"
-                                disabled={loadingOlder}
-                                onClick={() => void loadOlder()}
-                                className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted disabled:opacity-60"
-                            >
-                                {loadingOlder ? "Loading" : "Load earlier messages"}
-                            </button>
-                        </div>
+                        // A line rather than a button. Scrolling is what loads
+                        // the next page now; this says the conversation goes
+                        // further back, and is what somebody sees for the
+                        // moment it takes.
+                        <p className="py-2 text-center text-xs text-muted-foreground">
+                            {loadingOlder ? "Loading earlier messages" : "Earlier messages"}
+                        </p>
                     )}
 
                     {messages === null ? (
@@ -561,6 +793,25 @@ export function ChannelView({
                             onEdit={setEditing}
                             onDelete={setDeleting}
                         />
+                    )}
+
+                    {/* The way back, for somebody who has read a long way up.
+                        Scrolling down would work and would take a page at a
+                        time; this is one press. */}
+                    {newerThan && (
+                        <div className="sticky bottom-2 flex justify-center">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    following.current = true;
+                                    anchor.current = null;
+                                    void load();
+                                }}
+                                className="rounded-full border border-border bg-elevated px-3 py-1 text-xs shadow-md transition-colors hover:bg-card-hover"
+                            >
+                                Jump to the newest
+                            </button>
+                        </div>
                     )}
                 </div>
 
@@ -609,9 +860,12 @@ export function ChannelView({
                         }
                     }}
                     onSaveEdit={async (messageId, body) => {
-                        await runAction(() => actions.editAction({ messageId, body }), setError);
+                        const result = await runAction(
+                            () => actions.editAction({ messageId, body }),
+                            setError
+                        );
                         setEditing(null);
-                        await load();
+                        if (!result?.error) patchMessage(messageId, { body, edited: true });
                     }}
                 />
             </div>
@@ -639,7 +893,7 @@ export function ChannelView({
                     canPost={canPost}
                     canModerate={canModerate}
                     onClose={() => setThread(null)}
-                    onChanged={() => void load()}
+                    onChanged={() => void catchUp()}
                 />
             )}
 
@@ -663,10 +917,24 @@ export function ChannelView({
                 confirmLabel="Delete message"
                 onConfirm={async () => {
                     if (deleting) {
-                        await runAction(() => actions.deleteMessageAction(deleting.id), setError);
+                        const result = await runAction(
+                            () => actions.deleteMessageAction(deleting.id),
+                            setError
+                        );
+                        // The tombstone, exactly as the server draws one: the
+                        // line stays and says so, because a conversation whose
+                        // replies suddenly answer nothing is worse than one that
+                        // admits something was taken back.
+                        if (!result?.error) {
+                            patchMessage(deleting.id, {
+                                body: "",
+                                deleted: true,
+                                reactions: [],
+                                attachments: []
+                            });
+                        }
                     }
                     setDeleting(null);
-                    await load();
                     router.refresh();
                 }}
             />
