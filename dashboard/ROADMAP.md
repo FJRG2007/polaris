@@ -183,6 +183,13 @@ Tasks (work management):
       name shared by two statuses is one column, and renaming, deleting or
       reordering it acts on all of them together, the way the drag already did
 - [x] Saved views: filters, grouping, sorting, shared or private
+- [x] The list reads the way a list of work should: priority on the row (it is
+      the default sort, and a list ordered by something it never showed was one
+      nobody could check), group headings that stay put while their group
+      scrolls, and no status column when the list is already grouped by status
+- [x] Keyboard: j/k or the arrows move a cursor through List and Table, Enter
+      opens, x adds to the selection, Escape puts it away. The cursor is a
+      separate idea from the selection, so looking at a row is not acting on it
 - [x] Filter engine shared by views and automations (relative dates, custom
       fields, any/all matching), pure and unit-tested in `@polaris/core`
 - [x] Comments (one level of replies, resolve, assign), checklists (promote a

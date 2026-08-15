@@ -16,8 +16,10 @@ import { toFacts } from "@/lib/tasks/facts";
 import { CustomFieldValue } from "../custom-fields";
 import { useDisplayFormat } from "@/components/display-format";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { useRowCursor } from "./row-cursor";
 import { clickMode, type SelectMode, type ViewProps } from "./shared";
 import { commandsFor, TaskControls, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
+import { PriorityFlag } from "@/components/priority-flag";
 import {
     AssigneePicker,
     AvatarStack,
@@ -35,20 +37,37 @@ function TaskLine({
     commands,
     depth,
     selected,
+    cursor,
+    showStatus,
     showLocation,
     positioned = true,
     onSelect,
+    onPoint,
+    onRegister,
     onDragStart,
     onDropBefore
 }: {
     commands: TaskCommands;
     depth: number;
     selected: boolean;
+    /** Whether the keyboard cursor is on this row. Drawn as a rail down the left
+     *  edge rather than as a background, so it stays legible on a row that is
+     *  also selected - the two mean different things and have to be tellable
+     *  apart. */
+    cursor: boolean;
+    /** Whether the row says what its status is. False when the list is already
+     *  grouped by status, where every row in a group would repeat the heading
+     *  above it - the widest column on the screen saying nothing. */
+    showStatus: boolean;
     showLocation?: boolean;
     /** Whether dropping here would actually put the row here. False while a
      *  search is on, where the rows are ranked by how well they matched. */
     positioned?: boolean;
     onSelect: (mode: SelectMode) => void;
+    /** A press anywhere on the row moves the cursor here, so the keyboard picks
+     *  up from wherever the reader last looked rather than from the top. */
+    onPoint?: () => void;
+    onRegister?: (element: HTMLElement | null) => void;
     onDragStart?: () => void;
     onDropBefore?: () => void;
 }) {
@@ -59,6 +78,8 @@ function TaskLine({
     return (
         <TaskMenu commands={commands}>
         <li
+            ref={onRegister}
+            onMouseDown={onPoint}
             draggable={canEdit && onDragStart !== undefined}
             onDragStart={(event) => {
                 event.dataTransfer.effectAllowed = "move";
@@ -78,8 +99,10 @@ function TaskLine({
                 onDropBefore();
             }}
             className={cn(
-                "group flex items-center gap-2 border-b border-border px-2 py-1.5 transition-colors hover:bg-muted/50",
+                "group relative flex items-center gap-2 border-b border-border px-2 py-1.5 transition-colors hover:bg-card-hover",
                 selected && "bg-primary/5",
+                cursor &&
+                    "bg-card-hover before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-primary",
                 over && positioned && "border-t-2 border-t-primary"
             )}
             style={{ paddingLeft: `${0.5 + depth * 1.25}rem` }}
@@ -98,6 +121,11 @@ function TaskLine({
                     }}
                     className="flex min-w-0 items-center gap-2 text-left"
                 >
+                    {/* Priority first, because the list is sorted by it out of
+                        the box and a list ordered by something it never shows is
+                        a list nobody can check. Nothing is drawn for a task with
+                        none, so it costs no width in the common case. */}
+                    <PriorityFlag priority={task.priority} />
                     <span className="hidden font-mono text-[11px] text-muted-foreground sm:inline">{task.reference}</span>
                     <span className={cn("truncate text-sm", core.isFinishedStatus(task.statusType) && "text-muted-foreground")}>
                         {task.name}
@@ -110,10 +138,12 @@ function TaskLine({
                 {showLocation && <TaskLocation task={task} />}
             </div>
 
-            <span className="hidden items-center gap-1 text-[11px] text-muted-foreground md:flex">
-                <StatusDot color={task.statusColor} />
-                {task.statusName}
-            </span>
+            {showStatus && (
+                <span className="hidden items-center gap-1 text-[11px] text-muted-foreground md:flex">
+                    <StatusDot color={task.statusColor} />
+                    {task.statusName}
+                </span>
+            )}
             <span className="hidden w-24 justify-end md:flex">
                 <DueBadge dueDate={task.dueDate} statusType={task.statusType} timed={task.timed} format={format.date} />
             </span>
@@ -135,7 +165,7 @@ function TaskLine({
 }
 
 export function ListView(props: ViewProps) {
-    const { groups, canEdit, selection, onSelect, onMove, onQuickCreate, orderable } = props;
+    const { groups, canEdit, selection, onOpen, onSelect, onMove, onQuickCreate, orderable } = props;
     const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
     const [dragging, setDragging] = useState<string | null>(null);
     const [addingTo, setAddingTo] = useState<string | null>(null);
@@ -166,6 +196,8 @@ export function ListView(props: ViewProps) {
         [groups, collapsed]
     );
 
+    const cursor = useRowCursor(rendered, { onOpen, onSelect });
+
     return (
         <div className="flex flex-col gap-4">
             {groups.map((group) => {
@@ -177,8 +209,11 @@ export function ListView(props: ViewProps) {
                 const rows = core.flattenTree(core.buildTaskTree(group.tasks.map(toFacts)));
 
                 return (
-                    <section key={group.key} className="overflow-hidden rounded-lg border border-border">
-                        <header className="flex items-center gap-2 bg-muted/40 px-3 py-2">
+                    <section key={group.key} className="rounded-lg border border-border">
+                        {/* Sticky, because a long group scrolls past its own
+                            heading and "which status am I looking at" is the one
+                            question the heading exists to answer. */}
+                        <header className="sticky top-0 z-10 flex items-center gap-2 rounded-t-lg border-b border-border bg-surface px-3 py-2">
                             <button
                                 type="button"
                                 onClick={() => toggleGroup(group.key)}
@@ -232,8 +267,12 @@ export function ListView(props: ViewProps) {
                                             commands={commandsFor(props, task)}
                                             depth={node.depth}
                                             selected={selection.has(task.id)}
+                                            cursor={cursor.at === task.id}
+                                            showStatus={props.groupBy !== "status"}
                                             showLocation={props.showLocation}
                                             positioned={orderable}
+                                            onPoint={() => cursor.moveTo(task.id)}
+                                            onRegister={(element) => cursor.register(task.id, element)}
                                             onSelect={(mode) => onSelect(task.id, mode, rendered)}
                                             onDragStart={() => setDragging(task.id)}
                                             onDropBefore={() => {
@@ -303,12 +342,13 @@ export function TableView(props: ViewProps) {
     const columns = context.fields;
     // A table is flat, so the rows themselves are the order a shift-click spans.
     const rendered = useMemo(() => rows.map((task) => task.id), [rows]);
+    const cursor = useRowCursor(rendered, { onOpen, onSelect });
 
     return (
         <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full min-w-[52rem] border-collapse text-sm">
-                <thead>
-                    <tr className="border-b border-border bg-muted/40 text-left text-xs text-muted-foreground">
+                <thead className="sticky top-0 z-10">
+                    <tr className="border-b border-border bg-surface text-left text-xs text-muted-foreground">
                         <th className="w-8 px-2 py-2" />
                         <th className="px-2 py-2 font-medium">Task</th>
                         <th className="px-2 py-2 font-medium">Status</th>
@@ -330,9 +370,13 @@ export function TableView(props: ViewProps) {
                         return (
                         <TaskMenu key={task.id} commands={commands}>
                         <tr
+                            ref={(element) => cursor.register(task.id, element)}
+                            onMouseDown={() => cursor.moveTo(task.id)}
                             className={cn(
-                                "group border-b border-border transition-colors hover:bg-muted/40",
-                                selection.has(task.id) && "bg-primary/5"
+                                "group border-b border-border transition-colors hover:bg-card-hover",
+                                selection.has(task.id) && "bg-primary/5",
+                                cursor.at === task.id &&
+                                    "bg-card-hover shadow-[inset_2px_0_0_0_hsl(var(--primary))]"
                             )}
                         >
                             <td className="px-2 py-1.5">
