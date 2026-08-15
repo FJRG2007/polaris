@@ -148,6 +148,9 @@ model User {
     protectedResources  ProtectedResource[]
     backupJobs          BackupJob[]
     ownedVaults         VaultOrganization[]  @relation("VaultOwner")
+    privacy             UserPrivacy?
+    friendshipsAsked    Friendship[]         @relation("FriendshipRequester")
+    friendshipsReceived Friendship[]         @relation("FriendshipAddressee")
 }
 
 // What somebody last searched for, so the panel opens on their own work.
@@ -5666,6 +5669,10 @@ model ChatChannelMember {
     // The last message this person has seen. Null before they have read any.
     lastReadMessageId String?   @db.Uuid
     lastReadAt        DateTime?
+    // When their browser last had the messages in hand, which is a different
+    // claim to having read them: one is the device, the other is the person.
+    // What the second tick means.
+    lastDeliveredAt   DateTime?
     // No badge, and no notification, without leaving the channel.
     muted             Boolean   @default(false)
     createdAt         DateTime  @default(now())
@@ -5842,6 +5849,47 @@ model LinkPreview {
     fetchedAt   DateTime @default(now())
 
     @@index([fetchedAt])
+}
+
+// Who may see what about somebody.
+//
+// One row per account, written only when they change something - an account with
+// no row is on the defaults, which are the open ones. Every field is the same
+// three-valued audience so the screen reads as one idea rather than a switch, a
+// dropdown and a radio group that happen to sit together.
+model UserPrivacy {
+    userId String @id @db.Uuid
+    // everyone | friends | nobody
+    lastSeen     String   @default("everyone")
+    readReceipts String   @default("everyone")
+    avatar       String   @default("everyone")
+    updatedAt    DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Two accounts that know each other.
+//
+// One row per pair, and the direction is kept because it is the answer to "who
+// asked" while it is pending. Once accepted the pair is unordered and every read
+// looks at both columns.
+model Friendship {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    requesterId String    @db.Uuid
+    addresseeId String    @db.Uuid
+    // pending | accepted
+    status      String    @default("pending")
+    createdAt   DateTime  @default(now())
+    respondedAt DateTime?
+
+    requester User @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+    addressee User @relation("FriendshipAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+    // One pair, one row in each direction at most. Asking somebody who has
+    // already asked you is answered by the service rather than stored twice.
+    @@unique([requesterId, addresseeId])
+    @@index([addresseeId, status])
+    @@index([requesterId, status])
 }
 
 // ---------------------------------------------------------------------------

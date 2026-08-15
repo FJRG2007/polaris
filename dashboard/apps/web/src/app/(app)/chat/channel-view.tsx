@@ -320,6 +320,9 @@ export function ChannelView({ channelId }: { channelId: string }) {
             // The server has not looked at any link in it yet, and the card
             // arrives with the message the reload brings back.
             preview: null,
+            // Nothing has happened to it yet, not even leaving. The first tick
+            // arrives with the message the reload brings back.
+            receipt: null,
             createdAt: new Date().toISOString()
         };
         setPending((current) => [...current, draft]);

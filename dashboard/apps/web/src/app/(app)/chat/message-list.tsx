@@ -27,6 +27,8 @@ import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
 import { useDisplayFormat } from "@/components/display-format";
 import {
+    Check,
+    CheckCheck,
     CornerUpLeft,
     MessageSquare,
     Paperclip,
@@ -247,6 +249,7 @@ function Message({
                 ) : (
                     <div className="text-sm">
                         <RichText value={message.body} />
+                        {message.receipt && <Ticks receipt={message.receipt} />}
                         {message.edited && (
                             // A button, not a label: "(edited)" that cannot be
                             // opened asks the room to take the change on trust.
@@ -418,6 +421,39 @@ function Message({
             />
         </div>
         </MessageMenu>
+    );
+}
+
+/**
+ * How far a message got.
+ *
+ * One tick for sent, two for delivered, two in colour for read - the shape
+ * everybody already reads without being taught. It only ever appears on your own
+ * messages in a one-to-one conversation, and only when both people allow it, so
+ * its absence is not a state to be explained.
+ */
+function Ticks({ receipt }: { receipt: NonNullable<ChatMessageView["receipt"]> }) {
+    const label = {
+        sent: "Sent",
+        delivered: "Delivered",
+        read: "Read"
+    }[receipt];
+
+    return (
+        <span
+            title={label}
+            aria-label={label}
+            className={cn(
+                "ml-1 inline-flex align-middle",
+                receipt === "read" ? "text-primary" : "text-foreground-subtle"
+            )}
+        >
+            {receipt === "sent" ? (
+                <Check className="size-3" />
+            ) : (
+                <CheckCheck className="size-3" />
+            )}
+        </span>
     );
 }
 

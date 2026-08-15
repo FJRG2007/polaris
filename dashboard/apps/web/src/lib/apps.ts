@@ -21,6 +21,7 @@ import {
     Contact,
     Container,
     Database,
+    EyeOff,
     FileText,
     FolderGit2,
     FolderOpen,
@@ -547,6 +548,20 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/account/preferences",
             icon: SlidersHorizontal,
             keywords: ["units", "language", "timezone", "week start", "calendar"]
+        },
+        {
+            label: "Privacy",
+            href: "/account/privacy",
+            icon: EyeOff,
+            keywords: [
+                "read receipts",
+                "ticks",
+                "last seen",
+                "online",
+                "avatar",
+                "photo",
+                "friends"
+            ]
         },
         {
             label: "Notifications",

@@ -14,6 +14,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { rulesForChannel } from "./rules";
+import { receiptsBetween } from "@/lib/privacy-service";
 import { publishChatChange } from "./live";
 import { knownPreviews, unfurl, type LinkPreviewView } from "./link-preview";
 import { discardAttachments, isInlineImage, type StoredAttachment } from "./attachments";
@@ -54,6 +55,14 @@ export interface ChatMessageView {
      *  looked. Null until it has, which is why a card appears a moment after the
      *  message rather than with it. */
     readonly preview: LinkPreviewView | null;
+    /**
+     * How far this message got, for the ticks under it.
+     *
+     * Only on your own messages, only in a one-to-one conversation, and only
+     * when both people's settings allow it - null everywhere else, which is what
+     * tells the list to draw nothing rather than to draw "sent".
+     */
+    readonly receipt: core.MessageReceipt | null;
     readonly createdAt: string;
 }
 
@@ -118,6 +127,7 @@ export async function readChannel(
     before?: string
 ): Promise<ChatPage> {
     await requireChannel(actor, channelId);
+    await markDelivered(actor, channelId);
 
     const cursor = before
         ? await prisma.chatMessage.findFirst({
@@ -180,6 +190,7 @@ export async function readSince(
     afterId: string | null
 ): Promise<readonly ChatMessageView[]> {
     await requireChannel(actor, channelId);
+    await markDelivered(actor, channelId);
     const cursor = afterId
         ? await prisma.chatMessage.findFirst({
               where: { id: afterId, channelId },
@@ -543,6 +554,24 @@ export async function react(actor: ChatActor, input: core.ChatReactInput): Promi
 }
 
 /**
+ * Say that this browser now has the messages.
+ *
+ * The second tick, and a different claim to the third: this is the device
+ * holding them, and reading is the person. Written on every fetch rather than on
+ * a signal of its own, because fetching them *is* the event - a client that has
+ * the messages has had them delivered, whatever it does next.
+ *
+ * Only where there is somebody to tell. A membership row is what carries the
+ * mark, and somebody reading a public channel through the space has none.
+ */
+async function markDelivered(actor: ChatActor, channelId: string): Promise<void> {
+    await prisma.chatChannelMember.updateMany({
+        where: { channelId, userId: actor.id },
+        data: { lastDeliveredAt: new Date() }
+    });
+}
+
+/**
  * Mark a channel read up to a message.
  *
  * Never moves the mark backwards. Two tabs open on the same channel disagree
@@ -726,6 +755,11 @@ export async function decorateMessages(actor: ChatActor, rows: readonly Row[]): 
         if (link) links.set(row.id, link);
     }
 
+    // How far the reader's own messages got, in a one-to-one conversation where
+    // both sides allow it. Worked out once for the page rather than per message:
+    // it is one other person and two timestamps.
+    const receipts = await receiptStateFor(actor, rows);
+
     const [authors, reactions, files, stars, quoted, previews] = await Promise.all([
         authorIds.length
             ? prisma.user.findMany({
@@ -816,8 +850,67 @@ export async function decorateMessages(actor: ChatActor, rows: readonly Row[]): 
         quote: quoteViewOf(row, quotes, names),
         starred: kept.has(row.id),
         preview: previewOf(row, links, previews),
+        receipt: receiptFor(row, actor, receipts),
         createdAt: row.createdAt.toISOString()
     }));
+}
+
+/** How far the other person in a one-to-one conversation has got. Null when
+ *  there is no such person, or when the ticks are not theirs to be shown. */
+interface ReceiptState {
+    readonly deliveredAt: Date | null;
+    readonly readAt: Date | null;
+}
+
+/**
+ * The other side's marks, if this is a conversation that has ticks at all.
+ *
+ * Everything about this is deliberately narrow. Only a one-to-one conversation:
+ * "read by three of the seven people here" is a different feature and not one
+ * anybody asked for. Only when both settings allow it, because a receipt you can
+ * see and they cannot is a mirror rather than a setting. And nothing at all in a
+ * page with none of the reader's own messages in it, which costs the lookup
+ * nothing.
+ */
+async function receiptStateFor(
+    actor: ChatActor,
+    rows: readonly Row[]
+): Promise<ReceiptState | null> {
+    const mine = rows.filter((row) => row.authorId === actor.id && !row.deletedAt);
+    if (mine.length === 0) return null;
+
+    const channelId = mine[0]!.channelId;
+    const channel = await prisma.chatChannel.findUnique({
+        where: { id: channelId },
+        select: { kind: true }
+    });
+    if (channel?.kind !== "dm") return null;
+
+    const other = await prisma.chatChannelMember.findFirst({
+        where: { channelId, userId: { not: actor.id } },
+        select: { userId: true, lastReadAt: true, lastDeliveredAt: true }
+    });
+    if (!other) return null;
+
+    // The reader is not resolved as an administrator here: these are their own
+    // messages in their own conversation, and the admin exception is about
+    // reading somebody else's.
+    const allowed = await receiptsBetween({ id: actor.id, isAdmin: false }, other.userId);
+    if (!allowed) return null;
+
+    return { deliveredAt: other.lastDeliveredAt, readAt: other.lastReadAt };
+}
+
+/** The ticks for one message. */
+function receiptFor(
+    row: Row,
+    actor: ChatActor,
+    state: ReceiptState | null
+): core.MessageReceipt | null {
+    if (!state || row.authorId !== actor.id || row.deletedAt) return null;
+    if (state.readAt && state.readAt >= row.createdAt) return "read";
+    if (state.deliveredAt && state.deliveredAt >= row.createdAt) return "delivered";
+    return "sent";
 }
 
 /** The card under one message, or null when there is no link or nothing is yet

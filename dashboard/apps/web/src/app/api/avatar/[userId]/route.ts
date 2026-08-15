@@ -13,6 +13,7 @@
  */
 
 import { requireUser } from "@/lib/session";
+import { maySee } from "@/lib/privacy-service";
 import { resolveAvatar } from "@/lib/avatar-service";
 import { BLANK_AVATAR_ETAG, blankAvatarResponse } from "@/lib/avatar-blank";
 
@@ -31,8 +32,18 @@ export const dynamic = "force-dynamic";
 const CACHE = "private, max-age=300, must-revalidate";
 
 export async function GET(request: Request, { params }: { params: Promise<{ userId: string }> }): Promise<Response> {
-    await requireUser();
+    const viewer = await requireUser();
     const { userId } = await params;
+
+    // Somebody who keeps their photo to themselves, or to their friends. The
+    // answer is the same one an account with no photo gives - the blank pixel,
+    // with the component's initials showing through - rather than a refusal:
+    // a 403 here would tell the person asking that there is one to see.
+    const visible = await maySee(userId, "avatar", {
+        id: viewer.id,
+        isAdmin: Boolean(viewer.isAdmin)
+    });
+    if (!visible) return blankAvatarResponse(CACHE);
 
     const picture = await resolveAvatar(userId);
     // Cached too: an account with no picture is the common case, and without
