@@ -13,6 +13,7 @@ import { AppNavDrawer } from "@/components/app-nav-drawer";
 import { AppShell, CapabilityProvider, ToastProvider } from "@polaris/ui";
 import { ScopeSwitcher } from "@/components/scope-switcher";
 import { IncomingCalls } from "@/components/incoming-calls";
+import { CallHolder } from "@/components/call-holder";
 import { MessageToasts } from "@/components/message-toasts";
 import { CommandPalette } from "@/components/command-palette";
 import { listNotifications } from "@/lib/notification-service";
@@ -59,6 +60,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                     <SessionScopeProvider userId={user.id}>
                         <NotificationsProvider initial={notifications}>
                             <ToastProvider>
+                                {/* The call is held above every screen rather
+                                    than by the conversation that started it, so
+                                    walking off to look something up shrinks it
+                                    into a bar instead of hanging up. */}
+                                <CallHolder viewerId={user.id} hasChat={apps.ids.includes("chat")}>
                                 <NotificationFavicon />
                                 <PresenceReporter />
                                 <VisitRecorder />
@@ -105,6 +111,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                                         />
                                     ) : null}
                                 </AppShell>
+                                </CallHolder>
                             </ToastProvider>
                         </NotificationsProvider>
                     </SessionScopeProvider>

@@ -34,6 +34,7 @@ import { MessageList } from "./message-list";
 import { runAction } from "@/lib/run-action";
 import { ForwardDialog } from "./forward-dialog";
 import { ChannelHeader } from "./channel-header";
+import { useCallHold } from "./call-session";
 import { useChatStream } from "./use-chat-stream";
 import type { RecordedSound } from "./voice-recorder";
 import type { ChatMessageView } from "@/lib/chat/messages";
@@ -108,14 +109,13 @@ export function ChannelView({
         []
     );
     const [live, setLive] = useState<{ meetingId: string; count: number } | null>(null);
-    // The call this tab is actually sitting in, which is not the same question as
-    // whether one is running: somebody can watch a channel with a call in it
-    // without joining, and must not have their camera opened for them.
-    const [inCall, setInCall] = useState<string | null>(null);
-    // Whether this browser opened its camera on the way in. An audio call is not
-    // a different kind of call - it is the same room joined with the camera shut
-    // - so it is remembered here rather than anywhere the server can see.
-    const [callVideo, setCallVideo] = useState(true);
+    // The call this browser is sitting in, held above every screen so that
+    // walking out of the conversation shrinks it into a bar rather than hanging
+    // up. Being in one is not the same question as one running here: somebody
+    // can watch a channel with a call in it without joining, and must not have
+    // their camera opened for them.
+    const { call, session, enter, leave: leaveCall } = useCallHold();
+    const inCall = session?.channelId === channelId ? session.meetingId : null;
 
     const scroller = useRef<HTMLDivElement>(null);
     // The end of the list, scrolled to rather than computed. `scrollTop =
@@ -164,6 +164,12 @@ export function ChannelView({
         () => channels.find((entry) => entry.id === channelId) ?? null,
         [channels, channelId]
     );
+    // What the bar calls this call while somebody is elsewhere in Polaris.
+    const callTitle = channel
+        ? channel.kind === "text"
+            ? `#${channel.name}`
+            : channel.name
+        : "Call";
     const canPost = channel ? !channel.archived : true;
     const canModerate = channel?.mayAdminister ?? false;
     // What the instance allows in a conversation of this shape. Until the list
@@ -181,7 +187,6 @@ export function ChannelView({
         setReplyingTo(null);
         setForwarding(null);
         setError("");
-        setInCall(null);
         marked.current = "";
         following.current = true;
         olderThanRef.current = null;
@@ -405,12 +410,13 @@ export function ChannelView({
         if (!answering || answered.current === answering) return;
         answered.current = answering;
         router.replace(`/chat/c/${channelId}`, { scroll: false });
-        setCallVideo(false);
         void runAction(() => calls.startCallAction(channelId), setError).then((result) => {
-            if (result?.meetingId) setInCall(result.meetingId);
+            if (result?.meetingId) {
+                enter({ meetingId: result.meetingId, channelId, title: callTitle }, false);
+            }
             checkCall();
         });
-    }, [answering, channelId, router, checkCall]);
+    }, [answering, channelId, router, checkCall, enter, callTitle]);
 
     // A link straight to a message. Waits for the first page rather than racing
     // it: the message may well be on it, and walking backwards from an empty
@@ -770,9 +776,12 @@ export function ChannelView({
                             setError
                         );
                         if (!result || result.error) return;
-                        setCallVideo(withVideo);
-                        if (result.meetingId) setInCall(result.meetingId);
-                        else setError("That call could not be joined. Try again.");
+                        if (result.meetingId) {
+                            enter(
+                                { meetingId: result.meetingId, channelId, title: callTitle },
+                                withVideo
+                            );
+                        } else setError("That call could not be joined. Try again.");
                         checkCall();
                     }}
                     onSearch={() => setSearching((current) => !current)}
@@ -790,14 +799,17 @@ export function ChannelView({
                         name={channel.name}
                         count={live?.count ?? 0}
                         onJoin={(video) => {
-                            setCallVideo(video);
                             void runAction(
                                 () => calls.startCallAction(channelId),
                                 setError
                             ).then((result) => {
                                 if (!result || result.error) return;
-                                if (result.meetingId) setInCall(result.meetingId);
-                                else setError("That call could not be joined. Try again.");
+                                if (result.meetingId) {
+                                    enter(
+                                        { meetingId: result.meetingId, channelId, title: callTitle },
+                                        video
+                                    );
+                                } else setError("That call could not be joined. Try again.");
                                 checkCall();
                             });
                         }}
@@ -807,11 +819,11 @@ export function ChannelView({
                 {inCall && (
                     <div className="flex max-h-[60%] min-h-0 shrink-0 flex-col border-b border-border">
                         <CallRoom
+                            call={call}
                             meetingId={inCall}
-                            withVideo={callVideo}
                             viewerId={viewerId}
                             onLeave={() => {
-                                setInCall(null);
+                                leaveCall();
                                 checkCall();
                             }}
                         />

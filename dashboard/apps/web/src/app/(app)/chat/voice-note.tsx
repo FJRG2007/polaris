@@ -72,7 +72,7 @@ export function VoiceNote({
     const [playing, setPlaying] = useState(false);
     const [at, setAt] = useState(0);
     const [measured, setMeasured] = useState(0);
-    const [broken, setBroken] = useState(false);
+    const [broken, setBroken] = useState("");
     // Read from storage after mount rather than during render: the server has no
     // local storage, and a button that said "2x" only after hydration would
     // change under somebody's finger.
@@ -93,9 +93,29 @@ export function VoiceNote({
             // through, so anything that is not a real number is not an answer.
             if (Number.isFinite(element.duration)) setMeasured(element.duration);
         };
+        /**
+         * Ask why, rather than shrugging.
+         *
+         * An `<audio>` element cannot read a response body, so a recording that
+         * will not play is only ever "no supported source" from in here. One
+         * request on failure - and only on failure - gets the server's own
+         * answer, which is the difference between a player that is broken and a
+         * storage that lost the file.
+         */
         const onBroken = () => {
             setPlaying(false);
-            setBroken(true);
+            setBroken("This recording could not be loaded.");
+            void fetch(href)
+                .then(async (response) => {
+                    if (response.ok) return;
+                    const said: unknown = await response.json().catch(() => null);
+                    const detail =
+                        typeof said === "object" && said !== null && "error" in said
+                            ? String((said as { error: unknown }).error)
+                            : "";
+                    if (detail) setBroken(detail);
+                })
+                .catch(() => undefined);
         };
         const onEnd = () => {
             setPlaying(false);
@@ -140,7 +160,7 @@ export function VoiceNote({
     const toggle = () => {
         const element = audio.current;
         if (!element) return;
-        setBroken(false);
+        setBroken("");
         if (element.paused) {
             element.playbackRate = speed;
             void element.play().then(() => setPlaying(true));
@@ -175,11 +195,7 @@ export function VoiceNote({
                 bytes live on whatever storage this instance writes uploads to,
                 and "the NAS is not answering" looks exactly like a broken
                 player from here. */}
-            {broken && (
-                <span className="text-[11px] text-danger">
-                    This recording could not be loaded.
-                </span>
-            )}
+            {broken && <span className="text-[11px] text-danger">{broken}</span>}
             <span className="flex items-center gap-2">
                 <button
                     type="button"

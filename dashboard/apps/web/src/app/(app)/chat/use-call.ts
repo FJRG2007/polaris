@@ -140,7 +140,13 @@ export interface CallState {
     refresh: () => void;
 }
 
-export function useCall(meetingId: string, options?: { video?: boolean }): CallState {
+/**
+ * @param meetingId - The call to be in, or null for none. Null is what lets this
+ *   live above the screen that shows a call: the provider holds one of these for
+ *   the whole dashboard, and a browser that is not in a call is a browser where
+ *   nothing here opens, connects or beats.
+ */
+export function useCall(meetingId: string | null, options?: { video?: boolean }): CallState {
     const withVideo = options?.video ?? true;
 
     const [meeting, setMeeting] = useState<MeetingView | null>(null);
@@ -235,6 +241,7 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
     }, []);
 
     const refresh = useCallback(() => {
+        if (!meetingId) return;
         void actions.readCallAction(meetingId).then((result) => {
             if (result.error) {
                 setError(result.error);
@@ -251,6 +258,7 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
 
     const send = useCallback(
         async (toId: string, payload: unknown) => {
+            if (!meetingId) return;
             await fetch(`/api/chat/meetings/${meetingId}/signal`, {
                 method: "POST",
                 headers: { "content-type": "application/json" },
@@ -400,13 +408,16 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
 
     /** Open the microphone and camera, then the stream, then the connections. */
     useEffect(() => {
+        // Not in a call: nothing is opened, nothing connects, nothing beats.
+        if (!meetingId) return;
+        const inCall = meetingId;
         let stopped = false;
         let source: EventSource | null = null;
         let beat: ReturnType<typeof setInterval> | null = null;
 
         async function start(): Promise<void> {
-            ice.current = await actions.iceServersAction(meetingId).catch(() => []);
-            licensed.current = await actions.licensedFilterAction(meetingId).catch(() => null);
+            ice.current = await actions.iceServersAction(inCall).catch(() => []);
+            licensed.current = await actions.licensedFilterAction(inCall).catch(() => null);
             setLicensedFilter(licensed.current !== null);
 
             try {
@@ -442,7 +453,7 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
 
             if (stopped) return;
 
-            source = new EventSource(`/api/chat/meetings/${meetingId}/stream`);
+            source = new EventSource(`/api/chat/meetings/${inCall}/stream`);
             source.onmessage = (event) => {
                 let raw: unknown;
                 try {
@@ -470,7 +481,7 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
                 void onSignal(frame.data.fromId, frame.data.payload);
             };
 
-            beat = setInterval(() => void actions.keepSeatAction(meetingId), KEEPALIVE_MS);
+            beat = setInterval(() => void actions.keepSeatAction(inCall), KEEPALIVE_MS);
             refresh();
         }
 
@@ -557,7 +568,7 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
             mic.current = null;
             camera.current = null;
             screen.current = null;
-            void actions.leaveCallAction(meetingId);
+            void actions.leaveCallAction(inCall);
         };
     }, [listDevices, meetingId, peerFor, publishLocalPreview, refresh, send, startFilter, withVideo]);
 

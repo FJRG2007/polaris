@@ -26,7 +26,7 @@
  * is instant and nobody else is told.
  */
 
-import { useCall } from "./use-call";
+import type { CallState } from "./use-call";
 import * as actions from "./meeting-actions";
 import { Avatar } from "@/components/avatar";
 import { playCallSound } from "@/lib/call-sounds";
@@ -67,12 +67,18 @@ import {
     cn
 } from "@polaris/ui";
 
+/**
+ * The room.
+ *
+ * The call itself is held above every screen (see `call-session`), so this draws
+ * one rather than owning one: walking out of the conversation shrinks the call
+ * into the bar instead of hanging it up, and walking back in finds the same
+ * connections still running.
+ */
 export function CallRoom({
     meetingId,
+    call,
     onLeave,
-    /** Whether this browser opened its camera on the way in. False for somebody
-     *  who pressed the audio button, who can still turn it on from here. */
-    withVideo = true,
     /** Whoever is watching, when they have an account. The guest link is the
      *  host's to open and nobody else's, so the control is drawn from who the
      *  call says its host is rather than from who opened this screen - offering
@@ -80,11 +86,10 @@ export function CallRoom({
     viewerId
 }: {
     meetingId: string;
+    call: CallState;
     onLeave: () => void;
-    withVideo?: boolean;
     viewerId?: string;
 }) {
-    const call = useCall(meetingId, { video: withVideo });
     const [guestLink, setGuestLink] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [shareError, setShareError] = useState("");

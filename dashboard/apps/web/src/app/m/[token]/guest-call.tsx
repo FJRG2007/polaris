@@ -14,6 +14,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, Video } from "lucide-react";
+import { useCall } from "@/app/(app)/chat/use-call";
 import { CallRoom } from "@/app/(app)/chat/call-room";
 import { PublicShell } from "@/components/public-shell";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
@@ -79,7 +80,7 @@ export function GuestCall({
                     <Video className="size-4 text-muted-foreground" />
                     <span className="text-sm font-medium">{title || "Call"}</span>
                 </header>
-                <CallRoom
+                <GuestRoom
                     meetingId={seat.meetingId}
                     onLeave={() => {
                         setSeat(null);
@@ -139,4 +140,16 @@ export function GuestCall({
             </Card>
         </PublicShell>
     );
+}
+
+/**
+ * A guest's own call.
+ *
+ * The dashboard holds one call above every screen, and a guest has no
+ * dashboard - one page, one room, and leaving it is closing the tab. So this is
+ * where their call lives.
+ */
+function GuestRoom({ meetingId, onLeave }: { meetingId: string; onLeave: () => void }) {
+    const call = useCall(meetingId, { video: true });
+    return <CallRoom meetingId={meetingId} call={call} onLeave={onLeave} />;
 }

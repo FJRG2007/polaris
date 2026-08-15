@@ -195,6 +195,20 @@ function soundOf(detail: SoundDetail | undefined): {
  * `screenshot.png` must not collide. What they called it is kept on the row and
  * is what the download is served as.
  */
+/**
+ * A file that went to storage and did not come back.
+ *
+ * Its own error because the caller has to say something different about it: not
+ * "that could not be sent", which reads as a bug in Polaris, but which storage
+ * took the bytes and what it said when they were asked for again.
+ */
+export class AttachmentStorageError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "AttachmentStorageError";
+    }
+}
+
 export async function storeAttachment(
     channelId: string,
     file: { name: string; type: string; bytes: Uint8Array },
@@ -214,6 +228,29 @@ export async function storeAttachment(
             mime: file.type || "application/octet-stream",
             size: BigInt(file.bytes.length)
         });
+
+        /**
+         * Asked for straight back, before a row is written that says it is
+         * there.
+         *
+         * A write that returns without complaining is not proof of anything -
+         * a share that has gone away, a mount that accepts writes into nothing
+         * and a folder inside a container the next deploy replaces all accept
+         * files and lose them. Without this the message lands, the attachment
+         * row lands, and the failure surfaces days later as a download that
+         * 404s with nothing anywhere saying why. One stat is a very cheap way
+         * to be told now instead.
+         */
+        const written = await driver.stat(path).catch((error: unknown) => {
+            throw new AttachmentStorageError(
+                `The file was written to ${target.name} but could not be found again: ${reason(error)}`
+            );
+        });
+        if (Number(written.size) !== file.bytes.length) {
+            throw new AttachmentStorageError(
+                `${target.name} kept ${Number(written.size)} bytes of ${file.bytes.length}.`
+            );
+        }
     } finally {
         await driver.dispose().catch(() => undefined);
     }
@@ -317,6 +354,11 @@ export async function channelOfAttachment(attachmentId: string): Promise<string 
         select: { message: { select: { channelId: true } } }
     });
     return row?.message.channelId ?? null;
+}
+
+/** Whatever a driver threw, as a line somebody can act on. */
+function reason(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
 }
 
 /** A path segment that cannot be anything but a path segment. */

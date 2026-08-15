@@ -56,7 +56,20 @@ export async function GET(
     }
 
     const file = await readAttachment(attachmentId);
-    if (!file) return new Response(null, { status: 404 });
+    // Gone rather than missing, and said out loud. Access has already been
+    // proved by this point, so there is nothing left to withhold - and the two
+    // are not the same thing to whoever is looking at it: "there is no such
+    // attachment" sends somebody to the browser, and "the storage this instance
+    // writes to did not give it back" sends them to the disk, which is where it
+    // is.
+    if (!file) {
+        return Response.json(
+            {
+                error: "This file is not on the storage Polaris keeps uploads on. It was written and is no longer there."
+            },
+            { status: 410 }
+        );
+    }
 
     const shown = isInlineImage(file.contentType) || isPlayableMedia(file.contentType);
     return new Response(file.bytes as unknown as BodyInit, {

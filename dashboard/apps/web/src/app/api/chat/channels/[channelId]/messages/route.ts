@@ -21,7 +21,11 @@ import { send } from "@/lib/chat/messages";
 import { requirePermission } from "@/lib/session";
 import { rulesForChannel } from "@/lib/chat/rules";
 import { ChatAccessError, requirePostable } from "@/lib/chat/access";
-import { storeAttachment, type StoredAttachment } from "@/lib/chat/attachments";
+import {
+    AttachmentStorageError,
+    storeAttachment,
+    type StoredAttachment
+} from "@/lib/chat/attachments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -162,6 +166,13 @@ export async function POST(
         );
         if (caught instanceof ChatAccessError) {
             return Response.json({ error: caught.message }, { status: 403 });
+        }
+        // Said as what it is. "That could not be sent" for a storage that took
+        // the file and lost it sends whoever reads it looking at the browser, at
+        // the network and at the message - anywhere but at the disk.
+        if (caught instanceof AttachmentStorageError) {
+            console.error(caught);
+            return Response.json({ error: caught.message }, { status: 502 });
         }
         console.error(caught);
         return Response.json({ error: "That could not be sent" }, { status: 500 });
