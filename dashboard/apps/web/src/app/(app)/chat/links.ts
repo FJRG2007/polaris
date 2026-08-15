@@ -1,0 +1,38 @@
+/**
+ * The addresses a conversation and a message have.
+ *
+ * Every conversation is a URL already - a channel, a group and a direct message
+ * are all one kind of thing with one id - and a message is that URL with the
+ * message on the end. So a link somebody pastes into an email points at the
+ * line, not at the room with an instruction to scroll.
+ *
+ * Built on the address Polaris hands out rather than on the tab's own hostname:
+ * that may be the LAN name the installer wrote, which resolves on this network
+ * and nowhere else. Same reason, and the same helper, as a task link.
+ */
+
+/** The conversation itself: a channel, a group chat or a direct message. */
+export function channelLink(baseUrl: string, channelId: string): string {
+    return `${baseUrl}/chat/c/${channelId}`;
+}
+
+/** One message inside it. */
+export function messageLink(baseUrl: string, channelId: string, messageId: string): string {
+    return `${channelLink(baseUrl, channelId)}/${messageId}`;
+}
+
+/**
+ * Put something on the clipboard, or do nothing.
+ *
+ * There is no clipboard on an insecure origin and none in a document that is not
+ * focused, and neither is a state worth interrupting somebody about - they will
+ * see that nothing was copied and press it again.
+ */
+export async function copyText(value: string): Promise<void> {
+    if (!navigator.clipboard) return;
+    try {
+        await navigator.clipboard.writeText(value);
+    } catch {
+        // Refused. Nothing useful to say about it.
+    }
+}

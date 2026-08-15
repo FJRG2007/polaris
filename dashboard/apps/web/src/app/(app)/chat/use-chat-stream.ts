@@ -28,6 +28,17 @@ const frameSchema = z.discriminatedUnion("kind", [
         channelId: z.string(),
         userId: z.string(),
         name: z.string()
+    }),
+    // A call in a conversation started, grew, shrank or ended. `ringing` is the
+    // one that sounds; the rest keep the count beside the call button honest,
+    // which nothing else does - starting and leaving a call post no message.
+    z.object({
+        kind: z.literal("call"),
+        channelId: z.string(),
+        meetingId: z.string(),
+        state: z.enum(["ringing", "moved", "ended"]),
+        count: z.number(),
+        name: z.string()
     })
 ]);
 

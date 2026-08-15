@@ -21,20 +21,20 @@
  * did not read them.
  */
 
-import * as core from "@polaris/core";
 import * as actions from "./actions";
+import * as core from "@polaris/core";
 import { Composer } from "./composer";
 import { CallRoom } from "./call-room";
-import { ForwardDialog } from "./forward-dialog";
 import { useChat } from "./chat-context";
+import { VoiceRoom } from "./voice-room";
 import * as calls from "./meeting-actions";
 import { useRouter } from "next/navigation";
 import { ThreadPanel } from "./thread-panel";
 import { SearchPanel } from "./search-panel";
-import { VoiceRoom } from "./voice-room";
 import { MessageList } from "./message-list";
 import { runAction } from "@/lib/run-action";
 import { MessageCircle } from "lucide-react";
+import { ForwardDialog } from "./forward-dialog";
 import { ChannelHeader } from "./channel-header";
 import { useChatStream } from "./use-chat-stream";
 import type { ChatMessageView } from "@/lib/chat/messages";
@@ -57,7 +57,15 @@ const JUMP_PAGES = 20;
 /** How long the message a search led to stays lit. */
 const HIGHLIGHT_MS = 2500;
 
-export function ChannelView({ channelId }: { channelId: string }) {
+export function ChannelView({
+    channelId,
+    messageId = null
+}: {
+    channelId: string;
+    /** Arrived at from a link to one message. The conversation opens as it
+     *  always does and then walks back to it. */
+    messageId?: string | null;
+}) {
     const router = useRouter();
     const { viewerId, channels, refresh, rulesFor } = useChat();
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
@@ -97,6 +105,10 @@ export function ChannelView({ channelId }: { channelId: string }) {
     // pages inside one tick and state would still hold the one from before the
     // first of them.
     const olderThanRef = useRef<string | null>(null);
+    // The message a link asked for, once it has been walked back to. Kept so a
+    // reload of the list - one arrives with every message anybody sends - does
+    // not drag the reader back to it over and over.
+    const landed = useRef<string | null>(null);
 
     const channel = useMemo(
         () => channels.find((entry) => entry.id === channelId) ?? null,
@@ -123,6 +135,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
         marked.current = "";
         following.current = true;
         olderThanRef.current = null;
+        landed.current = null;
         sent.current.clear();
     }, [channelId]);
 
@@ -209,12 +222,33 @@ export function ChannelView({ channelId }: { channelId: string }) {
         [loadOlder]
     );
 
+    // A link straight to a message. Waits for the first page rather than racing
+    // it: the message may well be on it, and walking backwards from an empty
+    // list would ask for pages that are already on the way.
+    useEffect(() => {
+        if (!messageId || messages === null || landed.current === messageId) return;
+        landed.current = messageId;
+        void jumpTo(messageId);
+    }, [messageId, messages, jumpTo]);
+
     useChatStream(
         useCallback(
             (frame) => {
                 if (frame.kind === "posted" && frame.channels.includes(channelId)) {
                     void load();
                     checkCall();
+                }
+                // The count beside the call button, kept honest. Nothing is
+                // posted when somebody joins or leaves a call, so before this
+                // frame existed the number was whatever it happened to be when
+                // this screen last had another reason to ask - which is how one
+                // tab said one, another said two, and neither was right.
+                if (frame.kind === "call" && frame.channelId === channelId) {
+                    setLive(
+                        frame.state === "ended" || frame.count === 0
+                            ? null
+                            : { meetingId: frame.meetingId, count: frame.count }
+                    );
                 }
                 if (frame.kind === "typing" && frame.channelId === channelId) {
                     setTypists((current) => [

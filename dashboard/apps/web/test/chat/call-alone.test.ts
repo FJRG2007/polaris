@@ -62,6 +62,10 @@ vi.mock("@polaris/db", () => ({
                 startedAt,
                 channel: { kind }
             }),
+            // Asked before the call is closed, so that ending it announces
+            // itself to the conversation once rather than once per route that
+            // can end a call.
+            findFirst: async () => (endedAt === null ? { id: "m1" } : null),
             updateMany: async ({ data }: { data: { endedAt?: Date } }) => {
                 if (data.endedAt) endedAt = data.endedAt;
                 return { count: 1 };

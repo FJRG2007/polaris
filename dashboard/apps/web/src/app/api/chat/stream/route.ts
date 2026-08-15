@@ -140,6 +140,23 @@ export async function GET(request: Request): Promise<Response> {
                 if (change.actorId === actor.id) return;
 
                 if (reachable.has(change.channelId)) {
+                    if (change.kind === "call") {
+                        // Never coalesced. A call frame is not "something
+                        // changed, go and look" - it is what makes a browser
+                        // ring, and a ring that arrives after the caller gave
+                        // up is worse than none.
+                        if (change.call) {
+                            send({
+                                kind: "call",
+                                channelId: change.channelId,
+                                meetingId: change.call.meetingId,
+                                state: change.call.state,
+                                count: change.call.count,
+                                name: change.actorName ?? ""
+                            });
+                        }
+                        return;
+                    }
                     if (change.kind === "typing") {
                         send({
                             kind: "typing",

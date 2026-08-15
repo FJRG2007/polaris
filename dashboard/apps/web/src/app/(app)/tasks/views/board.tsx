@@ -668,7 +668,8 @@ export function BoardView(props: ViewProps) {
                                                 )}
                                                 {props.onDeleteStatus && (
                                                     <DropdownMenuItem
-                                                        className="gap-2 text-danger focus:bg-danger/10"
+                                                        variant="danger"
+                                                        className="gap-2"
                                                         // A board needs somewhere for the
                                                         // work to go, so the last column
                                                         // stays.

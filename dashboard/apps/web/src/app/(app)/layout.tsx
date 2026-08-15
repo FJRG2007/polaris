@@ -10,7 +10,9 @@ import { AccountMenu } from "@/components/account-menu";
 import { DeniedNotice } from "@/components/denied-notice";
 import { ViewAsBanner } from "@/components/view-as-banner";
 import { AppNavDrawer } from "@/components/app-nav-drawer";
+import { AppShell, CapabilityProvider } from "@polaris/ui";
 import { ScopeSwitcher } from "@/components/scope-switcher";
+import { IncomingCalls } from "@/components/incoming-calls";
 import { CommandPalette } from "@/components/command-palette";
 import { listNotifications } from "@/lib/notification-service";
 import { UpdateIndicator } from "@/components/update-indicator";
@@ -20,7 +22,6 @@ import { resolveScope, scopeChoices } from "@/lib/workspace-scope";
 import { RouteSkeletonCapture } from "@/components/route-skeleton";
 import { DisplayFormatProvider } from "@/components/display-format";
 import { VisitRecorder } from "@/components/overview/visit-recorder";
-import { AppShell, CapabilityProvider, EditionBadge } from "@polaris/ui";
 import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 import { PresenceReporter } from "@/components/notifications/presence-reporter";
 import { NotificationFavicon } from "@/components/notifications/notification-favicon";
@@ -59,6 +60,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                             <NotificationFavicon />
                             <PresenceReporter />
                             <VisitRecorder />
+                            {/* Out here rather than inside Chat: a call you only
+                                hear about while looking at the conversation it
+                                is in is a notice, not a call. Only for somebody
+                                who has Chat at all - the stream it listens on
+                                refuses anybody else. */}
+                            {apps.ids.includes("chat") ? <IncomingCalls /> : null}
                             <AppShell
                                 switcher={
                                     <>
@@ -77,11 +84,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                                     <>
                                         {user.isAdmin ? <UpdateIndicator /> : null}
                                         <NotificationBell />
-                                        {/* The edition reads as a sentence, so it waits for a bar
-                                            wide enough to carry it next to the controls. */}
-                                        <span className="hidden lg:inline-flex">
-                                            <EditionBadge />
-                                        </span>
                                         <AccountMenu id={user.id} name={user.name} email={user.email} />
                                     </>
                                 }

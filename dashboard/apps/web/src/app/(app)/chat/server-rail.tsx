@@ -13,9 +13,17 @@
  * they behave like - a place you go, holding conversations - even though they
  * belong to no space at all.
  *
- * A space is drawn as its initials on its own colour rather than an icon nobody
+ * A space is drawn as its initials in its own colour rather than an icon nobody
  * chose. Two spaces with the same initials are told apart by the colour, and
  * neither needs anybody to have uploaded anything.
+ *
+ * The colour is a tint rather than a fill: the tile keeps the border and the
+ * card surface every other panel in Polaris has, and the space's colour is spent
+ * on the letters and the edge. A column of six saturated squares is the one
+ * thing on the screen shouting, and it is furniture - the same reason the token
+ * file keeps the violet for the few places that earn it. It also means a space
+ * whose colour somebody set to a pale yellow is still readable, which a block of
+ * that colour with white letters on it is not.
  */
 
 import { cn } from "@polaris/ui";
@@ -24,6 +32,16 @@ import { useMemo, useState } from "react";
 import { MessageSquare, Plus } from "lucide-react";
 import { NewSpaceDialog } from "./new-space-dialog";
 import type { ChatSpaceView } from "@/lib/chat/chat-service";
+
+/** A stored colour as `#rrggbb`, or null when it is not one this can draw with.
+ *  The column is a free string, so a space could hold anything at all. */
+function hex(color: string | undefined): string | null {
+    if (!color) return null;
+    const trimmed = color.trim();
+    const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(trimmed);
+    if (short) return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`.toLowerCase();
+    return /^#[0-9a-f]{6}$/i.test(trimmed) ? trimmed.toLowerCase() : null;
+}
 
 export function ServerRail() {
     const { spaces, channels, activeSpaceId, setActiveSpaceId, refresh } = useChat();
@@ -42,7 +60,7 @@ export function ServerRail() {
     }, [channels]);
 
     return (
-        <div className="flex h-full w-14 shrink-0 flex-col items-center gap-2 border-r border-border bg-elevated py-2">
+        <div className="flex h-full w-14 shrink-0 flex-col items-center gap-1.5 border-r border-border bg-surface py-2">
             <Pill
                 label="Direct messages"
                 active={activeSpaceId === null}
@@ -54,14 +72,14 @@ export function ServerRail() {
 
             <span className="h-px w-6 shrink-0 bg-border" />
 
-            <div className="flex min-h-0 flex-1 flex-col items-center gap-2 overflow-y-auto">
+            <div className="flex min-h-0 flex-1 flex-col items-center gap-1.5 overflow-y-auto no-scrollbar">
                 {spaces.map((space) => (
                     <Pill
                         key={space.id}
                         label={space.name}
                         active={activeSpaceId === space.id}
                         unread={waiting.get(space.id) ?? 0}
-                        color={space.color}
+                        color={hex(space.color)}
                         onClick={() => setActiveSpaceId(space.id)}
                     >
                         {initials(space)}
@@ -74,7 +92,7 @@ export function ServerRail() {
                 aria-label="New space"
                 title="New space"
                 onClick={() => setNewSpace(true)}
-                className="flex size-9 shrink-0 items-center justify-center rounded-2xl border border-dashed border-border text-muted-foreground transition-colors hover:border-border-strong hover:text-foreground"
+                className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors duration-fast hover:border-border-strong hover:bg-card-hover hover:text-foreground"
             >
                 <Plus className="size-4" />
             </button>
@@ -89,9 +107,11 @@ export function ServerRail() {
 /**
  * One button in the column.
  *
- * The marker on the left edge says which one is open. A background alone would
- * not: these are coloured squares, and a coloured square on a slightly different
- * background is not a state anybody can read at a glance.
+ * The marker on the left edge says which one is open, because the tiles are all
+ * one surface apart and a surface step alone is not a state anybody reads at a
+ * glance down a narrow column. Radius does the rest: the open one is drawn
+ * tighter than the others, which is the motion this pattern is known by, and
+ * both steps are on the four-step scale rather than beyond it.
  */
 function Pill({
     label,
@@ -104,7 +124,9 @@ function Pill({
     label: string;
     active: boolean;
     unread: number;
-    color?: string;
+    /** The space's own colour as `#rrggbb`, already checked. Direct messages
+     *  have none: they are not a space and borrow no identity. */
+    color?: string | null;
     onClick: () => void;
     children: React.ReactNode;
 }) {
@@ -113,7 +135,7 @@ function Pill({
             <span
                 aria-hidden="true"
                 className={cn(
-                    "absolute -left-2 w-1 rounded-r-full bg-foreground transition-all",
+                    "absolute -left-2 w-1 rounded-r-full bg-foreground transition-all duration-fast",
                     active ? "h-6" : unread > 0 ? "h-2" : "h-0"
                 )}
             />
@@ -123,19 +145,31 @@ function Pill({
                 aria-label={label}
                 aria-current={active ? "true" : undefined}
                 title={label}
-                style={color ? { backgroundColor: color } : undefined}
+                style={
+                    color
+                        ? // Two alphas of the space's own colour, over the card
+                          // it would otherwise be. Hex rather than a token, so
+                          // it stays the colour somebody chose in both themes.
+                          { backgroundColor: `${color}1f`, borderColor: `${color}66`, color }
+                        : undefined
+                }
                 className={cn(
-                    "flex size-9 items-center justify-center overflow-hidden text-xs font-semibold transition-all duration-fast",
-                    // Rounded into a square as it becomes the open one, which is
-                    // the motion this pattern is known by.
-                    active ? "rounded-xl" : "rounded-2xl",
-                    color ? "text-white" : "bg-muted text-foreground hover:bg-card-hover"
+                    "flex size-9 items-center justify-center overflow-hidden border text-xs font-semibold transition-all duration-fast",
+                    active ? "rounded-md" : "rounded-lg",
+                    color
+                        ? "hover:brightness-125"
+                        : cn(
+                              "border-border bg-card",
+                              active
+                                  ? "border-border-strong text-foreground"
+                                  : "text-muted-foreground hover:bg-card-hover hover:text-foreground"
+                          )
                 )}
             >
                 {children}
             </button>
             {unread > 0 && (
-                <span className="pointer-events-none absolute -bottom-0.5 -right-1 rounded-full bg-primary px-1 text-[10px] font-medium leading-4 text-white">
+                <span className="pointer-events-none absolute -bottom-0.5 -right-1 rounded-full bg-primary px-1 text-[10px] font-medium leading-4 text-primary-foreground">
                     {unread > 98 ? "99+" : unread}
                 </span>
             )}

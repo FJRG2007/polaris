@@ -25,25 +25,35 @@ import Link from "next/link";
 import * as actions from "./actions";
 import { useChat } from "./chat-context";
 import { Avatar } from "@/components/avatar";
+import { channelLink, copyText } from "./links";
+import { useAppUrl } from "@/components/app-url";
 import { NewDirectDialog } from "./new-direct-dialog";
 import { NewChannelDialog } from "./new-channel-dialog";
 import { useParams, usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
 import {
+    Bell,
+    BellOff,
     ChevronDown,
     FolderPlus,
     Hash,
+    Link2,
     Lock,
     MessageSquarePlus,
     Plus,
     Star,
+    Trash2,
     Users,
     Volume2
 } from "lucide-react";
 import {
     Button,
     cn,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuTrigger,
     Dialog,
     DialogContent,
     DialogFooter,
@@ -224,6 +234,7 @@ export function ChatSidebar() {
                             directs.map((channel) => (
                                 <Row
                                     key={channel.id}
+                                    channel={channel}
                                     href={`/chat/c/${channel.id}`}
                                     active={open === channel.id}
                                     unread={channel.unread}
@@ -285,6 +296,7 @@ export function ChatSidebar() {
                                                     </DropdownMenuItem>
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem
+                                                        variant="danger"
                                                         onSelect={async () => {
                                                             const result =
                                                                 await actions.deleteCategoryAction(
@@ -293,6 +305,7 @@ export function ChatSidebar() {
                                                             setError(result.error ?? "");
                                                         }}
                                                     >
+                                                        <Trash2 className="size-3.5" />
                                                         Delete category
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
@@ -396,6 +409,7 @@ function ChannelRows({
                 return (
                     <div key={channel.id}>
                         <Row
+                            channel={channel}
                             href={`/chat/c/${channel.id}`}
                             active={open === channel.id}
                             // A voice room has nothing to be unread: walking in
@@ -478,7 +492,8 @@ function Row({
     unread,
     muted,
     label,
-    icon
+    icon,
+    channel
 }: {
     href: string;
     active: boolean;
@@ -486,15 +501,18 @@ function Row({
     muted: boolean;
     label: string;
     icon: React.ReactNode;
+    /** What a right-click acts on. Absent on the rows that are not a
+     *  conversation, such as the link to what somebody has saved. */
+    channel?: ChatChannelView;
 }) {
     // A muted conversation still counts its messages - it just does not shout
     // about them, which is the difference between muting and leaving.
     const shout = unread > 0 && !muted;
-    return (
+    const row = (
         <Link
             href={href}
             className={cn(
-                "flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover",
+                "flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover data-[state=open]:bg-card-hover",
                 active ? "bg-card-hover text-foreground" : "text-muted-foreground",
                 shout && "font-medium text-foreground"
             )}
@@ -507,13 +525,53 @@ function Row({
                 <span
                     className={cn(
                         "shrink-0 rounded-full px-1.5 text-[10px] font-medium leading-4",
-                        muted ? "bg-muted text-muted-foreground" : "bg-primary text-white"
+                        muted
+                            ? "bg-muted text-muted-foreground"
+                            : "bg-primary text-primary-foreground"
                     )}
                 >
                     {unread > 98 ? "99+" : unread}
                 </span>
             )}
         </Link>
+    );
+
+    return channel ? <RowMenu channel={channel}>{row}</RowMenu> : row;
+}
+
+/**
+ * Right-click a conversation in the list.
+ *
+ * The address is the point of it: every conversation is a URL, and the place
+ * somebody looks for it is the row with its name on, not the room after opening
+ * it. Muting is here because it is the other thing anybody does to a row without
+ * wanting to read it first.
+ */
+function RowMenu({ channel, children }: { channel: ChatChannelView; children: React.ReactNode }) {
+    const baseUrl = useAppUrl();
+    const { refresh } = useChat();
+
+    return (
+        <ContextMenu>
+            <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+            <ContextMenuContent className="w-48">
+                <ContextMenuItem
+                    onSelect={() => void copyText(channelLink(baseUrl, channel.id))}
+                >
+                    <Link2 className="size-3.5" />
+                    Copy link
+                </ContextMenuItem>
+                <ContextMenuItem
+                    onSelect={async () => {
+                        await actions.setMutedAction(channel.id, !channel.muted);
+                        refresh();
+                    }}
+                >
+                    {channel.muted ? <Bell className="size-3.5" /> : <BellOff className="size-3.5" />}
+                    {channel.muted ? "Unmute" : "Mute"}
+                </ContextMenuItem>
+            </ContextMenuContent>
+        </ContextMenu>
     );
 }
 

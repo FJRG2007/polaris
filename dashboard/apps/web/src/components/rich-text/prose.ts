@@ -22,6 +22,10 @@ export const RICH_TEXT_PROSE = cn(
     "[&_ul[data-type=taskList]]:list-none [&_ul[data-type=taskList]]:pl-0",
     "[&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground",
     "[&_hr]:my-4 [&_hr]:border-border [&_img]:max-w-full [&_img]:rounded-md",
-    "[&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-xs",
+    // A highlighted fence brings its own frame - a header with the language and
+    // a copy button - and it opts out by carrying `data-code`. Without the
+    // exclusion this rule wins on specificity and paints a second background
+    // inside the first.
+    "[&_pre:not([data-code])]:overflow-x-auto [&_pre:not([data-code])]:rounded-md [&_pre:not([data-code])]:bg-muted [&_pre:not([data-code])]:p-3 [&_pre:not([data-code])]:font-mono [&_pre:not([data-code])]:text-xs",
     "[&_:not(pre)>code]:rounded [&_:not(pre)>code]:bg-muted [&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-0.5"
 );

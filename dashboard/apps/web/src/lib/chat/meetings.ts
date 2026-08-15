@@ -27,6 +27,7 @@ import { loadEnv } from "@polaris/config";
 import { randomBytes } from "node:crypto";
 import { prisma, type Prisma } from "@polaris/db";
 import { publishMeetingEvent } from "./meeting-signal";
+import { publishChatChange, type CallState } from "./live";
 import { ChatAccessError, requireChannel, type ChatActor } from "./access";
 
 /** How many browsers one call holds.
@@ -126,7 +127,15 @@ export async function startOrJoin(
     channelId: string
 ): Promise<MeetingSeat> {
     await requireChannel(actor, channelId);
-    return seatFor(await liveMeetingId(actor, channelId), actor.id, actor.name);
+    const meetingId = await liveMeetingId(actor, channelId);
+    // Asked before the seat is taken, so "was anybody already here" is a
+    // question about the room rather than about the room plus the person now
+    // walking into it. An empty room is a call starting, which is what makes
+    // everybody else's browser ring; an occupied one is somebody joining.
+    const wasEmpty = (await admittedCount(meetingId)) === 0;
+    const seat = await seatFor(meetingId, actor.id, actor.name);
+    await announceCall(meetingId, wasEmpty ? "ringing" : "moved", actor.id, actor.name);
+    return seat;
 }
 
 /** Join a call by id, as an account. The conversation it is in decides. */
@@ -142,7 +151,9 @@ export async function join(
     if (meeting.channelId) await requireChannel(actor, meeting.channelId);
     else throw new ChatAccessError("That call has ended");
 
-    return seatFor(meetingId, actor.id, actor.name);
+    const seat = await seatFor(meetingId, actor.id, actor.name);
+    await announceCall(meetingId, "moved", actor.id, actor.name);
+    return seat;
 }
 
 /**
@@ -231,6 +242,10 @@ export async function leave(seat: { meetingId: string; participantId: string }):
     });
     await endIfEmpty(seat.meetingId);
     publishMeetingEvent({ meetingId: seat.meetingId, kind: "roster" });
+    // Whoever is looking at the conversation without being in the call needs
+    // the count beside the button to go down, which nothing else would tell
+    // them: leaving posts no message either.
+    await announceCall(seat.meetingId, "moved", "");
 }
 
 /** End it for everybody. Only the host. */
@@ -489,10 +504,47 @@ async function seatFor(meetingId: string, userId: string, name: string): Promise
 /** Refuse a join that would take the call past what a mesh can carry. */
 async function requireRoom(meetingId: string): Promise<void> {
     await sweep(meetingId);
-    const inside = await prisma.meetingParticipant.count({
+    if ((await admittedCount(meetingId)) >= MAX_IN_CALL) {
+        throw new ChatAccessError("That call is full");
+    }
+}
+
+/** How many browsers are in the room right now. */
+async function admittedCount(meetingId: string): Promise<number> {
+    return prisma.meetingParticipant.count({
         where: { meetingId, leftAt: null, admission: "admitted" }
     });
-    if (inside >= MAX_IN_CALL) throw new ChatAccessError("That call is full");
+}
+
+/**
+ * Tell the conversation what its call is doing.
+ *
+ * A call starts, grows, shrinks and ends without a single message being posted,
+ * so the only screens that ever knew were the ones inside it. Everybody else
+ * kept whatever count they happened to read when they opened the conversation -
+ * which is how one tab said one, another said two, and a reload said neither.
+ *
+ * Sent on the ordinary chat channel rather than the call's own, because the
+ * audience is exactly the people who are *not* in the call.
+ */
+async function announceCall(
+    meetingId: string,
+    state: CallState,
+    actorId: string,
+    actorName?: string
+): Promise<void> {
+    const meeting = await prisma.meeting.findUnique({
+        where: { id: meetingId },
+        select: { channelId: true }
+    });
+    if (!meeting?.channelId) return;
+    publishChatChange({
+        channelId: meeting.channelId,
+        kind: "call",
+        actorId,
+        actorName,
+        call: { meetingId, state, count: state === "ended" ? 0 : await admittedCount(meetingId) }
+    });
 }
 
 /** The caller's own row, which is both the proof and the answer to "what am I
@@ -581,11 +633,8 @@ async function endIfAlone(meetingId: string): Promise<void> {
     if (!meeting || meeting.endedAt) return;
     if (meeting.channel?.kind !== "dm") return;
 
-    const inside = await prisma.meetingParticipant.count({
-        where: { meetingId, leftAt: null, admission: "admitted" }
-    });
     // Nobody at all is `endIfEmpty`'s job, and two people is a call.
-    if (inside !== 1) return;
+    if ((await admittedCount(meetingId)) !== 1) return;
 
     const lastOut = await prisma.meetingParticipant.findFirst({
         where: { meetingId, leftAt: { not: null } },
@@ -599,16 +648,19 @@ async function endIfAlone(meetingId: string): Promise<void> {
 }
 
 async function endIfEmpty(meetingId: string): Promise<void> {
-    const left = await prisma.meetingParticipant.count({
-        where: { meetingId, leftAt: null, admission: "admitted" }
-    });
-    if (left === 0) await closeMeeting(meetingId);
+    if ((await admittedCount(meetingId)) === 0) await closeMeeting(meetingId);
 }
 
 /** End a call and shut its door: the guest token goes with it, so a link that
  *  was forwarded cannot reopen the room later, and `liveKey` is released so the
  *  conversation can hold a call again. */
 async function closeMeeting(meetingId: string): Promise<void> {
+    // Read before the row is closed, since a closed meeting is about to be one
+    // nothing can be told about.
+    const stillLive = await prisma.meeting.findFirst({
+        where: { id: meetingId, endedAt: null },
+        select: { id: true }
+    });
     await prisma.$transaction([
         prisma.meeting.updateMany({
             where: { id: meetingId, endedAt: null },
@@ -620,4 +672,8 @@ async function closeMeeting(meetingId: string): Promise<void> {
         })
     ]);
     publishMeetingEvent({ meetingId, kind: "ended" });
+    // Only for the one caller that actually closed it. Ending is reached from
+    // several places - the last person out, a lone call timing out, the host
+    // pressing the button - and each would otherwise announce it again.
+    if (stillLive) await announceCall(meetingId, "ended", "");
 }

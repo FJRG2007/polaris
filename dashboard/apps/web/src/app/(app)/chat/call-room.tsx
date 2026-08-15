@@ -16,12 +16,21 @@
  * screen, and deafen. Each button carries the state it is in rather than the
  * action it performs, because a row of buttons that all say what they will do
  * cannot be read at a glance to find out what is currently on.
+ *
+ * A tile is ringed while its owner is talking. With cameras off - which is most
+ * calls - there is otherwise nothing at all to say who is speaking, because the
+ * sound comes out of one pair of speakers whoever it belongs to.
+ *
+ * Right-clicking a tile turns that person up or down, for this pair of ears
+ * only. It is applied to the audio element rather than to the connection, so it
+ * is instant and nobody else is told.
  */
 
 import { useCall } from "./use-call";
 import * as actions from "./meeting-actions";
+import { playCallSound } from "@/lib/call-sounds";
 import { useEffect, useRef, useState } from "react";
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, cn } from "@polaris/ui";
+import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
 import {
     Check,
     ChevronUp,
@@ -35,8 +44,26 @@ import {
     PhoneOff,
     Video,
     VideoOff,
+    Volume2,
+    VolumeX,
     X
 } from "lucide-react";
+import {
+    Button,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuLabel,
+    ContextMenuSeparator,
+    ContextMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    cn
+} from "@polaris/ui";
 
 export function CallRoom({
     meetingId,
@@ -69,6 +96,15 @@ export function CallRoom({
         if (!call.meeting?.guestToken) return;
         setGuestLink(`${window.location.origin}/m/${call.meeting.guestToken}`);
     }, [call.meeting?.guestToken]);
+
+    // The call ending under somebody - the host closing it, or the last other
+    // person leaving a one-to-one - is the case that most needs a sound: the
+    // screen they are looking at is not this one.
+    const wasEnded = useRef(false);
+    useEffect(() => {
+        if (call.ended && !wasEnded.current) playCallSound("hangUp");
+        wasEnded.current = call.ended;
+    }, [call.ended]);
 
     if (call.ended) {
         return (
@@ -135,6 +171,11 @@ export function CallRoom({
                     stream={call.localStream}
                     name="You"
                     muted
+                    speaking={
+                        call.participantId !== null &&
+                        call.speaking.has(call.participantId) &&
+                        call.micOn
+                    }
                     cameraOff={!call.cameraOn && !call.sharing}
                     sharing={call.sharing}
                 />
@@ -146,6 +187,11 @@ export function CallRoom({
                             stream={call.remote.get(person.id) ?? null}
                             name={person.name}
                             guest={person.guest}
+                            speaking={call.speaking.has(person.id)}
+                            // Their account where they have one, so turning
+                            // somebody down holds across calls; their seat where
+                            // they do not, which lasts as long as the seat.
+                            volumeKey={person.userId ?? person.id}
                             // Deafening is done here rather than at the
                             // connection: the audio still arrives, it simply is
                             // not played, so undeafening is instant and nobody
@@ -243,7 +289,14 @@ export function CallRoom({
                     </Button>
                 )}
 
-                <Button size="sm" variant="danger" onClick={onLeave}>
+                <Button
+                    size="sm"
+                    variant="danger"
+                    onClick={() => {
+                        playCallSound("hangUp");
+                        onLeave();
+                    }}
+                >
                     <PhoneOff className="size-4" />
                     Leave
                 </Button>
@@ -342,7 +395,9 @@ function Tile({
     muted = false,
     guest = false,
     cameraOff = false,
-    sharing = false
+    sharing = false,
+    speaking = false,
+    volumeKey
 }: {
     stream: MediaStream | null;
     name: string;
@@ -352,15 +407,35 @@ function Tile({
     guest?: boolean;
     cameraOff?: boolean;
     sharing?: boolean;
+    speaking?: boolean;
+    /** Who this tile's volume is remembered against. Absent on your own tile,
+     *  which has no volume to set - it is never played back. */
+    volumeKey?: string;
 }) {
     const video = useRef<HTMLVideoElement>(null);
+    const [volume, setVolume] = useCallVolume(volumeKey ?? "");
 
     useEffect(() => {
         if (video.current && stream) video.current.srcObject = stream;
     }, [stream]);
 
-    return (
-        <div className="relative min-h-0 overflow-hidden rounded-lg bg-elevated ring-1 ring-border">
+    // Applied to the element rather than to the connection: the audio still
+    // arrives and is simply played quieter, so a change lands on the next frame
+    // and nobody is renegotiated at.
+    useEffect(() => {
+        if (video.current && volumeKey) video.current.volume = volume;
+    }, [volume, volumeKey, stream]);
+
+    const tile = (
+        <div
+            className={cn(
+                "relative min-h-0 overflow-hidden rounded-lg bg-elevated ring-1 transition-shadow duration-fast",
+                // Two rings rather than a thicker one: a border that appears and
+                // disappears would move everything inside the tile by two pixels
+                // every time somebody drew breath.
+                speaking ? "ring-2 ring-success" : "ring-border"
+            )}
+        >
             <video
                 ref={video}
                 autoPlay
@@ -384,8 +459,57 @@ function Tile({
                 {name}
                 {guest && <span className="text-muted-foreground">guest</span>}
                 {sharing && <span className="text-primary">sharing</span>}
+                {volumeKey && volume === 0 && (
+                    <VolumeX className="size-3 text-danger" aria-label="Silenced for you" />
+                )}
             </span>
         </div>
+    );
+
+    if (!volumeKey) return tile;
+
+    return (
+        <ContextMenu>
+            <ContextMenuTrigger asChild>{tile}</ContextMenuTrigger>
+            <ContextMenuContent className="w-56">
+                <ContextMenuLabel>{name}</ContextMenuLabel>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                    onSelect={(event) => {
+                        // The menu would otherwise close on the press that moved
+                        // the slider, which is the one control here that is used
+                        // by dragging rather than by choosing.
+                        event.preventDefault();
+                    }}
+                    className="flex-col items-stretch gap-1.5"
+                >
+                    <span className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Volume</span>
+                        <span className="tabular-nums">{Math.round(volume * 100)}%</span>
+                    </span>
+                    <input
+                        type="range"
+                        min={0}
+                        max={MAX_VOLUME}
+                        step={0.05}
+                        value={volume}
+                        aria-label={`How loud ${name} is`}
+                        onChange={(event) => setVolume(Number(event.target.value))}
+                        className="w-full accent-primary"
+                    />
+                </ContextMenuItem>
+                <ContextMenuItem
+                    onSelect={() => setVolume(volume === 0 ? DEFAULT_VOLUME : 0)}
+                >
+                    {volume === 0 ? (
+                        <Volume2 className="size-3.5" />
+                    ) : (
+                        <VolumeX className="size-3.5" />
+                    )}
+                    {volume === 0 ? "Let them through" : "Silence them for you"}
+                </ContextMenuItem>
+            </ContextMenuContent>
+        </ContextMenu>
     );
 }
 

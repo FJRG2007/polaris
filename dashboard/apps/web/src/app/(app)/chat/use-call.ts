@@ -34,9 +34,11 @@
  */
 
 import { z } from "zod";
+import { useSpeaking } from "./use-speaking";
 import * as actions from "./meeting-actions";
+import { playCallSound } from "@/lib/call-sounds";
 import type { MeetingView } from "@/lib/chat/meetings";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /** How often the server is told this browser is still on the call. Comfortably
  *  inside the window it sweeps on. */
@@ -73,6 +75,18 @@ export interface CallDevice {
 /** One connection and the small amount of state perfect negotiation needs. */
 interface Peer {
     readonly connection: RTCPeerConnection;
+    /**
+     * The two slots this browser sends through, kept rather than looked up.
+     *
+     * Searching the transceiver list for "the one carrying video" only works
+     * while there is something on it: a slot with no track and no incoming
+     * track yet answers to neither kind, so the search misses it and a camera
+     * turned on mid-call is added as a *second* video slot instead of filling
+     * the empty one. The far side, which negotiated one, then shows nothing.
+     * Holding the references makes the question unnecessary.
+     */
+    readonly audio: RTCRtpTransceiver | null;
+    readonly video: RTCRtpTransceiver | null;
     /** True while an offer of ours is in flight, which is half of what makes a
      *  collision a collision. */
     makingOffer: boolean;
@@ -87,6 +101,9 @@ export interface CallState {
     readonly localStream: MediaStream | null;
     /** Remote video and audio, by the participant id it belongs to. */
     readonly remote: ReadonlyMap<string, MediaStream>;
+    /** The participant ids talking right now, this browser's own included.
+     *  Measured here rather than announced by anybody - see `useSpeaking`. */
+    readonly speaking: ReadonlySet<string>;
     readonly micOn: boolean;
     readonly cameraOn: boolean;
     /** Whether this browser has a camera to turn on at all. */
@@ -209,14 +226,15 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
      */
     const publishTrack = useCallback((kind: "audio" | "video", track: MediaStreamTrack | null) => {
         for (const peer of peers.current.values()) {
-            const transceiver = peer.connection
-                .getTransceivers()
-                .find((entry) => (entry.sender.track?.kind ?? entry.receiver.track?.kind) === kind);
-            if (!transceiver) {
-                if (track) peer.connection.addTrack(track);
-                continue;
-            }
+            if (peer.connection.connectionState === "closed") continue;
+            const transceiver = kind === "audio" ? peer.audio : peer.video;
+            if (!transceiver) continue;
             void transceiver.sender.replaceTrack(track).catch(() => undefined);
+            // The direction is what actually opens the tap. `replaceTrack` on a
+            // slot that is only receiving succeeds and sends nothing, which is
+            // the shape of "I turned my camera on and nobody saw it"; changing
+            // the direction is also what asks for the renegotiation that tells
+            // the other side to expect it.
             const wanted = track ? "sendrecv" : "recvonly";
             if (transceiver.direction !== wanted) transceiver.direction = wanted;
         }
@@ -229,19 +247,27 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
             if (existing) return existing.connection;
 
             const connection = new RTCPeerConnection({ iceServers: ice.current });
-            const peer: Peer = { connection, makingOffer: false, ignoring: false };
+
+            // Two slots, always, in the same order on both sides, whether or not
+            // there is anything to put in them yet. A slot that is only
+            // receiving still puts its line in the offer - which is why somebody
+            // with no camera can see everybody else - and, just as importantly,
+            // it is the slot a camera turned on later goes into. `addTransceiver`
+            // rather than `addTrack` in both cases, so the reference is the
+            // return value rather than something to go looking for.
+            const audio = connection.addTransceiver("audio", {
+                direction: mic.current ? "sendrecv" : "recvonly"
+            });
+            if (mic.current) void audio.sender.replaceTrack(mic.current).catch(() => undefined);
+
+            const outgoing = screen.current ?? camera.current;
+            const video = connection.addTransceiver("video", {
+                direction: outgoing ? "sendrecv" : "recvonly"
+            });
+            if (outgoing) void video.sender.replaceTrack(outgoing).catch(() => undefined);
+
+            const peer: Peer = { connection, audio, video, makingOffer: false, ignoring: false };
             peers.current.set(otherId, peer);
-
-            // Send what we have, and leave a place for what they have. A
-            // transceiver that is only receiving still puts the line in the
-            // offer, which is the whole reason somebody with no camera can see
-            // everybody else.
-            if (mic.current) connection.addTrack(mic.current);
-            else connection.addTransceiver("audio", { direction: "recvonly" });
-
-            const video = screen.current ?? camera.current;
-            if (video) connection.addTrack(video);
-            else connection.addTransceiver("video", { direction: "recvonly" });
 
             connection.onicecandidate = (event) => {
                 if (!event.candidate) return;
@@ -539,6 +565,7 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
             publishTrack("video", camera.current);
             publishLocalPreview();
             setSharing(false);
+            playCallSound("shareOff");
             return;
         }
         void navigator.mediaDevices
@@ -553,11 +580,13 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
                     publishTrack("video", camera.current);
                     publishLocalPreview();
                     setSharing(false);
+                    playCallSound("shareOff");
                 };
                 screen.current = track;
                 publishTrack("video", track);
                 publishLocalPreview();
                 setSharing(true);
+                playCallSound("shareOn");
             })
             .catch(() => {
                 // Cancelling the picker is the ordinary way out of this dialog,
@@ -615,6 +644,42 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
         [cameraOn, deafened, micOn, publishLocalPreview, publishTrack]
     );
 
+    /**
+     * Everything with sound in it, by the participant it belongs to, so one
+     * meter can watch the whole room.
+     *
+     * This browser's own is in it under its own participant id: somebody needs
+     * to see that their microphone is working at least as much as they need to
+     * see that somebody else's is, and it is the same measurement.
+     */
+    const audible = useMemo(() => {
+        const streams = new Map<string, MediaStream | null>(remote);
+        if (participantId) streams.set(participantId, localStream);
+        return streams;
+    }, [remote, localStream, participantId]);
+
+    const speaking = useSpeaking(audible, !ended);
+
+    /**
+     * Somebody arrived, or somebody left.
+     *
+     * Sounded rather than only drawn: whoever is in a call is usually looking at
+     * something else, which is the whole reason to be on a call rather than in a
+     * document together. The first roster is not announced - joining a call of
+     * four is not four people arriving.
+     */
+    const roster = useRef<readonly string[] | null>(null);
+    useEffect(() => {
+        const inside = (meeting?.participants ?? [])
+            .filter((person) => person.admission === "admitted")
+            .map((person) => person.id);
+        const before = roster.current;
+        roster.current = inside;
+        if (before === null) return;
+        if (inside.some((id) => !before.includes(id))) playCallSound("join");
+        else if (before.some((id) => !inside.includes(id))) playCallSound("leave");
+    }, [meeting]);
+
     const chooseMicrophone = useCallback(
         (deviceId: string) => chooseDevice("audio", deviceId),
         [chooseDevice]
@@ -629,6 +694,7 @@ export function useCall(meetingId: string, options?: { video?: boolean }): CallS
         participantId,
         localStream,
         remote,
+        speaking,
         micOn,
         cameraOn,
         hasCamera,

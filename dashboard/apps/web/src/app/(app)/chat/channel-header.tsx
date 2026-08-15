@@ -13,11 +13,13 @@
  */
 
 import Link from "next/link";
+import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { useEffect, useState } from "react";
-import * as actions from "./actions";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
+import { channelLink, copyText } from "./links";
+import { useAppUrl } from "@/components/app-url";
 import { AddPeopleDialog } from "./add-people-dialog";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import {
@@ -25,6 +27,7 @@ import {
     Bell,
     BellOff,
     Hash,
+    Link2,
     LogOut,
     Lock,
     MoreHorizontal,
@@ -73,6 +76,7 @@ export function ChannelHeader({
     onSearch?: () => void;
 }) {
     const router = useRouter();
+    const baseUrl = useAppUrl();
     const [adding, setAdding] = useState(false);
     const [renaming, setRenaming] = useState(false);
     const [name, setName] = useState("");
@@ -190,6 +194,18 @@ export function ChannelHeader({
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                            {/* Every conversation has an address, whether it is
+                                a channel, a group or one person - they are one
+                                kind of thing with one id. */}
+                            <DropdownMenuItem
+                                onSelect={() =>
+                                    void copyText(channelLink(baseUrl, channel.id))
+                                }
+                            >
+                                <Link2 className="size-3.5" />
+                                Copy link
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
                                 onSelect={() =>
                                     void act(() =>
@@ -212,6 +228,7 @@ export function ChannelHeader({
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem
+                                        variant="danger"
                                         onSelect={async () => {
                                             await runAction(
                                                 () =>
@@ -242,7 +259,10 @@ export function ChannelHeader({
                                         {channel.archived ? "Reopen channel" : "Archive channel"}
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem onSelect={() => setConfirmDelete(true)}>
+                                    <DropdownMenuItem
+                                        variant="danger"
+                                        onSelect={() => setConfirmDelete(true)}
+                                    >
                                         <Trash2 className="size-3.5" />
                                         Delete channel
                                     </DropdownMenuItem>

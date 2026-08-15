@@ -21,20 +21,37 @@
  * as being in that channel.
  */
 
+/** What a call in a conversation just did. */
+export type CallState = "ringing" | "moved" | "ended";
+
 /** Something worth waking the other screens for. */
 export interface ChatChange {
     readonly channelId: string;
     /** posted - a message arrived or changed, pull the channel again.
      *  channels - what this person can reach changed, redraw the rail.
-     *  typing - somebody is composing right now. */
-    readonly kind: "posted" | "channels" | "typing";
+     *  typing - somebody is composing right now.
+     *  call - a call in this conversation started, moved or ended. */
+    readonly kind: "posted" | "channels" | "typing" | "call";
     /** Who caused it. A tab does not need waking for its own write. */
     readonly actorId: string;
-    /** Only on `typing`: what to draw beside the dots. */
+    /** Only on `typing` and `call`: what to draw beside the dots, or who is
+     *  calling. */
     readonly actorName?: string;
     /** Only on `channels`: who should redraw, when the change is about one
      *  person joining or leaving rather than about the channel itself. */
     readonly audience?: readonly string[];
+    /**
+     * Only on `call`.
+     *
+     * Starting a call posts no message, so without this nothing tells the rest
+     * of the conversation that one is running - which is why the count beside
+     * the call button used to be whatever it was when the screen last had a
+     * reason to ask, differently wrong in every tab. `ringing` is the one that
+     * makes somebody's browser sound: it is only sent when the room went from
+     * empty to occupied, so walking into a call already in progress does not
+     * ring the people already sitting in it.
+     */
+    readonly call?: { readonly meetingId: string; readonly state: CallState; readonly count: number };
 }
 
 type Listener = (change: ChatChange) => void;

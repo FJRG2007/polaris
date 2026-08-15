@@ -1143,7 +1143,7 @@ export function FilesView({
                             </>
                         ) : null}
                         <ContextMenuSeparator />
-                        <ContextMenuItem onSelect={() => onScheduleDelete(targets)}>
+                        <ContextMenuItem variant="danger" onSelect={() => onScheduleDelete(targets)}>
                             <CalendarClock className="size-4" />
                             Delete later...
                         </ContextMenuItem>

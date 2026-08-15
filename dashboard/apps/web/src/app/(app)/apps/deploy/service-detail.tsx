@@ -382,7 +382,7 @@ function DeploymentMenu({
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                    className="text-danger focus:text-danger"
+                    variant="danger"
                     onSelect={() => run(() => deployActions.removeApplicationDeploymentAction(app.id))}
                 >
                     <Trash2 className="size-4" /> Remove

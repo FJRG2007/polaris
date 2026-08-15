@@ -15,6 +15,7 @@
 import Link from "next/link";
 import { cn } from "@polaris/ui";
 import * as refs from "./references";
+import { CodeBlock } from "./code-block";
 import { RICH_TEXT_PROSE } from "./prose";
 import { chipClass, chipLabel } from "./chip";
 import type { JSONContent } from "@tiptap/core";
@@ -50,7 +51,18 @@ function Block({ node }: { node: JSONContent }) {
             // the shared type styles reaches both.
             return <ul data-type="taskList">{taskItems(node.content)}</ul>;
         case "codeBlock":
+            return (
+                <CodeBlock
+                    code={text(node)}
+                    language={
+                        typeof node.attrs?.language === "string" ? node.attrs.language : null
+                    }
+                />
+            );
         case MARKDOWN_BLOCK:
+            // Markdown the schema has no node for - a table, a piece of raw HTML
+            // - shown as the source it is. No language to declare and nothing to
+            // highlight, so it keeps the plain frame.
             return (
                 <pre>
                     <code>{text(node)}</code>

@@ -558,7 +558,9 @@ function ResourceLine({
                 <ContextMenuLabel>Plan</ContextMenuLabel>
                 <PlanChoices row={row} plans={plans} onChanged={onChanged} />
                 <ContextMenuSeparator />
-                <ContextMenuItem onSelect={onRemove}>Stop backing up</ContextMenuItem>
+                <ContextMenuItem variant="danger" onSelect={onRemove}>
+                    Stop backing up
+                </ContextMenuItem>
             </ContextMenuContent>
         </ContextMenu>
     );

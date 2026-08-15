@@ -470,7 +470,7 @@ export function TaskPanel({
                                         </DropdownMenuItem>
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem
-                                            className="text-destructive"
+                                            variant="danger"
                                             onSelect={() => setConfirmDelete(true)}
                                         >
                                             Delete

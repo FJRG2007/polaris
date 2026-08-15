@@ -22,9 +22,9 @@ import { saveOverviewPreferencesAction } from "./actions";
 import { clearRecentPlaces } from "@/lib/overview/recent-places";
 import { ActivityWidget, SessionsWidget } from "./widgets/account";
 import type { OverviewData } from "@/lib/overview/overview-service";
-import { overviewSize, overviewWidget, OVERVIEW_SIZE_LABELS } from "@/lib/overview/catalog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { emptyCards, relevanceOrder, rememberEmptyCards } from "@/lib/overview/relevance";
+import { overviewSize, overviewWidget, OVERVIEW_SIZE_LABELS } from "@/lib/overview/catalog";
 import { AppsWidget, NotificationsWidget, RecentWidget, ShortcutsWidget } from "./widgets/personal";
 import { AlarmsWidget, GamesWidget, ServicesWidget, StorageWidget, TasksWidget, UsageWidget } from "./widgets/infrastructure";
 import { ArrowDown, ArrowUp, EyeOff, GripVertical, LayoutGrid, MoreVertical, RefreshCw, Settings2, Trash2 } from "lucide-react";
@@ -581,7 +581,7 @@ function WidgetMenu({
                 ) : null}
                 <DropdownMenuSeparator />
                 {onClear ? (
-                    <DropdownMenuItem onSelect={onClear}>
+                    <DropdownMenuItem variant="danger" onSelect={onClear}>
                         <Trash2 className="size-4" aria-hidden="true" />
                         Clear history
                     </DropdownMenuItem>

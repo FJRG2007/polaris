@@ -347,7 +347,7 @@ function RuleRow({
                             Duplicate
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem disabled={!canEdit} onSelect={onRemove}>
+                        <DropdownMenuItem variant="danger" disabled={!canEdit} onSelect={onRemove}>
                             <Trash2 className="size-3.5 shrink-0" aria-hidden="true" />
                             Delete
                         </DropdownMenuItem>

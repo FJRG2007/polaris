@@ -27,6 +27,13 @@ import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
 import { useDisplayFormat } from "@/components/display-format";
 import {
+    cn,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger
+} from "@polaris/ui";
+import {
     Check,
     CheckCheck,
     CornerUpLeft,
@@ -37,13 +44,6 @@ import {
     Star,
     Trash2
 } from "lucide-react";
-import {
-    cn,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger
-} from "@polaris/ui";
 
 /** How close together two messages have to be to share a header. Long enough
  *  that a paused sentence stays one block, short enough that coming back an hour
@@ -189,16 +189,22 @@ function Message({
                 onDelete
             }}
         >
+        {/* `data-state` arrives from the right-click menu's trigger, which this
+            is. A menu opened over a dense list has to say which line it is about
+            - the pointer has left the row to reach the menu, so the hover that
+            told you is gone by the time you are reading the options. It is lit
+            harder than a hover for the same reason: one row is picked out, and
+            the pointer is somewhere else. */}
         <div
             className={cn(
-                "group relative flex gap-2 px-4 transition-colors hover:bg-card-hover/60",
+                "group relative flex gap-2 px-4 transition-colors hover:bg-card-hover/60 data-[state=open]:bg-card-hover",
                 grouped ? "py-0.5" : "pb-0.5 pt-3"
             )}
         >
             <span className="w-8 shrink-0">
                 {grouped ? (
                     <span
-                        className="hidden pt-1 text-[10px] leading-4 text-foreground-subtle group-hover:block"
+                        className="hidden pt-1 text-[10px] leading-4 text-foreground-subtle group-hover:block group-data-[state=open]:block"
                         title={format.dateTime(message.createdAt)}
                     >
                         {format.time(message.createdAt)}
@@ -341,7 +347,7 @@ function Message({
             </div>
 
             {canPost && !message.deleted && (
-                <div className="absolute right-3 top-0 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border border-border bg-elevated p-0.5 shadow-popover group-focus-within:flex group-hover:flex">
+                <div className="absolute right-3 top-0 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border border-border bg-elevated p-0.5 shadow-popover group-focus-within:flex group-hover:flex group-data-[state=open]:flex">
                     {QUICK_EMOJI.map((emoji) => (
                         <button
                             key={emoji}
@@ -405,7 +411,10 @@ function Message({
                                         Edit
                                     </DropdownMenuItem>
                                 )}
-                                <DropdownMenuItem onSelect={() => onDelete(message)}>
+                                <DropdownMenuItem
+                                    variant="danger"
+                                    onSelect={() => onDelete(message)}
+                                >
                                     <Trash2 className="size-3.5" />
                                     Delete
                                 </DropdownMenuItem>

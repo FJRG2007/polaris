@@ -13,11 +13,14 @@
  */
 
 import type { ReactNode } from "react";
+import { copyText, messageLink } from "./links";
+import { useAppUrl } from "@/components/app-url";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import {
     Copy,
     CornerUpLeft,
     Forward,
+    Link2,
     MessageSquare,
     Pencil,
     Star,
@@ -52,6 +55,7 @@ export function MessageMenu({
     children: ReactNode;
 }) {
     const { message, mine, canPost, canModerate } = actions;
+    const baseUrl = useAppUrl();
 
     return (
         <ContextMenu>
@@ -81,10 +85,19 @@ export function MessageMenu({
                     <Star className="size-3.5" />
                     {message.starred ? "Remove from saved" : "Save"}
                 </ContextMenuItem>
+                {/* Offered on a deleted message too: the line is still there,
+                    replies still hang off it, and its address still opens the
+                    conversation at the right place. */}
+                <ContextMenuItem
+                    onSelect={() =>
+                        void copyText(messageLink(baseUrl, message.channelId, message.id))
+                    }
+                >
+                    <Link2 className="size-3.5" />
+                    Copy link
+                </ContextMenuItem>
                 {!message.deleted && (
-                    <ContextMenuItem
-                        onSelect={() => void navigator.clipboard?.writeText(message.body)}
-                    >
+                    <ContextMenuItem onSelect={() => void copyText(message.body)}>
                         <Copy className="size-3.5" />
                         Copy text
                     </ContextMenuItem>
@@ -99,7 +112,10 @@ export function MessageMenu({
                                 Edit
                             </ContextMenuItem>
                         )}
-                        <ContextMenuItem onSelect={() => actions.onDelete(message)}>
+                        <ContextMenuItem
+                            variant="danger"
+                            onSelect={() => actions.onDelete(message)}
+                        >
                             <Trash2 className="size-3.5" />
                             Delete
                         </ContextMenuItem>

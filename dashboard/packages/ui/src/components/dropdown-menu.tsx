@@ -33,14 +33,28 @@ export const DropdownMenuContent = forwardRef<
 ));
 DropdownMenuContent.displayName = "DropdownMenuContent";
 
+/**
+ * One option.
+ *
+ * `variant="danger"` is how an option that destroys something is drawn, and it
+ * is the same red in the context menu, so the item that deletes a thing looks
+ * the same whether it was reached by a right-click or by a trigger button. It
+ * belongs to the primitive rather than to each caller's `className`: a colour
+ * every screen restates is a colour that ends up slightly different on half of
+ * them, and this one is a warning.
+ */
 export const DropdownMenuItem = forwardRef<
     ElementRef<typeof RadixMenu.Item>,
-    ComponentPropsWithoutRef<typeof RadixMenu.Item> & { disabled?: boolean }
->(({ className, ...props }, ref) => (
+    ComponentPropsWithoutRef<typeof RadixMenu.Item> & {
+        disabled?: boolean;
+        variant?: "default" | "danger";
+    }
+>(({ className, variant = "default", ...props }, ref) => (
     <RadixMenu.Item
         ref={ref}
         className={cn(
             "relative flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-[13px] outline-none transition-colors duration-fast focus:bg-card-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+            variant === "danger" && "text-danger focus:bg-danger/10 focus:text-danger",
             className
         )}
         {...props}
