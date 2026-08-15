@@ -19,11 +19,20 @@
  */
 
 import { Avatar } from "@/components/avatar";
+import { MessageMenu } from "./message-menu";
 import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
 import { useDisplayFormat } from "@/components/display-format";
-import { MessageSquare, Paperclip, Pencil, SmilePlus, Star, Trash2 } from "lucide-react";
+import {
+    CornerUpLeft,
+    MessageSquare,
+    Paperclip,
+    Pencil,
+    SmilePlus,
+    Star,
+    Trash2
+} from "lucide-react";
 import {
     cn,
     DropdownMenu,
@@ -53,6 +62,8 @@ export interface MessageListProps {
     onOpenThread?: (message: ChatMessageView) => void;
     onReact: (messageId: string, emoji: string) => void;
     onStar: (message: ChatMessageView) => void;
+    onReply: (message: ChatMessageView) => void;
+    onForward: (message: ChatMessageView) => void;
     onEdit: (message: ChatMessageView) => void;
     onDelete: (message: ChatMessageView) => void;
 }
@@ -65,6 +76,8 @@ export function MessageList({
     onOpenThread,
     onReact,
     onStar,
+    onReply,
+    onForward,
     onEdit,
     onDelete
 }: MessageListProps) {
@@ -94,6 +107,8 @@ export function MessageList({
                             onOpenThread={onOpenThread}
                             onReact={onReact}
                             onStar={onStar}
+                            onReply={onReply}
+                            onForward={onForward}
                             onEdit={onEdit}
                             onDelete={onDelete}
                         />
@@ -113,6 +128,8 @@ function Message({
     onOpenThread,
     onReact,
     onStar,
+    onReply,
+    onForward,
     onEdit,
     onDelete
 }: {
@@ -124,6 +141,8 @@ function Message({
     onOpenThread?: (message: ChatMessageView) => void;
     onReact: (messageId: string, emoji: string) => void;
     onStar: (message: ChatMessageView) => void;
+    onReply: (message: ChatMessageView) => void;
+    onForward: (message: ChatMessageView) => void;
     onEdit: (message: ChatMessageView) => void;
     onDelete: (message: ChatMessageView) => void;
 }) {
@@ -139,6 +158,20 @@ function Message({
     }
 
     return (
+        <MessageMenu
+            actions={{
+                message,
+                mine,
+                canPost,
+                canModerate,
+                onReply,
+                onForward,
+                onOpenThread,
+                onStar,
+                onEdit,
+                onDelete
+            }}
+        >
         <div
             className={cn(
                 "group relative flex gap-2 px-4 transition-colors hover:bg-card-hover/60",
@@ -171,6 +204,23 @@ function Message({
                             title={format.dateTime(message.createdAt)}
                         >
                             <RelativeTime iso={message.createdAt} />
+                        </span>
+                    </p>
+                )}
+
+                {message.quote && (
+                    <p className="mb-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <CornerUpLeft className="size-3 shrink-0" />
+                        {message.quote.forwarded && (
+                            <span className="shrink-0 font-medium">Forwarded from</span>
+                        )}
+                        <span className="shrink-0 font-medium text-foreground">
+                            {message.quote.authorName ?? "somebody who has left"}
+                        </span>
+                        <span className="min-w-0 truncate" title={message.quote.excerpt}>
+                            {message.quote.deleted
+                                ? "message deleted"
+                                : message.quote.excerpt || "attachment"}
                         </span>
                     </p>
                 )}
@@ -290,6 +340,15 @@ function Message({
                     >
                         <Star className={cn("size-3.5", message.starred && "fill-current")} />
                     </button>
+                    <button
+                        type="button"
+                        aria-label="Reply"
+                        title="Reply"
+                        onClick={() => onReply(message)}
+                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                        <CornerUpLeft className="size-3.5" />
+                    </button>
                     {onOpenThread && (
                         <button
                             type="button"
@@ -329,6 +388,7 @@ function Message({
                 </div>
             )}
         </div>
+        </MessageMenu>
     );
 }
 

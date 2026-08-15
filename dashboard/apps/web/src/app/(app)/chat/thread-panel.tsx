@@ -93,6 +93,15 @@ export function ThreadPanel({
                         viewerId={viewerId}
                         canPost={canPost}
                         canModerate={canModerate}
+                        onReply={() => {
+                            // A thread is already the reply. Quoting inside one
+                            // would be a reply to a reply with no room to draw
+                            // it, so the action is left to the channel.
+                        }}
+                        onForward={() => {
+                            // Same: forwarding out of a thread is done from the
+                            // channel, where the whole conversation is.
+                        }}
                         onStar={async (message) => {
                             await runAction(() => actions.starAction(message.id), setError);
                             await load();

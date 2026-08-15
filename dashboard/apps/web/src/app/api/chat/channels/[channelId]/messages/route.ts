@@ -35,7 +35,8 @@ const fieldsSchema = z.object({
     // message, and forcing somebody to type "here" first is a tax on the common
     // case of sending a screenshot.
     body: z.string().trim().max(core.MAX_CHAT_MESSAGE),
-    parentId: z.string().uuid().nullable()
+    parentId: z.string().uuid().nullable(),
+    replyToId: z.string().uuid().nullable()
 });
 
 export async function POST(
@@ -63,7 +64,8 @@ export async function POST(
 
     const fields = fieldsSchema.safeParse({
         body: String(form.get("body") ?? ""),
-        parentId: form.get("parentId") ? String(form.get("parentId")) : null
+        parentId: form.get("parentId") ? String(form.get("parentId")) : null,
+        replyToId: form.get("replyToId") ? String(form.get("replyToId")) : null
     });
     if (!fields.success) return Response.json({ error: "That could not be sent" }, { status: 400 });
 
@@ -105,7 +107,8 @@ export async function POST(
                 body: fields.data.body || " ",
                 parentId: fields.data.parentId
             },
-            stored
+            stored,
+            fields.data.replyToId ? { messageId: fields.data.replyToId, forwarded: false } : null
         );
         return Response.json({ id });
     } catch (caught) {

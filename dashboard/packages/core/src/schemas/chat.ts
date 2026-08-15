@@ -172,11 +172,26 @@ export type ChatDirectOpenInput = z.infer<typeof chatDirectOpenSchema>;
 export const chatSendSchema = z.object({
     channelId: z.string().uuid(),
     body: chatMessageBody,
-    /** The message this is a reply to, which puts it in that thread. */
-    parentId: z.string().uuid().nullable().optional()
+    /** The thread this belongs in. Takes the message out of the channel. */
+    parentId: z.string().uuid().nullable().optional(),
+    /** The message this one answers, shown quoted above it and left in the
+     *  channel. The ordinary way to answer something; a thread is the
+     *  alternative for when a side conversation would bury the room. */
+    replyToId: z.string().uuid().nullable().optional()
 });
 
 export type ChatSendInput = z.infer<typeof chatSendSchema>;
+
+/** Sending somebody else's message on to another conversation. */
+export const chatForwardSchema = z.object({
+    messageId: z.string().uuid(),
+    /** Where it goes. Proved against the reader like any other write. */
+    channelId: z.string().uuid(),
+    /** A line of their own on top of it, which is what a forward usually is. */
+    note: z.string().trim().max(MAX_CHAT_MESSAGE).default("")
+});
+
+export type ChatForwardInput = z.infer<typeof chatForwardSchema>;
 
 export const chatEditSchema = z.object({
     messageId: z.string().uuid(),

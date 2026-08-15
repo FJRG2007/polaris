@@ -24,7 +24,7 @@
 import { Button, cn } from "@polaris/ui";
 import { typingAction } from "./actions";
 import { EmojiPicker } from "./emoji-picker";
-import { Paperclip, SendHorizontal, X } from "lucide-react";
+import { CornerUpLeft, Paperclip, SendHorizontal, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
@@ -41,6 +41,8 @@ export function Composer({
     disabled,
     placeholder,
     editing,
+    replyingTo,
+    onCancelReply,
     onSend,
     onMedia,
     onSaveEdit,
@@ -51,6 +53,10 @@ export function Composer({
     placeholder: string;
     /** The message being rewritten, if any. */
     editing?: ChatMessageView | null;
+    /** The message being answered, if any. Shown above the field so nobody
+     *  sends a reply having forgotten what it answers. */
+    replyingTo?: ChatMessageView | null;
+    onCancelReply?: () => void;
     /** Files come back alongside the text. Empty for the ordinary case, which is
      *  why the caller can still take the fast optimistic path when it is. */
     onSend: (body: string, files: readonly File[]) => void | Promise<void>;
@@ -119,6 +125,30 @@ export function Composer({
                 dragging && "bg-primary/10"
             )}
         >
+            {replyingTo && !editing && (
+                <div className="mb-2 flex items-center gap-2 rounded-md bg-muted px-2 py-1 text-xs">
+                    <CornerUpLeft className="size-3 shrink-0 text-muted-foreground" />
+                    <span className="shrink-0 text-muted-foreground">Replying to</span>
+                    <span className="shrink-0 font-medium">
+                        {replyingTo.authorName ?? "somebody who has left"}
+                    </span>
+                    <span
+                        className="min-w-0 flex-1 truncate text-muted-foreground"
+                        title={replyingTo.body}
+                    >
+                        {replyingTo.body}
+                    </span>
+                    <button
+                        type="button"
+                        aria-label="Stop replying"
+                        onClick={onCancelReply}
+                        className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                        <X className="size-3.5" />
+                    </button>
+                </div>
+            )}
+
             {editing && (
                 <div className="mb-2 flex items-center justify-between gap-2 rounded-md bg-muted px-2 py-1 text-xs">
                     <span className="text-muted-foreground">Editing a message</span>

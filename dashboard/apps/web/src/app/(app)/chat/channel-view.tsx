@@ -24,6 +24,7 @@
 import * as actions from "./actions";
 import { Composer } from "./composer";
 import { CallRoom } from "./call-room";
+import { ForwardDialog } from "./forward-dialog";
 import { useChat } from "./chat-context";
 import * as calls from "./meeting-actions";
 import { useRouter } from "next/navigation";
@@ -56,6 +57,8 @@ export function ChannelView({ channelId }: { channelId: string }) {
     const [thread, setThread] = useState<ChatMessageView | null>(null);
     const [editing, setEditing] = useState<ChatMessageView | null>(null);
     const [deleting, setDeleting] = useState<ChatMessageView | null>(null);
+    const [replyingTo, setReplyingTo] = useState<ChatMessageView | null>(null);
+    const [forwarding, setForwarding] = useState<ChatMessageView | null>(null);
     const [typists, setTypists] = useState<readonly { userId: string; name: string; at: number }[]>(
         []
     );
@@ -88,6 +91,8 @@ export function ChannelView({ channelId }: { channelId: string }) {
         setPending([]);
         setThread(null);
         setEditing(null);
+        setReplyingTo(null);
+        setForwarding(null);
         setError("");
         setInCall(null);
         marked.current = "";
@@ -199,7 +204,9 @@ export function ChannelView({ channelId }: { channelId: string }) {
             following.current = true;
             const form = new FormData();
             form.set("body", body);
+            if (replyingTo) form.set("replyToId", replyingTo.id);
             for (const file of files) form.append("files", file);
+            setReplyingTo(null);
             const response = await fetch(`/api/chat/channels/${channelId}/messages`, {
                 method: "POST",
                 body: form
@@ -235,13 +242,22 @@ export function ChannelView({ channelId }: { channelId: string }) {
             deleted: false,
             reactions: [],
             attachments: [],
+            quote: null,
             starred: false,
             createdAt: new Date().toISOString()
         };
         setPending((current) => [...current, draft]);
         following.current = true;
 
-        const result = await runAction(() => actions.sendAction({ channelId, body }), setError);
+        const answering = replyingTo?.id ?? null;
+        // Cleared before the round trip: the reply bar is about what is being
+        // written, and the message has left.
+        setReplyingTo(null);
+
+        const result = await runAction(
+            () => actions.sendAction({ channelId, body, replyToId: answering }),
+            setError
+        );
         if (result?.error || !result?.id) {
             setPending((current) => current.filter((entry) => entry.id !== draft.id));
             return;
@@ -380,6 +396,8 @@ export function ChannelView({ channelId }: { channelId: string }) {
                             onOpenThread={setThread}
                             onReact={react}
                             onStar={star}
+                            onReply={setReplyingTo}
+                            onForward={setForwarding}
                             onEdit={setEditing}
                             onDelete={setDeleting}
                         />
@@ -403,6 +421,8 @@ export function ChannelView({ channelId }: { channelId: string }) {
                             : "This conversation is archived."
                     }
                     editing={editing}
+                    replyingTo={replyingTo}
+                    onCancelReply={() => setReplyingTo(null)}
                     onCancelEdit={() => setEditing(null)}
                     onSend={send}
                     onMedia={async (address) => {
@@ -434,6 +454,12 @@ export function ChannelView({ channelId }: { channelId: string }) {
                     onChanged={() => void load()}
                 />
             )}
+
+            <ForwardDialog
+                message={forwarding}
+                onOpenChange={(open) => !open && setForwarding(null)}
+                onSent={refresh}
+            />
 
             <ConfirmDeleteDialog
                 open={deleting !== null}

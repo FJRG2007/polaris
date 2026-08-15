@@ -40,6 +40,10 @@ export interface ChatMessageView {
     readonly deleted: boolean;
     readonly reactions: readonly ChatReactionView[];
     readonly attachments: readonly ChatAttachmentView[];
+    /** The message this one answers or forwards, already resolved to what the
+     *  quote line needs. Null when it stands alone, and present-but-gone when
+     *  the original was deleted - which is a different thing to say. */
+    readonly quote: ChatQuoteView | null;
     /** Whether this reader kept it. Private to them - starring is a bookmark,
      *  not a signal to the room. */
     readonly starred: boolean;
@@ -56,6 +60,22 @@ export interface ChatAttachmentView {
     /** Whether the list may draw it rather than link to it. */
     readonly inline: boolean;
 }
+
+/** The message a reply or a forward stands on, as the quote line draws it. */
+export interface ChatQuoteView {
+    readonly id: string;
+    readonly authorName: string | null;
+    /** Trimmed to a line: a quote that repeats a paragraph is the paragraph
+     *  twice. */
+    readonly excerpt: string;
+    readonly deleted: boolean;
+    /** True for a forward, false for a reply. The two read differently and are
+     *  placed differently, and this is what decides which. */
+    readonly forwarded: boolean;
+}
+
+/** How much of the quoted message the line carries. */
+const QUOTE_LENGTH = 160;
 
 /** One emoji on a message, already counted. */
 export interface ChatReactionView {
@@ -187,7 +207,9 @@ export async function send(
     /** Files already written to storage, to be tied to the message in the same
      *  transaction. A message that landed without its attachments would be a
      *  message nobody could make sense of. */
-    attachments: readonly StoredAttachment[] = []
+    attachments: readonly StoredAttachment[] = [],
+    /** The message this one answers, or the one being forwarded. */
+    quote: { readonly messageId: string; readonly forwarded: boolean } | null = null
 ): Promise<string> {
     await requirePostable(actor, input.channelId);
 
@@ -204,6 +226,27 @@ export async function send(
         input = { ...input, parentId: parent.parentId ?? input.parentId };
     }
 
+    // Resolved before the write and only when it is real: a reply pointing at a
+    // message in another conversation would let somebody quote a room they
+    // cannot read into one they can.
+    let quoted: string | null = null;
+    if (quote) {
+        const original = await prisma.chatMessage.findUnique({
+            where: { id: quote.messageId },
+            select: { channelId: true }
+        });
+        if (original) {
+            // A forward is the one case where the two differ on purpose: it
+            // carries a message out of where it was said. The reader is proved
+            // against the source before it moves.
+            if (original.channelId === input.channelId) quoted = quote.messageId;
+            else if (quote.forwarded) {
+                await requireChannel(actor, original.channelId);
+                quoted = quote.messageId;
+            }
+        }
+    }
+
     const id = await prisma.$transaction(async (tx) => {
         const message = await tx.chatMessage.create({
             data: {
@@ -211,6 +254,8 @@ export async function send(
                 authorId: actor.id,
                 body: input.body,
                 parentId: input.parentId ?? null,
+                replyToId: quoted,
+                forwarded: quoted !== null && (quote?.forwarded ?? false),
                 ...(attachments.length
                     ? { attachments: { createMany: { data: attachments.map((file) => ({ ...file })) } } }
                     : {})
@@ -358,6 +403,32 @@ export async function markRead(actor: ChatActor, input: core.ChatMarkReadInput):
 }
 
 /**
+ * Send somebody else's message on to another conversation.
+ *
+ * Both ends are proved: the reader has to be able to read where it came from -
+ * checked inside `send` - and to post where it is going. Without the first, a
+ * forward is a way to lift a message out of a room you were never in.
+ *
+ * The body is the forwarder's own note, and the original travels as the quote
+ * rather than as copied text. Copying would strip who said it and when, which is
+ * most of what makes a forwarded message worth anything.
+ */
+export async function forward(actor: ChatActor, input: core.ChatForwardInput): Promise<string> {
+    const original = await prisma.chatMessage.findUnique({
+        where: { id: input.messageId },
+        select: { id: true, deletedAt: true }
+    });
+    if (!original || original.deletedAt) throw new ChatAccessError("That message is gone");
+
+    return send(
+        actor,
+        { channelId: input.channelId, body: input.note || " ", parentId: null },
+        [],
+        { messageId: input.messageId, forwarded: true }
+    );
+}
+
+/**
  * Keep a message, or stop keeping it. Returns whether it is kept now.
  *
  * Anybody who can read the message can keep it, including in a channel they
@@ -424,6 +495,8 @@ const MESSAGE_SELECT = {
     kind: true,
     body: true,
     parentId: true,
+    replyToId: true,
+    forwarded: true,
     replyCount: true,
     lastReplyAt: true,
     editedAt: true,
@@ -438,6 +511,8 @@ interface Row {
     kind: string;
     body: string;
     parentId: string | null;
+    replyToId: string | null;
+    forwarded: boolean;
     replyCount: number;
     lastReplyAt: Date | null;
     editedAt: Date | null;
@@ -461,7 +536,10 @@ async function decorate(actor: ChatActor, rows: readonly Row[]): Promise<ChatMes
     const authorIds = [
         ...new Set(rows.map((row) => row.authorId).filter((id): id is string => id !== null))
     ];
-    const [authors, reactions, files, stars] = await Promise.all([
+    const quotedIds = [
+        ...new Set(rows.map((row) => row.replyToId).filter((id): id is string => id !== null))
+    ];
+    const [authors, reactions, files, stars, quoted] = await Promise.all([
         authorIds.length
             ? prisma.user.findMany({
                   where: { id: { in: authorIds } },
@@ -480,10 +558,30 @@ async function decorate(actor: ChatActor, rows: readonly Row[]): Promise<ChatMes
         prisma.chatStar.findMany({
             where: { userId: actor.id, messageId: { in: rows.map((row) => row.id) } },
             select: { messageId: true }
-        })
+        }),
+        quotedIds.length
+            ? prisma.chatMessage.findMany({
+                  where: { id: { in: quotedIds } },
+                  select: { id: true, authorId: true, body: true, deletedAt: true }
+              })
+            : Promise.resolve([])
     ]);
 
-    const names = new Map(authors.map((author) => [author.id, author.name]));
+    // The quoted messages have authors of their own, and they are usually
+    // already in the page - but not always, which is why they join the lookup
+    // rather than being read out of it.
+    const quoteAuthorIds = quoted
+        .map((row) => row.authorId)
+        .filter((id): id is string => id !== null && !authorIds.includes(id));
+    const quoteAuthors = quoteAuthorIds.length
+        ? await prisma.user.findMany({
+              where: { id: { in: [...new Set(quoteAuthorIds)] } },
+              select: { id: true, name: true }
+          })
+        : [];
+
+    const names = new Map([...authors, ...quoteAuthors].map((author) => [author.id, author.name]));
+    const quotes = new Map(quoted.map((row) => [row.id, row]));
     const kept = new Set(stars.map((row) => row.messageId));
     const onMessageFiles = new Map<string, ChatAttachmentView[]>();
     for (const file of files) {
@@ -527,7 +625,41 @@ async function decorate(actor: ChatActor, rows: readonly Row[]): Promise<ChatMes
                 (left, right) => right.count - left.count || left.emoji.localeCompare(right.emoji)
             ),
         attachments: onMessageFiles.get(row.id) ?? [],
+        quote: quoteViewOf(row, quotes, names),
         starred: kept.has(row.id),
         createdAt: row.createdAt.toISOString()
     }));
+}
+
+/** The quote line for one message, or null when it stands alone. */
+function quoteViewOf(
+    row: Row,
+    quotes: ReadonlyMap<
+        string,
+        { id: string; authorId: string | null; body: string; deletedAt: Date | null }
+    >,
+    names: ReadonlyMap<string, string>
+): ChatQuoteView | null {
+    if (!row.replyToId) return null;
+    const original = quotes.get(row.replyToId);
+    // The column survives the message it pointed at being deleted, so the
+    // absence is said rather than swallowed: an answer with no visible question
+    // is worse than one that admits the question is gone.
+    if (!original) {
+        return {
+            id: row.replyToId,
+            authorName: null,
+            excerpt: "",
+            deleted: true,
+            forwarded: row.forwarded
+        };
+    }
+    const body = original.deletedAt ? "" : original.body.replace(/\s+/g, " ").trim();
+    return {
+        id: original.id,
+        authorName: original.authorId ? (names.get(original.authorId) ?? null) : null,
+        excerpt: body.length > QUOTE_LENGTH ? `${body.slice(0, QUOTE_LENGTH)}...` : body,
+        deleted: original.deletedAt !== null,
+        forwarded: row.forwarded
+    };
 }

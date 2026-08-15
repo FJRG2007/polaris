@@ -132,7 +132,26 @@ export async function sendAction(input: unknown): Promise<{ id?: string; error?:
     if (!parsed.success)
         return { error: parsed.error.issues[0]?.message ?? "That could not be sent" };
 
-    const result = await guard(() => messages.send(me, parsed.data));
+    const result = await guard(() =>
+        messages.send(
+            me,
+            parsed.data,
+            [],
+            parsed.data.replyToId ? { messageId: parsed.data.replyToId, forwarded: false } : null
+        )
+    );
+    return result.error ? { error: result.error } : { id: result.value };
+}
+
+/** Send a message on to another conversation. */
+export async function forwardAction(input: unknown): Promise<{ id?: string; error?: string }> {
+    const me = await actor();
+    const parsed = core.chatForwardSchema.safeParse(input);
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That could not be forwarded" };
+
+    const result = await guard(() => messages.forward(me, parsed.data));
+    if (!result.error) revalidatePath(CHAT_PATH);
     return result.error ? { error: result.error } : { id: result.value };
 }
 

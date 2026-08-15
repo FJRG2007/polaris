@@ -5675,6 +5675,19 @@ model ChatMessage {
     kind        String    @default("text")
     body        String    @default("")
     parentId    String?   @db.Uuid
+    // The message this one quotes, for a reply shown inline in the channel or a
+    // message forwarded into another conversation. Distinct from `parentId`,
+    // which puts a message inside a thread and takes it out of the channel:
+    // a reply stays in the flow and carries the thing it answers above it, which
+    // is what people reach for far more often.
+    //
+    // ON DELETE SET NULL: deleting what was quoted must not delete the answer.
+    // The quote falls back to saying the original is gone.
+    replyToId   String?   @db.Uuid
+    // Whether the quote is a forward rather than a reply. One column pair for
+    // both because they are the same relationship - this message stands on that
+    // one - and only the wording and the placement differ.
+    forwarded   Boolean   @default(false)
     replyCount  Int       @default(0)
     lastReplyAt DateTime?
     editedAt    DateTime?
@@ -5684,12 +5697,15 @@ model ChatMessage {
     channel     ChatChannel      @relation(fields: [channelId], references: [id], onDelete: Cascade)
     parent      ChatMessage?     @relation("ChatThread", fields: [parentId], references: [id], onDelete: Cascade)
     replies     ChatMessage[]    @relation("ChatThread")
+    replyTo     ChatMessage?     @relation("ChatQuote", fields: [replyToId], references: [id], onDelete: SetNull)
+    quotedBy    ChatMessage[]    @relation("ChatQuote")
     reactions   ChatReaction[]
     attachments ChatAttachment[]
     stars       ChatStar[]
 
     @@index([channelId, createdAt])
     @@index([parentId, createdAt])
+    @@index([replyToId])
 }
 
 // An emoji somebody put on a message. One row per person per emoji per message,
