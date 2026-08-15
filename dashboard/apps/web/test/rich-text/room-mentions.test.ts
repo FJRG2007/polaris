@@ -85,3 +85,20 @@ describe("drawing it", () => {
         ]);
     });
 });
+
+describe("@all", () => {
+    it("is the same thing as @everyone, because it is what half of people type", () => {
+        expect(named("@all please read this")).toEqual(["everyone"]);
+    });
+
+    it("is drawn as what was written rather than corrected", () => {
+        // Rewriting somebody's message to say a word they did not use is not
+        // this file's job.
+        const parts = splitChannelMentions("@all now");
+        expect(parts[0]).toEqual({ text: "@all", mention: "everyone" });
+    });
+
+    it("is still only a whole word", () => {
+        expect(named("@allocation of the budget")).toEqual([]);
+    });
+});

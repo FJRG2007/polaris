@@ -454,9 +454,20 @@ export const CHANNEL_MENTIONS = ["everyone", "here"] as const;
 
 export type ChannelMention = (typeof CHANNEL_MENTIONS)[number];
 
-/** Matches either, and only as a whole word: `@everyone` counts, `@everyones`
- *  and an email ending in `@here.example` do not. */
-const CHANNEL_MENTION = /(^|[^\w@])@(everyone|here)(?![\w-])/g;
+/**
+ * Matches any of them, and only as a whole word: `@everyone` counts,
+ * `@everyones` and an email ending in `@here.example` do not.
+ *
+ * `@all` is the same thing as `@everyone` and is matched because it is what
+ * half the people who want it will type. It is drawn as what they wrote rather
+ * than rewritten, since correcting somebody's message is not this file's job.
+ */
+const CHANNEL_MENTION = /(^|[^\w@])@(everyone|all|here)(?![\w-])/g;
+
+/** What a written mention means. Two spellings, two meanings. */
+function meaningOf(word: string): ChannelMention {
+    return word === "here" ? "here" : "everyone";
+}
 
 /**
  * Which of the two a message uses.
@@ -473,7 +484,7 @@ export function channelMentions(markdown: string): Set<ChannelMention> {
         if (node.type === "text") {
             if ((node.marks ?? []).some((mark) => mark.type === "code")) return;
             for (const match of (node.text ?? "").matchAll(CHANNEL_MENTION)) {
-                found.add(match[2] as ChannelMention);
+                found.add(meaningOf(match[2] ?? ""));
             }
             return;
         }
@@ -499,7 +510,7 @@ export function splitChannelMentions(
         const lead = match[1] ?? "";
         const start = (match.index ?? 0) + lead.length;
         if (start > at) parts.push({ text: text.slice(at, start), mention: null });
-        parts.push({ text: `@${match[2]}`, mention: match[2] as ChannelMention });
+        parts.push({ text: `@${match[2]}`, mention: meaningOf(match[2] ?? "") });
         at = start + 1 + (match[2]?.length ?? 0);
     }
     if (at < text.length) parts.push({ text: text.slice(at), mention: null });
