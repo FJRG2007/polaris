@@ -17,7 +17,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { ArrowLeft, ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { Badge, Button, Card, CardBody, Checkbox, Select, Skeleton } from "@polaris/ui";
-import type { AccessExplanation, PermissionVerdict } from "@/lib/access-explain-service";
+import type { AccessExplanation } from "@/lib/access-explain-service";
 import { removeUserGrantAction, setUserGroupAction, setUserPolicyAction, userAccessAction } from "./actions";
 
 interface Named {
@@ -114,7 +114,6 @@ export function UserAccessView({
                 }}
             />
             <ResourcesCard userId={userId} access={access} onChanged={load} />
-            <EffectiveCard access={access} />
         </div>
     );
 }
@@ -354,78 +353,5 @@ function ResourcesCard({
             </CardBody>
             {confirmElement}
         </Card>
-    );
-}
-
-function EffectiveCard({ access }: { access: AccessExplanation | null }) {
-    return (
-        <Card>
-            <CardBody className="flex flex-col gap-3">
-                <div className="flex flex-col gap-1">
-                    <h2 className="text-sm font-medium">Effective permissions</h2>
-                    <p className="text-sm text-muted-foreground">
-                        What all of the above adds up to, and where each answer comes from.
-                    </p>
-                </div>
-                {access === null ? (
-                    <div className="flex flex-col gap-2">
-                        <Skeleton className="h-8 w-full" />
-                        <Skeleton className="h-8 w-full" />
-                        <Skeleton className="h-8 w-2/3" />
-                    </div>
-                ) : access.isAdmin ? (
-                    // Twenty-two green rows would be a lie about where they come
-                    // from: an administrator holds them by being one, and holds
-                    // whatever a later version adds too.
-                    <p className="text-sm">
-                        Administrator. Holds every permission, including ones added by future updates, and no policy
-                        deny applies to them.
-                    </p>
-                ) : (
-                    <div className="flex flex-col gap-4">
-                        {[...new Set(access.global.map((row) => row.area))].map((area) => (
-                            <div key={area} className="flex flex-col gap-1">
-                                <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                    {area}
-                                </h3>
-                                {access.global
-                                    .filter((row) => row.area === area)
-                                    .map((row) => (
-                                        <VerdictRow key={row.permission} verdict={row} />
-                                    ))}
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </CardBody>
-        </Card>
-    );
-}
-
-function VerdictRow({ verdict }: { verdict: PermissionVerdict }) {
-    const denied = verdict.reasons.filter((reason) => reason.effect === "deny");
-    const allowed = verdict.reasons.filter((reason) => reason.effect === "allow");
-    const shown = denied.length > 0 ? denied : allowed;
-    return (
-        <div className="flex items-baseline justify-between gap-3 py-0.5 text-sm">
-            <span className={verdict.allowed ? undefined : "text-muted-foreground"}>{verdict.label}</span>
-            <span className="shrink-0 text-xs text-muted-foreground">
-                {shown.length === 0
-                    ? "Not granted"
-                    : shown.map((reason, index) => (
-                          <span key={`${reason.label}-${index}`}>
-                              {index > 0 && ", "}
-                              {reason.effect === "deny" && "Denied by "}
-                              {reason.href ? (
-                                  <Link href={reason.href} className="hover:underline">
-                                      {reason.label}
-                                  </Link>
-                              ) : (
-                                  reason.label
-                              )}
-                          </span>
-                      ))}
-            </span>
-        </div>
     );
 }

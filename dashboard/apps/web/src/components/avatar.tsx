@@ -27,6 +27,32 @@ export interface AvatarPerson {
     readonly image?: string | null;
 }
 
+/**
+ * The colour behind somebody's initials.
+ *
+ * Everybody used to get `bg-muted`, which is a surface token: hue 225, so a
+ * whole column of faces came out the same faint blue and read as a UI element
+ * that had failed to load rather than as a person. A face with no photo still
+ * has to look deliberate.
+ *
+ * So the hue comes from the id - stable, so the same person is the same colour
+ * on every screen and across sessions, and spread, so two people in a list are
+ * tellable apart before their initials are read. Saturation and lightness are
+ * fixed rather than derived: they are what keeps white text legible on all 360
+ * of them, and what stops the palette turning into a bag of sweets.
+ *
+ * Fixed values rather than tokens because they must not move with the theme: the
+ * initials are white on this in both, and a background that lightened for the
+ * light theme would take the contrast with it.
+ */
+function tintFor(id: string): string {
+    let hash = 0;
+    for (let index = 0; index < id.length; index += 1) {
+        hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
+    }
+    return `hsl(${hash % 360} 36% 42%)`;
+}
+
 /** Initials from a display name. Two words give two letters, one word gives two
  *  of its own, and something unnameable gives a question mark. */
 export function initials(name: string): string {
@@ -87,11 +113,16 @@ export function Avatar({
         <span
             title={person.name}
             className={cn(
-                "relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden bg-muted font-medium text-muted-foreground ring-1 ring-border",
+                "relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden font-medium text-white ring-1 ring-border",
                 shape,
                 className
             )}
-            style={{ width: size, height: size, fontSize: Math.max(9, Math.round(size * 0.4)) }}
+            style={{
+                width: size,
+                height: size,
+                fontSize: Math.max(9, Math.round(size * 0.4)),
+                backgroundColor: tintFor(person.id)
+            }}
         >
             {initials(person.name)}
             {!failed && (
