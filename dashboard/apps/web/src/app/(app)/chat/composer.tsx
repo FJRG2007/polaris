@@ -410,8 +410,14 @@ export function Composer({
                         focusAt={focusAt}
                         disabled={disabled}
                         placeholder={placeholder}
-                        onChange={(next) => {
-                            setBody(next);
+                        onChange={setBody}
+                        // From the keys and not from the document changing. A
+                        // document changes for reasons that are not a person
+                        // writing - a chip resolving its name, an extension
+                        // settling as the editor mounts - and every one of those
+                        // told the other side somebody was typing when they had
+                        // only opened the conversation.
+                        onTyping={() => {
                             if (!disabled) announce();
                         }}
                         onSubmit={(next) => void submit(next)}

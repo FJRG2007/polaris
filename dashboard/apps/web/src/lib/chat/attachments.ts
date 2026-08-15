@@ -65,7 +65,44 @@ export const MAX_ATTACHMENT_BYTES = core.CHAT_ATTACHMENT_CEILING_MIB * 1024 * 10
 const INLINE_IMAGE = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"]);
 
 export function isInlineImage(contentType: string): boolean {
-    return INLINE_IMAGE.has(contentType.toLowerCase());
+    return INLINE_IMAGE.has(baseType(contentType));
+}
+
+/**
+ * What may be served as the sound or the picture-with-sound that it is.
+ *
+ * A voice message is played by an `<audio>` element pointed at the download
+ * route, and a browser will not play what it is handed as
+ * `application/octet-stream` - `nosniff` is set, deliberately, so it may not
+ * guess either. So the media types Polaris draws a player for are served as
+ * themselves, and everything not on this list keeps being an opaque download.
+ *
+ * A fixed list rather than `startsWith("audio/")`, because the type comes from
+ * an upload: this decides what a browser is told to do with somebody else's
+ * bytes, and the safe answer for anything unrecognised is "save it".
+ */
+const PLAYABLE = new Set([
+    "audio/webm",
+    "audio/ogg",
+    "audio/mpeg",
+    "audio/mp4",
+    "audio/aac",
+    "audio/wav",
+    "audio/x-wav",
+    "audio/flac",
+    "video/mp4",
+    "video/webm",
+    "video/ogg"
+]);
+
+export function isPlayableMedia(contentType: string): boolean {
+    return PLAYABLE.has(baseType(contentType));
+}
+
+/** The type without its parameters. A recording arrives as
+ *  `audio/webm;codecs=opus`, and the codec is not part of the question. */
+function baseType(contentType: string): string {
+    return (contentType.split(";")[0] ?? "").trim().toLowerCase();
 }
 
 export interface ChatStorageSettings {
@@ -217,10 +254,16 @@ export async function readAttachment(attachmentId: string): Promise<{
             if (value) chunks.push(Buffer.from(value));
         }
         return { name: row.name, contentType: row.contentType, bytes: Buffer.concat(chunks) };
-    } catch {
+    } catch (error) {
         // A swept file, a storage target that moved, a NAS that is not answering.
         // The caller turns this into a 404 rather than a 500: from the reader's
         // side those are the same thing.
+        //
+        // Said out loud, though. Silently, this is a message with a file on it
+        // that nobody can open and nothing anywhere saying why - which is a
+        // afternoon of guessing at the client for something that happened on a
+        // disk.
+        console.error(`chat: could not read attachment ${attachmentId} at ${row.path}:`, error);
         return null;
     } finally {
         await driver.dispose().catch(() => undefined);

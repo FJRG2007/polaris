@@ -66,3 +66,21 @@ describe("a track somebody attached", () => {
         expect(markup).not.toContain("min-w-px");
     });
 });
+
+describe("how fast it plays", () => {
+    it("starts at ordinary speed, with the way to change it in reach", () => {
+        const markup = renderToStaticMarkup(
+            <VoiceNote
+                href="/api/chat/attachments/z"
+                name="voice-message.webm"
+                recorded={true}
+                durationMs={4000}
+                waveform="55"
+            />
+        );
+        // One times, drawn as the button that walks through 1, 1.5 and 2 - the
+        // same three every messenger settled on.
+        expect(markup).toContain(">1x<");
+        expect(markup).toContain("Press to change");
+    });
+});

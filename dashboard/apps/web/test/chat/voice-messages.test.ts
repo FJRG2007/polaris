@@ -9,6 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { isInlineImage, isPlayableMedia } from "@/lib/chat/attachments";
 import {
     barsFrom,
     barsOf,
@@ -98,5 +99,40 @@ describe("how long it is", () => {
         [-3, "0:00"]
     ])("%s seconds reads as %s", (seconds, shown) => {
         expect(spokenLength(seconds)).toBe(shown);
+    });
+});
+
+/**
+ * What the download route is allowed to serve as itself.
+ *
+ * `nosniff` is set on that route on purpose, which means the browser does
+ * exactly what the type says and never guesses. A recording handed over as
+ * `application/octet-stream` is therefore not played, it is offered as a file to
+ * save - which is what a voice message did on the way back out.
+ *
+ * The trap is the parameter: a browser records `audio/webm;codecs=opus`, and a
+ * check that compared the whole string matched none of it.
+ */
+describe("what may be served as itself", () => {
+    it("plays a recording, codec and all", () => {
+        expect(isPlayableMedia("audio/webm;codecs=opus")).toBe(true);
+        expect(isPlayableMedia("audio/webm")).toBe(true);
+        expect(isPlayableMedia("AUDIO/MP4")).toBe(true);
+        expect(isPlayableMedia("video/mp4")).toBe(true);
+    });
+
+    it("still draws a picture", () => {
+        expect(isInlineImage("image/png")).toBe(true);
+        expect(isInlineImage("image/jpeg; charset=binary")).toBe(true);
+    });
+
+    it("refuses everything else, which stays a download", () => {
+        // The two that matter: a document that can carry script, and anything
+        // unrecognised. Both are handed over as bytes to save.
+        expect(isPlayableMedia("image/svg+xml")).toBe(false);
+        expect(isInlineImage("image/svg+xml")).toBe(false);
+        expect(isPlayableMedia("text/html")).toBe(false);
+        expect(isPlayableMedia("application/pdf")).toBe(false);
+        expect(isPlayableMedia("audio/x-made-up")).toBe(false);
     });
 });

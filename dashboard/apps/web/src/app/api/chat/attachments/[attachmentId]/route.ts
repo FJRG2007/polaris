@@ -7,14 +7,24 @@
  *
  * Served with everything that stops a browser treating somebody's upload as
  * something to run. `Content-Disposition` is inline for the formats the list
- * draws and an attachment for everything else, which is the same decision the
- * message list makes about whether to show it - taken from the same function, so
- * the two cannot disagree.
+ * draws or plays and an attachment for everything else, which is the same
+ * decision the message list makes about whether to show it - taken from the same
+ * functions, so the two cannot disagree.
+ *
+ * Type matters as much as disposition here. `nosniff` is set on purpose, which
+ * means a browser will do exactly what the header says and nothing else: a
+ * recording served as `application/octet-stream` is not played, it is offered as
+ * a file to save. So the formats with a player get their own type.
  */
 
 import { requirePermission } from "@/lib/session";
 import { channelAccess } from "@/lib/chat/access";
-import { channelOfAttachment, isInlineImage, readAttachment } from "@/lib/chat/attachments";
+import {
+    channelOfAttachment,
+    isInlineImage,
+    isPlayableMedia,
+    readAttachment
+} from "@/lib/chat/attachments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,19 +42,26 @@ export async function GET(
 
     const channelId = await channelOfAttachment(attachmentId);
     // The same answer for "not there" and "not yours", so this cannot be used to
-    // find out which conversations exist.
-    if (!channelId) return new Response(null, { status: 404 });
+    // find out which conversations exist. They are logged apart, though: from
+    // the outside a 404 is a 404, and from the inside "there is no such row",
+    // "you are not in that conversation" and "the disk did not answer" are three
+    // different afternoons.
+    if (!channelId) {
+        console.warn(`chat: attachment ${attachmentId} has no row`);
+        return new Response(null, { status: 404 });
+    }
     if (!(await channelAccess({ id: user.id }, channelId))) {
+        console.warn(`chat: ${user.id} may not read attachment ${attachmentId}`);
         return new Response(null, { status: 404 });
     }
 
     const file = await readAttachment(attachmentId);
     if (!file) return new Response(null, { status: 404 });
 
-    const inline = isInlineImage(file.contentType);
+    const shown = isInlineImage(file.contentType) || isPlayableMedia(file.contentType);
     return new Response(file.bytes as unknown as BodyInit, {
         headers: {
-            "Content-Type": inline ? file.contentType : "application/octet-stream",
+            "Content-Type": shown ? file.contentType : "application/octet-stream",
             "Content-Length": String(file.bytes.length),
             "Cache-Control": CACHE,
             // The bytes came from a person and are served from Polaris's own
@@ -53,7 +70,7 @@ export async function GET(
             // found inside them.
             "X-Content-Type-Options": "nosniff",
             "Content-Security-Policy": "default-src 'none'; sandbox",
-            "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.name)}`
+            "Content-Disposition": `${shown ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.name)}`
         }
     });
 }

@@ -32,6 +32,16 @@ export interface RichTextEditorProps {
     value: string;
     /** Told on every keystroke, for a caller that keeps the draft itself. */
     onChange?: (markdown: string) => void;
+    /**
+     * Told when a key that writes something is pressed here.
+     *
+     * Not the same question as `onChange`, which is why it exists. A document
+     * changes for all sorts of reasons that are not a person typing - a chip
+     * resolving its name, an extension settling on mount, a value arriving from
+     * elsewhere - and a chat that announced "typing" on any of those told the
+     * other side somebody was writing when they had only opened the room.
+     */
+    onTyping?: () => void;
     /** Told when the caret leaves, for a field that saves on blur. */
     onBlur?: (markdown: string) => void;
     /** When set, Enter sends and shift+enter breaks the line, the way a chat
@@ -55,6 +65,19 @@ export interface RichTextEditorProps {
     className?: string;
 }
 
+/**
+ * Whether a key press is somebody writing.
+ *
+ * A single printable character, or one of the two that take one away. Arrows,
+ * tab, escape and every shortcut are movement or commands - announcing typing
+ * for those is how an indicator stays up for somebody who is reading.
+ */
+function writes(event: KeyboardEvent): boolean {
+    if (event.metaKey || event.ctrlKey || event.altKey) return false;
+    if (event.key === "Backspace" || event.key === "Delete") return true;
+    return [...event.key].length === 1;
+}
+
 /** What a chip says while its real name is still being looked up. */
 const PENDING_LABEL = "…";
 
@@ -63,6 +86,7 @@ export function RichTextEditor({
     onChange,
     onBlur,
     onSubmit,
+    onTyping,
     placeholder = "Write something",
     disabled = false,
     autoFocus = false,
@@ -72,8 +96,8 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
     // Held in a ref rather than in the dependency list: the editor is built once
     // and these change with every render of the parent.
-    const handlers = useRef({ onChange, onBlur, onSubmit });
-    handlers.current = { onChange, onBlur, onSubmit };
+    const handlers = useRef({ onChange, onBlur, onSubmit, onTyping });
+    handlers.current = { onChange, onBlur, onSubmit, onTyping };
 
     const search = useCallback(async (kinds: readonly refs.ReferenceKind[], query: string) => {
         const result = await runAction(() => searchMentionsAction({ kinds: [...kinds], query }), () => undefined);
@@ -108,6 +132,11 @@ export function RichTextEditor({
                 )
             },
             handleKeyDown: (view, event) => {
+                // Somebody is writing. Anything that puts a character in - a
+                // letter, a space, a backspace - and nothing that only moves
+                // around, holds a modifier or leaves the field.
+                if (writes(event)) handlers.current.onTyping?.();
+
                 if (!handlers.current.onSubmit) return false;
                 if (event.key !== "Enter" || event.shiftKey) return false;
                 // A list open under the caret owns Enter: it is being pressed to

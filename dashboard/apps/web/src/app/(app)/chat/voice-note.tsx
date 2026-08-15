@@ -29,6 +29,30 @@ import { barsOf, spokenLength } from "./voice-recorder";
  *  still reads as a strip of sound rather than a gap in one. */
 const QUIETEST = 12;
 
+/**
+ * The speeds, in the order the button walks through them.
+ *
+ * The same three every messenger settled on, and for the reason everybody who
+ * has been sent a four-minute recording knows: at one and a half you still hear
+ * every word, and at two you find out whether it needed four minutes.
+ */
+const SPEEDS = [1, 1.5, 2] as const;
+
+/** Where the choice is kept. Per browser, and it carries to the next recording -
+ *  somebody who speeds one up is telling you how they want to be read to, not
+ *  making a decision about one file. */
+const SPEED_KEY = "polaris.voice.speed";
+
+function rememberedSpeed(): number {
+    if (typeof window === "undefined") return 1;
+    try {
+        const stored = Number(window.localStorage.getItem(SPEED_KEY));
+        return SPEEDS.includes(stored as (typeof SPEEDS)[number]) ? stored : 1;
+    } catch {
+        return 1;
+    }
+}
+
 export function VoiceNote({
     href,
     name,
@@ -48,6 +72,12 @@ export function VoiceNote({
     const [playing, setPlaying] = useState(false);
     const [at, setAt] = useState(0);
     const [measured, setMeasured] = useState(0);
+    const [broken, setBroken] = useState(false);
+    // Read from storage after mount rather than during render: the server has no
+    // local storage, and a button that said "2x" only after hydration would
+    // change under somebody's finger.
+    const [speed, setSpeed] = useState(1);
+    useEffect(() => setSpeed(rememberedSpeed()), []);
 
     // What was stored wins: it was measured while recording, and the file itself
     // may never admit to a duration at all.
@@ -63,6 +93,10 @@ export function VoiceNote({
             // through, so anything that is not a real number is not an answer.
             if (Number.isFinite(element.duration)) setMeasured(element.duration);
         };
+        const onBroken = () => {
+            setPlaying(false);
+            setBroken(true);
+        };
         const onEnd = () => {
             setPlaying(false);
             setAt(0);
@@ -76,18 +110,39 @@ export function VoiceNote({
         element.addEventListener("loadedmetadata", onLength);
         element.addEventListener("durationchange", onLength);
         element.addEventListener("ended", onEnd);
+        element.addEventListener("error", onBroken);
         return () => {
             element.removeEventListener("timeupdate", onTime);
             element.removeEventListener("loadedmetadata", onLength);
             element.removeEventListener("durationchange", onLength);
             element.removeEventListener("ended", onEnd);
+            element.removeEventListener("error", onBroken);
         };
     }, []);
+
+    // Set on the element rather than only at play: changing it mid-sentence is
+    // the whole point of the button.
+    useEffect(() => {
+        if (audio.current) audio.current.playbackRate = speed;
+    }, [speed]);
+
+    const faster = () => {
+        const next = SPEEDS[(SPEEDS.indexOf(speed as (typeof SPEEDS)[number]) + 1) % SPEEDS.length] ?? 1;
+        setSpeed(next);
+        try {
+            window.localStorage.setItem(SPEED_KEY, String(next));
+        } catch {
+            // A browser with storage switched off still plays at the speed it
+            // was given; it just forgets by the next message.
+        }
+    };
 
     const toggle = () => {
         const element = audio.current;
         if (!element) return;
+        setBroken(false);
         if (element.paused) {
+            element.playbackRate = speed;
             void element.play().then(() => setPlaying(true));
         } else {
             element.pause();
@@ -114,6 +169,15 @@ export function VoiceNote({
                     title={name}
                 >
                     {name}
+                </span>
+            )}
+            {/* Said rather than left as a play button that does nothing. The
+                bytes live on whatever storage this instance writes uploads to,
+                and "the NAS is not answering" looks exactly like a broken
+                player from here. */}
+            {broken && (
+                <span className="text-[11px] text-danger">
+                    This recording could not be loaded.
                 </span>
             )}
             <span className="flex items-center gap-2">
@@ -180,6 +244,16 @@ export function VoiceNote({
                 <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
                     {length > 0 ? spokenLength(length - at) : spokenLength(at)}
                 </span>
+
+                <button
+                    type="button"
+                    onClick={faster}
+                    aria-label={`Playing at ${speed} times speed. Press to change.`}
+                    title="Playback speed"
+                    className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground transition-colors hover:bg-card-hover"
+                >
+                    {speed}x
+                </button>
             </span>
             {/* eslint-disable-next-line jsx-a11y/media-has-caption -- somebody's voice, with no transcript to caption it */}
             <audio ref={audio} src={href} preload="none" />
