@@ -66,6 +66,28 @@ const envSchema = z.object({
      */
     POLARIS_MASTER_KEY: z.string().min(1, "POLARIS_MASTER_KEY is required"),
 
+    /**
+     * STUN servers a call uses to find a path between two browsers, comma
+     * separated (`stun:stun.example.org:3478`).
+     *
+     * Empty by default, and that is a working default rather than a missing one:
+     * two browsers on the same network reach each other on their own addresses,
+     * which is the case Polaris is usually in. It is also the private default -
+     * with none set, no address of anybody's is offered to a third party.
+     *
+     * Set it when calls have to cross the internet. Two people behind different
+     * NATs frequently still cannot connect with STUN alone, which is what the
+     * TURN keys below are for.
+     */
+    POLARIS_STUN_URLS: z.string().default(""),
+
+    /** A TURN server to relay a call through when the browsers cannot reach each
+     *  other directly. Unset means calls work on the local network and between
+     *  anybody with a reachable address, and not otherwise. */
+    POLARIS_TURN_URL: z.string().optional(),
+    POLARIS_TURN_USERNAME: z.string().optional(),
+    POLARIS_TURN_PASSWORD: z.string().optional(),
+
     /** Directory for container-local storage and upload scratch space. */
     POLARIS_DATA_DIR: z.string().default("/var/lib/polaris"),
 

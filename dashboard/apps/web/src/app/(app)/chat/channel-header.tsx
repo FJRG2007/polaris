@@ -19,7 +19,18 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { AddPeopleDialog } from "./add-people-dialog";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
-import { ArrowLeft, Bell, BellOff, Hash, Lock, MoreHorizontal, Trash2, UserPlus, Users } from "lucide-react";
+import {
+    ArrowLeft,
+    Bell,
+    BellOff,
+    Hash,
+    Lock,
+    MoreHorizontal,
+    Trash2,
+    UserPlus,
+    Users,
+    Video
+} from "lucide-react";
 import {
     ConfirmDeleteDialog,
     DropdownMenu,
@@ -31,10 +42,16 @@ import {
 
 export function ChannelHeader({
     channel,
-    onChanged
+    onChanged,
+    call,
+    onStartCall
 }: {
     channel: ChatChannelView;
     onChanged: () => void;
+    /** The call running in this conversation, if there is one, so somebody who
+     *  arrives late can see it rather than start a second one. */
+    call: { meetingId: string; count: number } | null;
+    onStartCall: () => void;
 }) {
     const router = useRouter();
     const [adding, setAdding] = useState(false);
@@ -77,6 +94,20 @@ export function ChannelHeader({
                 )}
 
                 <div className="ml-auto flex shrink-0 items-center gap-0.5">
+                    <button
+                        type="button"
+                        onClick={onStartCall}
+                        aria-label={call ? "Join the call" : "Start a call"}
+                        title={call ? "Join the call" : "Start a call"}
+                        className={
+                            call
+                                ? "flex items-center gap-1.5 rounded-md bg-primary/15 px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-primary/25"
+                                : "rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        }
+                    >
+                        <Video className="size-4" />
+                        {call && <span>{call.count}</span>}
+                    </button>
                     {named && (
                         <button
                             type="button"

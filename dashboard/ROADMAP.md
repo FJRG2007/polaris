@@ -246,8 +246,19 @@ Chat (talking to the people here):
       carry ids, never message text - the tab pulls through the same access check
       that drew the screen
 - [x] Reached by being in it. No administrator override, no instance-wide read
-- [ ] Attachments, calls, presence dots, unfurled links, and search across
-      conversations
+- [x] Calls: audio and video started from a conversation, browser to browser
+      with no media ever passing through Polaris. Mute, camera, and a roster of
+      who is in the room. Capped at 8, which is what a mesh carries
+- [x] Somebody with no Polaris account can be brought into a call, on a
+      per-meeting link an account holder opens. They wait in a lobby until
+      somebody inside lets them in, the link dies with the call, and the cookie
+      they get is a seat in one room rather than anything resembling a session
+- [ ] STUN/TURN are configuration (`POLARIS_STUN_URLS`, `POLARIS_TURN_URL`).
+      With neither set, calls work on one network and between reachable
+      addresses, and not otherwise - a hosted TURN default is not something
+      Polaris should decide for an operator
+- [ ] Attachments, screen sharing, recording, scheduled meetings, presence dots,
+      unfurled links, and search across conversations
 
 ## Notes / deliberate decisions
 

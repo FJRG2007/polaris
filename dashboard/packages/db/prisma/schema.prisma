@@ -5618,6 +5618,7 @@ model ChatChannel {
     space    ChatSpace?          @relation(fields: [spaceId], references: [id], onDelete: Cascade)
     members  ChatChannelMember[]
     messages ChatMessage[]
+    meetings Meeting[]
 
     @@index([spaceId, order])
     @@index([lastMessageAt])
@@ -5725,4 +5726,78 @@ model ChatAttachment {
     message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
     @@index([messageId])
+}
+// ---------------------------------------------------------------------------
+// Meetings (calls)
+// ---------------------------------------------------------------------------
+
+// A call.
+//
+// Started from a conversation, or standing on its own. Media never touches
+// Polaris - the browsers connect to each other directly - so what is stored here
+// is who is in the room and how somebody gets into it, not a second of audio.
+//
+// `guestToken` is the whole of the outside-access story: a link that lets
+// somebody with no Polaris account join a call an account holder started. It is
+// null when the host did not want that, and it is per-meeting rather than
+// per-account, so handing one out grants exactly one room and only while it
+// runs.
+//
+// `hostId` is a bare uuid rather than a foreign key. A meeting is minutes long
+// and its record is a fact about what happened; it is not worth a cascade that
+// would rewrite history when somebody leaves the company.
+model Meeting {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    // The conversation it belongs to, or null for one that belongs to nothing.
+    channelId     String?   @db.Uuid
+    hostId        String    @db.Uuid
+    title         String    @default("")
+    guestToken    String?   @unique
+    // Whether a guest waits in a lobby until somebody inside lets them in. On by
+    // default: a link that can be forwarded is a link that will be, and the host
+    // seeing who is at the door is the only check left after that.
+    approveGuests Boolean   @default(true)
+    startedAt     DateTime  @default(now())
+    // Set when the last person leaves, or when the host ends it. A meeting with
+    // this set refuses every join, including one holding the guest token.
+    endedAt       DateTime?
+    createdAt     DateTime  @default(now())
+
+    channel      ChatChannel?         @relation(fields: [channelId], references: [id], onDelete: Cascade)
+    participants MeetingParticipant[]
+
+    @@index([channelId, endedAt])
+    @@index([endedAt])
+}
+
+// Somebody in a call, or somebody at the door.
+//
+// One row per join rather than one per person: leaving and coming back is two
+// rows, which is what makes "who was in this call" answerable afterwards.
+//
+// `guestKey` is a guest's credential for their own row and nothing else. It is
+// minted server-side, handed back once in a cookie, and is the only thing that
+// lets a browser with no session say "this is me" - so it is unique, unguessable
+// and worth nothing outside this meeting.
+model MeetingParticipant {
+    id         String    @id @default(uuid(7)) @db.Uuid
+    meetingId  String    @db.Uuid
+    // The account, or null for somebody who arrived on the guest link.
+    userId     String?   @db.Uuid
+    // What to draw beside them. An account's own name, or what a guest typed.
+    name       String
+    guestKey   String?   @unique
+    // admitted | waiting | denied. Only ever anything but `admitted` for a guest
+    // at a meeting whose host asked to approve them.
+    admission  String    @default("admitted")
+    joinedAt   DateTime  @default(now())
+    leftAt     DateTime?
+    // Refreshed while their browser is on the call, so a participant whose
+    // laptop shut is swept rather than left in the room forever.
+    lastSeenAt DateTime  @default(now())
+
+    meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+    @@index([meetingId, leftAt])
+    @@index([meetingId, admission])
 }

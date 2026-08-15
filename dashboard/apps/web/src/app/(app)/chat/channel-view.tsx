@@ -22,6 +22,8 @@
  */
 
 import * as actions from "./actions";
+import * as calls from "./meeting-actions";
+import { CallRoom } from "./call-room";
 import { Composer } from "./composer";
 import { useChat } from "./chat-context";
 import { useRouter } from "next/navigation";
@@ -55,6 +57,11 @@ export function ChannelView({ channelId }: { channelId: string }) {
     const [editing, setEditing] = useState<ChatMessageView | null>(null);
     const [deleting, setDeleting] = useState<ChatMessageView | null>(null);
     const [typists, setTypists] = useState<readonly { userId: string; name: string; at: number }[]>([]);
+    const [live, setLive] = useState<{ meetingId: string; count: number } | null>(null);
+    // The call this tab is actually sitting in, which is not the same question as
+    // whether one is running: somebody can watch a channel with a call in it
+    // without joining, and must not have their camera opened for them.
+    const [inCall, setInCall] = useState<string | null>(null);
 
     const scroller = useRef<HTMLDivElement>(null);
     const following = useRef(true);
@@ -74,9 +81,22 @@ export function ChannelView({ channelId }: { channelId: string }) {
         setThread(null);
         setEditing(null);
         setError("");
+        setInCall(null);
         marked.current = "";
         following.current = true;
     }, [channelId]);
+
+    // Whether there is a call to join, asked on arrival and again whenever
+    // something happens in the channel - starting one posts nothing, so the
+    // question has to be asked rather than inferred from the messages.
+    const checkCall = useCallback(() => {
+        void calls
+            .liveCallAction(channelId)
+            .then(setLive)
+            .catch(() => setLive(null));
+    }, [channelId]);
+
+    useEffect(checkCall, [checkCall]);
 
     const load = useCallback(async () => {
         const result = await actions.readChannelAction(channelId);
@@ -103,7 +123,10 @@ export function ChannelView({ channelId }: { channelId: string }) {
     useChatStream(
         useCallback(
             (frame) => {
-                if (frame.kind === "posted" && frame.channels.includes(channelId)) void load();
+                if (frame.kind === "posted" && frame.channels.includes(channelId)) {
+                    void load();
+                    checkCall();
+                }
                 if (frame.kind === "typing" && frame.channelId === channelId) {
                     setTypists((current) => [
                         ...current.filter((entry) => entry.userId !== frame.userId),
@@ -111,7 +134,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
                     ]);
                 }
             },
-            [channelId, load]
+            [channelId, load, checkCall]
         )
     );
 
@@ -215,7 +238,33 @@ export function ChannelView({ channelId }: { channelId: string }) {
     return (
         <div className="flex min-h-0 flex-1">
             <div className="flex min-w-0 flex-1 flex-col">
-                <ChannelHeader channel={channel} onChanged={refresh} />
+                <ChannelHeader
+                    channel={channel}
+                    onChanged={refresh}
+                    call={live}
+                    onStartCall={async () => {
+                        const result = await calls.startCallAction(channelId);
+                        if (result.error) {
+                            setError(result.error);
+                            return;
+                        }
+                        if (result.meetingId) setInCall(result.meetingId);
+                        checkCall();
+                    }}
+                />
+
+                {inCall && (
+                    <div className="flex max-h-[60%] min-h-0 shrink-0 flex-col border-b border-border">
+                        <CallRoom
+                            meetingId={inCall}
+                            canShare
+                            onLeave={() => {
+                                setInCall(null);
+                                checkCall();
+                            }}
+                        />
+                    </div>
+                )}
 
                 <div
                     ref={scroller}
