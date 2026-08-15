@@ -328,7 +328,9 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             id: channel.id,
             spaceId: channel.spaceId,
             kind: channel.kind as core.ChatChannelKind,
-            name: channel.spaceId ? channel.name : directName(others),
+            // A group that has been named keeps it; one that has not is called
+            // after the people in it, which is what it is.
+            name: channel.spaceId ? channel.name : channel.name || directName(others),
             topic: channel.topic,
             private: channel.private,
             archived: channel.archived,
@@ -407,6 +409,30 @@ export async function updateChannel(
     publishChatChange({ channelId: input.channelId, kind: "channels", actorId: actor.id });
 }
 
+/**
+ * Name a group, or take its name off again.
+ *
+ * Its own entry point rather than `updateChannel`, because the two are not the
+ * same kind of name. A channel's is a slug - lowercased and dashed, so a room
+ * capitalized differently is the same room - and a group's is a label somebody
+ * wrote: "Weekend plans" is what they meant, not "weekend-plans".
+ *
+ * Anybody in the group may do it. A group belongs to everybody in it, and an
+ * owner would make it a channel with extra steps. Emptying the name puts it back
+ * to being called after the people in it.
+ */
+export async function renameGroup(
+    actor: ChatActor,
+    channelId: string,
+    name: string
+): Promise<void> {
+    const access = await requireChannel(actor, channelId);
+    if (access.kind !== "group") throw new ChatAccessError("That conversation has no name to set");
+
+    await prisma.chatChannel.update({ where: { id: channelId }, data: { name } });
+    publishChatChange({ channelId, kind: "channels", actorId: actor.id });
+}
+
 export async function deleteChannel(actor: ChatActor, channelId: string): Promise<void> {
     const access = await requireChannel(actor, channelId);
     if (!access.mayAdminister) throw new ChatAccessError("You cannot delete that channel");
@@ -420,10 +446,27 @@ export async function addChannelMembers(
     userIds: readonly string[]
 ): Promise<void> {
     const access = await requireChannel(actor, channelId);
-    if (!access.mayAdminister) throw new ChatAccessError("You cannot add people to that channel");
+    const group = access.kind === "group";
+    if (!access.mayAdminister && !group) {
+        throw new ChatAccessError("You cannot add people to that channel");
+    }
 
     const wanted = [...new Set(userIds)];
     if (wanted.length === 0) return;
+
+    if (group) {
+        // Past this it is a channel, and saying so is more useful than growing a
+        // list nobody can read the header of.
+        const already = await prisma.chatChannelMember.count({ where: { channelId } });
+        const newcomers = await prisma.chatChannelMember.count({
+            where: { channelId, userId: { in: wanted } }
+        });
+        if (already + wanted.length - newcomers > core.MAX_GROUP_MEMBERS) {
+            throw new ChatAccessError(
+                `A group holds ${core.MAX_GROUP_MEMBERS} people. Make a channel instead.`
+            );
+        }
+    }
     // Somebody without the chat has no screen this channel could appear on, so
     // putting them in it would be adding a member who can never hear anybody.
     const reachable = await messageable(wanted);
@@ -437,16 +480,26 @@ export async function addChannelMembers(
     publishChatChange({ channelId, kind: "channels", actorId: actor.id, audience: wanted });
 }
 
-/** Leaving, or being removed. A direct message cannot be left: it is between the
- *  people in it, and one of them walking out would leave the other talking to a
- *  room that still says two names. */
+/**
+ * Leaving, or being removed.
+ *
+ * A one-to-one conversation cannot be left: it is between the people in it, and
+ * one of them walking out would leave the other talking to a room that still
+ * says two names. A group can, by whoever is leaving and by nobody else -
+ * turning somebody out of a group is a thing groups do not do, and a member with
+ * the power to do it would change what a group is.
+ */
 export async function removeChannelMember(
     actor: ChatActor,
     channelId: string,
     userId: string
 ): Promise<void> {
     const access = await requireChannel(actor, channelId);
-    if (!access.spaceId) throw new ChatAccessError("A direct message cannot be left");
+    const group = access.kind === "group";
+    if (!access.spaceId && !group) throw new ChatAccessError("A direct message cannot be left");
+    if (group && userId !== actor.id) {
+        throw new ChatAccessError("Only the person leaving can leave a group");
+    }
     if (userId !== actor.id && !access.mayAdminister) {
         throw new ChatAccessError("You cannot remove people from that channel");
     }

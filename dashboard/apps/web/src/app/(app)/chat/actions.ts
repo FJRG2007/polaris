@@ -401,6 +401,26 @@ export async function addChannelMembersAction(input: unknown): Promise<{ error?:
     return result;
 }
 
+/** Name a group, or take the name off again. Anybody in it may. */
+export async function renameGroupAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = core.chatGroupNameSchema.safeParse(input);
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That could not be saved" };
+
+    const result = await guard(() => chat.renameGroup(me, parsed.data.channelId, parsed.data.name));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result;
+}
+
+/** Walk out of a group. Nobody needs to be told which member they are. */
+export async function leaveChannelAction(channelId: string): Promise<{ error?: string }> {
+    const me = await actor();
+    const result = await guard(() => chat.removeChannelMember(me, channelId, me.id));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result;
+}
+
 export async function removeChannelMemberAction(
     channelId: string,
     userId: string

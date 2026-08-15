@@ -71,9 +71,11 @@ export function AddPeopleDialog({
                 <DialogHeader>
                     <DialogTitle>Add people</DialogTitle>
                     <DialogDescription>
-                        {channel.private
-                            ? "They will see this channel and everything already said in it."
-                            : "Anybody in the space can already read this channel. Adding them puts it in their list."}
+                        {channel.kind === "group"
+                            ? "They join the group and can read everything already said in it."
+                            : channel.private
+                              ? "They will see this channel and everything already said in it."
+                              : "Anybody in the space can already read this channel. Adding them puts it in their list."}
                     </DialogDescription>
                 </DialogHeader>
 

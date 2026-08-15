@@ -13,7 +13,8 @@
  */
 
 import Link from "next/link";
-import { useState } from "react";
+import * as core from "@polaris/core";
+import { useEffect, useState } from "react";
 import * as actions from "./actions";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
@@ -24,8 +25,10 @@ import {
     Bell,
     BellOff,
     Hash,
+    LogOut,
     Lock,
     MoreHorizontal,
+    Pencil,
     Phone,
     Search,
     Trash2,
@@ -34,12 +37,19 @@ import {
     Video
 } from "lucide-react";
 import {
+    Button,
     ConfirmDeleteDialog,
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
-    DropdownMenuTrigger
+    DropdownMenuTrigger,
+    Input
 } from "@polaris/ui";
 
 export function ChannelHeader({
@@ -62,10 +72,19 @@ export function ChannelHeader({
 }) {
     const router = useRouter();
     const [adding, setAdding] = useState(false);
+    const [renaming, setRenaming] = useState(false);
+    const [name, setName] = useState("");
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [error, setError] = useState("");
 
     const named = channel.spaceId !== null;
+    // A group belongs to everybody in it: any of them can name it, add somebody
+    // and walk out. What none of them can do is turn anybody else out.
+    const group = channel.kind === "group";
+
+    useEffect(() => {
+        if (renaming) setName(channel.name);
+    }, [renaming, channel.name]);
     const Icon = channel.private ? Lock : named ? Hash : Users;
 
     const act = async (run: () => Promise<{ error?: string }>) => {
@@ -145,7 +164,7 @@ export function ChannelHeader({
                             </button>
                         </>
                     )}
-                    {named && (
+                    {(named || group) && (
                         <button
                             type="button"
                             aria-label="Add people"
@@ -181,6 +200,29 @@ export function ChannelHeader({
                                 )}
                                 {channel.muted ? "Unmute" : "Mute"}
                             </DropdownMenuItem>
+                            {group && (
+                                <>
+                                    <DropdownMenuItem onSelect={() => setRenaming(true)}>
+                                        <Pencil className="size-3.5" />
+                                        Name this group
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        onSelect={async () => {
+                                            await runAction(
+                                                () =>
+                                                    actions.leaveChannelAction(channel.id),
+                                                setError
+                                            );
+                                            onChanged();
+                                            router.push("/chat");
+                                        }}
+                                    >
+                                        <LogOut className="size-3.5" />
+                                        Leave this group
+                                    </DropdownMenuItem>
+                                </>
+                            )}
                             {named && (
                                 <>
                                     <DropdownMenuItem
@@ -222,6 +264,41 @@ export function ChannelHeader({
                 channel={channel}
                 onAdded={onChanged}
             />
+
+            <Dialog open={renaming} onOpenChange={setRenaming}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Name this group</DialogTitle>
+                    </DialogHeader>
+                    <Input
+                        value={name}
+                        autoFocus
+                        maxLength={core.MAX_CHAT_CHANNEL_NAME}
+                        placeholder="Leave it empty to go back to the names"
+                        aria-label="What this group is called"
+                        onChange={(event) => setName(event.target.value)}
+                    />
+                    <DialogFooter>
+                        <Button variant="ghost" size="sm" onClick={() => setRenaming(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            size="sm"
+                            onClick={async () => {
+                                await act(() =>
+                                    actions.renameGroupAction({
+                                        channelId: channel.id,
+                                        name
+                                    })
+                                );
+                                setRenaming(false);
+                            }}
+                        >
+                            Save
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <ConfirmDeleteDialog
                 open={confirmDelete}

@@ -313,3 +313,18 @@ export function firstLink(body: string): string | null {
  *  than a link, and it also keeps the stored one inside what a unique index can
  *  hold. */
 export const MAX_LINK_LENGTH = 512;
+
+/**
+ * What a group is called.
+ *
+ * Not `channelName`: that one is a slug, lowercased and collapsed to dashes so a
+ * room somebody capitalized differently is the same room. A group's name is a
+ * label a person wrote - "Weekend plans" is what they meant - and emptying it
+ * puts the conversation back to being called after the people in it.
+ */
+export const chatGroupNameSchema = z.object({
+    channelId: z.string().uuid(),
+    name: z.string().trim().max(MAX_CHAT_CHANNEL_NAME)
+});
+
+export type ChatGroupNameInput = z.infer<typeof chatGroupNameSchema>;
