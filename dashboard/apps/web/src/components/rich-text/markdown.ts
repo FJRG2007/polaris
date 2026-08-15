@@ -88,7 +88,9 @@ function block(token: Token, origin: string | null): JSONContent | null {
             return {
                 type: "codeBlock",
                 attrs: { language: (code.lang ?? "").trim().split(/\s+/)[0] || null },
-                content: code.text ? [{ type: "text", text: code.text }] : undefined
+                // Code carries whatever was written, entities included - the
+                // parser escaped it on the way in and nothing here renders HTML.
+                content: code.text ? [{ type: "text", text: decodeEntities(code.text) }] : undefined
             };
         }
         case "blockquote": {
@@ -189,7 +191,61 @@ function inlineNodes(token: Token, origin: string | null): JSONContent[] {
 }
 
 function textNode(text: string): JSONContent[] {
-    return text ? [{ type: "text", text }] : [];
+    const decoded = decodeEntities(text);
+    return decoded ? [{ type: "text", text: decoded }] : [];
+}
+
+/**
+ * Undo the HTML escaping the Markdown parser does on the way in.
+ *
+ * `marked` exists to produce HTML, so it turns `"` into `&quot;` and `&` into
+ * `&amp;` before handing the text over. Polaris does not render HTML - the
+ * document becomes React elements, and React escapes text itself - so those
+ * entities arrive at the screen as the literal characters `&quot;`, which is
+ * what somebody sees when they type a pair of quotation marks and get six
+ * characters back.
+ *
+ * Decoding here rather than at the screen is what keeps the stored Markdown and
+ * what is drawn from it the same text: the serializer writes the raw character
+ * back out, so a round trip through the editor does not slowly turn every quote
+ * into an entity.
+ *
+ * Safe by construction, and worth being explicit about since this reverses an
+ * escape: what comes out is a *text node*. React sets it as text, which escapes
+ * it again on the way to the DOM, and ProseMirror sets it as textContent. There
+ * is no path here where a decoded `<script>` becomes an element - it becomes the
+ * five characters somebody typed.
+ *
+ * Only the five HTML entities the parser actually emits, plus numeric escapes,
+ * because a general entity table would also decode things nobody wrote.
+ */
+const NAMED_ENTITIES: Readonly<Record<string, string>> = {
+    "&amp;": "&",
+    "&lt;": "<",
+    "&gt;": ">",
+    "&quot;": '"',
+    "&#39;": "'",
+    "&#x27;": "'",
+    "&#x2F;": "/",
+    // Built rather than written: a literal non-breaking space in source is
+    // invisible, and the next person here would take it for an ordinary
+    // space and delete it.
+    "&nbsp;": String.fromCharCode(160)
+};
+
+export function decodeEntities(text: string): string {
+    if (!text.includes("&")) return text;
+    return text.replace(/&(?:#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);/g, (entity) => {
+        const named = NAMED_ENTITIES[entity.toLowerCase()] ?? NAMED_ENTITIES[entity];
+        if (named !== undefined) return named;
+        const numeric = /^&#(x)?([0-9a-fA-F]+);$/.exec(entity);
+        if (!numeric) return entity;
+        const code = Number.parseInt(numeric[2]!, numeric[1] ? 16 : 10);
+        // Anything outside what a character can be, and the C0 controls, are
+        // left as they were written rather than turned into something unprintable.
+        if (!Number.isFinite(code) || code < 0x20 || code > 0x10ffff) return entity;
+        return String.fromCodePoint(code);
+    });
 }
 
 /** Adds a mark to every node that can carry one. */
