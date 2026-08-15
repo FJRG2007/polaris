@@ -66,7 +66,12 @@ function sweep(now: number): void {
  * heartbeat while the tab is on screen; a path that is not an in-app one is
  * treated as the tab reporting nothing.
  */
-export function recordPresence(userId: string, viewerId: string, path: string, now = Date.now()): void {
+export function recordPresence(
+    userId: string,
+    viewerId: string,
+    path: string,
+    now = Date.now()
+): void {
     sweep(now);
     const normalized = viewPath(path);
     if (!normalized) return dropPresence(userId, viewerId);
@@ -81,7 +86,9 @@ export function recordPresence(userId: string, viewerId: string, path: string, n
     // Past the cap the oldest report goes, which is the one least likely to be a
     // tab somebody is looking at.
     while (held.size > MAX_VIEWERS_PER_USER) {
-        const oldest = [...held.entries()].reduce((least, entry) => (entry[1].at < least[1].at ? entry : least));
+        const oldest = [...held.entries()].reduce((least, entry) =>
+            entry[1].at < least[1].at ? entry : least
+        );
         held.delete(oldest[0]);
     }
 }
@@ -103,7 +110,11 @@ export function dropPresence(userId: string, viewerId: string): void {
  * also exact rather than a prefix, because being somewhere above a page is not
  * seeing it - a list of tasks does not show what happened to one of them.
  */
-export function isViewing(userId: string, href: string | null | undefined, now = Date.now()): boolean {
+export function isViewing(
+    userId: string,
+    href: string | null | undefined,
+    now = Date.now()
+): boolean {
     const target = viewPath(href);
     if (!target) return false;
     const held = viewers.get(userId);

@@ -5,7 +5,9 @@
  *
  * Everything a reader needs to decide something, and the three verbs they would
  * otherwise leave Polaris for: say something, close or reopen it, and - for a
- * pull request - merge it.
+ * pull request - merge it. All three are drawn only for somebody who may act on
+ * a repository, because each of them lands on GitHub under their own name and a
+ * read-only account has no business being offered them.
  *
  * Merging asks first, and asks in the shape of the decision rather than as a
  * yes/no: which of the three ways, because picking the wrong one is the mistake
@@ -41,11 +43,15 @@ import {
 export function WorkDetail({
     owner,
     repo,
-    number
+    number,
+    /** Whether this account holds `agents.manage`, which is what commenting,
+     *  closing and merging need. */
+    canWrite
 }: {
     owner: string;
     repo: string;
     number: number;
+    canWrite: boolean;
 }) {
     const [item, setItem] = useState<CodeDetail | null>(null);
     const [comments, setComments] = useState<readonly CodeComment[] | null>(null);
@@ -77,7 +83,10 @@ export function WorkDetail({
         return (
             <div className="flex flex-col gap-3">
                 <BackLink />
-                <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <p
+                    role="alert"
+                    className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                >
                     {error}
                 </p>
             </div>
@@ -131,7 +140,10 @@ export function WorkDetail({
             </div>
 
             {error && (
-                <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <p
+                    role="alert"
+                    className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                >
                     {error}
                 </p>
             )}
@@ -177,70 +189,72 @@ export function WorkDetail({
                 ))
             )}
 
-            <div className="flex flex-col gap-2">
-                <Textarea
-                    value={body}
-                    rows={4}
-                    aria-label="Say something"
-                    placeholder="Say something. Markdown, the same as on GitHub."
-                    onChange={(event) => setBody(event.target.value)}
-                />
-                <div className="flex flex-wrap gap-2">
-                    <Button
-                        size="sm"
-                        disabled={busy || !body.trim()}
-                        onClick={async () => {
-                            setBusy(true);
-                            const result = await runAction(
-                                () => actions.commentAction({ ...target, body }),
-                                setError
-                            );
-                            setBusy(false);
-                            if (result?.error) return;
-                            setBody("");
-                            await load();
-                        }}
-                    >
-                        {busy && <Loader2 className="size-4 animate-spin" />}
-                        Comment
-                    </Button>
-
-                    <Button
-                        size="sm"
-                        variant="secondary"
-                        disabled={busy}
-                        onClick={async () => {
-                            setBusy(true);
-                            await runAction(
-                                () =>
-                                    actions.setStateAction({
-                                        ...target,
-                                        state: open ? "closed" : "open"
-                                    }),
-                                setError
-                            );
-                            setBusy(false);
-                            await load();
-                        }}
-                    >
-                        {open ? <X className="size-4" /> : <Check className="size-4" />}
-                        {open ? "Close" : "Reopen"}
-                    </Button>
-
-                    {item.kind === "pr" && open && !item.merged && (
-                        <Button size="sm" variant="secondary" onClick={() => setMerging(true)}>
-                            <GitMerge className="size-4" />
-                            Merge
+            {canWrite && (
+                <div className="flex flex-col gap-2">
+                    <Textarea
+                        value={body}
+                        rows={4}
+                        aria-label="Say something"
+                        placeholder="Say something. Markdown, the same as on GitHub."
+                        onChange={(event) => setBody(event.target.value)}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                        <Button
+                            size="sm"
+                            disabled={busy || !body.trim()}
+                            onClick={async () => {
+                                setBusy(true);
+                                const result = await runAction(
+                                    () => actions.commentAction({ ...target, body }),
+                                    setError
+                                );
+                                setBusy(false);
+                                if (result?.error) return;
+                                setBody("");
+                                await load();
+                            }}
+                        >
+                            {busy && <Loader2 className="size-4 animate-spin" />}
+                            Comment
                         </Button>
+
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={busy}
+                            onClick={async () => {
+                                setBusy(true);
+                                await runAction(
+                                    () =>
+                                        actions.setStateAction({
+                                            ...target,
+                                            state: open ? "closed" : "open"
+                                        }),
+                                    setError
+                                );
+                                setBusy(false);
+                                await load();
+                            }}
+                        >
+                            {open ? <X className="size-4" /> : <Check className="size-4" />}
+                            {open ? "Close" : "Reopen"}
+                        </Button>
+
+                        {item.kind === "pr" && open && !item.merged && (
+                            <Button size="sm" variant="secondary" onClick={() => setMerging(true)}>
+                                <GitMerge className="size-4" />
+                                Merge
+                            </Button>
+                        )}
+                    </div>
+                    {item.kind === "pr" && item.mergeable === false && (
+                        <p className="text-xs text-muted-foreground">
+                            GitHub reports conflicts on this branch. Merging will be refused until
+                            they are resolved.
+                        </p>
                     )}
                 </div>
-                {item.kind === "pr" && item.mergeable === false && (
-                    <p className="text-xs text-muted-foreground">
-                        GitHub reports conflicts on this branch. Merging will be refused until they
-                        are resolved.
-                    </p>
-                )}
-            </div>
+            )}
 
             <Dialog open={merging} onOpenChange={setMerging}>
                 <DialogContent>

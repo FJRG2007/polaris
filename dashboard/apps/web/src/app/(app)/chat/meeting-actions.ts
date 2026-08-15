@@ -17,8 +17,8 @@ import { z } from "zod";
 import { cookies } from "next/headers";
 import * as meetings from "@/lib/chat/meetings";
 import { requirePermission } from "@/lib/session";
-import { ChatAccessError } from "@/lib/chat/access";
 import type { MeetingView } from "@/lib/chat/meetings";
+import { ChatAccessError, requireChannel } from "@/lib/chat/access";
 import { GUEST_COOKIE, GUEST_COOKIE_MAX_AGE, resolveSeat } from "@/lib/chat/meeting-seat";
 
 async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: string }> {
@@ -69,9 +69,7 @@ export async function joinAsGuestAction(
     const parsed = guestJoinSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That did not work" };
 
-    const result = await guard(() =>
-        meetings.joinAsGuest(parsed.data.token, parsed.data.name)
-    );
+    const result = await guard(() => meetings.joinAsGuest(parsed.data.token, parsed.data.name));
     if (result.error || !result.value) return { error: result.error ?? "That did not work" };
 
     const seat = result.value;
@@ -136,17 +134,37 @@ export async function setGuestLinkAction(
     return result.error ? { error: result.error } : { token: result.value ?? null };
 }
 
-/** Whether a conversation has a call running in it, for the header. */
+/**
+ * Whether a conversation has a call running in it, for the header.
+ *
+ * The conversation is proved, not just the permission: "is anybody on a call in
+ * this channel, and how many" is something about a room, and answering it for a
+ * channel id somebody guessed would be a way to read a private conversation one
+ * bit at a time.
+ */
 export async function liveCallAction(
     channelId: string
 ): Promise<{ meetingId: string; count: number } | null> {
-    await requirePermission("chat.use");
-    const live = await meetings.liveIn(channelId);
+    const user = await requirePermission("chat.use");
+    const result = await guard(async () => {
+        await requireChannel({ id: user.id }, channelId);
+        return meetings.liveIn(channelId);
+    });
+    const live = result.value;
     return live ? { meetingId: live.id, count: live.count } : null;
 }
 
-/** The addresses this browser should try. Server-side because a TURN credential
- *  is configuration, and the browser needs it to connect at all. */
-export async function iceServersAction(): Promise<RTCIceServer[]> {
+/**
+ * The addresses this browser should try. Server-side because a TURN credential
+ * is configuration, and the browser needs it to connect at all.
+ *
+ * A seat in the call it is for is the gate. A TURN credential relays whatever is
+ * handed to it, so an action that gave one to anybody who could reach the app
+ * would be an open relay with a Polaris login page in front of it - and this one
+ * ships in the guest bundle, where there is not even that.
+ */
+export async function iceServersAction(meetingId: string): Promise<RTCIceServer[]> {
+    const seat = await resolveSeat(meetingId);
+    if (!seat || seat.admission !== "admitted") return [];
     return meetings.iceServers() as RTCIceServer[];
 }

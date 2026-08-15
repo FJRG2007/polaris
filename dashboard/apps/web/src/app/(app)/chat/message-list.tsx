@@ -24,7 +24,13 @@ import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
 import { useDisplayFormat } from "@/components/display-format";
 import { MessageSquare, Pencil, SmilePlus, Trash2 } from "lucide-react";
-import { cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@polaris/ui";
+import {
+    cn,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger
+} from "@polaris/ui";
 
 /** How close together two messages have to be to share a header. Long enough
  *  that a paused sentence stays one block, short enough that coming back an hour
@@ -122,8 +128,7 @@ function Message({
     if (message.kind === "system") {
         return (
             <p className="px-4 py-1 text-xs text-muted-foreground">
-                {message.body}{" "}
-                <RelativeTime iso={message.createdAt} />
+                {message.body} <RelativeTime iso={message.createdAt} />
             </p>
         );
     }
@@ -173,7 +178,9 @@ function Message({
                     <div className="text-sm">
                         <RichText value={message.body} />
                         {message.edited && (
-                            <span className="ml-1 text-[11px] text-foreground-subtle">(edited)</span>
+                            <span className="ml-1 text-[11px] text-foreground-subtle">
+                                (edited)
+                            </span>
                         )}
                     </div>
                 )}
@@ -279,7 +286,9 @@ function DaySeparator({ iso }: { iso: string }) {
     return (
         <div className="flex items-center gap-3 px-4 pt-4">
             <span className="h-px flex-1 bg-border" />
-            <span className="text-[11px] font-medium text-foreground-subtle">{format.date(iso)}</span>
+            <span className="text-[11px] font-medium text-foreground-subtle">
+                {format.date(iso)}
+            </span>
             <span className="h-px flex-1 bg-border" />
         </div>
     );

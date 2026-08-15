@@ -102,7 +102,8 @@ export async function listMembersAction(
 export async function sendAction(input: unknown): Promise<{ id?: string; error?: string }> {
     const me = await actor();
     const parsed = core.chatSendSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That could not be sent" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That could not be sent" };
 
     const result = await guard(() => messages.send(me, parsed.data));
     return result.error ? { error: result.error } : { id: result.value };
@@ -111,7 +112,8 @@ export async function sendAction(input: unknown): Promise<{ id?: string; error?:
 export async function editAction(input: unknown): Promise<{ error?: string }> {
     const me = await actor();
     const parsed = core.chatEditSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That could not be saved" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That could not be saved" };
     return guard(() => messages.edit(me, parsed.data));
 }
 
@@ -123,7 +125,8 @@ export async function deleteMessageAction(messageId: string): Promise<{ error?: 
 export async function reactAction(input: unknown): Promise<{ on?: boolean; error?: string }> {
     const me = await actor();
     const parsed = core.chatReactSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not an emoji" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That is not an emoji" };
 
     const result = await guard(() => messages.react(me, parsed.data));
     return result.error ? { error: result.error } : { on: result.value };
@@ -150,7 +153,8 @@ export async function typingAction(channelId: string): Promise<void> {
 export async function createSpaceAction(input: unknown): Promise<{ id?: string; error?: string }> {
     const me = await actor();
     const parsed = core.chatSpaceCreateSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That space could not be made" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That space could not be made" };
 
     const result = await guard(() => chat.createSpace(me, parsed.data));
     if (!result.error) revalidatePath(CHAT_PATH);
@@ -160,7 +164,8 @@ export async function createSpaceAction(input: unknown): Promise<{ id?: string; 
 export async function updateSpaceAction(input: unknown): Promise<{ error?: string }> {
     const me = await actor();
     const parsed = core.chatSpaceUpdateSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That could not be saved" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That could not be saved" };
 
     const result = await guard(() => chat.updateSpace(me, parsed.data));
     if (!result.error) revalidatePath(CHAT_PATH);
@@ -174,10 +179,13 @@ export async function deleteSpaceAction(spaceId: string): Promise<{ error?: stri
     return result;
 }
 
-export async function createChannelAction(input: unknown): Promise<{ id?: string; error?: string }> {
+export async function createChannelAction(
+    input: unknown
+): Promise<{ id?: string; error?: string }> {
     const me = await actor();
     const parsed = core.chatChannelCreateSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That channel could not be made" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That channel could not be made" };
 
     const result = await guard(() => chat.createChannel(me, parsed.data));
     if (!result.error) revalidatePath(CHAT_PATH);
@@ -187,7 +195,8 @@ export async function createChannelAction(input: unknown): Promise<{ id?: string
 export async function updateChannelAction(input: unknown): Promise<{ error?: string }> {
     const me = await actor();
     const parsed = core.chatChannelUpdateSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That could not be saved" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That could not be saved" };
 
     const result = await guard(() => chat.updateChannel(me, parsed.data));
     if (!result.error) revalidatePath(CHAT_PATH);
@@ -253,7 +262,10 @@ export async function removeChannelMemberAction(
     return result;
 }
 
-export async function setMutedAction(channelId: string, muted: boolean): Promise<{ error?: string }> {
+export async function setMutedAction(
+    channelId: string,
+    muted: boolean
+): Promise<{ error?: string }> {
     const me = await actor();
     const result = await guard(() => chat.setMuted(me, channelId, muted));
     if (!result.error) revalidatePath(CHAT_PATH);

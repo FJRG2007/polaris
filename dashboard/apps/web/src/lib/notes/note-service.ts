@@ -186,7 +186,8 @@ export async function moveNote(
     });
     const parents = new Map(rows.map((row) => [row.id, row.parentId]));
     if (!parents.has(input.noteId)) return "That note no longer exists";
-    if (input.parentId !== null && !parents.has(input.parentId)) return "That note no longer exists";
+    if (input.parentId !== null && !parents.has(input.parentId))
+        return "That note no longer exists";
     if (input.parentId === input.noteId) return "A note cannot go inside itself";
 
     if (input.parentId !== null) {
@@ -246,7 +247,10 @@ function depthOf(noteId: string, parents: ReadonlyMap<string, string | null>): n
 }
 
 /** How many levels the subtree under a note goes down. Zero when it has none. */
-function heightOf(noteId: string, rows: readonly { id: string; parentId: string | null }[]): number {
+function heightOf(
+    noteId: string,
+    rows: readonly { id: string; parentId: string | null }[]
+): number {
     const children = new Map<string, string[]>();
     for (const row of rows) {
         if (!row.parentId) continue;

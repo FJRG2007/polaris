@@ -224,7 +224,8 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
     });
     if (!message) throw new ChatAccessError("That message is gone");
     await requirePostable(actor, message.channelId);
-    if (message.authorId !== actor.id) throw new ChatAccessError("You can only edit your own messages");
+    if (message.authorId !== actor.id)
+        throw new ChatAccessError("You can only edit your own messages");
     if (message.deletedAt) throw new ChatAccessError("That message was deleted");
 
     await prisma.chatMessage.update({
@@ -372,16 +373,18 @@ interface Row {
  * their account, which is the opposite of what a record of a conversation is
  * for.
  */
-async function decorate(
-    actor: ChatActor,
-    rows: readonly Row[]
-): Promise<ChatMessageView[]> {
+async function decorate(actor: ChatActor, rows: readonly Row[]): Promise<ChatMessageView[]> {
     if (rows.length === 0) return [];
 
-    const authorIds = [...new Set(rows.map((row) => row.authorId).filter((id): id is string => id !== null))];
+    const authorIds = [
+        ...new Set(rows.map((row) => row.authorId).filter((id): id is string => id !== null))
+    ];
     const [authors, reactions] = await Promise.all([
         authorIds.length
-            ? prisma.user.findMany({ where: { id: { in: authorIds } }, select: { id: true, name: true } })
+            ? prisma.user.findMany({
+                  where: { id: { in: authorIds } },
+                  select: { id: true, name: true }
+              })
             : Promise.resolve([]),
         prisma.chatReaction.findMany({
             where: { messageId: { in: rows.map((row) => row.id) } },
@@ -416,7 +419,9 @@ async function decorate(
             .map(([emoji, tally]) => ({ emoji, count: tally.count, mine: tally.mine }))
             // Most-reacted first, then by emoji so the order is stable between
             // renders when two have the same count.
-            .sort((left, right) => right.count - left.count || left.emoji.localeCompare(right.emoji)),
+            .sort(
+                (left, right) => right.count - left.count || left.emoji.localeCompare(right.emoji)
+            ),
         createdAt: row.createdAt.toISOString()
     }));
 }

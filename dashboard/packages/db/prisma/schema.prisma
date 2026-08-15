@@ -5750,6 +5750,12 @@ model Meeting {
     id            String    @id @default(uuid(7)) @db.Uuid
     // The conversation it belongs to, or null for one that belongs to nothing.
     channelId     String?   @db.Uuid
+    // The conversation this call holds while it runs, and null once it has
+    // ended. Unique, so two people pressing the call button at the same instant
+    // end up in one room rather than two: the second insert is refused and reads
+    // back the first. Null is distinct from null in Postgres, which is what
+    // lets every ended call keep sitting here.
+    liveKey       String?   @unique @db.Uuid
     hostId        String    @db.Uuid
     title         String    @default("")
     guestToken    String?   @unique

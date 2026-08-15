@@ -52,9 +52,8 @@ vi.mock("@polaris/db", () => ({
                         where.OR.some((clause) => {
                             if ("ownerId" in clause) return space.ownerId === clause.ownerId;
                             if ("members" in clause) {
-                                const userId = (
-                                    clause.members as { some: { userId: string } }
-                                ).some.userId;
+                                const userId = (clause.members as { some: { userId: string } }).some
+                                    .userId;
                                 return spaceMembers.some(
                                     (row) => row.spaceId === space.id && row.userId === userId
                                 );

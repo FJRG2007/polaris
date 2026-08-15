@@ -16,7 +16,15 @@
 
 import { listChannelsAction } from "./actions";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useState,
+    type ReactNode
+} from "react";
 
 interface ChatContextValue {
     readonly viewerId: string;

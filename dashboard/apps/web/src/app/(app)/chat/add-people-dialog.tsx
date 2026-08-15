@@ -89,7 +89,11 @@ export function AddPeopleDialog({
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
                         Cancel
                     </Button>
-                    <Button size="sm" disabled={busy || picked.length === 0} onClick={() => void add()}>
+                    <Button
+                        size="sm"
+                        disabled={busy || picked.length === 0}
+                        onClick={() => void add()}
+                    >
                         {busy && <Loader2 className="size-4 animate-spin" />}
                         Add
                     </Button>

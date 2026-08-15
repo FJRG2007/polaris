@@ -75,7 +75,10 @@ export function referenceHref(kind: ReferenceKind, id: string): string | null {
  * browser bar matches as well as a path does. Anything under another host is
  * left alone: a link to somebody else's site is not a chip.
  */
-export function referenceFromUrl(url: string, origin: string | null): { kind: ReferenceKind; id: string } | null {
+export function referenceFromUrl(
+    url: string,
+    origin: string | null
+): { kind: ReferenceKind; id: string } | null {
     let path = url.trim();
     if (/^https?:\/\//i.test(path)) {
         if (!origin) return null;

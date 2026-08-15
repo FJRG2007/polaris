@@ -82,6 +82,12 @@ must be freshly generated, never copied:
 Set `POLARIS_SITE_ADDRESS` to your domain for automatic HTTPS via Caddy, and
 `POLARIS_APP_URL` to the origin users reach.
 
+Chat calls work with no configuration between browsers that can already reach
+each other. To carry a call across the internet or between separate NATs, set
+`POLARIS_STUN_URLS` and, if that alone is not enough, `POLARIS_TURN_URL` with
+`POLARIS_TURN_USERNAME`/`POLARIS_TURN_PASSWORD` - Polaris does not default to a
+hosted TURN server, since that is an operator's call to make.
+
 ## Updates
 
 Updating is one command - re-run it and it adds any new settings to `.env` for

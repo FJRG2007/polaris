@@ -23,9 +23,9 @@
  *     them - a link that can be forwarded is a link that will be.
  */
 
-import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { randomBytes } from "node:crypto";
+import { prisma, type Prisma } from "@polaris/db";
 import { publishMeetingEvent } from "./meeting-signal";
 import { ChatAccessError, requireChannel, type ChatActor } from "./access";
 
@@ -103,28 +103,16 @@ export function iceServers(): { urls: string[]; username?: string; credential?: 
  *
  * One live call per conversation, always. Two people pressing the button at the
  * same moment mean one call with both of them in it, not two rooms with one
- * person each staring at nothing.
+ * person each staring at nothing - which a check followed by a create cannot
+ * promise on its own, so `liveKey` carries the conversation while the call runs
+ * and the database refuses the second one.
  */
 export async function startOrJoin(
     actor: ChatActor & { name: string },
     channelId: string
 ): Promise<MeetingSeat> {
     await requireChannel(actor, channelId);
-
-    const running = await prisma.meeting.findFirst({
-        where: { channelId, endedAt: null },
-        select: { id: true }
-    });
-    const meetingId =
-        running?.id ??
-        (
-            await prisma.meeting.create({
-                data: { channelId, hostId: actor.id },
-                select: { id: true }
-            })
-        ).id;
-
-    return seatFor(meetingId, actor.id, actor.name);
+    return seatFor(await liveMeetingId(actor, channelId), actor.id, actor.name);
 }
 
 /** Join a call by id, as an account. The conversation it is in decides. */
@@ -151,10 +139,7 @@ export async function join(
  * default - the seat starts in the lobby and no signalling reaches it until
  * somebody inside admits them.
  */
-export async function joinAsGuest(
-    token: string,
-    name: string
-): Promise<MeetingSeat> {
+export async function joinAsGuest(token: string, name: string): Promise<MeetingSeat> {
     const meeting = await prisma.meeting.findUnique({
         where: { guestToken: token },
         select: { id: true, endedAt: true, approveGuests: true }
@@ -185,13 +170,18 @@ export async function joinAsGuest(
 
 /** Let somebody in, or turn them away. Anybody already in the call may do it -
  *  a lobby only one person can open is a lobby that strands people whenever that
- *  person is the one who stepped out. */
+ *  person is the one who stepped out. Anybody *in* the call: a seat at the door
+ *  is not a seat in the room, or the lobby would be a formality a forwarded link
+ *  walks straight past. */
 export async function decideAdmission(
     seat: { meetingId: string; participantId: string },
     targetId: string,
     admitted: boolean
 ): Promise<void> {
-    await requireSeated(seat);
+    const seated = await requireSeated(seat);
+    if (seated.admission !== "admitted") {
+        throw new ChatAccessError("You are still waiting to be let in");
+    }
     if (admitted) await requireRoom(seat.meetingId);
 
     await prisma.meetingParticipant.updateMany({
@@ -202,10 +192,7 @@ export async function decideAdmission(
 }
 
 /** Still here. Called on a heartbeat from the browser showing the call. */
-export async function keepSeat(seat: {
-    meetingId: string;
-    participantId: string;
-}): Promise<void> {
+export async function keepSeat(seat: { meetingId: string; participantId: string }): Promise<void> {
     await prisma.meetingParticipant.updateMany({
         where: { id: seat.participantId, meetingId: seat.meetingId, leftAt: null },
         data: { lastSeenAt: new Date() }
@@ -214,10 +201,7 @@ export async function keepSeat(seat: {
 
 /** Leave. The last one out ends the call, so a room is never left running with
  *  nobody in it and a live guest link pointing at it. */
-export async function leave(seat: {
-    meetingId: string;
-    participantId: string;
-}): Promise<void> {
+export async function leave(seat: { meetingId: string; participantId: string }): Promise<void> {
     await prisma.meetingParticipant.updateMany({
         where: { id: seat.participantId, leftAt: null },
         data: { leftAt: new Date() }
@@ -267,13 +251,52 @@ export async function setGuestLink(
     return token;
 }
 
-/** The call as the screen draws it. `seat` proves the reader is in it. */
+/**
+ * The call as the screen draws it. `seat` proves the reader is in it.
+ *
+ * Somebody in the lobby is *at* the call rather than in it, and gets back their
+ * own admission and nothing else: not the roster, not the guest link, not who
+ * else is here. The stream withholds the same things from the same seat, and a
+ * screen that polls must not be the way around it.
+ */
 export async function readMeeting(seat: {
     meetingId: string;
     participantId: string;
 }): Promise<MeetingView | null> {
-    await requireSeated(seat);
+    const seated = await requireSeated(seat);
+    // Reading the call is a browser saying it is still there, which is the only
+    // thing somebody waiting at the door does - without it they are swept out of
+    // the lobby before anybody has had a chance to let them in.
+    await keepSeat(seat);
     await sweep(seat.meetingId);
+
+    if (seated.admission !== "admitted") {
+        const meeting = await prisma.meeting.findUnique({
+            where: { id: seat.meetingId },
+            select: { id: true, title: true, startedAt: true, endedAt: true }
+        });
+        if (!meeting) return null;
+        return {
+            id: meeting.id,
+            channelId: null,
+            hostId: "",
+            title: meeting.title,
+            startedAt: meeting.startedAt.toISOString(),
+            ended: meeting.endedAt !== null,
+            guestToken: null,
+            approveGuests: true,
+            participants: [
+                {
+                    id: seated.id,
+                    userId: seated.userId,
+                    name: seated.name,
+                    admission: seated.admission,
+                    guest: seated.userId === null,
+                    joinedAt: seated.joinedAt.toISOString()
+                }
+            ]
+        };
+    }
 
     const meeting = await prisma.meeting.findUnique({
         where: { id: seat.meetingId },
@@ -356,10 +379,7 @@ export async function seatForGuestKey(guestKey: string): Promise<MeetingSeat | n
 }
 
 /** Resolve an account's seat in a meeting they say they are in. */
-export async function seatForUser(
-    userId: string,
-    meetingId: string
-): Promise<MeetingSeat | null> {
+export async function seatForUser(userId: string, meetingId: string): Promise<MeetingSeat | null> {
     const participant = await prisma.meetingParticipant.findFirst({
         where: { meetingId, userId, leftAt: null },
         orderBy: { joinedAt: "desc" },
@@ -410,15 +430,58 @@ async function requireRoom(meetingId: string): Promise<void> {
     if (inside >= MAX_IN_CALL) throw new ChatAccessError("That call is full");
 }
 
-async function requireSeated(seat: {
-    meetingId: string;
-    participantId: string;
-}): Promise<void> {
+/** The caller's own row, which is both the proof and the answer to "what am I
+ *  allowed to see" - so it is returned rather than thrown away. */
+async function requireSeated(seat: { meetingId: string; participantId: string }): Promise<{
+    id: string;
+    userId: string | null;
+    name: string;
+    admission: MeetingSeat["admission"];
+    joinedAt: Date;
+}> {
     const participant = await prisma.meetingParticipant.findFirst({
         where: { id: seat.participantId, meetingId: seat.meetingId, leftAt: null },
-        select: { id: true }
+        select: { id: true, userId: true, name: true, admission: true, joinedAt: true }
     });
     if (!participant) throw new ChatAccessError("You are not in that call");
+    return { ...participant, admission: participant.admission as MeetingSeat["admission"] };
+}
+
+/** The id of the call running in a conversation, starting it if there is none.
+ *
+ * The create can lose a race with another tab pressing the same button, and the
+ * unique `liveKey` is what makes that recoverable rather than a second room:
+ * the loser reads back the one the winner made and walks into it. */
+async function liveMeetingId(actor: ChatActor, channelId: string): Promise<string> {
+    const running = await prisma.meeting.findFirst({
+        where: { channelId, endedAt: null },
+        select: { id: true }
+    });
+    if (running) return running.id;
+
+    try {
+        const created = await prisma.meeting.create({
+            data: { channelId, hostId: actor.id, liveKey: channelId },
+            select: { id: true }
+        });
+        return created.id;
+    } catch (caught) {
+        if (!isUniqueViolation(caught)) throw caught;
+        const raced = await prisma.meeting.findUnique({
+            where: { liveKey: channelId },
+            select: { id: true }
+        });
+        if (!raced) throw caught;
+        return raced.id;
+    }
+}
+
+function isUniqueViolation(caught: unknown): boolean {
+    return (
+        typeof caught === "object" &&
+        caught !== null &&
+        (caught as Prisma.PrismaClientKnownRequestError).code === "P2002"
+    );
 }
 
 /** Drop anybody whose browser stopped saying it was there. */
@@ -441,12 +504,13 @@ async function endIfEmpty(meetingId: string): Promise<void> {
 }
 
 /** End a call and shut its door: the guest token goes with it, so a link that
- *  was forwarded cannot reopen the room later. */
+ *  was forwarded cannot reopen the room later, and `liveKey` is released so the
+ *  conversation can hold a call again. */
 async function closeMeeting(meetingId: string): Promise<void> {
     await prisma.$transaction([
         prisma.meeting.updateMany({
             where: { id: meetingId, endedAt: null },
-            data: { endedAt: new Date(), guestToken: null }
+            data: { endedAt: new Date(), guestToken: null, liveKey: null }
         }),
         prisma.meetingParticipant.updateMany({
             where: { meetingId, leftAt: null },

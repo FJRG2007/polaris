@@ -132,7 +132,9 @@ export function ChannelHeader({
                         <DropdownMenuContent align="end">
                             <DropdownMenuItem
                                 onSelect={() =>
-                                    void act(() => actions.setMutedAction(channel.id, !channel.muted))
+                                    void act(() =>
+                                        actions.setMutedAction(channel.id, !channel.muted)
+                                    )
                                 }
                             >
                                 {channel.muted ? (
@@ -169,12 +171,20 @@ export function ChannelHeader({
             </div>
 
             {error && (
-                <p role="alert" className="border-b border-border px-4 py-1 text-xs text-destructive">
+                <p
+                    role="alert"
+                    className="border-b border-border px-4 py-1 text-xs text-destructive"
+                >
                     {error}
                 </p>
             )}
 
-            <AddPeopleDialog open={adding} onOpenChange={setAdding} channel={channel} onAdded={onChanged} />
+            <AddPeopleDialog
+                open={adding}
+                onOpenChange={setAdding}
+                channel={channel}
+                onAdded={onChanged}
+            />
 
             <ConfirmDeleteDialog
                 open={confirmDelete}

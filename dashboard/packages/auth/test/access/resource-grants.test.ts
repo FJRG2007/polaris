@@ -68,6 +68,10 @@ vi.mock("@polaris/db", () => ({
             findMany: async ({ where }: { where: { userId: string } }) =>
                 (groupsOf.get(where.userId) ?? []).map((groupId) => ({ groupId }))
         },
+        // Nobody here has a capability switched on or off on their account: what
+        // this file pins is roles against written grants, and an override would
+        // only be a third answer to a question neither of them is being asked.
+        userPermission: { findMany: async () => [] },
         policyAttachment: { findMany: async () => [] },
         policy: { findMany: async () => [] },
         resourceGrant: {

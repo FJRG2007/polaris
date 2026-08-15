@@ -51,6 +51,10 @@ export interface ChatChannelView {
      *  never opened and nothing has happened in. */
     readonly unread: number;
     readonly muted: boolean;
+    /** Whether this reader administers the conversation, which is what decides
+     *  whether the screen offers them anything only a moderator may do. Always
+     *  false in a direct message, where everybody in one is equal in it. */
+    readonly mayAdminister: boolean;
     /** The other people in a direct message, for the avatars beside it. Empty
      *  for a named channel, where the name is the whole label. */
     readonly others: readonly { id: string; name: string }[];
@@ -228,7 +232,12 @@ export async function addSpaceMembers(
         data: wanted.map((userId) => ({ spaceId, userId })),
         skipDuplicates: true
     });
-    publishChatChange({ channelId: spaceId, kind: "channels", actorId: actor.id, audience: wanted });
+    publishChatChange({
+        channelId: spaceId,
+        kind: "channels",
+        actorId: actor.id,
+        audience: wanted
+    });
 }
 
 export async function removeSpaceMember(
@@ -252,7 +261,12 @@ export async function removeSpaceMember(
             where: { userId, channelId: { in: channels.map((row) => row.id) } }
         });
     });
-    publishChatChange({ channelId: spaceId, kind: "channels", actorId: actor.id, audience: [userId] });
+    publishChatChange({
+        channelId: spaceId,
+        kind: "channels",
+        actorId: actor.id,
+        audience: [userId]
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -268,10 +282,13 @@ export async function removeSpaceMember(
  */
 export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]> {
     const spaces = await reachableSpaceIds(actor);
-    const memberships = await prisma.chatChannelMember.findMany({
-        where: { userId: actor.id },
-        select: { channelId: true, lastReadAt: true, muted: true }
-    });
+    const [memberships, administered] = await Promise.all([
+        prisma.chatChannelMember.findMany({
+            where: { userId: actor.id },
+            select: { channelId: true, lastReadAt: true, muted: true, role: true }
+        }),
+        administeredSpaceIds(actor)
+    ]);
     const mine = new Map(memberships.map((row) => [row.channelId, row]));
 
     const channels = await prisma.chatChannel.findMany({
@@ -313,20 +330,27 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             lastMessageAt: channel.lastMessageAt?.toISOString() ?? null,
             unread: unread.get(channel.id) ?? 0,
             muted: mine.get(channel.id)?.muted ?? false,
+            mayAdminister: Boolean(
+                channel.spaceId &&
+                    (administered.has(channel.spaceId) || mine.get(channel.id)?.role === "admin")
+            ),
             others: channel.spaceId ? [] : others
         };
     });
 }
 
-/** One conversation, or null when it is not this reader's to open. */
-export async function getChannel(
-    actor: ChatActor,
-    channelId: string
-): Promise<ChatChannelView | null> {
-    const access = await channelAccess(actor, channelId);
-    if (!access) return null;
-    const channels = await listChannels(actor);
-    return channels.find((channel) => channel.id === channelId) ?? null;
+/** The spaces this actor administers, by either of the two ways of doing so.
+ *  The same rule `channelAccess` applies one channel at a time, asked once for
+ *  a whole rail. */
+async function administeredSpaceIds(actor: ChatActor): Promise<Set<string>> {
+    const [owned, admin] = await Promise.all([
+        prisma.chatSpace.findMany({ where: { ownerId: actor.id }, select: { id: true } }),
+        prisma.chatSpaceMember.findMany({
+            where: { userId: actor.id, role: "admin" },
+            select: { spaceId: true }
+        })
+    ]);
+    return new Set([...owned.map((row) => row.id), ...admin.map((row) => row.spaceId)]);
 }
 
 export async function createChannel(
@@ -419,11 +443,7 @@ export async function removeChannelMember(
     publishChatChange({ channelId, kind: "channels", actorId: actor.id, audience: [userId] });
 }
 
-export async function setMuted(
-    actor: ChatActor,
-    channelId: string,
-    muted: boolean
-): Promise<void> {
+export async function setMuted(actor: ChatActor, channelId: string, muted: boolean): Promise<void> {
     await requireChannel(actor, channelId);
     await prisma.chatChannelMember.upsert({
         where: { channelId_userId: { channelId, userId: actor.id } },
@@ -440,10 +460,7 @@ export async function setMuted(
  * history each. A group has no such key - three people can genuinely want two
  * different group conversations - so asking twice makes two.
  */
-export async function openDirect(
-    actor: ChatActor,
-    userIds: readonly string[]
-): Promise<string> {
+export async function openDirect(actor: ChatActor, userIds: readonly string[]): Promise<string> {
     const others = [...new Set(userIds)].filter((id) => id !== actor.id);
     if (others.length === 0) throw new ChatAccessError("Pick somebody to message");
 
@@ -451,7 +468,8 @@ export async function openDirect(
         where: { id: { in: others } },
         select: { id: true, name: true }
     });
-    if (present.length !== others.length) throw new ChatAccessError("Somebody there no longer has an account");
+    if (present.length !== others.length)
+        throw new ChatAccessError("Somebody there no longer has an account");
 
     const everyone = [actor.id, ...others];
     if (others.length === 1) {

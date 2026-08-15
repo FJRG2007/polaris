@@ -70,7 +70,9 @@ function ChatColumns({ children }: { children: ReactNode }) {
             >
                 <ChatSidebar />
             </div>
-            <div className={`${inConversation ? "flex" : "hidden md:flex"} min-w-0 flex-1 flex-col`}>
+            <div
+                className={`${inConversation ? "flex" : "hidden md:flex"} min-w-0 flex-1 flex-col`}
+            >
                 {children}
             </div>
         </div>

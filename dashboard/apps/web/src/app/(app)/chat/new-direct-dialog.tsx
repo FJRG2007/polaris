@@ -60,9 +60,7 @@ export function NewDirectDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>New message</DialogTitle>
-                    <DialogDescription>
-                        One person, or several for a group.
-                    </DialogDescription>
+                    <DialogDescription>One person, or several for a group.</DialogDescription>
                 </DialogHeader>
 
                 <PeoplePicker
@@ -84,7 +82,11 @@ export function NewDirectDialog({
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
                         Cancel
                     </Button>
-                    <Button size="sm" disabled={busy || picked.length === 0} onClick={() => void start()}>
+                    <Button
+                        size="sm"
+                        disabled={busy || picked.length === 0}
+                        onClick={() => void start()}
+                    >
                         {busy && <Loader2 className="size-4 animate-spin" />}
                         {picked.length > 1 ? "Start group" : "Start conversation"}
                     </Button>
