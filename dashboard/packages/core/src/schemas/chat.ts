@@ -281,3 +281,35 @@ export function chatSearchIsEmpty(input: ChatSearchInput): boolean {
         input.before === null
     );
 }
+
+/**
+ * The first web address in a message, or null.
+ *
+ * Only the first: a message with six links is a list, and six cards under it is
+ * the message buried under its own footnotes.
+ *
+ * Code is taken out before looking. A fenced block full of shell is exactly
+ * where an address appears that nobody meant as a link, and unfurling it would
+ * both misread the message and send Polaris off to fetch something somebody was
+ * only quoting.
+ */
+export function firstLink(body: string): string | null {
+    const prose = body
+        .replace(/```[\s\S]*?```/g, " ")
+        .replace(/~~~[\s\S]*?~~~/g, " ")
+        .replace(/`[^`]*`/g, " ");
+
+    const match = /https?:\/\/[^\s<>"')\]]+/i.exec(prose);
+    if (!match) return null;
+
+    // Trailing punctuation belongs to the sentence, not the address: "see
+    // https://example.com." is a link and a full stop.
+    const address = match[0].replace(/[.,;:!?]+$/, "");
+    if (address.length > MAX_LINK_LENGTH) return null;
+    return address;
+}
+
+/** The longest address Polaris will look at. Past this it is a payload rather
+ *  than a link, and it also keeps the stored one inside what a unique index can
+ *  hold. */
+export const MAX_LINK_LENGTH = 512;

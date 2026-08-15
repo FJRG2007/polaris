@@ -15,6 +15,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { rulesForChannel } from "./rules";
 import { publishChatChange } from "./live";
+import { knownPreviews, unfurl, type LinkPreviewView } from "./link-preview";
 import { discardAttachments, isInlineImage, type StoredAttachment } from "./attachments";
 import {
     ChatAccessError,
@@ -49,6 +50,10 @@ export interface ChatMessageView {
     /** Whether this reader kept it. Private to them - starring is a bookmark,
      *  not a signal to the room. */
     readonly starred: boolean;
+    /** What the first link in it turned out to be, when Polaris has already
+     *  looked. Null until it has, which is why a card appears a moment after the
+     *  message rather than with it. */
+    readonly preview: LinkPreviewView | null;
     readonly createdAt: string;
 }
 
@@ -291,6 +296,12 @@ export async function send(
     });
 
     publishChatChange({ channelId: input.channelId, kind: "posted", actorId: actor.id });
+
+    // Deliberately not awaited. A message appearing is worth more than the card
+    // under it, and the card arrives with the next frame either way.
+    const link = core.firstLink(input.body);
+    if (link) void unfurl(link).catch(() => undefined);
+
     return id;
 }
 
@@ -372,6 +383,10 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
         });
     });
     publishChatChange({ channelId: message.channelId, kind: "posted", actorId: actor.id });
+
+    // An edit can put a link in a message that did not have one.
+    const link = core.firstLink(input.body);
+    if (link) void unfurl(link).catch(() => undefined);
 }
 
 /** One version of a message, as the history dialog draws it. */
@@ -701,7 +716,17 @@ export async function decorateMessages(actor: ChatActor, rows: readonly Row[]): 
     const quotedIds = [
         ...new Set(rows.map((row) => row.replyToId).filter((id): id is string => id !== null))
     ];
-    const [authors, reactions, files, stars, quoted] = await Promise.all([
+    // The links in the page, looked up in one query rather than one per message.
+    // Nothing is fetched here: a read path that could reach out to a third party
+    // is a read path that hangs when they are slow.
+    const links = new Map<string, string>();
+    for (const row of rows) {
+        if (row.deletedAt) continue;
+        const link = core.firstLink(row.body);
+        if (link) links.set(row.id, link);
+    }
+
+    const [authors, reactions, files, stars, quoted, previews] = await Promise.all([
         authorIds.length
             ? prisma.user.findMany({
                   where: { id: { in: authorIds } },
@@ -726,7 +751,8 @@ export async function decorateMessages(actor: ChatActor, rows: readonly Row[]): 
                   where: { id: { in: quotedIds } },
                   select: { id: true, authorId: true, body: true, deletedAt: true }
               })
-            : Promise.resolve([])
+            : Promise.resolve([]),
+        knownPreviews([...links.values()])
     ]);
 
     // The quoted messages have authors of their own, and they are usually
@@ -789,8 +815,20 @@ export async function decorateMessages(actor: ChatActor, rows: readonly Row[]): 
         attachments: onMessageFiles.get(row.id) ?? [],
         quote: quoteViewOf(row, quotes, names),
         starred: kept.has(row.id),
+        preview: previewOf(row, links, previews),
         createdAt: row.createdAt.toISOString()
     }));
+}
+
+/** The card under one message, or null when there is no link or nothing is yet
+ *  known about it. */
+function previewOf(
+    row: Row,
+    links: ReadonlyMap<string, string>,
+    previews: ReadonlyMap<string, LinkPreviewView>
+): LinkPreviewView | null {
+    const link = links.get(row.id);
+    return link ? (previews.get(link) ?? null) : null;
 }
 
 /** The quote line for one message, or null when it stands alone. */

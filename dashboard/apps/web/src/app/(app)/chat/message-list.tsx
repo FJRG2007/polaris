@@ -262,6 +262,8 @@ function Message({
                     </div>
                 )}
 
+                {message.preview && <LinkCard preview={message.preview} />}
+
                 {message.attachments.length > 0 && (
                     <ul className="mt-1 flex flex-col gap-1">
                         {message.attachments.map((file) => (
@@ -416,6 +418,51 @@ function Message({
             />
         </div>
         </MessageMenu>
+    );
+}
+
+/**
+ * What a link in a message turned out to be.
+ *
+ * Under the message rather than replacing it: the sentence somebody wrote about
+ * the link is usually the point, and a card that swallowed it would lose that.
+ *
+ * The picture comes from Polaris rather than from the site, so scrolling past a
+ * card does not announce the reader to whoever runs the page.
+ */
+function LinkCard({ preview }: { preview: NonNullable<ChatMessageView["preview"]> }) {
+    return (
+        <a
+            href={preview.url}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="mt-1 flex max-w-lg gap-3 rounded-md border border-border border-l-2 border-l-primary bg-card p-2 transition-colors hover:bg-card-hover"
+        >
+            {preview.hasImage && (
+                // eslint-disable-next-line @next/next/no-img-element -- one thumbnail, fetched through Polaris, no loader wanted
+                <img
+                    src={`/api/chat/links/${preview.id}/image`}
+                    alt=""
+                    loading="lazy"
+                    className="size-16 shrink-0 rounded object-cover"
+                />
+            )}
+            <span className="flex min-w-0 flex-col gap-0.5">
+                {preview.siteName && (
+                    <span className="truncate text-[11px] text-muted-foreground">
+                        {preview.siteName}
+                    </span>
+                )}
+                <span className="truncate text-xs font-medium text-foreground">
+                    {preview.title || preview.url}
+                </span>
+                {preview.description && (
+                    <span className="line-clamp-2 text-xs text-muted-foreground">
+                        {preview.description}
+                    </span>
+                )}
+            </span>
+        </a>
     );
 }
 

@@ -316,6 +316,9 @@ export function ChannelView({ channelId }: { channelId: string }) {
             attachments: [],
             quote: null,
             starred: false,
+            // The server has not looked at any link in it yet, and the card
+            // arrives with the message the reload brings back.
+            preview: null,
             createdAt: new Date().toISOString()
         };
         setPending((current) => [...current, draft]);

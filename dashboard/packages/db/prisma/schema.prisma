@@ -5791,6 +5791,32 @@ model ChatMessageEdit {
     @@index([messageId, replacedAt])
 }
 
+// What a link posted in a conversation turned out to be.
+//
+// Keyed by the address rather than by the message: the same link posted in four
+// rooms is one page, and fetching it four times would tell whoever runs that
+// page four times over that somebody here read it.
+//
+// A row is written even when the look failed, which is what stops a dead link
+// being re-fetched on every render. `ok` is what the difference is.
+model LinkPreview {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    // Capped by the caller at what a unique index can hold; longer than that is
+    // a payload rather than a link.
+    url         String   @unique
+    title       String   @default("")
+    description String   @default("")
+    siteName    String   @default("")
+    // Where the picture is, as that site addresses it. Never handed to a
+    // browser: it is fetched back through Polaris, so reading a message does not
+    // announce the reader to a third party.
+    imageUrl    String?
+    ok          Boolean  @default(false)
+    fetchedAt   DateTime @default(now())
+
+    @@index([fetchedAt])
+}
+
 // ---------------------------------------------------------------------------
 // Meetings (calls)
 // ---------------------------------------------------------------------------
