@@ -13,6 +13,7 @@
  */
 
 import { useChat } from "./chat-context";
+import Fuse from "fuse.js";
 import { useMemo, useState } from "react";
 import { forwardAction } from "./actions";
 import { runAction } from "@/lib/run-action";
@@ -48,12 +49,28 @@ export function ForwardDialog({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
 
+    const open = useMemo(() => channels.filter((channel) => !channel.archived), [channels]);
+
+    /**
+     * Ranked rather than filtered.
+     *
+     * Somebody forwarding a message is typing a room name from memory, into a
+     * box, in a hurry - which is exactly where a substring match fails: a
+     * transposed letter, a missing accent or two words the other way round and
+     * the conversation they meant is simply not in the list. Fuse is already
+     * carried for the task search, the data is already here, and the ranking is
+     * the point: the best match should be first, not wherever the array put it.
+     */
+    const index = useMemo(
+        () => new Fuse(open, { keys: ["name"], threshold: 0.3, ignoreLocation: true }),
+        [open]
+    );
+
     const options = useMemo(() => {
-        const term = query.trim().toLowerCase();
-        return channels
-            .filter((channel) => !channel.archived)
-            .filter((channel) => !term || channel.name.toLowerCase().includes(term));
-    }, [channels, query]);
+        const term = query.trim();
+        // Nothing typed is a browse, and a browse keeps the order the rail has.
+        return term ? index.search(term).map((hit) => hit.item) : open;
+    }, [index, open, query]);
 
     const send = async () => {
         if (!message || !target) return;

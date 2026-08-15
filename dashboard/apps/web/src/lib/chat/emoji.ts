@@ -14,6 +14,8 @@
  * without either knowing about this file.
  */
 
+import Fuse from "fuse.js";
+
 export interface EmojiGroup {
     readonly name: string;
     /** Drawn on the tab strip. One of its own members, so the tabs need no
@@ -499,16 +501,27 @@ export const EMOJI_GROUPS: readonly EmojiGroup[] = [
     }
 ];
 
-/** Every emoji that matches a typed term, flattened. Empty query gives nothing:
- *  the tabs are for browsing, and a search with no term is a browse. */
+/** Everything, flattened once, so the index is built over a stable array. */
+const ALL: readonly { char: string; words: string }[] = EMOJI_GROUPS.flatMap(
+    (group) => group.emoji
+);
+
+/**
+ * The index behind the search box.
+ *
+ * Ranked rather than filtered, and built once at module scope because the list
+ * never changes. A substring match would miss "thumbsup" for "thumbs up",
+ * "smilie" for "smile" and every transposition somebody types at speed - and it
+ * cannot rank, so the emoji you meant sits wherever the list happened to put it.
+ */
+const INDEX = new Fuse(ALL, { keys: ["words"], threshold: 0.3, ignoreLocation: true });
+
+/** Every emoji that matches a typed term. Empty query gives nothing: the tabs
+ *  are for browsing, and a search with no term is a browse. */
 export function searchEmoji(query: string): { char: string; words: string }[] {
-    const term = query.trim().toLowerCase();
+    const term = query.trim();
     if (!term) return [];
-    const hits: { char: string; words: string }[] = [];
-    for (const group of EMOJI_GROUPS) {
-        for (const entry of group.emoji) {
-            if (entry.words.includes(term) || entry.char === term) hits.push(entry);
-        }
-    }
-    return hits;
+    // An exact emoji pasted in is itself, which no fuzzy match over words finds.
+    const pasted = ALL.filter((entry) => entry.char === term);
+    return [...pasted, ...INDEX.search(term).map((hit) => hit.item)];
 }

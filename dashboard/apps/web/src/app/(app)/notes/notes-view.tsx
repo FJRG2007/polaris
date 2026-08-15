@@ -13,6 +13,7 @@
  * to remember something the machine already knows.
  */
 
+import Fuse from "fuse.js";
 import * as actions from "./actions";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
@@ -146,7 +147,20 @@ export function NotesView({
         if (!result?.error) router.refresh();
     };
 
-    const term = query.trim().toLowerCase();
+    const term = query.trim();
+
+    const index = useMemo(
+        () =>
+            new Fuse(notes, {
+                keys: [
+                    { name: "title", weight: 3 },
+                    { name: "excerpt", weight: 1 }
+                ],
+                threshold: 0.3,
+                ignoreLocation: true
+            }),
+        [notes]
+    );
 
     /**
      * What the sidebar draws.
@@ -157,13 +171,12 @@ export function NotesView({
      */
     const shown = useMemo(() => {
         if (term) {
-            return notes
-                .filter(
-                    (entry) =>
-                        entry.title.toLowerCase().includes(term) ||
-                        entry.excerpt.toLowerCase().includes(term)
-                )
-                .map((entry) => ({ ...entry, depth: 0, hasChildren: false }));
+            // Ranked rather than filtered: somebody looking for a note is typing
+            // a title from memory, and a substring match misses a transposition
+            // or two words the other way round. The best match goes first.
+            return index
+                .search(term)
+                .map((hit) => ({ ...hit.item, depth: 0, hasChildren: false }));
         }
         const hidden = new Set<string>();
         return notes.filter((entry) => {
@@ -174,7 +187,7 @@ export function NotesView({
             if (collapsed.includes(entry.id)) hidden.add(entry.id);
             return true;
         });
-    }, [notes, term, collapsed]);
+    }, [notes, term, collapsed, index]);
 
     const ancestors = useMemo(() => trail(notes, note?.id ?? null), [notes, note?.id]);
     const childCount = notes.filter((entry) => entry.parentId === note?.id).length;
