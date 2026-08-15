@@ -161,7 +161,16 @@ export function PeoplePicker({
                             <button
                                 type="button"
                                 disabled={full}
-                                onClick={() => onChange([...picked, person])}
+                                onClick={() => {
+                                    // The box empties with the press: the name
+                                    // is now a chip above it, and leaving the
+                                    // text behind means the next person is
+                                    // searched for by typing over somebody
+                                    // else's name.
+                                    setQuery("");
+                                    setResults([]);
+                                    onChange([...picked, person]);
+                                }}
                                 className={cn(
                                     "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted disabled:opacity-60"
                                 )}

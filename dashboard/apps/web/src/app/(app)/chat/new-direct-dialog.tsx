@@ -8,10 +8,18 @@
  * rather than a second empty one. More than one makes a group, and asking twice
  * there does make two, because three people can genuinely want two different
  * conversations.
+ *
+ * Which of the two is a choice made at the top rather than inferred from how
+ * many names end up in the box, because the two want opposite things from the
+ * same screen. A direct message is one press: picking the person IS the
+ * decision, and a confirm button after it asks somebody to agree with what they
+ * just did. A group is not finished until the last person is in it, so that one
+ * keeps its button.
  */
 
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { cn } from "@polaris/ui";
+import { Loader2, MessageSquare, Users } from "lucide-react";
 import { useChat } from "./chat-context";
 import { useRouter } from "next/navigation";
 import { openDirectAction, searchPeopleAction } from "./actions";
@@ -36,15 +44,17 @@ export function NewDirectDialog({
 }) {
     const router = useRouter();
     const { viewerId, refresh } = useChat();
+    const [kind, setKind] = useState<"direct" | "group">("direct");
     const [picked, setPicked] = useState<readonly PickedPerson[]>([]);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
 
-    const start = async () => {
+    const open_ = async (userIds: readonly string[]) => {
+        if (userIds.length === 0) return;
         setBusy(true);
         setError("");
         const result = await runAction(
-            () => openDirectAction({ userIds: picked.map((person) => person.id) }),
+            () => openDirectAction({ userIds: [...userIds] }),
             setError
         );
         setBusy(false);
@@ -63,10 +73,47 @@ export function NewDirectDialog({
                     <DialogDescription>One person, or several for a group.</DialogDescription>
                 </DialogHeader>
 
+                <div className="flex gap-1 rounded-md bg-muted p-0.5">
+                    {(["direct", "group"] as const).map((option) => (
+                        <button
+                            key={option}
+                            type="button"
+                            aria-pressed={kind === option}
+                            onClick={() => {
+                                setKind(option);
+                                setPicked([]);
+                                setError("");
+                            }}
+                            className={cn(
+                                "flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors",
+                                kind === option
+                                    ? "bg-card text-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            {option === "direct" ? (
+                                <MessageSquare className="size-3.5" />
+                            ) : (
+                                <Users className="size-3.5" />
+                            )}
+                            {option === "direct" ? "Direct message" : "Group"}
+                        </button>
+                    ))}
+                </div>
+
                 <PeoplePicker
                     search={searchPeopleAction}
-                    picked={picked}
-                    onChange={setPicked}
+                    picked={kind === "group" ? picked : []}
+                    onChange={(next) => {
+                        if (kind === "group") {
+                            setPicked(next);
+                            return;
+                        }
+                        // One press. Whoever was just chosen is the whole
+                        // decision, so the conversation opens on the spot.
+                        const person = next.at(-1);
+                        if (person) void open_([person.id]);
+                    }}
                     // Messaging yourself is not what anybody means by this, and
                     // the room it would open has nobody else in it.
                     exclude={[viewerId]}
@@ -83,14 +130,16 @@ export function NewDirectDialog({
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
                         Cancel
                     </Button>
-                    <Button
-                        size="sm"
-                        disabled={busy || picked.length === 0}
-                        onClick={() => void start()}
-                    >
-                        {busy && <Loader2 className="size-4 animate-spin" />}
-                        {picked.length > 1 ? "Start group" : "Start conversation"}
-                    </Button>
+                    {kind === "group" && (
+                        <Button
+                            size="sm"
+                            disabled={busy || picked.length === 0}
+                            onClick={() => void open_(picked.map((person) => person.id))}
+                        >
+                            {busy && <Loader2 className="size-4 animate-spin" />}
+                            Start group
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

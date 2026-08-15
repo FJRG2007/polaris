@@ -33,6 +33,7 @@ interface Note {
 }
 
 export type CallSound =
+    | "message"
     | "join"
     | "leave"
     | "shareOn"
@@ -42,6 +43,17 @@ export type CallSound =
     | "ringBack";
 
 const SOUNDS: Record<CallSound, readonly Note[]> = {
+    /**
+     * Somebody said something in a conversation that is not the one on screen.
+     *
+     * Quieter and shorter than anything else here, because it is the one that
+     * happens all day: two notes a fifth apart, gone in a tenth of a second.
+     * Loud enough to look up at, quiet enough to sit next to somebody using it.
+     */
+    message: [
+        { from: 659.25, at: 0, seconds: 0.05, gain: 0.05 },
+        { from: 987.77, at: 0.045, seconds: 0.07, gain: 0.05 }
+    ],
     /** Somebody joined the call you are in. */
     join: [
         { from: 523.25, at: 0, seconds: 0.09 },

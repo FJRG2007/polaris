@@ -28,6 +28,7 @@ import { useToast, type Toast } from "@polaris/ui";
 import { useCallback, useEffect, useRef } from "react";
 import { messageToastsAction } from "@/app/(app)/chat/actions";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
+import { playCallSound } from "@/lib/call-sounds";
 import { notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
 
 /** How long the words wait for more of them before being fetched. A burst of
@@ -58,6 +59,7 @@ export function MessageToasts() {
         if (asked.length === 0) return;
 
         const { toasts } = await messageToastsAction(asked).catch(() => ({ toasts: [] }));
+        let sounded = false;
         for (const message of toasts) {
             // The conversation somebody is standing in needs no announcement:
             // the message is already on their screen.
@@ -79,6 +81,16 @@ export function MessageToasts() {
                 onPress: () => go.current(`/chat/c/${message.channelId}/${message.messageId}`)
             };
             raise.current(note);
+
+            // Heard, not only seen. A silent card in the corner of a screen
+            // somebody is typing on is a message they find later; every
+            // messenger makes a noise for the same reason. Once for the batch,
+            // and only from the tab holding the connection - five tabs are one
+            // notification.
+            if (owner.current && !sounded) {
+                sounded = true;
+                playCallSound("message");
+            }
 
             // Past the window as well, when nobody is looking at it - and only
             // from the tab holding the connection, so one device draws one.

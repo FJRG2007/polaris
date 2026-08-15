@@ -394,9 +394,28 @@ export async function diagnoseAttachment(attachmentId: string): Promise<string> 
         }
         const held = listed.entries.length;
         const stat = await driver.stat(row.path).catch((error: unknown) => reason(error));
-        return typeof stat === "string"
-            ? `${head}: the folder holds ${held} file(s) and this one is not readable: ${stat}`
-            : `${head}: the file is there (${Number(stat.size)} bytes) and the read still failed.`;
+        if (typeof stat === "string") {
+            return `${head}: the folder holds ${held} file(s) and this one cannot even be stat'd: ${stat}`;
+        }
+
+        // The read itself, since that is the thing that failed. A file that
+        // stats and will not open is a lock or a permission, and the storage's
+        // own words for it are the whole answer.
+        const opened = await driver
+            .readStream(row.path)
+            .then(async (stream) => {
+                const reader = stream.getReader();
+                try {
+                    await reader.read();
+                    return "";
+                } finally {
+                    await reader.cancel().catch(() => undefined);
+                }
+            })
+            .catch((error: unknown) => reason(error) || "no reason given");
+        return opened
+            ? `${head}: the file is there (${Number(stat.size)} bytes) and opening it for reading fails: ${opened}`
+            : `${head}: the file is there (${Number(stat.size)} bytes) and reads fine now - whatever refused it has passed.`;
     } finally {
         await driver.dispose().catch(() => undefined);
     }
