@@ -30,8 +30,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { isBlankMarkdown } from "@/components/rich-text/markdown";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
-import { CornerUpLeft, Mic, Paperclip, SendHorizontal, Trash2, X } from "lucide-react";
-import { canRecord, MAX_VOICE_SECONDS, spokenLength, useVoiceRecording } from "./voice-recorder";
+import { CornerUpLeft, Mic, MicOff, Paperclip, SendHorizontal, Trash2, X } from "lucide-react";
+import {
+    canRecord,
+    MAX_VOICE_SECONDS,
+    spokenLength,
+    useVoiceRecording,
+    type RecordedSound
+} from "./voice-recorder";
 
 /** How often, at most, the server is told somebody is typing. */
 const TYPING_EVERY_MS = 2500;
@@ -69,8 +75,14 @@ export function Composer({
     replyingTo?: ChatMessageView | null;
     onCancelReply?: () => void;
     /** Files come back alongside the text. Empty for the ordinary case, which is
-     *  why the caller can still take the fast optimistic path when it is. */
-    onSend: (body: string, files: readonly File[]) => void | Promise<void>;
+     *  why the caller can still take the fast optimistic path when it is.
+     *  `sounds` carries what the browser measured for each of them, which is
+     *  only ever a recording. */
+    onSend: (
+        body: string,
+        files: readonly File[],
+        sounds?: readonly RecordedSound[]
+    ) => void | Promise<void>;
     /** A GIF or sticker chosen from the picker. Its own path rather than a
      *  staged file: it is already somewhere, and it is the whole message. */
     onMedia?: (address: string) => void | Promise<void>;
@@ -150,14 +162,14 @@ export function Composer({
      * a second press is the shape everybody gets wrong. Cancelling is the other
      * button, and it is next to it while the recording runs.
      */
-    const voice = useVoiceRecording((file) => {
+    const voice = useVoiceRecording((file, sound) => {
         if (disabled) return;
         if (file.size > maxBytes) {
             setRefused(`A recording here can be up to ${rules.maxAttachmentMib} MB.`);
             return;
         }
         setRefused("");
-        void onSend("", [file]);
+        void onSend("", [file], [sound]);
     });
 
     const submit = async (value: string) => {
@@ -307,21 +319,52 @@ export function Composer({
             )}
 
             {voice.recording && (
-                <div className="mb-2 flex items-center gap-2 rounded-md border border-border bg-field px-3 py-2">
-                    <span aria-hidden="true" className="size-2 animate-pulse rounded-full bg-danger" />
-                    <span className="text-sm font-medium tabular-nums">
-                        {spokenLength(voice.seconds)}
-                    </span>
-                    <span className="truncate text-xs text-muted-foreground">
-                        Recording - {spokenLength(MAX_VOICE_SECONDS - voice.seconds)} left
-                    </span>
-                    <span className="ml-auto flex items-center gap-1">
+                <div className="mb-2 flex flex-col gap-1.5 rounded-md border border-border bg-field px-3 py-2">
+                    {/* Said while there is still time to do something about it.
+                        A recording that turns out to be silence is only ever
+                        discovered by the person it was sent to. */}
+                    {voice.silent && (
+                        <p role="status" className="flex items-center gap-1.5 text-xs text-danger">
+                            <MicOff className="size-3.5 shrink-0" />
+                            Polaris is not hearing anything. Check your microphone, or that it is
+                            the one your browser is using.
+                        </p>
+                    )}
+                    <div className="flex items-center gap-2">
+                        <span
+                            aria-hidden="true"
+                            className="size-2 shrink-0 animate-pulse rounded-full bg-danger"
+                        />
+                        <span className="shrink-0 text-sm font-medium tabular-nums">
+                            {spokenLength(voice.seconds)}
+                        </span>
+                        {/* What the microphone is hearing, now. The one thing
+                            that tells somebody it is working without them
+                            playing anything back. */}
+                        <span
+                            aria-hidden="true"
+                            className="flex h-6 min-w-0 flex-1 items-center gap-px overflow-hidden"
+                        >
+                            {voice.levels.map((level, at) => (
+                                <span
+                                    key={at}
+                                    style={{ height: `${Math.max(8, Math.min(100, level * 260))}%` }}
+                                    className={cn(
+                                        "w-1 shrink-0 rounded-full",
+                                        voice.silent ? "bg-border" : "bg-primary"
+                                    )}
+                                />
+                            ))}
+                        </span>
+                        <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
+                            {spokenLength(MAX_VOICE_SECONDS - voice.seconds)} left
+                        </span>
                         <button
                             type="button"
                             onClick={voice.cancel}
                             aria-label="Throw this recording away"
                             title="Throw it away"
-                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                            className="shrink-0 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                         >
                             <Trash2 className="size-4" />
                         </button>
@@ -330,11 +373,11 @@ export function Composer({
                             onClick={voice.stop}
                             aria-label="Send this recording"
                             title="Send it"
-                            className="rounded p-1.5 text-primary transition-colors hover:bg-muted"
+                            className="shrink-0 rounded p-1.5 text-primary transition-colors hover:bg-muted"
                         >
                             <SendHorizontal className="size-4" />
                         </button>
-                    </span>
+                    </div>
                 </div>
             )}
 

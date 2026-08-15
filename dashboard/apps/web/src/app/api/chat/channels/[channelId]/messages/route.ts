@@ -35,6 +35,31 @@ const fieldsSchema = z.object({
     replyToId: z.string().uuid().nullable()
 });
 
+/** How long each file plays for and what it looks like, by position. */
+const soundsSchema = z
+    .array(
+        z
+            .object({
+                durationMs: z.number().int().positive().max(60 * 60 * 1000).nullable(),
+                waveform: z.string().regex(/^[0-9]{1,64}$/).nullable()
+            })
+            .partial()
+    )
+    .max(core.CHAT_ATTACHMENT_COUNT_CEILING)
+    .default([]);
+
+/** The field as it arrives, or nothing at all - a message with no recording in
+ *  it does not send one, and a malformed one is treated as none rather than as a
+ *  reason to refuse the message. */
+function readSounds(field: FormDataEntryValue | null): unknown {
+    if (typeof field !== "string" || !field) return [];
+    try {
+        return JSON.parse(field);
+    } catch {
+        return [];
+    }
+}
+
 export async function POST(
     request: Request,
     { params }: { params: Promise<{ channelId: string }> }
@@ -57,6 +82,12 @@ export async function POST(
     } catch {
         return Response.json({ error: "That could not be read" }, { status: 400 });
     }
+
+    // What the browser measured while recording, one entry per file in the same
+    // order. Optional, absent for every ordinary attachment, and checked again
+    // where it is stored - this is a number and a string from a client, and the
+    // fact that they are only ever drawn is what makes checking them matter.
+    const sounds = soundsSchema.safeParse(readSounds(form.get("sounds")));
 
     const fields = fieldsSchema.safeParse({
         body: String(form.get("body") ?? ""),
@@ -94,13 +125,17 @@ export async function POST(
 
     const stored: StoredAttachment[] = [];
     try {
-        for (const file of files) {
+        for (const [at, file] of files.entries()) {
             stored.push(
-                await storeAttachment(channelId, {
-                    name: file.name,
-                    type: file.type,
-                    bytes: new Uint8Array(await file.arrayBuffer())
-                })
+                await storeAttachment(
+                    channelId,
+                    {
+                        name: file.name,
+                        type: file.type,
+                        bytes: new Uint8Array(await file.arrayBuffer())
+                    },
+                    sounds.success ? sounds.data[at] : undefined
+                )
             );
         }
 

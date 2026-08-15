@@ -9,7 +9,14 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { isPlayable, isVoiceMessage, spokenLength, voiceFileName } from "@/app/(app)/chat/voice-recorder";
+import {
+    barsFrom,
+    barsOf,
+    isPlayable,
+    isVoiceMessage,
+    spokenLength,
+    voiceFileName
+} from "@/app/(app)/chat/voice-recorder";
 
 describe("what gets a player", () => {
     it("plays anything that is audio", () => {
@@ -47,6 +54,37 @@ describe("the file it is sent as", () => {
         ["audio/ogg;codecs=opus", "voice-message.ogg"]
     ])("%s is sent as %s", (type, name) => {
         expect(voiceFileName(type)).toBe(name);
+    });
+});
+
+describe("the shape of it", () => {
+    it("scales against its own loudest moment", () => {
+        // Somebody who recorded quietly gets a shape, not a hyphen: the tallest
+        // bar is always full height and the rest are relative to it.
+        expect(barsFrom([0.01, 0.02, 0.04], 3)).toBe("259");
+    });
+
+    it("takes the loudest moment in a slice, not the average", () => {
+        // A waveform is read as "where did they speak", and averaging speech
+        // with the gaps around it draws a flat line.
+        expect(barsFrom([0, 1, 0, 0, 0, 0], 2)).toBe("90");
+    });
+
+    it("draws silence as silence", () => {
+        expect(barsFrom([0, 0, 0, 0], 4)).toBe("0000");
+        expect(barsFrom([], 4)).toBe("0000");
+    });
+
+    it("stays inside what the server will store", () => {
+        const shape = barsFrom(Array.from({ length: 4000 }, () => 0.5), 500);
+        expect(shape.length).toBeLessThanOrEqual(64);
+        expect(shape).toMatch(/^[0-9]+$/);
+    });
+
+    it("reads back the digits it wrote", () => {
+        expect(barsOf("0459")).toEqual([0, 4, 5, 9]);
+        expect(barsOf(null)).toEqual([]);
+        expect(barsOf("")).toEqual([]);
     });
 });
 

@@ -5850,6 +5850,17 @@ model ChatAttachment {
     connectionId String?  @db.Uuid
     // Where it landed, as that storage addresses it.
     path         String
+    // How long it plays for, when it is something that plays and the browser
+    // that recorded it said so. Kept rather than worked out on the way in: a
+    // recording made in a browser carries no duration in its container, so the
+    // only place the answer exists for free is the machine that made it - and
+    // asking for it later means every reader downloading the whole file to draw
+    // a number.
+    durationMs   Int?
+    // The shape of the sound, one digit 0-9 per bar. A string because it is
+    // written once, read whole and never queried, and because sixty-four
+    // characters is smaller than any structure that would hold the same numbers.
+    waveform     String?
     createdAt    DateTime @default(now())
 
     message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)

@@ -35,6 +35,7 @@ import { runAction } from "@/lib/run-action";
 import { ForwardDialog } from "./forward-dialog";
 import { ChannelHeader } from "./channel-header";
 import { useChatStream } from "./use-chat-stream";
+import type { RecordedSound } from "./voice-recorder";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { MessageCircle, Mic, Video, Volume2 } from "lucide-react";
@@ -325,13 +326,21 @@ export function ChannelView({
      * route and waits, and the composer having shown the staged files all along
      * is what stops that wait from looking like nothing happened.
      */
-    const send = async (body: string, files: readonly File[] = []) => {
+    const send = async (
+        body: string,
+        files: readonly File[] = [],
+        sounds: readonly RecordedSound[] = []
+    ) => {
         if (files.length > 0) {
             following.current = true;
             const form = new FormData();
             form.set("body", body);
             if (replyingTo) form.set("replyToId", replyingTo.id);
             for (const file of files) form.append("files", file);
+            // How long each recording is and what it looks like, measured while
+            // it was made. Sent as one field in file order rather than one per
+            // file, so a message with no recording in it sends nothing.
+            if (sounds.length > 0) form.set("sounds", JSON.stringify(sounds));
             setReplyingTo(null);
             const response = await fetch(`/api/chat/channels/${channelId}/messages`, {
                 method: "POST",

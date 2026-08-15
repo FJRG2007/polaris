@@ -84,6 +84,11 @@ export interface ChatAttachmentView {
     readonly contentType: string;
     /** Whether the list may draw it rather than link to it. */
     readonly inline: boolean;
+    /** How long it plays for, for the player to say so before a byte of it has
+     *  been fetched. Null for anything nobody measured. */
+    readonly durationMs: number | null;
+    /** Its shape, one digit a bar, drawn under the play button. */
+    readonly waveform: string | null;
 }
 
 /** The message a reply or a forward stands on, as the quote line draws it. */
@@ -840,7 +845,15 @@ export async function decorateMessages(actor: ChatActor, rows: readonly Row[]): 
         prisma.chatAttachment.findMany({
             where: { messageId: { in: rows.map((row) => row.id) } },
             orderBy: { createdAt: "asc" },
-            select: { id: true, messageId: true, name: true, size: true, contentType: true }
+            select: {
+                id: true,
+                name: true,
+                size: true,
+                waveform: true,
+                messageId: true,
+                durationMs: true,
+                contentType: true
+            }
         }),
         prisma.chatStar.findMany({
             where: { userId: actor.id, messageId: { in: rows.map((row) => row.id) } },
@@ -878,6 +891,8 @@ export async function decorateMessages(actor: ChatActor, rows: readonly Row[]): 
             id: file.id,
             name: file.name,
             size: Number(file.size),
+            waveform: file.waveform,
+            durationMs: file.durationMs,
             contentType: file.contentType,
             inline: isInlineImage(file.contentType)
         });

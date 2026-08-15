@@ -73,11 +73,79 @@ export function spokenLength(seconds: number): string {
     return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
 }
 
+/** How many bars a recording is drawn as. Enough to read as speech and few
+ *  enough to fit beside a play button on a phone. */
+export const WAVEFORM_BARS = 48;
+
+/** The most bars that may be stored, which is what the server allows. */
+const MAX_BARS = 64;
+
+/** How often the microphone is measured. Also the resolution of the shape: ten
+ *  samples a second is more than a bar an eighth of a second wide needs. */
+const METER_EVERY_MS = 100;
+
+/** Under this, nothing is being heard. A live microphone in a quiet room still
+ *  reads a thousandth or two; a muted one reads exactly nothing. */
+const SILENCE = 0.008;
+
+/** How long silence has to last before it is worth saying so. Long enough that
+ *  a pause between sentences is not an alarm. */
+const SILENT_AFTER_MS = 2500;
+
+/**
+ * The shape of a recording, one digit a bar.
+ *
+ * Levels are the loudest moment in each slice rather than the average, because a
+ * waveform is read as "where did they speak", and an average of speech and the
+ * gaps around it is a flat line. Then the whole thing is scaled against its own
+ * loudest bar - somebody who recorded quietly gets a shape rather than a hyphen.
+ */
+export function barsFrom(levels: readonly number[], bars: number = WAVEFORM_BARS): string {
+    const wanted = Math.max(1, Math.min(Math.round(bars), MAX_BARS));
+    if (levels.length === 0) return "0".repeat(wanted);
+
+    const loudest: number[] = [];
+    for (let bar = 0; bar < wanted; bar += 1) {
+        const from = Math.floor((bar * levels.length) / wanted);
+        const to = Math.max(from + 1, Math.floor(((bar + 1) * levels.length) / wanted));
+        let peak = 0;
+        for (let at = from; at < to && at < levels.length; at += 1) {
+            peak = Math.max(peak, levels[at] ?? 0);
+        }
+        loudest.push(peak);
+    }
+
+    const top = Math.max(...loudest);
+    if (top <= 0) return "0".repeat(wanted);
+    return loudest
+        .map((level) => String(Math.min(9, Math.max(0, Math.round((level / top) * 9)))))
+        .join("");
+}
+
+/** A stored waveform read back as numbers, for drawing. */
+export function barsOf(waveform: string | null | undefined): number[] {
+    if (!waveform) return [];
+    return [...waveform].map((digit) => Number(digit) || 0);
+}
+
+/** What the browser measured while recording, sent alongside the file. */
+export interface RecordedSound {
+    readonly durationMs: number;
+    readonly waveform: string;
+}
+
 export interface VoiceRecording {
     /** True from the moment the microphone opens. */
     readonly recording: boolean;
     /** How long it has been running, in whole seconds. */
     readonly seconds: number;
+    /** The last couple of seconds of level, newest last, for the meter that
+     *  moves while somebody talks. */
+    readonly levels: readonly number[];
+    /** True when nothing has been heard for a while - a muted microphone, the
+     *  wrong device, a headset that is not the one selected. Said out loud
+     *  rather than left to be discovered when the message is played back. */
+    readonly silent: boolean;
     /** What went wrong, in the words somebody can act on. */
     readonly error: string | null;
     readonly start: () => void;
@@ -95,15 +163,22 @@ export interface VoiceRecording {
  * than at each of the three exits. Leaving the room - a navigation, a closed
  * conversation - is one of those exits, which is what the effect is for.
  */
-export function useVoiceRecording(onRecorded: (file: File) => void): VoiceRecording {
+export function useVoiceRecording(
+    onRecorded: (file: File, sound: RecordedSound) => void
+): VoiceRecording {
     const [recording, setRecording] = useState(false);
     const [seconds, setSeconds] = useState(0);
+    const [levels, setLevels] = useState<readonly number[]>([]);
+    const [silent, setSilent] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const recorder = useRef<MediaRecorder | null>(null);
     const chunks = useRef<Blob[]>([]);
     const keep = useRef(true);
     const ticker = useRef<ReturnType<typeof setInterval> | null>(null);
+    const began = useRef(0);
+    const measured = useRef<number[]>([]);
+    const listener = useRef<AudioContext | null>(null);
     const done = useRef(onRecorded);
     done.current = onRecorded;
 
@@ -112,8 +187,14 @@ export function useVoiceRecording(onRecorded: (file: File) => void): VoiceRecord
         ticker.current = null;
         for (const track of recorder.current?.stream.getTracks() ?? []) track.stop();
         recorder.current = null;
+        // The graph goes with the microphone. A context left open holds the
+        // audio hardware awake for a conversation nobody is recording in.
+        void listener.current?.close().catch(() => undefined);
+        listener.current = null;
         setRecording(false);
         setSeconds(0);
+        setLevels([]);
+        setSilent(false);
     }, []);
 
     const start = useCallback(() => {
@@ -139,24 +220,64 @@ export function useVoiceRecording(onRecorded: (file: File) => void): VoiceRecord
                     const parts = chunks.current;
                     chunks.current = [];
                     const wanted = keep.current;
+                    // Measured here rather than read off the file. A stream
+                    // recorded in a browser carries no duration in its
+                    // container - which is why a seven-second message played
+                    // back as 0:00 - and the clock that ran while it recorded is
+                    // the one place the answer exists without downloading the
+                    // whole thing to find out.
+                    const sound = {
+                        durationMs: Math.max(0, Date.now() - began.current),
+                        waveform: barsFrom(measured.current)
+                    };
                     release();
                     if (!wanted || parts.length === 0) return;
                     const blob = new Blob(parts, { type });
-                    done.current(new File([blob], voiceFileName(type), { type }));
+                    done.current(new File([blob], voiceFileName(type), { type }), sound);
                 };
+
+                // The same microphone, listened to as well as recorded. Nothing
+                // is connected to the speakers: this graph ends at the analyser,
+                // or somebody would hear themselves half a second late.
+                const listening = new AudioContext();
+                listener.current = listening;
+                void listening.resume().catch(() => undefined);
+                const analyser = listening.createAnalyser();
+                analyser.fftSize = 1024;
+                analyser.smoothingTimeConstant = 0.2;
+                listening.createMediaStreamSource(stream).connect(analyser);
+                const frame = new Uint8Array(analyser.fftSize);
 
                 media.start();
                 setRecording(true);
                 setSeconds(0);
-                const began = Date.now();
+                setLevels([]);
+                setSilent(false);
+                measured.current = [];
+                began.current = Date.now();
+                let lastHeard = Date.now();
+
                 ticker.current = setInterval(() => {
-                    const elapsed = Math.floor((Date.now() - began) / 1000);
-                    setSeconds(elapsed);
+                    analyser.getByteTimeDomainData(frame);
+                    let square = 0;
+                    for (const sample of frame) {
+                        const value = (sample - 128) / 128;
+                        square += value * value;
+                    }
+                    const level = Math.sqrt(square / frame.length);
+                    measured.current.push(level);
+                    setLevels((current) => [...current, level].slice(-WAVEFORM_BARS));
+
+                    const now = Date.now();
+                    if (level > SILENCE) lastHeard = now;
+                    setSilent(now - lastHeard > SILENT_AFTER_MS);
+                    setSeconds(Math.floor((now - began.current) / 1000));
+
                     // The ceiling ends the recording rather than dropping it:
                     // somebody who has talked for five minutes should get the
                     // five minutes, not an apology.
-                    if (elapsed >= MAX_VOICE_SECONDS) media.stop();
-                }, 250);
+                    if (now - began.current >= MAX_VOICE_SECONDS * 1000) media.stop();
+                }, METER_EVERY_MS);
             })
             .catch(() => {
                 setError("Polaris could not reach your microphone.");
@@ -183,5 +304,5 @@ export function useVoiceRecording(onRecorded: (file: File) => void): VoiceRecord
         };
     }, [release]);
 
-    return { recording, seconds, error, start, stop, cancel };
+    return { recording, seconds, levels, silent, error, start, stop, cancel };
 }

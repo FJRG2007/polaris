@@ -356,6 +356,8 @@ function Message({
                                         href={`/api/chat/attachments/${file.id}`}
                                         name={file.name}
                                         recorded={isVoiceMessage(file.name, file.contentType)}
+                                        waveform={file.waveform}
+                                        durationMs={file.durationMs}
                                     />
                                 ) : (
                                     <a

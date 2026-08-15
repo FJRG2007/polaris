@@ -105,6 +105,49 @@ export interface StoredAttachment {
     readonly contentType: string;
     readonly connectionId: string | null;
     readonly path: string;
+    /** How long it plays for, when the browser that made it knew. */
+    readonly durationMs: number | null;
+    /** Its shape, one digit a bar. */
+    readonly waveform: string | null;
+}
+
+/**
+ * What the browser that recorded something says about the sound of it.
+ *
+ * Taken from the client and therefore checked here rather than trusted: a
+ * duration is clamped to something a recording can be, and a waveform is digits
+ * or it is nothing. Neither is ever used for a decision - they are drawn - but
+ * "only drawn" is exactly how a string from outside ends up in a page.
+ */
+export interface SoundDetail {
+    readonly durationMs?: unknown;
+    readonly waveform?: unknown;
+}
+
+/** The longest a duration may claim to be: the recording ceiling with room to
+ *  spare, so a wrong number cannot draw a bar an hour long. */
+const MAX_DURATION_MS = 60 * 60 * 1000;
+
+/** How many bars a waveform may carry. The recorder draws forty-eight; the
+ *  ceiling is what is accepted, not what is asked for. */
+const MAX_WAVEFORM_BARS = 64;
+
+function soundOf(detail: SoundDetail | undefined): {
+    durationMs: number | null;
+    waveform: string | null;
+} {
+    const claimed = Number(detail?.durationMs);
+    const durationMs =
+        Number.isFinite(claimed) && claimed > 0
+            ? Math.min(Math.round(claimed), MAX_DURATION_MS)
+            : null;
+
+    const shape = typeof detail?.waveform === "string" ? detail.waveform : "";
+    const waveform =
+        shape.length > 0 && shape.length <= MAX_WAVEFORM_BARS && /^[0-9]+$/.test(shape)
+            ? shape
+            : null;
+    return { durationMs, waveform };
 }
 
 /**
@@ -117,7 +160,9 @@ export interface StoredAttachment {
  */
 export async function storeAttachment(
     channelId: string,
-    file: { name: string; type: string; bytes: Uint8Array }
+    file: { name: string; type: string; bytes: Uint8Array },
+    /** What the browser said about the sound of it, for a recording. */
+    sound?: SoundDetail
 ): Promise<StoredAttachment> {
     if (file.bytes.length > MAX_ATTACHMENT_BYTES) throw new Error("That file is too big");
 
@@ -141,7 +186,8 @@ export async function storeAttachment(
         size: file.bytes.length,
         contentType: file.type || "application/octet-stream",
         connectionId: target.id === LOCAL_TARGET ? null : target.id,
-        path
+        path,
+        ...soundOf(sound)
     };
 }
 
