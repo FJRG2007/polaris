@@ -23,7 +23,8 @@
 
 import { Button, cn } from "@polaris/ui";
 import { typingAction } from "./actions";
-import { Paperclip, X } from "lucide-react";
+import { EmojiPicker } from "./emoji-picker";
+import { Paperclip, SendHorizontal, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
@@ -41,6 +42,7 @@ export function Composer({
     placeholder,
     editing,
     onSend,
+    onMedia,
     onSaveEdit,
     onCancelEdit
 }: {
@@ -52,6 +54,9 @@ export function Composer({
     /** Files come back alongside the text. Empty for the ordinary case, which is
      *  why the caller can still take the fast optimistic path when it is. */
     onSend: (body: string, files: readonly File[]) => void | Promise<void>;
+    /** A GIF or sticker chosen from the picker. Its own path rather than a
+     *  staged file: it is already somewhere, and it is the whole message. */
+    onMedia?: (address: string) => void | Promise<void>;
     onSaveEdit?: (messageId: string, body: string) => void | Promise<void>;
     onCancelEdit?: () => void;
 }) {
@@ -155,18 +160,70 @@ export function Composer({
                 </ul>
             )}
 
-            <RichTextEditor
-                key={generation}
-                value={body}
-                bordered
-                disabled={disabled}
-                placeholder={placeholder}
-                onChange={(next) => {
-                    setBody(next);
-                    if (!disabled) announce();
-                }}
-                onSubmit={(next) => void submit(next)}
-            />
+            {/* One box: the text and the controls that act on it are the same
+                field, the way every chat client draws it. Buttons in a row
+                underneath read as a form somebody has to fill in and submit. */}
+            <div className="rounded-md border border-border bg-field transition-colors focus-within:border-border-strong">
+                <div className="px-3 pt-2">
+                    <RichTextEditor
+                        key={generation}
+                        value={body}
+                        disabled={disabled}
+                        placeholder={placeholder}
+                        onChange={(next) => {
+                            setBody(next);
+                            if (!disabled) announce();
+                        }}
+                        onSubmit={(next) => void submit(next)}
+                    />
+                </div>
+
+                <div className="flex items-center gap-0.5 px-2 pb-1.5">
+                    {!editing && (
+                        <>
+                            <button
+                                type="button"
+                                disabled={disabled || files.length >= MAX_FILES}
+                                onClick={() => picker.current?.click()}
+                                aria-label="Attach a file"
+                                title="Attach a file"
+                                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                            >
+                                <Paperclip className="size-4" />
+                            </button>
+                            <EmojiPicker
+                                disabled={disabled}
+                                onEmoji={(char) => setBody((current) => `${current}${char}`)}
+                                onMedia={(address) => void onMedia?.(address)}
+                            />
+                        </>
+                    )}
+
+                    <span className="ml-auto flex items-center gap-2">
+                        {editing ? (
+                            <>
+                                <Button size="xs" variant="ghost" onClick={onCancelEdit}>
+                                    Cancel
+                                </Button>
+                                <Button size="xs" onClick={() => void submit(body)}>
+                                    Save
+                                </Button>
+                            </>
+                        ) : (
+                            <button
+                                type="button"
+                                disabled={disabled || (!body.trim() && files.length === 0)}
+                                onClick={() => void submit(body)}
+                                aria-label="Send"
+                                title="Send"
+                                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+                            >
+                                <SendHorizontal className="size-4" />
+                            </button>
+                        )}
+                    </span>
+                </div>
+            </div>
 
             <input
                 ref={picker}
@@ -180,37 +237,6 @@ export function Composer({
                     event.target.value = "";
                 }}
             />
-
-            {!editing && (
-                <div className="mt-2 flex items-center gap-2">
-                    <button
-                        type="button"
-                        disabled={disabled || files.length >= MAX_FILES}
-                        onClick={() => picker.current?.click()}
-                        aria-label="Attach a file"
-                        title="Attach a file"
-                        className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-                    >
-                        <Paperclip className="size-4" />
-                    </button>
-                    {files.length > 0 && (
-                        <Button size="xs" onClick={() => void submit(body)}>
-                            Send
-                        </Button>
-                    )}
-                </div>
-            )}
-
-            {editing && (
-                <div className="mt-2 flex gap-2">
-                    <Button size="xs" onClick={() => void submit(body)}>
-                        Save
-                    </Button>
-                    <Button size="xs" variant="ghost" onClick={onCancelEdit}>
-                        Cancel
-                    </Button>
-                </div>
-            )}
         </div>
     );
 }

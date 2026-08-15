@@ -130,6 +130,14 @@ export function ThreadPanel({
                 channelId={root.channelId}
                 disabled={!canPost}
                 placeholder="Reply in this thread"
+                onMedia={async (address) => {
+                    await runAction(
+                        () => actions.sendMediaAction(root.channelId, address, root.id),
+                        setError
+                    );
+                    await load();
+                    onChanged();
+                }}
                 onSend={async (body, files) => {
                     if (files.length > 0) {
                         // A reply with files takes the same route a message does,

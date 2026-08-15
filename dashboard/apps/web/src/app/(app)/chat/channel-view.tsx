@@ -405,6 +405,17 @@ export function ChannelView({ channelId }: { channelId: string }) {
                     editing={editing}
                     onCancelEdit={() => setEditing(null)}
                     onSend={send}
+                    onMedia={async (address) => {
+                        following.current = true;
+                        const result = await runAction(
+                            () => actions.sendMediaAction(channelId, address),
+                            setError
+                        );
+                        if (!result?.error) {
+                            await load();
+                            refresh();
+                        }
+                    }}
                     onSaveEdit={async (messageId, body) => {
                         await runAction(() => actions.editAction({ messageId, body }), setError);
                         setEditing(null);

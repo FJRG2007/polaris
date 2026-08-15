@@ -79,8 +79,14 @@ export function AppShell({
  * symptom - a composer just below the fold, a scrollbar on the window as well as
  * on the list - reads as a layout bug in the page rather than as the coupling it
  * is.
+ *
+ * Height and clipping only. It deliberately does not say `flex` or a direction:
+ * a caller that wanted rows would have to override a direction set here, and two
+ * Tailwind classes for the same property do not resolve by the order they are
+ * written in the attribute - they resolve by stylesheet order, so the override
+ * silently loses and a two-column screen comes out stacked.
  */
-export const PAGE_FILL = "flex h-[calc(100vh-var(--header-height)-var(--page-inset))] flex-col overflow-hidden";
+export const PAGE_FILL = "h-[calc(100vh-var(--header-height)-var(--page-inset))] overflow-hidden";
 
 /** The Polaris wordmark: the star glyph plus the name. `nameClassName` lets a
  *  cramped bar drop the name and keep the glyph.

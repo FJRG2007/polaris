@@ -65,7 +65,7 @@ function ChatColumns({ children }: { children: ReactNode }) {
     );
 
     return (
-        <div className={`${PAGE_FILL} w-full flex-row`}>
+        <div className={`${PAGE_FILL} flex w-full flex-row`}>
             <div
                 className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 w-full shrink-0 flex-col border-r border-border md:w-64`}
             >

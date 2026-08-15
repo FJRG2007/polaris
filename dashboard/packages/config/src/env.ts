@@ -81,6 +81,16 @@ const envSchema = z.object({
      */
     POLARIS_STUN_URLS: z.string().default(""),
 
+    /**
+     * A Tenor API key, for the GIF and sticker tabs of the chat picker.
+     *
+     * Unset means those two tabs say so and offer nothing; emoji still work,
+     * because those are a local list. It is deliberately not shipped with a key
+     * of Polaris's own: a shared key is a shared quota, and the first busy
+     * instance would spend everybody else's.
+     */
+    POLARIS_TENOR_KEY: z.string().optional(),
+
     /** A TURN server to relay a call through when the browsers cannot reach each
      *  other directly. Unset means calls work on the local network and between
      *  anybody with a reachable address, and not otherwise. */

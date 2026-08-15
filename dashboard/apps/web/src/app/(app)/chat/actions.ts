@@ -20,7 +20,9 @@ import * as chat from "@/lib/chat/chat-service";
 import * as messages from "@/lib/chat/messages";
 import { requirePermission } from "@/lib/session";
 import { searchAccounts } from "@/lib/rich-text/mention-service";
-import { ChatAccessError, messageable } from "@/lib/chat/access";
+import { storeAttachment } from "@/lib/chat/attachments";
+import { ChatAccessError, messageable, requirePostable } from "@/lib/chat/access";
+import { fetchRemoteMedia, searchTenor, tenorConfigured, type TenorResult } from "@/lib/chat/tenor";
 import type { ChatMessageView, ChatPage } from "@/lib/chat/messages";
 import type { ChatChannelView, ChatMemberView, ChatSpaceView } from "@/lib/chat/chat-service";
 
@@ -155,6 +157,52 @@ export async function reactAction(input: unknown): Promise<{ on?: boolean; error
 
     const result = await guard(() => messages.react(me, parsed.data));
     return result.error ? { error: result.error } : { on: result.value };
+}
+
+/** Whether the GIF and sticker tabs have anything behind them. */
+export async function tenorReadyAction(): Promise<boolean> {
+    await actor();
+    return tenorConfigured();
+}
+
+/** What the GIF or sticker tab shows. */
+export async function searchTenorAction(
+    query: string,
+    kind: "gif" | "sticker"
+): Promise<{ results: TenorResult[] }> {
+    await actor();
+    return { results: await searchTenor(String(query ?? ""), kind === "sticker" ? "sticker" : "gif") };
+}
+
+/**
+ * Send one of them.
+ *
+ * The file is pulled down here and stored like any other attachment rather than
+ * linked. A message whose GIF is an address at Tenor tells Tenor who read it and
+ * when, every time somebody scrolls past - and it stops being a message at all
+ * the day they take the file down. The cost is the disk it takes, which is the
+ * same disk the same GIF would have taken if somebody had uploaded it.
+ */
+export async function sendMediaAction(
+    channelId: string,
+    address: string,
+    parentId?: string | null
+): Promise<{ id?: string; error?: string }> {
+    const me = await actor();
+
+    const access = await guard(() => requirePostable(me, channelId));
+    if (access.error) return { error: access.error };
+
+    const media = await fetchRemoteMedia(String(address ?? ""));
+    if (!media) return { error: "That could not be fetched" };
+
+    const stored = await storeAttachment(channelId, media);
+    const sent = await guard(() =>
+        // A body of one space: the schema refuses an empty one, and what this
+        // message says is said by the picture under it.
+        messages.send(me, { channelId, body: " ", parentId: parentId ?? null }, [stored])
+    );
+    return sent.error ? { error: sent.error } : { id: sent.value };
 }
 
 /** Keep a message, or stop keeping it. Returns whether it is kept now, so an
