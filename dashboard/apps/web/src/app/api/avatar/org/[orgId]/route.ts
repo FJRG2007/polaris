@@ -16,6 +16,7 @@
 import { requireUser } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { requireOrgPermission } from "@/lib/orgs/org-service";
+import { BLANK_AVATAR_ETAG, blankAvatarResponse } from "@/lib/avatar-blank";
 import {
     deleteAvatar,
     MAX_AVATAR_BYTES,
@@ -23,7 +24,6 @@ import {
     sniffImageMime,
     storeAvatar
 } from "@/lib/avatar-service";
-import { BLANK_AVATAR_ETAG, blankAvatarResponse } from "@/lib/avatar-blank";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +33,10 @@ const TOO_BIG = `A photo has to be under ${Math.round(MAX_AVATAR_BYTES / (1024 *
 /** Five minutes, revalidated after that - the same deal an account's face gets,
  *  and for the same reason: it is drawn dozens of times on one screen. */
 const CACHE = "private, max-age=300, must-revalidate";
+
+/** And the same rule for a failure: a storage that did not answer is not the
+ *  same statement as "there is no picture", so it is not cached as one. */
+const NO_CACHE = "private, no-store";
 
 export async function GET(request: Request, { params }: { params: Promise<{ orgId: string }> }): Promise<Response> {
     await requireUser();
@@ -60,7 +64,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
     }
 
     const bytes = await picture.load();
-    if (!bytes) return blankAvatarResponse(CACHE);
+    if (!bytes) return blankAvatarResponse(NO_CACHE);
 
     return new Response(bytes as BodyInit, {
         headers: {

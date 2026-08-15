@@ -42,11 +42,15 @@ export function PeoplePicker({
     max?: number;
     label?: string;
     /** Who may be offered. Chat passes its own, which leaves out anybody whose
-     *  chat is switched off - they have no screen a message could arrive on. */
-    search: (query: string) => Promise<{ results?: { id: string; name: string }[] }>;
+     *  chat is switched off - they have no screen a message could arrive on -
+     *  and says how many it left out, so the list can explain itself. */
+    search: (
+        query: string
+    ) => Promise<{ results?: { id: string; name: string }[]; withheld?: number }>;
 }) {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<readonly PickedPerson[]>([]);
+    const [withheld, setWithheld] = useState(0);
     const [searching, setSearching] = useState(false);
     // Answers can come back out of order; only the newest one may win.
     const asked = useRef(0);
@@ -59,6 +63,7 @@ export function PeoplePicker({
             const result = await search(term);
             if (mine !== asked.current) return;
             setResults(result.results ?? []);
+            setWithheld(result.withheld ?? 0);
             setSearching(false);
         }, SEARCH_AFTER);
         return () => clearTimeout(timer);
@@ -109,6 +114,19 @@ export function PeoplePicker({
                     <Loader2 className="absolute right-2 top-1/2 size-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
                 )}
             </div>
+
+            {/* Why the list is short, when it is short for a reason. Somebody
+                who has just typed a colleague's name and been told "nobody"
+                reads it as a broken search; the account is real, it simply
+                cannot receive a message. */}
+            {!searching && withheld > 0 && (
+                <p className="px-2 text-xs text-muted-foreground">
+                    {withheld === 1
+                        ? "One account matches but does not have Chat."
+                        : `${withheld} accounts match but do not have Chat.`}{" "}
+                    An administrator can turn it on for them under People.
+                </p>
+            )}
 
             <ul className="max-h-48 overflow-y-auto">
                 {offered.length === 0 ? (

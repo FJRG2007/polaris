@@ -328,10 +328,12 @@ const gravatarCache = new Map<string, GravatarMemo>();
  * "nobody" instead of handing back a generated pattern, so an account with no
  * picture anywhere can still fall through to its initials.
  */
-async function gravatarImage(email: string): Promise<AvatarImage | null> {
+async function gravatarImage(email: string): Promise<GravatarAnswer> {
     const hash = gravatarHash(email);
     const cached = gravatarCache.get(hash);
-    if (cached && Date.now() < cached.until) return cached.image;
+    if (cached && Date.now() < cached.until) {
+        return { image: cached.image, certain: !cached.failed };
+    }
 
     let image: AvatarImage | null = null;
     let answered = false;
@@ -363,12 +365,26 @@ async function gravatarImage(email: string): Promise<AvatarImage | null> {
         if (!cached?.failed) console.error("avatars: gravatar unreachable:", error);
     }
 
+    // A failed lookup does not take away a face Polaris already had. The old
+    // answer is kept and served while the retry window runs, because "the
+    // network hiccuped" is not news about anybody's account - and without this
+    // one slow moment blanks a face, the browser caches the blank for five
+    // minutes, and the picture appears to come and go.
+    const kept = answered ? image : (cached?.image ?? null);
     gravatarCache.set(hash, {
         until: Date.now() + (answered ? GRAVATAR_TTL_MS : GRAVATAR_RETRY_MS),
-        image,
+        image: kept,
         failed: !answered
     });
-    return image;
+    return { image: kept, certain: answered };
+}
+
+/** A Gravatar answer, and whether it is one. `certain` is false when the lookup
+ *  failed: the caller may still have a picture to serve - the last one - but
+ *  must not let a browser cache "there is none" on the strength of it. */
+interface GravatarAnswer {
+    readonly image: AvatarImage | null;
+    readonly certain: boolean;
 }
 
 /** Forget an address, so a photo taken down here is not shadowed by a stale
@@ -382,21 +398,38 @@ export function forgetGravatar(email: string): void {
 // ---------------------------------------------------------------------------
 
 /**
- * The picture for an account, or null when it has none and should be drawn as
- * initials. Uploaded first, then Gravatar, and nothing after that.
+ * What to serve for an account: the photo they uploaded, else their Gravatar,
+ * else nothing and let the initials stand.
  *
  * A Gravatar arrives already fetched, because whether one exists is only
  * answerable by asking - but the answer is remembered for a day, so this is a
  * lookup rather than a request nearly every time.
  */
-export async function resolveAvatar(userId: string): Promise<AvatarRef | null> {
+export interface AvatarAnswer {
+    readonly picture: AvatarRef | null;
+    /**
+     * Whether "no picture" is a fact rather than a shrug.
+     *
+     * False only when a lookup failed, and it exists because of what the caller
+     * does next: a browser told "no picture, keep that for five minutes" on the
+     * strength of one timed-out request will hide a face that was there all
+     * along, and hide it long after the network came back.
+     */
+    readonly certain: boolean;
+}
+
+export async function resolveAvatar(userId: string): Promise<AvatarAnswer> {
     const uploaded = await uploadedAvatar({ kind: "user", id: userId });
-    if (uploaded) return uploaded;
-    if (!(await gravatarEnabled())) return null;
+    if (uploaded) return { picture: uploaded, certain: true };
+    if (!(await gravatarEnabled())) return { picture: null, certain: true };
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-    if (!user) return null;
-    const image = await gravatarImage(user.email);
-    return image ? { etag: image.etag, mime: image.mime, load: async () => image.bytes } : null;
+    if (!user) return { picture: null, certain: true };
+
+    const { image, certain } = await gravatarImage(user.email);
+    return {
+        picture: image ? { etag: image.etag, mime: image.mime, load: async () => image.bytes } : null,
+        certain
+    };
 }
 
 /**

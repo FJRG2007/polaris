@@ -31,6 +31,18 @@ export const dynamic = "force-dynamic";
  */
 const CACHE = "private, max-age=300, must-revalidate";
 
+/**
+ * What a failed answer is cached as, which is not at all.
+ *
+ * The face that came and went: one slow Gravatar lookup, or a storage that did
+ * not answer, produced the same blank pixel as "this account has no photo" -
+ * with the same five minutes on it. So a hiccup lasting a second took a face off
+ * the screen for five minutes, in every tab that asked during it, and put it
+ * back afterwards as if nothing had happened. "I could not find out" is not an
+ * answer to cache.
+ */
+const NO_CACHE = "private, no-store";
+
 export async function GET(request: Request, { params }: { params: Promise<{ userId: string }> }): Promise<Response> {
     const viewer = await requireUser();
     const { userId } = await params;
@@ -45,17 +57,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
     });
     if (!visible) return blankAvatarResponse(CACHE);
 
-    const picture = await resolveAvatar(userId);
+    const { picture, certain } = await resolveAvatar(userId);
     // Cached too: an account with no picture is the common case, and without
-    // this every one of them is asked for again on every screen.
+    // this every one of them is asked for again on every screen. Unless nobody
+    // could find out, in which case the next request asks again.
     if (!picture) {
-        if (request.headers.get("if-none-match") === BLANK_AVATAR_ETAG) {
+        if (certain && request.headers.get("if-none-match") === BLANK_AVATAR_ETAG) {
             return new Response(null, {
                 status: 304,
                 headers: { ETag: BLANK_AVATAR_ETAG, "Cache-Control": CACHE }
             });
         }
-        return blankAvatarResponse(CACHE);
+        return blankAvatarResponse(certain ? CACHE : NO_CACHE);
     }
 
     // Answered before the bytes are fetched, which is the point of the split:
@@ -65,10 +78,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
     }
 
     const bytes = await picture.load();
-    // The row said there was a picture and the bytes are gone - a swept upload,
-    // a storage target that moved. Same answer as having none: the screen wants
-    // initials, not a broken image.
-    if (!bytes) return blankAvatarResponse(CACHE);
+    // The row said there was a picture and the bytes did not arrive - a swept
+    // upload, a storage target that moved, a NAS that is not answering this
+    // second. Same answer as having none, since the screen wants initials rather
+    // than a broken image, but not cached: the row still says there is a photo,
+    // so this is a failure to fetch it and not a fact about the account.
+    if (!bytes) return blankAvatarResponse(NO_CACHE);
 
     return new Response(bytes as BodyInit, {
         headers: {

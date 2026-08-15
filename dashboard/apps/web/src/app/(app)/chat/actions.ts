@@ -144,7 +144,7 @@ export async function readThreadAction(
  */
 export async function searchPeopleAction(
     query: string
-): Promise<{ results?: { id: string; name: string }[]; error?: string }> {
+): Promise<{ results?: { id: string; name: string }[]; withheld?: number; error?: string }> {
     const me = await actor();
     const found = await searchAccounts({ id: me.id, isAdmin: false }, String(query ?? ""), 24);
     const allowed = await messageable(found.map((person) => person.id));
@@ -152,7 +152,13 @@ export async function searchPeopleAction(
         results: found
             .filter((person) => allowed.has(person.id))
             .slice(0, 8)
-            .map((person) => ({ id: person.id, name: person.name }))
+            .map((person) => ({ id: person.id, name: person.name })),
+        // How many matched and were left out because they do not have Chat. A
+        // count and nothing else: the picker needs to say why it is empty, and
+        // "no results" for somebody the searcher just typed the name of reads as
+        // a broken search rather than as an account that cannot receive a
+        // message. Naming them would say more than the search was asked.
+        withheld: found.filter((person) => !allowed.has(person.id)).length
     };
 }
 
