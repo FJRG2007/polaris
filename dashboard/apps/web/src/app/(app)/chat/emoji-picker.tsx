@@ -28,10 +28,11 @@ import { createPortal } from "react-dom";
 import type { TenorResult } from "@/lib/chat/tenor";
 import { Loader2, Search, Smile } from "lucide-react";
 import { EMOJI_GROUPS, searchEmoji } from "@/lib/chat/emoji";
-import { searchTenorAction, tenorReadyAction } from "./actions";
+import type { SavedMediaView } from "@/lib/chat/saved-media";
+import { listSavedMediaAction, searchTenorAction, tenorReadyAction } from "./actions";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-type Tab = "emoji" | "gif" | "sticker";
+type Tab = "emoji" | "saved" | "gif" | "sticker";
 
 /** How long the field sits still before Tenor is asked. */
 const SEARCH_AFTER = 300;
@@ -83,18 +84,23 @@ function place(button: DOMRect): Placement {
 export function EmojiPicker({
     disabled,
     onEmoji,
-    onMedia
+    onMedia,
+    onSaved
 }: {
     disabled: boolean;
     onEmoji: (char: string) => void;
     /** A chosen GIF or sticker, by address. The caller sends it. */
     onMedia: (address: string) => void;
+    /** One the reader kept, by its id. Sent through its own path, since a stored
+     *  one is copied rather than fetched back off this Polaris. */
+    onSaved: (savedId: string) => void;
 }) {
     const [open, setOpen] = useState(false);
     const [tab, setTab] = useState<Tab>("emoji");
     const [query, setQuery] = useState("");
     const [tenorReady, setTenorReady] = useState<boolean | null>(null);
     const [results, setResults] = useState<readonly TenorResult[]>([]);
+    const [saved, setSaved] = useState<readonly SavedMediaView[] | null>(null);
     const [searching, setSearching] = useState(false);
     const [at, setAt] = useState<Placement | null>(null);
     const trigger = useRef<HTMLButtonElement>(null);
@@ -155,8 +161,16 @@ export function EmojiPicker({
         void tenorReadyAction().then(setTenorReady);
     }, [open, tenorReady]);
 
+    // Asked once the tab is opened rather than with the picker: most times this
+    // is opened it is to pick an emoji, and a list nobody looked at is a query
+    // nobody needed.
     useEffect(() => {
-        if (!open || tab === "emoji" || !tenorReady) return;
+        if (!open || tab !== "saved" || saved !== null) return;
+        void listSavedMediaAction().then((answer) => setSaved(answer.saved));
+    }, [open, tab, saved]);
+
+    useEffect(() => {
+        if (!open || tab === "emoji" || tab === "saved" || !tenorReady) return;
         setSearching(true);
         const timer = setTimeout(async () => {
             const answer = await searchTenorAction(query, tab === "sticker" ? "sticker" : "gif");
@@ -206,6 +220,7 @@ export function EmojiPicker({
                         {(
                             [
                                 ["emoji", "Emoji"],
+                                ["saved", "Kept"],
                                 ["gif", "GIFs"],
                                 ["sticker", "Stickers"]
                             ] as const
@@ -218,7 +233,7 @@ export function EmojiPicker({
                                     setResults([]);
                                 }}
                                 className={cn(
-                                    "flex-1 px-3 py-2 text-xs font-medium transition-colors",
+                                    "flex-1 px-2 py-2 text-xs font-medium transition-colors",
                                     tab === value
                                         ? "border-b-2 border-primary text-foreground"
                                         : "text-muted-foreground hover:text-foreground"
@@ -229,7 +244,14 @@ export function EmojiPicker({
                         ))}
                     </div>
 
-                    <div className="relative shrink-0 border-b border-border px-2 py-1.5">
+                    <div
+                        className={cn(
+                            "relative shrink-0 border-b border-border px-2 py-1.5",
+                            // Nothing to search: what is kept is a short list
+                            // somebody assembled themselves.
+                            tab === "saved" && "hidden"
+                        )}
+                    >
                         <Search className="pointer-events-none absolute left-4 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                         <input
                             autoFocus
@@ -272,6 +294,42 @@ export function EmojiPicker({
                                         />
                                     </section>
                                 ))
+                            )
+                        ) : tab === "saved" ? (
+                            saved === null ? (
+                                <p className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground">
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                    Looking
+                                </p>
+                            ) : saved.length === 0 ? (
+                                <p className="px-2 py-6 text-center text-xs text-muted-foreground">
+                                    Nothing kept yet. The star in the corner of a picture in a
+                                    message puts it here.
+                                </p>
+                            ) : (
+                                <ul className="grid grid-cols-2 gap-1">
+                                    {saved.map((entry) => (
+                                        <li key={entry.id}>
+                                            <button
+                                                type="button"
+                                                title={entry.name || "Send this"}
+                                                onClick={() => {
+                                                    onSaved(entry.id);
+                                                    setOpen(false);
+                                                }}
+                                                className="block w-full overflow-hidden rounded-md ring-border transition-shadow hover:ring-2"
+                                            >
+                                                {/* eslint-disable-next-line @next/next/no-img-element -- a preview grid, no loader wanted */}
+                                                <img
+                                                    src={entry.src}
+                                                    alt={entry.name}
+                                                    loading="lazy"
+                                                    className="h-24 w-full bg-muted object-cover"
+                                                />
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
                             )
                         ) : tenorReady === false ? (
                             <p className="px-2 py-6 text-center text-xs text-muted-foreground">

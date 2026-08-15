@@ -142,6 +142,7 @@ model User {
     chatSpaces          ChatSpace[]
     chatSpaceMemberships ChatSpaceMember[]
     chatSpaceInvites     ChatSpaceInvite[]
+    chatSavedMedia       ChatSavedMedia[]
     chatChannelMemberships ChatChannelMember[]
     searches            SearchHistory[]
     backupDestinations  BackupDestination[]
@@ -5605,6 +5606,32 @@ model ChatSpaceInvite {
     createdBy User      @relation(fields: [createdById], references: [id], onDelete: Cascade)
 
     @@index([spaceId, createdAt])
+}
+
+// A picture somebody kept, so they can send it again.
+//
+// One row per person per thing, because keeping something is a fact about a
+// reader and not about the message it was seen in - the message can be deleted,
+// the channel can be left, and what was kept stays kept.
+//
+// `source` is either an http address, for a picture posted as a link, or
+// `attachment:<id>` for one already stored here. One column with a prefix rather
+// than two nullable ones, the same shape Drive uses for its prefixed sources: a
+// pair of columns where exactly one is set is a pair that can be wrong.
+model ChatSavedMedia {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    userId      String   @db.Uuid
+    source      String
+    // What it is called and what it is, so the picker can label it without
+    // fetching anything. Whatever it was called where it was found.
+    name        String   @default("")
+    contentType String   @default("")
+    createdAt   DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, source])
+    @@index([userId, createdAt])
 }
 
 model ChatSpaceMember {

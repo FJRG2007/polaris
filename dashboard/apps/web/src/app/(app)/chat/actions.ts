@@ -18,6 +18,7 @@ import { z } from "zod";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import * as invites from "@/lib/chat/invites";
+import * as saved from "@/lib/chat/saved-media";
 import * as chat from "@/lib/chat/chat-service";
 import * as messages from "@/lib/chat/messages";
 import { allChatRules } from "@/lib/chat/rules";
@@ -35,6 +36,7 @@ import {
     requirePostable
 } from "@/lib/chat/access";
 import type { ChatInviteOffer, ChatInviteView } from "@/lib/chat/invites";
+import type { SavedMediaView } from "@/lib/chat/saved-media";
 import type {
     ChatCategoryView,
     ChatChannelView,
@@ -618,4 +620,57 @@ export async function inviteToDirectAction(input: {
         return channelId;
     });
     return result.error ? { error: result.error } : { channelId: result.value };
+}
+
+// ---------------------------------------------------------------------------
+// Pictures somebody kept
+// ---------------------------------------------------------------------------
+
+/** Keep a picture, so it turns up in the picker rather than having to be found
+ *  again by scrolling. `source` is `attachment:<id>` or an http address. */
+export async function saveMediaAction(
+    source: string,
+    name?: string
+): Promise<{ saved?: SavedMediaView; error?: string }> {
+    const me = await actor();
+    const result = await guard(() => saved.saveMedia(me, String(source ?? ""), String(name ?? "")));
+    return result.error ? { error: result.error } : { saved: result.value };
+}
+
+export async function unsaveMediaAction(source: string): Promise<{ error?: string }> {
+    const me = await actor();
+    return guard(() => saved.unsaveMedia(me, String(source ?? "")));
+}
+
+export async function listSavedMediaAction(): Promise<{ saved: readonly SavedMediaView[] }> {
+    const me = await actor();
+    return { saved: await saved.listSavedMedia(me) };
+}
+
+/** Which of these the reader has kept, so the star on each picture is drawn
+ *  right without one request per picture. */
+export async function savedSourcesAction(sources: string[]): Promise<{ sources: string[] }> {
+    const me = await actor();
+    const asked = Array.isArray(sources) ? sources.map(String) : [];
+    return { sources: [...(await saved.savedSources(me, asked))] };
+}
+
+/**
+ * Send a kept picture.
+ *
+ * A stored one is copied into the conversation; a remote one goes back through
+ * the ordinary fetch, so its address is checked at the moment it is used rather
+ * than trusted because it was once in a message.
+ */
+export async function sendSavedMediaAction(
+    channelId: string,
+    savedId: string
+): Promise<{ id?: string; error?: string }> {
+    const me = await actor();
+    const result = await guard(() =>
+        saved.sendSavedMedia(me, String(channelId), String(savedId))
+    );
+    if (result.error || !result.value) return { error: result.error ?? "That could not be sent" };
+    if ("messageId" in result.value) return { id: result.value.messageId };
+    return sendMediaAction(channelId, result.value.remote);
 }

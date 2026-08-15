@@ -48,6 +48,7 @@ export function Composer({
     onCancelReply,
     onSend,
     onMedia,
+    onSaved,
     onSaveEdit,
     onCancelEdit
 }: {
@@ -71,6 +72,9 @@ export function Composer({
     /** A GIF or sticker chosen from the picker. Its own path rather than a
      *  staged file: it is already somewhere, and it is the whole message. */
     onMedia?: (address: string) => void | Promise<void>;
+    /** One the reader kept, by its id. Its own path again, because a picture
+     *  already stored here is copied rather than fetched back off Polaris. */
+    onSaved?: (savedId: string) => void | Promise<void>;
     onSaveEdit?: (messageId: string, body: string) => void | Promise<void>;
     onCancelEdit?: () => void;
 }) {
@@ -278,6 +282,7 @@ export function Composer({
                                 disabled={disabled}
                                 onEmoji={(char) => setBody((current) => `${current}${char}`)}
                                 onMedia={(address) => void onMedia?.(address)}
+                                onSaved={(savedId) => void onSaved?.(savedId)}
                             />
                         </>
                     )}

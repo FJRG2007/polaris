@@ -566,6 +566,17 @@ export function ChannelView({
                             refresh();
                         }
                     }}
+                    onSaved={async (savedId) => {
+                        following.current = true;
+                        const result = await runAction(
+                            () => actions.sendSavedMediaAction(channelId, savedId),
+                            setError
+                        );
+                        if (!result?.error) {
+                            await load();
+                            refresh();
+                        }
+                    }}
                     onSaveEdit={async (messageId, body) => {
                         await runAction(() => actions.editAction({ messageId, body }), setError);
                         setEditing(null);

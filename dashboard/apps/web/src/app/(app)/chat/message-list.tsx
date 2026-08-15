@@ -18,6 +18,7 @@
  * was taken back.
  */
 
+import * as actions from "./actions";
 import { Avatar } from "@/components/avatar";
 import { MessageMenu } from "./message-menu";
 import { embedFor } from "@/lib/chat/embeds";
@@ -341,14 +342,12 @@ function Message({
                         {message.attachments.map((file) => (
                             <li key={file.id}>
                                 {file.inline ? (
-                                    // eslint-disable-next-line @next/next/no-img-element -- one image per attachment, no loader wanted
-                                    <a href={`/api/chat/attachments/${file.id}`} target="_blank" rel="noreferrer">
-                                        <img
-                                            src={`/api/chat/attachments/${file.id}`}
-                                            alt={file.name}
-                                            className="max-h-72 max-w-full rounded-md border border-border object-contain"
-                                        />
-                                    </a>
+                                    <KeepableImage
+                                        href={`/api/chat/attachments/${file.id}`}
+                                        alt={file.name}
+                                        source={`attachment:${file.id}`}
+                                        name={file.name}
+                                    />
                                 ) : (
                                     <a
                                         href={`/api/chat/attachments/${file.id}`}
@@ -493,6 +492,73 @@ function Message({
             />
         </div>
         </MessageMenu>
+    );
+}
+
+/**
+ * A picture, with a star in the corner for keeping it.
+ *
+ * The star appears on hover and on focus, in the corner, where every client that
+ * has this puts it - and pressing it puts the picture in the emoji picker beside
+ * the search that would otherwise have to find it again.
+ *
+ * Whether it is already kept is asked once when the star is first pressed rather
+ * than for every picture on screen: a channel of forty GIFs would otherwise be
+ * forty questions on every render, to draw a control nobody has looked at.
+ */
+function KeepableImage({
+    href,
+    alt,
+    source,
+    name
+}: {
+    href: string;
+    alt: string;
+    /** What is stored: `attachment:<id>`, or the address for a remote one. */
+    source: string;
+    name: string;
+}) {
+    const [kept, setKept] = useState<boolean | null>(null);
+    const [busy, setBusy] = useState(false);
+
+    const toggle = async () => {
+        setBusy(true);
+        // Unknown means it has not been asked about. Pressing the star is the
+        // moment somebody wants it kept, so that is what it does; pressing it
+        // again takes it back off.
+        const next = kept !== true;
+        const result = next
+            ? await actions.saveMediaAction(source, name)
+            : await actions.unsaveMediaAction(source);
+        setBusy(false);
+        if (!("error" in result) || !result.error) setKept(next);
+    };
+
+    return (
+        <span className="group/pic relative inline-block max-w-full">
+            <a href={href} target="_blank" rel="noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element -- one image per attachment, no loader wanted */}
+                <img
+                    src={href}
+                    alt={alt}
+                    className="max-h-72 max-w-full rounded-md border border-border object-contain"
+                />
+            </a>
+            <button
+                type="button"
+                disabled={busy}
+                aria-pressed={kept === true}
+                aria-label={kept ? "Stop keeping this picture" : "Keep this picture"}
+                title={kept ? "Kept. It is in your picker." : "Keep this"}
+                onClick={() => void toggle()}
+                className={cn(
+                    "absolute right-1 top-1 rounded-md border border-border bg-background/80 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/pic:opacity-100",
+                    kept === true && "text-primary opacity-100"
+                )}
+            >
+                <Star className={cn("size-3.5", kept === true && "fill-current")} />
+            </button>
+        </span>
     );
 }
 
