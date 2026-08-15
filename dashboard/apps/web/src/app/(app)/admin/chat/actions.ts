@@ -1,0 +1,41 @@
+"use server";
+
+/**
+ * Saving the house rules for one kind of conversation.
+ *
+ * Validated against the same schema the reader parses with, so a value that
+ * would be ignored on the way out is refused on the way in rather than stored
+ * and silently replaced by a default.
+ */
+
+import * as core from "@polaris/core";
+import { revalidatePath } from "next/cache";
+import { requireAdmin } from "@/lib/session";
+import { setChatRules } from "@/lib/chat/rules";
+import { recordAudit } from "@/lib/audit-service";
+
+export async function setChatRulesAction(
+    scope: unknown,
+    rules: unknown
+): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+
+    const chosen = core.CHAT_RULE_SCOPES.find((entry) => entry === scope);
+    if (!chosen) return { error: "That is not a kind of conversation" };
+
+    const parsed = core.chatRulesSchema.safeParse(rules);
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? "Those limits could not be saved" };
+    }
+
+    await setChatRules(chosen, parsed.data);
+    await recordAudit({
+        actorId: admin.id,
+        action: "chat.rules.update",
+        targetType: "setting",
+        targetId: `chat.rules.${chosen}`,
+        metadata: { ...parsed.data }
+    });
+    revalidatePath("/admin/chat");
+    return {};
+}

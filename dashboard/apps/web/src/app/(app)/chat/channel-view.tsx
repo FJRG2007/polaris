@@ -21,6 +21,7 @@
  * did not read them.
  */
 
+import * as core from "@polaris/core";
 import * as actions from "./actions";
 import { Composer } from "./composer";
 import { CallRoom } from "./call-room";
@@ -48,7 +49,7 @@ const TYPING_TTL_MS = 4000;
 
 export function ChannelView({ channelId }: { channelId: string }) {
     const router = useRouter();
-    const { viewerId, channels, refresh } = useChat();
+    const { viewerId, channels, refresh, rulesFor } = useChat();
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
     const [pending, setPending] = useState<readonly ChatMessageView[]>([]);
     const [olderThan, setOlderThan] = useState<string | null>(null);
@@ -83,6 +84,10 @@ export function ChannelView({ channelId }: { channelId: string }) {
     );
     const canPost = channel ? !channel.archived : true;
     const canModerate = channel?.mayAdminister ?? false;
+    // What the instance allows in a conversation of this shape. Until the list
+    // has arrived there is no channel to ask about, and the defaults are the
+    // permissive ones, so nothing is briefly refused that would be allowed.
+    const rules = channel ? rulesFor(channel) : core.DEFAULT_CHAT_RULES;
 
     // Everything about this screen is about one id; a different one is a
     // different conversation and none of the previous state belongs to it.
@@ -414,6 +419,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
 
                 <Composer
                     channelId={channelId}
+                    rules={rules}
                     disabled={!canPost}
                     placeholder={
                         canPost
@@ -447,6 +453,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
             {thread && (
                 <ThreadPanel
                     root={thread}
+                    rules={rules}
                     viewerId={viewerId}
                     canPost={canPost}
                     canModerate={canModerate}
@@ -467,7 +474,11 @@ export function ChannelView({ channelId }: { channelId: string }) {
                 name={deleting?.body.slice(0, 40) ?? ""}
                 kind="message"
                 requireTyping={false}
-                description="It leaves a line saying it was deleted, so any replies under it still make sense."
+                description={
+                    rules.deleteLeavesTrace || (deleting?.replyCount ?? 0) > 0
+                        ? "It leaves a line saying it was deleted, so any replies under it still make sense."
+                        : "It goes without trace, along with anything attached to it. Nobody is told it was there."
+                }
                 confirmLabel="Delete message"
                 onConfirm={async () => {
                     if (deleting) {

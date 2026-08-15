@@ -17,6 +17,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import * as core from "@polaris/core";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import {
     AUTOMATIC_TARGET,
@@ -43,16 +44,15 @@ const LOCAL_FOLDER = "chat";
 const ATTACHMENT_ROOT = "polaris/chat";
 
 /**
- * The most one file may be.
+ * The most one file may be, whatever the rules say.
  *
  * A chat is not a file server: something bigger than this belongs in Drive, with
- * a link to it in the conversation. The ceiling also bounds what one message can
- * cost to render for everybody in the room.
+ * a link to it in the conversation. The admin sets the actual limit per kind of
+ * conversation and can only go lower - this is the ceiling, and it is a fact
+ * about the code rather than a matter of taste, because a file is held in memory
+ * whole on its way in and on its way back out.
  */
-export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
-
-/** How many files ride on one message. */
-export const MAX_ATTACHMENTS = 10;
+export const MAX_ATTACHMENT_BYTES = core.CHAT_ATTACHMENT_CEILING_MIB * 1024 * 1024;
 
 /**
  * What the browser is allowed to show inline.
@@ -179,6 +179,45 @@ export async function readAttachment(attachmentId: string): Promise<{
     } finally {
         await driver.dispose().catch(() => undefined);
     }
+}
+
+/**
+ * Delete the files on a message from wherever they were written.
+ *
+ * For the delete that leaves no trace. The rows go with the message by cascade;
+ * this is the part the database cannot do, and without it "no trace" would mean
+ * the message is gone and the photo is still on the NAS.
+ *
+ * One driver per storage rather than one per file, because opening a NAS session
+ * for each of ten attachments is ten handshakes for one delete. A file that
+ * cannot be removed - a target that has moved, a share that is not answering -
+ * does not stop the deletion: the caller is taking a message back, and refusing
+ * that because a byte range is unreachable helps nobody.
+ */
+export async function discardAttachments(messageId: string): Promise<void> {
+    const files = await prisma.chatAttachment.findMany({
+        where: { messageId },
+        select: { connectionId: true, path: true }
+    });
+    if (files.length === 0) return;
+
+    const byTarget = new Map<string, string[]>();
+    for (const file of files) {
+        const target = file.connectionId ?? LOCAL_TARGET;
+        byTarget.set(target, [...(byTarget.get(target) ?? []), file.path]);
+    }
+
+    await Promise.all(
+        [...byTarget].map(async ([target, paths]) => {
+            const driver = await driverForTarget(target, LOCAL_FOLDER).catch(() => null);
+            if (!driver) return;
+            try {
+                for (const path of paths) await driver.delete(path).catch(() => undefined);
+            } finally {
+                await driver.dispose().catch(() => undefined);
+            }
+        })
+    );
 }
 
 /** Which channel an attachment belongs to, so the download can be authorized

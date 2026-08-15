@@ -38,6 +38,7 @@ import {
     ListTodo,
     Mail,
     MessageCircle,
+    MessageSquare,
     MessagesSquare,
     MonitorSmartphone,
     Network,
@@ -730,6 +731,22 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "ses",
                 "outgoing",
                 "account mail"
+            ],
+            group: ADMIN_COMMUNICATION_GROUP
+        },
+        {
+            label: "Chat",
+            href: "/admin/chat",
+            icon: MessageSquare,
+            keywords: [
+                "messages",
+                "limits",
+                "edit history",
+                "delete",
+                "attachments",
+                "rate limit",
+                "direct messages",
+                "group chats"
             ],
             group: ADMIN_COMMUNICATION_GROUP
         },

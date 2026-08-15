@@ -5702,6 +5702,7 @@ model ChatMessage {
     reactions   ChatReaction[]
     attachments ChatAttachment[]
     stars       ChatStar[]
+    edits       ChatMessageEdit[]
 
     @@index([channelId, createdAt])
     @@index([parentId, createdAt])
@@ -5767,6 +5768,29 @@ model ChatStar {
     @@unique([messageId, userId])
     @@index([userId, createdAt])
 }
+
+// What a message said before somebody edited it.
+//
+// One row per edit, holding the text that was replaced and the moment it was
+// replaced; the current body on the message is the newest version and needs no
+// row of its own. That way the history is exactly "what this used to say", which
+// is the question somebody clicking (edited) is asking.
+//
+// Written only while the scope's rules keep history. An admin who turns it off
+// is not left with one accumulating in the database that nobody can read.
+model ChatMessageEdit {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    messageId  String   @db.Uuid
+    // The body as it stood before this edit.
+    body       String
+    // When it stopped being the current text.
+    replacedAt DateTime @default(now())
+
+    message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+    @@index([messageId, replacedAt])
+}
+
 // ---------------------------------------------------------------------------
 // Meetings (calls)
 // ---------------------------------------------------------------------------

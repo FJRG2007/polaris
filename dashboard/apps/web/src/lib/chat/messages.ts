@@ -13,10 +13,12 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { rulesForChannel } from "./rules";
 import { publishChatChange } from "./live";
-import { isInlineImage, type StoredAttachment } from "./attachments";
+import { discardAttachments, isInlineImage, type StoredAttachment } from "./attachments";
 import {
     ChatAccessError,
+    ChatRuleError,
     reachableChannelIds,
     requireChannel,
     requirePostable,
@@ -212,6 +214,7 @@ export async function send(
     quote: { readonly messageId: string; readonly forwarded: boolean } | null = null
 ): Promise<string> {
     await requirePostable(actor, input.channelId);
+    await requireSendable(actor, input.channelId, input.body);
 
     if (input.parentId) {
         const parent = await prisma.chatMessage.findUnique({
@@ -291,50 +294,205 @@ export async function send(
     return id;
 }
 
-/** Rewrite one of your own. Nobody edits somebody else's, an admin included:
- *  a channel where what you said can change under you is not a record of
- *  anything. */
+/**
+ * What this conversation's rules allow, applied to something about to be said.
+ *
+ * The length ceiling in the schema is what Polaris can store; this is what the
+ * instance allows, and it can only be tighter. The rate is per person per
+ * conversation, which is where flooding actually happens - a limit across the
+ * whole instance would punish a busy afternoon in one channel by silencing
+ * everybody's direct messages.
+ */
+async function requireSendable(actor: ChatActor, channelId: string, body: string): Promise<void> {
+    const rules = await rulesForChannel(channelId);
+
+    // Code points rather than UTF-16 units: a limit that counted the latter
+    // would refuse a message of emoji at half its stated length.
+    if ([...body].length > rules.maxMessageLength) {
+        throw new ChatRuleError(
+            `Messages here are limited to ${rules.maxMessageLength} characters`
+        );
+    }
+
+    if (rules.maxPerMinute !== core.CHAT_NO_LIMIT) {
+        const recent = await prisma.chatMessage.count({
+            where: {
+                channelId,
+                authorId: actor.id,
+                createdAt: { gte: new Date(Date.now() - 60_000) }
+            }
+        });
+        if (recent >= rules.maxPerMinute) {
+            throw new ChatRuleError("You are sending messages too quickly. Wait a moment.");
+        }
+    }
+}
+
+/**
+ * Rewrite one of your own.
+ *
+ * Nobody edits somebody else's, an admin included: a channel where what you said
+ * can change under you is not a record of anything.
+ *
+ * How long it stays editable is the instance's decision and defaults to forever,
+ * which is what people expect and what every messenger does. When the scope keeps
+ * history, the text being replaced is written in the same transaction as the
+ * replacement - a version recorded outside it could be lost while the edit
+ * landed, and a history with a hole is worse than none.
+ */
 export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise<void> {
     const message = await prisma.chatMessage.findUnique({
         where: { id: input.messageId },
-        select: { channelId: true, authorId: true, deletedAt: true }
+        select: { channelId: true, authorId: true, body: true, deletedAt: true, createdAt: true }
     });
     if (!message) throw new ChatAccessError("That message is gone");
     await requirePostable(actor, message.channelId);
     if (message.authorId !== actor.id)
         throw new ChatAccessError("You can only edit your own messages");
     if (message.deletedAt) throw new ChatAccessError("That message was deleted");
+    await requireSendable(actor, message.channelId, input.body);
 
-    await prisma.chatMessage.update({
-        where: { id: input.messageId },
-        data: { body: input.body, editedAt: new Date() }
+    const rules = await rulesForChannel(message.channelId);
+    if (!core.withinEditWindow(rules, message.createdAt)) {
+        throw new ChatRuleError(
+            `Messages here can be edited for ${core.editWindowLabel(rules.editWindowMinutes)} after they are sent`
+        );
+    }
+
+    const editedAt = new Date();
+    await prisma.$transaction(async (tx) => {
+        if (rules.keepEditHistory) {
+            await tx.chatMessageEdit.create({
+                data: { messageId: input.messageId, body: message.body, replacedAt: editedAt }
+            });
+        }
+        await tx.chatMessage.update({
+            where: { id: input.messageId },
+            data: { body: input.body, editedAt }
+        });
     });
     publishChatChange({ channelId: message.channelId, kind: "posted", actorId: actor.id });
+}
+
+/** One version of a message, as the history dialog draws it. */
+export interface ChatMessageVersion {
+    readonly body: string;
+    /** When this text stopped being the current one. */
+    readonly replacedAt: string;
+}
+
+export interface ChatEditHistory {
+    /** Whether this conversation keeps history at all. False is a different
+     *  answer to an empty list, and the dialog says so rather than implying the
+     *  message was never edited. */
+    readonly kept: boolean;
+    /** Newest replacement first, so the version above the current text is at the
+     *  top where somebody comparing the two is already looking. */
+    readonly versions: readonly ChatMessageVersion[];
+}
+
+/**
+ * What a message used to say.
+ *
+ * Anybody who can read the message can read its history: the point of recording
+ * it is that "(edited)" without it asks the room to take the change on trust,
+ * and a history only the author could open would not answer that.
+ */
+export async function editHistory(
+    actor: ChatActor,
+    messageId: string
+): Promise<ChatEditHistory> {
+    const message = await prisma.chatMessage.findUnique({
+        where: { id: messageId },
+        select: { channelId: true, deletedAt: true }
+    });
+    if (!message) throw new ChatAccessError("That message is gone");
+    await requireChannel(actor, message.channelId);
+
+    const rules = await rulesForChannel(message.channelId);
+    // A deleted message has no text to compare against, and handing back what it
+    // used to say would undo the deletion for anybody who asked.
+    if (!rules.keepEditHistory || message.deletedAt) return { kept: false, versions: [] };
+
+    const rows = await prisma.chatMessageEdit.findMany({
+        where: { messageId },
+        orderBy: { replacedAt: "desc" },
+        select: { body: true, replacedAt: true }
+    });
+    return {
+        kept: true,
+        versions: rows.map((row) => ({
+            body: row.body,
+            replacedAt: row.replacedAt.toISOString()
+        }))
+    };
 }
 
 /**
  * Take one back.
  *
- * A tombstone rather than a delete: the replies under a message stay findable,
- * and the message above it does not silently inherit the meaning of the one that
- * went. The author does it, or somebody who administers the channel - moderating
- * a room is exactly the case where removing somebody else's words is the point.
+ * The author does it, or somebody who administers the channel - moderating a
+ * room is exactly the case where removing somebody else's words is the point.
+ *
+ * What is left behind is the instance's decision. A tombstone by default: the
+ * replies under a message stay findable and the message above it does not
+ * silently inherit the meaning of the one that went. An operator can choose no
+ * trace instead, and then the row goes and so do its files - "no trace" that
+ * left the bytes on the NAS would be a claim the storage does not back.
  */
 export async function remove(actor: ChatActor, messageId: string): Promise<void> {
     const message = await prisma.chatMessage.findUnique({
         where: { id: messageId },
-        select: { channelId: true, authorId: true }
+        select: {
+            channelId: true,
+            authorId: true,
+            parentId: true,
+            replyCount: true,
+            createdAt: true
+        }
     });
     if (!message) return;
     const access = await requireChannel(actor, message.channelId);
-    if (message.authorId !== actor.id && !access.mayAdminister) {
+    const mine = message.authorId === actor.id;
+    if (!mine && !access.mayAdminister) {
         throw new ChatAccessError("You cannot delete that message");
     }
 
-    await prisma.chatMessage.update({
-        where: { id: messageId },
-        data: { deletedAt: new Date(), body: "" }
-    });
+    const rules = await rulesForChannel(message.channelId);
+    // The window binds the author, not a moderator. Somebody removing a message
+    // from a room they run is not taking back their own words, and a rule that
+    // stopped them would turn moderation into a race against a clock.
+    if (mine && !access.mayAdminister && !core.withinEditWindow(rules, message.createdAt)) {
+        throw new ChatRuleError(
+            `Messages here can be deleted for ${core.editWindowLabel(rules.editWindowMinutes)} after they are sent`
+        );
+    }
+
+    // A thread root is the one message that cannot leave without trace: the
+    // replies hang off it by foreign key and would cascade away with it, so
+    // choosing "no trace" would delete other people's messages. The tombstone is
+    // the honest outcome there, and it is what keeps the thread reachable.
+    const wouldTakeOthers = message.replyCount > 0;
+
+    if (rules.deleteLeavesTrace || wouldTakeOthers) {
+        await prisma.chatMessage.update({
+            where: { id: messageId },
+            data: { deletedAt: new Date(), body: "" }
+        });
+    } else {
+        // Bytes first: the rows cascade with the message, and an attachment row
+        // deleted before its file would leave a file nothing points at.
+        await discardAttachments(messageId);
+        await prisma.$transaction(async (tx) => {
+            await tx.chatMessage.delete({ where: { id: messageId } });
+            if (message.parentId) {
+                await tx.chatMessage.update({
+                    where: { id: message.parentId },
+                    data: { replyCount: { decrement: 1 } }
+                });
+            }
+        });
+    }
     publishChatChange({ channelId: message.channelId, kind: "posted", actorId: actor.id });
 }
 

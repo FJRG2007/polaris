@@ -18,13 +18,14 @@ import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import * as chat from "@/lib/chat/chat-service";
 import * as messages from "@/lib/chat/messages";
+import { allChatRules } from "@/lib/chat/rules";
 import { requirePermission } from "@/lib/session";
-import { searchAccounts } from "@/lib/rich-text/mention-service";
 import { storeAttachment } from "@/lib/chat/attachments";
-import { ChatAccessError, messageable, requirePostable } from "@/lib/chat/access";
-import { fetchRemoteMedia, searchTenor, tenorConfigured, type TenorResult } from "@/lib/chat/tenor";
+import { searchAccounts } from "@/lib/rich-text/mention-service";
 import type { ChatMessageView, ChatPage } from "@/lib/chat/messages";
+import { ChatAccessError, messageable, requirePostable } from "@/lib/chat/access";
 import type { ChatChannelView, ChatMemberView, ChatSpaceView } from "@/lib/chat/chat-service";
+import { fetchRemoteMedia, searchTenor, tenorConfigured, type TenorResult } from "@/lib/chat/tenor";
 
 const CHAT_PATH = "/chat";
 
@@ -166,6 +167,30 @@ export async function editAction(input: unknown): Promise<{ error?: string }> {
 export async function deleteMessageAction(messageId: string): Promise<{ error?: string }> {
     const me = await actor();
     return guard(() => messages.remove(me, messageId));
+}
+
+/** What a message said before it was edited, for the panel behind "(edited)". */
+export async function editHistoryAction(
+    messageId: string
+): Promise<{ history?: messages.ChatEditHistory; error?: string }> {
+    const me = await actor();
+    const result = await guard(() => messages.editHistory(me, messageId));
+    return result.error ? { error: result.error } : { history: result.value };
+}
+
+/**
+ * The instance's rules, all three scopes at once.
+ *
+ * Read by the composer so a limit is met while typing rather than after
+ * uploading: a 40 MB video refused by the server was still a 40 MB upload, and
+ * the person who sent it waited for it. Three small objects, fetched once when
+ * the app opens.
+ */
+export async function chatRulesAction(): Promise<{
+    rules: Record<core.ChatRuleScope, core.ChatRules>;
+}> {
+    await actor();
+    return { rules: await allChatRules() };
 }
 
 export async function reactAction(input: unknown): Promise<{ on?: boolean; error?: string }> {

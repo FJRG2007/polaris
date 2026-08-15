@@ -39,6 +39,22 @@ export class ChatAccessError extends Error {
 }
 
 /**
+ * Refused by the instance's rules rather than by who the caller is: a message
+ * longer than this kind of conversation allows, an edit past its window, a
+ * file bigger than the ceiling.
+ *
+ * A subclass because every caller does the same thing with both - shows the
+ * sentence - and one catch that missed this would turn a limit into a 500. The
+ * name is what tells the two apart in a log.
+ */
+export class ChatRuleError extends ChatAccessError {
+    constructor(message: string) {
+        super(message);
+        this.name = "ChatRuleError";
+    }
+}
+
+/**
  * What this actor may do in this space, or null when it is not theirs to reach.
  *
  * An archived space still resolves: reading what was said in one is exactly what

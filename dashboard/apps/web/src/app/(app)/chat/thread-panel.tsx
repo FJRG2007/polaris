@@ -13,6 +13,7 @@
  */
 
 import { X } from "lucide-react";
+import * as core from "@polaris/core";
 import * as actions from "./actions";
 import { Composer } from "./composer";
 import { Skeleton } from "@polaris/ui";
@@ -24,6 +25,7 @@ import type { ChatMessageView } from "@/lib/chat/messages";
 
 export function ThreadPanel({
     root,
+    rules,
     viewerId,
     canPost,
     canModerate,
@@ -31,6 +33,9 @@ export function ThreadPanel({
     onChanged
 }: {
     root: ChatMessageView;
+    /** The channel's rules, handed down rather than resolved again: a thread is
+     *  in the conversation it hangs off and is under the same limits. */
+    rules: core.ChatRules;
     viewerId: string;
     canPost: boolean;
     canModerate: boolean;
@@ -137,6 +142,7 @@ export function ThreadPanel({
 
             <Composer
                 channelId={root.channelId}
+                rules={rules}
                 disabled={!canPost}
                 placeholder="Reply in this thread"
                 onMedia={async (address) => {

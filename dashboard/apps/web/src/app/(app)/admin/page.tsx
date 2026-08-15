@@ -11,6 +11,7 @@ import {
     HardDrive,
     IdCard,
     Mail,
+    MessageSquare,
     MessagesSquare,
     Scale,
     Settings,
@@ -53,6 +54,12 @@ const SECTIONS = [
         icon: MessagesSquare,
         title: "Inbox",
         description: "Conversations, the channels they arrive on, and who they are with."
+    },
+    {
+        href: "/admin/chat",
+        icon: MessageSquare,
+        title: "Chat",
+        description: "Message and file limits, how long one stays editable, and what a deleted one leaves."
     },
     {
         href: "/admin/email",

@@ -14,8 +14,9 @@
  * the live frame already brings.
  */
 
-import { listChannelsAction } from "./actions";
+import * as core from "@polaris/core";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
+import { chatRulesAction, listChannelsAction } from "./actions";
 import {
     createContext,
     useCallback,
@@ -38,6 +39,10 @@ interface ChatContextValue {
      *  from "nothing at all" and skeleton the first rather than empty-state it. */
     readonly loaded: boolean;
     readonly refresh: () => void;
+    /** What the instance allows in a conversation of a given shape. The
+     *  defaults until the answer arrives, so the composer is never briefly
+     *  stricter than the server. */
+    readonly rulesFor: (channel: { spaceId: string | null; kind: string }) => core.ChatRules;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -57,6 +62,7 @@ export function ChatProvider({
 }) {
     const [channels, setChannels] = useState<readonly ChatChannelView[]>([]);
     const [loaded, setLoaded] = useState(false);
+    const [rules, setRules] = useState<Record<core.ChatRuleScope, core.ChatRules> | null>(null);
 
     const refresh = useCallback(() => {
         void listChannelsAction()
@@ -70,9 +76,28 @@ export function ChatProvider({
 
     useEffect(refresh, [refresh]);
 
+    // Once, when the app opens. The rules are an instance setting: they do not
+    // change while somebody is typing, and re-reading them per conversation
+    // would be three rows fetched on every navigation.
+    useEffect(() => {
+        void chatRulesAction()
+            .then((result) => setRules(result.rules))
+            .catch(() => {
+                // Left null, which reads as the defaults. The server enforces
+                // the real ones either way; this only decides what the composer
+                // warns about.
+            });
+    }, []);
+
+    const rulesFor = useCallback(
+        (channel: { spaceId: string | null; kind: string }) =>
+            rules?.[core.chatRuleScopeOf(channel)] ?? core.DEFAULT_CHAT_RULES,
+        [rules]
+    );
+
     const value = useMemo(
-        () => ({ viewerId, viewerName, orgId, orgName, channels, loaded, refresh }),
-        [viewerId, viewerName, orgId, orgName, channels, loaded, refresh]
+        () => ({ viewerId, viewerName, orgId, orgName, channels, loaded, refresh, rulesFor }),
+        [viewerId, viewerName, orgId, orgName, channels, loaded, refresh, rulesFor]
     );
 
     return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

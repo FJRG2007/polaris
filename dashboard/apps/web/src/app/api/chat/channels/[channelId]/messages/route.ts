@@ -19,13 +19,9 @@ import { z } from "zod";
 import * as core from "@polaris/core";
 import { send } from "@/lib/chat/messages";
 import { requirePermission } from "@/lib/session";
+import { rulesForChannel } from "@/lib/chat/rules";
 import { ChatAccessError, requirePostable } from "@/lib/chat/access";
-import {
-    MAX_ATTACHMENTS,
-    MAX_ATTACHMENT_BYTES,
-    storeAttachment,
-    type StoredAttachment
-} from "@/lib/chat/attachments";
+import { storeAttachment, type StoredAttachment } from "@/lib/chat/attachments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,15 +69,26 @@ export async function POST(
     if (files.length === 0 && !fields.data.body) {
         return Response.json({ error: "Write something, or attach a file" }, { status: 400 });
     }
-    if (files.length > MAX_ATTACHMENTS) {
+    // How many files and how big is the instance's decision, and it is answered
+    // per kind of conversation: an operator may reasonably allow a screenshot in
+    // a channel and nothing at all in a direct message.
+    const rules = await rulesForChannel(channelId);
+    if (files.length > 0 && rules.maxAttachments === 0) {
+        return Response.json({ error: "Files cannot be sent here" }, { status: 400 });
+    }
+    if (files.length > rules.maxAttachments) {
         return Response.json(
-            { error: `That is more than ${MAX_ATTACHMENTS} files` },
+            { error: `That is more than ${rules.maxAttachments} files` },
             { status: 400 }
         );
     }
+    const biggest = rules.maxAttachmentMib * 1024 * 1024;
     for (const file of files) {
-        if (file.size > MAX_ATTACHMENT_BYTES) {
-            return Response.json({ error: `${file.name} is too big` }, { status: 400 });
+        if (file.size > biggest) {
+            return Response.json(
+                { error: `${file.name} is bigger than ${rules.maxAttachmentMib} MB` },
+                { status: 400 }
+            );
         }
     }
 

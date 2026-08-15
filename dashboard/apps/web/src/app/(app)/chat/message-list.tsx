@@ -18,8 +18,10 @@
  * was taken back.
  */
 
+import { useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { MessageMenu } from "./message-menu";
+import { EditHistoryDialog } from "./edit-history-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
@@ -147,6 +149,7 @@ function Message({
     onDelete: (message: ChatMessageView) => void;
 }) {
     const format = useDisplayFormat();
+    const [showingHistory, setShowingHistory] = useState(false);
     const author = message.authorName ?? "Somebody who has left";
 
     if (message.kind === "system") {
@@ -233,9 +236,16 @@ function Message({
                     <div className="text-sm">
                         <RichText value={message.body} />
                         {message.edited && (
-                            <span className="ml-1 text-[11px] text-foreground-subtle">
+                            // A button, not a label: "(edited)" that cannot be
+                            // opened asks the room to take the change on trust.
+                            <button
+                                type="button"
+                                onClick={() => setShowingHistory(true)}
+                                title="See what it said before"
+                                className="ml-1 rounded text-[11px] text-foreground-subtle underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
+                            >
                                 (edited)
-                            </span>
+                            </button>
                         )}
                     </div>
                 )}
@@ -387,6 +397,11 @@ function Message({
                     )}
                 </div>
             )}
+
+            <EditHistoryDialog
+                message={showingHistory ? message : null}
+                onOpenChange={(open) => setShowingHistory(open)}
+            />
         </div>
         </MessageMenu>
     );

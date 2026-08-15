@@ -21,23 +21,25 @@
  * how most people expect to send a screenshot.
  */
 
+import * as core from "@polaris/core";
 import { Button, cn } from "@polaris/ui";
 import { typingAction } from "./actions";
 import { EmojiPicker } from "./emoji-picker";
-import { CornerUpLeft, Paperclip, SendHorizontal, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
+import { CornerUpLeft, Paperclip, SendHorizontal, X } from "lucide-react";
 
 /** How often, at most, the server is told somebody is typing. */
 const TYPING_EVERY_MS = 2500;
 
-/** What the route accepts on one message. Repeated here so the field stops
- *  accepting them rather than letting somebody stage twelve and be refused. */
-const MAX_FILES = 10;
+/** How close to the length limit the counter appears. Showing it from the first
+ *  character would put a number on a field nobody is near the end of. */
+const COUNTER_WITHIN = 200;
 
 export function Composer({
     channelId,
+    rules,
     disabled,
     placeholder,
     editing,
@@ -49,6 +51,11 @@ export function Composer({
     onCancelEdit
 }: {
     channelId: string;
+    /** What this kind of conversation allows: how long a message may be, how
+     *  many files it may carry and how big one may be. Enforced again on the
+     *  server; here so a limit is met while typing rather than after a
+     *  40 MB upload somebody waited for. */
+    rules: core.ChatRules;
     disabled: boolean;
     placeholder: string;
     /** The message being rewritten, if any. */
@@ -68,6 +75,7 @@ export function Composer({
 }) {
     const [body, setBody] = useState("");
     const [files, setFiles] = useState<readonly File[]>([]);
+    const [refused, setRefused] = useState("");
     const [dragging, setDragging] = useState(false);
     const picker = useRef<HTMLInputElement>(null);
     // Bumped to rebuild the editor, which is how it is cleared: the editor owns
@@ -81,22 +89,53 @@ export function Composer({
         setGeneration((current) => current + 1);
     }, [editing]);
 
+    // Code points rather than length, so the count matches the one the server
+    // makes: an emoji is one character to the person typing it and two to
+    // JavaScript.
+    const typed = [...body.trim()].length;
+    const tooLong = typed > rules.maxMessageLength;
+    const maxBytes = rules.maxAttachmentMib * 1024 * 1024;
+
     const submit = async (value: string) => {
         const text = value.trim();
         // A message that is only a file is a message. Making somebody type
         // "here" before they can send a screenshot is a tax on the common case.
-        if (disabled || (!text && files.length === 0)) return;
+        if (disabled || tooLong || (!text && files.length === 0)) return;
         const sending = files;
         setBody("");
         setFiles([]);
+        setRefused("");
         setGeneration((current) => current + 1);
         if (editing && onSaveEdit) await onSaveEdit(editing.id, text);
         else await onSend(text, sending);
     };
 
+    /**
+     * Take what fits and say what did not.
+     *
+     * Silently dropping the eleventh file is how somebody sends ten of the
+     * twelve screenshots they meant to and finds out later.
+     */
     const stage = (picked: FileList | null): void => {
         if (!picked || picked.length === 0) return;
-        setFiles((current) => [...current, ...Array.from(picked)].slice(0, MAX_FILES));
+        const chosen = Array.from(picked);
+        const room = Math.max(0, rules.maxAttachments - files.length);
+        const small = chosen.filter((file) => file.size <= maxBytes);
+        const accepted = small.slice(0, room);
+
+        const notes: string[] = [];
+        if (small.length < chosen.length) {
+            notes.push(`Files here can be up to ${rules.maxAttachmentMib} MB.`);
+        }
+        if (accepted.length < small.length) {
+            notes.push(
+                rules.maxAttachments === 0
+                    ? "Files cannot be sent here."
+                    : `A message can carry ${rules.maxAttachments} files.`
+            );
+        }
+        setRefused(notes.join(" "));
+        if (accepted.length > 0) setFiles((current) => [...current, ...accepted]);
     };
 
     const announce = () => {
@@ -163,6 +202,12 @@ export function Composer({
                 </div>
             )}
 
+            {refused && (
+                <p role="alert" className="mb-2 text-xs text-danger">
+                    {refused}
+                </p>
+            )}
+
             {files.length > 0 && (
                 <ul className="mb-2 flex flex-wrap gap-1">
                     {files.map((file, index) => (
@@ -211,16 +256,21 @@ export function Composer({
                 <div className="flex items-center gap-0.5 px-2 pb-1.5">
                     {!editing && (
                         <>
-                            <button
-                                type="button"
-                                disabled={disabled || files.length >= MAX_FILES}
-                                onClick={() => picker.current?.click()}
-                                aria-label="Attach a file"
-                                title="Attach a file"
-                                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-                            >
-                                <Paperclip className="size-4" />
-                            </button>
+                            {/* Gone rather than disabled where the instance
+                                allows no files at all: a permanently dead
+                                button is a promise the room cannot keep. */}
+                            {rules.maxAttachments > 0 && (
+                                <button
+                                    type="button"
+                                    disabled={disabled || files.length >= rules.maxAttachments}
+                                    onClick={() => picker.current?.click()}
+                                    aria-label="Attach a file"
+                                    title="Attach a file"
+                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                >
+                                    <Paperclip className="size-4" />
+                                </button>
+                            )}
                             <EmojiPicker
                                 disabled={disabled}
                                 onEmoji={(char) => setBody((current) => `${current}${char}`)}
@@ -230,19 +280,29 @@ export function Composer({
                     )}
 
                     <span className="ml-auto flex items-center gap-2">
+                        {typed > rules.maxMessageLength - COUNTER_WITHIN && (
+                            <span
+                                className={cn(
+                                    "text-[11px] tabular-nums",
+                                    tooLong ? "text-danger" : "text-muted-foreground"
+                                )}
+                            >
+                                {typed}/{rules.maxMessageLength}
+                            </span>
+                        )}
                         {editing ? (
                             <>
                                 <Button size="xs" variant="ghost" onClick={onCancelEdit}>
                                     Cancel
                                 </Button>
-                                <Button size="xs" onClick={() => void submit(body)}>
+                                <Button size="xs" disabled={tooLong} onClick={() => void submit(body)}>
                                     Save
                                 </Button>
                             </>
                         ) : (
                             <button
                                 type="button"
-                                disabled={disabled || (!body.trim() && files.length === 0)}
+                                disabled={disabled || tooLong || (!body.trim() && files.length === 0)}
                                 onClick={() => void submit(body)}
                                 aria-label="Send"
                                 title="Send"
