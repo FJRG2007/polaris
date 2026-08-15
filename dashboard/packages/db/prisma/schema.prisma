@@ -5675,6 +5675,11 @@ model ChatChannelMember {
     lastDeliveredAt   DateTime?
     // No badge, and no notification, without leaving the channel.
     muted             Boolean   @default(false)
+    // When the quiet ends. Null while `muted` means "until I turn it back on",
+    // which is a different thing from a silence that expires and the only way
+    // the screen can say which one is on. A lapsed row is cleared on the next
+    // read rather than by a job: nothing else has to run for it to be right.
+    mutedUntil        DateTime?
     createdAt         DateTime  @default(now())
 
     channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)

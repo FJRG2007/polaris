@@ -61,6 +61,9 @@ export interface ChatChannelView {
      *  never opened and nothing has happened in. */
     readonly unread: number;
     readonly muted: boolean;
+    /** When the quiet ends, or null when it does not - either because the
+     *  conversation is not muted or because it was muted with no end. */
+    readonly mutedUntil: string | null;
     /** Whether this reader administers the conversation, which is what decides
      *  whether the screen offers them anything only a moderator may do. Always
      *  false in a direct message, where everybody in one is equal in it. */
@@ -299,7 +302,13 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
     const [memberships, administered] = await Promise.all([
         prisma.chatChannelMember.findMany({
             where: { userId: actor.id },
-            select: { channelId: true, lastReadAt: true, muted: true, role: true }
+            select: {
+                channelId: true,
+                lastReadAt: true,
+                muted: true,
+                mutedUntil: true,
+                role: true
+            }
         }),
         administeredSpaceIds(actor)
     ]);
@@ -334,6 +343,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
         const others = channel.members
             .filter((member) => member.userId !== actor.id)
             .map((member) => ({ id: member.userId, name: member.user.name }));
+        const membership = mine.get(channel.id);
         return {
             id: channel.id,
             spaceId: channel.spaceId,
@@ -347,7 +357,10 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             archived: channel.archived,
             lastMessageAt: channel.lastMessageAt?.toISOString() ?? null,
             unread: unread.get(channel.id) ?? 0,
-            muted: mine.get(channel.id)?.muted ?? false,
+            // Worked out rather than read: a mute with an end that has passed is
+            // not a mute, and nothing runs to clear the flag.
+            muted: membership ? core.muteInForce(membership) : false,
+            mutedUntil: membership?.mutedUntil?.toISOString() ?? null,
             mayAdminister: Boolean(
                 channel.spaceId &&
                     (administered.has(channel.spaceId) || mine.get(channel.id)?.role === "admin")
@@ -606,13 +619,33 @@ export async function removeChannelMember(
     publishChatChange({ channelId, kind: "channels", actorId: actor.id, audience: [userId] });
 }
 
-export async function setMuted(actor: ChatActor, channelId: string, muted: boolean): Promise<void> {
+/**
+ * Go quiet, for a while or until told otherwise.
+ *
+ * @param minutes - How long, `MUTE_FOREVER` for no end, or null to unmute.
+ *   Validated against the offered set rather than taken as a number: an
+ *   arbitrary one is not a thing any screen can say afterwards, and "muted for
+ *   527 minutes" is not a state anybody chose.
+ */
+export async function setMuted(
+    actor: ChatActor,
+    channelId: string,
+    minutes: number | null
+): Promise<void> {
     await requireChannel(actor, channelId);
+    const parsed = core.muteSchema.safeParse({ channelId, minutes });
+    if (!parsed.success) throw new ChatAccessError("That is not a length this can be muted for");
+
+    const muted = parsed.data.minutes !== null;
+    const mutedUntil = muted ? core.muteEndsAt(parsed.data.minutes!) : null;
     await prisma.chatChannelMember.upsert({
         where: { channelId_userId: { channelId, userId: actor.id } },
-        update: { muted },
-        create: { channelId, userId: actor.id, muted }
+        update: { muted, mutedUntil },
+        create: { channelId, userId: actor.id, muted, mutedUntil }
     });
+    // The rail draws the bell, and the tab that pressed it is not the only one
+    // showing this conversation.
+    publishChatChange({ channelId, kind: "channels", actorId: actor.id, audience: [actor.id] });
 }
 
 /**

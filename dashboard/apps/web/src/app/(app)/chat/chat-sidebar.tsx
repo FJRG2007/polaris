@@ -30,11 +30,10 @@ import { useAppUrl } from "@/components/app-url";
 import { NewDirectDialog } from "./new-direct-dialog";
 import { NewChannelDialog } from "./new-channel-dialog";
 import { useParams, usePathname } from "next/navigation";
+import { MuteOptions, type MenuParts } from "./mute-menu";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
 import {
-    Bell,
-    BellOff,
     ChevronDown,
     FolderPlus,
     Hash,
@@ -53,6 +52,9 @@ import {
     ContextMenu,
     ContextMenuContent,
     ContextMenuItem,
+    ContextMenuSub,
+    ContextMenuSubContent,
+    ContextMenuSubTrigger,
     ContextMenuTrigger,
     Dialog,
     DialogContent,
@@ -67,6 +69,14 @@ import {
     Input,
     Skeleton
 } from "@polaris/ui";
+
+/** How the shared mute list draws itself inside a right-click menu. */
+const CONTEXT_PARTS: MenuParts = {
+    Item: ContextMenuItem,
+    Sub: ContextMenuSub,
+    SubTrigger: ContextMenuSubTrigger,
+    SubContent: ContextMenuSubContent
+};
 
 /** How often the rail asks who is sitting in the voice rooms. Often enough that
  *  somebody walking in appears while you are looking at it, rarely enough that a
@@ -561,15 +571,14 @@ function RowMenu({ channel, children }: { channel: ChatChannelView; children: Re
                     <Link2 className="size-3.5" />
                     Copy link
                 </ContextMenuItem>
-                <ContextMenuItem
-                    onSelect={async () => {
-                        await actions.setMutedAction(channel.id, !channel.muted);
+                <MuteOptions
+                    channel={channel}
+                    parts={CONTEXT_PARTS}
+                    onChoose={async (minutes) => {
+                        await actions.setMutedAction(channel.id, minutes);
                         refresh();
                     }}
-                >
-                    {channel.muted ? <Bell className="size-3.5" /> : <BellOff className="size-3.5" />}
-                    {channel.muted ? "Unmute" : "Mute"}
-                </ContextMenuItem>
+                />
             </ContextMenuContent>
         </ContextMenu>
     );

@@ -3,6 +3,8 @@
 /** Dropdown menu built on Radix. Used by the app switcher and row actions. */
 
 import { cn } from "../lib/cn";
+import { ChevronRight } from "lucide-react";
+import { useSettledHover } from "../lib/menu-hover";
 import { ignoreOpeningPress } from "../lib/menu-press";
 import * as RadixMenu from "@radix-ui/react-dropdown-menu";
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
@@ -10,6 +12,7 @@ import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "reac
 export const DropdownMenu = RadixMenu.Root;
 export const DropdownMenuTrigger = RadixMenu.Trigger;
 export const DropdownMenuGroup = RadixMenu.Group;
+export const DropdownMenuSub = RadixMenu.Sub;
 export const DropdownMenuSeparatorRoot = RadixMenu.Separator;
 
 export const DropdownMenuContent = forwardRef<
@@ -61,6 +64,58 @@ export const DropdownMenuItem = forwardRef<
     />
 ));
 DropdownMenuItem.displayName = "DropdownMenuItem";
+
+/** A submenu's trigger. Same shape and same nudge as the right-click menu's:
+ *  they are the same submenus reached two ways. */
+export const DropdownMenuSubTrigger = forwardRef<
+    ElementRef<typeof RadixMenu.SubTrigger>,
+    ComponentPropsWithoutRef<typeof RadixMenu.SubTrigger>
+>(({ className, children, onPointerMove, onPointerLeave, ...props }, ref) => {
+    const settled = useSettledHover();
+    return (
+        <RadixMenu.SubTrigger
+            ref={ref}
+            className={cn(
+                "relative flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-[13px] outline-none transition-colors duration-fast focus:bg-card-hover data-[state=open]:bg-card-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+                className
+            )}
+            {...props}
+            // After the spread, so nothing a caller passes loses the nudge.
+            onPointerMove={(event) => {
+                onPointerMove?.(event);
+                settled.onPointerMove(event);
+            }}
+            onPointerLeave={(event) => {
+                onPointerLeave?.(event);
+                settled.onPointerLeave();
+            }}
+        >
+            {children}
+            <ChevronRight className="ml-auto size-4" />
+        </RadixMenu.SubTrigger>
+    );
+});
+DropdownMenuSubTrigger.displayName = "DropdownMenuSubTrigger";
+
+export const DropdownMenuSubContent = forwardRef<
+    ElementRef<typeof RadixMenu.SubContent>,
+    ComponentPropsWithoutRef<typeof RadixMenu.SubContent>
+>(({ className, ...props }, ref) => (
+    <RadixMenu.Portal>
+        <RadixMenu.SubContent
+            ref={ref}
+            className={cn(
+                "z-50 min-w-[12rem] overflow-hidden rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+                className
+            )}
+            {...props}
+            // After the spread: the menu must never commit an option on the
+            // release of the press that opened it.
+            onPointerUpCapture={ignoreOpeningPress}
+        />
+    </RadixMenu.Portal>
+));
+DropdownMenuSubContent.displayName = "DropdownMenuSubContent";
 
 export function DropdownMenuSeparator({ className }: { className?: string }) {
     return <RadixMenu.Separator className={cn("-mx-1 my-1 h-px bg-border", className)} />;

@@ -19,11 +19,13 @@ import { revalidatePath } from "next/cache";
 import * as chat from "@/lib/chat/chat-service";
 import * as messages from "@/lib/chat/messages";
 import { allChatRules } from "@/lib/chat/rules";
-import { searchMessages, type ChatSearchHit } from "@/lib/chat/search";
 import { requirePermission } from "@/lib/session";
+import { voicePresence } from "@/lib/chat/meetings";
 import { storeAttachment } from "@/lib/chat/attachments";
 import { searchAccounts } from "@/lib/rich-text/mention-service";
 import type { ChatMessageView, ChatPage } from "@/lib/chat/messages";
+import { searchMessages, type ChatSearchHit } from "@/lib/chat/search";
+import { fetchRemoteMedia, searchTenor, tenorConfigured, type TenorResult } from "@/lib/chat/tenor";
 import {
     ChatAccessError,
     messageable,
@@ -36,8 +38,6 @@ import type {
     ChatMemberView,
     ChatSpaceView
 } from "@/lib/chat/chat-service";
-import { voicePresence } from "@/lib/chat/meetings";
-import { fetchRemoteMedia, searchTenor, tenorConfigured, type TenorResult } from "@/lib/chat/tenor";
 
 const CHAT_PATH = "/chat";
 
@@ -493,12 +493,13 @@ export async function removeChannelMemberAction(
     return result;
 }
 
+/** @param minutes - How long, `MUTE_FOREVER` for no end, or null to unmute. */
 export async function setMutedAction(
     channelId: string,
-    muted: boolean
+    minutes: number | null
 ): Promise<{ error?: string }> {
     const me = await actor();
-    const result = await guard(() => chat.setMuted(me, channelId, muted));
+    const result = await guard(() => chat.setMuted(me, channelId, minutes));
     if (!result.error) revalidatePath(CHAT_PATH);
     return result;
 }

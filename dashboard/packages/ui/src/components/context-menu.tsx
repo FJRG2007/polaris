@@ -8,30 +8,17 @@
 
 import { cn } from "../lib/cn";
 import { ChevronRight } from "lucide-react";
+import { useSettledHover } from "../lib/menu-hover";
 import { ignoreOpeningPress } from "../lib/menu-press";
 import * as RadixMenu from "@radix-ui/react-context-menu";
 import {
     createContext,
     forwardRef,
     useContext,
-    useEffect,
-    useRef,
     useState,
     type ComponentPropsWithoutRef,
     type ElementRef
 } from "react";
-
-/**
- * How long to wait before a submenu that should have opened is asked again.
- *
- * A menu ignores a hover that arrives while the pointer still looks like it is
- * heading for the submenu it just left - the courtesy that lets somebody cut the
- * corner into a submenu without it closing under them. It lasts 300ms, and only
- * a pointer that MOVES afterwards opens anything. So a hand that runs down the
- * options and stops on one inside that window gets nothing at all, and has to
- * jiggle the mouse to be noticed, which is what makes a quick scan feel broken.
- */
-const SETTLED_MS = 350;
 
 export const ContextMenu = RadixMenu.Root;
 export const ContextMenuTrigger = RadixMenu.Trigger;
@@ -111,12 +98,7 @@ export const ContextMenuSubTrigger = forwardRef<
     ElementRef<typeof RadixMenu.SubTrigger>,
     ComponentPropsWithoutRef<typeof RadixMenu.SubTrigger>
 >(({ className, children, onPointerMove, onPointerLeave, ...props }, ref) => {
-    const settled = useRef<number | undefined>(undefined);
-    const cancel = () => {
-        if (settled.current !== undefined) window.clearTimeout(settled.current);
-        settled.current = undefined;
-    };
-    useEffect(() => cancel, []);
+    const settled = useSettledHover();
 
     return (
         <RadixMenu.SubTrigger
@@ -129,24 +111,11 @@ export const ContextMenuSubTrigger = forwardRef<
             // After the spread, so nothing a caller passes loses the nudge.
             onPointerMove={(event) => {
                 onPointerMove?.(event);
-                if (event.pointerType !== "mouse" || settled.current !== undefined) return;
-                const trigger = event.currentTarget;
-                const { clientX, clientY } = event;
-                // The pointer has arrived. If it is still here once the menu has
-                // stopped being courteous and this is still shut, move for it -
-                // the jiggle somebody would otherwise have to do themselves.
-                settled.current = window.setTimeout(() => {
-                    settled.current = undefined;
-                    if (!trigger.isConnected || trigger.dataset.state === "open") return;
-                    if (!trigger.matches(":hover")) return;
-                    trigger.dispatchEvent(
-                        new PointerEvent("pointermove", { bubbles: true, clientX, clientY, pointerType: "mouse" })
-                    );
-                }, SETTLED_MS);
+                settled.onPointerMove(event);
             }}
             onPointerLeave={(event) => {
                 onPointerLeave?.(event);
-                cancel();
+                settled.onPointerLeave();
             }}
         >
             {children}

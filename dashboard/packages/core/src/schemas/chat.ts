@@ -364,3 +364,62 @@ export const chatCategoryUpdateSchema = z.object({
 });
 
 export type ChatCategoryUpdateInput = z.infer<typeof chatCategoryUpdateSchema>;
+
+/**
+ * How long a conversation stays quiet.
+ *
+ * The set every messenger has settled on, and the last one is the one that
+ * matters: a silence with no end is a different decision from a silence that
+ * lapses, and offering only timed options makes somebody re-mute a noisy channel
+ * every morning. Minutes rather than a date, so the choice means the same thing
+ * whenever it is made and nothing has to be recomputed on the way to the server.
+ */
+export const MUTE_DURATIONS = [15, 60, 180, 480, 1440] as const;
+
+/** Minutes, or 0 for "until I turn it back on". */
+export const MUTE_FOREVER = 0;
+
+export const MUTE_LABELS: Readonly<Record<number, string>> = {
+    15: "For 15 minutes",
+    60: "For an hour",
+    180: "For 3 hours",
+    480: "For 8 hours",
+    1440: "For 24 hours",
+    [MUTE_FOREVER]: "Until I turn it back on"
+};
+
+/** The lengths a mute may be, as one set: the offered durations and no end.
+ *  Anything else is not a state any screen could describe afterwards. */
+const MUTE_MINUTES: readonly number[] = [MUTE_FOREVER, ...MUTE_DURATIONS];
+
+export const muteSchema = z.object({
+    channelId: z.string().uuid(),
+    /** Null means unmute. */
+    minutes: z
+        .number()
+        .refine((value) => MUTE_MINUTES.includes(value), "That is not a length to mute for")
+        .nullable()
+});
+
+export type MuteInput = z.infer<typeof muteSchema>;
+
+/** When a mute of this length ends, or null when it does not. */
+export function muteEndsAt(minutes: number, now = new Date()): Date | null {
+    return minutes === MUTE_FOREVER ? null : new Date(now.getTime() + minutes * 60_000);
+}
+
+/**
+ * Whether a stored mute is still in force.
+ *
+ * A row whose end has passed is not muted, whatever the flag says. Worked out
+ * on read rather than cleared by a job, so nothing has to be running for a
+ * silence to expire on time.
+ */
+export function muteInForce(
+    row: { muted: boolean; mutedUntil: Date | string | null },
+    now = new Date()
+): boolean {
+    if (!row.muted) return false;
+    if (row.mutedUntil === null) return true;
+    return new Date(row.mutedUntil).getTime() > now.getTime();
+}

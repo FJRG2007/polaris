@@ -21,11 +21,10 @@ import { runAction } from "@/lib/run-action";
 import { channelLink, copyText } from "./links";
 import { useAppUrl } from "@/components/app-url";
 import { AddPeopleDialog } from "./add-people-dialog";
+import { MuteOptions, type MenuParts } from "./mute-menu";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import {
     ArrowLeft,
-    Bell,
-    BellOff,
     Hash,
     Link2,
     LogOut,
@@ -51,9 +50,20 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
     Input
 } from "@polaris/ui";
+
+/** How the shared mute list draws itself inside a dropdown. */
+const DROPDOWN_PARTS: MenuParts = {
+    Item: DropdownMenuItem,
+    Sub: DropdownMenuSub,
+    SubTrigger: DropdownMenuSubTrigger,
+    SubContent: DropdownMenuSubContent
+};
 
 export function ChannelHeader({
     channel,
@@ -206,20 +216,13 @@ export function ChannelHeader({
                                 Copy link
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                onSelect={() =>
-                                    void act(() =>
-                                        actions.setMutedAction(channel.id, !channel.muted)
-                                    )
+                            <MuteOptions
+                                channel={channel}
+                                parts={DROPDOWN_PARTS}
+                                onChoose={(minutes) =>
+                                    void act(() => actions.setMutedAction(channel.id, minutes))
                                 }
-                            >
-                                {channel.muted ? (
-                                    <Bell className="size-3.5" />
-                                ) : (
-                                    <BellOff className="size-3.5" />
-                                )}
-                                {channel.muted ? "Unmute" : "Mute"}
-                            </DropdownMenuItem>
+                            />
                             {group && (
                                 <>
                                     <DropdownMenuItem onSelect={() => setRenaming(true)}>

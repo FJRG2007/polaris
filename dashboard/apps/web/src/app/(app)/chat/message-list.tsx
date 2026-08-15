@@ -18,9 +18,10 @@
  * was taken back.
  */
 
-import { useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { MessageMenu } from "./message-menu";
+import { embedFor } from "@/lib/chat/embeds";
+import { useEffect, useRef, useState } from "react";
 import { EditHistoryDialog } from "./edit-history-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
@@ -40,6 +41,7 @@ import {
     MessageSquare,
     Paperclip,
     Pencil,
+    Play,
     SmilePlus,
     Star,
     Trash2
@@ -89,6 +91,8 @@ export function MessageList({
     onEdit,
     onDelete
 }: MessageListProps) {
+    useEditKey({ messages, viewerId, canPost, onEdit });
+
     return (
         <ol className="flex flex-col">
             {messages.map((message, index) => {
@@ -133,6 +137,65 @@ export function MessageList({
             })}
         </ol>
     );
+}
+
+/**
+ * F2 rewrites the message under the pointer.
+ *
+ * The row already lights up on hover and already carries a pencil, so the thing
+ * being pointed at is unambiguous - this is a shortcut to the control that is
+ * visibly there, not a hidden gesture. Focus counts as well as hover, so the
+ * same key reaches the same message for somebody using a keyboard.
+ *
+ * Ignored while a field has focus. F2 does nothing in a text box, but a shortcut
+ * that fired while somebody was typing would be one that fired at the wrong
+ * message.
+ */
+function useEditKey({
+    messages,
+    viewerId,
+    canPost,
+    onEdit
+}: {
+    messages: readonly ChatMessageView[];
+    viewerId: string;
+    canPost: boolean;
+    onEdit: (message: ChatMessageView) => void;
+}) {
+    // Held in a ref so the listener is bound once rather than rebuilt on every
+    // message that arrives.
+    const latest = useRef({ messages, viewerId, canPost, onEdit });
+    latest.current = { messages, viewerId, canPost, onEdit };
+
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key !== "F2" || event.metaKey || event.ctrlKey || event.altKey) return;
+            const active = document.activeElement;
+            if (
+                active instanceof HTMLElement &&
+                (active.isContentEditable ||
+                    ["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName))
+            ) {
+                return;
+            }
+
+            const { messages: shown, viewerId: me, canPost: allowed, onEdit: edit } = latest.current;
+            if (!allowed) return;
+            const row =
+                document.querySelector("li[id^='message-']:hover") ??
+                active?.closest("li[id^='message-']");
+            const id = row?.id.replace(/^message-/, "");
+            const message = shown.find((entry) => entry.id === id);
+            // Only your own, and not one that has been taken back. The same rule
+            // the pencil is drawn under, so the key can never do something the
+            // screen does not offer.
+            if (!message || message.deleted || message.authorId !== me) return;
+            event.preventDefault();
+            edit(message);
+        };
+        document.addEventListener("keydown", onKey);
+        return () => document.removeEventListener("keydown", onKey);
+    }, []);
 }
 
 function Message({
@@ -476,6 +539,84 @@ function Ticks({ receipt }: { receipt: NonNullable<ChatMessageView["receipt"]> }
  * card does not announce the reader to whoever runs the page.
  */
 function LinkCard({ preview }: { preview: NonNullable<ChatMessageView["preview"]> }) {
+    const embed = embedFor(preview.url);
+    const [playing, setPlaying] = useState(false);
+
+    const details = (
+        <span className="flex min-w-0 flex-col gap-0.5">
+            {preview.siteName && (
+                <span className="truncate text-[11px] text-muted-foreground">
+                    {preview.siteName}
+                </span>
+            )}
+            <span className="truncate text-xs font-medium text-foreground">
+                {preview.title || preview.url}
+            </span>
+            {preview.description && (
+                <span className="line-clamp-2 text-xs text-muted-foreground">
+                    {preview.description}
+                </span>
+            )}
+        </span>
+    );
+
+    // Something Polaris can play. The frame is built only once somebody presses
+    // play: until then nothing has been requested from the site, which is the
+    // same promise the picture already keeps.
+    if (embed) {
+        return (
+            <div className="mt-1 flex max-w-lg flex-col gap-2 rounded-md border border-border border-l-2 border-l-primary bg-card p-2">
+                <a
+                    href={preview.url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="min-w-0 no-underline"
+                >
+                    {details}
+                </a>
+                {playing ? (
+                    <iframe
+                        src={embed.url}
+                        title={preview.title || embed.provider}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture"
+                        allowFullScreen
+                        referrerPolicy="strict-origin-when-cross-origin"
+                        className={cn(
+                            "w-full rounded border-0 bg-black",
+                            embed.shape === "audio" ? "h-20" : "aspect-video"
+                        )}
+                    />
+                ) : (
+                    <button
+                        type="button"
+                        onClick={() => setPlaying(true)}
+                        aria-label={`Play this on ${embed.provider}, here`}
+                        title={`Plays here. ${embed.provider} sees you once you press it.`}
+                        className={cn(
+                            "group/play relative w-full overflow-hidden rounded bg-muted transition-colors hover:bg-card-hover",
+                            embed.shape === "audio" ? "h-20" : "aspect-video"
+                        )}
+                    >
+                        {preview.hasImage && (
+                            // eslint-disable-next-line @next/next/no-img-element -- fetched through Polaris, no loader wanted
+                            <img
+                                src={`/api/chat/links/${preview.id}/image`}
+                                alt=""
+                                loading="lazy"
+                                className="size-full object-cover"
+                            />
+                        )}
+                        <span className="absolute inset-0 flex items-center justify-center">
+                            <span className="flex size-11 items-center justify-center rounded-full bg-background/80 text-foreground transition-transform group-hover/play:scale-110">
+                                <Play className="size-5 fill-current" />
+                            </span>
+                        </span>
+                    </button>
+                )}
+            </div>
+        );
+    }
+
     return (
         <a
             href={preview.url}
@@ -492,21 +633,7 @@ function LinkCard({ preview }: { preview: NonNullable<ChatMessageView["preview"]
                     className="size-16 shrink-0 rounded object-cover"
                 />
             )}
-            <span className="flex min-w-0 flex-col gap-0.5">
-                {preview.siteName && (
-                    <span className="truncate text-[11px] text-muted-foreground">
-                        {preview.siteName}
-                    </span>
-                )}
-                <span className="truncate text-xs font-medium text-foreground">
-                    {preview.title || preview.url}
-                </span>
-                {preview.description && (
-                    <span className="line-clamp-2 text-xs text-muted-foreground">
-                        {preview.description}
-                    </span>
-                )}
-            </span>
+            {details}
         </a>
     );
 }

@@ -14,8 +14,9 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { rulesForChannel } from "./rules";
-import { receiptsBetween } from "@/lib/privacy-service";
 import { publishChatChange } from "./live";
+import { receiptsBetween } from "@/lib/privacy-service";
+import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { knownPreviews, unfurl, type LinkPreviewView } from "./link-preview";
 import { discardAttachments, isInlineImage, type StoredAttachment } from "./attachments";
 import {
@@ -308,10 +309,7 @@ export async function send(
 
     publishChatChange({ channelId: input.channelId, kind: "posted", actorId: actor.id });
 
-    // Deliberately not awaited. A message appearing is worth more than the card
-    // under it, and the card arrives with the next frame either way.
-    const link = core.firstLink(input.body);
-    if (link) void unfurl(link).catch(() => undefined);
+    unfurlLater(input.channelId, input.body);
 
     return id;
 }
@@ -396,8 +394,35 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
     publishChatChange({ channelId: message.channelId, kind: "posted", actorId: actor.id });
 
     // An edit can put a link in a message that did not have one.
-    const link = core.firstLink(input.body);
-    if (link) void unfurl(link).catch(() => undefined);
+    unfurlLater(message.channelId, input.body);
+}
+
+/**
+ * Look up the link in a message, after the message itself has gone out, and tell
+ * the conversation once there is something to draw.
+ *
+ * Not awaited by the send: a message appearing is worth more than the card under
+ * it, and waiting on somebody else's server before showing what you typed is the
+ * wrong trade every time.
+ *
+ * The announcement afterwards is the part that was missing, and without it the
+ * card simply never appeared. Nothing else was going to wake the screens: the
+ * unfurl finishes a second or two after the reload that followed the send, and
+ * the next reload only comes when somebody says something else. So the last
+ * message in every conversation - which is the one being looked at - had no card
+ * until the conversation moved on.
+ */
+function unfurlLater(channelId: string, body: string): void {
+    const link = core.firstLink(body);
+    if (!link) return;
+    void unfurl(link)
+        .then(() => {
+            // No actor: this is not anybody's write, and a frame attributed to
+            // the sender would be filtered out of the sender's own tab, which is
+            // the one tab certain to be looking at the message.
+            publishChatChange({ channelId, kind: "posted", actorId: "" });
+        })
+        .catch(() => undefined);
 }
 
 /** One version of a message, as the history dialog draws it. */
@@ -947,11 +972,12 @@ function quoteViewOf(
             forwarded: row.forwarded
         };
     }
-    const body = original.deletedAt ? "" : original.body.replace(/\s+/g, " ").trim();
     return {
         id: original.id,
         authorName: original.authorId ? (names.get(original.authorId) ?? null) : null,
-        excerpt: body.length > QUOTE_LENGTH ? `${body.slice(0, QUOTE_LENGTH)}...` : body,
+        // The words, not the Markdown they were written in. A quote that read
+        // "```py print(1) ```" showed the reader the fence rather than the code.
+        excerpt: original.deletedAt ? "" : plainExcerpt(original.body, QUOTE_LENGTH),
         deleted: original.deletedAt !== null,
         forwarded: row.forwarded
     };

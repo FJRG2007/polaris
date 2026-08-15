@@ -27,6 +27,7 @@ import { typingAction } from "./actions";
 import { EmojiPicker } from "./emoji-picker";
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessageView } from "@/lib/chat/messages";
+import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { CornerUpLeft, Paperclip, SendHorizontal, X } from "lucide-react";
 
@@ -171,11 +172,13 @@ export function Composer({
                     <span className="shrink-0 font-medium">
                         {replyingTo.authorName ?? "somebody who has left"}
                     </span>
+                    {/* The words, not the Markdown. Answering a code block used
+                        to fill this bar with backticks and a language tag. */}
                     <span
                         className="min-w-0 flex-1 truncate text-muted-foreground"
-                        title={replyingTo.body}
+                        title={plainExcerpt(replyingTo.body, 200)}
                     >
-                        {replyingTo.body}
+                        {plainExcerpt(replyingTo.body, 200)}
                     </span>
                     <button
                         type="button"

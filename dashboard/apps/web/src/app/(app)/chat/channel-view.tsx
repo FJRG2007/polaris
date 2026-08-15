@@ -38,6 +38,7 @@ import { ForwardDialog } from "./forward-dialog";
 import { ChannelHeader } from "./channel-header";
 import { useChatStream } from "./use-chat-stream";
 import type { ChatMessageView } from "@/lib/chat/messages";
+import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { ConfirmDeleteDialog, EmptyState, Skeleton } from "@polaris/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -589,7 +590,7 @@ export function ChannelView({
             <ConfirmDeleteDialog
                 open={deleting !== null}
                 onOpenChange={(open) => !open && setDeleting(null)}
-                name={deleting?.body.slice(0, 40) ?? ""}
+                name={deleting ? plainExcerpt(deleting.body, 40) : ""}
                 kind="message"
                 requireTyping={false}
                 description={
