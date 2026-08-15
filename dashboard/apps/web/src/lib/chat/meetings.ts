@@ -387,6 +387,48 @@ export async function liveIn(channelId: string): Promise<{ id: string; count: nu
     return { id: meeting.id, count };
 }
 
+/**
+ * Who is sitting in each voice channel of a space.
+ *
+ * The rail draws names under a voice room the way every client does, because a
+ * count on its own does not answer the question anybody is asking - which is not
+ * "how many" but "is anyone I want to talk to in there".
+ *
+ * One query for the whole space rather than one per channel. Channels the reader
+ * cannot reach are left out by the caller, which resolved them already.
+ */
+export async function voicePresence(
+    channelIds: readonly string[]
+): Promise<Map<string, { id: string; name: string }[]>> {
+    if (channelIds.length === 0) return new Map();
+
+    const meetings = await prisma.meeting.findMany({
+        where: { channelId: { in: [...channelIds] }, endedAt: null },
+        select: {
+            channelId: true,
+            participants: {
+                where: {
+                    leftAt: null,
+                    admission: "admitted",
+                    // Swept here rather than by a write: a browser that stopped
+                    // saying it was there would otherwise sit in the rail as a
+                    // name in a room nobody is in.
+                    lastSeenAt: { gte: new Date(Date.now() - PARTICIPANT_TTL_MS) }
+                },
+                orderBy: { joinedAt: "asc" },
+                select: { id: true, name: true }
+            }
+        }
+    });
+
+    const byChannel = new Map<string, { id: string; name: string }[]>();
+    for (const meeting of meetings) {
+        if (!meeting.channelId || meeting.participants.length === 0) continue;
+        byChannel.set(meeting.channelId, meeting.participants);
+    }
+    return byChannel;
+}
+
 /** Resolve a guest's cookie into their seat, or null when it names nothing. */
 export async function seatForGuestKey(guestKey: string): Promise<MeetingSeat | null> {
     const participant = await prisma.meetingParticipant.findUnique({

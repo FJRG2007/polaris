@@ -5560,8 +5560,9 @@ model ChatSpace {
 
     owner    User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
     org      Organization?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
-    members  ChatSpaceMember[]
-    channels ChatChannel[]
+    members    ChatSpaceMember[]
+    channels   ChatChannel[]
+    categories ChatCategory[]
 
     @@index([ownerId])
     @@index([orgId])
@@ -5599,7 +5600,11 @@ model ChatSpaceMember {
 model ChatChannel {
     id            String    @id @default(uuid(7)) @db.Uuid
     spaceId       String?   @db.Uuid
-    // text | dm | group
+    // The heading it sits under inside its space, or null for the channels above
+    // the first one. ON DELETE SET NULL: removing a heading must not remove the
+    // rooms under it.
+    categoryId    String?   @db.Uuid
+    // text | voice | dm | group
     kind          String    @default("text")
     name          String
     topic         String    @default("")
@@ -5617,12 +5622,34 @@ model ChatChannel {
     updatedAt     DateTime  @updatedAt
 
     space    ChatSpace?          @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    category ChatCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
     members  ChatChannelMember[]
     messages ChatMessage[]
     meetings Meeting[]
 
     @@index([spaceId, order])
+    @@index([categoryId, order])
     @@index([lastMessageAt])
+}
+
+// A heading inside a space, with channels under it.
+//
+// Purely an arrangement: a category grants nothing and hides nothing, and a
+// channel that belongs to none is simply drawn above the first heading. That is
+// deliberate - a grouping that also carried permissions would be two ideas
+// wearing one name, and the second one would be invisible.
+model ChatCategory {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    spaceId   String   @db.Uuid
+    // A label somebody wrote rather than a slug: nothing is addressed by it.
+    name      String
+    order     Float    @default(1024)
+    createdAt DateTime @default(now())
+
+    space    ChatSpace     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    channels ChatChannel[]
+
+    @@index([spaceId, order])
 }
 
 // Who is in a channel, and how much of it they have read.

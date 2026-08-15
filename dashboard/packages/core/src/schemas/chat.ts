@@ -31,11 +31,23 @@ export type ChatSpaceRole = (typeof CHAT_SPACE_ROLES)[number];
 /**
  * What a conversation is.
  *
- * `text` lives in a space and is named. `dm` is between exactly two accounts and
- * `group` between three or more; neither belongs to a space, and neither is
- * named by anybody - the name is who is in it.
+ * `text` and `voice` live in a space and are named. `dm` is between exactly two
+ * accounts and `group` between three or more; neither belongs to a space, and
+ * neither is named by anybody - the name is who is in it.
+ *
+ * A voice channel is a room rather than a record: there is no message list in
+ * one, and walking in is joining the call that is already there. It is the same
+ * channel row and the same call machinery as a video call in a text channel -
+ * what differs is that the call is the point rather than something started
+ * inside a conversation.
  */
-export const CHAT_CHANNEL_KINDS = ["text", "dm", "group"] as const;
+export const CHAT_CHANNEL_KINDS = ["text", "voice", "dm", "group"] as const;
+
+/** The two kinds somebody can actually make. A direct message is opened by
+ *  picking people, not by choosing a kind. */
+export const CHAT_SPACE_CHANNEL_KINDS = ["text", "voice"] as const;
+
+export type ChatSpaceChannelKind = (typeof CHAT_SPACE_CHANNEL_KINDS)[number];
 
 export type ChatChannelKind = (typeof CHAT_CHANNEL_KINDS)[number];
 
@@ -138,7 +150,10 @@ export const chatChannelCreateSchema = z.object({
     name: channelName,
     topic: z.string().trim().max(MAX_CHAT_TOPIC).default(""),
     /** A channel only the people put in it can see. */
-    private: z.boolean().default(false)
+    private: z.boolean().default(false),
+    kind: z.enum(CHAT_SPACE_CHANNEL_KINDS).default("text"),
+    /** The heading it sits under, or null for the ones above the first one. */
+    categoryId: z.string().uuid().nullable().default(null)
 });
 
 export type ChatChannelCreateInput = z.infer<typeof chatChannelCreateSchema>;
@@ -147,7 +162,9 @@ export const chatChannelUpdateSchema = z.object({
     channelId: z.string().uuid(),
     name: channelName.optional(),
     topic: z.string().trim().max(MAX_CHAT_TOPIC).optional(),
-    archived: z.boolean().optional()
+    archived: z.boolean().optional(),
+    /** Moving it under a different heading, or out from under all of them. */
+    categoryId: z.string().uuid().nullable().optional()
 });
 
 export type ChatChannelUpdateInput = z.infer<typeof chatChannelUpdateSchema>;
@@ -328,3 +345,22 @@ export const chatGroupNameSchema = z.object({
 });
 
 export type ChatGroupNameInput = z.infer<typeof chatGroupNameSchema>;
+
+/** A heading inside a space, with channels under it. */
+export const MAX_CHAT_CATEGORY_NAME = 60;
+
+export const chatCategoryCreateSchema = z.object({
+    spaceId: z.string().uuid(),
+    /** A label rather than a slug: it is a heading somebody wrote, and nothing
+     *  is ever addressed by it. */
+    name: z.string().trim().min(1, "Give the category a name").max(MAX_CHAT_CATEGORY_NAME)
+});
+
+export type ChatCategoryCreateInput = z.infer<typeof chatCategoryCreateSchema>;
+
+export const chatCategoryUpdateSchema = z.object({
+    categoryId: z.string().uuid(),
+    name: z.string().trim().min(1).max(MAX_CHAT_CATEGORY_NAME)
+});
+
+export type ChatCategoryUpdateInput = z.infer<typeof chatCategoryUpdateSchema>;

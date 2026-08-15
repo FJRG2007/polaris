@@ -24,8 +24,19 @@ import { requirePermission } from "@/lib/session";
 import { storeAttachment } from "@/lib/chat/attachments";
 import { searchAccounts } from "@/lib/rich-text/mention-service";
 import type { ChatMessageView, ChatPage } from "@/lib/chat/messages";
-import { ChatAccessError, messageable, requirePostable } from "@/lib/chat/access";
-import type { ChatChannelView, ChatMemberView, ChatSpaceView } from "@/lib/chat/chat-service";
+import {
+    ChatAccessError,
+    messageable,
+    reachableChannelIds,
+    requirePostable
+} from "@/lib/chat/access";
+import type {
+    ChatCategoryView,
+    ChatChannelView,
+    ChatMemberView,
+    ChatSpaceView
+} from "@/lib/chat/chat-service";
+import { voicePresence } from "@/lib/chat/meetings";
 import { fetchRemoteMedia, searchTenor, tenorConfigured, type TenorResult } from "@/lib/chat/tenor";
 
 const CHAT_PATH = "/chat";
@@ -64,6 +75,28 @@ export async function listSpacesAction(): Promise<{ spaces: ChatSpaceView[] }> {
 export async function listChannelsAction(): Promise<{ channels: ChatChannelView[] }> {
     const me = await actor();
     return { channels: await chat.listChannels(me) };
+}
+
+export async function listCategoriesAction(): Promise<{ categories: ChatCategoryView[] }> {
+    const me = await actor();
+    return { categories: await chat.listCategories(me) };
+}
+
+/**
+ * Who is in each voice room, for the rail.
+ *
+ * Asked for the channels the rail is already showing, and answered only for the
+ * ones this reader can reach - the ids arrive from a browser, so they are
+ * intersected with what the reader can see rather than trusted.
+ */
+export async function voicePresenceAction(
+    channelIds: string[]
+): Promise<{ inRoom: Record<string, { id: string; name: string }[]> }> {
+    const me = await actor();
+    const reachable = await reachableChannelIds(me);
+    const asked = (Array.isArray(channelIds) ? channelIds : []).filter((id) => reachable.has(id));
+    const found = await voicePresence(asked);
+    return { inRoom: Object.fromEntries(found) };
 }
 
 export async function readChannelAction(
@@ -348,6 +381,35 @@ export async function updateChannelAction(input: unknown): Promise<{ error?: str
         return { error: parsed.error.issues[0]?.message ?? "That could not be saved" };
 
     const result = await guard(() => chat.updateChannel(me, parsed.data));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result;
+}
+
+export async function createCategoryAction(input: unknown): Promise<{ id?: string; error?: string }> {
+    const me = await actor();
+    const parsed = core.chatCategoryCreateSchema.safeParse(input);
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That category could not be made" };
+
+    const result = await guard(() => chat.createCategory(me, parsed.data));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result.error ? { error: result.error } : { id: result.value };
+}
+
+export async function renameCategoryAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = core.chatCategoryUpdateSchema.safeParse(input);
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That could not be saved" };
+
+    const result = await guard(() => chat.renameCategory(me, parsed.data));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result;
+}
+
+export async function deleteCategoryAction(categoryId: string): Promise<{ error?: string }> {
+    const me = await actor();
+    const result = await guard(() => chat.deleteCategory(me, categoryId));
     if (!result.error) revalidatePath(CHAT_PATH);
     return result;
 }

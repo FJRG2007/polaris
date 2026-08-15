@@ -31,6 +31,7 @@ import * as calls from "./meeting-actions";
 import { useRouter } from "next/navigation";
 import { ThreadPanel } from "./thread-panel";
 import { SearchPanel } from "./search-panel";
+import { VoiceRoom } from "./voice-room";
 import { MessageList } from "./message-list";
 import { runAction } from "@/lib/run-action";
 import { MessageCircle } from "lucide-react";
@@ -346,6 +347,10 @@ export function ChannelView({ channelId }: { channelId: string }) {
         await runAction(() => actions.reactAction({ messageId, emoji }), setError);
         await load();
     };
+
+    // A voice channel is a room, not a record: no message list, no composer, and
+    // opening it is a decision to join rather than a decision to read.
+    if (channel?.kind === "voice") return <VoiceRoom channel={channel} />;
 
     if (!channel && messages === null) {
         return (

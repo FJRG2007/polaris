@@ -36,10 +36,19 @@ export interface ChatSpaceView {
     readonly access: "member" | "admin" | "owner";
 }
 
+/** A heading inside a space. */
+export interface ChatCategoryView {
+    readonly id: string;
+    readonly spaceId: string;
+    readonly name: string;
+}
+
 /** A conversation in the rail: a channel, or a direct message. */
 export interface ChatChannelView {
     readonly id: string;
     readonly spaceId: string | null;
+    /** The heading it sits under, or null for the ones above the first one. */
+    readonly categoryId: string | null;
     readonly kind: core.ChatChannelKind;
     /** For a channel, its name. For a direct message, who is in it - resolved
      *  here because "who is in it" is the name, and the client has no roster. */
@@ -307,6 +316,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
         select: {
             id: true,
             spaceId: true,
+            categoryId: true,
             kind: true,
             name: true,
             topic: true,
@@ -327,6 +337,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
         return {
             id: channel.id,
             spaceId: channel.spaceId,
+            categoryId: channel.categoryId,
             kind: channel.kind as core.ChatChannelKind,
             // A group that has been named keeps it; one that has not is called
             // after the people in it, which is what it is.
@@ -360,6 +371,82 @@ async function administeredSpaceIds(actor: ChatActor): Promise<Set<string>> {
     return new Set([...owned.map((row) => row.id), ...admin.map((row) => row.spaceId)]);
 }
 
+// ---------------------------------------------------------------------------
+// Categories
+// ---------------------------------------------------------------------------
+
+/**
+ * The headings in every space this person can reach.
+ *
+ * Asked once for the whole rail rather than per space: a category is three
+ * columns, an instance has tens of them, and one query is one round trip.
+ */
+export async function listCategories(actor: ChatActor): Promise<ChatCategoryView[]> {
+    const spaces = await reachableSpaceIds(actor);
+    if (spaces.size === 0) return [];
+
+    const rows = await prisma.chatCategory.findMany({
+        where: { spaceId: { in: [...spaces] } },
+        orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+        select: { id: true, spaceId: true, name: true }
+    });
+    return rows;
+}
+
+/** Add a heading. An administrator of the space, like adding a channel: it
+ *  changes the shape of the room for everybody in it. */
+export async function createCategory(
+    actor: ChatActor,
+    input: core.ChatCategoryCreateInput
+): Promise<string> {
+    await requireSpace(actor, input.spaceId, "admin");
+    const category = await prisma.chatCategory.create({
+        data: { spaceId: input.spaceId, name: input.name },
+        select: { id: true }
+    });
+    publishChatChange({ channelId: category.id, kind: "channels", actorId: actor.id });
+    return category.id;
+}
+
+export async function renameCategory(
+    actor: ChatActor,
+    input: core.ChatCategoryUpdateInput
+): Promise<void> {
+    const category = await prisma.chatCategory.findUnique({
+        where: { id: input.categoryId },
+        select: { spaceId: true }
+    });
+    if (!category) throw new ChatAccessError("That category is gone");
+    await requireSpace(actor, category.spaceId, "admin");
+
+    await prisma.chatCategory.update({ where: { id: input.categoryId }, data: { name: input.name } });
+    publishChatChange({ channelId: input.categoryId, kind: "channels", actorId: actor.id });
+}
+
+/**
+ * Remove a heading.
+ *
+ * The channels under it stay and move above the first heading - the foreign key
+ * is `ON DELETE SET NULL` for exactly this reason. Deleting a grouping must not
+ * delete what was grouped, and somebody tidying the rail is not asking to lose
+ * four rooms.
+ */
+export async function deleteCategory(actor: ChatActor, categoryId: string): Promise<void> {
+    const category = await prisma.chatCategory.findUnique({
+        where: { id: categoryId },
+        select: { spaceId: true }
+    });
+    if (!category) return;
+    await requireSpace(actor, category.spaceId, "admin");
+
+    await prisma.chatCategory.delete({ where: { id: categoryId } });
+    publishChatChange({ channelId: categoryId, kind: "channels", actorId: actor.id });
+}
+
+// ---------------------------------------------------------------------------
+// Channels
+// ---------------------------------------------------------------------------
+
 export async function createChannel(
     actor: ChatActor,
     input: core.ChatChannelCreateInput
@@ -372,13 +459,24 @@ export async function createChannel(
     });
     if (clash) throw new ChatAccessError("A channel with that name is already here");
 
+    // A heading from another space would put the channel somewhere nobody in
+    // this one can see it.
+    if (input.categoryId) {
+        const category = await prisma.chatCategory.findFirst({
+            where: { id: input.categoryId, spaceId: input.spaceId },
+            select: { id: true }
+        });
+        if (!category) throw new ChatAccessError("That category is not in this space");
+    }
+
     const channel = await prisma.chatChannel.create({
         data: {
             spaceId: input.spaceId,
             name: input.name,
             topic: input.topic,
             private: input.private,
-            kind: "text",
+            kind: input.kind,
+            categoryId: input.categoryId,
             createdById: actor.id,
             // A private channel with nobody in it is a channel its creator
             // cannot reopen, so they are put in it on the way through.
@@ -403,7 +501,8 @@ export async function updateChannel(
         data: {
             ...(input.name !== undefined ? { name: input.name } : {}),
             ...(input.topic !== undefined ? { topic: input.topic } : {}),
-            ...(input.archived !== undefined ? { archived: input.archived } : {})
+            ...(input.archived !== undefined ? { archived: input.archived } : {}),
+            ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {})
         }
     });
     publishChatChange({ channelId: input.channelId, kind: "channels", actorId: actor.id });

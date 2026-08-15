@@ -17,6 +17,7 @@
  */
 
 import { PAGE_FILL } from "@polaris/ui";
+import { ServerRail } from "./server-rail";
 import { ChatSidebar } from "./chat-sidebar";
 import { usePathname } from "next/navigation";
 import { useChatStream } from "./use-chat-stream";
@@ -66,6 +67,12 @@ function ChatColumns({ children }: { children: ReactNode }) {
 
     return (
         <div className={`${PAGE_FILL} flex w-full flex-row`}>
+            {/* The column of spaces stays on a phone while the list is showing,
+                and steps aside with it once a conversation is open - on a narrow
+                screen the conversation gets the whole width. */}
+            <div className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 shrink-0`}>
+                <ServerRail />
+            </div>
             <div
                 className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 w-full shrink-0 flex-col border-r border-border md:w-64`}
             >
