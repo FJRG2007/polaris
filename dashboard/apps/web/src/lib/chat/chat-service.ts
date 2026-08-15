@@ -232,7 +232,12 @@ export async function addSpaceMembers(
         data: wanted.map((userId) => ({ spaceId, userId })),
         skipDuplicates: true
     });
-    publishChatChange({ channelId: spaceId, kind: "channels", actorId: actor.id, audience: wanted });
+    publishChatChange({
+        channelId: spaceId,
+        kind: "channels",
+        actorId: actor.id,
+        audience: wanted
+    });
 }
 
 export async function removeSpaceMember(
@@ -256,7 +261,12 @@ export async function removeSpaceMember(
             where: { userId, channelId: { in: channels.map((row) => row.id) } }
         });
     });
-    publishChatChange({ channelId: spaceId, kind: "channels", actorId: actor.id, audience: [userId] });
+    publishChatChange({
+        channelId: spaceId,
+        kind: "channels",
+        actorId: actor.id,
+        audience: [userId]
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -322,8 +332,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             muted: mine.get(channel.id)?.muted ?? false,
             mayAdminister: Boolean(
                 channel.spaceId &&
-                    (administered.has(channel.spaceId) ||
-                        mine.get(channel.id)?.role === "admin")
+                    (administered.has(channel.spaceId) || mine.get(channel.id)?.role === "admin")
             ),
             others: channel.spaceId ? [] : others
         };
@@ -434,11 +443,7 @@ export async function removeChannelMember(
     publishChatChange({ channelId, kind: "channels", actorId: actor.id, audience: [userId] });
 }
 
-export async function setMuted(
-    actor: ChatActor,
-    channelId: string,
-    muted: boolean
-): Promise<void> {
+export async function setMuted(actor: ChatActor, channelId: string, muted: boolean): Promise<void> {
     await requireChannel(actor, channelId);
     await prisma.chatChannelMember.upsert({
         where: { channelId_userId: { channelId, userId: actor.id } },
@@ -455,10 +460,7 @@ export async function setMuted(
  * history each. A group has no such key - three people can genuinely want two
  * different group conversations - so asking twice makes two.
  */
-export async function openDirect(
-    actor: ChatActor,
-    userIds: readonly string[]
-): Promise<string> {
+export async function openDirect(actor: ChatActor, userIds: readonly string[]): Promise<string> {
     const others = [...new Set(userIds)].filter((id) => id !== actor.id);
     if (others.length === 0) throw new ChatAccessError("Pick somebody to message");
 
@@ -466,7 +468,8 @@ export async function openDirect(
         where: { id: { in: others } },
         select: { id: true, name: true }
     });
-    if (present.length !== others.length) throw new ChatAccessError("Somebody there no longer has an account");
+    if (present.length !== others.length)
+        throw new ChatAccessError("Somebody there no longer has an account");
 
     const everyone = [actor.id, ...others];
     if (others.length === 1) {

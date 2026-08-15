@@ -77,9 +77,7 @@ export function NewChannelDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>New channel</DialogTitle>
-                    <DialogDescription>
-                        In {space?.name ?? "this space"}.
-                    </DialogDescription>
+                    <DialogDescription>In {space?.name ?? "this space"}.</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">

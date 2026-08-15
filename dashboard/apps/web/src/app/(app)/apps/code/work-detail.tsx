@@ -83,7 +83,10 @@ export function WorkDetail({
         return (
             <div className="flex flex-col gap-3">
                 <BackLink />
-                <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <p
+                    role="alert"
+                    className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                >
                     {error}
                 </p>
             </div>
@@ -137,7 +140,10 @@ export function WorkDetail({
             </div>
 
             {error && (
-                <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <p
+                    role="alert"
+                    className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                >
                     {error}
                 </p>
             )}
@@ -243,8 +249,8 @@ export function WorkDetail({
                     </div>
                     {item.kind === "pr" && item.mergeable === false && (
                         <p className="text-xs text-muted-foreground">
-                            GitHub reports conflicts on this branch. Merging will be refused until they
-                            are resolved.
+                            GitHub reports conflicts on this branch. Merging will be refused until
+                            they are resolved.
                         </p>
                     )}
                 </div>

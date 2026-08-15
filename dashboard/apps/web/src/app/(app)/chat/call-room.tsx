@@ -38,9 +38,7 @@ export function CallRoom({
     const [shareError, setShareError] = useState("");
 
     const canShare = Boolean(viewerId) && call.meeting?.hostId === viewerId;
-    const admitted = call.meeting?.participants.filter(
-        (person) => person.admission === "admitted"
-    );
+    const admitted = call.meeting?.participants.filter((person) => person.admission === "admitted");
     const waiting = call.meeting?.participants.filter((person) => person.admission === "waiting");
     const columns = gridColumns((admitted?.length ?? 1) || 1);
 
@@ -63,7 +61,10 @@ export function CallRoom({
     return (
         <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
             {(call.error || shareError) && (
-                <p role="alert" className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+                <p
+                    role="alert"
+                    className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground"
+                >
                     {call.error || shareError}
                 </p>
             )}
@@ -107,12 +108,7 @@ export function CallRoom({
             )}
 
             <div className={cn("grid min-h-0 flex-1 gap-2", columns)}>
-                <Tile
-                    stream={call.localStream}
-                    name="You"
-                    muted
-                    cameraOff={!call.cameraOn}
-                />
+                <Tile stream={call.localStream} name="You" muted cameraOff={!call.cameraOn} />
                 {(admitted ?? [])
                     .filter((person) => person.id !== call.participantId)
                     .map((person) => (
@@ -151,7 +147,9 @@ export function CallRoom({
                         variant="secondary"
                         onClick={async () => {
                             if (guestLink) {
-                                await navigator.clipboard.writeText(guestLink).catch(() => undefined);
+                                await navigator.clipboard
+                                    .writeText(guestLink)
+                                    .catch(() => undefined);
                                 setCopied(true);
                                 setTimeout(() => setCopied(false), 2000);
                                 return;

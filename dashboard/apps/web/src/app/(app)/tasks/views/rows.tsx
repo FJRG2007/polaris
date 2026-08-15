@@ -18,7 +18,13 @@ import { useDisplayFormat } from "@/components/display-format";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { useRowCursor } from "./row-cursor";
 import { clickMode, type SelectMode, type ViewProps } from "./shared";
-import { commandsFor, TaskControls, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
+import {
+    commandsFor,
+    TaskControls,
+    TaskMenu,
+    TaskStatusMarker,
+    type TaskCommands
+} from "./task-actions";
 import { PriorityFlag } from "@/components/priority-flag";
 import {
     AssigneePicker,
@@ -77,95 +83,110 @@ function TaskLine({
 
     return (
         <TaskMenu commands={commands}>
-        <li
-            ref={onRegister}
-            onMouseDown={onPoint}
-            draggable={canEdit && onDragStart !== undefined}
-            onDragStart={(event) => {
-                event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData("text/plain", task.id);
-                onDragStart?.();
-            }}
-            onDragOver={(event) => {
-                if (!onDropBefore) return;
-                event.preventDefault();
-                setOver(true);
-            }}
-            onDragLeave={() => setOver(false)}
-            onDrop={(event) => {
-                if (!onDropBefore) return;
-                event.preventDefault();
-                setOver(false);
-                onDropBefore();
-            }}
-            className={cn(
-                "group relative flex items-center gap-2 border-b border-border px-2 py-1.5 transition-colors hover:bg-card-hover",
-                selected && "bg-primary/5",
-                cursor &&
-                    "bg-card-hover before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-primary",
-                over && positioned && "border-t-2 border-t-primary"
-            )}
-            style={{ paddingLeft: `${0.5 + depth * 1.25}rem` }}
-        >
-            <TaskStatusMarker commands={commands} />
-            <div className="flex min-w-0 flex-1 flex-col">
-                <button
-                    type="button"
-                    // A shift-click would otherwise drag a text selection across
-                    // half the screen on its way to selecting the rows.
-                    onMouseDown={(event) => (event.shiftKey ? event.preventDefault() : undefined)}
-                    onClick={(event) => {
-                        const mode = clickMode(event);
-                        if (mode) onSelect(mode);
-                        else onOpen();
-                    }}
-                    className="flex min-w-0 items-center gap-2 text-left"
-                >
-                    {/* Priority first, because the list is sorted by it out of
+            <li
+                ref={onRegister}
+                onMouseDown={onPoint}
+                draggable={canEdit && onDragStart !== undefined}
+                onDragStart={(event) => {
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", task.id);
+                    onDragStart?.();
+                }}
+                onDragOver={(event) => {
+                    if (!onDropBefore) return;
+                    event.preventDefault();
+                    setOver(true);
+                }}
+                onDragLeave={() => setOver(false)}
+                onDrop={(event) => {
+                    if (!onDropBefore) return;
+                    event.preventDefault();
+                    setOver(false);
+                    onDropBefore();
+                }}
+                className={cn(
+                    "group relative flex items-center gap-2 border-b border-border px-2 py-1.5 transition-colors hover:bg-card-hover",
+                    selected && "bg-primary/5",
+                    cursor &&
+                        "bg-card-hover before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-primary",
+                    over && positioned && "border-t-2 border-t-primary"
+                )}
+                style={{ paddingLeft: `${0.5 + depth * 1.25}rem` }}
+            >
+                <TaskStatusMarker commands={commands} />
+                <div className="flex min-w-0 flex-1 flex-col">
+                    <button
+                        type="button"
+                        // A shift-click would otherwise drag a text selection across
+                        // half the screen on its way to selecting the rows.
+                        onMouseDown={(event) =>
+                            event.shiftKey ? event.preventDefault() : undefined
+                        }
+                        onClick={(event) => {
+                            const mode = clickMode(event);
+                            if (mode) onSelect(mode);
+                            else onOpen();
+                        }}
+                        className="flex min-w-0 items-center gap-2 text-left"
+                    >
+                        {/* Priority first, because the list is sorted by it out of
                         the box and a list ordered by something it never shows is
                         a list nobody can check. Nothing is drawn for a task with
                         none, so it costs no width in the common case. */}
-                    <PriorityFlag priority={task.priority} />
-                    <span className="hidden font-mono text-[11px] text-muted-foreground sm:inline">{task.reference}</span>
-                    <span className={cn("truncate text-sm", core.isFinishedStatus(task.statusType) && "text-muted-foreground")}>
-                        {task.name}
-                    </span>
-                    <BlockedMarker task={task} format={format.date} />
-                    {task.tags.slice(0, 2).map((tag) => (
-                        <TagChip key={tag.id} tag={tag} />
-                    ))}
-                </button>
-                {showLocation && <TaskLocation task={task} />}
-            </div>
+                        <PriorityFlag priority={task.priority} />
+                        <span className="hidden font-mono text-[11px] text-muted-foreground sm:inline">
+                            {task.reference}
+                        </span>
+                        <span
+                            className={cn(
+                                "truncate text-sm",
+                                core.isFinishedStatus(task.statusType) && "text-muted-foreground"
+                            )}
+                        >
+                            {task.name}
+                        </span>
+                        <BlockedMarker task={task} format={format.date} />
+                        {task.tags.slice(0, 2).map((tag) => (
+                            <TagChip key={tag.id} tag={tag} />
+                        ))}
+                    </button>
+                    {showLocation && <TaskLocation task={task} />}
+                </div>
 
-            {showStatus && (
-                <span className="hidden items-center gap-1 text-[11px] text-muted-foreground md:flex">
-                    <StatusDot color={task.statusColor} />
-                    {task.statusName}
+                {showStatus && (
+                    <span className="hidden items-center gap-1 text-[11px] text-muted-foreground md:flex">
+                        <StatusDot color={task.statusColor} />
+                        {task.statusName}
+                    </span>
+                )}
+                <span className="hidden w-24 justify-end md:flex">
+                    <DueBadge
+                        dueDate={task.dueDate}
+                        statusType={task.statusType}
+                        timed={task.timed}
+                        format={format.date}
+                    />
                 </span>
-            )}
-            <span className="hidden w-24 justify-end md:flex">
-                <DueBadge dueDate={task.dueDate} statusType={task.statusType} timed={task.timed} format={format.date} />
-            </span>
-            <AvatarStack people={task.assignees} size={20} />
-            {/* The editable versions of what the row just showed. They sit at the
+                <AvatarStack people={task.assignees} size={20} />
+                {/* The editable versions of what the row just showed. They sit at the
                 end so the row still reads left to right, and stay out of the way
                 until somebody is actually pointing at this task. */}
-            <span
-                className={cn(
-                    "flex shrink-0 items-center transition-opacity focus-within:opacity-100 group-hover:opacity-100",
-                    canEdit ? "opacity-0" : "hidden"
-                )}
-            >
-                <TaskControls commands={commands} />
-            </span>
-        </li>
+                <span
+                    className={cn(
+                        "flex shrink-0 items-center transition-opacity focus-within:opacity-100 group-hover:opacity-100",
+                        canEdit ? "opacity-0" : "hidden"
+                    )}
+                >
+                    <TaskControls commands={commands} />
+                </span>
+            </li>
         </TaskMenu>
     );
 }
 
 export function ListView(props: ViewProps) {
-    const { groups, canEdit, selection, onOpen, onSelect, onMove, onQuickCreate, orderable } = props;
+    const { groups, canEdit, selection, onOpen, onSelect, onMove, onQuickCreate, orderable } =
+        props;
     const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
     const [dragging, setDragging] = useState<string | null>(null);
     const [addingTo, setAddingTo] = useState<string | null>(null);
@@ -217,10 +238,18 @@ export function ListView(props: ViewProps) {
                             <button
                                 type="button"
                                 onClick={() => toggleGroup(group.key)}
-                                aria-label={isCollapsed ? `Expand ${group.label}` : `Collapse ${group.label}`}
+                                aria-label={
+                                    isCollapsed
+                                        ? `Expand ${group.label}`
+                                        : `Collapse ${group.label}`
+                                }
                                 className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                             >
-                                {isCollapsed ? <ChevronRight className="size-4" /> : <ChevronDown className="size-4" />}
+                                {isCollapsed ? (
+                                    <ChevronRight className="size-4" />
+                                ) : (
+                                    <ChevronDown className="size-4" />
+                                )}
                             </button>
                             {group.color && <StatusDot color={group.color} />}
                             <h3 className="text-sm font-medium">{group.label}</h3>
@@ -249,7 +278,9 @@ export function ListView(props: ViewProps) {
                                 onDragOver={(event) => event.preventDefault()}
                                 onDrop={() => {
                                     if (!dragging) return;
-                                    const last = group.tasks.filter((task) => task.id !== dragging).at(-1);
+                                    const last = group.tasks
+                                        .filter((task) => task.id !== dragging)
+                                        .at(-1);
                                     onMove({
                                         taskId: dragging,
                                         groupKey: group.key,
@@ -272,17 +303,23 @@ export function ListView(props: ViewProps) {
                                             showLocation={props.showLocation}
                                             positioned={orderable}
                                             onPoint={() => cursor.moveTo(task.id)}
-                                            onRegister={(element) => cursor.register(task.id, element)}
+                                            onRegister={(element) =>
+                                                cursor.register(task.id, element)
+                                            }
                                             onSelect={(mode) => onSelect(task.id, mode, rendered)}
                                             onDragStart={() => setDragging(task.id)}
                                             onDropBefore={() => {
                                                 if (!dragging) return;
-                                                const without = group.tasks.filter((entry) => entry.id !== dragging);
+                                                const without = group.tasks.filter(
+                                                    (entry) => entry.id !== dragging
+                                                );
                                                 // Only the group is honoured while a
                                                 // search is on: the row landed on says
                                                 // which one, not where in it.
                                                 const index = orderable
-                                                    ? without.findIndex((entry) => entry.id === task.id)
+                                                    ? without.findIndex(
+                                                          (entry) => entry.id === task.id
+                                                      )
                                                     : without.length;
                                                 onMove({
                                                     taskId: dragging,
@@ -318,7 +355,9 @@ export function ListView(props: ViewProps) {
                                     </li>
                                 ) : (
                                     group.tasks.length === 0 && (
-                                        <li className="px-4 py-4 text-xs text-muted-foreground">Nothing here yet.</li>
+                                        <li className="px-4 py-4 text-xs text-muted-foreground">
+                                            Nothing here yet.
+                                        </li>
                                     )
                                 )}
                             </ul>
@@ -328,7 +367,10 @@ export function ListView(props: ViewProps) {
             })}
 
             {groups.length === 0 && (
-                <EmptyState title="No tasks match this view." description="Change the filters, or add the first one." />
+                <EmptyState
+                    title="No tasks match this view."
+                    description="Change the filters, or add the first one."
+                />
             )}
         </div>
     );
@@ -368,105 +410,125 @@ export function TableView(props: ViewProps) {
                     {rows.map((task) => {
                         const commands = commandsFor(props, task);
                         return (
-                        <TaskMenu key={task.id} commands={commands}>
-                        <tr
-                            ref={(element) => cursor.register(task.id, element)}
-                            onMouseDown={() => cursor.moveTo(task.id)}
-                            className={cn(
-                                "group border-b border-border transition-colors hover:bg-card-hover",
-                                selection.has(task.id) && "bg-primary/5",
-                                cursor.at === task.id &&
-                                    "bg-card-hover shadow-[inset_2px_0_0_0_hsl(var(--primary))]"
-                            )}
-                        >
-                            <td className="px-2 py-1.5">
-                                <TaskStatusMarker commands={commands} />
-                            </td>
-                            <td className="max-w-xs px-2 py-1.5">
-                                <button
-                                    type="button"
-                                    onMouseDown={(event) => (event.shiftKey ? event.preventDefault() : undefined)}
-                                    onClick={(event) => {
-                                        const mode = clickMode(event);
-                                        if (mode) onSelect(task.id, mode, rendered);
-                                        else onOpen(task.id);
-                                    }}
-                                    className="flex w-full items-center gap-2 text-left"
+                            <TaskMenu key={task.id} commands={commands}>
+                                <tr
+                                    ref={(element) => cursor.register(task.id, element)}
+                                    onMouseDown={() => cursor.moveTo(task.id)}
+                                    className={cn(
+                                        "group border-b border-border transition-colors hover:bg-card-hover",
+                                        selection.has(task.id) && "bg-primary/5",
+                                        cursor.at === task.id &&
+                                            "bg-card-hover shadow-[inset_2px_0_0_0_hsl(var(--primary))]"
+                                    )}
                                 >
-                                    <span className="font-mono text-[11px] text-muted-foreground">{task.reference}</span>
-                                    <span className="truncate">{task.name}</span>
-                                </button>
-                                {props.showLocation && <TaskLocation task={task} />}
-                            </td>
-                            <td className="whitespace-nowrap px-2 py-1.5">
-                                <span className="inline-flex items-center gap-1.5 text-xs">
-                                    <StatusDot color={task.statusColor} />
-                                    {task.statusName}
-                                </span>
-                            </td>
-                            <td className="px-2 py-1.5">
-                                <span className="flex items-center gap-1">
-                                    <AvatarStack people={task.assignees} size={20} />
-                                    <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-                                        <AssigneePicker
-                                            people={context.people}
-                                            selected={task.assignees.map((person) => person.id)}
-                                            disabled={!props.canEdit}
-                                            onChange={(assigneeIds) => props.onEdit(task, { assigneeIds })}
-                                        />
-                                    </span>
-                                </span>
-                            </td>
-                            <td className="whitespace-nowrap px-2 py-1.5 text-xs">
-                                <span className="inline-flex items-center gap-1.5">
-                                    <PriorityPicker
-                                        value={task.priority}
-                                        disabled={!props.canEdit}
-                                        onChange={(priority) => props.onEdit(task, { priority })}
-                                    />
-                                    {core.TASK_PRIORITY_LABELS[task.priority]}
-                                </span>
-                            </td>
-                            <td className="whitespace-nowrap px-2 py-1.5">
-                                <span className="inline-flex items-center gap-1">
-                                    <DueBadge
-                                        dueDate={task.dueDate}
-                                        statusType={task.statusType}
-                                        timed={task.timed}
-                                        format={format.date}
-                                    />
-                                    <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-                                        <DuePicker
-                                            dueDate={task.dueDate}
-                                            timed={task.timed}
-                                            disabled={!props.canEdit}
-                                            onChange={(dueDate) => props.onEdit(task, { dueDate })}
-                                        />
-                                    </span>
-                                </span>
-                            </td>
-                            <td className="whitespace-nowrap px-2 py-1.5 text-xs text-muted-foreground">
-                                {core.formatDurationMinutes(task.timeEstimate) || "-"}
-                            </td>
-                            <td className="whitespace-nowrap px-2 py-1.5 text-xs text-muted-foreground">
-                                {task.trackedSeconds > 0 ? core.formatTrackedSeconds(task.trackedSeconds) : "-"}
-                            </td>
-                            {columns.map((field) => (
-                                <td key={field.id} className="max-w-[12rem] px-2 py-1.5 text-xs">
-                                    <CustomFieldValue
-                                        field={field}
-                                        value={task.customValues[field.id] ?? ""}
-                                        people={context.people}
-                                    />
-                                </td>
-                            ))}
-                        </tr>
-                        </TaskMenu>
+                                    <td className="px-2 py-1.5">
+                                        <TaskStatusMarker commands={commands} />
+                                    </td>
+                                    <td className="max-w-xs px-2 py-1.5">
+                                        <button
+                                            type="button"
+                                            onMouseDown={(event) =>
+                                                event.shiftKey ? event.preventDefault() : undefined
+                                            }
+                                            onClick={(event) => {
+                                                const mode = clickMode(event);
+                                                if (mode) onSelect(task.id, mode, rendered);
+                                                else onOpen(task.id);
+                                            }}
+                                            className="flex w-full items-center gap-2 text-left"
+                                        >
+                                            <span className="font-mono text-[11px] text-muted-foreground">
+                                                {task.reference}
+                                            </span>
+                                            <span className="truncate">{task.name}</span>
+                                        </button>
+                                        {props.showLocation && <TaskLocation task={task} />}
+                                    </td>
+                                    <td className="whitespace-nowrap px-2 py-1.5">
+                                        <span className="inline-flex items-center gap-1.5 text-xs">
+                                            <StatusDot color={task.statusColor} />
+                                            {task.statusName}
+                                        </span>
+                                    </td>
+                                    <td className="px-2 py-1.5">
+                                        <span className="flex items-center gap-1">
+                                            <AvatarStack people={task.assignees} size={20} />
+                                            <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                                                <AssigneePicker
+                                                    people={context.people}
+                                                    selected={task.assignees.map(
+                                                        (person) => person.id
+                                                    )}
+                                                    disabled={!props.canEdit}
+                                                    onChange={(assigneeIds) =>
+                                                        props.onEdit(task, { assigneeIds })
+                                                    }
+                                                />
+                                            </span>
+                                        </span>
+                                    </td>
+                                    <td className="whitespace-nowrap px-2 py-1.5 text-xs">
+                                        <span className="inline-flex items-center gap-1.5">
+                                            <PriorityPicker
+                                                value={task.priority}
+                                                disabled={!props.canEdit}
+                                                onChange={(priority) =>
+                                                    props.onEdit(task, { priority })
+                                                }
+                                            />
+                                            {core.TASK_PRIORITY_LABELS[task.priority]}
+                                        </span>
+                                    </td>
+                                    <td className="whitespace-nowrap px-2 py-1.5">
+                                        <span className="inline-flex items-center gap-1">
+                                            <DueBadge
+                                                dueDate={task.dueDate}
+                                                statusType={task.statusType}
+                                                timed={task.timed}
+                                                format={format.date}
+                                            />
+                                            <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                                                <DuePicker
+                                                    dueDate={task.dueDate}
+                                                    timed={task.timed}
+                                                    disabled={!props.canEdit}
+                                                    onChange={(dueDate) =>
+                                                        props.onEdit(task, { dueDate })
+                                                    }
+                                                />
+                                            </span>
+                                        </span>
+                                    </td>
+                                    <td className="whitespace-nowrap px-2 py-1.5 text-xs text-muted-foreground">
+                                        {core.formatDurationMinutes(task.timeEstimate) || "-"}
+                                    </td>
+                                    <td className="whitespace-nowrap px-2 py-1.5 text-xs text-muted-foreground">
+                                        {task.trackedSeconds > 0
+                                            ? core.formatTrackedSeconds(task.trackedSeconds)
+                                            : "-"}
+                                    </td>
+                                    {columns.map((field) => (
+                                        <td
+                                            key={field.id}
+                                            className="max-w-[12rem] px-2 py-1.5 text-xs"
+                                        >
+                                            <CustomFieldValue
+                                                field={field}
+                                                value={task.customValues[field.id] ?? ""}
+                                                people={context.people}
+                                            />
+                                        </td>
+                                    ))}
+                                </tr>
+                            </TaskMenu>
                         );
                     })}
                     {rows.length === 0 && (
                         <tr>
-                            <td colSpan={8 + columns.length} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                            <td
+                                colSpan={8 + columns.length}
+                                className="px-4 py-10 text-center text-sm text-muted-foreground"
+                            >
                                 No tasks match this view.
                             </td>
                         </tr>

@@ -21,7 +21,18 @@ import { RelativeTime } from "@/components/relative-time";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { NoteSummary, NoteView } from "@/lib/notes/note-service";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
-import { Archive, ChevronRight, CornerDownRight, MoreHorizontal, Move, Pin, PinOff, Plus, Search, Trash2 } from "lucide-react";
+import {
+    Archive,
+    ChevronRight,
+    CornerDownRight,
+    MoreHorizontal,
+    Move,
+    Pin,
+    PinOff,
+    Plus,
+    Search,
+    Trash2
+} from "lucide-react";
 import {
     cn,
     Button,
@@ -281,7 +292,11 @@ export function NotesView({
                                 }
                                 className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
-                                {note.pinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
+                                {note.pinned ? (
+                                    <PinOff className="size-4" />
+                                ) : (
+                                    <Pin className="size-4" />
+                                )}
                             </button>
                             <button
                                 type="button"
@@ -424,7 +439,11 @@ function NoteRow({
                 <button
                     type="button"
                     onClick={onToggle}
-                    aria-label={collapsed ? `Show what is under ${entry.title}` : `Hide what is under ${entry.title}`}
+                    aria-label={
+                        collapsed
+                            ? `Show what is under ${entry.title}`
+                            : `Hide what is under ${entry.title}`
+                    }
                     aria-expanded={!collapsed}
                     className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                 >
@@ -470,7 +489,11 @@ function NoteRow({
                         Add a note under this
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={onPin}>
-                        {entry.pinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
+                        {entry.pinned ? (
+                            <PinOff className="size-3.5" />
+                        ) : (
+                            <Pin className="size-3.5" />
+                        )}
                         {entry.pinned ? "Unpin" : "Pin to the top"}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />

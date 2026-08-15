@@ -22,7 +22,16 @@ import { RelativeTime } from "@/components/relative-time";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn, EmptyState, SegmentedControl, Skeleton } from "@polaris/ui";
 import type { CodeItem, CodeKind, CodeScope, CodeState } from "@/lib/code/code-service";
-import { CircleDot, CircleSlash, ExternalLink, GitMerge, GitPullRequest, GitPullRequestDraft, MessageSquare, Search } from "lucide-react";
+import {
+    CircleDot,
+    CircleSlash,
+    ExternalLink,
+    GitMerge,
+    GitPullRequest,
+    GitPullRequestDraft,
+    MessageSquare,
+    Search
+} from "lucide-react";
 
 /** How long typing pauses before the list is asked again. GitHub's search takes
  *  thirty requests a minute and a qualifier is thirty keystrokes, so a request
@@ -57,16 +66,19 @@ export function CodeView() {
         const mine = ++asked.current;
         setItems(null);
         setError("");
-        const timer = setTimeout(async () => {
-            const result = await listWorkAction({ kind, scope: effectiveScope, state, query });
-            if (mine !== asked.current) return;
-            if (result.error) {
-                setError(result.error);
-                setItems([]);
-                return;
-            }
-            setItems(result.items ?? []);
-        }, query.trim() ? SEARCH_AFTER : 0);
+        const timer = setTimeout(
+            async () => {
+                const result = await listWorkAction({ kind, scope: effectiveScope, state, query });
+                if (mine !== asked.current) return;
+                if (result.error) {
+                    setError(result.error);
+                    setItems([]);
+                    return;
+                }
+                setItems(result.items ?? []);
+            },
+            query.trim() ? SEARCH_AFTER : 0
+        );
         return () => clearTimeout(timer);
     }, [kind, effectiveScope, state, query]);
 
@@ -129,7 +141,10 @@ export function CodeView() {
             </div>
 
             {error && (
-                <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <p
+                    role="alert"
+                    className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                >
                     {error}
                 </p>
             )}
@@ -165,8 +180,7 @@ export function CodeView() {
 
 function WorkRow({ item }: { item: CodeItem }) {
     const [owner, repo] = item.repo.split("/");
-    const href =
-        owner && repo ? `/apps/code/${owner}/${repo}/${item.number}` : item.url;
+    const href = owner && repo ? `/apps/code/${owner}/${repo}/${item.number}` : item.url;
 
     return (
         <div className="flex items-start gap-3 bg-card px-3 py-2.5 transition-colors hover:bg-card-hover">
@@ -185,7 +199,10 @@ function WorkRow({ item }: { item: CodeItem }) {
                         <span
                             key={label.name}
                             className="rounded-full px-1.5 py-px text-[10px] ring-1"
-                            style={{ color: label.color, boxShadow: `inset 0 0 0 1px ${label.color}55` }}
+                            style={{
+                                color: label.color,
+                                boxShadow: `inset 0 0 0 1px ${label.color}55`
+                            }}
                         >
                             {label.name}
                         </span>

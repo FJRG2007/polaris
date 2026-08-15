@@ -94,7 +94,10 @@ export function ThreadPanel({
                         canPost={canPost}
                         canModerate={canModerate}
                         onReact={async (messageId, emoji) => {
-                            await runAction(() => actions.reactAction({ messageId, emoji }), setError);
+                            await runAction(
+                                () => actions.reactAction({ messageId, emoji }),
+                                setError
+                            );
                             await load();
                         }}
                         onEdit={() => {
@@ -125,7 +128,12 @@ export function ThreadPanel({
                 placeholder="Reply in this thread"
                 onSend={async (body) => {
                     await runAction(
-                        () => actions.sendAction({ channelId: root.channelId, body, parentId: root.id }),
+                        () =>
+                            actions.sendAction({
+                                channelId: root.channelId,
+                                body,
+                                parentId: root.id
+                            }),
                         setError
                     );
                     await load();

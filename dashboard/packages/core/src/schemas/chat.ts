@@ -161,7 +161,10 @@ export type ChatChannelUpdateInput = z.infer<typeof chatChannelUpdateSchema>;
  * it is a list somebody built by clicking.
  */
 export const chatDirectOpenSchema = z.object({
-    userIds: z.array(z.string().uuid()).min(1, "Pick somebody").max(MAX_GROUP_MEMBERS - 1)
+    userIds: z
+        .array(z.string().uuid())
+        .min(1, "Pick somebody")
+        .max(MAX_GROUP_MEMBERS - 1)
 });
 
 export type ChatDirectOpenInput = z.infer<typeof chatDirectOpenSchema>;

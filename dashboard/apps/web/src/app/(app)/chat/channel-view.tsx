@@ -56,7 +56,9 @@ export function ChannelView({ channelId }: { channelId: string }) {
     const [thread, setThread] = useState<ChatMessageView | null>(null);
     const [editing, setEditing] = useState<ChatMessageView | null>(null);
     const [deleting, setDeleting] = useState<ChatMessageView | null>(null);
-    const [typists, setTypists] = useState<readonly { userId: string; name: string; at: number }[]>([]);
+    const [typists, setTypists] = useState<readonly { userId: string; name: string; at: number }[]>(
+        []
+    );
     const [live, setLive] = useState<{ meetingId: string; count: number } | null>(null);
     // The call this tab is actually sitting in, which is not the same question as
     // whether one is running: somebody can watch a channel with a call in it
@@ -239,7 +241,9 @@ export function ChannelView({ channelId }: { channelId: string }) {
                 <EmptyState
                     icon={<MessageCircle />}
                     title="This conversation is not yours to open."
-                    description={error || "It may have been deleted, or you may have been removed from it."}
+                    description={
+                        error || "It may have been deleted, or you may have been removed from it."
+                    }
                 />
             </div>
         );

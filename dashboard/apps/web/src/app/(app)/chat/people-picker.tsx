@@ -73,7 +73,9 @@ export function PeoplePicker({
                         <li key={person.id}>
                             <span className="flex items-center gap-1 rounded-full bg-muted py-0.5 pl-0.5 pr-1.5 text-xs">
                                 <Avatar person={person} size={18} />
-                                <span className="max-w-[10rem] truncate" title={person.name}>{person.name}</span>
+                                <span className="max-w-[10rem] truncate" title={person.name}>
+                                    {person.name}
+                                </span>
                                 <button
                                     type="button"
                                     aria-label={`Remove ${person.name}`}
@@ -122,7 +124,9 @@ export function PeoplePicker({
                                 )}
                             >
                                 <Avatar person={person} size={20} />
-                                <span className="truncate" title={person.name}>{person.name}</span>
+                                <span className="truncate" title={person.name}>
+                                    {person.name}
+                                </span>
                             </button>
                         </li>
                     ))

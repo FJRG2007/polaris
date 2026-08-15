@@ -20,11 +20,7 @@ import { LinkUnavailable } from "@/components/public-shell";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export default async function GuestMeetingPage({
-    params
-}: {
-    params: Promise<{ token: string }>;
-}) {
+export default async function GuestMeetingPage({ params }: { params: Promise<{ token: string }> }) {
     const { token } = await params;
     const session = await getSession();
 

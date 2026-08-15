@@ -139,10 +139,7 @@ export async function join(
  * default - the seat starts in the lobby and no signalling reaches it until
  * somebody inside admits them.
  */
-export async function joinAsGuest(
-    token: string,
-    name: string
-): Promise<MeetingSeat> {
+export async function joinAsGuest(token: string, name: string): Promise<MeetingSeat> {
     const meeting = await prisma.meeting.findUnique({
         where: { guestToken: token },
         select: { id: true, endedAt: true, approveGuests: true }
@@ -195,10 +192,7 @@ export async function decideAdmission(
 }
 
 /** Still here. Called on a heartbeat from the browser showing the call. */
-export async function keepSeat(seat: {
-    meetingId: string;
-    participantId: string;
-}): Promise<void> {
+export async function keepSeat(seat: { meetingId: string; participantId: string }): Promise<void> {
     await prisma.meetingParticipant.updateMany({
         where: { id: seat.participantId, meetingId: seat.meetingId, leftAt: null },
         data: { lastSeenAt: new Date() }
@@ -207,10 +201,7 @@ export async function keepSeat(seat: {
 
 /** Leave. The last one out ends the call, so a room is never left running with
  *  nobody in it and a live guest link pointing at it. */
-export async function leave(seat: {
-    meetingId: string;
-    participantId: string;
-}): Promise<void> {
+export async function leave(seat: { meetingId: string; participantId: string }): Promise<void> {
     await prisma.meetingParticipant.updateMany({
         where: { id: seat.participantId, leftAt: null },
         data: { leftAt: new Date() }
@@ -388,10 +379,7 @@ export async function seatForGuestKey(guestKey: string): Promise<MeetingSeat | n
 }
 
 /** Resolve an account's seat in a meeting they say they are in. */
-export async function seatForUser(
-    userId: string,
-    meetingId: string
-): Promise<MeetingSeat | null> {
+export async function seatForUser(userId: string, meetingId: string): Promise<MeetingSeat | null> {
     const participant = await prisma.meetingParticipant.findFirst({
         where: { meetingId, userId, leftAt: null },
         orderBy: { joinedAt: "desc" },
@@ -444,10 +432,7 @@ async function requireRoom(meetingId: string): Promise<void> {
 
 /** The caller's own row, which is both the proof and the answer to "what am I
  *  allowed to see" - so it is returned rather than thrown away. */
-async function requireSeated(seat: {
-    meetingId: string;
-    participantId: string;
-}): Promise<{
+async function requireSeated(seat: { meetingId: string; participantId: string }): Promise<{
     id: string;
     userId: string | null;
     name: string;

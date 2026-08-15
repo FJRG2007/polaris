@@ -79,10 +79,12 @@ describe("the notes screen", () => {
             depth: 1,
             pinned: false
         };
-        const markup = screen(
-            [{ ...summary, hasChildren: true }, child],
-            { ...note, id: child.id, title: child.title, parentId: summary.id }
-        );
+        const markup = screen([{ ...summary, hasChildren: true }, child], {
+            ...note,
+            id: child.id,
+            title: child.title,
+            parentId: summary.id
+        });
         expect(markup).toContain("Where this note sits");
         // The parent's title is on the page as the step above it, not only as a
         // sidebar row: a breadcrumb that named nothing would be decoration.

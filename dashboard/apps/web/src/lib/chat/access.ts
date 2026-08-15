@@ -162,10 +162,7 @@ export async function channelAccess(
 }
 
 /** The same, refused loudly. */
-export async function requireChannel(
-    actor: ChatActor,
-    channelId: string
-): Promise<ChannelAccess> {
+export async function requireChannel(actor: ChatActor, channelId: string): Promise<ChannelAccess> {
     const access = await channelAccess(actor, channelId);
     if (!access) throw new ChatAccessError();
     return access;
@@ -173,10 +170,7 @@ export async function requireChannel(
 
 /** The same again, for a write. Says which of the two reasons refused it, since
  *  "you are not in it" and "it is archived" call for different next steps. */
-export async function requirePostable(
-    actor: ChatActor,
-    channelId: string
-): Promise<ChannelAccess> {
+export async function requirePostable(actor: ChatActor, channelId: string): Promise<ChannelAccess> {
     const access = await requireChannel(actor, channelId);
     if (!access.mayPost) throw new ChatAccessError("That conversation is archived");
     return access;

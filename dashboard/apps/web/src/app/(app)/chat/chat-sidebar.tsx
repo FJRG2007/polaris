@@ -55,7 +55,9 @@ export function ChatSidebar() {
         () =>
             channels
                 .filter((channel) => channel.spaceId === null)
-                .sort((left, right) => (right.lastMessageAt ?? "").localeCompare(left.lastMessageAt ?? "")),
+                .sort((left, right) =>
+                    (right.lastMessageAt ?? "").localeCompare(left.lastMessageAt ?? "")
+                ),
         [channels]
     );
 
@@ -243,9 +245,14 @@ function Section({
                     className="flex min-w-0 flex-1 items-center gap-1 rounded px-1 py-1 text-left text-[11px] font-medium uppercase tracking-[0.04em] text-foreground-subtle transition-colors hover:text-foreground"
                 >
                     <ChevronDown
-                        className={cn("size-3 shrink-0 transition-transform", folded && "-rotate-90")}
+                        className={cn(
+                            "size-3 shrink-0 transition-transform",
+                            folded && "-rotate-90"
+                        )}
                     />
-                    <span className="truncate" title={label}>{label}</span>
+                    <span className="truncate" title={label}>
+                        {label}
+                    </span>
                 </button>
                 {action}
             </div>

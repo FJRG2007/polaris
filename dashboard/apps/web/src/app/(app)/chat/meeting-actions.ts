@@ -69,9 +69,7 @@ export async function joinAsGuestAction(
     const parsed = guestJoinSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That did not work" };
 
-    const result = await guard(() =>
-        meetings.joinAsGuest(parsed.data.token, parsed.data.name)
-    );
+    const result = await guard(() => meetings.joinAsGuest(parsed.data.token, parsed.data.name));
     if (result.error || !result.value) return { error: result.error ?? "That did not work" };
 
     const seat = result.value;

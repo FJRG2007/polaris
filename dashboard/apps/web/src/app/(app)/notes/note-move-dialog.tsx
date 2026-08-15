@@ -87,7 +87,9 @@ export function NoteMoveDialog({
                             >
                                 <span className="font-medium">Top level</span>
                                 {parentId === null && (
-                                    <span className="text-xs text-muted-foreground">where it is</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        where it is
+                                    </span>
                                 )}
                             </button>
                         </li>
@@ -101,7 +103,9 @@ export function NoteMoveDialog({
                                     className="flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm transition-colors hover:bg-muted disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent"
                                 >
                                     <CornerDownRight className="size-3.5 shrink-0 text-muted-foreground" />
-                                    <span className="truncate" title={entry.title}>{entry.title}</span>
+                                    <span className="truncate" title={entry.title}>
+                                        {entry.title}
+                                    </span>
                                     {parentId === entry.id && (
                                         <span className="shrink-0 text-xs text-muted-foreground">
                                             where it is
