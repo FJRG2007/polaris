@@ -23,7 +23,7 @@ import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
 import { useDisplayFormat } from "@/components/display-format";
-import { MessageSquare, Pencil, SmilePlus, Trash2 } from "lucide-react";
+import { MessageSquare, Paperclip, Pencil, SmilePlus, Star, Trash2 } from "lucide-react";
 import {
     cn,
     DropdownMenu,
@@ -52,6 +52,7 @@ export interface MessageListProps {
     /** Absent inside a thread, where a reply has nowhere further to go. */
     onOpenThread?: (message: ChatMessageView) => void;
     onReact: (messageId: string, emoji: string) => void;
+    onStar: (message: ChatMessageView) => void;
     onEdit: (message: ChatMessageView) => void;
     onDelete: (message: ChatMessageView) => void;
 }
@@ -63,6 +64,7 @@ export function MessageList({
     canModerate,
     onOpenThread,
     onReact,
+    onStar,
     onEdit,
     onDelete
 }: MessageListProps) {
@@ -91,6 +93,7 @@ export function MessageList({
                             canModerate={canModerate}
                             onOpenThread={onOpenThread}
                             onReact={onReact}
+                            onStar={onStar}
                             onEdit={onEdit}
                             onDelete={onDelete}
                         />
@@ -109,6 +112,7 @@ function Message({
     canModerate,
     onOpenThread,
     onReact,
+    onStar,
     onEdit,
     onDelete
 }: {
@@ -119,6 +123,7 @@ function Message({
     canModerate: boolean;
     onOpenThread?: (message: ChatMessageView) => void;
     onReact: (messageId: string, emoji: string) => void;
+    onStar: (message: ChatMessageView) => void;
     onEdit: (message: ChatMessageView) => void;
     onDelete: (message: ChatMessageView) => void;
 }) {
@@ -185,6 +190,38 @@ function Message({
                     </div>
                 )}
 
+                {message.attachments.length > 0 && (
+                    <ul className="mt-1 flex flex-col gap-1">
+                        {message.attachments.map((file) => (
+                            <li key={file.id}>
+                                {file.inline ? (
+                                    // eslint-disable-next-line @next/next/no-img-element -- one image per attachment, no loader wanted
+                                    <a href={`/api/chat/attachments/${file.id}`} target="_blank" rel="noreferrer">
+                                        <img
+                                            src={`/api/chat/attachments/${file.id}`}
+                                            alt={file.name}
+                                            className="max-h-72 max-w-full rounded-md border border-border object-contain"
+                                        />
+                                    </a>
+                                ) : (
+                                    <a
+                                        href={`/api/chat/attachments/${file.id}`}
+                                        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-xs transition-colors hover:bg-card-hover"
+                                    >
+                                        <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
+                                        <span className="max-w-[16rem] truncate" title={file.name}>
+                                            {file.name}
+                                        </span>
+                                        <span className="shrink-0 text-muted-foreground">
+                                            {readableSize(file.size)}
+                                        </span>
+                                    </a>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                )}
+
                 {message.reactions.length > 0 && (
                     <ul className="mt-1 flex flex-wrap gap-1">
                         {message.reactions.map((reaction) => (
@@ -239,6 +276,20 @@ function Message({
                             {emoji}
                         </button>
                     ))}
+                    <button
+                        type="button"
+                        aria-label={message.starred ? "Remove from saved" : "Save this message"}
+                        title={message.starred ? "Remove from saved" : "Save"}
+                        onClick={() => onStar(message)}
+                        className={cn(
+                            "rounded p-1 transition-colors hover:bg-muted",
+                            message.starred
+                                ? "text-primary"
+                                : "text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        <Star className={cn("size-3.5", message.starred && "fill-current")} />
+                    </button>
                     {onOpenThread && (
                         <button
                             type="button"
@@ -300,4 +351,11 @@ function sameDay(left: string, right: string): boolean {
 
 function withinWindow(left: string, right: string): boolean {
     return new Date(right).getTime() - new Date(left).getTime() < GROUP_WINDOW_MS;
+}
+
+/** A size somebody can read at a glance. */
+function readableSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

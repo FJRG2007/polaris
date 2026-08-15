@@ -93,6 +93,10 @@ export function ThreadPanel({
                         viewerId={viewerId}
                         canPost={canPost}
                         canModerate={canModerate}
+                        onStar={async (message) => {
+                            await runAction(() => actions.starAction(message.id), setError);
+                            await load();
+                        }}
                         onReact={async (messageId, emoji) => {
                             await runAction(
                                 () => actions.reactAction({ messageId, emoji }),
@@ -126,16 +130,33 @@ export function ThreadPanel({
                 channelId={root.channelId}
                 disabled={!canPost}
                 placeholder="Reply in this thread"
-                onSend={async (body) => {
-                    await runAction(
-                        () =>
-                            actions.sendAction({
-                                channelId: root.channelId,
-                                body,
-                                parentId: root.id
-                            }),
-                        setError
-                    );
+                onSend={async (body, files) => {
+                    if (files.length > 0) {
+                        // A reply with files takes the same route a message does,
+                        // with the thread named on it.
+                        const form = new FormData();
+                        form.set("body", body);
+                        form.set("parentId", root.id);
+                        for (const file of files) form.append("files", file);
+                        const response = await fetch(
+                            `/api/chat/channels/${root.channelId}/messages`,
+                            { method: "POST", body: form }
+                        );
+                        if (!response.ok) {
+                            setError("That could not be sent");
+                            return;
+                        }
+                    } else {
+                        await runAction(
+                            () =>
+                                actions.sendAction({
+                                    channelId: root.channelId,
+                                    body,
+                                    parentId: root.id
+                                }),
+                            setError
+                        );
+                    }
                     await load();
                     onChanged();
                 }}

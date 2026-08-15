@@ -157,6 +157,20 @@ export async function reactAction(input: unknown): Promise<{ on?: boolean; error
     return result.error ? { error: result.error } : { on: result.value };
 }
 
+/** Keep a message, or stop keeping it. Returns whether it is kept now, so an
+ *  optimistic star settles without asking again. */
+export async function starAction(messageId: string): Promise<{ on?: boolean; error?: string }> {
+    const me = await actor();
+    const result = await guard(() => messages.star(me, messageId));
+    return result.error ? { error: result.error } : { on: result.value };
+}
+
+/** Everything this reader kept, for the Saved screen. */
+export async function starredAction(): Promise<{ messages: readonly ChatMessageView[] }> {
+    const me = await actor();
+    return { messages: await messages.starred(me) };
+}
+
 export async function markReadAction(input: unknown): Promise<{ error?: string }> {
     const me = await actor();
     const parsed = core.chatMarkReadSchema.safeParse(input);

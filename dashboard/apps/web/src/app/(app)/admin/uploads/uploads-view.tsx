@@ -17,7 +17,12 @@ import type { AvatarSettings } from "@/lib/avatar-service";
 import { ResolvedTarget, TargetPicker } from "./target-picker";
 import type { UploadSettings } from "@/lib/tasks/attachment-service";
 import { Button, Card, CardBody, Input, Switch, cn } from "@polaris/ui";
-import { setAvatarSettingsAction, setUploadSettingsAction } from "./actions";
+import type { ChatStorageSettings } from "@/lib/chat/attachments";
+import { setAvatarSettingsAction, setChatStorageTargetAction, setUploadSettingsAction } from "./actions";
+
+/** The chat's way of saying "whichever disk the photos are on". Not a storage
+ *  target, so it is its own value rather than one of theirs. */
+const FOLLOW_AVATARS = "follow-avatars";
 
 /** Megabytes are what people think in; the setting is stored in bytes. */
 function toMegabytes(bytes: number): number {
@@ -223,11 +228,84 @@ function PhotosCard({ settings }: { settings: AvatarSettings }) {
     );
 }
 
-export function UploadsView({ uploads, avatars }: { uploads: UploadSettings; avatars: AvatarSettings }) {
+function ChatCard({ settings }: { settings: ChatStorageSettings }) {
+    const initial = settings.followingAvatars ? FOLLOW_AVATARS : settings.choice!;
+    const [target, setTarget] = useState(initial);
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
+    const [error, setError] = useState("");
+
+    const dirty = target !== initial;
+
+    const save = async () => {
+        if (saving) return;
+        setSaving(true);
+        setError("");
+        const result = await runAction(() => setChatStorageTargetAction({ target }), setError);
+        setSaving(false);
+        if (result?.error) {
+            setError(result.error);
+            return;
+        }
+        setSaved(true);
+    };
+
+    return (
+        <Card>
+            <CardBody className="flex flex-col gap-4 p-4">
+                <div>
+                    <h2 className="text-sm font-medium">Files sent in chat</h2>
+                    <p className="text-xs text-muted-foreground">
+                        Screenshots and documents people put on a message. Capped at 25 MB each -
+                        anything bigger belongs in Drive, with a link to it in the conversation.
+                    </p>
+                </div>
+
+                <ResolvedTarget
+                    resolved={settings.resolved}
+                    automatic="Worked out from what this instance has connected. Connect a NAS and new files follow it."
+                />
+
+                <TargetPicker
+                    label="Where to keep them"
+                    hint="Files already sent stay where they were written; this decides where the next ones go."
+                    value={target}
+                    options={settings.options}
+                    resolvedName={settings.resolved.name}
+                    lead={{ value: FOLLOW_AVATARS, label: "Same as profile photos" }}
+                    onChange={(value) => {
+                        setTarget(value);
+                        setSaved(false);
+                    }}
+                />
+
+                <SaveRow
+                    dirty={dirty}
+                    valid
+                    saving={saving}
+                    saved={saved}
+                    error={error}
+                    onSave={() => void save()}
+                />
+            </CardBody>
+        </Card>
+    );
+}
+
+export function UploadsView({
+    uploads,
+    avatars,
+    chat
+}: {
+    uploads: UploadSettings;
+    avatars: AvatarSettings;
+    chat: ChatStorageSettings;
+}) {
     return (
         <div className="flex max-w-2xl flex-col gap-4">
             <AttachmentsCard settings={uploads} />
             <PhotosCard settings={avatars} />
+            <ChatCard settings={chat} />
         </div>
     );
 }

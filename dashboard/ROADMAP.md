@@ -264,8 +264,19 @@ Chat (talking to the people here):
       With neither set, calls work on one network and between reachable
       addresses, and not otherwise - a hosted TURN default is not something
       Polaris should decide for an operator
-- [ ] Attachments, screen sharing, recording, scheduled meetings, presence dots,
-      unfurled links, and search across conversations
+- [x] Files on a message: staged in the composer, dropped onto the conversation,
+      or picked. Images shown inline, everything else a download, and the
+      download authorized by the conversation before a byte is read. An
+      administrator picks where they go under Uploads, defaulting to wherever
+      profile photos already go rather than asking the same question twice
+- [x] Keeping a message: private to whoever kept it, with a Saved screen that
+      links back to the room it came from. Starring is a bookmark, not a signal -
+      reactions are the public version
+- [x] Somebody whose chat has been switched off cannot be messaged: they are not
+      offered in a picker, and a direct message or channel add naming them is
+      refused. They have no screen a message could arrive on
+- [ ] Screen sharing, recording, scheduled meetings, presence dots, unfurled
+      links, and search across conversations
 
 Code (pull requests and issues):
 

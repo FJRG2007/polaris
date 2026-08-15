@@ -14,7 +14,14 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { publishChatChange } from "./live";
-import { ChatAccessError, requireChannel, requirePostable, type ChatActor } from "./access";
+import { isInlineImage, type StoredAttachment } from "./attachments";
+import {
+    ChatAccessError,
+    reachableChannelIds,
+    requireChannel,
+    requirePostable,
+    type ChatActor
+} from "./access";
 
 /** One message, with everything the list needs to draw it. */
 export interface ChatMessageView {
@@ -32,7 +39,22 @@ export interface ChatMessageView {
     readonly edited: boolean;
     readonly deleted: boolean;
     readonly reactions: readonly ChatReactionView[];
+    readonly attachments: readonly ChatAttachmentView[];
+    /** Whether this reader kept it. Private to them - starring is a bookmark,
+     *  not a signal to the room. */
+    readonly starred: boolean;
     readonly createdAt: string;
+}
+
+/** One file on a message. The bytes are fetched by their own route, which
+ *  authorizes the channel before it reads anything. */
+export interface ChatAttachmentView {
+    readonly id: string;
+    readonly name: string;
+    readonly size: number;
+    readonly contentType: string;
+    /** Whether the list may draw it rather than link to it. */
+    readonly inline: boolean;
 }
 
 /** One emoji on a message, already counted. */
@@ -159,7 +181,14 @@ export async function readSince(
  * conversations and how a thread announces itself, and a message that landed
  * without them would be a message nobody is shown.
  */
-export async function send(actor: ChatActor, input: core.ChatSendInput): Promise<string> {
+export async function send(
+    actor: ChatActor,
+    input: core.ChatSendInput,
+    /** Files already written to storage, to be tied to the message in the same
+     *  transaction. A message that landed without its attachments would be a
+     *  message nobody could make sense of. */
+    attachments: readonly StoredAttachment[] = []
+): Promise<string> {
     await requirePostable(actor, input.channelId);
 
     if (input.parentId) {
@@ -181,7 +210,10 @@ export async function send(actor: ChatActor, input: core.ChatSendInput): Promise
                 channelId: input.channelId,
                 authorId: actor.id,
                 body: input.body,
-                parentId: input.parentId ?? null
+                parentId: input.parentId ?? null,
+                ...(attachments.length
+                    ? { attachments: { createMany: { data: attachments.map((file) => ({ ...file })) } } }
+                    : {})
             },
             select: { id: true, createdAt: true }
         });
@@ -325,6 +357,56 @@ export async function markRead(actor: ChatActor, input: core.ChatMarkReadInput):
     });
 }
 
+/**
+ * Keep a message, or stop keeping it. Returns whether it is kept now.
+ *
+ * Anybody who can read the message can keep it, including in a channel they
+ * reach through the space rather than by membership: a bookmark is about the
+ * reader, and nothing about it is visible to anybody else.
+ */
+export async function star(actor: ChatActor, messageId: string): Promise<boolean> {
+    const message = await prisma.chatMessage.findUnique({
+        where: { id: messageId },
+        select: { channelId: true }
+    });
+    if (!message) throw new ChatAccessError("That message is gone");
+    await requireChannel(actor, message.channelId);
+
+    const existing = await prisma.chatStar.findUnique({
+        where: { messageId_userId: { messageId, userId: actor.id } },
+        select: { id: true }
+    });
+    if (existing) {
+        await prisma.chatStar.delete({ where: { id: existing.id } });
+        return false;
+    }
+    await prisma.chatStar.create({ data: { messageId, userId: actor.id } });
+    return true;
+}
+
+/**
+ * Everything this reader kept, newest first.
+ *
+ * Re-checked against the channel on the way out rather than trusted from the
+ * star: somebody removed from a private channel keeps their bookmarks as rows,
+ * and this is where they stop being readable.
+ */
+export async function starred(actor: ChatActor, limit = 100): Promise<ChatMessageView[]> {
+    const stars = await prisma.chatStar.findMany({
+        where: { userId: actor.id },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        select: { message: { select: MESSAGE_SELECT } }
+    });
+    if (stars.length === 0) return [];
+
+    const reachable = await reachableChannelIds(actor);
+    const rows = stars
+        .map((entry) => entry.message)
+        .filter((row) => reachable.has(row.channelId) && row.deletedAt === null);
+    return decorate(actor, rows);
+}
+
 /** Say that somebody is composing. Nothing is stored: it is true for a few
  *  seconds and then it is not, and a table would only ever hold stale rows. */
 export async function announceTyping(
@@ -379,7 +461,7 @@ async function decorate(actor: ChatActor, rows: readonly Row[]): Promise<ChatMes
     const authorIds = [
         ...new Set(rows.map((row) => row.authorId).filter((id): id is string => id !== null))
     ];
-    const [authors, reactions] = await Promise.all([
+    const [authors, reactions, files, stars] = await Promise.all([
         authorIds.length
             ? prisma.user.findMany({
                   where: { id: { in: authorIds } },
@@ -389,10 +471,32 @@ async function decorate(actor: ChatActor, rows: readonly Row[]): Promise<ChatMes
         prisma.chatReaction.findMany({
             where: { messageId: { in: rows.map((row) => row.id) } },
             select: { messageId: true, emoji: true, userId: true }
+        }),
+        prisma.chatAttachment.findMany({
+            where: { messageId: { in: rows.map((row) => row.id) } },
+            orderBy: { createdAt: "asc" },
+            select: { id: true, messageId: true, name: true, size: true, contentType: true }
+        }),
+        prisma.chatStar.findMany({
+            where: { userId: actor.id, messageId: { in: rows.map((row) => row.id) } },
+            select: { messageId: true }
         })
     ]);
 
     const names = new Map(authors.map((author) => [author.id, author.name]));
+    const kept = new Set(stars.map((row) => row.messageId));
+    const onMessageFiles = new Map<string, ChatAttachmentView[]>();
+    for (const file of files) {
+        const bucket = onMessageFiles.get(file.messageId) ?? [];
+        bucket.push({
+            id: file.id,
+            name: file.name,
+            size: Number(file.size),
+            contentType: file.contentType,
+            inline: isInlineImage(file.contentType)
+        });
+        onMessageFiles.set(file.messageId, bucket);
+    }
     const onMessage = new Map<string, Map<string, { count: number; mine: boolean }>>();
     for (const reaction of reactions) {
         const bucket = onMessage.get(reaction.messageId) ?? new Map();
@@ -422,6 +526,8 @@ async function decorate(actor: ChatActor, rows: readonly Row[]): Promise<ChatMes
             .sort(
                 (left, right) => right.count - left.count || left.emoji.localeCompare(right.emoji)
             ),
+        attachments: onMessageFiles.get(row.id) ?? [],
+        starred: kept.has(row.id),
         createdAt: row.createdAt.toISOString()
     }));
 }

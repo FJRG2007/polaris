@@ -9,6 +9,7 @@ import { z } from "zod";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { setAvatarSettings } from "@/lib/avatar-service";
+import { setChatStorageTarget } from "@/lib/chat/attachments";
 import { setUploadSettings } from "@/lib/tasks/attachment-service";
 
 /** A storage connection id, `local`, or `auto`. */
@@ -60,6 +61,35 @@ export async function setAvatarSettingsAction(input: unknown): Promise<{ error?:
             // Whether an instance talks to Gravatar is the part an operator may
             // later need to account for, so it is recorded alongside the target.
             metadata: { target: parsed.data.target, gravatar: parsed.data.gravatar }
+        });
+        return {};
+    } catch (caught) {
+        console.error(caught);
+        return { error: "Could not save that" };
+    }
+}
+
+/**
+ * Where chat attachments go.
+ *
+ * `follow-avatars` is stored as no choice at all, which is what makes it a
+ * living default rather than a copy: pointing profile photos at a NAS moves chat
+ * with them, until somebody answers this question separately.
+ */
+export async function setChatStorageTargetAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = z.object({ target: z.union([target, z.literal("follow-avatars")]) }).safeParse(input);
+    if (!parsed.success) return { error: "Check the settings and try again" };
+    try {
+        await setChatStorageTarget(
+            parsed.data.target === "follow-avatars" ? null : parsed.data.target
+        );
+        await recordAudit({
+            actorId: admin.id,
+            action: "settings.chat.uploads.update",
+            targetType: "setting",
+            targetId: "chat.attachments",
+            metadata: { target: parsed.data.target }
         });
         return {};
     } catch (caught) {

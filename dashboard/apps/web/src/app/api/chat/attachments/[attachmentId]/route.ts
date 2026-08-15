@@ -1,0 +1,59 @@
+/**
+ * One file somebody put on a message.
+ *
+ * Authorized by the conversation it is in, resolved before a single byte is
+ * read: an attachment id in a URL is a request, and being able to guess one must
+ * not be a way into a private channel.
+ *
+ * Served with everything that stops a browser treating somebody's upload as
+ * something to run. `Content-Disposition` is inline for the formats the list
+ * draws and an attachment for everything else, which is the same decision the
+ * message list makes about whether to show it - taken from the same function, so
+ * the two cannot disagree.
+ */
+
+import { requirePermission } from "@/lib/session";
+import { channelAccess } from "@/lib/chat/access";
+import { channelOfAttachment, isInlineImage, readAttachment } from "@/lib/chat/attachments";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/** A file on a message never changes - a new upload is a new row - so it can be
+ *  kept for a long time. Private: it is one conversation's, not a proxy's. */
+const CACHE = "private, max-age=86400, immutable";
+
+export async function GET(
+    _request: Request,
+    { params }: { params: Promise<{ attachmentId: string }> }
+): Promise<Response> {
+    const user = await requirePermission("chat.use");
+    const { attachmentId } = await params;
+
+    const channelId = await channelOfAttachment(attachmentId);
+    // The same answer for "not there" and "not yours", so this cannot be used to
+    // find out which conversations exist.
+    if (!channelId) return new Response(null, { status: 404 });
+    if (!(await channelAccess({ id: user.id }, channelId))) {
+        return new Response(null, { status: 404 });
+    }
+
+    const file = await readAttachment(attachmentId);
+    if (!file) return new Response(null, { status: 404 });
+
+    const inline = isInlineImage(file.contentType);
+    return new Response(file.bytes as unknown as BodyInit, {
+        headers: {
+            "Content-Type": inline ? file.contentType : "application/octet-stream",
+            "Content-Length": String(file.bytes.length),
+            "Cache-Control": CACHE,
+            // The bytes came from a person and are served from Polaris's own
+            // origin: the browser must treat them as what they were declared to
+            // be and nothing else, and must not be talked into running anything
+            // found inside them.
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+            "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.name)}`
+        }
+    });
+}

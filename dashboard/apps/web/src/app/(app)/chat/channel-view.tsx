@@ -180,7 +180,47 @@ export function ChannelView({ channelId }: { channelId: string }) {
         void actions.markReadAction({ channelId, messageId: newest.id }).then(refresh);
     }, [messages, channelId, refresh]);
 
-    const send = async (body: string) => {
+    const star = async (message: ChatMessageView) => {
+        await runAction(() => actions.starAction(message.id), setError);
+        await load();
+    };
+
+    /**
+     * Send.
+     *
+     * With no files it stays optimistic: the line is on screen before the server
+     * answers, which is the whole feel of a chat. With files it cannot be - the
+     * bytes have to be written before the message exists - so it posts to the
+     * route and waits, and the composer having shown the staged files all along
+     * is what stops that wait from looking like nothing happened.
+     */
+    const send = async (body: string, files: readonly File[] = []) => {
+        if (files.length > 0) {
+            following.current = true;
+            const form = new FormData();
+            form.set("body", body);
+            for (const file of files) form.append("files", file);
+            const response = await fetch(`/api/chat/channels/${channelId}/messages`, {
+                method: "POST",
+                body: form
+            });
+            if (!response.ok) {
+                const answer: unknown = await response.json().catch(() => null);
+                const message =
+                    typeof answer === "object" && answer !== null && "error" in answer
+                        ? String((answer as { error: unknown }).error)
+                        : "That could not be sent";
+                setError(message);
+                return;
+            }
+            await load();
+            refresh();
+            return;
+        }
+        return sendText(body);
+    };
+
+    const sendText = async (body: string) => {
         const draft: ChatMessageView = {
             id: `pending:${++drafts.current}`,
             channelId,
@@ -194,6 +234,8 @@ export function ChannelView({ channelId }: { channelId: string }) {
             edited: false,
             deleted: false,
             reactions: [],
+            attachments: [],
+            starred: false,
             createdAt: new Date().toISOString()
         };
         setPending((current) => [...current, draft]);
@@ -337,6 +379,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
                             canModerate={canModerate}
                             onOpenThread={setThread}
                             onReact={react}
+                            onStar={star}
                             onEdit={setEditing}
                             onDelete={setDeleting}
                         />

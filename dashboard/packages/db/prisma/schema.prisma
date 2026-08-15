@@ -5686,6 +5686,7 @@ model ChatMessage {
     replies     ChatMessage[]    @relation("ChatThread")
     reactions   ChatReaction[]
     attachments ChatAttachment[]
+    stars       ChatStar[]
 
     @@index([channelId, createdAt])
     @@index([parentId, createdAt])
@@ -5715,18 +5716,40 @@ model ChatReaction {
 // message takes the row; sweeping the bytes is the upload layer's job, the same
 // as everywhere else.
 model ChatAttachment {
-    id          String   @id @default(uuid(7)) @db.Uuid
-    messageId   String   @db.Uuid
-    name        String
-    size        BigInt   @default(0)
-    contentType String   @default("application/octet-stream")
-    // Where it landed, as the storage layer addresses it.
-    path        String
-    createdAt   DateTime @default(now())
+    id           String   @id @default(uuid(7)) @db.Uuid
+    messageId    String   @db.Uuid
+    name         String
+    size         BigInt   @default(0)
+    contentType  String   @default("application/octet-stream")
+    // The storage connection it was written to, or null for the disk Polaris
+    // runs on. Recorded per file rather than read from the setting: an operator
+    // who points chat at a NAS next month must not break every file already
+    // written somewhere else.
+    connectionId String?  @db.Uuid
+    // Where it landed, as that storage addresses it.
+    path         String
+    createdAt    DateTime @default(now())
 
     message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
     @@index([messageId])
+}
+
+// A message somebody kept.
+//
+// Private to the person who kept it - starring is a bookmark, not a signal to
+// the room, and a public one would turn "I need to come back to this" into a
+// statement about somebody else's message. That is what reactions are for.
+model ChatStar {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    messageId String   @db.Uuid
+    userId    String   @db.Uuid
+    createdAt DateTime @default(now())
+
+    message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+    @@unique([messageId, userId])
+    @@index([userId, createdAt])
 }
 // ---------------------------------------------------------------------------
 // Meetings (calls)

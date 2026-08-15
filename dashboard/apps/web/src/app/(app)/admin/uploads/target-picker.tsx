@@ -46,7 +46,8 @@ export function TargetPicker({
     value,
     options,
     resolvedName,
-    onChange
+    onChange,
+    lead
 }: {
     label: string;
     hint: string;
@@ -55,6 +56,9 @@ export function TargetPicker({
     /** Named in the automatic option, so it says what it would actually pick. */
     resolvedName: string;
     onChange: (value: string) => void;
+    /** A choice that comes before the storage ones, for a kind of upload that
+     *  can defer to another kind rather than answer for itself. */
+    lead?: { value: string; label: string };
 }) {
     return (
         <label className="flex flex-col gap-1.5">
@@ -63,6 +67,7 @@ export function TargetPicker({
                 value={value}
                 onValueChange={onChange}
                 options={[
+                    ...(lead ? [lead] : []),
                     { value: AUTOMATIC, label: `Choose for me (${resolvedName})` },
                     { value: LOCAL, label: "This server" },
                     ...options.map((connection) => ({

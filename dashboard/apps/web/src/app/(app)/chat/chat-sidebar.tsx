@@ -17,14 +17,14 @@
 import Link from "next/link";
 import * as actions from "./actions";
 import { useChat } from "./chat-context";
-import { useParams } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { NewSpaceDialog } from "./new-space-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { NewDirectDialog } from "./new-direct-dialog";
 import { NewChannelDialog } from "./new-channel-dialog";
 import type { ChatSpaceView } from "@/lib/chat/chat-service";
-import { ChevronDown, Hash, Lock, MessageSquarePlus, Plus, Users } from "lucide-react";
+import { ChevronDown, Hash, Lock, MessageSquarePlus, Plus, Star, Users } from "lucide-react";
 import {
     cn,
     Skeleton,
@@ -38,6 +38,7 @@ export function ChatSidebar() {
     const { channels, loaded } = useChat();
     const params = useParams<{ channelId?: string }>();
     const open = params.channelId ?? null;
+    const saved = usePathname() === "/chat/saved";
 
     const [spaces, setSpaces] = useState<readonly ChatSpaceView[]>([]);
     const [folded, setFolded] = useState<readonly string[]>([]);
@@ -88,6 +89,17 @@ export function ChatSidebar() {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+                <Link
+                    href="/chat/saved"
+                    className={cn(
+                        "mb-3 flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover",
+                        saved ? "bg-card-hover text-foreground" : "text-muted-foreground"
+                    )}
+                >
+                    <Star className="size-3.5 shrink-0" />
+                    <span>Saved</span>
+                </Link>
+
                 {error && (
                     <p role="alert" className="px-1 pb-2 text-xs text-destructive">
                         {error}
