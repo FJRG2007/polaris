@@ -22,8 +22,7 @@
 import { can } from "@polaris/auth";
 import { prisma } from "@polaris/db";
 import { memberOrgIds } from "@/lib/orgs/org-service";
-import { discoverableBy } from "@/lib/privacy-service";
-import { like } from "@/lib/rich-text/mention-service";
+import { findPeople, type FoundPeople } from "@/lib/people-search";
 
 /** The caller, as the action layer resolved them. */
 export interface ChatActor {
@@ -239,75 +238,23 @@ export async function reachableChannelIds(actor: ChatActor): Promise<Set<string>
  * the thing asking.
  */
 /**
- * The fewest characters that count as looking for somebody.
- *
- * Two, because one letter is not a search - it is the first page of a directory,
- * and paging a directory is exactly what nobody here has agreed to.
- */
-const SHORTEST_SEARCH = 2;
-
-/**
  * Who this account may start a conversation with.
  *
- * **Nothing is listed.** An empty box answers with an empty list, and so does a
- * single letter: a picker that shows everybody the moment it opens is a user
- * directory, and an instance is not always a company where everybody may know
- * everybody. You find somebody you are already looking for.
+ * The instance-wide person search, narrowed to accounts that can actually
+ * receive a message: an account without `chat.use` has no screen one could
+ * arrive on, and that is the same capability the write enforces, so what is
+ * offered and what is allowed are one set.
  *
- * Three rules narrow what a search can reach, in this order:
- *
- * - the account has to be findable *by this person* - see `discoverable` in
- *   privacy settings, which is how somebody stays out of every search and is
- *   reached only by a friend request from whoever they gave their username to;
- * - it has to hold `chat.use`, since an account without the app has no screen a
- *   message could arrive on. That is the same capability the write enforces, so
- *   what is offered and what is allowed are one set;
- * - and it is not banned, and not the searcher.
- *
- * Asked wider than it answers, since neither of the first two is a `where`
- * clause: both are resolved per account after the query.
+ * Everything else about who may be found - that nothing is listed, and that
+ * somebody who has hidden themselves is not there at all - is `findPeople`,
+ * because it is a privacy rule and must not have a second copy here.
  */
 export async function searchForConversation(
     actor: ChatActor,
     query: string,
     limit = 8
-): Promise<{ people: { id: string; name: string }[]; withheld: number }> {
-    const term = query.trim();
-    if (term.length < SHORTEST_SEARCH) return { people: [], withheld: 0 };
-
-    const contains = like(term);
-    const found = await prisma.user.findMany({
-        where: {
-            id: { not: actor.id },
-            bannedAt: null,
-            OR: [{ name: contains }, { email: contains }, { username: contains }]
-        },
-        select: { id: true, name: true, email: true },
-        orderBy: { name: "asc" },
-        take: Math.min(limit * 4, 40)
-    });
-
-    // Findable first, then reachable. The order matters for what is counted
-    // below: somebody who has hidden themselves is not "an account without
-    // Chat", they are not an account this search knows about at all.
-    const visible = await discoverableBy(
-        { id: actor.id, isAdmin: false },
-        found.map((person) => person.id)
-    );
-    const candidates = found.filter((person) => visible.has(person.id));
-
-    const allowed = await messageable(candidates.map((person) => person.id));
-    const people = candidates.filter((person) => allowed.has(person.id));
-    return {
-        people: people.slice(0, limit).map((person) => ({
-            id: person.id,
-            name: person.name || person.email
-        })),
-        // How many the searcher could have found but cannot write to, so the
-        // picker can say why it is empty rather than implying the account does
-        // not exist. Never counts anybody they were not allowed to find.
-        withheld: candidates.length - people.length
-    };
+): Promise<FoundPeople> {
+    return findPeople(actor, query, { reachableOnly: true, reachable: messageable, limit });
 }
 
 export async function messageable(userIds: readonly string[]): Promise<Set<string>> {

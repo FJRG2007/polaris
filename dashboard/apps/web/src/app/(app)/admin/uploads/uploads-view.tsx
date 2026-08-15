@@ -18,7 +18,13 @@ import { ResolvedTarget, TargetPicker } from "./target-picker";
 import type { UploadSettings } from "@/lib/tasks/attachment-service";
 import { Button, Card, CardBody, Input, Switch, cn } from "@polaris/ui";
 import type { ChatStorageSettings } from "@/lib/chat/attachments";
-import { setAvatarSettingsAction, setChatStorageTargetAction, setUploadSettingsAction } from "./actions";
+import {
+    checkStorageAction,
+    setAvatarSettingsAction,
+    setChatStorageTargetAction,
+    setUploadSettingsAction,
+    type StorageCheck
+} from "./actions";
 
 /** The chat's way of saying "whichever disk the photos are on". Not a storage
  *  target, so it is its own value rather than one of theirs. */
@@ -27,6 +33,47 @@ const FOLLOW_AVATARS = "follow-avatars";
 /** Megabytes are what people think in; the setting is stored in bytes. */
 function toMegabytes(bytes: number): number {
     return Math.round(bytes / (1024 * 1024));
+}
+
+/**
+ * Prove it works, rather than that it saved.
+ *
+ * Storage that takes a file and will not give it back looks exactly like storage
+ * that works, right up until somebody opens a message from last week and gets
+ * nothing. This writes a small file, reads it back and removes it - the same
+ * three calls an upload and a download make - and says what happened.
+ */
+function CheckButton({ which }: { which: StorageCheck }) {
+    const [busy, setBusy] = useState(false);
+    const [said, setSaid] = useState<{ ok: boolean; detail: string; where: string } | null>(null);
+
+    return (
+        <div className="flex flex-col gap-1.5">
+            <div>
+                <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={async () => {
+                        setBusy(true);
+                        setSaid(null);
+                        const result = await runAction(() => checkStorageAction(which), () => undefined);
+                        setBusy(false);
+                        setSaid(result ?? { ok: false, detail: "That check could not be run.", where: "" });
+                    }}
+                >
+                    {busy && <Loader2 className="size-4 animate-spin" />}
+                    Check it works
+                </Button>
+            </div>
+            {said && (
+                <p className={cn("text-xs", said.ok ? "text-muted-foreground" : "text-danger")}>
+                    {said.where ? `${said.where}: ` : ""}
+                    {said.detail}
+                </p>
+            )}
+        </div>
+    );
 }
 
 /** The Save row every card ends with, including what it says afterwards. */
@@ -133,6 +180,7 @@ function AttachmentsCard({ settings }: { settings: UploadSettings }) {
                     {!limitValid && <span className="text-xs text-danger">Between 1 and 10240 MB.</span>}
                 </label>
 
+                <CheckButton which="tasks" />
                 <SaveRow
                     dirty={dirty}
                     valid={limitValid}
@@ -215,6 +263,7 @@ function PhotosCard({ settings }: { settings: AvatarSettings }) {
                     />
                 </label>
 
+                <CheckButton which="avatars" />
                 <SaveRow
                     dirty={dirty}
                     valid
@@ -279,6 +328,7 @@ function ChatCard({ settings }: { settings: ChatStorageSettings }) {
                     }}
                 />
 
+                <CheckButton which="chat" />
                 <SaveRow
                     dirty={dirty}
                     valid

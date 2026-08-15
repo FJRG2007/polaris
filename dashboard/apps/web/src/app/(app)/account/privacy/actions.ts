@@ -11,6 +11,7 @@
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
+import { findPeople } from "@/lib/people-search";
 import { setPrivacy } from "@/lib/privacy-service";
 import {
     FriendError,
@@ -41,6 +42,23 @@ export async function savePrivacyAction(input: unknown): Promise<{ error?: strin
     await setPrivacy(user.id, parsed.data);
     revalidatePath(PRIVACY_PATH);
     return {};
+}
+
+/**
+ * Who this account may ask to be friends with.
+ *
+ * Its own search rather than the chat one, and the reason is a bug this fixed:
+ * the friends card borrowed Chat's, whose first act is to check `chat.use` - so
+ * an account without the chat was sent away from its own privacy screen the
+ * moment the picker mounted, by a redirect it never asked for. Being friends is
+ * not a chat feature; it decides what the settings above this mean.
+ */
+export async function searchForFriendAction(
+    query: string
+): Promise<{ results?: { id: string; name: string }[]; withheld?: number }> {
+    const user = await requireUser();
+    const found = await findPeople(user, String(query ?? ""), { reachableOnly: false });
+    return { results: found.people, withheld: 0 };
 }
 
 export async function requestFriendAction(userId: string): Promise<{ error?: string }> {

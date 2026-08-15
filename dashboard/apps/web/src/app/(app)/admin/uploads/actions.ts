@@ -11,6 +11,10 @@ import { recordAudit } from "@/lib/audit-service";
 import { setAvatarSettings } from "@/lib/avatar-service";
 import { setChatStorageTarget } from "@/lib/chat/attachments";
 import { setUploadSettings } from "@/lib/tasks/attachment-service";
+import { checkStorageTarget } from "@/lib/storage-target";
+import { chatTarget } from "@/lib/chat/attachments";
+import { avatarSettings } from "@/lib/avatar-service";
+import { uploadSettings } from "@/lib/tasks/attachment-service";
 
 /** A storage connection id, `local`, or `auto`. */
 const target = z.string().trim().min(1).max(128);
@@ -96,4 +100,42 @@ export async function setChatStorageTargetAction(input: unknown): Promise<{ erro
         console.error(caught);
         return { error: "Could not save that" };
     }
+}
+
+/** The three questions this screen answers, and the folder each writes under. */
+const CHECKS = {
+    tasks: "uploads",
+    avatars: "avatars",
+    chat: "chat"
+} as const;
+
+export type StorageCheck = keyof typeof CHECKS;
+
+/**
+ * Prove that a target actually works, rather than that it was accepted.
+ *
+ * Every one of these settings is a promise about where bytes will be next week,
+ * and the only way to test a promise like that is to make it and then ask for
+ * the bytes back. What this catches is the failure nothing else does: storage
+ * that takes a file and will not return it, which reaches somebody as an
+ * attachment that 404s long after whoever sent it has gone.
+ */
+export async function checkStorageAction(
+    which: StorageCheck
+): Promise<{ ok: boolean; detail: string; where: string }> {
+    await requireAdmin();
+    const folder = CHECKS[which] ?? CHECKS.tasks;
+
+    const target =
+        which === "chat"
+            ? await chatTarget()
+            : which === "avatars"
+              ? (await avatarSettings()).resolved
+              : (await uploadSettings()).resolved;
+
+    const result = await checkStorageTarget(target.id, folder);
+    return {
+        ...result,
+        where: target.name
+    };
 }

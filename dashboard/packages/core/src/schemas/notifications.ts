@@ -43,6 +43,7 @@ export const NOTIFICATION_GROUPS = [
     "security",
     "drive",
     "network",
+    "people",
     "system"
 ] as const;
 
@@ -55,6 +56,7 @@ export const NOTIFICATION_GROUP_LABEL: Record<NotificationGroup, string> = {
     security: "Security",
     drive: "Drive",
     network: "Network",
+    people: "People",
     system: "Polaris"
 };
 
@@ -203,6 +205,18 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         group: "security",
         label: "A session ended",
         description: "A device was signed out, by you or by something else.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "account.friend",
+        group: "people",
+        // One entry for both halves of the same exchange: being asked, and
+        // being answered. Somebody who wants to know about one wants to know
+        // about the other, and two switches for one thing is two switches to
+        // get wrong.
+        label: "Friend requests",
+        description: "Somebody asked to be added, or answered a request you sent.",
         level: "info",
         defaults: { inapp: true, email: false }
     },

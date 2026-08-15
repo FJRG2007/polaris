@@ -14,6 +14,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { notify } from "@/lib/notifications/dispatch";
 
 /** Somebody, as a friends list draws them. */
 export interface FriendView {
@@ -141,10 +142,43 @@ export async function requestFriend(userId: string, otherId: string): Promise<vo
             where: { id: existing.id },
             data: { status: "accepted", respondedAt: new Date() }
         });
+        await announce(otherId, userId, "accepted");
         return;
     }
 
     await prisma.friendship.create({ data: { requesterId: userId, addresseeId: otherId } });
+    await announce(otherId, userId, "asked");
+}
+
+/** Where a friend request is answered. */
+const FRIENDS_PATH = "/account/friends";
+
+/**
+ * Tell somebody about it.
+ *
+ * A request that sits on a screen nobody has open is a request nobody answers,
+ * and the person who sent it is left wondering whether they typed the username
+ * wrong. Never fails the thing it is announcing: the friendship is the point and
+ * the alert is the courtesy.
+ */
+async function announce(userId: string, aboutId: string, what: "asked" | "accepted"): Promise<void> {
+    const person = await prisma.user.findUnique({
+        where: { id: aboutId },
+        select: { name: true, email: true }
+    });
+    const name = person?.name || person?.email || "Somebody";
+    await notify({
+        userId,
+        event: "account.friend",
+        title: what === "asked" ? `${name} wants to be added` : `${name} added you`,
+        body:
+            what === "asked"
+                ? "Answer it on your friends page."
+                : "You can now see whatever they show their friends.",
+        href: FRIENDS_PATH,
+        // Only the request is waiting on anybody. Being accepted is news.
+        actionRequired: what === "asked"
+    }).catch(() => undefined);
 }
 
 /**
@@ -215,6 +249,8 @@ export async function respondToRequest(
         where: { id: requestId },
         data: { status: "accepted", respondedAt: new Date() }
     });
+    // The one who asked is the one waiting to hear.
+    await announce(request.requesterId, userId, "accepted");
 }
 
 /** Stop being friends. Either of them, without telling the other - and it is

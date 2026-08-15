@@ -28,6 +28,10 @@ export interface PickedPerson {
  *  is one request rather than eight. */
 const SEARCH_AFTER = 220;
 
+/** Below this nothing is asked at all - the same floor the server keeps, said
+ *  here too so the request is never made. */
+const SHORTEST = 2;
+
 export function PeoplePicker({
     picked,
     onChange,
@@ -60,6 +64,16 @@ export function PeoplePicker({
     useEffect(() => {
         const term = query.trim();
         const mine = ++asked.current;
+        // Nothing is asked for a box with nothing in it. Not only because the
+        // answer would be empty: a request that runs the moment the picker
+        // mounts is a request an account without the app can be refused, and
+        // being refused a search you did not ask for takes you off the page.
+        if (term.length < SHORTEST) {
+            setResults([]);
+            setWithheld(0);
+            setSearching(false);
+            return;
+        }
         setSearching(true);
         const timer = setTimeout(async () => {
             const result = await search(term);
@@ -123,7 +137,7 @@ export function PeoplePicker({
                 who has just typed a colleague's name and been told "nobody"
                 reads it as a broken search; the account is real, it simply
                 cannot receive a message. */}
-            {!searching && withheld > 0 && query.trim().length >= 2 && (
+            {!searching && withheld > 0 && query.trim().length >= SHORTEST && (
                 <p className="px-2 text-xs text-muted-foreground">
                     {withheld === 1
                         ? "One account matches but does not have Chat."
@@ -135,7 +149,7 @@ export function PeoplePicker({
             <ul className="max-h-48 overflow-y-auto">
                 {offered.length === 0 ? (
                     <li className="px-2 py-2 text-xs text-muted-foreground">
-                        {query.trim().length < 2
+                        {query.trim().length < SHORTEST
                             ? "Type a name, an email or a username."
                             : searching
                               ? "Looking"

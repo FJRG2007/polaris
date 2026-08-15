@@ -120,3 +120,79 @@ export function safeName(name: string): string {
         .replace(/-{2,}/g, "-");
     return cleaned.slice(0, 120) || "file";
 }
+
+/**
+ * Write a small file, read it back, and delete it.
+ *
+ * The check that would have answered a whole afternoon: a message with a
+ * recording on it that everybody could see and nobody could open, because the
+ * bytes went somewhere that took them and would not give them back. A write that
+ * appears to succeed proves nothing on its own - a share that has gone away, a
+ * directory inside a container that the next deploy replaces, a mount that
+ * accepts writes into nothing all look exactly like working storage until
+ * somebody asks for the file.
+ *
+ * So this asks for the file. It is the same three calls an upload and a download
+ * make, in order, against the target actually in use.
+ */
+export async function checkStorageTarget(
+    targetId: string,
+    localFolder: string
+): Promise<{ ok: boolean; detail: string }> {
+    const path = `polaris/health/${crypto.randomUUID()}`;
+    const written = new TextEncoder().encode("polaris storage check");
+
+    let driver;
+    try {
+        driver = await driverForTarget(targetId, localFolder);
+    } catch (error) {
+        return { ok: false, detail: `Could not reach it: ${message(error)}` };
+    }
+
+    try {
+        await driver.mkdir("polaris/health").catch(() => undefined);
+        await driver.writeStream(
+            path,
+            new ReadableStream<Uint8Array>({
+                start(controller) {
+                    controller.enqueue(written);
+                    controller.close();
+                }
+            }),
+            { mime: "text/plain", size: BigInt(written.length) }
+        );
+    } catch (error) {
+        return { ok: false, detail: `Wrote nothing: ${message(error)}` };
+    }
+
+    try {
+        const reader = (await driver.readStream(path)).getReader();
+        let read = 0;
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            read += value?.length ?? 0;
+        }
+        if (read !== written.length) {
+            return {
+                ok: false,
+                detail: `Took the file and gave back ${read} bytes of ${written.length}.`
+            };
+        }
+    } catch (error) {
+        // The one that matters: the write said yes and the read says no. That is
+        // exactly what an attachment that 404s looks like from the inside.
+        return { ok: false, detail: `Took the file but would not give it back: ${message(error)}` };
+    } finally {
+        await driver.delete(path).catch(() => undefined);
+        await driver.dispose().catch(() => undefined);
+    }
+
+    return { ok: true, detail: "Wrote a file, read it back and removed it." };
+}
+
+/** Whatever a driver threw, as a line somebody can act on. */
+function message(error: unknown): string {
+    if (error instanceof Error) return error.message;
+    return String(error);
+}

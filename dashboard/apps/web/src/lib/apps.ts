@@ -564,6 +564,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
+            label: "Friends",
+            href: "/account/friends",
+            icon: Users,
+            keywords: ["friend", "request", "add somebody", "contacts"]
+        },
+        {
             label: "Notifications",
             href: "/account/notifications",
             icon: Bell,
