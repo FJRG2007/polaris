@@ -126,7 +126,7 @@ export function SpaceScreen(props: SpaceScreenProps) {
             {error && (
                 <p
                     role="alert"
-                    className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                    className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger"
                 >
                     {error}
                 </p>
@@ -412,7 +412,7 @@ function StatusesTab({
                                                     ?.id ?? ""
                                             );
                                         }}
-                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                                     >
                                         <Trash2 className="size-3.5" />
                                     </button>
@@ -551,7 +551,7 @@ function FieldsTab({
                                     );
                                     if (result?.error) onError(result.error);
                                 }}
-                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                             >
                                 <Trash2 className="size-3.5" />
                             </button>
@@ -756,7 +756,7 @@ function PeopleTab({
                                         );
                                         if (result?.error) onError(result.error);
                                     }}
-                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                                 >
                                     <Trash2 className="size-3.5" />
                                 </button>
@@ -924,7 +924,7 @@ function SpaceTeams({
                                             if (result?.error) onError(result.error);
                                             await reload();
                                         }}
-                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                                     >
                                         <Trash2 className="size-3.5" />
                                     </button>

@@ -345,7 +345,7 @@ export function NotesView({
                                 aria-label="Delete this note"
                                 title="Delete"
                                 onClick={() => setConfirmDelete(true)}
-                                className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                                className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                             >
                                 <Trash2 className="size-4" />
                             </button>
@@ -366,7 +366,7 @@ export function NotesView({
                         {error && (
                             <p
                                 role="alert"
-                                className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                                className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger"
                             >
                                 {error}
                             </p>
@@ -561,7 +561,7 @@ export function NewNoteButton() {
                 <Plus className="size-4" />
                 New note
             </Button>
-            {error && <span className="text-xs text-destructive">{error}</span>}
+            {error && <span className="text-xs text-danger">{error}</span>}
         </>
     );
 }

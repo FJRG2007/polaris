@@ -112,7 +112,7 @@ export function SecurityAdmin({ policy, mailReady }: { policy: InstanceSecurityP
                                         </p>
                                     ) : null}
                                     {unavailable ? (
-                                        <p className="mt-1 text-xs text-destructive">
+                                        <p className="mt-1 text-xs text-danger">
                                             No email channel carries account mail yet, so nobody can pick this.
                                             Connect a sender under Inbox &gt; Channels, then nominate it under
                                             Management &gt; Email.

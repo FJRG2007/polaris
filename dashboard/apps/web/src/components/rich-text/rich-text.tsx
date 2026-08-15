@@ -13,13 +13,14 @@
  */
 
 import Link from "next/link";
+import { Fragment } from "react";
 import { cn } from "@polaris/ui";
 import * as refs from "./references";
 import { CodeBlock } from "./code-block";
 import { RICH_TEXT_PROSE } from "./prose";
 import { chipClass, chipLabel } from "./chip";
 import type { JSONContent } from "@tiptap/core";
-import { markdownToDoc, MARKDOWN_BLOCK, REFERENCE } from "./markdown";
+import { markdownToDoc, splitChannelMentions, MARKDOWN_BLOCK, REFERENCE } from "./markdown";
 
 export function RichText({ value, className }: { value: string; className?: string }) {
     const doc = markdownToDoc(value);
@@ -128,8 +129,33 @@ function Inline({ node }: { node: JSONContent }) {
     if (node.type === REFERENCE) return <Chip node={node} />;
     if (node.type !== "text") return <>{inline(node.content)}</>;
 
+    // `@everyone` and `@here` are stored as the text somebody typed - there is
+    // nothing to point at, since they mean "this conversation" - so they are
+    // picked out here rather than being their own node. Never inside code,
+    // which is where somebody puts one to show it without waking the room.
+    const marks = node.marks ?? [];
     let content: React.ReactNode = node.text ?? "";
-    for (const mark of node.marks ?? []) {
+    if (!marks.some((mark) => mark.type === "code")) {
+        const parts = splitChannelMentions(node.text ?? "");
+        // Only when there is one to draw. Wrapping every run of text in an
+        // element to find out would put a span around every word of every
+        // message in Polaris for the sake of the handful that name a room.
+        if (parts.some((part) => part.mention)) {
+            content = parts.map((part, index) =>
+                part.mention ? (
+                    <span
+                        key={index}
+                        className="rounded bg-primary/15 px-1 py-0.5 font-medium text-primary"
+                    >
+                        {part.text}
+                    </span>
+                ) : (
+                    <Fragment key={index}>{part.text}</Fragment>
+                )
+            );
+        }
+    }
+    for (const mark of marks) {
         if (mark.type === "bold") content = <strong>{content}</strong>;
         else if (mark.type === "italic") content = <em>{content}</em>;
         else if (mark.type === "strike") content = <s>{content}</s>;

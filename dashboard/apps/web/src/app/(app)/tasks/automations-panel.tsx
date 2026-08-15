@@ -233,7 +233,7 @@ function RuleEditor({
                                             actions: draft.actions.filter((_, position) => position !== index)
                                         })
                                     }
-                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                                 >
                                     <Trash2 className="size-3.5" />
                                 </button>
@@ -251,7 +251,7 @@ function RuleEditor({
                     </Button>
                 </div>
 
-                {error && <p className="text-xs text-destructive">{error}</p>}
+                {error && <p className="text-xs text-danger">{error}</p>}
 
                 <div className="flex gap-2">
                     <Button size="sm" onClick={onSave} disabled={!draft.name.trim() || draft.actions.length === 0}>
@@ -381,7 +381,7 @@ export function AutomationsPanel({
                                             setError
                                         );
                                     }}
-                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                                 >
                                     <Trash2 className="size-3.5" />
                                 </button>
@@ -451,7 +451,7 @@ export function FormsPanel({
                         <p className="text-xs text-muted-foreground">
                             It starts with two questions - a title and a description - which you can change afterwards.
                         </p>
-                        {error && <p className="text-xs text-destructive">{error}</p>}
+                        {error && <p className="text-xs text-danger">{error}</p>}
                         <div className="flex gap-2">
                             <Button
                                 size="sm"
@@ -532,7 +532,7 @@ export function FormsPanel({
                                         onClick={async () => {
                                             await runAction(() => actions.deleteFormAction(spaceId, form.id), setError);
                                         }}
-                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                                     >
                                         <Trash2 className="size-3.5" />
                                     </button>

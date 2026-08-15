@@ -14,8 +14,10 @@
  * same shape so a screen never has to know the difference.
  */
 
+import { z } from "zod";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
+import * as invites from "@/lib/chat/invites";
 import * as chat from "@/lib/chat/chat-service";
 import * as messages from "@/lib/chat/messages";
 import { allChatRules } from "@/lib/chat/rules";
@@ -32,6 +34,7 @@ import {
     reachableChannelIds,
     requirePostable
 } from "@/lib/chat/access";
+import type { ChatInviteOffer, ChatInviteView } from "@/lib/chat/invites";
 import type {
     ChatCategoryView,
     ChatChannelView,
@@ -502,4 +505,117 @@ export async function setMutedAction(
     const result = await guard(() => chat.setMuted(me, channelId, minutes));
     if (!result.error) revalidatePath(CHAT_PATH);
     return result;
+}
+
+/**
+ * Put the channels under one heading in the order they were dragged into.
+ *
+ * The whole list rather than one move, so the stored order is the order that was
+ * on screen. Nothing is revalidated: the rail is client state and asks again
+ * when it is told the channels moved.
+ */
+export async function reorderChannelsAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = core.chatChannelReorderSchema.safeParse(input);
+    if (!parsed.success) return { error: "Those channels could not be reordered" };
+    return guard(() => chat.reorderChannels(me, parsed.data));
+}
+
+export async function reorderCategoriesAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = core.chatCategoryReorderSchema.safeParse(input);
+    if (!parsed.success) return { error: "Those categories could not be reordered" };
+    return guard(() => chat.reorderCategories(me, parsed.data));
+}
+
+// ---------------------------------------------------------------------------
+// Invitations
+// ---------------------------------------------------------------------------
+
+export async function createInviteAction(
+    input: unknown
+): Promise<{ invite?: ChatInviteView; error?: string }> {
+    const me = await actor();
+    const parsed = core.chatInviteCreateSchema.safeParse(input);
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? "That invitation could not be made" };
+    }
+    const result = await guard(() => invites.createInvite(me, parsed.data));
+    return result.error ? { error: result.error } : { invite: result.value };
+}
+
+export async function listInvitesAction(
+    spaceId: string
+): Promise<{ invites?: readonly ChatInviteView[]; error?: string }> {
+    const me = await actor();
+    const result = await guard(() => invites.listInvites(me, String(spaceId)));
+    return result.error ? { error: result.error } : { invites: result.value };
+}
+
+export async function revokeInviteAction(inviteId: string): Promise<{ error?: string }> {
+    const me = await actor();
+    return guard(() => invites.revokeInvite(me, String(inviteId)));
+}
+
+/** What a link says it leads to, for the screen that asks somebody to accept. */
+export async function readInviteAction(
+    code: string
+): Promise<{ offer?: ChatInviteOffer | null; error?: string }> {
+    const me = await actor();
+    const parsed = core.inviteCodeSchema.safeParse(code);
+    if (!parsed.success) return { offer: null };
+    const result = await guard(() => invites.readInvite(me, parsed.data));
+    return result.error ? { error: result.error } : { offer: result.value };
+}
+
+export async function acceptInviteAction(
+    code: string
+): Promise<{ spaceId?: string; error?: string }> {
+    const me = await actor();
+    const parsed = core.inviteCodeSchema.safeParse(code);
+    if (!parsed.success) return { error: "That is not an invitation" };
+    const result = await guard(() => invites.acceptInvite(me, parsed.data));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result.error ? { error: result.error } : { spaceId: result.value!.spaceId };
+}
+
+/**
+ * Send an invitation straight to somebody, as a message.
+ *
+ * The link is posted into the direct conversation with them, which is the same
+ * conversation they would have had anyway - not a notification of its own, and
+ * not a request they have to accept before they can read it. Every check that
+ * makes a direct message possible still applies, so this can never open a
+ * conversation with somebody who does not accept them.
+ */
+export async function inviteToDirectAction(input: {
+    code: string;
+    userId: string;
+    baseUrl: string;
+}): Promise<{ channelId?: string; error?: string }> {
+    const me = await actor();
+    const code = core.inviteCodeSchema.safeParse(input?.code);
+    const userId = z.string().uuid().safeParse(input?.userId);
+    if (!code.success || !userId.success) return { error: "That invitation could not be sent" };
+
+    const result = await guard(async () => {
+        const offer = await invites.readInvite(me, code.data);
+        if (!offer) throw new ChatAccessError("That invitation is gone");
+        const channelId = await chat.openDirect(me, [userId.data]);
+        // Built on the address Polaris hands out rather than on the sender's
+        // tab, which may be a name that resolves on their network alone.
+        const base = String(input?.baseUrl ?? "").replace(/\/+$/, "");
+        await messages.send(
+            me,
+            {
+                channelId,
+                body: `[Join ${offer.spaceName}](${base}/chat/i/${offer.code})`,
+                replyToId: null
+            },
+            [],
+            null
+        );
+        return channelId;
+    });
+    return result.error ? { error: result.error } : { channelId: result.value };
 }

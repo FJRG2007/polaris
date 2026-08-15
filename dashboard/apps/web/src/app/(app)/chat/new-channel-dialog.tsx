@@ -13,9 +13,9 @@ import * as core from "@polaris/core";
 import { useChat } from "./chat-context";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Hash, Loader2, Volume2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { createChannelAction } from "./actions";
+import { Hash, Loader2, Volume2 } from "lucide-react";
 import type { ChatSpaceView } from "@/lib/chat/chat-service";
 import {
     Button,
@@ -147,8 +147,9 @@ export function NewChannelDialog({
 
                     {kind === "voice" && (
                         <p className="text-xs text-muted-foreground">
-                            A voice channel has no messages in it. Opening one puts you in the
-                            call that is already there, and the rail shows who else is.
+                            A voice channel has a conversation too, for the links and notes that
+                            go with what is being said. Joining the call is a press, not a
+                            consequence of opening it.
                         </p>
                     )}
 
@@ -163,7 +164,7 @@ export function NewChannelDialog({
                     </label>
 
                     {error && (
-                        <p role="alert" className="text-sm text-destructive">
+                        <p role="alert" className="text-sm text-danger">
                             {error}
                         </p>
                     )}

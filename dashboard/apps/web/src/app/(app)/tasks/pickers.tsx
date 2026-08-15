@@ -737,7 +737,7 @@ export function DurationField({
                 aria-invalid={invalid}
                 className="h-8 w-28 text-xs"
             />
-            {invalid && <p className="mt-1 text-[11px] text-destructive">Try 2h 30m, 1d or 90</p>}
+            {invalid && <p className="mt-1 text-[11px] text-danger">Try 2h 30m, 1d or 90</p>}
         </div>
     );
 }
@@ -765,7 +765,7 @@ export function DueBadge({
     );
     const tone =
         bucket === "overdue"
-            ? "text-destructive"
+            ? "text-danger"
             : bucket === "today"
               ? "text-amber-500"
               : "text-muted-foreground";

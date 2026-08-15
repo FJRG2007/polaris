@@ -65,7 +65,7 @@ export function ReportsView({
 
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <Stat label="Open tasks" value={summary.open} icon={ListTodo} />
-                <Stat label="Overdue" value={summary.overdue} tone="text-destructive" icon={CircleAlert} />
+                <Stat label="Overdue" value={summary.overdue} tone="text-danger" icon={CircleAlert} />
                 <Stat
                     label="Completed this week"
                     value={summary.completedThisWeek}
@@ -184,7 +184,7 @@ export function ReportsView({
                                     />
                                 </div>
                                 <span className="text-muted-foreground">{person.open} open</span>
-                                {person.overdue > 0 && <span className="text-destructive">{person.overdue} overdue</span>}
+                                {person.overdue > 0 && <span className="text-danger">{person.overdue} overdue</span>}
                                 {person.points > 0 && <span className="text-muted-foreground">{person.points} pts</span>}
                             </li>
                         ))}

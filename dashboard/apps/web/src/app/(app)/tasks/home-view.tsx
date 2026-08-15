@@ -196,7 +196,7 @@ export function HomeView({
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <Stat label="Assigned to you" value={counts.assigned} icon={ListChecks} />
                 <Stat label="Due today" value={counts.dueToday} icon={Clock} tone="text-amber-500" />
-                <Stat label="Overdue" value={counts.overdue} icon={CircleAlert} tone="text-destructive" />
+                <Stat label="Overdue" value={counts.overdue} icon={CircleAlert} tone="text-danger" />
             </div>
 
             {timer && (
@@ -224,7 +224,7 @@ export function HomeView({
             )}
 
             {error && (
-                <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
                     {error}
                 </p>
             )}
@@ -238,7 +238,7 @@ export function HomeView({
                     <h2
                         className={cn(
                             "text-sm font-medium",
-                            group.bucket === "overdue" && "text-destructive",
+                            group.bucket === "overdue" && "text-danger",
                             group.bucket === "today" && "text-amber-500"
                         )}
                     >

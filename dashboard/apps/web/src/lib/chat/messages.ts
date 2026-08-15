@@ -15,6 +15,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { rulesForChannel } from "./rules";
 import { publishChatChange } from "./live";
+import { announceRoomMention } from "./room-mentions";
 import { receiptsBetween } from "@/lib/privacy-service";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { knownPreviews, unfurl, type LinkPreviewView } from "./link-preview";
@@ -310,6 +311,9 @@ export async function send(
     publishChatChange({ channelId: input.channelId, kind: "posted", actorId: actor.id });
 
     unfurlLater(input.channelId, input.body);
+    // Not awaited, and never allowed to fail the send: a message going out
+    // matters more than the notification about it.
+    void announceRoomMention(input.channelId, actor.id, input.body, id).catch(() => undefined);
 
     return id;
 }

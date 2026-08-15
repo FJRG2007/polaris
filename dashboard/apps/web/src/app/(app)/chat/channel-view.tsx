@@ -26,21 +26,20 @@ import * as core from "@polaris/core";
 import { Composer } from "./composer";
 import { CallRoom } from "./call-room";
 import { useChat } from "./chat-context";
-import { VoiceRoom } from "./voice-room";
 import * as calls from "./meeting-actions";
 import { useRouter } from "next/navigation";
 import { ThreadPanel } from "./thread-panel";
 import { SearchPanel } from "./search-panel";
 import { MessageList } from "./message-list";
 import { runAction } from "@/lib/run-action";
-import { MessageCircle } from "lucide-react";
 import { ForwardDialog } from "./forward-dialog";
 import { ChannelHeader } from "./channel-header";
 import { useChatStream } from "./use-chat-stream";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
-import { ConfirmDeleteDialog, EmptyState, Skeleton } from "@polaris/ui";
+import { MessageCircle, Mic, Video, Volume2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Button, ConfirmDeleteDialog, EmptyState, Skeleton } from "@polaris/ui";
 
 /** How close to the bottom still counts as "following along". A few pixels of
  *  slack, because a trackpad rarely lands exactly on zero. */
@@ -386,10 +385,6 @@ export function ChannelView({
         await load();
     };
 
-    // A voice channel is a room, not a record: no message list, no composer, and
-    // opening it is a decision to join rather than a decision to read.
-    if (channel?.kind === "voice") return <VoiceRoom channel={channel} />;
-
     if (!channel && messages === null) {
         return (
             <div className="flex flex-1 flex-col">
@@ -444,6 +439,31 @@ export function ChannelView({
                     }}
                     onSearch={() => setSearching((current) => !current)}
                 />
+
+                {/* A voice channel is a room AND a record. It used to be only
+                    the room - no messages, no composer - which meant the one
+                    place a group is most likely to want to drop a link was the
+                    one place it could not. The strip is what a room needs that
+                    a text channel does not: a way in that is a decision, since
+                    a channel that opened your microphone because you clicked
+                    its name is a channel people are afraid to click. */}
+                {channel.kind === "voice" && !inCall && (
+                    <VoiceStrip
+                        name={channel.name}
+                        count={live?.count ?? 0}
+                        onJoin={(video) => {
+                            setCallVideo(video);
+                            void calls.startCallAction(channelId).then((result) => {
+                                if (result.error) {
+                                    setError(result.error);
+                                    return;
+                                }
+                                if (result.meetingId) setInCall(result.meetingId);
+                                checkCall();
+                            });
+                        }}
+                    />
+                )}
 
                 {inCall && (
                     <div className="flex max-h-[60%] min-h-0 shrink-0 flex-col border-b border-border">
@@ -516,7 +536,7 @@ export function ChannelView({
                 <TypingLine typists={typists} viewerId={viewerId} />
 
                 {error && (
-                    <p role="alert" className="px-4 pb-1 text-xs text-destructive">
+                    <p role="alert" className="px-4 pb-1 text-xs text-danger">
                         {error}
                     </p>
                 )}
@@ -608,6 +628,47 @@ export function ChannelView({
                     router.refresh();
                 }}
             />
+        </div>
+    );
+}
+
+/**
+ * The way into a voice room, above the conversation that belongs to it.
+ *
+ * Joining is deliberately a press rather than a consequence of opening the
+ * channel. Reading what was said in a room is not the same act as walking into
+ * it, and a room that opened a microphone on arrival is one nobody browses.
+ */
+function VoiceStrip({
+    name,
+    count,
+    onJoin
+}: {
+    name: string;
+    count: number;
+    onJoin: (withVideo: boolean) => void;
+}) {
+    return (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-4 py-2">
+            <Volume2 className="size-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate text-sm">
+                <span className="font-medium">{name}</span>
+                <span className="text-muted-foreground">
+                    {count === 0
+                        ? " - nobody is in here"
+                        : count === 1
+                          ? " - one person is in here"
+                          : ` - ${count} people are in here`}
+                </span>
+            </span>
+            <Button size="xs" onClick={() => onJoin(false)}>
+                <Mic className="size-3.5" />
+                Join
+            </Button>
+            <Button size="xs" variant="secondary" onClick={() => onJoin(true)}>
+                <Video className="size-3.5" />
+                With video
+            </Button>
         </div>
     );
 }

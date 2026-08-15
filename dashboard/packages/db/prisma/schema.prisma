@@ -141,6 +141,7 @@ model User {
     notes               Note[]
     chatSpaces          ChatSpace[]
     chatSpaceMemberships ChatSpaceMember[]
+    chatSpaceInvites     ChatSpaceInvite[]
     chatChannelMemberships ChatChannelMember[]
     searches            SearchHistory[]
     backupDestinations  BackupDestination[]
@@ -5566,6 +5567,7 @@ model ChatSpace {
     members    ChatSpaceMember[]
     channels   ChatChannel[]
     categories ChatCategory[]
+    invites    ChatSpaceInvite[]
 
     @@index([ownerId])
     @@index([orgId])
@@ -5573,6 +5575,38 @@ model ChatSpace {
 
 // Somebody other than the owner who may reach a space. The owner is never a row
 // here, so removing every member cannot lock the space away from its creator.
+// An invitation into a space.
+//
+// The code is the whole credential, so what one grants is deliberately narrow
+// and deliberately bounded: one space, until it expires, for as many people as
+// it was made for. Both bounds are optional and both are checked on every use,
+// because a link that can be forwarded is a link that will be.
+//
+// Uses are counted rather than the people recorded: who accepted is already a
+// membership row, and a second list of it would be a second thing to keep right.
+// A revoked invite is kept rather than deleted so a link that stops working can
+// say it was withdrawn instead of pretending it never existed.
+model ChatSpaceInvite {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    spaceId     String    @db.Uuid
+    // The part that appears in a URL. Unique across the instance, so an invite
+    // is resolved by the code alone and nobody has to name the space to use one.
+    code        String    @unique
+    createdById String    @db.Uuid
+    // Null for one with no end.
+    expiresAt   DateTime?
+    // Null for one with no limit.
+    maxUses     Int?
+    uses        Int       @default(0)
+    revokedAt   DateTime?
+    createdAt   DateTime  @default(now())
+
+    space     ChatSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    createdBy User      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+    @@index([spaceId, createdAt])
+}
+
 model ChatSpaceMember {
     id        String   @id @default(uuid(7)) @db.Uuid
     spaceId   String   @db.Uuid

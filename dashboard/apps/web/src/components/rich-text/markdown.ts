@@ -440,3 +440,68 @@ function escapeText(text: string): string {
         .replace(/^(\s*)([#>+-])/gm, "$1\\$2")
         .replace(/^(\s*\d+)\./gm, "$1\\.");
 }
+
+/**
+ * The two mentions that name a room rather than a person.
+ *
+ * `@everyone` reaches everybody in the conversation; `@here` reaches the ones
+ * who are actually at their screen. They are stored as the plain text somebody
+ * typed rather than as a reference, because there is nothing to point at: they
+ * mean "this conversation", which the message already belongs to. That also
+ * means they keep working in any client that reads the stored Markdown.
+ */
+export const CHANNEL_MENTIONS = ["everyone", "here"] as const;
+
+export type ChannelMention = (typeof CHANNEL_MENTIONS)[number];
+
+/** Matches either, and only as a whole word: `@everyone` counts, `@everyones`
+ *  and an email ending in `@here.example` do not. */
+const CHANNEL_MENTION = /(^|[^\w@])@(everyone|here)(?![\w-])/g;
+
+/**
+ * Which of the two a message uses.
+ *
+ * Goes through the parse rather than over the raw Markdown, so `@everyone`
+ * inside a code fence is code - which is exactly where somebody would put one to
+ * show it to a colleague without waking the room. Inline code is skipped for the
+ * same reason.
+ */
+export function channelMentions(markdown: string): Set<ChannelMention> {
+    const found = new Set<ChannelMention>();
+    const walk = (node: JSONContent) => {
+        if (node.type === "codeBlock" || node.type === MARKDOWN_BLOCK) return;
+        if (node.type === "text") {
+            if ((node.marks ?? []).some((mark) => mark.type === "code")) return;
+            for (const match of (node.text ?? "").matchAll(CHANNEL_MENTION)) {
+                found.add(match[2] as ChannelMention);
+            }
+            return;
+        }
+        for (const child of node.content ?? []) walk(child);
+    };
+    walk(markdownToDoc(markdown));
+    return found;
+}
+
+/**
+ * A run of text split into the parts that are one of these mentions and the
+ * parts that are not, so a renderer can draw the mentions differently.
+ *
+ * Returned as pieces rather than as markup: nothing here produces HTML, and the
+ * text still goes to the screen as text.
+ */
+export function splitChannelMentions(
+    text: string
+): { readonly text: string; readonly mention: ChannelMention | null }[] {
+    const parts: { text: string; mention: ChannelMention | null }[] = [];
+    let at = 0;
+    for (const match of text.matchAll(CHANNEL_MENTION)) {
+        const lead = match[1] ?? "";
+        const start = (match.index ?? 0) + lead.length;
+        if (start > at) parts.push({ text: text.slice(at, start), mention: null });
+        parts.push({ text: `@${match[2]}`, mention: match[2] as ChannelMention });
+        at = start + 1 + (match[2]?.length ?? 0);
+    }
+    if (at < text.length) parts.push({ text: text.slice(at), mention: null });
+    return parts;
+}

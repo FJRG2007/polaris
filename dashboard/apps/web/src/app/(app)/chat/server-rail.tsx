@@ -26,12 +26,22 @@
  * that colour with white letters on it is not.
  */
 
-import { cn } from "@polaris/ui";
 import { useChat } from "./chat-context";
 import { useMemo, useState } from "react";
-import { MessageSquare, Plus } from "lucide-react";
+import { InviteDialog } from "./invite-dialog";
 import { NewSpaceDialog } from "./new-space-dialog";
+import { NewChannelDialog } from "./new-channel-dialog";
 import type { ChatSpaceView } from "@/lib/chat/chat-service";
+import { Hash, MessageSquare, Plus, UserPlus } from "lucide-react";
+import {
+    cn,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuLabel,
+    ContextMenuSeparator,
+    ContextMenuTrigger
+} from "@polaris/ui";
 
 /** A stored colour as `#rrggbb`, or null when it is not one this can draw with.
  *  The column is a free string, so a space could hold anything at all. */
@@ -46,6 +56,8 @@ function hex(color: string | undefined): string | null {
 export function ServerRail() {
     const { spaces, channels, activeSpaceId, setActiveSpaceId, refresh } = useChat();
     const [newSpace, setNewSpace] = useState(false);
+    const [newChannelIn, setNewChannelIn] = useState<ChatSpaceView | null>(null);
+    const [inviting, setInviting] = useState<ChatSpaceView | null>(null);
 
     /** Unread, summed per space, so a space with something waiting says so
      *  without the list under it being open. */
@@ -74,16 +86,25 @@ export function ServerRail() {
 
             <div className="flex min-h-0 flex-1 flex-col items-center gap-1.5 overflow-y-auto no-scrollbar">
                 {spaces.map((space) => (
-                    <Pill
+                    <SpaceMenu
                         key={space.id}
-                        label={space.name}
-                        active={activeSpaceId === space.id}
-                        unread={waiting.get(space.id) ?? 0}
-                        color={hex(space.color)}
-                        onClick={() => setActiveSpaceId(space.id)}
+                        space={space}
+                        onNewChannel={() => {
+                            setActiveSpaceId(space.id);
+                            setNewChannelIn(space);
+                        }}
+                        onInvite={() => setInviting(space)}
                     >
-                        {initials(space)}
-                    </Pill>
+                        <Pill
+                            label={space.name}
+                            active={activeSpaceId === space.id}
+                            unread={waiting.get(space.id) ?? 0}
+                            color={hex(space.color)}
+                            onClick={() => setActiveSpaceId(space.id)}
+                        >
+                            {initials(space)}
+                        </Pill>
+                    </SpaceMenu>
                 ))}
             </div>
 
@@ -100,6 +121,14 @@ export function ServerRail() {
             {/* Creating a space posts nothing, so nothing would tell the rail
                 about it. Asking again is what puts it in the column. */}
             <NewSpaceDialog open={newSpace} onOpenChange={setNewSpace} onCreated={refresh} />
+            <NewChannelDialog
+                space={newChannelIn}
+                onOpenChange={(next: boolean) => !next && setNewChannelIn(null)}
+            />
+            <InviteDialog
+                space={inviting}
+                onOpenChange={(next: boolean) => !next && setInviting(null)}
+            />
         </div>
     );
 }
@@ -174,6 +203,60 @@ function Pill({
                 </span>
             )}
         </span>
+    );
+}
+
+/**
+ * Right-clicking a space.
+ *
+ * The things somebody does to a space rather than inside one: add a channel to
+ * it, and let somebody else in. Both were reachable only from inside the space,
+ * which meant switching to it first - and switching to a space is a decision to
+ * read it, which is not what somebody sending an invitation is doing.
+ *
+ * What is offered depends on the seat: adding a channel is an administrator's,
+ * and so is inviting into a private space, because a private space is one whose
+ * roster was chosen.
+ */
+function SpaceMenu({
+    space,
+    onNewChannel,
+    onInvite,
+    children
+}: {
+    space: ChatSpaceView;
+    onNewChannel: () => void;
+    onInvite: () => void;
+    children: React.ReactNode;
+}) {
+    const administers = space.access !== "member";
+    const mayInvite = administers || space.visibility !== "private";
+
+    return (
+        <ContextMenu>
+            <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+            <ContextMenuContent className="w-52">
+                <ContextMenuLabel>{space.name}</ContextMenuLabel>
+                <ContextMenuSeparator />
+                {mayInvite && (
+                    <ContextMenuItem onSelect={onInvite}>
+                        <UserPlus className="size-3.5" />
+                        Invite people
+                    </ContextMenuItem>
+                )}
+                {administers && (
+                    <ContextMenuItem onSelect={onNewChannel}>
+                        <Hash className="size-3.5" />
+                        New channel
+                    </ContextMenuItem>
+                )}
+                {!mayInvite && !administers && (
+                    <ContextMenuItem disabled>
+                        Only an administrator can change this space
+                    </ContextMenuItem>
+                )}
+            </ContextMenuContent>
+        </ContextMenu>
     );
 }
 

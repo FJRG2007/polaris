@@ -180,7 +180,7 @@ export function ActivityStream({
                                 await runAction(() => actions.deleteCommentAction(taskId, comment.id), onError);
                                 onChanged();
                             }}
-                            className="hover:text-destructive"
+                            className="hover:text-danger"
                         >
                             Delete
                         </button>
@@ -387,7 +387,7 @@ export function TimeSection({
                                         await runAction(() => actions.deleteTimeEntryAction(taskId, entry.id), onError);
                                         onChanged();
                                     }}
-                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                                 >
                                     <Trash2 className="size-3.5" />
                                 </button>

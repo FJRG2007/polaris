@@ -501,6 +501,80 @@ export async function createChannel(
     return channel.id;
 }
 
+/**
+ * Put the channels under one heading in the order somebody dragged them into.
+ *
+ * The whole list is rewritten rather than the one that moved. It is a handful of
+ * rows, it is one transaction, and it means the stored order is exactly the
+ * order that was on screen - which a "shift everything after it" would only be
+ * as long as nothing else was moving at the same time.
+ *
+ * Anything not in the list is left where it is. A channel somebody else made
+ * while this drag was in flight does not vanish from the rail because it was not
+ * in a list drawn before it existed.
+ */
+export async function reorderChannels(
+    actor: ChatActor,
+    input: core.ChatChannelReorderInput
+): Promise<void> {
+    await requireSpace(actor, input.spaceId, "admin");
+
+    if (input.categoryId) {
+        const category = await prisma.chatCategory.findFirst({
+            where: { id: input.categoryId, spaceId: input.spaceId },
+            select: { id: true }
+        });
+        if (!category) throw new ChatAccessError("That category is not in this space");
+    }
+
+    // Every id is checked against the space rather than trusted from the client:
+    // an unchecked id here would move a channel out of a space this actor
+    // administers into one they do not, or the other way about.
+    const mine = await prisma.chatChannel.findMany({
+        where: { id: { in: input.channelIds }, spaceId: input.spaceId },
+        select: { id: true }
+    });
+    const allowed = new Set(mine.map((row) => row.id));
+
+    await prisma.$transaction(
+        input.channelIds
+            .filter((channelId) => allowed.has(channelId))
+            .map((channelId, index) =>
+                prisma.chatChannel.update({
+                    where: { id: channelId },
+                    data: { categoryId: input.categoryId, order: index * core.CHAT_ORDER_STEP }
+                })
+            )
+    );
+    publishChatChange({ channelId: input.channelIds[0] ?? "", kind: "channels", actorId: "" });
+}
+
+/** The same, for the headings themselves. */
+export async function reorderCategories(
+    actor: ChatActor,
+    input: core.ChatCategoryReorderInput
+): Promise<void> {
+    await requireSpace(actor, input.spaceId, "admin");
+
+    const mine = await prisma.chatCategory.findMany({
+        where: { id: { in: input.categoryIds }, spaceId: input.spaceId },
+        select: { id: true }
+    });
+    const allowed = new Set(mine.map((row) => row.id));
+
+    await prisma.$transaction(
+        input.categoryIds
+            .filter((categoryId) => allowed.has(categoryId))
+            .map((categoryId, index) =>
+                prisma.chatCategory.update({
+                    where: { id: categoryId },
+                    data: { order: index * core.CHAT_ORDER_STEP }
+                })
+            )
+    );
+    publishChatChange({ channelId: "", kind: "channels", actorId: "" });
+}
+
 export async function updateChannel(
     actor: ChatActor,
     input: core.ChatChannelUpdateInput

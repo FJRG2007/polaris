@@ -161,7 +161,7 @@ export function AttachmentSection({
                                         );
                                         onChanged();
                                     }}
-                                    className="absolute right-1 top-1 rounded bg-background/80 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                                    className="absolute right-1 top-1 rounded bg-background/80 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
                                 >
                                     <X className="size-3.5" />
                                 </button>
@@ -199,7 +199,7 @@ export function AttachmentSection({
                                         );
                                         onChanged();
                                     }}
-                                    className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                                    className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
                                 >
                                     <Trash2 className="size-3.5" />
                                 </button>
@@ -289,7 +289,7 @@ export function CommitSection({
                                         await runAction(() => actions.unlinkCommitAction(taskId, commit.id), onError);
                                         onChanged();
                                     }}
-                                    className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                                    className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
                                 >
                                     <X className="size-3.5" />
                                 </button>

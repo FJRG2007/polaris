@@ -58,7 +58,7 @@ export function SprintsView({
             </header>
 
             {error && (
-                <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
                     {error}
                 </p>
             )}
@@ -198,7 +198,7 @@ export function SprintsView({
                                                 );
                                                 if (result?.error) setError(result.error);
                                             }}
-                                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                                         >
                                             <Trash2 className="size-3.5" />
                                         </button>
@@ -277,7 +277,7 @@ export function GoalsView({
             </header>
 
             {error && (
-                <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
                     {error}
                 </p>
             )}
@@ -356,7 +356,7 @@ export function GoalsView({
                                             const result = await runAction(() => actions.deleteGoalAction(goal.id), setError);
                                             if (result?.error) setError(result.error);
                                         }}
-                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                                     >
                                         <Trash2 className="size-3.5" />
                                     </button>
@@ -401,7 +401,7 @@ export function GoalsView({
                                                     );
                                                     if (result?.error) setError(result.error);
                                                 }}
-                                                className="rounded p-0.5 text-muted-foreground transition-colors hover:text-destructive"
+                                                className="rounded p-0.5 text-muted-foreground transition-colors hover:text-danger"
                                             >
                                                 <Trash2 className="size-3" />
                                             </button>

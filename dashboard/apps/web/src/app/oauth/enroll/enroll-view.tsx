@@ -232,7 +232,7 @@ function EmailFactor({
                     </form>
                 )}
 
-                {error ? <p className="text-xs text-destructive">{error}</p> : null}
+                {error ? <p className="text-xs text-danger">{error}</p> : null}
                 {onBack ? (
                     <button type="button" className="self-start text-xs text-muted-foreground underline" onClick={onBack}>
                         Use something else
@@ -356,7 +356,7 @@ function AuthenticatorFactor({
                     </form>
                 )}
 
-                {error ? <p className="text-xs text-destructive">{error}</p> : null}
+                {error ? <p className="text-xs text-danger">{error}</p> : null}
                 {onBack ? (
                     <button type="button" className="self-start text-xs text-muted-foreground underline" onClick={onBack}>
                         Use something else

@@ -40,7 +40,7 @@ export function ArchiveView({ notes }: { notes: readonly ArchivedNote[] }) {
     return (
         <div className="flex flex-col gap-3">
             {error && (
-                <p role="alert" className="text-sm text-destructive">
+                <p role="alert" className="text-sm text-danger">
                     {error}
                 </p>
             )}
@@ -68,7 +68,7 @@ export function ArchiveView({ notes }: { notes: readonly ArchivedNote[] }) {
                             aria-label={`Delete ${note.title}`}
                             title="Delete"
                             onClick={() => setDeleting(note)}
-                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                         >
                             <Trash2 className="size-4" />
                         </button>

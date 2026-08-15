@@ -157,7 +157,7 @@ export function CallRoom({
                                     await actions.admitAction(meetingId, person.id, false);
                                     call.refresh();
                                 }}
-                                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                             >
                                 <X className="size-4" />
                             </button>

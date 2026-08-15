@@ -135,7 +135,7 @@ export function ThreadPanel({
             </div>
 
             {error && (
-                <p role="alert" className="px-3 pb-1 text-xs text-destructive">
+                <p role="alert" className="px-3 pb-1 text-xs text-danger">
                     {error}
                 </p>
             )}

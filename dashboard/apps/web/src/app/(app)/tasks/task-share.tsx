@@ -191,7 +191,7 @@ export function ShareDialog({
                 ) : (
                     <div className="flex flex-col gap-6">
                         {error && (
-                            <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                            <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
                                 {error}
                             </p>
                         )}
@@ -310,7 +310,7 @@ export function ShareDialog({
                                 </div>
 
                                 {outcome?.failures.map((failure) => (
-                                    <p key={failure.recipient} className="text-xs text-destructive">
+                                    <p key={failure.recipient} className="text-xs text-danger">
                                         {failure.recipient}: {failure.reason}
                                     </p>
                                 ))}

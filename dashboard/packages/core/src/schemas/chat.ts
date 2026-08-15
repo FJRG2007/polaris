@@ -423,3 +423,122 @@ export function muteInForce(
     if (row.mutedUntil === null) return true;
     return new Date(row.mutedUntil).getTime() > now.getTime();
 }
+
+/**
+ * Putting the channels of one space in the order somebody dragged them into.
+ *
+ * The whole list for a heading rather than one move: the client already knows
+ * the order it just drew, and sending it means the server never has to work out
+ * where "between these two" is. It also means two people rearranging at once end
+ * with one of the two orders rather than with an interleaving neither chose.
+ */
+export const chatChannelReorderSchema = z.object({
+    spaceId: z.string().uuid(),
+    /** The heading these now sit under, or null for the ones above the first. */
+    categoryId: z.string().uuid().nullable(),
+    channelIds: z.array(z.string().uuid()).max(200)
+});
+
+export type ChatChannelReorderInput = z.infer<typeof chatChannelReorderSchema>;
+
+export const chatCategoryReorderSchema = z.object({
+    spaceId: z.string().uuid(),
+    categoryIds: z.array(z.string().uuid()).max(100)
+});
+
+export type ChatCategoryReorderInput = z.infer<typeof chatCategoryReorderSchema>;
+
+/** The gap left between neighbours, so a later insert has somewhere to go
+ *  without every row being rewritten. */
+export const CHAT_ORDER_STEP = 1024;
+
+/**
+ * How long an invitation lasts, in minutes, and what "no end" is.
+ *
+ * The set Discord settled on, because the question somebody is answering is
+ * always one of "for this conversation", "for today", "for this week" or "for
+ * good", and offering a free-form duration makes them do arithmetic to say it.
+ */
+export const INVITE_DURATIONS = [30, 60, 60 * 6, 60 * 12, 60 * 24, 60 * 24 * 7] as const;
+
+/** Minutes, or 0 for an invite with no end. */
+export const INVITE_FOREVER = 0;
+
+export const INVITE_DURATION_LABELS: Readonly<Record<number, string>> = {
+    30: "30 minutes",
+    60: "1 hour",
+    360: "6 hours",
+    720: "12 hours",
+    1440: "1 day",
+    10080: "7 days",
+    [INVITE_FOREVER]: "Never"
+};
+
+/** How many people one invitation may let in. */
+export const INVITE_USE_LIMITS = [1, 5, 10, 25, 50, 100] as const;
+
+/** Zero for an invite with no limit. */
+export const INVITE_UNLIMITED = 0;
+
+export const INVITE_USE_LABELS: Readonly<Record<number, string>> = {
+    1: "1 use",
+    5: "5 uses",
+    10: "10 uses",
+    25: "25 uses",
+    50: "50 uses",
+    100: "100 uses",
+    [INVITE_UNLIMITED]: "No limit"
+};
+
+/** The code in a space invitation's URL. Long enough not to be guessed, short
+ *  enough to read out over a call. Named for the space it belongs to, since
+ *  account invitations have a length of their own. */
+export const CHAT_INVITE_CODE_LENGTH = 10;
+
+const inviteMinutes: readonly number[] = [INVITE_FOREVER, ...INVITE_DURATIONS];
+const inviteUses: readonly number[] = [INVITE_UNLIMITED, ...INVITE_USE_LIMITS];
+
+export const chatInviteCreateSchema = z.object({
+    spaceId: z.string().uuid(),
+    expiresMinutes: z
+        .number()
+        .refine((value) => inviteMinutes.includes(value), "That is not a length to offer"),
+    maxUses: z.number().refine((value) => inviteUses.includes(value), "That is not a limit to offer")
+});
+
+export type ChatInviteCreateInput = z.infer<typeof chatInviteCreateSchema>;
+
+/** An invite code as it appears in a URL: the alphabet the generator uses and
+ *  nothing else, so a malformed one is refused before it reaches the database. */
+export const inviteCodeSchema = z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9_-]{6,32}$/, "That is not an invitation");
+
+/** When an invitation of this length runs out, or null when it does not. */
+export function inviteExpiresAt(minutes: number, now = new Date()): Date | null {
+    return minutes === INVITE_FOREVER ? null : new Date(now.getTime() + minutes * 60_000);
+}
+
+/**
+ * Whether an invitation may still be used.
+ *
+ * Every bound is checked here rather than at the place that made it, because the
+ * code is the credential and the only moment that matters is the moment somebody
+ * presents one.
+ */
+export function inviteUsable(
+    invite: {
+        expiresAt: Date | string | null;
+        maxUses: number | null;
+        uses: number;
+        revokedAt: Date | string | null;
+    },
+    now = new Date()
+): boolean {
+    if (invite.revokedAt !== null) return false;
+    if (invite.expiresAt !== null && new Date(invite.expiresAt).getTime() <= now.getTime()) {
+        return false;
+    }
+    return invite.maxUses === null || invite.uses < invite.maxUses;
+}

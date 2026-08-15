@@ -31,8 +31,10 @@ import { NewDirectDialog } from "./new-direct-dialog";
 import { NewChannelDialog } from "./new-channel-dialog";
 import { useParams, usePathname } from "next/navigation";
 import { MuteOptions, type MenuParts } from "./mute-menu";
+import { ChannelSettingsDialog } from "./channel-settings-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
+import { reordered, useRailDrag, type Dragging, type DropTarget } from "./use-rail-drag";
 import {
     ChevronDown,
     FolderPlus,
@@ -41,6 +43,7 @@ import {
     Lock,
     MessageSquarePlus,
     Plus,
+    Settings2,
     Star,
     Trash2,
     Users,
@@ -52,6 +55,7 @@ import {
     ContextMenu,
     ContextMenuContent,
     ContextMenuItem,
+    ContextMenuSeparator,
     ContextMenuSub,
     ContextMenuSubContent,
     ContextMenuSubTrigger,
@@ -84,7 +88,8 @@ const CONTEXT_PARTS: MenuParts = {
 const PRESENCE_EVERY_MS = 8000;
 
 export function ChatSidebar() {
-    const { channels, spaces, categories, activeSpaceId, setActiveSpaceId, loaded } = useChat();
+    const { channels, spaces, categories, activeSpaceId, setActiveSpaceId, refresh, loaded } =
+        useChat();
     const params = useParams<{ channelId?: string }>();
     const open = params.channelId ?? null;
     const saved = usePathname() === "/chat/saved";
@@ -98,6 +103,7 @@ export function ChatSidebar() {
     const [newCategory, setNewCategory] = useState(false);
     const [categoryName, setCategoryName] = useState("");
     const [error, setError] = useState("");
+    const [managing, setManaging] = useState<ChatChannelView | null>(null);
     const [inRoom, setInRoom] = useState<Record<string, { id: string; name: string }[]>>({});
 
     const space = useMemo(
@@ -158,6 +164,61 @@ export function ChatSidebar() {
     }, [readPresence, voiceIds.length]);
 
     const manages = space !== null && space.access !== "member";
+
+    /**
+     * A drag ended.
+     *
+     * The rail rebuilds the list it just drew and sends the whole thing, so the
+     * stored order is the order somebody was looking at. Nothing is drawn
+     * optimistically: the write is one small statement and the rail is told
+     * about it, and a rail that moved and then moved back would be worse than
+     * one that moves a moment late.
+     */
+    const drag = useRailDrag({
+        enabled: manages,
+        onDrop: useCallback(
+            (source: Dragging, target: DropTarget) => {
+                if (!space) return;
+                if (source.kind === "category") {
+                    const ids = categories
+                        .filter((entry) => entry.spaceId === space.id)
+                        .map((entry) => entry.id);
+                    void actions
+                        .reorderCategoriesAction({
+                            spaceId: space.id,
+                            categoryIds: reordered(ids, source.id, target)
+                        })
+                        .then((result) => setError(result.error ?? ""))
+                        .then(refresh);
+                    return;
+                }
+
+                // Which heading it landed under: the one it was dropped past the
+                // end of, or the one holding the row it was dropped on.
+                const landedIn =
+                    target.at === "end"
+                        ? target.categoryId
+                        : (channels.find((entry) => entry.id === target.id)?.categoryId ?? null);
+                const ids = channels
+                    .filter(
+                        (entry) =>
+                            entry.spaceId === space.id &&
+                            entry.categoryId === landedIn &&
+                            !entry.archived
+                    )
+                    .map((entry) => entry.id);
+                void actions
+                    .reorderChannelsAction({
+                        spaceId: space.id,
+                        categoryId: landedIn,
+                        channelIds: reordered(ids, source.id, target)
+                    })
+                    .then((result) => setError(result.error ?? ""))
+                    .then(refresh);
+            },
+            [categories, channels, refresh, space]
+        )
+    });
 
     return (
         <div className="flex h-full min-h-0 flex-col">
@@ -225,7 +286,7 @@ export function ChatSidebar() {
                 )}
 
                 {error && (
-                    <p role="alert" className="px-1 pb-2 text-xs text-destructive">
+                    <p role="alert" className="px-1 pb-2 text-xs text-danger">
                         {error}
                     </p>
                 )}
@@ -270,6 +331,10 @@ export function ChatSidebar() {
                             channels={inSpace.filter((channel) => channel.categoryId === null)}
                             open={open}
                             inRoom={inRoom}
+                            drag={drag}
+                            manages={manages}
+                            categoryId={null}
+                            onManage={setManaging}
                         />
 
                         {categories
@@ -280,6 +345,25 @@ export function ChatSidebar() {
                                     label={category.name}
                                     folded={folded.includes(category.id)}
                                     onToggle={() => toggle(category.id)}
+                                    handle={
+                                        manages
+                                            ? {
+                                                  ...drag.handleProps({
+                                                      kind: "category",
+                                                      id: category.id
+                                                  }),
+                                                  ...drag.rowProps("category", category.id)
+                                              }
+                                            : undefined
+                                    }
+                                    dropping={
+                                        drag.dropAt?.kind === "category" &&
+                                        drag.dropAt.id === category.id
+                                            ? drag.dropAt.after
+                                                ? "after"
+                                                : "before"
+                                            : null
+                                    }
                                     action={
                                         manages ? (
                                             <DropdownMenu>
@@ -329,6 +413,10 @@ export function ChatSidebar() {
                                         )}
                                         open={open}
                                         inRoom={inRoom}
+                                        drag={drag}
+                                        manages={manages}
+                                        categoryId={category.id}
+                                        onManage={setManaging}
                                         empty="Nothing here yet."
                                     />
                                 </Section>
@@ -342,6 +430,11 @@ export function ChatSidebar() {
                     </>
                 )}
             </div>
+
+            <ChannelSettingsDialog
+                channel={managing}
+                onOpenChange={(next) => !next && setManaging(null)}
+            />
 
             <NewDirectDialog open={newDirect} onOpenChange={setNewDirect} />
             <NewChannelDialog
@@ -401,32 +494,74 @@ function ChannelRows({
     channels,
     open,
     inRoom,
+    drag,
+    manages,
+    categoryId,
+    onManage,
     empty
 }: {
     channels: readonly ChatChannelView[];
     open: string | null;
     inRoom: Record<string, { id: string; name: string }[]>;
+    /** Absent in the direct-message list, which has no order to arrange. */
+    drag?: ReturnType<typeof useRailDrag>;
+    manages?: boolean;
+    categoryId?: string | null;
+    onManage?: (channel: ChatChannelView) => void;
     empty?: string;
 }) {
+    // The whole group is a drop target as well as each row, so a heading with
+    // nothing under it is somewhere a channel can go and the space past the last
+    // row means the end rather than nothing.
+    const area = drag && manages ? drag.areaProps(categoryId ?? null) : {};
+
     if (channels.length === 0) {
-        return empty ? <p className="px-2 py-1 text-xs text-foreground-subtle">{empty}</p> : null;
+        return empty ? (
+            <p {...area} className="px-2 py-1 text-xs text-foreground-subtle">
+                {empty}
+            </p>
+        ) : null;
     }
 
     return (
-        <div className="mb-2 flex flex-col gap-px">
+        <div {...area} className="mb-2 flex flex-col gap-px">
             {channels.map((channel) => {
                 const inside = inRoom[channel.id] ?? [];
+                const dropping =
+                    drag?.dropAt?.kind === "channel" && drag.dropAt.id === channel.id
+                        ? drag.dropAt.after
+                            ? "after"
+                            : "before"
+                        : null;
                 return (
-                    <div key={channel.id}>
+                    <div
+                        key={channel.id}
+                        className={cn(
+                            "relative",
+                            // A line rather than a gap: a row that moved aside
+                            // would shift every row under it on every pointer
+                            // move, and the list would appear to twitch.
+                            dropping === "before" &&
+                                "before:absolute before:inset-x-2 before:-top-px before:h-0.5 before:rounded-full before:bg-primary",
+                            dropping === "after" &&
+                                "after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary",
+                            drag?.dragging?.id === channel.id && "opacity-40"
+                        )}
+                        {...(manages && drag
+                            ? {
+                                  ...drag.handleProps({ kind: "channel", id: channel.id }),
+                                  ...drag.rowProps("channel", channel.id)
+                              }
+                            : {})}
+                    >
                         <Row
                             channel={channel}
                             href={`/chat/c/${channel.id}`}
                             active={open === channel.id}
-                            // A voice room has nothing to be unread: walking in
-                            // is the only way to hear what is happening in one.
-                            unread={channel.kind === "voice" ? 0 : channel.unread}
+                            unread={channel.unread}
                             muted={channel.muted}
                             label={channel.name}
+                            onManage={manages ? onManage : undefined}
                             icon={
                                 channel.kind === "voice" ? (
                                     <Volume2 className="size-3.5 shrink-0 text-muted-foreground" />
@@ -462,17 +597,32 @@ function Section({
     folded,
     onToggle,
     action,
+    handle,
+    dropping = null,
     children
 }: {
     label: string;
     folded: boolean;
     onToggle: () => void;
     action?: React.ReactNode;
+    /** What makes the heading itself draggable, when the reader may rearrange
+     *  the space. Absent everywhere else. */
+    handle?: Record<string, unknown>;
+    dropping?: "before" | "after" | null;
     children: React.ReactNode;
 }) {
     return (
         <div className="mb-3">
-            <div className="group flex items-center gap-1 px-1">
+            <div
+                {...handle}
+                className={cn(
+                    "group relative flex items-center gap-1 px-1",
+                    dropping === "before" &&
+                        "before:absolute before:inset-x-2 before:-top-px before:h-0.5 before:rounded-full before:bg-primary",
+                    dropping === "after" &&
+                        "after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary"
+                )}
+            >
                 <button
                     type="button"
                     onClick={onToggle}
@@ -503,7 +653,8 @@ function Row({
     muted,
     label,
     icon,
-    channel
+    channel,
+    onManage
 }: {
     href: string;
     active: boolean;
@@ -514,6 +665,9 @@ function Row({
     /** What a right-click acts on. Absent on the rows that are not a
      *  conversation, such as the link to what somebody has saved. */
     channel?: ChatChannelView;
+    /** Present for somebody who administers the space, so the menu can offer
+     *  what only they may do. */
+    onManage?: (channel: ChatChannelView) => void;
 }) {
     // A muted conversation still counts its messages - it just does not shout
     // about them, which is the difference between muting and leaving.
@@ -546,7 +700,13 @@ function Row({
         </Link>
     );
 
-    return channel ? <RowMenu channel={channel}>{row}</RowMenu> : row;
+    return channel ? (
+        <RowMenu channel={channel} onManage={onManage}>
+            {row}
+        </RowMenu>
+    ) : (
+        row
+    );
 }
 
 /**
@@ -557,7 +717,15 @@ function Row({
  * it. Muting is here because it is the other thing anybody does to a row without
  * wanting to read it first.
  */
-function RowMenu({ channel, children }: { channel: ChatChannelView; children: React.ReactNode }) {
+function RowMenu({
+    channel,
+    onManage,
+    children
+}: {
+    channel: ChatChannelView;
+    onManage?: (channel: ChatChannelView) => void;
+    children: React.ReactNode;
+}) {
     const baseUrl = useAppUrl();
     const { refresh } = useChat();
 
@@ -579,6 +747,19 @@ function RowMenu({ channel, children }: { channel: ChatChannelView; children: Re
                         refresh();
                     }}
                 />
+
+                {/* Only for somebody who administers the space, and only for a
+                    channel in one: a direct message has no settings and a group
+                    is managed from its own header. */}
+                {onManage && channel.spaceId && (
+                    <>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem onSelect={() => onManage(channel)}>
+                            <Settings2 className="size-3.5" />
+                            Edit channel
+                        </ContextMenuItem>
+                    </>
+                )}
             </ContextMenuContent>
         </ContextMenu>
     );

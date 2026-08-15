@@ -462,7 +462,7 @@ export function ChecklistSection({
                                                 );
                                                 onChanged();
                                             }}
-                                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                                         >
                                             <Trash2 className="size-3.5" />
                                         </button>
@@ -542,7 +542,7 @@ export function ChecklistSection({
                                                         );
                                                         onChanged();
                                                     }}
-                                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                                                 >
                                                     <X className="size-3.5" />
                                                 </button>
@@ -635,7 +635,7 @@ export function DependencySection({
                         await runAction(() => actions.removeDependencyAction(taskId, edge.id), onError);
                         onChanged();
                     }}
-                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                 >
                     <X className="size-3.5" />
                 </button>

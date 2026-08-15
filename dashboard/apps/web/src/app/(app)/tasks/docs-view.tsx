@@ -206,7 +206,7 @@ export function DocsView({
                                             await runAction(() => actions.deleteDocAction(doc.id), setError);
                                             router.push("/tasks/docs");
                                         }}
-                                        className="rounded p-1 transition-colors hover:bg-muted hover:text-destructive"
+                                        className="rounded p-1 transition-colors hover:bg-muted hover:text-danger"
                                     >
                                         <Trash2 className="size-3.5" />
                                     </button>
@@ -215,7 +215,7 @@ export function DocsView({
                         </div>
 
                         {error && (
-                            <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                            <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
                                 {error}
                             </p>
                         )}

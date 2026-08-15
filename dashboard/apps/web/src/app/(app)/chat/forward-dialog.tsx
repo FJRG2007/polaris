@@ -145,7 +145,7 @@ export function ForwardDialog({
                     />
 
                     {error && (
-                        <p role="alert" className="text-sm text-destructive">
+                        <p role="alert" className="text-sm text-danger">
                             {error}
                         </p>
                     )}

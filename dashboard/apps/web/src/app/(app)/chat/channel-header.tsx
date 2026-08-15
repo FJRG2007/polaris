@@ -279,7 +279,7 @@ export function ChannelHeader({
             {error && (
                 <p
                     role="alert"
-                    className="border-b border-border px-4 py-1 text-xs text-destructive"
+                    className="border-b border-border px-4 py-1 text-xs text-danger"
                 >
                     {error}
                 </p>

@@ -95,7 +95,7 @@ export function PublicForm({
                         <label key={field.id} className="flex flex-col gap-1 text-sm">
                             <span>
                                 {field.label}
-                                {field.required && <span className="ml-1 text-destructive">*</span>}
+                                {field.required && <span className="ml-1 text-danger">*</span>}
                             </span>
                             {field.help && <span className="text-xs text-muted-foreground">{field.help}</span>}
 
@@ -141,13 +141,13 @@ export function PublicForm({
                                 />
                             )}
 
-                            {invalid && <span className="text-xs text-destructive">This one is required.</span>}
+                            {invalid && <span className="text-xs text-danger">This one is required.</span>}
                         </label>
                     );
                 })}
 
                 {error && (
-                    <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
                         {error}
                     </p>
                 )}

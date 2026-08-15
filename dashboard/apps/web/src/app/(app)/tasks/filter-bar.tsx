@@ -271,7 +271,7 @@ export function FilterBar({
                                             conditions: filter.conditions.filter((_, position) => position !== index)
                                         })
                                     }
-                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                                 >
                                     <X className="size-3.5" />
                                 </button>
