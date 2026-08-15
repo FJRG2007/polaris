@@ -547,8 +547,25 @@ function Tile({
     const video = useRef<HTMLVideoElement>(null);
     const [volume, setVolume] = useCallVolume(volumeKey ?? "");
 
+    /**
+     * Attach the stream, and make sure it is actually playing.
+     *
+     * `autoPlay` asks; a browser is entitled to say no, and it says no silently.
+     * That is how somebody sat in a call watching the other person's ring light
+     * up green - the audio was arriving and being measured, and the element
+     * holding it had never started. So it is started here, and when the browser
+     * refuses, the tile says so and offers the press it is waiting for. A press
+     * is all it wants.
+     */
+    const [blocked, setBlocked] = useState(false);
     useEffect(() => {
-        if (video.current && stream) video.current.srcObject = stream;
+        const element = video.current;
+        if (!element || !stream) return;
+        element.srcObject = stream;
+        void element
+            .play()
+            .then(() => setBlocked(false))
+            .catch(() => setBlocked(true));
     }, [stream]);
 
     /**
@@ -639,6 +656,20 @@ function Tile({
                         )}
                     />
                 </span>
+            )}
+            {blocked && !muted && (
+                <button
+                    type="button"
+                    onClick={() => {
+                        void video.current
+                            ?.play()
+                            .then(() => setBlocked(false))
+                            .catch(() => undefined);
+                    }}
+                    className="absolute inset-0 flex items-center justify-center bg-background/70 text-xs font-medium"
+                >
+                    Press to hear {name}
+                </button>
             )}
             <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[11px]">
                 {name}

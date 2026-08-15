@@ -406,7 +406,68 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
         setMicFilter(built.using);
     }, []);
 
-    /** Open the microphone and camera, then the stream, then the connections. */
+    /**
+ * Open what this browser can, and say what it could not.
+ *
+ * Asked in three goes rather than one, because one is how a busy camera takes
+ * the microphone with it: a single `getUserMedia` for both fails as a whole, so
+ * somebody with Discord or OBS holding the camera joined a call able to hear and
+ * unable to speak, with nothing on screen saying why. So both, then sound alone,
+ * then picture alone.
+ *
+ * The reasons are the browser's own names for them, translated. `NotReadable` is
+ * the one worth naming precisely: on Windows a device is held exclusively, and
+ * "another application is using it" is a sentence somebody can act on in a way
+ * that "could not reach your microphone" is not.
+ */
+async function openMedia(withVideo: boolean): Promise<{ stream: MediaStream | null; note: string }> {
+    const ask = (audio: boolean, video: boolean) =>
+        navigator.mediaDevices.getUserMedia({
+            // Echo, background noise and a level that keeps somebody audible
+            // from across the room, all handled by the browser before anything
+            // is sent - see `mic-cleanup`.
+            audio: audio ? micConstraints() : false,
+            video
+        });
+
+    try {
+        return { stream: await ask(true, withVideo), note: "" };
+    } catch (first) {
+        if (!withVideo) return { stream: null, note: refused(first, "microphone") };
+
+        // The camera is the likelier of the two to be busy, and the one nobody
+        // needs. Try again without it before giving up on being heard.
+        try {
+            return {
+                stream: await ask(true, false),
+                note: refused(first, "camera")
+            };
+        } catch (second) {
+            try {
+                return { stream: await ask(false, true), note: refused(second, "microphone") };
+            } catch {
+                return { stream: null, note: refused(second, "microphone or camera") };
+            }
+        }
+    }
+}
+
+/** What the browser refused, in words somebody can do something about. */
+function refused(error: unknown, what: string): string {
+    const name = error instanceof Error ? error.name : "";
+    if (name === "NotAllowedError" || name === "SecurityError") {
+        return `Polaris was not allowed to use your ${what}. Allow it in the address bar and rejoin.`;
+    }
+    if (name === "NotReadableError" || name === "AbortError") {
+        return `Your ${what} is busy - another application is holding it. Close it, or pick a different device, and rejoin.`;
+    }
+    if (name === "NotFoundError" || name === "OverconstrainedError") {
+        return `No ${what} was found on this device.`;
+    }
+    return `Polaris could not reach your ${what}.`;
+}
+
+/** Open the microphone and camera, then the stream, then the connections. */
     useEffect(() => {
         // Not in a call: nothing is opened, nothing connects, nothing beats.
         if (!meetingId) return;
@@ -420,21 +481,17 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
             licensed.current = await actions.licensedFilterAction(inCall).catch(() => null);
             setLicensedFilter(licensed.current !== null);
 
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    // Echo, background noise and a level that keeps somebody
-                    // audible from across the room, all handled by the browser
-                    // before anything is sent - see `mic-cleanup`.
-                    audio: micConstraints(),
-                    video: withVideo
-                });
-                if (stopped) {
-                    for (const track of stream.getTracks()) track.stop();
-                    return;
-                }
-                mic.current = stream.getAudioTracks()[0] ?? null;
-                camera.current = stream.getVideoTracks()[0] ?? null;
+            const opened = await openMedia(withVideo);
+            if (stopped) {
+                for (const track of opened.stream?.getTracks() ?? []) track.stop();
+                return;
+            }
+            if (opened.stream) {
+                mic.current = opened.stream.getAudioTracks()[0] ?? null;
+                camera.current = opened.stream.getVideoTracks()[0] ?? null;
                 setHasCamera(camera.current !== null);
+                setMicOn(mic.current !== null);
+                setCameraOn(camera.current !== null);
                 setMicrophoneId(mic.current?.getSettings().deviceId ?? null);
                 setCameraId(camera.current?.getSettings().deviceId ?? null);
                 publishLocalPreview();
@@ -443,13 +500,13 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
                 // carries the filtered track and nobody hears the raw room for
                 // the second it would take to swap.
                 await startFilter();
-            } catch {
-                // A call with no camera is still a call: the connections are made
-                // either way and this browser simply sends nothing.
-                setError(
-                    "Polaris could not reach your camera or microphone. You can still hear and see everybody else."
-                );
             }
+            // A call with no camera, or none with no microphone, is still a
+            // call: the connections are made either way and this browser sends
+            // whatever it has. What it could not open is said out loud, because
+            // sitting in a room where nobody can hear you and nothing says so is
+            // the worst version of this.
+            if (opened.note) setError(opened.note);
 
             if (stopped) return;
 
