@@ -44,11 +44,11 @@ beforeEach(() => {
 
 describe("posting", () => {
     it("fills in the parts a caller left out", async () => {
-        await comments.post("u1", { subjectType: "service", subjectId: "s1", body: "Disk was full" });
+        await comments.post("u1", { subjectType: "app", subjectId: "s1", body: "Disk was full" });
 
         expect(commentCreate).toHaveBeenCalledWith({
             data: {
-                subjectType: "service",
+                subjectType: "app",
                 subjectId: "s1",
                 parentId: null,
                 userId: "u1",
@@ -81,7 +81,7 @@ describe("reading", () => {
             }
         ]);
 
-        const thread = await comments.thread("service", "s1");
+        const thread = await comments.thread("app", "s1");
 
         expect(thread).toEqual([
             {
@@ -164,9 +164,9 @@ describe("changing what was said", () => {
 
 describe("forgetting", () => {
     it("takes one subject or a list of them", async () => {
-        await comments.forget("service", "s1");
+        await comments.forget("app", "s1");
         expect(commentDeleteMany).toHaveBeenCalledWith({
-            where: { subjectType: "service", subjectId: { in: ["s1"] } }
+            where: { subjectType: "app", subjectId: { in: ["s1"] } }
         });
 
         await comments.forget("task", ["a", "b"]);

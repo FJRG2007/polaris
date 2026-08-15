@@ -24,7 +24,7 @@ async function requireOwnedHost(hostId: string, ownerId: string): Promise<void> 
 /** What has happened to this server. */
 export async function serverHistory(hostId: string, ownerId: string): Promise<activity.ActivityLine[]> {
     await requireOwnedHost(hostId, ownerId);
-    return activity.history("server", hostId, 60);
+    return activity.history("host", hostId, 60);
 }
 
 /** Write one line of it. Called by whatever changes the server. */
@@ -35,7 +35,7 @@ export async function recordServerEvent(
     values?: { from?: string | null; to?: string | null }
 ): Promise<void> {
     await activity.record({
-        subjectType: "server",
+        subjectType: "host",
         subjectId: hostId,
         userId: actorId,
         action,
@@ -46,12 +46,12 @@ export async function recordServerEvent(
 
 export async function serverNotes(hostId: string, ownerId: string): Promise<comments.CommentView[]> {
     await requireOwnedHost(hostId, ownerId);
-    return comments.thread("server", hostId);
+    return comments.thread("host", hostId);
 }
 
 export async function postServerNote(hostId: string, ownerId: string, body: string): Promise<void> {
     await requireOwnedHost(hostId, ownerId);
-    await comments.post(ownerId, { subjectType: "server", subjectId: hostId, body });
+    await comments.post(ownerId, { subjectType: "host", subjectId: hostId, body });
 }
 
 export async function deleteServerNote(hostId: string, ownerId: string, commentId: string): Promise<void> {
@@ -63,13 +63,13 @@ export async function deleteServerNote(hostId: string, ownerId: string, commentI
 
 export async function isFollowingServer(hostId: string, userId: string): Promise<boolean> {
     await requireOwnedHost(hostId, userId);
-    return follow.isFollowing("server", hostId, userId);
+    return follow.isFollowing("host", hostId, userId);
 }
 
 export async function setFollowingServer(hostId: string, userId: string, following: boolean): Promise<void> {
     await requireOwnedHost(hostId, userId);
-    if (following) await follow.follow("server", hostId, userId);
-    else await follow.unfollow("server", hostId, userId);
+    if (following) await follow.follow("host", hostId, userId);
+    else await follow.unfollow("host", hostId, userId);
 }
 
 /**
@@ -78,7 +78,7 @@ export async function setFollowingServer(hostId: string, userId: string, followi
  * one per app - so removing a server calls this.
  */
 export async function forgetServer(hostId: string): Promise<void> {
-    await activity.forget("server", hostId);
-    await comments.forget("server", hostId);
-    await follow.forget("server", hostId);
+    await activity.forget("host", hostId);
+    await comments.forget("host", hostId);
+    await follow.forget("host", hostId);
 }

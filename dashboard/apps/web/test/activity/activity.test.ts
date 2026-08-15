@@ -50,11 +50,11 @@ beforeEach(() => {
 
 describe("writing", () => {
     it("fills in the parts a caller left out", async () => {
-        await activity.record({ subjectType: "service", subjectId: "s1", action: "restarted" });
+        await activity.record({ subjectType: "app", subjectId: "s1", action: "restarted" });
 
         expect(activityCreate).toHaveBeenCalledWith({
             data: {
-                subjectType: "service",
+                subjectType: "app",
                 subjectId: "s1",
                 userId: null,
                 action: "restarted",
@@ -96,7 +96,7 @@ describe("reading", () => {
         activityFindMany.mockResolvedValueOnce([line()]);
         userFindMany.mockResolvedValueOnce([{ id: "u1", name: "Ana" }]);
 
-        const lines = await activity.history("service", "s1");
+        const lines = await activity.history("app", "s1");
 
         expect(lines).toEqual([
             { id: "l1", action: "deployed", fromValue: null, toValue: null, authorName: "Ana", createdAt: AT.toISOString() }
@@ -107,7 +107,7 @@ describe("reading", () => {
         activityFindMany.mockResolvedValueOnce([line()]);
         userFindMany.mockResolvedValueOnce([]);
 
-        const [only] = await activity.history("service", "s1");
+        const [only] = await activity.history("app", "s1");
 
         expect(only?.action).toBe("deployed");
         expect(only?.authorName).toBeNull();
@@ -129,23 +129,23 @@ describe("reading", () => {
             { id: "u2", name: "Bo" }
         ]);
 
-        await activity.history("service", "s1");
+        await activity.history("app", "s1");
 
         const call = userFindMany.mock.calls[0]?.[0] as { where: { id: { in: string[] } } };
         expect(call.where.id.in).toEqual(["u1", "u2"]);
     });
 
     it("reads nothing for an empty set of subjects", async () => {
-        expect(await activity.historyOfMany("service", [])).toEqual([]);
+        expect(await activity.historyOfMany("app", [])).toEqual([]);
         expect(activityFindMany).not.toHaveBeenCalled();
     });
 });
 
 describe("forgetting", () => {
     it("takes one subject or a list of them", async () => {
-        await activity.forget("service", "s1");
+        await activity.forget("app", "s1");
         expect(activityDeleteMany).toHaveBeenCalledWith({
-            where: { subjectType: "service", subjectId: { in: ["s1"] } }
+            where: { subjectType: "app", subjectId: { in: ["s1"] } }
         });
 
         await activity.forget("task", ["a", "b"]);

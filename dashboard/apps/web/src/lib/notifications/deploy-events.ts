@@ -109,7 +109,7 @@ export async function notifyDeployFinished(input: {
         const recipients = new Set([input.ownerId]);
         if (deployment.triggeredById) recipients.add(deployment.triggeredById);
         if (deployment.deployableType === "application") {
-            for (const userId of await follow.followers("service", deployment.deployableId)) {
+            for (const userId of await follow.followers("app", deployment.deployableId)) {
                 recipients.add(userId);
             }
         }

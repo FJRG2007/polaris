@@ -114,7 +114,7 @@ async function recordServiceEvent(
 ): Promise<void> {
     await recordAudit({ actorId, action: audit, targetType: "application", targetId: applicationId });
     await activity.record({
-        subjectType: "service",
+        subjectType: "app",
         subjectId: applicationId,
         userId: actorId,
         action,
@@ -356,7 +356,7 @@ export async function saveEnvVarAction(input: {
         await setEnvVar(input.scope, input.scopeId, user.id, { key: input.key, value: input.value, isSecret: input.isSecret });
         if (input.scope === "application") {
             await activity.record({
-                subjectType: "service",
+                subjectType: "app",
                 subjectId: input.scopeId,
                 userId: user.id,
                 action: "variable",
@@ -385,7 +385,7 @@ export async function importEnvVarsAction(input: {
         const count = await setEnvVars(input.scope, input.scopeId, user.id, parsed);
         if (input.scope === "application") {
             await activity.record({
-                subjectType: "service",
+                subjectType: "app",
                 subjectId: input.scopeId,
                 userId: user.id,
                 action: "variables-imported",
@@ -415,7 +415,7 @@ export async function deleteEnvVarAction(id: string): Promise<{ error?: string }
     if (scope) void deployService.redeployForEnvScope(scope.scope, scope.scopeId, user.id).catch(() => undefined);
     if (scope?.scope === "application") {
         await activity.record({
-            subjectType: "service",
+            subjectType: "app",
             subjectId: scope.scopeId,
             userId: user.id,
             action: "variable-removed"
@@ -542,7 +542,7 @@ export async function setAppPortAction(applicationId: string, port: number): Pro
     try {
         await deployService.setApplicationPort(applicationId, user.id, port);
         await activity.record({
-            subjectType: "service",
+            subjectType: "app",
             subjectId: applicationId,
             userId: user.id,
             action: "port",
@@ -641,9 +641,9 @@ export async function deleteApplicationAction(applicationId: string): Promise<{ 
         // the feed and the notes were about a service that no longer exists, so
         // they go with it. Neither cascades; both live in a table shared by every
         // app and have no foreign key to follow.
-        await activity.forget("service", applicationId);
-        await comments.forget("service", applicationId);
-        await follow.forget("service", applicationId);
+        await activity.forget("app", applicationId);
+        await comments.forget("app", applicationId);
+        await follow.forget("app", applicationId);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {

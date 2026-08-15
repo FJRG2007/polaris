@@ -15,8 +15,16 @@
 
 import { prisma, type Prisma } from "@polaris/db";
 
-/** Every kind of thing that keeps a history. Adding one is a line here. */
-export const SUBJECTS = ["task", "service", "server", "volume"] as const;
+/**
+ * Every kind of thing that keeps a history. Adding one is a line here.
+ *
+ * The words are the schema's, not the interface's: an `app` is what the screens
+ * call a service and a `host` is what they call a server. `MetricSample` and
+ * `MetricRollup` addressed subjects this way long before these tables did, with
+ * exactly this vocabulary, and two answers to "what is an Application called in
+ * a subjectType column" is a question somebody would have to ask twice.
+ */
+export const SUBJECTS = ["task", "app", "host"] as const;
 
 export type ActivitySubject = (typeof SUBJECTS)[number];
 

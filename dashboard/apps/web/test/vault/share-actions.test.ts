@@ -25,6 +25,8 @@ const requirePermission = vi.fn(
             isAdmin: boolean;
         }
 );
+const accountVault = vi.fn(async (_userId: string) => ({ publicKey: "own-public" }) as unknown);
+
 vi.mock("@/lib/session", () => ({
     requirePermission: (...args: unknown[]) => requirePermission(...args)
 }));
@@ -84,6 +86,13 @@ vi.mock("@/lib/vault/orgs", () => ({
 }));
 
 const moveCipher = vi.fn(async () => ({ ok: true }) as { ok: boolean });
+// The screen lists the account's own vault first, so the actions read it. Mocked
+// rather than imported: the real module pulls in the audit log and therefore the
+// whole environment, which this file has no business needing.
+vi.mock("@/lib/vault/account", () => ({
+    getVault: (userId: string) => accountVault(userId)
+}));
+
 vi.mock("@/lib/vault/ciphers", () => ({
     moveCipher: (...args: unknown[]) => moveCipher(...args)
 }));
@@ -174,6 +183,31 @@ describe("the administered() gate, exercised through saveVaultCollectionAction",
 });
 
 describe("vaultListAction", () => {
+    it("lists the account's own vault first, so the screen is never empty for somebody who has one", async () => {
+        vaultsReachableBy.mockResolvedValue([]);
+
+        const [first, ...rest] = await actions.vaultListAction();
+
+        expect(first).toMatchObject({
+            account: true,
+            name: "My own vault",
+            mine: true,
+            vaultId: null,
+            organizationId: null,
+            // Nothing to run: it is one person's, so there is nobody to invite
+            // and no collection to scope.
+            mayAdminister: false
+        });
+        expect(rest).toEqual([]);
+    });
+
+    it("leaves the account's own vault out when there is not one yet", async () => {
+        vaultsReachableBy.mockResolvedValue([]);
+        accountVault.mockResolvedValueOnce(null);
+
+        expect(await actions.vaultListAction()).toEqual([]);
+    });
+
     it("marks a vault of this account's own as its own and administrable", async () => {
         vaultsReachableBy.mockResolvedValue([
             {
@@ -186,7 +220,7 @@ describe("vaultListAction", () => {
                 members: [{ id: "m1", key: ENC, status: 2, type: 0, accessAll: true }]
             }
         ]);
-        const [view] = await actions.vaultListAction();
+        const view = (await actions.vaultListAction()).find((entry) => !entry.account);
         expect(view).toMatchObject({
             vaultId: VAULT_ID,
             organizationId: null,
@@ -201,7 +235,7 @@ describe("vaultListAction", () => {
     it("lists an organization with no vault yet, so there is a way to make one", async () => {
         listMyOrgs.mockResolvedValue([{ id: ORG_ID, name: "Acme", slug: "acme" }]);
         orgCan.mockReturnValue(true);
-        const views = await actions.vaultListAction();
+        const views = (await actions.vaultListAction()).filter((entry) => !entry.account);
         expect(views).toEqual([
             expect.objectContaining({
                 vaultId: null,
@@ -227,7 +261,7 @@ describe("vaultListAction", () => {
                 members: [{ id: "m1", key: ENC, status: 2, type: 0, accessAll: true }]
             }
         ]);
-        const [view] = await actions.vaultListAction();
+        const view = (await actions.vaultListAction()).find((entry) => !entry.account);
         // Confirmed owner of the vault's own membership, and still not an
         // administrator: the organization decides that, not the vault.
         expect(view).toMatchObject({ confirmed: true, mayAdminister: false, mine: false });

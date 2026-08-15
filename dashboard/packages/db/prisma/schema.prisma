@@ -4299,7 +4299,8 @@ model TaskCustomFieldValue {
 // parent, which is a relation this table does have.
 model Comment {
     id           String    @id @default(uuid(7)) @db.Uuid
-    // task | service | server | volume - CommentSubject in lib/comments.
+    // task | app | host - CommentSubject in lib/comments. The schema's words,
+    // the same ones MetricSample uses: an `app` is a service, a `host` a server.
     subjectType  String
     subjectId    String    @db.Uuid
     parentId     String?   @db.Uuid
@@ -4408,7 +4409,8 @@ model TaskTimeEntry {
 // is kept and the name is looked up when the feed is read.
 model Activity {
     id          String   @id @default(uuid(7)) @db.Uuid
-    // task | service | server | volume | ... - ActivitySubject in lib/activity.
+    // task | app | host - ActivitySubject in lib/activity. The schema's words,
+    // the same ones MetricSample uses: an `app` is a service, a `host` a server.
     subjectType String
     subjectId   String   @db.Uuid
     userId      String?  @db.Uuid

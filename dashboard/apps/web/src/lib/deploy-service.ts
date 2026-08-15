@@ -1855,7 +1855,7 @@ export interface DeploymentSummary {
  */
 export async function serviceHistory(applicationId: string, ownerId: string): Promise<activity.ActivityLine[]> {
     await requireOwnedApplication(applicationId, ownerId);
-    return activity.history("service", applicationId, 60);
+    return activity.history("app", applicationId, 60);
 }
 
 /**
@@ -1869,12 +1869,12 @@ export async function serviceHistory(applicationId: string, ownerId: string): Pr
  */
 export async function serviceComments(applicationId: string, ownerId: string): Promise<comments.CommentView[]> {
     await requireOwnedApplication(applicationId, ownerId);
-    return comments.thread("service", applicationId);
+    return comments.thread("app", applicationId);
 }
 
 export async function postServiceComment(applicationId: string, ownerId: string, body: string): Promise<void> {
     await requireOwnedApplication(applicationId, ownerId);
-    await comments.post(ownerId, { subjectType: "service", subjectId: applicationId, body });
+    await comments.post(ownerId, { subjectType: "app", subjectId: applicationId, body });
 }
 
 export async function deleteServiceComment(applicationId: string, ownerId: string, commentId: string): Promise<void> {
@@ -1893,7 +1893,7 @@ export async function deleteServiceComment(applicationId: string, ownerId: strin
  */
 export async function isFollowingService(applicationId: string, userId: string): Promise<boolean> {
     await requireOwnedApplication(applicationId, userId);
-    return follow.isFollowing("service", applicationId, userId);
+    return follow.isFollowing("app", applicationId, userId);
 }
 
 export async function setFollowingService(
@@ -1902,8 +1902,8 @@ export async function setFollowingService(
     following: boolean
 ): Promise<void> {
     await requireOwnedApplication(applicationId, userId);
-    if (following) await follow.follow("service", applicationId, userId);
-    else await follow.unfollow("service", applicationId, userId);
+    if (following) await follow.follow("app", applicationId, userId);
+    else await follow.unfollow("app", applicationId, userId);
 }
 
 async function requireOwnedApplication(applicationId: string, ownerId: string): Promise<void> {

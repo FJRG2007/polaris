@@ -27,6 +27,7 @@ import { revalidatePath } from "next/cache";
 import * as vaultOrgs from "@/lib/vault/orgs";
 import * as ciphers from "@/lib/vault/ciphers";
 import { requirePermission } from "@/lib/session";
+import * as vaultAccount from "@/lib/vault/account";
 import { listMyOrgs, resolveOrgAccess, orgCan } from "@/lib/orgs/org-service";
 
 /** One vault, as the vault screens need to see it. */
@@ -48,6 +49,14 @@ export interface VaultView {
     publicKey: string | null;
     /** The membership row's id, which is what collections grant access to. */
     memberId: string | null;
+    /**
+     * True for the one vault every account already has - the one its items land
+     * in by default. It is a VaultAccount rather than a VaultOrganization, so it
+     * has folders instead of collections and nobody to invite, and the screen
+     * draws it differently. Listed all the same: a screen headed "Vaults" that
+     * leaves out the vault you actually use reads as though you have none.
+     */
+    account: boolean;
 }
 
 /**
@@ -101,7 +110,8 @@ export async function vaultListAction(): Promise<VaultView[]> {
             wrappedKey: membership?.key ?? null,
             confirmed: standing?.confirmed === true,
             publicKey: row.publicKey,
-            memberId: membership?.id ?? null
+            memberId: membership?.id ?? null,
+            account: false
         };
     });
 
@@ -117,7 +127,26 @@ export async function vaultListAction(): Promise<VaultView[]> {
             wrappedKey: null,
             confirmed: false,
             publicKey: null,
-            memberId: null
+            memberId: null,
+            account: false
+        });
+    }
+
+    // First, and first for a reason: it is the one the reader has, and every
+    // item they have not deliberately moved is in it.
+    const own = await vaultAccount.getVault(user.id);
+    if (own) {
+        views.unshift({
+            vaultId: null,
+            organizationId: null,
+            name: "My own vault",
+            mine: true,
+            mayAdminister: false,
+            wrappedKey: null,
+            confirmed: true,
+            publicKey: own.publicKey,
+            memberId: null,
+            account: true
         });
     }
     return views;

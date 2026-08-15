@@ -1,11 +1,17 @@
 "use client";
 
 /**
- * Vaults: the ones beside the account's own.
+ * Vaults: every one this account can open.
  *
  * A vault is a key and the people who hold it. One of somebody's own is that
  * with one member, an organization's is that with a roster, and this screen is
  * the same screen for both because nothing below the name differs.
+ *
+ * The account's own vault is listed first and drawn by a panel of its own. It is
+ * a VaultAccount rather than a VaultOrganization - folders instead of
+ * collections, nobody to invite - so none of the controls below apply to it, and
+ * leaving it off the list made a screen headed "Vaults" look empty to somebody
+ * whose items are all in one.
  *
  * Three things happen here that cannot happen anywhere else, and all three need
  * a browser holding an unlocked vault:
@@ -23,6 +29,7 @@
  *    a second vault.
  */
 
+import Link from "next/link";
 import * as core from "@polaris/core";
 import * as share from "../share-actions";
 import { useEffect, useState } from "react";
@@ -74,6 +81,7 @@ interface MemberRow {
 
 /** What a vault is picked by. An organization with no vault yet has no id. */
 function pickerValue(vault: VaultView): string {
+    if (vault.account) return "account";
     return vault.vaultId ?? `org:${vault.organizationId}`;
 }
 
@@ -95,7 +103,7 @@ export function VaultsView() {
                 <div>
                     <h1 className="text-[17px] font-semibold tracking-tight">Vaults</h1>
                     <p className="text-sm text-muted-foreground">
-                        Vaults beside your own, each with its own key. Your own vault stays yours.
+                        Every vault you can open, each with its own key. Yours is the first.
                     </p>
                 </div>
                 <Button size="sm" onClick={() => setCreating(true)}>
@@ -107,8 +115,8 @@ export function VaultsView() {
             {vaults.length === 0 ? (
                 <Card>
                     <CardBody className="p-6 text-sm text-muted-foreground">
-                        You have one vault, your own. Make another to keep something apart, or to
-                        share it with somebody.
+                        Nothing here yet. Set up your own vault from the Vault app first; then you
+                        can make another to keep something apart, or to share it with somebody.
                     </CardBody>
                 </Card>
             ) : (
@@ -126,7 +134,9 @@ export function VaultsView() {
             {error ? <p className="text-sm text-danger">{error}</p> : null}
 
             {current ? (
-                current.vaultId === null ? (
+                current.account ? (
+                    <AccountVaultPanel />
+                ) : current.vaultId === null ? (
                     <CreateOrganizationVault
                         vault={current}
                         onError={setError}
@@ -270,6 +280,40 @@ function NewVaultDialog({
 }
 
 /** Give an organization a vault. Every key in it is minted here. */
+/**
+ * The vault every account already has, on the screen that lists vaults.
+ *
+ * It has no panel of controls because there is nothing here to run: it is one
+ * person's, so there is nobody to invite and no collection to scope. What it
+ * needs to say is that it exists, that it is where items land by default, and
+ * how something gets out of it - which is by moving the item, not by sharing
+ * the vault.
+ */
+function AccountVaultPanel() {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>My own vault</CardTitle>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-3 text-[13px] text-muted-foreground">
+                <p>
+                    Everything you save lands here unless you put it somewhere else. It is yours
+                    alone: nobody can be let in, because the key is wrapped under your master
+                    password and nothing on the server can derive it.
+                </p>
+                <p>
+                    To let somebody at one of these items, make a vault below and move the item
+                    into it from the item itself. Moving re-encrypts it under that vault&apos;s key,
+                    which is what sharing actually is here.
+                </p>
+                <Button asChild variant="outline" size="sm" className="self-start">
+                    <Link href="/vault">Open it</Link>
+                </Button>
+            </CardBody>
+        </Card>
+    );
+}
+
 function CreateOrganizationVault({
     vault,
     onError,

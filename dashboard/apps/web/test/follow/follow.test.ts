@@ -44,24 +44,24 @@ describe("following", () => {
     });
 
     it("leaves the reason alone when they already follow it", async () => {
-        await follow.follow("service", "s1", "u1");
+        await follow.follow("app", "s1", "u1");
 
         const call = followUpsert.mock.calls[0]?.[0] as { update: Record<string, unknown> };
         expect(call.update).toEqual({});
     });
 
     it("defaults to having asked", async () => {
-        await follow.follow("service", "s1", "u1");
+        await follow.follow("app", "s1", "u1");
 
         const call = followUpsert.mock.calls[0]?.[0] as { create: { reason: string } };
         expect(call.create.reason).toBe("explicit");
     });
 
     it("unfollows without minding whether they were", async () => {
-        await follow.unfollow("service", "s1", "u1");
+        await follow.unfollow("app", "s1", "u1");
 
         expect(followDeleteMany).toHaveBeenCalledWith({
-            where: { subjectType: "service", subjectId: "s1", userId: "u1" }
+            where: { subjectType: "app", subjectId: "s1", userId: "u1" }
         });
     });
 });
@@ -69,30 +69,30 @@ describe("following", () => {
 describe("who is following", () => {
     it("answers yes or no rather than the row", async () => {
         followFindUnique.mockResolvedValueOnce({ userId: "u1" });
-        expect(await follow.isFollowing("service", "s1", "u1")).toBe(true);
+        expect(await follow.isFollowing("app", "s1", "u1")).toBe(true);
 
         followFindUnique.mockResolvedValueOnce(null);
-        expect(await follow.isFollowing("service", "s1", "u2")).toBe(false);
+        expect(await follow.isFollowing("app", "s1", "u2")).toBe(false);
     });
 
     it("leaves out whoever caused the thing being announced", async () => {
         followFindMany.mockResolvedValueOnce([{ userId: "u1" }, { userId: "u2" }]);
 
-        expect(await follow.followers("service", "s1", "u1")).toEqual(["u2"]);
+        expect(await follow.followers("app", "s1", "u1")).toEqual(["u2"]);
     });
 
     it("keeps everybody when nobody is excluded", async () => {
         followFindMany.mockResolvedValueOnce([{ userId: "u1" }, { userId: "u2" }]);
 
-        expect(await follow.followers("service", "s1")).toEqual(["u1", "u2"]);
+        expect(await follow.followers("app", "s1")).toEqual(["u1", "u2"]);
     });
 });
 
 describe("forgetting", () => {
     it("takes one subject or a list of them", async () => {
-        await follow.forget("service", "s1");
+        await follow.forget("app", "s1");
         expect(followDeleteMany).toHaveBeenCalledWith({
-            where: { subjectType: "service", subjectId: { in: ["s1"] } }
+            where: { subjectType: "app", subjectId: { in: ["s1"] } }
         });
 
         await follow.forget("task", ["a", "b"]);
