@@ -19,6 +19,7 @@
  */
 
 import * as actions from "./actions";
+import { VoiceNote } from "./voice-note";
 import { Avatar } from "@/components/avatar";
 import { MessageMenu } from "./message-menu";
 import { usableAccent } from "@/lib/chat/accent";
@@ -28,6 +29,7 @@ import { EditHistoryDialog } from "./edit-history-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
+import { isPlayable, isVoiceMessage } from "./voice-recorder";
 import { useDisplayFormat } from "@/components/display-format";
 import {
     cn,
@@ -348,6 +350,12 @@ function Message({
                                         alt={file.name}
                                         source={`attachment:${file.id}`}
                                         name={file.name}
+                                    />
+                                ) : isPlayable(file.contentType) ? (
+                                    <VoiceNote
+                                        href={`/api/chat/attachments/${file.id}`}
+                                        name={file.name}
+                                        recorded={isVoiceMessage(file.name, file.contentType)}
                                     />
                                 ) : (
                                     <a

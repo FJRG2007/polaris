@@ -30,7 +30,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { isBlankMarkdown } from "@/components/rich-text/markdown";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
-import { CornerUpLeft, Paperclip, SendHorizontal, X } from "lucide-react";
+import { CornerUpLeft, Mic, Paperclip, SendHorizontal, Trash2, X } from "lucide-react";
+import { canRecord, MAX_VOICE_SECONDS, spokenLength, useVoiceRecording } from "./voice-recorder";
 
 /** How often, at most, the server is told somebody is typing. */
 const TYPING_EVERY_MS = 2500;
@@ -89,6 +90,12 @@ export function Composer({
     const [generation, setGeneration] = useState(0);
     const lastAnnounced = useRef(0);
 
+    // Asked in the browser rather than while rendering: the server has no
+    // MediaRecorder, and a button that appeared only after hydration would be a
+    // button that moves under somebody's finger.
+    const [recordable, setRecordable] = useState(false);
+    useEffect(() => setRecordable(canRecord()), []);
+
     // What is being written changes when the message being rewritten changes,
     // and not when the same message arrives again: a reload that replaced the
     // object would otherwise wipe what has been typed into it. Backing out of an
@@ -134,6 +141,24 @@ export function Composer({
     // than of the stored source. Spaces and line breaks alone are not a message,
     // and they do not always serialize to an empty string.
     const blank = useMemo(() => isBlankMarkdown(body), [body]);
+
+    /**
+     * A recording goes as soon as it is stopped.
+     *
+     * Not staged like a picked file: somebody who has just said the thing has
+     * already decided to send it, and a recording sitting in a tray waiting for
+     * a second press is the shape everybody gets wrong. Cancelling is the other
+     * button, and it is next to it while the recording runs.
+     */
+    const voice = useVoiceRecording((file) => {
+        if (disabled) return;
+        if (file.size > maxBytes) {
+            setRefused(`A recording here can be up to ${rules.maxAttachmentMib} MB.`);
+            return;
+        }
+        setRefused("");
+        void onSend("", [file]);
+    });
 
     const submit = async (value: string) => {
         const text = isBlankMarkdown(value) ? "" : value.trim();
@@ -248,9 +273,9 @@ export function Composer({
                 </div>
             )}
 
-            {refused && (
+            {(refused || voice.error) && (
                 <p role="alert" className="mb-2 text-xs text-danger">
-                    {refused}
+                    {refused || voice.error}
                 </p>
             )}
 
@@ -279,6 +304,38 @@ export function Composer({
                         </li>
                     ))}
                 </ul>
+            )}
+
+            {voice.recording && (
+                <div className="mb-2 flex items-center gap-2 rounded-md border border-border bg-field px-3 py-2">
+                    <span aria-hidden="true" className="size-2 animate-pulse rounded-full bg-danger" />
+                    <span className="text-sm font-medium tabular-nums">
+                        {spokenLength(voice.seconds)}
+                    </span>
+                    <span className="truncate text-xs text-muted-foreground">
+                        Recording - {spokenLength(MAX_VOICE_SECONDS - voice.seconds)} left
+                    </span>
+                    <span className="ml-auto flex items-center gap-1">
+                        <button
+                            type="button"
+                            onClick={voice.cancel}
+                            aria-label="Throw this recording away"
+                            title="Throw it away"
+                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                        >
+                            <Trash2 className="size-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={voice.stop}
+                            aria-label="Send this recording"
+                            title="Send it"
+                            className="rounded p-1.5 text-primary transition-colors hover:bg-muted"
+                        >
+                            <SendHorizontal className="size-4" />
+                        </button>
+                    </span>
+                </div>
             )}
 
             {/* One box: the text and the controls that act on it are the same
@@ -315,6 +372,22 @@ export function Composer({
                                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                                 >
                                     <Paperclip className="size-4" />
+                                </button>
+                            )}
+                            {/* Only where a file may be sent at all, since a
+                                recording is one - and only in a browser that can
+                                record, rather than as a button that apologises
+                                when it is pressed. */}
+                            {rules.maxAttachments > 0 && recordable && (
+                                <button
+                                    type="button"
+                                    disabled={disabled || files.length >= rules.maxAttachments}
+                                    onClick={voice.start}
+                                    aria-label="Record a voice message"
+                                    title="Record a voice message"
+                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                >
+                                    <Mic className="size-4" />
                                 </button>
                             )}
                             <EmojiPicker
