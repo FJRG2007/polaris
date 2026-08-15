@@ -18,6 +18,20 @@ import * as refs from "./references";
 import type { Token, Tokens } from "marked";
 import type { JSONContent } from "@tiptap/core";
 
+/**
+ * The language on a line that is only a code fence, or null when the line is
+ * not one.
+ *
+ * Its own function because a chat composer has to decide it on a keystroke, and
+ * because "is this a fence" is the sort of thing that gets written three
+ * slightly different ways. An empty string is a fence with no language, which is
+ * a different answer from null.
+ */
+export function fenceLanguage(line: string): string | null {
+    const match = /^\s*(?:```|~~~)([A-Za-z0-9_+#-]*)\s*$/.exec(line);
+    return match ? (match[1] ?? "") : null;
+}
+
 /** A block whose Markdown the schema has no node for, kept as it was written. */
 export const MARKDOWN_BLOCK = "markdownBlock";
 

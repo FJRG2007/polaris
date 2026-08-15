@@ -117,6 +117,11 @@ export function baseExtensions(placeholder: string) {
             openOnClick: false,
             autolink: true,
             linkOnPaste: true,
+            // The same allowlist the renderer applies, applied at the other end:
+            // a pasted `javascript:` link would otherwise be a live link to
+            // whoever is writing, which is the self-XSS half of the problem.
+            // The renderer refuses it either way - this stops it being stored.
+            protocols: ["http", "https", "mailto"],
             HTMLAttributes: { rel: "noopener noreferrer nofollow", target: "_blank" }
         }),
         Placeholder.configure({ placeholder }),

@@ -89,8 +89,13 @@ function taskItems(nodes: readonly JSONContent[] | undefined): React.ReactNode {
 }
 
 function Media({ node }: { node: JSONContent }) {
-    const src = typeof node.attrs?.src === "string" ? node.attrs.src : "";
+    const src = typeof node.attrs?.src === "string" ? node.attrs.src.trim() : "";
     if (!src) return null;
+    // Same rule as a link, for the same reason: the address was written by
+    // somebody else. A `data:` image is how a payload gets inlined into a page,
+    // and an unparseable one is not an image.
+    const local = src.startsWith("/") && !src.startsWith("//");
+    if (!local && !isSafeHref(src)) return null;
     // Not next/image: these point at whatever somebody wrote, which is usually
     // an attachment on this Polaris but can be any address at all.
     // eslint-disable-next-line @next/next/no-img-element
@@ -122,14 +127,51 @@ function Inline({ node }: { node: JSONContent }) {
     return <>{content}</>;
 }
 
-/** An outside link opens away from Polaris and cannot reach back into it. */
+/**
+ * An outside link opens away from Polaris and cannot reach back into it - and
+ * only if it is a link at all.
+ *
+ * The text being rendered was written by somebody else, and Markdown lets a link
+ * carry any scheme: `[click me](javascript:...)` is a script that runs as the
+ * reader, in the reader's session, the moment they click something that looks
+ * like an ordinary link. React escapes text but does not check an href, so this
+ * has to. `data:` goes with it - a data URL is a page the attacker wrote, opened
+ * from a name you trusted.
+ *
+ * A refused scheme is drawn as plain text rather than dropped. The reader still
+ * sees what was written, which is the honest outcome: something was there and it
+ * was not something to click.
+ */
 function Anchor({ href, children }: { href: string; children: React.ReactNode }) {
-    if (href.startsWith("/")) return <Link href={href}>{children}</Link>;
+    // A path inside Polaris. Never protocol-relative - `//evil.example` is a
+    // different site wearing a leading slash.
+    if (href.startsWith("/") && !href.startsWith("//")) return <Link href={href}>{children}</Link>;
+    if (!isSafeHref(href)) return <>{children}</>;
     return (
         <a href={href} target="_blank" rel="noopener noreferrer nofollow">
             {children}
         </a>
     );
+}
+
+/** The schemes a written link may use. Everything else is text. */
+const SAFE_SCHEMES = new Set(["http:", "https:", "mailto:"]);
+
+export function isSafeHref(href: string): boolean {
+    const trimmed = href.trim();
+    if (!trimmed) return false;
+    try {
+        // A base is needed for the relative case, which has already been handled
+        // above; anything that parses relative here has no scheme of its own and
+        // is not something to link to from rendered text.
+        const parsed = new URL(trimmed, "https://polaris.invalid");
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("mailto:")) {
+            return SAFE_SCHEMES.has(parsed.protocol);
+        }
+        return false;
+    } catch {
+        return false;
+    }
 }
 
 function Chip({ node }: { node: JSONContent }) {

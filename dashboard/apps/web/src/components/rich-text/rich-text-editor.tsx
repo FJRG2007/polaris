@@ -105,8 +105,36 @@ export function RichTextEditor({
                 // direct editor prop and those are asked before any plugin, so
                 // the popup cannot decline it on its own.
                 if (popupOpen(view.state)) return false;
-                handlers.current.onSubmit(md.docToMarkdown(editorRef.current?.getJSON()));
-                return true;
+
+                const send = (): boolean => {
+                    handlers.current.onSubmit?.(md.docToMarkdown(editorRef.current?.getJSON()));
+                    return true;
+                };
+                // The one key that always sends, which is how you get out of a
+                // code block without reaching for the mouse.
+                if (event.metaKey || event.ctrlKey) return send();
+
+                const { $from } = view.state.selection;
+                // Inside a code block Enter is a newline. A composer where the
+                // only way to write two lines of code is to not press Enter is a
+                // composer nobody writes code in.
+                if ($from.parent.type.name === "codeBlock") return false;
+
+                // A line that is only a fence opens the block rather than
+                // sending it as text. Without this the fence is escaped on the
+                // way out and arrives in the conversation as three backticks.
+                const language = md.fenceLanguage($from.parent.textContent);
+                if (language !== null && editorRef.current) {
+                    editorRef.current
+                        .chain()
+                        .focus()
+                        .deleteRange({ from: $from.start(), to: $from.end() })
+                        .setNode("codeBlock", { language: language || null })
+                        .run();
+                    return true;
+                }
+
+                return send();
             },
             handlePaste: (view, event) => handleMarkdownPaste(editorRef.current, view, event)
         },
