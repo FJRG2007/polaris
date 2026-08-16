@@ -119,9 +119,16 @@ export function PrivacyView({
                     ))}
 
                     <p className="text-[11px] leading-snug text-muted-foreground">
-                        Whoever administers this Polaris can see all of it whatever you choose here.
-                        They can read the database, so a setting that claimed otherwise would not be
-                        true.
+                        Who counts as a friend is on your{" "}
+                        <a
+                            href="/account/friends"
+                            className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+                        >
+                            friends page
+                        </a>
+                        . Whoever administers this Polaris can see all of it whatever you choose
+                        here. They can read the database, so a setting that claimed otherwise would
+                        not be true.
                     </p>
 
                     {error && (
