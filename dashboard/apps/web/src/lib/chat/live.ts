@@ -21,6 +21,8 @@
  * as being in that channel.
  */
 
+import type * as core from "@polaris/core";
+
 /** What a call in a conversation just did. */
 export type CallState = "ringing" | "moved" | "ended";
 
@@ -37,6 +39,9 @@ export interface ChatChange {
     /** Only on `typing` and `call`: what to draw beside the dots, or who is
      *  calling. */
     readonly actorName?: string;
+    /** Only on `typing`: which of the two things that take a while they are
+     *  doing. A recording is silence from the other side otherwise. */
+    readonly activity?: core.ChatActivity;
     /** Only on `channels`: who should redraw, when the change is about one
      *  person joining or leaving rather than about the channel itself. */
     readonly audience?: readonly string[];

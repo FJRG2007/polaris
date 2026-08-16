@@ -15,6 +15,7 @@
 
 import { z } from "zod";
 import { useEffect, useRef } from "react";
+import { CHAT_ACTIVITIES } from "@polaris/core";
 import { subscribeSharedStream } from "@/lib/shared-stream";
 import { useSessionScope } from "@/components/session-scope";
 
@@ -27,7 +28,10 @@ const frameSchema = z.discriminatedUnion("kind", [
         kind: z.literal("typing"),
         channelId: z.string(),
         userId: z.string(),
-        name: z.string()
+        name: z.string(),
+        // Absent from a server still running the build before recordings were
+        // announced, which is a tab left open across a deploy.
+        activity: z.enum(CHAT_ACTIVITIES).optional()
     }),
     // A call in a conversation started, grew, shrank or ended. `ringing` is the
     // one that sounds; the rest keep the count beside the call button honest,

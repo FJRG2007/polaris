@@ -50,13 +50,18 @@ vi.mock("@polaris/storage", () => ({
  *  there is nowhere left to fall. */
 let broken = false;
 
-const { LOCAL_TARGET, openForWriting } = await import("../../src/lib/storage-target");
+const { LOCAL_TARGET, forgetStorageFailure, openForWriting } = await import(
+    "../../src/lib/storage-target"
+);
 
 const nas = { id: NAS, name: "The NAS", automatic: true };
 
 describe("opening a storage to write to", () => {
     beforeEach(() => {
         broken = false;
+        // What one test taught the module about this storage is not something
+        // the next one should still be paying for.
+        forgetStorageFailure(NAS);
         vi.clearAllMocks();
         vi.spyOn(console, "error").mockImplementation(() => undefined);
     });
@@ -94,6 +99,35 @@ describe("opening a storage to write to", () => {
         await openForWriting(nas, "chat");
 
         expect(complained).toHaveBeenCalled();
+    });
+
+    it("stops trying a storage that just refused, for a while", async () => {
+        getDriverForConnection.mockImplementation(async () => {
+            throw new Error("SMB connection failed: ETIMEDOUT");
+        });
+
+        await openForWriting(nas, "chat");
+        const again = await openForWriting(nas, "chat");
+
+        // The second upload does not pay the timeout again. That wait is what
+        // turns an unplugged share into a chat where everything anybody sends
+        // takes ten seconds to arrive.
+        expect(again.targetId).toBe(LOCAL_TARGET);
+        expect(getDriverForConnection).toHaveBeenCalledTimes(1);
+    });
+
+    it("goes back to it once it has proved itself", async () => {
+        getDriverForConnection.mockImplementation(async () => {
+            throw new Error("SMB connection failed: ETIMEDOUT");
+        });
+        await openForWriting(nas, "chat");
+
+        // What the check on the uploads screen does when it passes.
+        forgetStorageFailure(NAS);
+        const driver = { id: NAS };
+        getDriverForConnection.mockImplementation(async () => driver);
+
+        expect((await openForWriting(nas, "chat")).targetId).toBe(NAS);
     });
 
     it("throws when this server is the one that cannot be opened", async () => {

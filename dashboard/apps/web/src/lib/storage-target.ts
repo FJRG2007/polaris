@@ -139,23 +139,69 @@ export async function openForWriting(
     target: UploadTarget,
     localFolder: string
 ): Promise<WritableTarget> {
+    if (target.id !== LOCAL_TARGET && failedRecently(target.id)) {
+        return { ...(await here(localFolder)), fellBackFrom: target.name };
+    }
+
     try {
-        return {
+        const opened = {
             driver: await driverForTarget(target.id, localFolder),
             targetId: target.id,
             name: target.name,
             fellBackFrom: null
         };
+        FAILED.delete(target.id);
+        return opened;
     } catch (error) {
         if (target.id === LOCAL_TARGET) throw error;
+        FAILED.set(target.id, Date.now());
         console.error(`storage: ${target.name} could not be opened for writing:`, error);
-        return {
-            driver: await driverForTarget(LOCAL_TARGET, localFolder),
-            targetId: LOCAL_TARGET,
-            name: "this server",
-            fellBackFrom: target.name
-        };
+        return { ...(await here(localFolder)), fellBackFrom: target.name };
     }
+}
+
+/**
+ * How long a storage that would not open is left alone.
+ *
+ * Reaching one that is off is not free: a connect against a host that is not
+ * answering waits for the timeout, and paying that on every upload turns "the
+ * share is unplugged" into "everything anybody sends takes ten seconds to reach
+ * anybody" - which is what somebody on the other end experiences as a chat that
+ * has stopped being live. So the first failure is the one that waits, and the
+ * next minute of uploads goes straight to the disk that works.
+ *
+ * A minute, because the other side of this is a share that came back and is
+ * still being skipped. Short enough that nobody notices, and the check on the
+ * uploads screen clears it outright.
+ */
+const RETRY_AFTER_MS = 60_000;
+
+/** When each storage last refused to open. In this process only: it is a
+ *  latency shortcut, and a replica working it out for itself is correct. */
+const FAILED = new Map<string, number>();
+
+function failedRecently(targetId: string): boolean {
+    const at = FAILED.get(targetId);
+    if (at === undefined) return false;
+    if (Date.now() - at < RETRY_AFTER_MS) return true;
+    FAILED.delete(targetId);
+    return false;
+}
+
+/** Stop skipping a storage. For the check on the uploads screen: an operator who
+ *  has just watched it write, read and delete a file should not then wait out a
+ *  minute of Polaris remembering it was broken. */
+export function forgetStorageFailure(targetId: string): void {
+    FAILED.delete(targetId);
+}
+
+/** The disk Polaris runs on, opened. */
+async function here(localFolder: string): Promise<Omit<WritableTarget, "fellBackFrom">> {
+    return {
+        driver: await driverForTarget(LOCAL_TARGET, localFolder),
+        targetId: LOCAL_TARGET,
+        name: "this server"
+    };
 }
 
 /**
@@ -244,6 +290,10 @@ export async function checkStorageTarget(
         await driver.dispose().catch(() => undefined);
     }
 
+    // It works. Whatever this instance remembered about it not working is out of
+    // date as of a second ago, so the next upload goes to it rather than waiting
+    // out the rest of the minute on the disk next door.
+    forgetStorageFailure(targetId);
     return { ok: true, detail: `Wrote a file, read it back and removed it. ${await keeps(targetId, localFolder)}` };
 }
 

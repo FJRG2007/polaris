@@ -57,6 +57,22 @@ export const CHAT_MESSAGE_KINDS = ["text", "system", "call"] as const;
 
 export type ChatMessageKind = (typeof CHAT_MESSAGE_KINDS)[number];
 
+/**
+ * What somebody is doing in the box, for the line under the conversation.
+ *
+ * Typing is not the only thing worth saying out loud. A voice message is half a
+ * minute of nothing from the other side, and without this the person waiting has
+ * no way to tell it apart from having been left: the dots do not appear, because
+ * nobody is typing. Every messenger with recordings in it says which one it is.
+ */
+export const CHAT_ACTIVITIES = ["typing", "recording"] as const;
+
+export type ChatActivity = (typeof CHAT_ACTIVITIES)[number];
+
+/** Typing when a tab does not say - one running a build from before recordings
+ *  were announced still sends the bare call. */
+export const chatActivitySchema = z.enum(CHAT_ACTIVITIES).catch("typing").default("typing");
+
 export const MAX_CHAT_SPACE_NAME = 60;
 export const MAX_CHAT_CHANNEL_NAME = 60;
 export const MAX_CHAT_TOPIC = 200;

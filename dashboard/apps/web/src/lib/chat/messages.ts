@@ -773,14 +773,22 @@ export async function starred(actor: ChatActor, limit = 100): Promise<ChatMessag
     return decorateMessages(actor, rows);
 }
 
-/** Say that somebody is composing. Nothing is stored: it is true for a few
- *  seconds and then it is not, and a table would only ever hold stale rows. */
+/** Say that somebody is composing, and which way. Nothing is stored: it is true
+ *  for a few seconds and then it is not, and a table would only ever hold stale
+ *  rows. */
 export async function announceTyping(
     actor: ChatActor & { name: string },
-    channelId: string
+    channelId: string,
+    activity: core.ChatActivity = "typing"
 ): Promise<void> {
     await requireChannel(actor, channelId);
-    publishChatChange({ channelId, kind: "typing", actorId: actor.id, actorName: actor.name });
+    publishChatChange({
+        channelId,
+        kind: "typing",
+        actorId: actor.id,
+        actorName: actor.name,
+        activity
+    });
 }
 
 const MESSAGE_SELECT = {

@@ -163,7 +163,8 @@ export async function GET(request: Request): Promise<Response> {
                             kind: "typing",
                             channelId: change.channelId,
                             userId: change.actorId,
-                            name: change.actorName ?? ""
+                            name: change.actorName ?? "",
+                            activity: change.activity ?? "typing"
                         });
                     } else {
                         wake(change.channelId);

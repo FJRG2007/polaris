@@ -30,7 +30,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { isBlankMarkdown } from "@/components/rich-text/markdown";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
-import { CornerUpLeft, Mic, MicOff, Paperclip, SendHorizontal, Trash2, X } from "lucide-react";
 import {
     canRecord,
     MAX_VOICE_SECONDS,
@@ -38,6 +37,17 @@ import {
     useVoiceRecording,
     type RecordedSound
 } from "./voice-recorder";
+import {
+    Camera,
+    CornerUpLeft,
+    Image as ImageIcon,
+    Mic,
+    MicOff,
+    Paperclip,
+    SendHorizontal,
+    Trash2,
+    X
+} from "lucide-react";
 
 /** How often, at most, the server is told somebody is typing. */
 const TYPING_EVERY_MS = 2500;
@@ -97,6 +107,17 @@ export function Composer({
     const [refused, setRefused] = useState("");
     const [dragging, setDragging] = useState(false);
     const picker = useRef<HTMLInputElement>(null);
+    const gallery = useRef<HTMLInputElement>(null);
+    const camera = useRef<HTMLInputElement>(null);
+    // Whether this is something held in a hand, which is the only place a camera
+    // button belongs: `capture` on a laptop opens the same file dialog as every
+    // other picker, so the button would be a second paperclip wearing a camera.
+    const [handheld, setHandheld] = useState(false);
+    useEffect(() => {
+        setHandheld(
+            typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches
+        );
+    }, []);
     // Bumped to rebuild the editor, which is how it is cleared: the editor owns
     // its document, and setting the value prop back to "" does not empty it.
     const [generation, setGeneration] = useState(0);
@@ -232,12 +253,38 @@ export function Composer({
         if (accepted.length > 0) setFiles((current) => [...current, ...accepted]);
     };
 
+    /** What every picker does with what came back. Cleared afterwards so
+     *  choosing the same file twice in a row still fires a change. */
+    const picked = (event: React.ChangeEvent<HTMLInputElement>): void => {
+        stage(event.target.files);
+        event.target.value = "";
+    };
+
     const announce = () => {
         const now = Date.now();
         if (now - lastAnnounced.current < TYPING_EVERY_MS) return;
         lastAnnounced.current = now;
         void typingAction(channelId);
     };
+
+    /**
+     * A recording is announced the way typing is.
+     *
+     * Without it the other side gets half a minute of nothing - and no dots,
+     * because nobody is typing - which is indistinguishable from having been
+     * left mid-conversation. Repeated on the same interval because the indicator
+     * lapses after a few seconds by design, and a recording runs for minutes.
+     */
+    useEffect(() => {
+        if (!voice.recording || disabled) return;
+        const say = () => {
+            lastAnnounced.current = Date.now();
+            void typingAction(channelId, "recording");
+        };
+        say();
+        const timer = setInterval(say, TYPING_EVERY_MS);
+        return () => clearInterval(timer);
+    }, [voice.recording, disabled, channelId]);
 
     return (
         <div
@@ -442,6 +489,38 @@ export function Composer({
                                     <Paperclip className="size-4" />
                                 </button>
                             )}
+                            {/* A picture is most of what anybody sends, and
+                                finding it through a file dialog that offers
+                                every document on the device is the long way
+                                round. Filtered to images and video, which is
+                                what a phone answers with its gallery. */}
+                            {rules.maxAttachments > 0 && (
+                                <button
+                                    type="button"
+                                    disabled={disabled || files.length >= rules.maxAttachments}
+                                    onClick={() => gallery.current?.click()}
+                                    aria-label="Send a photo or video"
+                                    title="Photo or video"
+                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                >
+                                    <ImageIcon className="size-4" />
+                                </button>
+                            )}
+                            {/* Straight to the camera, on the devices that have
+                                one worth opening. The picture is staged like any
+                                other so it can still be thought better of. */}
+                            {rules.maxAttachments > 0 && handheld && (
+                                <button
+                                    type="button"
+                                    disabled={disabled || files.length >= rules.maxAttachments}
+                                    onClick={() => camera.current?.click()}
+                                    aria-label="Take a photo or video"
+                                    title="Camera"
+                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                >
+                                    <Camera className="size-4" />
+                                </button>
+                            )}
                             {/* Only where a file may be sent at all, since a
                                 recording is one - and only in a browser that can
                                 record, rather than as a button that apologises
@@ -507,17 +586,27 @@ export function Composer({
                 </div>
             </div>
 
+            {/* Three pickers rather than one that is reconfigured: setting
+                `accept` and `capture` on the way to a click is a change the
+                browser is not obliged to have applied by the time the dialog
+                opens, and on a phone that is the difference between the gallery
+                and the camera. */}
+            <input ref={picker} type="file" multiple className="hidden" onChange={picked} />
             <input
-                ref={picker}
+                ref={gallery}
                 type="file"
                 multiple
+                accept="image/*,video/*"
                 className="hidden"
-                onChange={(event) => {
-                    stage(event.target.files);
-                    // Cleared so picking the same file twice in a row still
-                    // fires a change.
-                    event.target.value = "";
-                }}
+                onChange={picked}
+            />
+            <input
+                ref={camera}
+                type="file"
+                accept="image/*,video/*"
+                capture="environment"
+                className="hidden"
+                onChange={picked}
             />
         </div>
     );

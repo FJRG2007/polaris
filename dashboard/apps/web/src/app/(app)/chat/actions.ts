@@ -359,9 +359,12 @@ export async function markReadAction(input: unknown): Promise<{ error?: string }
     return guard(() => messages.markRead(me, parsed.data));
 }
 
-export async function typingAction(channelId: string): Promise<void> {
+export async function typingAction(channelId: string, activity?: unknown): Promise<void> {
     const me = await actor();
-    await guard(() => messages.announceTyping(me, channelId));
+    // Checked rather than taken: it is a string from a browser that decides what
+    // a room full of people is told somebody is doing.
+    const doing = core.chatActivitySchema.parse(activity ?? undefined);
+    await guard(() => messages.announceTyping(me, channelId, doing));
 }
 
 // ---------------------------------------------------------------------------

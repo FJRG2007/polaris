@@ -27,17 +27,17 @@ import { Composer } from "./composer";
 import { CallRoom } from "./call-room";
 import { useChat } from "./chat-context";
 import * as calls from "./meeting-actions";
-import { useRouter, useSearchParams } from "next/navigation";
 import { ThreadPanel } from "./thread-panel";
 import { SearchPanel } from "./search-panel";
 import { MessageList } from "./message-list";
 import { runAction } from "@/lib/run-action";
+import { useCallHold } from "./call-session";
 import { ForwardDialog } from "./forward-dialog";
 import { ChannelHeader } from "./channel-header";
-import { useCallHold } from "./call-session";
 import { useChatStream } from "./use-chat-stream";
 import type { RecordedSound } from "./voice-recorder";
 import type { ChatMessageView } from "@/lib/chat/messages";
+import { useRouter, useSearchParams } from "next/navigation";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { MessageCircle, Mic, Video, Volume2 } from "lucide-react";
 import { Button, ConfirmDeleteDialog, EmptyState, Skeleton } from "@polaris/ui";
@@ -50,6 +50,14 @@ const AT_BOTTOM_SLACK = 60;
 /** How long a typing indicator stays up after the last frame about it. Just
  *  longer than the interval the composer sends them at. */
 const TYPING_TTL_MS = 4000;
+
+/** Somebody who is mid-something in the box, and when they last said so. */
+interface Typist {
+    readonly userId: string;
+    readonly name: string;
+    readonly activity: core.ChatActivity;
+    readonly at: number;
+}
 
 /** How many pages back a jump to a search hit will walk. Fifty messages a page,
  *  so this reaches a long way without letting one click pull a year of a busy
@@ -105,9 +113,7 @@ export function ChannelView({
     const [deleting, setDeleting] = useState<ChatMessageView | null>(null);
     const [replyingTo, setReplyingTo] = useState<ChatMessageView | null>(null);
     const [forwarding, setForwarding] = useState<ChatMessageView | null>(null);
-    const [typists, setTypists] = useState<readonly { userId: string; name: string; at: number }[]>(
-        []
-    );
+    const [typists, setTypists] = useState<readonly Typist[]>([]);
     const [live, setLive] = useState<{ meetingId: string; count: number } | null>(null);
     // The call this browser is sitting in, held above every screen so that
     // walking out of the conversation shrinks it into a bar rather than hanging
@@ -155,6 +161,15 @@ export function ChannelView({
     // One fetch at a time in each direction. A trackpad fires scroll events far
     // faster than a round trip.
     const fetching = useRef(false);
+    // Whether something arrived while that fetch was in flight.
+    //
+    // This is what made a message land late. A wake that turned up while any
+    // page was being fetched - the one above, the one below, or a previous wake
+    // - was dropped and never asked for again, so the message it was about sat
+    // there until something else happened to wake the screen. Which is exactly
+    // "it arrives, but not straight away".
+    const missed = useRef(false);
+    const catchUpAgain = useRef<() => void>(() => undefined);
     // The message a link asked for, once it has been walked back to. Kept so a
     // reload of the list - one arrives with every message anybody sends - does
     // not drag the reader back to it over and over.
@@ -220,6 +235,22 @@ export function ChannelView({
         );
     }, []);
 
+    /**
+     * Let go of the one fetch slot, and answer whatever arrived while it was
+     * held.
+     *
+     * On a timer of zero rather than straight away so the fetch that is
+     * finishing gets to run its own tail first - it is still about to write the
+     * window it just worked out, and a catch-up that started in the middle of
+     * that would be doing arithmetic on a list from a moment ago.
+     */
+    const release = useCallback(() => {
+        fetching.current = false;
+        if (!missed.current) return;
+        missed.current = false;
+        setTimeout(() => catchUpAgain.current(), 0);
+    }, []);
+
     /** The window, written in one place so the fetches below can do their
      *  arithmetic on what is actually on screen without waiting for a render. */
     const show = useCallback((next: readonly ChatMessageView[]) => {
@@ -276,7 +307,7 @@ export function ChannelView({
 
         const result = await actions.readChannelAction(channelId, cursor);
         setLoadingOlder(false);
-        fetching.current = false;
+        release();
         if (!result.page) return false;
 
         olderThanRef.current = result.page.olderThan;
@@ -300,7 +331,7 @@ export function ChannelView({
             show(window);
         }
         return result.page.olderThan !== null;
-    }, [channelId, show]);
+    }, [channelId, release, show]);
 
     /**
      * The page below the window, for a reader coming back down out of the
@@ -313,7 +344,7 @@ export function ChannelView({
         fetching.current = true;
 
         const result = await actions.readSinceAction(channelId, cursor);
-        fetching.current = false;
+        release();
         if (!result.page) return;
 
         newerThanRef.current = result.page.newerThan;
@@ -330,7 +361,7 @@ export function ChannelView({
             show(window);
         }
         settle(result.page.messages);
-    }, [channelId, settle, show]);
+    }, [channelId, release, settle, show]);
 
     /**
      * What has been said since the newest message on screen.
@@ -343,7 +374,15 @@ export function ChannelView({
      * when they scroll down.
      */
     const catchUp = useCallback(async () => {
-        if (newerThanRef.current || fetching.current) return;
+        if (newerThanRef.current) return;
+        // Remembered rather than dropped. Whoever holds the slot answers this
+        // the moment they let go of it, so a message that arrived during a fetch
+        // appears a round trip later instead of whenever the screen next has
+        // another reason to ask.
+        if (fetching.current) {
+            missed.current = true;
+            return;
+        }
         const newest = held.current[held.current.length - 1]?.id ?? null;
         if (!newest) {
             await load();
@@ -352,7 +391,7 @@ export function ChannelView({
 
         fetching.current = true;
         const result = await actions.readSinceAction(channelId, newest);
-        fetching.current = false;
+        release();
         const arrived = result.page?.messages ?? [];
         if (arrived.length === 0) return;
 
@@ -368,7 +407,12 @@ export function ChannelView({
             show(window);
         }
         settle(arrived);
-    }, [channelId, load, settle, show]);
+    }, [channelId, load, release, settle, show]);
+
+    // How `release` reaches back into the catch-up without the two defining each
+    // other. Kept fresh every render so it is never the version from before the
+    // conversation changed.
+    catchUpAgain.current = () => void catchUp();
 
     /**
      * Scroll to a message, fetching backwards until it is there.
@@ -449,7 +493,12 @@ export function ChannelView({
                 if (frame.kind === "typing" && frame.channelId === channelId) {
                     setTypists((current) => [
                         ...current.filter((entry) => entry.userId !== frame.userId),
-                        { userId: frame.userId, name: frame.name, at: Date.now() }
+                        {
+                            userId: frame.userId,
+                            name: frame.name,
+                            activity: frame.activity ?? "typing",
+                            at: Date.now()
+                        }
                     ]);
                 }
             },
@@ -1082,24 +1131,31 @@ function VoiceStrip({
     );
 }
 
-/** Who is composing right now. Names rather than "somebody", because in a
- *  channel of twelve that is the only version of this line that helps. */
-function TypingLine({
-    typists,
-    viewerId
-}: {
-    typists: readonly { userId: string; name: string }[];
-    viewerId: string;
-}) {
+/**
+ * Who is composing right now, and which way.
+ *
+ * Names rather than "somebody", because in a channel of twelve that is the only
+ * version of this line that helps. And recording said as recording: half a
+ * minute of nothing from the other side, with no dots because nobody is typing,
+ * is indistinguishable from having been left mid-conversation.
+ *
+ * When the two are mixed the recording wins the sentence. It is the one with a
+ * reason to be waited for.
+ */
+function TypingLine({ typists, viewerId }: { typists: readonly Typist[]; viewerId: string }) {
     const others = typists.filter((entry) => entry.userId !== viewerId);
     if (others.length === 0) return <div className="h-4" aria-hidden="true" />;
 
+    const recording = others.filter((entry) => entry.activity === "recording");
+    const shown = recording.length > 0 ? recording : others;
+    const doing = recording.length > 0 ? "recording a voice message" : "typing";
+
     const names =
-        others.length === 1
-            ? `${others[0]!.name} is typing`
-            : others.length === 2
-              ? `${others[0]!.name} and ${others[1]!.name} are typing`
-              : "Several people are typing";
+        shown.length === 1
+            ? `${shown[0]!.name} is ${doing}`
+            : shown.length === 2
+              ? `${shown[0]!.name} and ${shown[1]!.name} are ${doing}`
+              : `Several people are ${doing}`;
 
     return (
         <p aria-live="polite" className="h-4 px-4 text-[11px] text-muted-foreground">
