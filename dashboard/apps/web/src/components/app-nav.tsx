@@ -10,6 +10,7 @@
  *  inside Management - which are drawn under that subject's name and lead to it.
  *  Calling it Management would offer them a page that turns them away. */
 
+import Link from "next/link";
 import { AppSwitcher } from "@polaris/ui";
 import { usePathname } from "next/navigation";
 import { POLARIS_APPS, resolveActiveApp } from "@/lib/apps";
@@ -29,6 +30,10 @@ export function AppNav({ appIds, guestAppIds = [] }: { appIds: string[]; guestAp
             apps={apps}
             currentAppId={current.id}
             currentApp={current.hidden ? current : undefined}
+            // Moving between apps keeps the page. An anchor here reloaded the
+            // whole dashboard, which among other things hung up on whoever was
+            // on the other end of a call.
+            linkAs={Link}
         />
     );
 }

@@ -8,9 +8,10 @@
  * check must never nag.
  */
 
+import Link from "next/link";
+import { Badge } from "@polaris/ui";
 import { useEffect, useState } from "react";
 import { DownloadCloud } from "lucide-react";
-import { Badge } from "@polaris/ui";
 
 /** Re-poll every six hours; the server response is cached, so this is cheap. */
 const POLL_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -46,7 +47,7 @@ export function UpdateIndicator() {
     if (!available) return null;
 
     return (
-        <a
+        <Link
             href="/settings"
             title={
                 available.behindBy
@@ -58,6 +59,6 @@ export function UpdateIndicator() {
                 <DownloadCloud className="size-3.5" />
                 Update
             </Badge>
-        </a>
+        </Link>
     );
 }

@@ -59,6 +59,15 @@ export interface RichTextEditorProps {
      * means nothing.
      */
     focusAt?: number;
+    /**
+     * The conversation this editor is writing into, when it is writing into one.
+     *
+     * What @ offers then is the people in that room rather than the ones this
+     * account shares work with - which is what everybody expects, and what makes
+     * the picker useful in a direct message between two people who have no
+     * shared space anywhere else in Polaris.
+     */
+    mentionsIn?: string | null;
     /** Draw the border and background of a form field. Off by default: a
      *  description should read as part of the panel, not as an input. */
     bordered?: boolean;
@@ -91,6 +100,7 @@ export function RichTextEditor({
     disabled = false,
     autoFocus = false,
     focusAt = 0,
+    mentionsIn = null,
     bordered = false,
     className
 }: RichTextEditorProps) {
@@ -99,10 +109,21 @@ export function RichTextEditor({
     const handlers = useRef({ onChange, onBlur, onSubmit, onTyping });
     handlers.current = { onChange, onBlur, onSubmit, onTyping };
 
-    const search = useCallback(async (kinds: readonly refs.ReferenceKind[], query: string) => {
-        const result = await runAction(() => searchMentionsAction({ kinds: [...kinds], query }), () => undefined);
-        return result?.results ?? [];
-    }, []);
+    const search = useCallback(
+        async (kinds: readonly refs.ReferenceKind[], query: string) => {
+            const result = await runAction(
+                () =>
+                    searchMentionsAction({
+                        kinds: [...kinds],
+                        query,
+                        ...(mentionsIn ? { channelId: mentionsIn } : {})
+                    }),
+                () => undefined
+            );
+            return result?.results ?? [];
+        },
+        [mentionsIn]
+    );
 
     const extensions = useMemo(
         () => [...baseExtensions(placeholder), BlockMenu, mentionExtension(search)],

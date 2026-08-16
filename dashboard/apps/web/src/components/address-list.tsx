@@ -13,6 +13,7 @@
  * the LAN name and a zone hostname are not list entries to delete at all.
  */
 
+import Link from "next/link";
 import { useState } from "react";
 import { ConfirmDeleteDialog } from "@polaris/ui";
 import type { DisplayFormat } from "@polaris/core";
@@ -150,14 +151,14 @@ function AddressRow({
                 <div className="ml-auto flex shrink-0 items-center gap-1">
                     <CopyButton value={address.url} label={address.host} />
                     {manageHref && address.kind === "domain" ? (
-                        <a
+                        <Link
                             href={manageHref}
                             aria-label={`Manage ${address.host}`}
                             title="Manage in Domains"
                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                             <Settings2 className="size-3.5" />
-                        </a>
+                        </Link>
                     ) : null}
                     {removable ? (
                         <button

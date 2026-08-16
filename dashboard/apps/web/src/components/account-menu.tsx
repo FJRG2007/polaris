@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth-client";
 import { Avatar } from "@/components/avatar";
@@ -47,22 +48,22 @@ export function AccountMenu({ id, name, email }: { id: string; name: string; ema
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                    <a href="/account">
+                    <Link href="/account">
                         <UserCog className="size-4" />
                         My account
-                    </a>
+                    </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                    <a href="/account/notifications">
+                    <Link href="/account/notifications">
                         <Bell className="size-4" />
                         Notifications
-                    </a>
+                    </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                    <a href="/drive/shared-links">
+                    <Link href="/drive/shared-links">
                         <Link2 className="size-4" />
                         Shared links
-                    </a>
+                    </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={onSignOut}>
                     <LogOut className="size-4" />

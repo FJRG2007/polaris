@@ -20,6 +20,7 @@
  */
 
 import Link from "next/link";
+import { CallAudio } from "./call-audio";
 import { Button, cn } from "@polaris/ui";
 import { useCall, type CallState } from "./use-call";
 import { Headphones, HeadphoneOff, Mic, MicOff, PhoneOff } from "lucide-react";
@@ -72,7 +73,15 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
         [call, session, viewerId, enter, leave, withVideo]
     );
 
-    return <Context.Provider value={hold}>{children}</Context.Provider>;
+    return (
+        <Context.Provider value={hold}>
+            {/* Beside the call rather than beside the grid. This is what makes
+                walking out of the conversation shrink a call instead of
+                silencing it: the tiles unmount, the sound does not. */}
+            <CallAudio call={call} />
+            {children}
+        </Context.Provider>
+    );
 }
 
 /**

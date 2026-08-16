@@ -9,6 +9,7 @@
  */
 
 import { cn } from "../lib/cn";
+import type { ElementType } from "react";
 import { Check, ChevronDown, Lock, type LucideIcon } from "lucide-react";
 import {
     DropdownMenu,
@@ -32,7 +33,8 @@ export interface PolarisApp {
 export function AppSwitcher({
     apps,
     currentAppId,
-    currentApp
+    currentApp,
+    linkAs: Anchor = "a"
 }: {
     apps: readonly PolarisApp[];
     currentAppId: string;
@@ -40,6 +42,17 @@ export function AppSwitcher({
      *  account pages, for one), so the trigger names where the user actually is
      *  instead of falling back to the first app. */
     currentApp?: PolarisApp;
+    /**
+     * What draws a link here. A plain anchor by default, because this package
+     * knows nothing about the router above it - and a plain anchor is a full
+     * page load, which throws away everything the browser was holding.
+     *
+     * That is not a performance note. A call runs in the page: switching apps
+     * with an anchor tore the whole tree down and hung up on whoever was on the
+     * other end, so somebody could stay in a call as long as they stayed in
+     * Chat and not one screen further. The app passes its router's link.
+     */
+    linkAs?: ElementType;
 }) {
     const current = currentApp ?? apps.find((app) => app.id === currentAppId) ?? apps[0];
     if (!current) return null;
@@ -76,7 +89,7 @@ export function AppSwitcher({
                     const active = app.id === currentAppId;
                     return (
                         <DropdownMenuItem key={app.id} asChild disabled={app.locked}>
-                            <a
+                            <Anchor
                                 href={app.href}
                                 className={cn("w-full", app.locked && "opacity-60")}
                                 aria-current={active ? "page" : undefined}
@@ -95,7 +108,7 @@ export function AppSwitcher({
                                 ) : active ? (
                                     <Check className="size-4 text-primary" />
                                 ) : null}
-                            </a>
+                            </Anchor>
                         </DropdownMenuItem>
                     );
                 })}

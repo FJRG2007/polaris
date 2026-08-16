@@ -5,8 +5,9 @@
  */
 
 import { requireUser } from "@/lib/session";
-import { resolveDisplayPreferences } from "@polaris/core";
 import { saveDisplayPreferencesAction } from "./actions";
+import { resolveDisplayPreferences } from "@polaris/core";
+import { DeviceCacheCard } from "@/components/device-cache-card";
 import { DisplayPreferencesForm } from "@/components/display-preferences-form";
 import { getPlatformDisplayPreferences, getUserDisplayPreferences } from "@/lib/display-prefs-service";
 
@@ -33,6 +34,7 @@ export default async function PreferencesPage() {
                 allowInherit
                 save={saveDisplayPreferencesAction}
             />
+            <DeviceCacheCard />
         </div>
     );
 }

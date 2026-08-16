@@ -21,15 +21,21 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Five minutes, revalidated after that.
+ * Kept, and checked every time.
  *
- * A face appears dozens of times on one board, so it has to be cacheable; a
- * changed photo showing up minutes later on somebody else's screen costs
- * nothing, and the revalidation that follows is a 304 rather than the bytes.
+ * `no-cache` does not mean "do not store" - it means "store it and ask before
+ * using it", which is exactly right here. The tag is a row read, so the check
+ * costs a 304 and no bytes, and a browser never has a face this instance would
+ * now answer differently. The five minutes this used to hold was five minutes
+ * of somebody looking at a picture that had already changed, or - worse, and
+ * what actually happened - at the blank one served during a moment when the
+ * storage was not answering, with no way to make it ask again short of clearing
+ * the browser.
+ *
  * Private, because this is one person's picture served to one signed-in reader,
  * not something a shared proxy may keep.
  */
-const CACHE = "private, max-age=300, must-revalidate";
+const CACHE = "private, no-cache";
 
 /**
  * What a failed answer is cached as, which is not at all.

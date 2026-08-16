@@ -257,6 +257,66 @@ export async function searchForConversation(
     return findPeople(actor, query, { reachableOnly: true, reachable: messageable, limit });
 }
 
+/**
+ * Who can be named with an @ in one conversation.
+ *
+ * The people in the room, and only them. Which is both what everybody expects -
+ * Discord and WhatsApp offer the room, not a directory - and the privacy answer:
+ * being in a conversation together is the fact that makes somebody nameable,
+ * rather than sharing a space in another app entirely.
+ *
+ * That was the bug. The @ picker had one reach for the whole dashboard, worked
+ * out from shared work - Tasks spaces and organization rosters - so two people
+ * whose only connection was the conversation they were sitting in could not name
+ * each other in it. Nothing was refused; the list simply came back empty.
+ *
+ * Null when this account cannot reach the conversation at all, which the caller
+ * answers by falling back rather than by refusing: a caret typing @ is not a
+ * request worth failing.
+ */
+export async function conversationAudience(
+    actor: ChatActor,
+    channelId: string
+): Promise<string[] | null> {
+    const access = await channelAccess(actor, channelId);
+    if (!access) return null;
+
+    // A channel in a space is read by the space's people, whether or not they
+    // have a row on the channel: a public channel has member rows only for the
+    // people who joined it, and everybody in the space can see what is said.
+    // A private one is its own list, which is what makes it private.
+    const open = access.spaceId ? !(await isPrivate(channelId)) : false;
+    const [space, inSpace, inChannel] = await Promise.all([
+        // The owner, who has no membership row of their own - the space is
+        // theirs - and would otherwise be the one person nobody could name.
+        open && access.spaceId
+            ? prisma.chatSpace.findUnique({
+                  where: { id: access.spaceId },
+                  select: { ownerId: true }
+              })
+            : null,
+        open && access.spaceId
+            ? prisma.chatSpaceMember.findMany({
+                  where: { spaceId: access.spaceId },
+                  select: { userId: true }
+              })
+            : [],
+        prisma.chatChannelMember.findMany({ where: { channelId }, select: { userId: true } })
+    ]);
+
+    const ids = [...inSpace, ...inChannel].map((row) => row.userId);
+    if (space?.ownerId) ids.push(space.ownerId);
+    return [...new Set(ids)];
+}
+
+async function isPrivate(channelId: string): Promise<boolean> {
+    const channel = await prisma.chatChannel.findUnique({
+        where: { id: channelId },
+        select: { private: true }
+    });
+    return channel?.private ?? false;
+}
+
 export async function messageable(userIds: readonly string[]): Promise<Set<string>> {
     const unique = [...new Set(userIds)];
     if (unique.length === 0) return new Set();

@@ -202,7 +202,7 @@ export function CallRoom({
                     stream={call.localStream}
                     name="You"
                     personId={mine?.userId ?? viewerId ?? null}
-                    muted
+                    own
                     speaking={
                         call.participantId !== null &&
                         call.speaking.has(call.participantId) &&
@@ -225,11 +225,6 @@ export function CallRoom({
                             // somebody down holds across calls; their seat where
                             // they do not, which lasts as long as the seat.
                             volumeKey={person.userId ?? person.id}
-                            // Deafening is done here rather than at the
-                            // connection: the audio still arrives, it simply is
-                            // not played, so undeafening is instant and nobody
-                            // is renegotiated at.
-                            muted={call.deafened}
                         />
                     ))}
             </div>
@@ -520,7 +515,7 @@ function Tile({
     stream,
     name,
     personId,
-    muted = false,
+    own = false,
     guest = false,
     cameraOff = false,
     sharing = false,
@@ -533,11 +528,12 @@ function Tile({
      *  have one; a guest falls back to initials, which is all there is of
      *  somebody who arrived on a link. */
     personId?: string | null;
-    /** Own video only, or every tile while deafened. Playing your own
-     *  microphone back is an echo. */
-    muted?: boolean;
+    /** Yours. The only tile whose picture may be cropped to fill the frame,
+     *  because it is the only one this browser knows the shape of. */
+    own?: boolean;
     guest?: boolean;
     cameraOff?: boolean;
+    /** Whether YOUR picture is a screen rather than a camera. */
     sharing?: boolean;
     speaking?: boolean;
     /** Who this tile's volume is remembered against. Absent on your own tile,
@@ -548,24 +544,21 @@ function Tile({
     const [volume, setVolume] = useCallVolume(volumeKey ?? "");
 
     /**
-     * Attach the stream, and make sure it is actually playing.
+     * Attach the stream and start the picture.
      *
-     * `autoPlay` asks; a browser is entitled to say no, and it says no silently.
-     * That is how somebody sat in a call watching the other person's ring light
-     * up green - the audio was arriving and being measured, and the element
-     * holding it had never started. So it is started here, and when the browser
-     * refuses, the tile says so and offers the press it is waiting for. A press
-     * is all it wants.
+     * Picture only: this element is muted, always, whoever it belongs to. The
+     * room is played by `call-audio`, which is mounted beside the call rather
+     * than beside the grid - a tile that also carried the sound is a tile that
+     * takes the sound with it when somebody walks out of the conversation, and
+     * that is precisely what left people watching a green ring in silence.
+     *
+     * Muted media is never refused, so there is nothing here to be blocked on.
      */
-    const [blocked, setBlocked] = useState(false);
     useEffect(() => {
         const element = video.current;
         if (!element || !stream) return;
         element.srcObject = stream;
-        void element
-            .play()
-            .then(() => setBlocked(false))
-            .catch(() => setBlocked(true));
+        void element.play().catch(() => undefined);
     }, [stream]);
 
     /**
@@ -610,13 +603,6 @@ function Tile({
 
     const blank = !stream || cameraOff || !hasVideo;
 
-    // Applied to the element rather than to the connection: the audio still
-    // arrives and is simply played quieter, so a change lands on the next frame
-    // and nobody is renegotiated at.
-    useEffect(() => {
-        if (video.current && volumeKey) video.current.volume = volume;
-    }, [volume, volumeKey, stream]);
-
     const tile = (
         <div
             className={cn(
@@ -631,13 +617,17 @@ function Tile({
                 ref={video}
                 autoPlay
                 playsInline
-                muted={muted}
+                muted
                 className={cn(
                     "size-full",
-                    // A shared screen is letterboxed rather than cropped: the
-                    // edges of somebody's window are usually where the thing
-                    // they are pointing at is.
-                    sharing ? "object-contain" : "object-cover",
+                    // Letterboxed rather than cropped for anything that might be
+                    // a screen - and from here, anybody else's picture might be:
+                    // nothing says whether what arrived is a camera or a window,
+                    // and the edges of somebody's window are usually where the
+                    // thing they are pointing at is. Only your own picture is
+                    // cropped to fill the tile, because it is the only one this
+                    // browser knows the shape of.
+                    own && !sharing ? "object-cover" : "object-contain",
                     blank && "invisible"
                 )}
             />
@@ -656,20 +646,6 @@ function Tile({
                         )}
                     />
                 </span>
-            )}
-            {blocked && !muted && (
-                <button
-                    type="button"
-                    onClick={() => {
-                        void video.current
-                            ?.play()
-                            .then(() => setBlocked(false))
-                            .catch(() => undefined);
-                    }}
-                    className="absolute inset-0 flex items-center justify-center bg-background/70 text-xs font-medium"
-                >
-                    Press to hear {name}
-                </button>
             )}
             <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[11px]">
                 {name}

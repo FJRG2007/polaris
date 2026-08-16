@@ -16,6 +16,7 @@ import * as core from "@polaris/core";
 import { loadEnv } from "@polaris/config";
 import * as access from "@/lib/tasks/access";
 import { memberOrgIds } from "@/lib/orgs/org-service";
+import { conversationAudience } from "@/lib/chat/access";
 import type { ReferenceKind } from "@/components/rich-text/references";
 
 /** One row of the picker. */
@@ -83,12 +84,14 @@ export async function searchMentions(
     actor: access.TaskActor,
     kinds: readonly ReferenceKind[],
     query: string,
-    limit: number = PER_KIND
+    limit: number = PER_KIND,
+    /** Where the caret is, when that changes who may be named. */
+    where?: { readonly channelId?: string }
 ): Promise<MentionCandidate[]> {
     const term = query.trim();
     const wanted = new Set(kinds);
     const [people, teams, work] = await Promise.all([
-        wanted.has("user") ? searchPeople(actor, term, limit) : [],
+        wanted.has("user") ? searchPeople(actor, term, limit, where?.channelId) : [],
         wanted.has("team") ? searchTeams(actor, term, limit) : [],
         wanted.has("task") || wanted.has("doc") || wanted.has("note")
             ? searchWork(actor, wanted, term, limit)
@@ -101,10 +104,26 @@ export async function searchMentions(
  * People this account already shares work with: whoever is on a space it
  * reaches, plus everyone on the roster of an organization it belongs to. An
  * instance admin sees everybody, the same way they do everywhere else.
+ *
+ * Inside a conversation it is the conversation instead - the people in the room,
+ * as every messenger does it. Shared work is the wrong question there: two
+ * people whose only connection is the direct message they are sitting in could
+ * not name each other in it, and nothing said so. The room is also narrower than
+ * the default for a guest of one channel, so this replaces the reach rather than
+ * adding to it.
  */
-async function searchPeople(actor: access.TaskActor, term: string, limit: number): Promise<MentionCandidate[]> {
+async function searchPeople(
+    actor: access.TaskActor,
+    term: string,
+    limit: number,
+    channelId?: string
+): Promise<MentionCandidate[]> {
     const contains = term ? like(term) : undefined;
-    const scope = actor.isAdmin ? null : await reachablePeople(actor);
+    const inRoom = channelId ? await conversationAudience({ id: actor.id }, channelId) : null;
+    // Null means this account cannot reach that conversation - somebody typing
+    // into a channel they were just removed from, or a bad id. Falling back to
+    // the ordinary reach rather than refusing: a caret is not worth an error.
+    const scope = inRoom ?? (actor.isAdmin ? null : await reachablePeople(actor));
     const users = await prisma.user.findMany({
         where: {
             ...(scope ? { id: { in: scope } } : {}),

@@ -192,10 +192,10 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
     // Candidates that arrived before the description they belong to, which is
     // ordinary rather than exceptional - the two travel over different requests.
     const early = useRef(new Map<string, RTCIceCandidateInit[]>());
-    // One stream per other participant, built here rather than taken from the
-    // track event: a track added without a stream arrives with none attached,
+    // What has arrived from each other participant, held as tracks rather than
+    // as a stream: a track added without a stream arrives with none attached,
     // and a tile pointed at nothing shows nothing.
-    const inbound = useRef(new Map<string, MediaStream>());
+    const inbound = useRef(new Map<string, MediaStreamTrack[]>());
 
     /** What the call sends as this browser's voice: the filtered track when a
      *  model is running, and the microphone itself otherwise. */
@@ -332,15 +332,27 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
                 });
             };
 
+            /**
+             * Something arrived from the other side.
+             *
+             * A new `MediaStream` every time, rather than the same one with a
+             * track added to it. `addTrack` fires no `addtrack` event - the spec
+             * reserves that for tracks the user agent puts there - so anything
+             * watching the stream to find out whether there is a picture in it
+             * is never told when one appears. Which is exactly what a shared
+             * screen looked like from the other chair: it arrived, it was
+             * decoded, and the tile went on drawing the avatar over the top of
+             * it because as far as that tile knew there was still no video.
+             *
+             * A new object is a change React and every effect below can see.
+             */
             connection.ontrack = (event) => {
-                const stream = inbound.current.get(otherId) ?? new MediaStream();
-                inbound.current.set(otherId, stream);
-                if (!stream.getTracks().some((track) => track.id === event.track.id)) {
-                    stream.addTrack(event.track);
-                }
-                // A new Map each time, because the stream object is the same one
-                // and React would otherwise see no change at all.
-                setRemote((current) => new Map(current).set(otherId, stream));
+                const held = inbound.current.get(otherId) ?? [];
+                if (!held.some((track) => track.id === event.track.id)) held.push(event.track);
+                inbound.current.set(otherId, held);
+                setRemote((current) =>
+                    new Map(current).set(otherId, new MediaStream(held))
+                );
             };
 
             connection.onconnectionstatechange = () => {

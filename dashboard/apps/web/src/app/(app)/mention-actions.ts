@@ -22,7 +22,11 @@ const searchInput = z.object({
     kinds: z.array(z.enum(REFERENCE_KINDS)).min(1).max(REFERENCE_KINDS.length),
     // Long enough for a task title somebody pasted in, short enough that it is
     // still a search and not a document.
-    query: z.string().max(120)
+    query: z.string().max(120),
+    // The conversation the caret is in, when it is in one. What @ offers there
+    // is the room, the way it works in every messenger - and the service checks
+    // that this account is actually in it before offering anybody.
+    channelId: z.string().uuid().optional()
 });
 
 export async function searchMentionsAction(
@@ -36,7 +40,9 @@ export async function searchMentionsAction(
         const results = await mentions.searchMentions(
             { id: user.id, isAdmin: user.isAdmin },
             parsed.data.kinds,
-            parsed.data.query
+            parsed.data.query,
+            undefined,
+            { channelId: parsed.data.channelId }
         );
         return { results };
     } catch (caught) {

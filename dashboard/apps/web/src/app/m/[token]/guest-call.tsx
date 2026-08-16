@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Video } from "lucide-react";
 import { useCall } from "@/app/(app)/chat/use-call";
 import { CallRoom } from "@/app/(app)/chat/call-room";
+import { CallAudio } from "@/app/(app)/chat/call-audio";
 import { PublicShell } from "@/components/public-shell";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
 import { joinAsGuestAction, readCallAction } from "@/app/(app)/chat/meeting-actions";
@@ -151,5 +152,14 @@ export function GuestCall({
  */
 function GuestRoom({ meetingId, onLeave }: { meetingId: string; onLeave: () => void }) {
     const call = useCall(meetingId, { video: true });
-    return <CallRoom meetingId={meetingId} call={call} onLeave={onLeave} />;
+    return (
+        <>
+            {/* The room, played. In the dashboard this is mounted beside the
+                call so it survives walking away from the conversation; here
+                there is nowhere to walk, and it still has to be mounted by
+                somebody - the tiles carry the picture and nothing else. */}
+            <CallAudio call={call} />
+            <CallRoom meetingId={meetingId} call={call} onLeave={onLeave} />
+        </>
+    );
 }

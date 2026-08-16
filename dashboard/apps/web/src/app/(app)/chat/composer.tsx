@@ -159,6 +159,23 @@ export function Composer({
     }, [editingId, replyingToId]);
 
     /**
+     * Opening a conversation puts the caret in the box.
+     *
+     * On anything with a pointer, where the next thing somebody does is type.
+     * Never on a phone: focusing a field there throws the keyboard up over half
+     * the conversation before anybody has asked to write anything, and the
+     * messages somebody came to read are the half it covers.
+     *
+     * Asked of the browser here rather than read off state, because state
+     * settles a tick later and by then the keyboard is already up.
+     */
+    useEffect(() => {
+        if (disabled || editingId) return;
+        if (typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches) return;
+        setFocusAt((current) => current + 1);
+    }, [channelId, disabled, editingId]);
+
+    /**
      * Escape backs out.
      *
      * The edit first, then the reply, because that is the order they were
@@ -457,6 +474,10 @@ export function Composer({
                         focusAt={focusAt}
                         disabled={disabled}
                         placeholder={placeholder}
+                        // @ offers the people in this conversation. Not the ones
+                        // this account shares a Tasks space with, which is what
+                        // it used to offer and is a different question entirely.
+                        mentionsIn={channelId}
                         onChange={setBody}
                         // From the keys and not from the document changing. A
                         // document changes for reasons that are not a person
@@ -539,7 +560,14 @@ export function Composer({
                             )}
                             <EmojiPicker
                                 disabled={disabled}
-                                onEmoji={(char) => setBody((current) => `${current}${char}`)}
+                                // Back to the box, caret at the end. Picking an
+                                // emoji is part of writing the message, and
+                                // leaving the focus on the closed picker means
+                                // the next thing typed goes nowhere.
+                                onEmoji={(char) => {
+                                    setBody((current) => `${current}${char}`);
+                                    setFocusAt((current) => current + 1);
+                                }}
                                 onMedia={(address) => void onMedia?.(address)}
                                 onSaved={(savedId) => void onSaved?.(savedId)}
                             />

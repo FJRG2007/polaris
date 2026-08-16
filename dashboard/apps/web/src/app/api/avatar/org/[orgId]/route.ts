@@ -30,9 +30,10 @@ export const dynamic = "force-dynamic";
 
 const TOO_BIG = `A photo has to be under ${Math.round(MAX_AVATAR_BYTES / (1024 * 1024))} MB`;
 
-/** Five minutes, revalidated after that - the same deal an account's face gets,
- *  and for the same reason: it is drawn dozens of times on one screen. */
-const CACHE = "private, max-age=300, must-revalidate";
+/** Kept and checked every time - the same deal an account's face gets, and for
+ *  the same reason: the tag makes the check a 304, and a browser holding a
+ *  picture this instance would now answer differently has no way to find out. */
+const CACHE = "private, no-cache";
 
 /** And the same rule for a failure: a storage that did not answer is not the
  *  same statement as "there is no picture", so it is not cached as one. */
