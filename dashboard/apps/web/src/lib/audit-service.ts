@@ -152,7 +152,12 @@ export async function listActivityFeed(limit = 200): Promise<ActivityEntry[]> {
                   where: { id: { in: actorIds } },
                   select: { id: true, name: true, username: true }
               });
-    const nameById = new Map(actors.map((actor) => [actor.id, actor.name || (actor.username ? `@${actor.username}` : "somebody")]));
+    const nameById = new Map(
+        actors.map((actor) => [
+            actor.id,
+            actor.name || (actor.username ? `@${actor.username}` : "somebody")
+        ])
+    );
     return events.map((event) => ({
         id: event.id,
         at: event.at.toISOString(),
@@ -260,7 +265,9 @@ export async function listOrgActivity(
         select: { id: true, actorId: true, action: true, metadata: true, at: true }
     });
 
-    const actorIds = [...new Set(rows.map((row) => row.actorId).filter((id): id is string => Boolean(id)))];
+    const actorIds = [
+        ...new Set(rows.map((row) => row.actorId).filter((id): id is string => Boolean(id)))
+    ];
     const actors =
         actorIds.length === 0
             ? []
@@ -268,7 +275,12 @@ export async function listOrgActivity(
                   where: { id: { in: actorIds } },
                   select: { id: true, name: true, username: true }
               });
-    const nameById = new Map(actors.map((actor) => [actor.id, actor.name || (actor.username ? `@${actor.username}` : "somebody")]));
+    const nameById = new Map(
+        actors.map((actor) => [
+            actor.id,
+            actor.name || (actor.username ? `@${actor.username}` : "somebody")
+        ])
+    );
 
     return rows.map((row) => ({
         id: row.id,
@@ -286,8 +298,14 @@ export async function listOrgActivity(
 /** The people who appear in an organization's history, for the filter to offer.
  *  Grouped in the database because the feed is capped, and somebody whose entries
  *  have scrolled past the cap is exactly who a reader is looking for. */
-export async function listOrgActivityActors(orgId: string): Promise<{ id: string; name: string }[]> {
-    const groups = await prisma.auditLog.groupBy({ by: ["actorId"], where: { orgId }, _max: { at: true } });
+export async function listOrgActivityActors(
+    orgId: string
+): Promise<{ id: string; name: string }[]> {
+    const groups = await prisma.auditLog.groupBy({
+        by: ["actorId"],
+        where: { orgId },
+        _max: { at: true }
+    });
     const ids = groups.map((group) => group.actorId).filter((id): id is string => Boolean(id));
     if (ids.length === 0) return [];
     const actors = await prisma.user.findMany({
@@ -295,7 +313,10 @@ export async function listOrgActivityActors(orgId: string): Promise<{ id: string
         select: { id: true, name: true, username: true }
     });
     return actors
-        .map((actor) => ({ id: actor.id, name: actor.name || (actor.username ? `@${actor.username}` : "somebody") }))
+        .map((actor) => ({
+            id: actor.id,
+            name: actor.name || (actor.username ? `@${actor.username}` : "somebody")
+        }))
         .sort((left, right) => left.name.localeCompare(right.name));
 }
 

@@ -46,7 +46,8 @@ async function connectedSignIns(userId: string): Promise<ConnectedSignIn[]> {
     const allowed = new Map<string, boolean>(
         await Promise.all(
             CONNECTION_PROVIDERS.map(
-                async (provider) => [provider.slug, await connectionSignInAllowed(provider.slug)] as const
+                async (provider) =>
+                    [provider.slug, await connectionSignInAllowed(provider.slug)] as const
             )
         )
     );

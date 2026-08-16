@@ -33,7 +33,13 @@ import { EMOJI_GROUPS, searchEmoji } from "@/lib/chat/emoji";
 import type { SavedMediaView } from "@/lib/chat/saved-media";
 import { listSavedMediaAction, searchTenorAction, tenorReadyAction } from "./actions";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { recentEmoji, recentMedia, rememberEmoji, rememberMedia, type RecentMedia } from "./recents";
+import {
+    recentEmoji,
+    recentMedia,
+    rememberEmoji,
+    rememberMedia,
+    type RecentMedia
+} from "./recents";
 
 type Tab = "emoji" | "saved" | "gif" | "sticker";
 
@@ -361,8 +367,20 @@ export function EmojiPicker({
                             autoFocus
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
-                            placeholder={tab === "emoji" ? "Search emoji" : tab === "sticker" ? "Search stickers" : "Search GIFs"}
-                            aria-label={tab === "emoji" ? "Search emoji" : tab === "sticker" ? "Search stickers" : "Search GIFs"}
+                            placeholder={
+                                tab === "emoji"
+                                    ? "Search emoji"
+                                    : tab === "sticker"
+                                      ? "Search stickers"
+                                      : "Search GIFs"
+                            }
+                            aria-label={
+                                tab === "emoji"
+                                    ? "Search emoji"
+                                    : tab === "sticker"
+                                      ? "Search stickers"
+                                      : "Search GIFs"
+                            }
                             className="h-7 w-full rounded-md border border-border bg-background pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
                         />
                     </div>

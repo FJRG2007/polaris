@@ -139,7 +139,10 @@ export async function presenceChoiceOf(userId: string): Promise<PresenceChoiceVi
         });
         return { choice: "auto", until: null };
     }
-    return { choice: held, until: held === "auto" ? null : (row.presenceUntil?.toISOString() ?? null) };
+    return {
+        choice: held,
+        until: held === "auto" ? null : (row.presenceUntil?.toISOString() ?? null)
+    };
 }
 
 /**

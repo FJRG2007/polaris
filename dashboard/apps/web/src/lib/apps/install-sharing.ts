@@ -28,7 +28,12 @@ import { createInvite } from "@/lib/invite-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { canDelegateShare, sharingPolicy } from "@/lib/sharing-policy";
 import { grantsOnResource, removeResourceGrant, setResourceGrant } from "@polaris/auth";
-import { gamePermissionsFor, installRef, requireGameServer, sharingRightsFor } from "@/lib/apps/install-access";
+import {
+    gamePermissionsFor,
+    installRef,
+    requireGameServer,
+    sharingRightsFor
+} from "@/lib/apps/install-access";
 
 /** How many people one account may bring in per hour, per server. */
 const SHARE_LIMIT = 10;
@@ -72,14 +77,23 @@ async function labelsFor(
             where: { id: { in: byType("user") } },
             select: { id: true, name: true, username: true }
         }),
-        prisma.group.findMany({ where: { id: { in: byType("group") } }, select: { id: true, name: true } }),
-        prisma.role.findMany({ where: { id: { in: byType("role") } }, select: { id: true, name: true } })
+        prisma.group.findMany({
+            where: { id: { in: byType("group") } },
+            select: { id: true, name: true }
+        }),
+        prisma.role.findMany({
+            where: { id: { in: byType("role") } },
+            select: { id: true, name: true }
+        })
     ]);
     const labels = new Map<string, string>();
     // The handle rather than the address: this list is read by everybody
     // the server was shared with.
     for (const user of users) {
-        labels.set(`user:${user.id}`, user.username ? `${user.name} (@${user.username})` : user.name);
+        labels.set(
+            `user:${user.id}`,
+            user.username ? `${user.name} (@${user.username})` : user.name
+        );
     }
     for (const group of groups) labels.set(`group:${group.id}`, `${group.name} (group)`);
     for (const role of roles) labels.set(`role:${role.id}`, `${role.name} (role)`);
@@ -108,7 +122,11 @@ export async function listInstallAccess(installedAppId: string): Promise<Install
         {
             grantId: null,
             principalType: "owner",
-            label: owner ? (owner.username ? `${owner.name} (@${owner.username})` : owner.name) : "The owner",
+            label: owner
+                ? owner.username
+                    ? `${owner.name} (@${owner.username})`
+                    : owner.name
+                : "The owner",
             actions: ["games.read", "games.moderate", "games.manage"],
             canShare: true,
             expiresAt: null,
@@ -195,7 +213,8 @@ export async function shareInstall(input: ShareInstallInput): Promise<ShareInsta
     if (!verdict.ok) return { error: verdict.reason };
 
     const attempt = await rateLimit(`share:install:${user.id}`, SHARE_LIMIT, SHARE_WINDOW_MS);
-    if (!attempt.ok) return { error: "That is a lot of invites at once. Try again in a little while." };
+    if (!attempt.ok)
+        return { error: "That is a lot of invites at once. Try again in a little while." };
 
     const expiresAt = clampExpiry(input.expiresInDays, rights.until);
 
@@ -216,14 +235,20 @@ export async function shareInstall(input: ShareInstallInput): Promise<ShareInsta
             action: "app.access.grant",
             targetType: "installedApp",
             targetId: input.installedAppId,
-            metadata: { to: target.id, actions, canShare, expiresAt: expiresAt?.toISOString() ?? null }
+            metadata: {
+                to: target.id,
+                actions,
+                canShare,
+                expiresAt: expiresAt?.toISOString() ?? null
+            }
         });
         return { granted: true };
     }
 
     // Nobody by that name, so this is an invite. It carries what was promised, and
     // the claim narrows it again to whatever the inviter still holds by then.
-    if (!identifier.includes("@")) return { error: "No account matches that. Invite them by email address." };
+    if (!identifier.includes("@"))
+        return { error: "No account matches that. Invite them by email address." };
     const created = await createInvite(user.id, {
         email: identifier,
         role: policy.inviteRole,
@@ -248,7 +273,12 @@ export async function shareInstall(input: ShareInstallInput): Promise<ShareInsta
         action: "invite.delegate",
         targetType: "invite",
         targetId: created.id,
-        metadata: { email: identifier, resourceKind: "install", resourceId: input.installedAppId, actions }
+        metadata: {
+            email: identifier,
+            resourceKind: "install",
+            resourceId: input.installedAppId,
+            actions
+        }
     });
     return {
         invite: {
@@ -259,7 +289,10 @@ export async function shareInstall(input: ShareInstallInput): Promise<ShareInsta
 }
 
 /** Take somebody's access away. */
-export async function revokeInstallAccess(installedAppId: string, grantId: string): Promise<{ error?: string }> {
+export async function revokeInstallAccess(
+    installedAppId: string,
+    grantId: string
+): Promise<{ error?: string }> {
     const { user, access } = await requireGameServer("games.read", installedAppId);
     const rights = await sharingRightsFor(user, installedAppId, access.ownerId);
     const verdict = await canDelegateShare({ isAdmin: user.isAdmin, mayPassOn: rights.mayPassOn });

@@ -53,10 +53,7 @@ export function NewDirectDialog({
         if (userIds.length === 0) return;
         setBusy(true);
         setError("");
-        const result = await runAction(
-            () => openDirectAction({ userIds: [...userIds] }),
-            setError
-        );
+        const result = await runAction(() => openDirectAction({ userIds: [...userIds] }), setError);
         setBusy(false);
         if (result?.error || !result?.id) return;
         setPicked([]);

@@ -36,11 +36,7 @@ vi.mock("@polaris/db", () => ({
                 state.written.push(`link.keep:${(where.field?.notIn ?? []).join(",")}`);
                 return { count: 0 };
             },
-            upsert: async ({
-                where
-            }: {
-                where: { userId_field: { field: string } };
-            }) => {
+            upsert: async ({ where }: { where: { userId_field: { field: string } } }) => {
                 state.written.push(`link.upsert:${where.userId_field.field}`);
                 return {};
             }
@@ -121,7 +117,10 @@ describe("an audience that names nobody in particular", () => {
     it("lets go of the list a saved one was pointed at", async () => {
         await setPrivacy(
             "ada",
-            settings("email", { audience: "everyone", listId: "11111111-1111-4111-8111-111111111111" })
+            settings("email", {
+                audience: "everyone",
+                listId: "11111111-1111-4111-8111-111111111111"
+            })
         );
         expect(state.written).not.toContain("link.upsert:email");
         // Nothing points at the setting's own list any more, so it goes with it.

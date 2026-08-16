@@ -33,7 +33,9 @@ import type { AccessPrincipal, AccessSettings } from "./access-types";
 async function requireConnectionManager(connectionId: string): Promise<string> {
     const user = await requireUser();
     if (user.isAdmin) return user.id;
-    const owns = await prisma.storageConnection.count({ where: { id: connectionId, ownerId: user.id } });
+    const owns = await prisma.storageConnection.count({
+        where: { id: connectionId, ownerId: user.id }
+    });
     if (owns === 0) throw new Error("You do not manage this connection");
     return user.id;
 }
@@ -75,7 +77,9 @@ export async function setDriveAclAction(input: {
     effect: "allow" | "deny";
 }): Promise<{ error?: string }> {
     const userId = await requireConnectionManager(input.connectionId);
-    const actions = input.actions.filter((action) => (DRIVE_ACTIONS as readonly string[]).includes(action));
+    const actions = input.actions.filter((action) =>
+        (DRIVE_ACTIONS as readonly string[]).includes(action)
+    );
     if (actions.length === 0) return { error: "Select at least one action" };
     if (!input.principalId) return { error: "Choose who to grant access to" };
     try {
@@ -88,7 +92,10 @@ export async function setDriveAclAction(input: {
         action: "drive.acl.set",
         targetType: "connection",
         targetId: input.connectionId,
-        metadata: { path: normalizeRelPath(input.path), principal: `${input.principalType}:${input.principalId}` }
+        metadata: {
+            path: normalizeRelPath(input.path),
+            principal: `${input.principalType}:${input.principalId}`
+        }
     });
     revalidatePath("/drive");
     return {};
@@ -98,7 +105,13 @@ export async function setDriveAclAction(input: {
 export async function removeDriveAclAction(connectionId: string, aclId: string): Promise<void> {
     const userId = await requireConnectionManager(connectionId);
     await removeDriveAcl(connectionId, aclId);
-    await recordAudit({ actorId: userId, action: "drive.acl.remove", targetType: "connection", targetId: connectionId, metadata: { aclId } });
+    await recordAudit({
+        actorId: userId,
+        action: "drive.acl.remove",
+        targetType: "connection",
+        targetId: connectionId,
+        metadata: { aclId }
+    });
     revalidatePath("/drive");
 }
 
@@ -109,13 +122,20 @@ export async function lockPathAction(
     password: string
 ): Promise<{ error?: string }> {
     const userId = await requireConnectionManager(connectionId);
-    if (!password || password.length < 4) return { error: "Use a password of at least 4 characters" };
+    if (!password || password.length < 4)
+        return { error: "Use a password of at least 4 characters" };
     try {
         await createLock(connectionId, path, password, userId);
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not set the lock" };
     }
-    await recordAudit({ actorId: userId, action: "drive.lock.set", targetType: "connection", targetId: connectionId, metadata: { path: normalizeRelPath(path) } });
+    await recordAudit({
+        actorId: userId,
+        action: "drive.lock.set",
+        targetType: "connection",
+        targetId: connectionId,
+        metadata: { path: normalizeRelPath(path) }
+    });
     revalidatePath("/drive");
     return {};
 }
@@ -124,7 +144,13 @@ export async function lockPathAction(
 export async function removeLockAction(connectionId: string, lockId: string): Promise<void> {
     const userId = await requireConnectionManager(connectionId);
     await removeLock(connectionId, lockId);
-    await recordAudit({ actorId: userId, action: "drive.lock.remove", targetType: "connection", targetId: connectionId, metadata: { lockId } });
+    await recordAudit({
+        actorId: userId,
+        action: "drive.lock.remove",
+        targetType: "connection",
+        targetId: connectionId,
+        metadata: { lockId }
+    });
     revalidatePath("/drive");
 }
 

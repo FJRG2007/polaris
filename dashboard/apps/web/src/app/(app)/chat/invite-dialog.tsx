@@ -128,7 +128,9 @@ export function InviteDialog({
                                 />
                             </label>
                             <label className="flex min-w-32 flex-1 flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">Number of uses</span>
+                                <span className="text-xs text-muted-foreground">
+                                    Number of uses
+                                </span>
                                 <Select
                                     value={uses}
                                     onValueChange={setUses}

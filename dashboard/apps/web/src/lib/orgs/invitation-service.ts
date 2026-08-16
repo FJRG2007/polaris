@@ -187,7 +187,14 @@ export async function listOrgInvitations(
             role: true,
             createdAt: true,
             expiresAt: true,
-            org: { select: { id: true, name: true, slug: true, roles: { select: { slug: true, name: true } } } },
+            org: {
+                select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    roles: { select: { slug: true, name: true } }
+                }
+            },
             user: { select: { id: true, name: true, email: true, username: true } },
             invitedBy: { select: { name: true, username: true } }
         }
@@ -209,7 +216,14 @@ export async function listMyInvitations(userId: string): Promise<OrgInvitationVi
             role: true,
             createdAt: true,
             expiresAt: true,
-            org: { select: { id: true, name: true, slug: true, roles: { select: { slug: true, name: true } } } },
+            org: {
+                select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    roles: { select: { slug: true, name: true } }
+                }
+            },
             user: { select: { id: true, name: true, email: true, username: true } },
             invitedBy: { select: { name: true, username: true } }
         }
@@ -242,7 +256,9 @@ function drawn(row: InvitationRow, contact: string): OrgInvitationView {
             row.org.roles.find((role) => role.slug === row.role)?.name ??
             core.ORG_SYSTEM_ROLES[row.role]?.name ??
             row.role,
-        invitedBy: row.invitedBy.name || (row.invitedBy.username ? `@${row.invitedBy.username}` : "Somebody"),
+        invitedBy:
+            row.invitedBy.name ||
+            (row.invitedBy.username ? `@${row.invitedBy.username}` : "Somebody"),
         invitedAt: row.createdAt.toISOString(),
         expiresAt: row.expiresAt.toISOString()
     };

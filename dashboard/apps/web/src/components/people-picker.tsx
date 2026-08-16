@@ -127,9 +127,7 @@ export function PeoplePicker({
                     value={query}
                     disabled={full}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder={
-                        full ? "That is as many as this holds" : "Name, email or username"
-                    }
+                    placeholder={full ? "That is as many as this holds" : "Name, email or username"}
                     aria-label={label}
                     className="h-8 w-full rounded-md border border-border bg-background pl-7 pr-7 text-sm hover:border-border-strong focus:border-border-strong disabled:opacity-60"
                 />

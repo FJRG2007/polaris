@@ -79,9 +79,12 @@ async function findPerson(identifier: string): Promise<{ id: string; name: strin
         take: 2
     });
     if (byName.length > 1) {
-        throw new SuccessorError("More than one account has that name - use their username or email address");
+        throw new SuccessorError(
+            "More than one account has that name - use their username or email address"
+        );
     }
-    if (byName.length === 0) throw new SuccessorError("No account matches that username, name or email address");
+    if (byName.length === 0)
+        throw new SuccessorError("No account matches that username, name or email address");
     return byName[0]!;
 }
 
@@ -95,7 +98,8 @@ async function findPerson(identifier: string): Promise<{ id: string; name: strin
  */
 export async function setSuccessor(userId: string, identifier: string): Promise<SuccessorView> {
     const person = await findPerson(identifier);
-    if (person.id === userId) throw new SuccessorError("Name somebody else - you cannot succeed yourself");
+    if (person.id === userId)
+        throw new SuccessorError("Name somebody else - you cannot succeed yourself");
 
     const acknowledgedAt = new Date();
     await prisma.accountSuccessor.upsert({

@@ -181,7 +181,11 @@ const FRIENDS_PATH = "/account/friends";
  * wrong. Never fails the thing it is announcing: the friendship is the point and
  * the alert is the courtesy.
  */
-async function announce(userId: string, aboutId: string, what: "asked" | "accepted"): Promise<void> {
+async function announce(
+    userId: string,
+    aboutId: string,
+    what: "asked" | "accepted"
+): Promise<void> {
     const person = await prisma.user.findUnique({
         where: { id: aboutId },
         select: { name: true, username: true }

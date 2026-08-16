@@ -203,11 +203,7 @@ export async function contactLines(
     return new Map(
         people.map((person) => [
             person.id,
-            allowed.has(person.id)
-                ? person.email
-                : person.username
-                  ? `@${person.username}`
-                  : ""
+            allowed.has(person.id) ? person.email : person.username ? `@${person.username}` : ""
         ])
     );
 }
@@ -243,7 +239,9 @@ export async function setPrivacy(userId: string, settings: core.PrivacySettings)
     );
     const saved = naming
         .map((field) => ({ field, listId: settings[field].listId }))
-        .filter((entry): entry is { field: core.PrivacyField; listId: string } => entry.listId !== null);
+        .filter(
+            (entry): entry is { field: core.PrivacyField; listId: string } => entry.listId !== null
+        );
     await assertOwnLists(
         userId,
         saved.map((entry) => entry.listId)
@@ -304,7 +302,8 @@ async function ownListFor(
         select: { list: { select: { id: true, name: true } } }
     });
     const own = link && link.list.name === "" ? link.list.id : null;
-    const listId = own ?? (await prisma.privacyList.create({ data: { userId }, select: { id: true } })).id;
+    const listId =
+        own ?? (await prisma.privacyList.create({ data: { userId }, select: { id: true } })).id;
     await setListMembers(userId, listId, people);
     return listId;
 }
@@ -482,10 +481,7 @@ async function setListMembers(
     const members = await realPeople(memberIds);
     await prisma.$transaction([
         prisma.privacyListMember.deleteMany({
-            where:
-                members.length === 0
-                    ? { listId }
-                    : { listId, userId: { notIn: members } }
+            where: members.length === 0 ? { listId } : { listId, userId: { notIn: members } }
         }),
         ...members.map((memberId) =>
             prisma.privacyListMember.upsert({

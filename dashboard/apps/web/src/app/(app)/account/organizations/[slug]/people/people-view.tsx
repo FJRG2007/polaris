@@ -135,11 +135,19 @@ export function PeopleView({
                                     key={member.userId}
                                     className="hover:bg-muted flex flex-wrap items-center gap-3 rounded-md px-2 py-1.5"
                                 >
-                                    <Avatar person={{ id: member.userId, name: member.name }} size={32} />
+                                    <Avatar
+                                        person={{ id: member.userId, name: member.name }}
+                                        size={32}
+                                    />
                                     <div className="min-w-0 flex-1">
                                         <p className="truncate text-sm">
                                             {member.name}
-                                            {self ? <span className="text-muted-foreground"> (you)</span> : null}
+                                            {self ? (
+                                                <span className="text-muted-foreground">
+                                                    {" "}
+                                                    (you)
+                                                </span>
+                                            ) : null}
                                         </p>
                                         <p
                                             className="text-muted-foreground truncate text-xs"
@@ -156,7 +164,9 @@ export function PeopleView({
                                         </span>
                                     )}
                                     {owner || !canManage ? (
-                                        <Badge variant={owner ? "primary" : "neutral"}>{member.roleName}</Badge>
+                                        <Badge variant={owner ? "primary" : "neutral"}>
+                                            {member.roleName}
+                                        </Badge>
                                     ) : (
                                         <Select
                                             value={member.role}
@@ -164,14 +174,24 @@ export function PeopleView({
                                             aria-label={`Role for ${member.name}`}
                                             className="h-8 w-32 text-xs"
                                             onValueChange={(next) =>
-                                                void run(() => setOrgMemberRoleAction(orgId, member.userId, next))
+                                                void run(() =>
+                                                    setOrgMemberRoleAction(
+                                                        orgId,
+                                                        member.userId,
+                                                        next
+                                                    )
+                                                )
                                             }
                                         />
                                     )}
                                     {!owner && (canManage || self) && (
                                         <button
                                             type="button"
-                                            aria-label={self ? "Leave this organization" : `Remove ${member.name}`}
+                                            aria-label={
+                                                self
+                                                    ? "Leave this organization"
+                                                    : `Remove ${member.name}`
+                                            }
                                             title={self ? "Leave" : "Remove"}
                                             className="text-muted-foreground hover:bg-danger/10 hover:text-danger rounded p-1 transition-colors"
                                             onClick={async () => {
@@ -191,7 +211,8 @@ export function PeopleView({
                                                 );
                                                 // Leaving means this page is no
                                                 // longer theirs to look at.
-                                                if (done && self) router.push("/account/organizations");
+                                                if (done && self)
+                                                    router.push("/account/organizations");
                                             }}
                                         >
                                             {self ? (
@@ -229,7 +250,9 @@ export function PeopleView({
                                     size={32}
                                 />
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm" title={invitation.name}>{invitation.name}</p>
+                                    <p className="truncate text-sm" title={invitation.name}>
+                                        {invitation.name}
+                                    </p>
                                     <p className="text-muted-foreground truncate text-xs">
                                         Invited by {invitation.invitedBy}
                                         {invitation.contact ? ` - ${invitation.contact}` : ""}
@@ -305,7 +328,9 @@ function InvitePerson({
     // The first role is the one a picker should land on, and the list is ordered
     // with the seeded ones first - so this is Admin only if the organization has
     // deleted everything else, which it cannot.
-    const [role, setRole] = useState(roles.find((entry) => entry.slug === "member")?.slug ?? roles[0]?.slug ?? "member");
+    const [role, setRole] = useState(
+        roles.find((entry) => entry.slug === "member")?.slug ?? roles[0]?.slug ?? "member"
+    );
 
     const hint = roles.find((entry) => entry.slug === role)?.description ?? "";
 
@@ -320,7 +345,9 @@ function InvitePerson({
                     onSubmit={async (event) => {
                         event.preventDefault();
                         if (!identifier.trim()) return;
-                        const done = await onRun(() => inviteOrgMemberAction(orgId, identifier.trim(), role));
+                        const done = await onRun(() =>
+                            inviteOrgMemberAction(orgId, identifier.trim(), role)
+                        );
                         if (done) setIdentifier("");
                     }}
                 >

@@ -84,7 +84,9 @@ function Invitations({ invitations }: { invitations: readonly OrgInvitationView[
                                 size={32}
                             />
                             <span className="min-w-0 flex-1">
-                                <span className="block truncate text-sm" title={invitation.orgName}>{invitation.orgName}</span>
+                                <span className="block truncate text-sm" title={invitation.orgName}>
+                                    {invitation.orgName}
+                                </span>
                                 <span className="text-muted-foreground block truncate text-xs">
                                     {invitation.invitedBy} asked you to join as{" "}
                                     {invitation.roleName.toLowerCase()}
@@ -198,8 +200,9 @@ export function OrganizationsView({
                         <Building2 className="text-muted-foreground size-6" />
                         <p className="text-sm">An organization owns spaces on behalf of a group.</p>
                         <p className="text-muted-foreground max-w-sm text-xs">
-                            Put people on its roster, group them into teams, and give a team a space. Joining the
-                            team is then the only thing anybody has to do to reach the work.
+                            Put people on its roster, group them into teams, and give a team a
+                            space. Joining the team is then the only thing anybody has to do to
+                            reach the work.
                         </p>
                     </CardBody>
                 </Card>
@@ -217,8 +220,15 @@ export function OrganizationsView({
                                 <OrgAvatar org={org} size={36} />
                                 <span className="min-w-0 flex-1">
                                     <span className="flex items-center gap-2">
-                                        <span className="truncate text-sm font-medium" title={org.name}>{org.name}</span>
-                                        <Badge variant={org.role === "owner" ? "primary" : "neutral"}>
+                                        <span
+                                            className="truncate text-sm font-medium"
+                                            title={org.name}
+                                        >
+                                            {org.name}
+                                        </span>
+                                        <Badge
+                                            variant={org.role === "owner" ? "primary" : "neutral"}
+                                        >
                                             {org.roleName}
                                         </Badge>
                                     </span>
@@ -256,7 +266,9 @@ export function OrganizationsView({
                         <DialogTitle>New organization</DialogTitle>
                         <DialogDescription>
                             You own it. Add people to its roster afterwards and put them on teams.
-                            {memberLimit > 0 ? ` This Polaris allows up to ${memberLimit} members.` : ""}
+                            {memberLimit > 0
+                                ? ` This Polaris allows up to ${memberLimit} members.`
+                                : ""}
                         </DialogDescription>
                     </DialogHeader>
                     <form className="flex flex-col gap-3" onSubmit={submit}>
@@ -296,12 +308,19 @@ export function OrganizationsView({
                             />
                         </label>
                         {(issue || error) && (
-                            <p role="alert" className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
+                            <p
+                                role="alert"
+                                className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm"
+                            >
                                 {error || issue}
                             </p>
                         )}
                         <div className="flex justify-end gap-2">
-                            <Button type="button" variant="ghost" onClick={() => setCreating(false)}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => setCreating(false)}
+                            >
                                 Cancel
                             </Button>
                             <Button type="submit" disabled={!parsed.success || saving}>

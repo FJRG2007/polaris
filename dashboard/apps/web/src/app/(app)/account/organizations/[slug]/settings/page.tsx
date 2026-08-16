@@ -22,7 +22,11 @@ import { canDeleteOrg, listOrgMembers, orgDeletionImpact } from "@/lib/orgs/org-
 
 export const dynamic = "force-dynamic";
 
-export default async function OrganizationSettingsPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function OrganizationSettingsPage({
+    params
+}: {
+    params: Promise<{ slug: string }>;
+}) {
     const { slug } = await params;
     const user = await requireUser();
     const { org, access } = await requireOrgFrame(slug);
@@ -39,7 +43,9 @@ export default async function OrganizationSettingsPage({ params }: { params: Pro
         access.isOwner
             ? listOrgMembers(org.id, { id: user.id, isAdmin: user.isAdmin })
             : Promise.resolve([]),
-        canDelete ? orgDeletionImpact(org.id) : Promise.resolve({ spaces: 0, tasks: 0, projects: 0 })
+        canDelete
+            ? orgDeletionImpact(org.id)
+            : Promise.resolve({ spaces: 0, tasks: 0, projects: 0 })
     ]);
 
     return (

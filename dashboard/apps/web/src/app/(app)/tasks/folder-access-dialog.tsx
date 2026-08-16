@@ -16,9 +16,21 @@ import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { Loader2, Trash2, UserPlus } from "lucide-react";
 import type { FolderDetail, FolderMemberView } from "@/lib/tasks/space-service";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select
+} from "@polaris/ui";
 
-const ROLE_OPTIONS = core.SPACE_ROLES.map((role) => ({ value: role, label: core.SPACE_ROLE_LABELS[role] }));
+const ROLE_OPTIONS = core.SPACE_ROLES.map((role) => ({
+    value: role,
+    label: core.SPACE_ROLE_LABELS[role]
+}));
 
 export function FolderAccessDialog({
     folderId,
@@ -37,7 +49,9 @@ export function FolderAccessDialog({
     const [error, setError] = useState("");
     // Teams of the organization that owns the space around this folder. Both
     // lists are empty on a personal space, which is what hides the section.
-    const [granted, setGranted] = useState<{ teamId: string; teamName: string; role: core.SpaceRole }[]>([]);
+    const [granted, setGranted] = useState<
+        { teamId: string; teamName: string; role: core.SpaceRole }[]
+    >([]);
     const [available, setAvailable] = useState<{ id: string; name: string }[]>([]);
     const [teamPick, setTeamPick] = useState("");
     const [teamRole, setTeamRole] = useState<core.SpaceRole>("member");
@@ -94,7 +108,8 @@ export function FolderAccessDialog({
                     <DialogDescription>
                         {path && <span className="font-mono text-xs">{path}</span>}
                         {path && <br />}
-                        People added here reach this folder and everything inside it, and nothing else in the space.
+                        People added here reach this folder and everything inside it, and nothing
+                        else in the space.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -105,7 +120,10 @@ export function FolderAccessDialog({
                 )}
 
                 {error && (
-                    <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                    <p
+                        role="alert"
+                        className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger"
+                    >
                         {error}
                     </p>
                 )}
@@ -125,7 +143,9 @@ export function FolderAccessDialog({
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm">{member.name}</p>
                                     <p className="truncate text-xs text-muted-foreground">
-                                        {member.inherited ? `Through ${member.folderName}` : member.contact}
+                                        {member.inherited
+                                            ? `Through ${member.folderName}`
+                                            : member.contact}
                                     </p>
                                 </div>
                                 {member.inherited || !canManage ? (
@@ -186,7 +206,12 @@ export function FolderAccessDialog({
                             if (!folderId || !identifier.trim()) return;
                             setError("");
                             const result = await runAction(
-                                () => actions.addFolderMemberAction(folderId, identifier.trim(), role),
+                                () =>
+                                    actions.addFolderMemberAction(
+                                        folderId,
+                                        identifier.trim(),
+                                        role
+                                    ),
                                 setError
                             );
                             if (result?.error) {
@@ -236,7 +261,12 @@ export function FolderAccessDialog({
                                         key={grant.teamId}
                                         className="flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted"
                                     >
-                                        <p className="min-w-0 flex-1 truncate text-sm" title={grant.teamName}>{grant.teamName}</p>
+                                        <p
+                                            className="min-w-0 flex-1 truncate text-sm"
+                                            title={grant.teamName}
+                                        >
+                                            {grant.teamName}
+                                        </p>
                                         {canManage ? (
                                             <>
                                                 <Select
@@ -290,7 +320,9 @@ export function FolderAccessDialog({
                         )}
 
                         {canManage &&
-                            available.some((team) => !granted.some((grant) => grant.teamId === team.id)) && (
+                            available.some(
+                                (team) => !granted.some((grant) => grant.teamId === team.id)
+                            ) && (
                                 <div className="flex flex-wrap items-end gap-2">
                                     <Select
                                         value={teamPick}
@@ -299,7 +331,10 @@ export function FolderAccessDialog({
                                         className="h-9 min-w-48 flex-1"
                                         options={available
                                             .filter(
-                                                (team) => !granted.some((grant) => grant.teamId === team.id)
+                                                (team) =>
+                                                    !granted.some(
+                                                        (grant) => grant.teamId === team.id
+                                                    )
                                             )
                                             .map((team) => ({ value: team.id, label: team.name }))}
                                         onValueChange={setTeamPick}
@@ -309,7 +344,9 @@ export function FolderAccessDialog({
                                         options={ROLE_OPTIONS}
                                         aria-label="Role for the team"
                                         className="h-9 w-32"
-                                        onValueChange={(next) => setTeamRole(next as core.SpaceRole)}
+                                        onValueChange={(next) =>
+                                            setTeamRole(next as core.SpaceRole)
+                                        }
                                     />
                                     <Button
                                         type="button"
@@ -319,7 +356,11 @@ export function FolderAccessDialog({
                                             if (!folderId || !teamPick) return;
                                             const result = await runAction(
                                                 () =>
-                                                    actions.grantFolderTeamAction(folderId, teamPick, teamRole),
+                                                    actions.grantFolderTeamAction(
+                                                        folderId,
+                                                        teamPick,
+                                                        teamRole
+                                                    ),
                                                 setError
                                             );
                                             if (result?.error) {

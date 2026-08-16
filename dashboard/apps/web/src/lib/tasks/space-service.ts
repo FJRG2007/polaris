@@ -67,7 +67,11 @@ export interface SpaceTreeView {
  * branch: the folders outside it and the lists at the space root never leave the
  * server, so the sidebar cannot show a client the client beside them.
  */
-export async function listSpaceTree(userId: string, scope: TaskScope, isAdmin: boolean): Promise<SpaceTreeView[]> {
+export async function listSpaceTree(
+    userId: string,
+    scope: TaskScope,
+    isAdmin: boolean
+): Promise<SpaceTreeView[]> {
     const spaceIds = [...scope.spaceIds, ...scope.partialSpaceIds];
     if (spaceIds.length === 0) return [];
 
@@ -106,7 +110,11 @@ export async function listSpaceTree(userId: string, scope: TaskScope, isAdmin: b
         // Which lists hold anything at all. The counts above leave out archived
         // work and subtasks, which a delete still takes with it, so they cannot
         // answer whether a list is safe to drop without reading the name back.
-        prisma.task.groupBy({ by: ["listId"], where: { spaceId: { in: spaceIds } }, _count: { _all: true } })
+        prisma.task.groupBy({
+            by: ["listId"],
+            where: { spaceId: { in: spaceIds } },
+            _count: { _all: true }
+        })
     ]);
 
     const finishedStatusIds = await finishedStatuses(spaceIds);
@@ -142,12 +150,15 @@ export async function listSpaceTree(userId: string, scope: TaskScope, isAdmin: b
             .filter((list) => list.spaceId === space.id)
             .filter((list) => !partial || grantedListIds.has(list.id));
         const spaceRole: SpaceAccess =
-            space.ownerId === userId || isAdmin ? "owner" : ((space.members[0]?.role as core.SpaceRole) ?? "guest");
+            space.ownerId === userId || isAdmin
+                ? "owner"
+                : ((space.members[0]?.role as core.SpaceRole) ?? "guest");
         // In a partial space the space role means nothing - what the reader may
         // do is whatever their strongest grant gives them.
         const role: SpaceAccess = partial
             ? folders.reduce<core.SpaceRole>(
-                  (best, folder) => core.strongerRole(best, scope.folderRoles[folder.id] as core.SpaceRole),
+                  (best, folder) =>
+                      core.strongerRole(best, scope.folderRoles[folder.id] as core.SpaceRole),
                   "guest"
               )
             : spaceRole;
@@ -196,7 +207,10 @@ async function uniquePrefix(name: string): Promise<string> {
     const base = core.deriveSpacePrefix(name);
     for (let attempt = 0; attempt < 100; attempt += 1) {
         const candidate = attempt === 0 ? base : `${base}${attempt + 1}`;
-        const taken = await prisma.taskSpace.findUnique({ where: { prefix: candidate }, select: { id: true } });
+        const taken = await prisma.taskSpace.findUnique({
+            where: { prefix: candidate },
+            select: { id: true }
+        });
         if (!taken) return candidate;
     }
     // A hundred spaces sharing a derived prefix is not a real workspace, but a
@@ -214,7 +228,10 @@ export async function createSpace(
     input: core.SpaceInput
 ): Promise<{ id: string; listId: string }> {
     const prefix = await uniquePrefix(input.name);
-    const last = await prisma.taskSpace.findFirst({ orderBy: { order: "desc" }, select: { order: true } });
+    const last = await prisma.taskSpace.findFirst({
+        orderBy: { order: "desc" },
+        select: { order: true }
+    });
 
     return prisma.$transaction(async (tx) => {
         const space = await tx.taskSpace.create({
@@ -249,7 +266,11 @@ export async function createSpace(
         // existed before them through the migration, which skips whatever a team
         // had already named for itself.
         await tx.taskTag.createMany({
-            data: core.DEFAULT_TASK_TAGS.map((tag) => ({ spaceId: space.id, name: tag.name, color: tag.color }))
+            data: core.DEFAULT_TASK_TAGS.map((tag) => ({
+                spaceId: space.id,
+                name: tag.name,
+                color: tag.color
+            }))
         });
 
         const list = await tx.taskList.create({
@@ -353,7 +374,11 @@ export async function listSpaceMembers(
 
 /** Add somebody by email or username, which is what the operator has in front
  *  of them rather than an id. */
-export async function addSpaceMember(spaceId: string, identifier: string, role: core.SpaceRole): Promise<void> {
+export async function addSpaceMember(
+    spaceId: string,
+    identifier: string,
+    role: core.SpaceRole
+): Promise<void> {
     const needle = identifier.trim().toLowerCase();
     const user = await prisma.user.findFirst({
         where: { OR: [{ email: needle }, { username: needle }] },
@@ -361,7 +386,10 @@ export async function addSpaceMember(spaceId: string, identifier: string, role: 
     });
     if (!user) throw new Error("No account matches that email or username");
 
-    const space = await prisma.taskSpace.findUnique({ where: { id: spaceId }, select: { ownerId: true } });
+    const space = await prisma.taskSpace.findUnique({
+        where: { id: spaceId },
+        select: { ownerId: true }
+    });
     if (space?.ownerId === user.id) throw new Error("That person already owns this space");
 
     await prisma.taskSpaceMember.upsert({
@@ -371,8 +399,15 @@ export async function addSpaceMember(spaceId: string, identifier: string, role: 
     });
 }
 
-export async function setSpaceMemberRole(spaceId: string, userId: string, role: core.SpaceRole): Promise<void> {
-    await prisma.taskSpaceMember.update({ where: { spaceId_userId: { spaceId, userId } }, data: { role } });
+export async function setSpaceMemberRole(
+    spaceId: string,
+    userId: string,
+    role: core.SpaceRole
+): Promise<void> {
+    await prisma.taskSpaceMember.update({
+        where: { spaceId_userId: { spaceId, userId } },
+        data: { role }
+    });
 }
 
 export async function removeSpaceMember(spaceId: string, userId: string): Promise<void> {
@@ -388,7 +423,9 @@ export async function removeSpaceMember(spaceId: string, userId: string): Promis
  * folders was given, since a team grant is exactly as real a way in as a
  * personal one and work nobody can be assigned is work the team cannot run.
  */
-export async function spacePeople(spaceId: string): Promise<{ id: string; name: string; image: string | null }[]> {
+export async function spacePeople(
+    spaceId: string
+): Promise<{ id: string; name: string; image: string | null }[]> {
     const [space, grantees, spaceTeams, folderTeams] = await Promise.all([
         // Its own read rather than `listSpaceMembers`: a picker needs a name and
         // a face, and asking for the roster would work out what each of them is
@@ -406,11 +443,27 @@ export async function spacePeople(spaceId: string): Promise<{ id: string; name: 
         }),
         prisma.taskSpaceTeam.findMany({
             where: { spaceId },
-            select: { team: { select: { members: { select: { user: { select: { id: true, name: true, image: true } } } } } } }
+            select: {
+                team: {
+                    select: {
+                        members: {
+                            select: { user: { select: { id: true, name: true, image: true } } }
+                        }
+                    }
+                }
+            }
         }),
         prisma.taskFolderTeam.findMany({
             where: { folder: { spaceId } },
-            select: { team: { select: { members: { select: { user: { select: { id: true, name: true, image: true } } } } } } }
+            select: {
+                team: {
+                    select: {
+                        members: {
+                            select: { user: { select: { id: true, name: true, image: true } } }
+                        }
+                    }
+                }
+            }
         })
     ]);
     const roster = space ? [space.owner, ...space.members.map((member) => member.user)] : [];
@@ -468,7 +521,9 @@ export async function getFolder(folderId: string): Promise<FolderDetail | null> 
         spaceId: folder.spaceId,
         parentId: folder.parentId,
         name: folder.name,
-        path: core.folderAncestors(folders, folderId).map((entry) => ({ id: entry.id, name: entry.name }))
+        path: core
+            .folderAncestors(folders, folderId)
+            .map((entry) => ({ id: entry.id, name: entry.name }))
     };
 }
 
@@ -482,7 +537,10 @@ export async function listFolderMembers(
     folderId: string,
     viewer: { id: string; isAdmin: boolean }
 ): Promise<FolderMemberView[]> {
-    const folder = await prisma.taskFolder.findUnique({ where: { id: folderId }, select: { spaceId: true } });
+    const folder = await prisma.taskFolder.findUnique({
+        where: { id: folderId },
+        select: { spaceId: true }
+    });
     if (!folder) return [];
     const folders = await prisma.taskFolder.findMany({
         where: { spaceId: folder.spaceId },
@@ -517,7 +575,11 @@ export async function listFolderMembers(
 
 /** Invite somebody to one branch by email or username, which is what the person
  *  doing the inviting has in front of them rather than an id. */
-export async function addFolderMember(folderId: string, identifier: string, role: core.SpaceRole): Promise<void> {
+export async function addFolderMember(
+    folderId: string,
+    identifier: string,
+    role: core.SpaceRole
+): Promise<void> {
     const needle = identifier.trim().toLowerCase();
     const user = await prisma.user.findFirst({
         where: { OR: [{ email: needle }, { username: needle }] },
@@ -538,8 +600,15 @@ export async function addFolderMember(folderId: string, identifier: string, role
     });
 }
 
-export async function setFolderMemberRole(folderId: string, userId: string, role: core.SpaceRole): Promise<void> {
-    await prisma.taskFolderMember.update({ where: { folderId_userId: { folderId, userId } }, data: { role } });
+export async function setFolderMemberRole(
+    folderId: string,
+    userId: string,
+    role: core.SpaceRole
+): Promise<void> {
+    await prisma.taskFolderMember.update({
+        where: { folderId_userId: { folderId, userId } },
+        data: { role }
+    });
 }
 
 export async function removeFolderMember(folderId: string, userId: string): Promise<void> {
@@ -552,7 +621,11 @@ export async function removeFolderMember(folderId: string, userId: string): Prom
 
 /** The next order key at the end of a container, so a new folder or list lands
  *  last among its own siblings rather than last in the whole space. */
-async function nextOrder(model: "folder" | "list", spaceId: string, parentId: string | null): Promise<number> {
+async function nextOrder(
+    model: "folder" | "list",
+    spaceId: string,
+    parentId: string | null
+): Promise<number> {
     const last =
         model === "folder"
             ? await prisma.taskFolder.findFirst({
@@ -607,7 +680,11 @@ async function orderForDrop(
 }
 
 /** Evenly re-space one container's children after their gaps have collapsed. */
-async function rebalanceContainer(model: "folder" | "list", spaceId: string, parentId: string | null): Promise<void> {
+async function rebalanceContainer(
+    model: "folder" | "list",
+    spaceId: string,
+    parentId: string | null
+): Promise<void> {
     const siblings =
         model === "folder"
             ? await prisma.taskFolder.findMany({
@@ -624,7 +701,10 @@ async function rebalanceContainer(model: "folder" | "list", spaceId: string, par
     await prisma.$transaction(
         siblings.map((row, index) =>
             model === "folder"
-                ? prisma.taskFolder.update({ where: { id: row.id }, data: { order: orders[index] } })
+                ? prisma.taskFolder.update({
+                      where: { id: row.id },
+                      data: { order: orders[index] }
+                  })
                 : prisma.taskList.update({ where: { id: row.id }, data: { order: orders[index] } })
         )
     );
@@ -636,7 +716,8 @@ export async function createFolder(input: core.FolderInput): Promise<string> {
             where: { id: input.parentId },
             select: { spaceId: true }
         });
-        if (!parent || parent.spaceId !== input.spaceId) throw new Error("That folder is not in this space");
+        if (!parent || parent.spaceId !== input.spaceId)
+            throw new Error("That folder is not in this space");
         const folders = await spaceFolders(input.spaceId);
         if (core.folderDepth(folders, input.parentId) + 1 >= core.FOLDER_DEPTH_LIMIT) {
             throw new Error(`Folders can nest ${core.FOLDER_DEPTH_LIMIT} deep`);
@@ -668,7 +749,11 @@ async function spaceFolders(spaceId: string): Promise<{ id: string; parentId: st
  * The refusals live in the engine so a drag can grey out an illegal drop with
  * the same rule that rejects it here.
  */
-export async function moveFolder(spaceId: string, folderId: string, move: core.ContainerMove): Promise<void> {
+export async function moveFolder(
+    spaceId: string,
+    folderId: string,
+    move: core.ContainerMove
+): Promise<void> {
     const folders = await spaceFolders(spaceId);
     if (move.parentId && !folders.some((folder) => folder.id === move.parentId)) {
         throw new Error("That folder is not in this space");
@@ -678,18 +763,32 @@ export async function moveFolder(spaceId: string, folderId: string, move: core.C
 
     const order = await orderForDrop("folder", spaceId, move.parentId, move);
     if (order === null) throw new Error("That spot has moved. Try again.");
-    await prisma.taskFolder.update({ where: { id: folderId }, data: { parentId: move.parentId, order } });
+    await prisma.taskFolder.update({
+        where: { id: folderId },
+        data: { parentId: move.parentId, order }
+    });
 }
 
 /** Move a list into a folder (or back to the space root) and position it. */
-export async function moveList(spaceId: string, listId: string, move: core.ContainerMove): Promise<void> {
+export async function moveList(
+    spaceId: string,
+    listId: string,
+    move: core.ContainerMove
+): Promise<void> {
     if (move.parentId) {
-        const parent = await prisma.taskFolder.findUnique({ where: { id: move.parentId }, select: { spaceId: true } });
-        if (!parent || parent.spaceId !== spaceId) throw new Error("That folder is not in this space");
+        const parent = await prisma.taskFolder.findUnique({
+            where: { id: move.parentId },
+            select: { spaceId: true }
+        });
+        if (!parent || parent.spaceId !== spaceId)
+            throw new Error("That folder is not in this space");
     }
     const order = await orderForDrop("list", spaceId, move.parentId, move);
     if (order === null) throw new Error("That spot has moved. Try again.");
-    await prisma.taskList.update({ where: { id: listId }, data: { folderId: move.parentId, order } });
+    await prisma.taskList.update({
+        where: { id: listId },
+        data: { folderId: move.parentId, order }
+    });
 }
 
 /**
@@ -699,10 +798,16 @@ export async function moveList(spaceId: string, listId: string, move: core.Conta
  * a client's whole project tree down with a mis-click on the client.
  */
 export async function deleteFolder(folderId: string): Promise<void> {
-    const folder = await prisma.taskFolder.findUnique({ where: { id: folderId }, select: { parentId: true } });
+    const folder = await prisma.taskFolder.findUnique({
+        where: { id: folderId },
+        select: { parentId: true }
+    });
     if (!folder) return;
     await prisma.$transaction([
-        prisma.taskFolder.updateMany({ where: { parentId: folderId }, data: { parentId: folder.parentId } }),
+        prisma.taskFolder.updateMany({
+            where: { parentId: folderId },
+            data: { parentId: folder.parentId }
+        }),
         prisma.taskList.updateMany({ where: { folderId }, data: { folderId: folder.parentId } }),
         // Pages and sprints move up with everything else. The database clears
         // the link on its own, which would quietly promote a client's page to
@@ -728,7 +833,10 @@ export interface CreateContext {
  * task created from a project folder can be dropped into any list that project
  * holds. A null folder means the whole space.
  */
-export async function branchLists(spaceId: string, folderId: string | null): Promise<{ id: string; name: string }[]> {
+export async function branchLists(
+    spaceId: string,
+    folderId: string | null
+): Promise<{ id: string; name: string }[]> {
     if (!folderId) {
         return prisma.taskList.findMany({
             where: { spaceId, archived: false },
@@ -746,8 +854,12 @@ export async function branchLists(spaceId: string, folderId: string | null): Pro
 
 export async function createList(input: core.ListInput): Promise<string> {
     if (input.folderId) {
-        const parent = await prisma.taskFolder.findUnique({ where: { id: input.folderId }, select: { spaceId: true } });
-        if (!parent || parent.spaceId !== input.spaceId) throw new Error("That folder is not in this space");
+        const parent = await prisma.taskFolder.findUnique({
+            where: { id: input.folderId },
+            select: { spaceId: true }
+        });
+        if (!parent || parent.spaceId !== input.spaceId)
+            throw new Error("That folder is not in this space");
     }
     const list = await prisma.taskList.create({
         data: {
@@ -786,7 +898,10 @@ export async function renameList(listId: string, name: string): Promise<void> {
     await prisma.taskList.update({ where: { id: listId }, data: { name } });
 }
 
-export async function updateList(listId: string, input: Omit<core.ListInput, "spaceId">): Promise<void> {
+export async function updateList(
+    listId: string,
+    input: Omit<core.ListInput, "spaceId">
+): Promise<void> {
     await prisma.taskList.update({
         where: { id: listId },
         data: {
@@ -916,7 +1031,10 @@ export async function updateStatus(
     statusId: string,
     input: { name: string; type: core.TaskStatusType; color: string }
 ): Promise<void> {
-    const { count } = await prisma.taskStatus.updateMany({ where: { id: statusId, spaceId }, data: input });
+    const { count } = await prisma.taskStatus.updateMany({
+        where: { id: statusId, spaceId },
+        data: input
+    });
     if (count === 0) throw notInSpace("status");
 }
 
@@ -925,14 +1043,21 @@ export async function updateStatus(
  * simply vanish: the tasks on it would be left with no column to appear in, and
  * a board that silently drops work is worse than one that refuses the delete.
  */
-export async function deleteStatus(spaceId: string, statusId: string, replacementId: string): Promise<void> {
+export async function deleteStatus(
+    spaceId: string,
+    statusId: string,
+    replacementId: string
+): Promise<void> {
     if (statusId === replacementId) throw new Error("Pick a different status to move the tasks to");
     // Both ends are checked, not just the one being removed: a replacement from
     // another space would move this space's work onto a column nobody here can
     // see, and would do it under an authorization that never mentioned it.
     const [status, replacement, remaining] = await Promise.all([
         prisma.taskStatus.findFirst({ where: { id: statusId, spaceId }, select: { id: true } }),
-        prisma.taskStatus.findFirst({ where: { id: replacementId, spaceId }, select: { id: true } }),
+        prisma.taskStatus.findFirst({
+            where: { id: replacementId, spaceId },
+            select: { id: true }
+        }),
         prisma.taskStatus.count({ where: { spaceId } })
     ]);
     if (!status || !replacement) throw notInSpace("status");
@@ -977,12 +1102,23 @@ export async function createTag(spaceId: string, name: string, color: string): P
         select: { id: true }
     });
     if (existing) return existing.id;
-    const tag = await prisma.taskTag.create({ data: { spaceId, name, color }, select: { id: true } });
+    const tag = await prisma.taskTag.create({
+        data: { spaceId, name, color },
+        select: { id: true }
+    });
     return tag.id;
 }
 
-export async function updateTag(spaceId: string, tagId: string, name: string, color: string): Promise<void> {
-    const { count } = await prisma.taskTag.updateMany({ where: { id: tagId, spaceId }, data: { name, color } });
+export async function updateTag(
+    spaceId: string,
+    tagId: string,
+    name: string,
+    color: string
+): Promise<void> {
+    const { count } = await prisma.taskTag.updateMany({
+        where: { id: tagId, spaceId },
+        data: { name, color }
+    });
     if (count === 0) throw notInSpace("tag");
 }
 

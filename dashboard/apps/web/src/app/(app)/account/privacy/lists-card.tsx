@@ -88,9 +88,14 @@ export function ListsCard({ lists }: { lists: readonly PrivacyListView[] }) {
                 ) : (
                     <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
                         {lists.map((list) => (
-                            <li key={list.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
+                            <li
+                                key={list.id}
+                                className="flex flex-wrap items-center gap-2 px-3 py-2"
+                            >
                                 <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-[13px]" title={list.name}>{list.name}</span>
+                                    <span className="block truncate text-[13px]" title={list.name}>
+                                        {list.name}
+                                    </span>
                                     <span className="block text-[11px] text-foreground-subtle">
                                         {list.members.length === 0
                                             ? "Nobody on it"
@@ -165,7 +170,10 @@ export function ListsCard({ lists }: { lists: readonly PrivacyListView[] }) {
                     onChange={setEditing}
                     onClose={() => setEditing(null)}
                     onSave={async (next) => {
-                        const list = { name: next.name, members: next.members.map((person) => person.id) };
+                        const list = {
+                            name: next.name,
+                            members: next.members.map((person) => person.id)
+                        };
                         const done = await act(() =>
                             next.id
                                 ? updatePrivacyListAction(next.id, list)
@@ -228,7 +236,11 @@ function ListDialog({
                     <Button size="sm" variant="ghost" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button size="sm" disabled={!named || busy} onClick={() => void onSave(editing)}>
+                    <Button
+                        size="sm"
+                        disabled={!named || busy}
+                        onClick={() => void onSave(editing)}
+                    >
                         {busy && <Loader2 className="size-4 shrink-0 animate-spin" />}
                         Save
                     </Button>

@@ -162,9 +162,7 @@ export function PrivacyView({
                                 : [...current, person]
                         )
                     }
-                    onChange={(rule) =>
-                        setDraft((current) => ({ ...current, [editing]: rule }))
-                    }
+                    onChange={(rule) => setDraft((current) => ({ ...current, [editing]: rule }))}
                     onClose={() => setEditing(null)}
                 />
             )}

@@ -14,9 +14,7 @@ export default async function PrivacyPage() {
     const [settings, lists] = await Promise.all([privacyFor(session.id), listsFor(session.id)]);
     // Every name any rule needs, in one read: a row draws the people it names,
     // and it holds their ids.
-    const people = await namePeople(
-        core.PRIVACY_FIELDS.flatMap((field) => settings[field].people)
-    );
+    const people = await namePeople(core.PRIVACY_FIELDS.flatMap((field) => settings[field].people));
 
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">

@@ -567,7 +567,9 @@ export const chatInviteCreateSchema = z.object({
     expiresMinutes: z
         .number()
         .refine((value) => inviteMinutes.includes(value), "That is not a length to offer"),
-    maxUses: z.number().refine((value) => inviteUses.includes(value), "That is not a limit to offer")
+    maxUses: z
+        .number()
+        .refine((value) => inviteUses.includes(value), "That is not a limit to offer")
 });
 
 export type ChatInviteCreateInput = z.infer<typeof chatInviteCreateSchema>;

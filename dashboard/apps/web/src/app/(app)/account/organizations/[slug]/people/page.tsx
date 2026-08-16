@@ -17,7 +17,11 @@ import { requireOrgPage } from "@/lib/orgs/page-access";
 
 export const dynamic = "force-dynamic";
 
-export default async function OrganizationPeoplePage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function OrganizationPeoplePage({
+    params
+}: {
+    params: Promise<{ slug: string }>;
+}) {
     const { slug } = await params;
     const { org, access, user } = await requireOrgPage(slug);
 
@@ -35,7 +39,11 @@ export default async function OrganizationPeoplePage({ params }: { params: Promi
             orgSlug={org.slug}
             members={members}
             invitations={invitations}
-            roles={roles.map((role) => ({ slug: role.slug, name: role.name, description: role.description }))}
+            roles={roles.map((role) => ({
+                slug: role.slug,
+                name: role.name,
+                description: role.description
+            }))}
             currentUserId={user.id}
             canManage={hasOrgPermission(access.permissions, "people.manage")}
             memberLimit={policy.maxMembers}

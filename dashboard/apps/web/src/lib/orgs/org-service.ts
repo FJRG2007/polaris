@@ -53,7 +53,10 @@ export interface OrgMembership {
 
 /** What this actor may do across a whole organization, or null when it is not
  *  theirs to see. */
-export async function resolveOrgAccess(actor: OrgActor, orgId: string): Promise<OrgMembership | null> {
+export async function resolveOrgAccess(
+    actor: OrgActor,
+    orgId: string
+): Promise<OrgMembership | null> {
     const org = await prisma.organization.findUnique({
         where: { id: orgId },
         select: { ownerId: true, members: { where: { userId: actor.id }, select: { role: true } } }
@@ -82,7 +85,13 @@ export async function resolveOrgAccess(actor: OrgActor, orgId: string): Promise<
             : null;
     }
     const role = await roleFor(orgId, slug);
-    return { orgId, role: slug, roleName: role.name, isOwner: false, permissions: role.permissions };
+    return {
+        orgId,
+        role: slug,
+        roleName: role.name,
+        isOwner: false,
+        permissions: role.permissions
+    };
 }
 
 /**
@@ -94,7 +103,10 @@ export async function resolveOrgAccess(actor: OrgActor, orgId: string): Promise<
  * meant, never to nothing (which would lock a whole roster out of a place they
  * belong) and never to everything.
  */
-async function roleFor(orgId: string, slug: string): Promise<{ name: string; permissions: readonly string[] }> {
+async function roleFor(
+    orgId: string,
+    slug: string
+): Promise<{ name: string; permissions: readonly string[] }> {
     const role = await prisma.orgRole.findUnique({
         where: { orgId_slug: { orgId, slug } },
         select: { name: true, permissions: true }
@@ -121,7 +133,9 @@ function withRead(permissions: readonly string[]): readonly string[] {
 function parsePermissions(raw: string): string[] {
     try {
         const parsed: unknown = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((value): value is string => typeof value === "string")
+            : [];
     } catch {
         return [];
     }
@@ -170,7 +184,10 @@ export async function requireOrgOwner(actor: OrgActor, orgId: string): Promise<v
  * takes the spaces and the work with it.
  */
 export async function canDeleteOrg(actor: OrgActor, orgId: string): Promise<boolean> {
-    const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { ownerId: true } });
+    const org = await prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { ownerId: true }
+    });
     if (!org) return false;
     if (actor.isAdmin || org.ownerId === actor.id) return true;
     return isSuccessorOf(actor.id, org.ownerId);
@@ -205,7 +222,9 @@ export async function requireTeam(
     if (!access) throw new OrgAccessError();
     const canManage = orgCan(access, "teams.manage") || team.members[0]?.role === "maintainer";
     if (minimum === "manage" && !canManage) {
-        throw new OrgAccessError("Only somebody who runs the teams here, or a maintainer of this one, can do that");
+        throw new OrgAccessError(
+            "Only somebody who runs the teams here, or a maintainer of this one, can do that"
+        );
     }
     return { orgId: team.orgId, access, canManage };
 }
@@ -225,7 +244,10 @@ export async function teamIdsFor(userId: string): Promise<string[]> {
  * one read of each table. Owned organizations are always in, because the owner
  * holds everything and is never a member row.
  */
-export async function orgIdsWhere(actor: OrgActor, permission: core.OrgPermission): Promise<string[]> {
+export async function orgIdsWhere(
+    actor: OrgActor,
+    permission: core.OrgPermission
+): Promise<string[]> {
     if (actor.isAdmin) {
         const all = await prisma.organization.findMany({ select: { id: true } });
         return all.map((org) => org.id);
@@ -234,14 +256,20 @@ export async function orgIdsWhere(actor: OrgActor, permission: core.OrgPermissio
         prisma.organization.findMany({ where: { ownerId: actor.id }, select: { id: true } }),
         prisma.organizationMember.findMany({
             where: { userId: actor.id },
-            select: { orgId: true, role: true, org: { select: { roles: { select: { slug: true, permissions: true } } } } }
+            select: {
+                orgId: true,
+                role: true,
+                org: { select: { roles: { select: { slug: true, permissions: true } } } }
+            }
         })
     ]);
 
     const granted = memberships
         .filter((membership) => {
             const row = membership.org.roles.find((role) => role.slug === membership.role);
-            const permissions = row ? parsePermissions(row.permissions) : (core.ORG_SYSTEM_ROLES[membership.role]?.permissions ?? []);
+            const permissions = row
+                ? parsePermissions(row.permissions)
+                : (core.ORG_SYSTEM_ROLES[membership.role]?.permissions ?? []);
             return core.hasOrgPermission(permissions, permission);
         })
         .map((membership) => membership.orgId);
@@ -259,7 +287,9 @@ export async function administeredOrgIds(actor: OrgActor): Promise<string[]> {
  *  this space" picker is built from - somebody who only belongs to an
  *  organization is not offered it, because putting a space on the group's shelf
  *  takes being allowed to run its work. */
-export async function listAdministeredOrgs(actor: OrgActor): Promise<{ id: string; name: string }[]> {
+export async function listAdministeredOrgs(
+    actor: OrgActor
+): Promise<{ id: string; name: string }[]> {
     return listOrgsByIds(await administeredOrgIds(actor));
 }
 
@@ -346,7 +376,11 @@ export async function listMyOrgs(userId: string): Promise<OrgSummary[]> {
                 description: org.description,
                 image: org.image,
                 role: slug,
-                roleName: owner ? "Owner" : member ? roleDisplayName(org.roles, member) : "Successor",
+                roleName: owner
+                    ? "Owner"
+                    : member
+                      ? roleDisplayName(org.roles, member)
+                      : "Successor",
                 // The owner is not a member row, so the roster is always one
                 // longer than the table says.
                 memberCount: org._count.members + 1,
@@ -360,7 +394,9 @@ export async function listMyOrgs(userId: string): Promise<OrgSummary[]> {
 /** What a role slug is called. Falls back to the seeded name, and then to the
  *  slug itself, so a roster never shows a person with no role at all. */
 function roleDisplayName(roles: readonly { slug: string; name: string }[], slug: string): string {
-    return roles.find((role) => role.slug === slug)?.name ?? core.ORG_SYSTEM_ROLES[slug]?.name ?? slug;
+    return (
+        roles.find((role) => role.slug === slug)?.name ?? core.ORG_SYSTEM_ROLES[slug]?.name ?? slug
+    );
 }
 
 /** How many organizations this account owns, which is what the per-account cap
@@ -565,7 +601,9 @@ export async function listOrgSpaces(orgId: string): Promise<OrgSpaceView[]> {
         visibility: space.visibility,
         archived: space.archived,
         taskCount: space._count.tasks,
-        teams: space.teamGrants.map((grant) => grant.team.name).sort((left, right) => left.localeCompare(right))
+        teams: space.teamGrants
+            .map((grant) => grant.team.name)
+            .sort((left, right) => left.localeCompare(right))
     }));
 }
 
@@ -655,7 +693,9 @@ export async function listTeamGrants(teamId: string): Promise<TeamGrantView[]> {
             where: { teamId },
             select: {
                 role: true,
-                folder: { select: { id: true, name: true, space: { select: { id: true, name: true } } } }
+                folder: {
+                    select: { id: true, name: true, space: { select: { id: true, name: true } } }
+                }
             }
         })
     ]);
@@ -725,7 +765,10 @@ export async function createOrg(ownerId: string, input: core.OrganizationInput):
     return org.id;
 }
 
-export async function updateOrg(orgId: string, input: core.OrganizationProfileInput): Promise<void> {
+export async function updateOrg(
+    orgId: string,
+    input: core.OrganizationProfileInput
+): Promise<void> {
     await prisma.organization.update({
         where: { id: orgId },
         data: { name: input.name, description: input.description }
@@ -747,7 +790,10 @@ export async function changeOrgSlug(orgId: string, slug: string): Promise<void> 
  * that an owner is never also a member still holds afterwards.
  */
 export async function transferOrg(orgId: string, toUserId: string): Promise<void> {
-    const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { ownerId: true } });
+    const org = await prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { ownerId: true }
+    });
     if (!org) throw new OrgError("That organization no longer exists");
     if (org.ownerId === toUserId) return;
 
@@ -755,7 +801,8 @@ export async function transferOrg(orgId: string, toUserId: string): Promise<void
         where: { orgId_userId: { orgId, userId: toUserId } },
         select: { id: true }
     });
-    if (!membership) throw new OrgError("Only somebody already on the roster can be given the organization");
+    if (!membership)
+        throw new OrgError("Only somebody already on the roster can be given the organization");
 
     await prisma.$transaction([
         prisma.organizationMember.delete({ where: { orgId_userId: { orgId, userId: toUserId } } }),
@@ -777,7 +824,10 @@ export async function deleteOrg(orgId: string): Promise<void> {
     // cascade cannot stop a container: without this the services it was running
     // stay up on their servers with nothing left in Polaris pointing at them.
     // Reached at call time because deploy-service reads organizations from here.
-    const projects = await prisma.project.findMany({ where: { orgId }, select: { id: true, ownerId: true } });
+    const projects = await prisma.project.findMany({
+        where: { orgId },
+        select: { id: true, ownerId: true }
+    });
     if (projects.length > 0) {
         const { tearDownProject } = await import("@/lib/deploy-service");
         for (const project of projects) {
@@ -812,7 +862,10 @@ export async function orgDeletionImpact(
  * something nobody chose.
  */
 async function assertRoleExists(orgId: string, slug: string): Promise<void> {
-    const role = await prisma.orgRole.findUnique({ where: { orgId_slug: { orgId, slug } }, select: { id: true } });
+    const role = await prisma.orgRole.findUnique({
+        where: { orgId_slug: { orgId, slug } },
+        select: { id: true }
+    });
     if (!role) throw new OrgError("This organization has no role by that name");
 }
 
@@ -826,7 +879,10 @@ async function assertRoleExists(orgId: string, slug: string): Promise<void> {
 export async function setOrgMemberRole(orgId: string, userId: string, role: string): Promise<void> {
     await ensureSystemRoles(orgId);
     await assertRoleExists(orgId, role);
-    await prisma.organizationMember.update({ where: { orgId_userId: { orgId, userId } }, data: { role } });
+    await prisma.organizationMember.update({
+        where: { orgId_userId: { orgId, userId } },
+        data: { role }
+    });
 }
 
 /** Take somebody off the roster, and off every team with it - a team membership
@@ -842,7 +898,9 @@ export async function createTeam(orgId: string, input: core.TeamInput): Promise<
     const policy = await organizationPolicy();
     const count = await prisma.team.count({ where: { orgId } });
     if (!core.withinLimit(policy.maxTeams, count)) {
-        throw new OrgError(`This organization is at the ${policy.maxTeams}-team limit for this Polaris`);
+        throw new OrgError(
+            `This organization is at the ${policy.maxTeams}-team limit for this Polaris`
+        );
     }
     const clash = await prisma.team.findUnique({
         where: { orgId_slug: { orgId, slug: input.slug } },
@@ -864,7 +922,8 @@ export async function updateTeam(teamId: string, input: core.TeamInput): Promise
         where: { orgId_slug: { orgId: team.orgId, slug: input.slug } },
         select: { id: true }
     });
-    if (clash && clash.id !== teamId) throw new OrgError("This organization already has a team with that handle");
+    if (clash && clash.id !== teamId)
+        throw new OrgError("This organization already has a team with that handle");
 
     await prisma.team.update({
         where: { id: teamId },
@@ -896,7 +955,10 @@ export async function addTeamMember(
     });
     if (!user) throw new OrgError("No account matches that email or username");
 
-    const org = await prisma.organization.findUnique({ where: { id: team.orgId }, select: { ownerId: true } });
+    const org = await prisma.organization.findUnique({
+        where: { id: team.orgId },
+        select: { ownerId: true }
+    });
     const onRoster =
         org?.ownerId === user.id ||
         (await prisma.organizationMember.findUnique({
@@ -914,8 +976,15 @@ export async function addTeamMember(
     return user.id;
 }
 
-export async function setTeamMemberRole(teamId: string, userId: string, role: core.TeamRole): Promise<void> {
-    await prisma.teamMember.update({ where: { teamId_userId: { teamId, userId } }, data: { role } });
+export async function setTeamMemberRole(
+    teamId: string,
+    userId: string,
+    role: core.TeamRole
+): Promise<void> {
+    await prisma.teamMember.update({
+        where: { teamId_userId: { teamId, userId } },
+        data: { role }
+    });
 }
 
 export async function removeTeamMember(teamId: string, userId: string): Promise<void> {
@@ -927,7 +996,11 @@ export async function removeTeamMember(teamId: string, userId: string): Promise<
 // ---------------------------------------------------------------------------
 
 /** Grant, or re-grant at a different role, a team's access to a whole space. */
-export async function grantTeamSpace(teamId: string, spaceId: string, role: core.SpaceRole): Promise<void> {
+export async function grantTeamSpace(
+    teamId: string,
+    spaceId: string,
+    role: core.SpaceRole
+): Promise<void> {
     await prisma.taskSpaceTeam.upsert({
         where: { spaceId_teamId: { spaceId, teamId } },
         update: { role },
@@ -939,7 +1012,11 @@ export async function revokeTeamSpace(teamId: string, spaceId: string): Promise<
     await prisma.taskSpaceTeam.deleteMany({ where: { teamId, spaceId } });
 }
 
-export async function grantTeamFolder(teamId: string, folderId: string, role: core.SpaceRole): Promise<void> {
+export async function grantTeamFolder(
+    teamId: string,
+    folderId: string,
+    role: core.SpaceRole
+): Promise<void> {
     await prisma.taskFolderTeam.upsert({
         where: { folderId_teamId: { folderId, teamId } },
         update: { role },
@@ -955,7 +1032,10 @@ export async function revokeTeamFolder(teamId: string, folderId: string): Promis
  *  that owns it. A personal space has none, which is what makes the picker say
  *  so rather than offering somebody else's teams. */
 export async function teamsForSpace(spaceId: string): Promise<{ id: string; name: string }[]> {
-    const space = await prisma.taskSpace.findUnique({ where: { id: spaceId }, select: { orgId: true } });
+    const space = await prisma.taskSpace.findUnique({
+        where: { id: spaceId },
+        select: { orgId: true }
+    });
     if (!space?.orgId) return [];
     return prisma.team.findMany({
         where: { orgId: space.orgId },
@@ -973,7 +1053,11 @@ export async function spaceTeamGrants(
         select: { teamId: true, role: true, team: { select: { name: true } } }
     });
     return grants
-        .map((grant) => ({ teamId: grant.teamId, teamName: grant.team.name, role: grant.role as core.SpaceRole }))
+        .map((grant) => ({
+            teamId: grant.teamId,
+            teamName: grant.team.name,
+            role: grant.role as core.SpaceRole
+        }))
         .sort((left, right) => left.teamName.localeCompare(right.teamName));
 }
 
@@ -987,6 +1071,10 @@ export async function folderTeamGrants(
         select: { teamId: true, role: true, team: { select: { name: true } } }
     });
     return grants
-        .map((grant) => ({ teamId: grant.teamId, teamName: grant.team.name, role: grant.role as core.SpaceRole }))
+        .map((grant) => ({
+            teamId: grant.teamId,
+            teamName: grant.team.name,
+            role: grant.role as core.SpaceRole
+        }))
         .sort((left, right) => left.teamName.localeCompare(right.teamName));
 }

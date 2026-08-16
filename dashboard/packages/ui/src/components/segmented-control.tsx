@@ -75,15 +75,20 @@ export function SegmentedControl<T extends string>({
                         // Its own label when there is nothing more to say: a
                         // narrow column truncates, and a truncated option that
                         // cannot be hovered for the rest of it is a guess.
-                        title={option.title ?? (typeof option.label === "string" ? option.label : undefined)}
+                        title={
+                            option.title ??
+                            (typeof option.label === "string" ? option.label : undefined)
+                        }
                         disabled={option.disabled}
                         // Only the chosen option is in the tab order: one stop for
                         // the group, then the arrow keys choose within it.
                         tabIndex={active ? 0 : -1}
                         onClick={() => onValueChange(option.value)}
                         onKeyDown={(event) => {
-                            if (event.key === "ArrowRight" || event.key === "ArrowDown") move(index, 1);
-                            else if (event.key === "ArrowLeft" || event.key === "ArrowUp") move(index, -1);
+                            if (event.key === "ArrowRight" || event.key === "ArrowDown")
+                                move(index, 1);
+                            else if (event.key === "ArrowLeft" || event.key === "ArrowUp")
+                                move(index, -1);
                             else if (event.key === "Home") move(-1, 1);
                             else if (event.key === "End") move(0, -1);
                             else return;

@@ -91,9 +91,7 @@ function FriendsCard({
                                         size="xs"
                                         disabled={busy}
                                         onClick={() =>
-                                            void act(() =>
-                                                respondToRequestAction(request.id, true)
-                                            )
+                                            void act(() => respondToRequestAction(request.id, true))
                                         }
                                     >
                                         <UserPlus className="size-3.5" />
@@ -130,7 +128,9 @@ function FriendsCard({
                             >
                                 <Avatar person={friend} size={24} />
                                 <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-sm" title={friend.name}>{friend.name}</span>
+                                    <span className="block truncate text-sm" title={friend.name}>
+                                        {friend.name}
+                                    </span>
                                     <span className="block truncate text-xs text-muted-foreground">
                                         {friend.contact}
                                     </span>

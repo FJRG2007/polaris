@@ -82,7 +82,7 @@ export const PRIVACY_FIELD_NOTES = {
         "Who finds your account when they look for somebody. Anybody who cannot has to know your exact username to ask to be added, and is never told whether it exists.",
     lastSeen: "Whether other people can see that you are here now, or when you last were.",
     readReceipts:
-        "The ticks under a message in a direct conversation. Turning this down also stops you seeing anybody else's, and \"only\" is how you leave them on for one person.",
+        'The ticks under a message in a direct conversation. Turning this down also stops you seeing anybody else\'s, and "only" is how you leave them on for one person.',
     avatar: "Who sees your photo. Anybody who cannot gets your initials instead.",
     email: "Who sees the address you sign in with. Anybody who cannot sees your name and username, which is enough to write to you here.",
     phone: "The number kept for sign-in codes. Nobody is shown it unless you say so.",

@@ -33,7 +33,10 @@ import {
     teamDetailAction
 } from "@/app/(app)/account/organizations/actions";
 
-const ROLE_OPTIONS = core.TEAM_ROLES.map((role) => ({ value: role, label: core.TEAM_ROLE_LABELS[role] }));
+const ROLE_OPTIONS = core.TEAM_ROLES.map((role) => ({
+    value: role,
+    label: core.TEAM_ROLE_LABELS[role]
+}));
 
 export function TeamPanel({
     team,
@@ -97,8 +100,8 @@ export function TeamPanel({
                 <DialogHeader>
                     <DialogTitle>{team?.name ?? "Team"}</DialogTitle>
                     <DialogDescription>
-                        {team?.description || `A team in ${orgName}.`} Everybody on it reaches whatever it has been
-                        given.
+                        {team?.description || `A team in ${orgName}.`} Everybody on it reaches
+                        whatever it has been given.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -109,7 +112,10 @@ export function TeamPanel({
                 )}
 
                 {error && (
-                    <p role="alert" className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
+                    <p
+                        role="alert"
+                        className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm"
+                    >
                         {error}
                     </p>
                 )}
@@ -131,7 +137,10 @@ export function TeamPanel({
                                             <p className="truncate text-sm">
                                                 {member.name}
                                                 {member.userId === currentUserId ? (
-                                                    <span className="text-muted-foreground"> (you)</span>
+                                                    <span className="text-muted-foreground">
+                                                        {" "}
+                                                        (you)
+                                                    </span>
                                                 ) : null}
                                             </p>
                                             <p
@@ -174,12 +183,20 @@ export function TeamPanel({
                                                         ? "Leave this team"
                                                         : `Remove ${member.name}`
                                                 }
-                                                title={member.userId === currentUserId ? "Leave" : "Remove"}
+                                                title={
+                                                    member.userId === currentUserId
+                                                        ? "Leave"
+                                                        : "Remove"
+                                                }
                                                 className="text-muted-foreground hover:bg-danger/10 hover:text-danger rounded p-1 transition-colors"
                                                 onClick={async () => {
                                                     if (!teamId) return;
                                                     await runAction(
-                                                        () => removeTeamMemberAction(teamId, member.userId),
+                                                        () =>
+                                                            removeTeamMemberAction(
+                                                                teamId,
+                                                                member.userId
+                                                            ),
                                                         setError
                                                     );
                                                     await reload();
@@ -232,7 +249,8 @@ export function TeamPanel({
                                     <UserPlus className="size-4 shrink-0" /> Add
                                 </Button>
                                 <p className="text-muted-foreground w-full text-xs">
-                                    They have to be on the organization already. {core.TEAM_ROLE_HINTS[role]}
+                                    They have to be on the organization already.{" "}
+                                    {core.TEAM_ROLE_HINTS[role]}
                                 </p>
                             </form>
                         )}
@@ -241,8 +259,8 @@ export function TeamPanel({
                             <p className="mb-1 text-xs font-medium">What this team reaches</p>
                             {grants.length === 0 ? (
                                 <p className="text-muted-foreground text-xs">
-                                    Nothing yet. A space is given to a team from that space&apos;s own access
-                                    settings in Tasks.
+                                    Nothing yet. A space is given to a team from that space&apos;s
+                                    own access settings in Tasks.
                                 </p>
                             ) : (
                                 <ul className="flex flex-col gap-1">

@@ -42,7 +42,12 @@ const { clearSuccessor, isSuccessorOf, setSuccessor, SuccessorError } = await im
 function named(successorId: string) {
     successorFindUnique.mockResolvedValue({
         acknowledgedAt: new Date("2026-01-01T00:00:00.000Z"),
-        successor: { id: successorId, name: "Ana Garcia", email: "ana@example.com", username: "ana" }
+        successor: {
+            id: successorId,
+            name: "Ana Garcia",
+            email: "ana@example.com",
+            username: "ana"
+        }
     });
 }
 
@@ -73,7 +78,9 @@ describe("setSuccessor", () => {
         named("heir-1");
 
         await setSuccessor("me", "  ana   garcia ");
-        expect(userFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { name: "Ana Garcia" } }));
+        expect(userFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { name: "Ana Garcia" } })
+        );
     });
 
     it("refuses a name two accounts share rather than guessing", async () => {
@@ -86,7 +93,9 @@ describe("setSuccessor", () => {
     });
 
     it("refuses somebody who does not exist", async () => {
-        await expect(setSuccessor("me", "nobody@example.com")).rejects.toBeInstanceOf(SuccessorError);
+        await expect(setSuccessor("me", "nobody@example.com")).rejects.toBeInstanceOf(
+            SuccessorError
+        );
         expect(successorUpsert).not.toHaveBeenCalled();
     });
 

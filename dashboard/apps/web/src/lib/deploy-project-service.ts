@@ -95,7 +95,10 @@ export async function getProjectSettings(projectId: string): Promise<ProjectSett
         ownerName: project.owner.name,
         createdAt: project.createdAt.toISOString(),
         environments,
-        serviceCount: environments.reduce((total, environment) => total + environment.serviceCount, 0)
+        serviceCount: environments.reduce(
+            (total, environment) => total + environment.serviceCount,
+            0
+        )
     };
 }
 
@@ -129,17 +132,26 @@ export async function updateProjectGeneral(input: {
     });
 }
 
-export async function setProjectVisibility(projectId: string, visibility: ProjectVisibility): Promise<void> {
+export async function setProjectVisibility(
+    projectId: string,
+    visibility: ProjectVisibility
+): Promise<void> {
     await prisma.project.update({ where: { id: projectId }, data: { visibility } });
 }
 
 export async function setProjectFlags(projectId: string, flags: ProjectFlags): Promise<void> {
-    await prisma.project.update({ where: { id: projectId }, data: { flags: JSON.stringify(flags) } });
+    await prisma.project.update({
+        where: { id: projectId },
+        data: { flags: JSON.stringify(flags) }
+    });
 }
 
 /** A project's flags, defaulted, for the code paths that act on them. */
 export async function getProjectFlags(projectId: string): Promise<ProjectFlags> {
-    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { flags: true } });
+    const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { flags: true }
+    });
     return project ? parseProjectFlags(project.flags) : defaultProjectFlags();
 }
 
@@ -241,18 +253,30 @@ export async function addProjectMember(input: {
     });
     if (!user) throw new Error("No account here matches that email or username");
 
-    const project = await prisma.project.findUnique({ where: { id: input.projectId }, select: { ownerId: true } });
+    const project = await prisma.project.findUnique({
+        where: { id: input.projectId },
+        select: { ownerId: true }
+    });
     if (!project) throw new Error("Project not found");
     if (project.ownerId === user.id) throw new Error("That account already owns this project");
 
     await prisma.projectMember.upsert({
         where: { projectId_userId: { projectId: input.projectId, userId: user.id } },
-        create: { projectId: input.projectId, userId: user.id, role: input.role, invitedBy: input.invitedBy },
+        create: {
+            projectId: input.projectId,
+            userId: user.id,
+            role: input.role,
+            invitedBy: input.invitedBy
+        },
         update: { role: input.role }
     });
 }
 
-export async function setProjectMemberRole(projectId: string, memberId: string, role: ProjectRole): Promise<void> {
+export async function setProjectMemberRole(
+    projectId: string,
+    memberId: string,
+    role: ProjectRole
+): Promise<void> {
     await prisma.projectMember.updateMany({ where: { id: memberId, projectId }, data: { role } });
 }
 
@@ -305,7 +329,9 @@ export async function listProjectTokens(projectId: string): Promise<ProjectToken
 function safeList(raw: string): string[] {
     try {
         const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((entry): entry is string => typeof entry === "string")
+            : [];
     } catch {
         return [];
     }
@@ -419,7 +445,9 @@ export async function listProjectWebhooks(projectId: string): Promise<ProjectWeb
     return rows.map(toWebhookView);
 }
 
-export async function createProjectWebhook(input: ProjectWebhookInput): Promise<ProjectWebhookView> {
+export async function createProjectWebhook(
+    input: ProjectWebhookInput
+): Promise<ProjectWebhookView> {
     // Discord and Slack want their own JSON; guessing from the URL means the
     // common case needs no choice at all, and an explicit pick still wins.
     const format = input.format ?? detectWebhookFormat(input.url);
@@ -440,7 +468,11 @@ export async function createProjectWebhook(input: ProjectWebhookInput): Promise<
     return toWebhookView(row);
 }
 
-export async function setProjectWebhookEnabled(projectId: string, id: string, enabled: boolean): Promise<void> {
+export async function setProjectWebhookEnabled(
+    projectId: string,
+    id: string,
+    enabled: boolean
+): Promise<void> {
     await prisma.projectWebhook.updateMany({ where: { id, projectId }, data: { enabled } });
 }
 
@@ -477,11 +509,18 @@ async function recordWebhookResult(id: string, error: string | null): Promise<vo
 
 /** Send a sample event, so the operator finds out the endpoint is wrong now
  *  rather than during the deploy they needed to hear about. */
-export async function testProjectWebhook(projectId: string, id: string): Promise<{ error?: string }> {
-    const owned = await prisma.projectWebhook.findFirst({ where: { id, projectId }, select: { id: true } });
+export async function testProjectWebhook(
+    projectId: string,
+    id: string
+): Promise<{ error?: string }> {
+    const owned = await prisma.projectWebhook.findFirst({
+        where: { id, projectId },
+        select: { id: true }
+    });
     if (!owned) return { error: "Webhook not found" };
     const resolved = await webhookUrl(id);
-    if (!resolved) return { error: "The stored URL could not be read. Remove the webhook and add it again." };
+    if (!resolved)
+        return { error: "The stored URL could not be read. Remove the webhook and add it again." };
     const result = await sendWebhook(resolved.url, resolved.format, {
         event: "deploy.succeeded",
         level: "info",
@@ -597,7 +636,9 @@ export async function getProjectUsage(projectId: string): Promise<ProjectUsage> 
     });
     if (!project) throw new Error("Project not found");
 
-    const appIds = project.environments.flatMap((environment) => environment.applications.map((app) => app.id));
+    const appIds = project.environments.flatMap((environment) =>
+        environment.applications.map((app) => app.id)
+    );
     const volumeIds = project.environments.flatMap((environment) =>
         environment.applications.flatMap((app) => app.volumes.map((volume) => volume.id))
     );
@@ -626,7 +667,8 @@ export async function getProjectUsage(projectId: string): Promise<ProjectUsage> 
                 running: Boolean(app.currentDeploymentId),
                 cpuPercent: sample?.cpuPercent ?? null,
                 memUsedBytes: sample?.memUsedBytes != null ? Number(sample.memUsedBytes) : null,
-                volumeBytes: bytes.length > 0 ? bytes.reduce((sum, value) => sum + Number(value), 0) : null,
+                volumeBytes:
+                    bytes.length > 0 ? bytes.reduce((sum, value) => sum + Number(value), 0) : null,
                 volumeCount: app.volumes.length
             });
         }
@@ -639,7 +681,9 @@ export async function getProjectUsage(projectId: string): Promise<ProjectUsage> 
                 name: database.name,
                 kind: "database",
                 environmentName: environment.name,
-                running: ["running", "active", "healthy", "ready"].includes(database.status.toLowerCase()),
+                running: ["running", "active", "healthy", "ready"].includes(
+                    database.status.toLowerCase()
+                ),
                 cpuPercent: null,
                 memUsedBytes: null,
                 volumeBytes: null,
@@ -648,7 +692,9 @@ export async function getProjectUsage(projectId: string): Promise<ProjectUsage> 
         }
     }
 
-    const measured = services.filter((service) => service.cpuPercent != null || service.memUsedBytes != null);
+    const measured = services.filter(
+        (service) => service.cpuPercent != null || service.memUsedBytes != null
+    );
     return {
         services,
         totals: {
@@ -656,13 +702,20 @@ export async function getProjectUsage(projectId: string): Promise<ProjectUsage> 
             running: services.filter((service) => service.running).length,
             cpuPercent:
                 measured.length > 0
-                    ? Math.round(measured.reduce((sum, service) => sum + (service.cpuPercent ?? 0), 0) * 10) / 10
+                    ? Math.round(
+                          measured.reduce((sum, service) => sum + (service.cpuPercent ?? 0), 0) * 10
+                      ) / 10
                     : null,
             memUsedBytes:
-                measured.length > 0 ? measured.reduce((sum, service) => sum + (service.memUsedBytes ?? 0), 0) : null,
+                measured.length > 0
+                    ? measured.reduce((sum, service) => sum + (service.memUsedBytes ?? 0), 0)
+                    : null,
             volumeBytes:
                 volumeSamples.size > 0
-                    ? [...volumeSamples.values()].reduce((sum, sample) => sum + Number(sample.diskUsedBytes ?? 0n), 0)
+                    ? [...volumeSamples.values()].reduce(
+                          (sum, sample) => sum + Number(sample.diskUsedBytes ?? 0n),
+                          0
+                      )
                     : null,
             volumes: volumeIds.length
         },
@@ -672,7 +725,15 @@ export async function getProjectUsage(projectId: string): Promise<ProjectUsage> 
 
 /** The newest sample per subject, keyed by subject id. */
 async function latestSamples(subjectType: string, ids: string[]) {
-    const map = new Map<string, { ts: Date; cpuPercent: number | null; memUsedBytes: bigint | null; diskUsedBytes: bigint | null }>();
+    const map = new Map<
+        string,
+        {
+            ts: Date;
+            cpuPercent: number | null;
+            memUsedBytes: bigint | null;
+            diskUsedBytes: bigint | null;
+        }
+    >();
     if (ids.length === 0) return map;
     // A window rather than the whole table: a sample older than this describes a
     // container that is no longer reporting, and showing it as current would be
@@ -681,7 +742,13 @@ async function latestSamples(subjectType: string, ids: string[]) {
     const rows = await prisma.metricSample.findMany({
         where: { subjectType, subjectId: { in: ids }, ts: { gte: since } },
         orderBy: { ts: "asc" },
-        select: { subjectId: true, ts: true, cpuPercent: true, memUsedBytes: true, diskUsedBytes: true }
+        select: {
+            subjectId: true,
+            ts: true,
+            cpuPercent: true,
+            memUsedBytes: true,
+            diskUsedBytes: true
+        }
     });
     for (const row of rows) {
         map.set(row.subjectId, {
@@ -716,7 +783,10 @@ export async function exportProjectTemplate(projectId: string): Promise<Record<s
                 include: {
                     applications: {
                         orderBy: { createdAt: "asc" },
-                        include: { volumes: true, domains: { select: { kind: true, targetPort: true } } }
+                        include: {
+                            volumes: true,
+                            domains: { select: { kind: true, targetPort: true } }
+                        }
                     },
                     databases: { orderBy: { createdAt: "asc" } }
                 }
@@ -727,7 +797,9 @@ export async function exportProjectTemplate(projectId: string): Promise<Record<s
 
     const scopeIds = [
         ...project.environments.map((environment) => environment.id),
-        ...project.environments.flatMap((environment) => environment.applications.map((app) => app.id))
+        ...project.environments.flatMap((environment) =>
+            environment.applications.map((app) => app.id)
+        )
     ];
     const variables = await prisma.envVar.findMany({
         where: { scopeId: { in: scopeIds } },

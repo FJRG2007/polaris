@@ -26,10 +26,7 @@ let dns = new Map<string, string[]>();
  */
 const network = vi.hoisted(() => ({
     fetched: [] as string[],
-    responses: new Map<
-        string,
-        { status: number; headers: Record<string, string>; body: string }
-    >()
+    responses: new Map<string, { status: number; headers: Record<string, string>; body: string }>()
 }));
 
 vi.mock("undici", () => ({

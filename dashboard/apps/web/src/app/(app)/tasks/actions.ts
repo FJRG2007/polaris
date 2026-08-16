@@ -36,7 +36,9 @@ import * as automations from "@/lib/tasks/automation-service";
 const TASKS_PATH = "/tasks";
 
 /** The caller, once the instance permission has been established. */
-async function actor(permission: "tasks.read" | "tasks.manage" = "tasks.manage"): Promise<access.TaskActor> {
+async function actor(
+    permission: "tasks.read" | "tasks.manage" = "tasks.manage"
+): Promise<access.TaskActor> {
     const user = await requirePermission(permission);
     return { id: user.id, isAdmin: user.isAdmin };
 }
@@ -46,7 +48,8 @@ async function actor(permission: "tasks.read" | "tasks.manage" = "tasks.manage")
  *  logged rather than shown. */
 function failure(caught: unknown, fallback: string): { error: string } {
     if (caught instanceof access.TaskAccessError) return { error: caught.message };
-    if (caught instanceof Error && caught.message && !caught.message.includes("\n")) return { error: caught.message };
+    if (caught instanceof Error && caught.message && !caught.message.includes("\n"))
+        return { error: caught.message };
     console.error(caught);
     return { error: fallback };
 }
@@ -67,7 +70,10 @@ function failure(caught: unknown, fallback: string): { error: string } {
  * keeps to themselves, a timer that was not running - so it announces nothing
  * rather than waking the whole instance to look at something private.
  */
-function refresh(caller: access.TaskActor, where?: string | readonly (string | null)[] | null): void {
+function refresh(
+    caller: access.TaskActor,
+    where?: string | readonly (string | null)[] | null
+): void {
     revalidatePath(TASKS_PATH, "layout");
     const named = typeof where === "string" ? [where] : (where ?? []);
     for (const spaceId of new Set(named.filter((id): id is string => Boolean(id)))) {
@@ -82,12 +88,14 @@ function refresh(caller: access.TaskActor, where?: string | readonly (string | n
 export async function createSpaceAction(input: unknown): Promise<{ id?: string; error?: string }> {
     const caller = await actor();
     const parsed = core.spaceSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
         // Creating work on an organization's behalf takes being allowed to run
         // its work, so somebody who merely belongs to it cannot put a space
         // nobody asked for on the group's shelf.
-        if (parsed.data.orgId) await orgs.requireOrgPermission(caller, parsed.data.orgId, "spaces.manage");
+        if (parsed.data.orgId)
+            await orgs.requireOrgPermission(caller, parsed.data.orgId, "spaces.manage");
         const created = await spaces.createSpace(caller.id, parsed.data);
         // Stamped with the organization when it has one, so the group's own
         // history records the work being made rather than only the maker's.
@@ -105,10 +113,14 @@ export async function createSpaceAction(input: unknown): Promise<{ id?: string; 
     }
 }
 
-export async function updateSpaceAction(spaceId: string, input: unknown): Promise<{ error?: string }> {
+export async function updateSpaceAction(
+    spaceId: string,
+    input: unknown
+): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.spaceSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await spaces.updateSpace(spaceId, parsed.data);
@@ -125,7 +137,12 @@ export async function deleteSpaceAction(spaceId: string): Promise<{ error?: stri
         const role = await access.requireSpace(caller, spaceId, "admin");
         if (role !== "owner") return { error: "Only the space owner can delete it" };
         await spaces.deleteSpace(spaceId);
-        await recordAudit({ actorId: caller.id, action: "tasks.space.delete", targetType: "space", targetId: spaceId });
+        await recordAudit({
+            actorId: caller.id,
+            action: "tasks.space.delete",
+            targetType: "space",
+            targetId: spaceId
+        });
         refresh(caller, spaceId);
         return {};
     } catch (caught) {
@@ -165,7 +182,10 @@ export async function setSpaceMemberRoleAction(
     }
 }
 
-export async function removeSpaceMemberAction(spaceId: string, userId: string): Promise<{ error?: string }> {
+export async function removeSpaceMemberAction(
+    spaceId: string,
+    userId: string
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         await access.requireSpace(caller, spaceId, "admin");
@@ -184,7 +204,8 @@ export async function createFolderAction(input: unknown): Promise<{ id?: string;
     try {
         // A subfolder is authorized against the folder it goes into, so somebody
         // invited to one client can organise inside it without holding the space.
-        if (parsed.data.parentId) await access.requireFolder(caller, parsed.data.parentId, "member");
+        if (parsed.data.parentId)
+            await access.requireFolder(caller, parsed.data.parentId, "member");
         else await access.requireSpace(caller, parsed.data.spaceId, "member");
         const id = await spaces.createFolder(parsed.data);
         refresh(caller, parsed.data.spaceId);
@@ -194,7 +215,10 @@ export async function createFolderAction(input: unknown): Promise<{ id?: string;
     }
 }
 
-export async function renameFolderAction(folderId: string, name: string): Promise<{ error?: string }> {
+export async function renameFolderAction(
+    folderId: string,
+    name: string
+): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.containerName.safeParse(name);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a name" };
@@ -221,7 +245,10 @@ export async function deleteFolderAction(folderId: string): Promise<{ error?: st
 }
 
 /** Reparent or reposition a folder after a drag in the sidebar. */
-export async function moveFolderAction(folderId: string, move: unknown): Promise<{ error?: string }> {
+export async function moveFolderAction(
+    folderId: string,
+    move: unknown
+): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.containerMoveSchema.safeParse(move);
     if (!parsed.success) return { error: "Could not work out where that was dropped" };
@@ -229,7 +256,8 @@ export async function moveFolderAction(folderId: string, move: unknown): Promise
         const { spaceId } = await access.requireFolder(caller, folderId, "member");
         // Both ends are checked: dragging out of a branch you may edit into one
         // you may not is still a write to the destination.
-        if (parsed.data.parentId) await access.requireFolder(caller, parsed.data.parentId, "member");
+        if (parsed.data.parentId)
+            await access.requireFolder(caller, parsed.data.parentId, "member");
         else await access.requireSpace(caller, spaceId, "member");
         await spaces.moveFolder(spaceId, folderId, parsed.data);
         refresh(caller, spaceId);
@@ -247,7 +275,8 @@ export async function moveListAction(listId: string, move: unknown): Promise<{ e
     if (!parsed.success) return { error: "Could not work out where that was dropped" };
     try {
         const { spaceId } = await access.requireList(caller, listId, "member");
-        if (parsed.data.parentId) await access.requireFolder(caller, parsed.data.parentId, "member");
+        if (parsed.data.parentId)
+            await access.requireFolder(caller, parsed.data.parentId, "member");
         else await access.requireSpace(caller, spaceId, "member");
         await spaces.moveList(spaceId, listId, parsed.data);
         refresh(caller, spaceId);
@@ -317,7 +346,10 @@ export async function setFolderMemberRoleAction(
     }
 }
 
-export async function removeFolderMemberAction(folderId: string, userId: string): Promise<{ error?: string }> {
+export async function removeFolderMemberAction(
+    folderId: string,
+    userId: string
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         const { spaceId } = await access.requireFolder(caller, folderId, "admin");
@@ -332,7 +364,10 @@ export async function removeFolderMemberAction(folderId: string, userId: string)
 /** Who a new space could belong to besides the person making it. Fetched when
  *  the create form opens rather than sent with every page, because most people
  *  are in no organization at all and the form then asks nothing extra. */
-export async function spaceOwnerOptionsAction(): Promise<{ orgs?: { id: string; name: string }[]; error?: string }> {
+export async function spaceOwnerOptionsAction(): Promise<{
+    orgs?: { id: string; name: string }[];
+    error?: string;
+}> {
     const caller = await actor();
     try {
         return { orgs: await orgs.listAdministeredOrgs(caller) };
@@ -374,7 +409,10 @@ export async function grantSpaceTeamAction(
     }
 }
 
-export async function revokeSpaceTeamAction(spaceId: string, teamId: string): Promise<{ error?: string }> {
+export async function revokeSpaceTeamAction(
+    spaceId: string,
+    teamId: string
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         await access.requireSpace(caller, spaceId, "admin");
@@ -409,7 +447,10 @@ export async function grantFolderTeamAction(
     }
 }
 
-export async function revokeFolderTeamAction(folderId: string, teamId: string): Promise<{ error?: string }> {
+export async function revokeFolderTeamAction(
+    folderId: string,
+    teamId: string
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         const { spaceId } = await access.requireFolder(caller, folderId, "admin");
@@ -488,12 +529,14 @@ export async function createContextAction(
 export async function createListAction(input: unknown): Promise<{ id?: string; error?: string }> {
     const caller = await actor();
     const parsed = core.listSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
         // Authorized against the folder it goes into when there is one, so
         // somebody invited to a single project can add a list inside it without
         // being handed the space around it.
-        if (parsed.data.folderId) await access.requireFolder(caller, parsed.data.folderId, "member");
+        if (parsed.data.folderId)
+            await access.requireFolder(caller, parsed.data.folderId, "member");
         else await access.requireSpace(caller, parsed.data.spaceId, "member");
         const id = await spaces.createList(parsed.data);
         refresh(caller, parsed.data.spaceId);
@@ -514,9 +557,11 @@ export async function ensureListAction(
 ): Promise<{ list?: { id: string; name: string }; error?: string }> {
     const caller = await actor();
     const parsed = core.listSchema.safeParse({ spaceId, folderId, name: core.DEFAULT_LIST_NAME });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        if (parsed.data.folderId) await access.requireFolder(caller, parsed.data.folderId, "member");
+        if (parsed.data.folderId)
+            await access.requireFolder(caller, parsed.data.folderId, "member");
         else await access.requireSpace(caller, parsed.data.spaceId, "member");
         const list = await spaces.ensureList(parsed.data);
         refresh(caller, parsed.data.spaceId);
@@ -526,12 +571,16 @@ export async function ensureListAction(
     }
 }
 
-export async function updateListAction(listId: string, input: unknown): Promise<{ error?: string }> {
+export async function updateListAction(
+    listId: string,
+    input: unknown
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         const { spaceId } = await access.requireList(caller, listId, "member");
         const parsed = core.listSchema.safeParse({ ...(input as object), spaceId });
-        if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        if (!parsed.success)
+            return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
         await spaces.updateList(listId, parsed.data);
         refresh(caller, spaceId);
         return {};
@@ -556,7 +605,10 @@ export async function renameListAction(listId: string, name: string): Promise<{ 
     }
 }
 
-export async function renameSpaceAction(spaceId: string, name: string): Promise<{ error?: string }> {
+export async function renameSpaceAction(
+    spaceId: string,
+    name: string
+): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.containerName.safeParse(name);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a name" };
@@ -592,10 +644,16 @@ export async function createStatusAction(
 ): Promise<{ id?: string; error?: string }> {
     const caller = await actor();
     const parsed = core.statusSchema.safeParse({ spaceId, ...input });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the status and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the status and try again" };
     try {
         await access.requireSpace(caller, spaceId, "admin");
-        const id = await spaces.createStatus(spaceId, parsed.data.name, parsed.data.type, parsed.data.color);
+        const id = await spaces.createStatus(
+            spaceId,
+            parsed.data.name,
+            parsed.data.type,
+            parsed.data.color
+        );
         refresh(caller, spaceId);
         return { id };
     } catch (caught) {
@@ -610,7 +668,8 @@ export async function updateStatusAction(
 ): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.statusSchema.safeParse({ spaceId, ...input });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the status and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the status and try again" };
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await spaces.updateStatus(spaceId, statusId, parsed.data);
@@ -637,7 +696,10 @@ export async function deleteStatusAction(
     }
 }
 
-export async function reorderStatusesAction(spaceId: string, orderedIds: string[]): Promise<{ error?: string }> {
+export async function reorderStatusesAction(
+    spaceId: string,
+    orderedIds: string[]
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         await access.requireSpace(caller, spaceId, "admin");
@@ -649,10 +711,15 @@ export async function reorderStatusesAction(spaceId: string, orderedIds: string[
     }
 }
 
-export async function createTagAction(spaceId: string, name: string, color: string): Promise<{ id?: string; error?: string }> {
+export async function createTagAction(
+    spaceId: string,
+    name: string,
+    color: string
+): Promise<{ id?: string; error?: string }> {
     const caller = await actor();
     const parsed = core.tagSchema.safeParse({ spaceId, name, color });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the tag and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the tag and try again" };
     try {
         await access.requireSpace(caller, spaceId, "member");
         const id = await spaces.createTag(spaceId, parsed.data.name, parsed.data.color);
@@ -671,7 +738,8 @@ export async function updateTagAction(
 ): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.tagSchema.safeParse({ spaceId, name, color });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the tag and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the tag and try again" };
     try {
         await access.requireSpace(caller, spaceId, "member");
         await spaces.updateTag(spaceId, tagId, parsed.data.name, parsed.data.color);
@@ -697,7 +765,8 @@ export async function deleteTagAction(spaceId: string, tagId: string): Promise<{
 export async function createCustomFieldAction(input: unknown): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.customFieldSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the field and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the field and try again" };
     try {
         await access.requireSpace(caller, parsed.data.spaceId, "admin");
         await spaces.createCustomField(parsed.data);
@@ -715,7 +784,8 @@ export async function updateCustomFieldAction(
 ): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.customFieldSchema.safeParse({ ...(input as object), spaceId });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the field and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the field and try again" };
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await spaces.updateCustomField(spaceId, fieldId, parsed.data);
@@ -726,7 +796,10 @@ export async function updateCustomFieldAction(
     }
 }
 
-export async function deleteCustomFieldAction(spaceId: string, fieldId: string): Promise<{ error?: string }> {
+export async function deleteCustomFieldAction(
+    spaceId: string,
+    fieldId: string
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         await access.requireSpace(caller, spaceId, "admin");
@@ -742,10 +815,13 @@ export async function deleteCustomFieldAction(spaceId: string, fieldId: string):
 // Tasks
 // ---------------------------------------------------------------------------
 
-export async function createTaskAction(input: unknown): Promise<{ id?: string; reference?: string; error?: string }> {
+export async function createTaskAction(
+    input: unknown
+): Promise<{ id?: string; reference?: string; error?: string }> {
     const caller = await actor();
     const parsed = core.taskCreateSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the task and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the task and try again" };
     try {
         const { spaceId } = await access.requireList(caller, parsed.data.listId, "member");
         const created = await tasks.createTask(caller.id, spaceId, parsed.data);
@@ -759,7 +835,8 @@ export async function createTaskAction(input: unknown): Promise<{ id?: string; r
 export async function updateTaskAction(input: unknown): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.taskUpdateSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the task and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the task and try again" };
     try {
         const { spaceId } = await access.requireTask(caller, parsed.data.taskId, "member");
         await tasks.updateTask(caller.id, parsed.data);
@@ -796,14 +873,19 @@ export async function arrangeTasksAction(input: unknown): Promise<{ error?: stri
         const cleared = await access.writableTasks(caller, parsed.data.taskIds, "member");
         const writable = new Set(cleared.map((task) => task.id));
         await tasks.arrangeTasks(parsed.data.taskIds.filter((id) => writable.has(id)));
-        refresh(caller, cleared.map((task) => task.spaceId));
+        refresh(
+            caller,
+            cleared.map((task) => task.spaceId)
+        );
         return {};
     } catch (caught) {
         return failure(caught, "Could not keep that order");
     }
 }
 
-export async function bulkUpdateAction(input: unknown): Promise<{ count?: number; error?: string }> {
+export async function bulkUpdateAction(
+    input: unknown
+): Promise<{ count?: number; error?: string }> {
     const caller = await actor();
     const parsed = core.taskBulkSchema.safeParse(input);
     if (!parsed.success) return { error: "Check the selection and try again" };
@@ -813,7 +895,10 @@ export async function bulkUpdateAction(input: unknown): Promise<{ count?: number
         // destination arrives from the browser like the rest of it.
         if (parsed.data.listId) await access.requireList(caller, parsed.data.listId, "member");
         const count = await tasks.bulkUpdate(caller.id, writable, parsed.data);
-        refresh(caller, writable.map((task) => task.spaceId));
+        refresh(
+            caller,
+            writable.map((task) => task.spaceId)
+        );
         return { count };
     } catch (caught) {
         return failure(caught, "Could not apply that change");
@@ -823,14 +908,19 @@ export async function bulkUpdateAction(input: unknown): Promise<{ count?: number
 /** Delete a selection. The ids arrive from the browser like any other list, so
  *  what is actually deleted is the part of it the caller was cleared to write -
  *  the same narrowing a bulk edit goes through. */
-export async function deleteTasksAction(input: unknown): Promise<{ count?: number; error?: string }> {
+export async function deleteTasksAction(
+    input: unknown
+): Promise<{ count?: number; error?: string }> {
     const caller = await actor();
     const parsed = core.taskSelectionSchema.safeParse(input);
     if (!parsed.success) return { error: "Check the selection and try again" };
     try {
         const writable = await access.writableTasks(caller, parsed.data.taskIds, "member");
         const count = await tasks.deleteTasks(writable.map((task) => task.id));
-        refresh(caller, writable.map((task) => task.spaceId));
+        refresh(
+            caller,
+            writable.map((task) => task.spaceId)
+        );
         return { count };
     } catch (caught) {
         return failure(caught, "Could not delete those tasks");
@@ -849,7 +939,9 @@ export async function deleteTaskAction(taskId: string): Promise<{ error?: string
     }
 }
 
-export async function duplicateTaskAction(taskId: string): Promise<{ id?: string; error?: string }> {
+export async function duplicateTaskAction(
+    taskId: string
+): Promise<{ id?: string; error?: string }> {
     const caller = await actor();
     try {
         const { spaceId } = await access.requireTask(caller, taskId, "member");
@@ -876,7 +968,10 @@ export async function getTaskDetailAction(taskId: string): Promise<{
     }
 }
 
-export async function setWatchingAction(taskId: string, watching: boolean): Promise<{ error?: string }> {
+export async function setWatchingAction(
+    taskId: string,
+    watching: boolean
+): Promise<{ error?: string }> {
     const caller = await actor("tasks.read");
     try {
         await access.requireTask(caller, taskId, "guest");
@@ -894,7 +989,8 @@ export async function setWatchingAction(taskId: string, watching: boolean): Prom
 export async function addCommentAction(input: unknown): Promise<{ error?: string }> {
     const caller = await actor("tasks.read");
     const parsed = core.commentSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Write something first" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Write something first" };
     try {
         const { spaceId } = await access.requireTask(caller, parsed.data.taskId, "guest");
         await details.addComment(caller.id, parsed.data);
@@ -905,10 +1001,15 @@ export async function addCommentAction(input: unknown): Promise<{ error?: string
     }
 }
 
-export async function editCommentAction(taskId: string, commentId: string, body: string): Promise<{ error?: string }> {
+export async function editCommentAction(
+    taskId: string,
+    commentId: string,
+    body: string
+): Promise<{ error?: string }> {
     const caller = await actor("tasks.read");
     const parsed = core.commentSchema.shape.body.safeParse(body);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Write something first" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Write something first" };
     try {
         const { spaceId } = await access.requireTask(caller, taskId, "guest");
         await details.editComment(caller.id, commentId, parsed.data);
@@ -919,7 +1020,10 @@ export async function editCommentAction(taskId: string, commentId: string, body:
     }
 }
 
-export async function deleteCommentAction(taskId: string, commentId: string): Promise<{ error?: string }> {
+export async function deleteCommentAction(
+    taskId: string,
+    commentId: string
+): Promise<{ error?: string }> {
     const caller = await actor("tasks.read");
     try {
         const { role, spaceId } = await access.requireTask(caller, taskId, "guest");
@@ -947,7 +1051,10 @@ export async function resolveCommentAction(
     }
 }
 
-export async function createChecklistAction(taskId: string, name: string): Promise<{ error?: string }> {
+export async function createChecklistAction(
+    taskId: string,
+    name: string
+): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.checklistSchema.safeParse({ taskId, name });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a name" };
@@ -999,7 +1106,10 @@ export async function moveChecklistItemAction(
     }
 }
 
-export async function deleteChecklistAction(taskId: string, checklistId: string): Promise<{ error?: string }> {
+export async function deleteChecklistAction(
+    taskId: string,
+    checklistId: string
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         const { spaceId } = await access.requireTask(caller, taskId, "member");
@@ -1047,7 +1157,10 @@ export async function setChecklistItemDoneAction(
     }
 }
 
-export async function deleteChecklistItemAction(taskId: string, itemId: string): Promise<{ error?: string }> {
+export async function deleteChecklistItemAction(
+    taskId: string,
+    itemId: string
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         const { spaceId } = await access.requireTask(caller, taskId, "member");
@@ -1060,7 +1173,10 @@ export async function deleteChecklistItemAction(taskId: string, itemId: string):
 }
 
 /** Promote a checklist step to a task of its own in the same list. */
-export async function promoteChecklistItemAction(taskId: string, itemId: string): Promise<{ id?: string; error?: string }> {
+export async function promoteChecklistItemAction(
+    taskId: string,
+    itemId: string
+): Promise<{ id?: string; error?: string }> {
     const caller = await actor();
     try {
         const { listId, spaceId } = await access.requireTask(caller, taskId, "member");
@@ -1107,7 +1223,10 @@ export async function addDependencyAction(input: unknown): Promise<{ error?: str
     }
 }
 
-export async function removeDependencyAction(taskId: string, dependencyId: string): Promise<{ error?: string }> {
+export async function removeDependencyAction(
+    taskId: string,
+    dependencyId: string
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         const { spaceId } = await access.requireTask(caller, taskId, "member");
@@ -1135,7 +1254,11 @@ export async function setCustomValueAction(
     }
 }
 
-export async function addReminderAction(taskId: string, remindAt: string, note: string): Promise<{ error?: string }> {
+export async function addReminderAction(
+    taskId: string,
+    remindAt: string,
+    note: string
+): Promise<{ error?: string }> {
     const caller = await actor("tasks.read");
     const parsed = core.reminderSchema.safeParse({ taskId, remindAt, note });
     if (!parsed.success) return { error: "Pick a date and time" };
@@ -1183,7 +1306,8 @@ export async function setTaskShareAction(input: unknown): Promise<{
 }> {
     const caller = await actor();
     const parsed = core.taskShareSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
         await access.requireTask(caller, parsed.data.taskId, "member");
         const share = await shares.setTaskShare(caller.id, parsed.data);
@@ -1207,10 +1331,14 @@ export async function sendTaskShareAction(input: unknown): Promise<{
     const user = await requirePermission("tasks.manage");
     const caller: access.TaskActor = { id: user.id, isAdmin: user.isAdmin };
     const parsed = core.taskShareEmailSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Choose who to send it to" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Choose who to send it to" };
     try {
         await access.requireTask(caller, parsed.data.taskId, "member");
-        const delivery = await shares.sendTaskByEmail({ id: user.id, name: user.name }, parsed.data);
+        const delivery = await shares.sendTaskByEmail(
+            { id: user.id, name: user.name },
+            parsed.data
+        );
         return { sent: delivery.sent, failures: delivery.failures };
     } catch (caught) {
         return failure(caught, "Could not send the task");
@@ -1223,7 +1351,10 @@ export async function sendTaskShareAction(input: unknown): Promise<{
 
 /** Uploading goes through /api/tasks/attachments, which streams the body; this
  *  is only the other half - taking one off again. */
-export async function deleteAttachmentAction(taskId: string, attachmentId: string): Promise<{ error?: string }> {
+export async function deleteAttachmentAction(
+    taskId: string,
+    attachmentId: string
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         const { spaceId } = await access.requireTask(caller, taskId, "member");
@@ -1239,7 +1370,10 @@ export async function deleteAttachmentAction(taskId: string, attachmentId: strin
     }
 }
 
-export async function linkCommitAction(taskId: string, reference: string): Promise<{ error?: string }> {
+export async function linkCommitAction(
+    taskId: string,
+    reference: string
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         const { spaceId } = await access.requireTask(caller, taskId, "member");
@@ -1252,7 +1386,10 @@ export async function linkCommitAction(taskId: string, reference: string): Promi
     }
 }
 
-export async function unlinkCommitAction(taskId: string, commitId: string): Promise<{ error?: string }> {
+export async function unlinkCommitAction(
+    taskId: string,
+    commitId: string
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         const { spaceId } = await access.requireTask(caller, taskId, "member");
@@ -1291,11 +1428,21 @@ export async function stopTimerAction(): Promise<{ seconds?: number; error?: str
     }
 }
 
-export async function addTimeEntryAction(taskId: string, duration: string, note: string, billable: boolean): Promise<{ error?: string }> {
+export async function addTimeEntryAction(
+    taskId: string,
+    duration: string,
+    note: string,
+    billable: boolean
+): Promise<{ error?: string }> {
     const caller = await actor("tasks.read");
     const minutes = core.parseDurationMinutes(duration);
     if (minutes === null || minutes <= 0) return { error: "Enter a length like 1h 30m" };
-    const parsed = core.timeEntrySchema.safeParse({ taskId, duration: minutes * 60, note, billable });
+    const parsed = core.timeEntrySchema.safeParse({
+        taskId,
+        duration: minutes * 60,
+        note,
+        billable
+    });
     if (!parsed.success) return { error: "Check the entry and try again" };
     try {
         const { spaceId } = await access.requireTask(caller, taskId, "guest");
@@ -1307,7 +1454,10 @@ export async function addTimeEntryAction(taskId: string, duration: string, note:
     }
 }
 
-export async function deleteTimeEntryAction(taskId: string, entryId: string): Promise<{ error?: string }> {
+export async function deleteTimeEntryAction(
+    taskId: string,
+    entryId: string
+): Promise<{ error?: string }> {
     const caller = await actor("tasks.read");
     try {
         const { role, spaceId } = await access.requireTask(caller, taskId, "guest");
@@ -1326,7 +1476,8 @@ export async function deleteTimeEntryAction(taskId: string, entryId: string): Pr
 export async function createViewAction(input: unknown): Promise<{ id?: string; error?: string }> {
     const caller = await actor();
     const parsed = core.taskViewSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the view and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the view and try again" };
     try {
         let spaceId: string;
         if (parsed.data.listId) {
@@ -1343,10 +1494,14 @@ export async function createViewAction(input: unknown): Promise<{ id?: string; e
     }
 }
 
-export async function updateViewAction(viewId: string, input: unknown): Promise<{ error?: string }> {
+export async function updateViewAction(
+    viewId: string,
+    input: unknown
+): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.taskViewSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the view and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the view and try again" };
     try {
         const existing = await views.getView(viewId);
         if (!existing) return { error: "That view no longer exists" };
@@ -1356,7 +1511,12 @@ export async function updateViewAction(viewId: string, input: unknown): Promise<
                   spaceId: existing.spaceId as string,
                   role: await access.requireSpace(caller, existing.spaceId as string, "member")
               };
-        await views.updateView(caller.id, viewId, parsed.data, cleared.role === "owner" || cleared.role === "admin");
+        await views.updateView(
+            caller.id,
+            viewId,
+            parsed.data,
+            cleared.role === "owner" || cleared.role === "admin"
+        );
         refresh(caller, cleared.spaceId);
         return {};
     } catch (caught) {
@@ -1375,7 +1535,11 @@ export async function deleteViewAction(viewId: string): Promise<{ error?: string
                   spaceId: existing.spaceId as string,
                   role: await access.requireSpace(caller, existing.spaceId as string, "member")
               };
-        await views.deleteView(caller.id, viewId, cleared.role === "owner" || cleared.role === "admin");
+        await views.deleteView(
+            caller.id,
+            viewId,
+            cleared.role === "owner" || cleared.role === "admin"
+        );
         refresh(caller, cleared.spaceId);
         return {};
     } catch (caught) {
@@ -1390,11 +1554,13 @@ export async function deleteViewAction(viewId: string): Promise<{ error?: string
 export async function createSprintAction(input: unknown): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.sprintSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the dates and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the dates and try again" };
     try {
         // A sprint planning one folder is authorized against that folder, which
         // is what lets a project run its own sprints inside a shared space.
-        if (parsed.data.folderId) await access.requireFolder(caller, parsed.data.folderId, "member");
+        if (parsed.data.folderId)
+            await access.requireFolder(caller, parsed.data.folderId, "member");
         else await access.requireSpace(caller, parsed.data.spaceId, "member");
         await planning.createSprint(parsed.data);
         refresh(caller, parsed.data.spaceId);
@@ -1404,10 +1570,15 @@ export async function createSprintAction(input: unknown): Promise<{ error?: stri
     }
 }
 
-export async function updateSprintAction(spaceId: string, sprintId: string, input: unknown): Promise<{ error?: string }> {
+export async function updateSprintAction(
+    spaceId: string,
+    sprintId: string,
+    input: unknown
+): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.sprintSchema.safeParse({ ...(input as object), spaceId });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the dates and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the dates and try again" };
     try {
         await access.requireSpace(caller, spaceId, "member");
         await planning.updateSprint(sprintId, parsed.data);
@@ -1434,7 +1605,10 @@ export async function setSprintStatusAction(
     }
 }
 
-export async function deleteSprintAction(spaceId: string, sprintId: string): Promise<{ error?: string }> {
+export async function deleteSprintAction(
+    spaceId: string,
+    sprintId: string
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         await access.requireSpace(caller, spaceId, "admin");
@@ -1446,7 +1620,10 @@ export async function deleteSprintAction(spaceId: string, sprintId: string): Pro
     }
 }
 
-export async function setTaskSprintAction(taskId: string, sprintId: string | null): Promise<{ error?: string }> {
+export async function setTaskSprintAction(
+    taskId: string,
+    sprintId: string | null
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         const { spaceId } = await access.requireTask(caller, taskId, "member");
@@ -1479,7 +1656,10 @@ async function requireGoal(caller: access.TaskActor, goalId: string): Promise<st
 }
 
 /** The same, for one of a goal's targets. */
-async function requireGoalTarget(caller: access.TaskActor, targetId: string): Promise<string | null> {
+async function requireGoalTarget(
+    caller: access.TaskActor,
+    targetId: string
+): Promise<string | null> {
     const target = await planning.goalTargetOwner(targetId);
     if (!target) throw new access.TaskAccessError("That target no longer exists");
     return requireGoal(caller, target.goalId);
@@ -1488,7 +1668,8 @@ async function requireGoalTarget(caller: access.TaskActor, targetId: string): Pr
 export async function createGoalAction(input: unknown): Promise<{ id?: string; error?: string }> {
     const caller = await actor();
     const parsed = core.goalSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the goal and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the goal and try again" };
     try {
         if (parsed.data.spaceId) await access.requireSpace(caller, parsed.data.spaceId, "member");
         const id = await planning.createGoal(caller.id, parsed.data);
@@ -1499,10 +1680,14 @@ export async function createGoalAction(input: unknown): Promise<{ id?: string; e
     }
 }
 
-export async function updateGoalAction(goalId: string, input: unknown): Promise<{ error?: string }> {
+export async function updateGoalAction(
+    goalId: string,
+    input: unknown
+): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.goalSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the goal and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the goal and try again" };
     try {
         // Both ends: the space the goal is in now, and the one the edit would
         // move it to. Checking only the destination would let anybody adopt a
@@ -1519,7 +1704,10 @@ export async function updateGoalAction(goalId: string, input: unknown): Promise<
     }
 }
 
-export async function setGoalCompletedAction(goalId: string, completed: boolean): Promise<{ error?: string }> {
+export async function setGoalCompletedAction(
+    goalId: string,
+    completed: boolean
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         const spaceId = await requireGoal(caller, goalId);
@@ -1543,10 +1731,14 @@ export async function deleteGoalAction(goalId: string): Promise<{ error?: string
     }
 }
 
-export async function addGoalTargetAction(goalId: string, input: unknown): Promise<{ error?: string }> {
+export async function addGoalTargetAction(
+    goalId: string,
+    input: unknown
+): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.goalTargetSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the target and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the target and try again" };
     try {
         const spaceId = await requireGoal(caller, goalId);
         // A `tasks` target counts a list's finished work, so naming one is a read
@@ -1560,7 +1752,10 @@ export async function addGoalTargetAction(goalId: string, input: unknown): Promi
     }
 }
 
-export async function setGoalTargetValueAction(targetId: string, value: number): Promise<{ error?: string }> {
+export async function setGoalTargetValueAction(
+    targetId: string,
+    value: number
+): Promise<{ error?: string }> {
     const caller = await actor();
     if (!Number.isFinite(value)) return { error: "Enter a number" };
     try {
@@ -1592,7 +1787,8 @@ export async function deleteGoalTargetAction(targetId: string): Promise<{ error?
 export async function createAutomationAction(input: unknown): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.automationSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the rule and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the rule and try again" };
     if (!parsed.data.spaceId) return { error: "A rule has to belong to a space" };
     try {
         await access.requireSpace(caller, parsed.data.spaceId, "admin");
@@ -1611,7 +1807,8 @@ export async function updateAutomationAction(
 ): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.automationSchema.safeParse({ ...(input as object), spaceId });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the rule and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the rule and try again" };
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await automations.updateAutomation(automationId, parsed.data);
@@ -1638,7 +1835,10 @@ export async function setAutomationEnabledAction(
     }
 }
 
-export async function deleteAutomationAction(spaceId: string, automationId: string): Promise<{ error?: string }> {
+export async function deleteAutomationAction(
+    spaceId: string,
+    automationId: string
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         await access.requireSpace(caller, spaceId, "admin");
@@ -1657,12 +1857,15 @@ export async function deleteAutomationAction(spaceId: string, automationId: stri
 export async function createDocAction(input: unknown): Promise<{ id?: string; error?: string }> {
     const caller = await actor();
     const parsed = core.docSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the page and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the page and try again" };
     try {
         // A page written inside a folder is authorized against that folder; one
         // the space shares needs the space itself.
-        if (parsed.data.folderId) await access.requireFolder(caller, parsed.data.folderId, "member");
-        else if (parsed.data.spaceId) await access.requireSpace(caller, parsed.data.spaceId, "member");
+        if (parsed.data.folderId)
+            await access.requireFolder(caller, parsed.data.folderId, "member");
+        else if (parsed.data.spaceId)
+            await access.requireSpace(caller, parsed.data.spaceId, "member");
         const id = await docs.createDoc(caller.id, parsed.data);
         refresh(caller, parsed.data.spaceId);
         return { id };
@@ -1694,13 +1897,16 @@ async function requireDoc(caller: access.TaskActor, docId: string): Promise<stri
 export async function updateDocAction(docId: string, input: unknown): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.docSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the page and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the page and try again" };
     try {
         // Both ends, because an edit can also move the page: where it is now, and
         // the folder or space it would land in.
         const from = await requireDoc(caller, docId);
-        if (parsed.data.folderId) await access.requireFolder(caller, parsed.data.folderId, "member");
-        else if (parsed.data.spaceId) await access.requireSpace(caller, parsed.data.spaceId, "member");
+        if (parsed.data.folderId)
+            await access.requireFolder(caller, parsed.data.folderId, "member");
+        else if (parsed.data.spaceId)
+            await access.requireSpace(caller, parsed.data.spaceId, "member");
         await docs.updateDoc(caller.id, docId, parsed.data);
         refresh(caller, [from, parsed.data.spaceId]);
         return {};
@@ -1721,10 +1927,14 @@ export async function deleteDocAction(docId: string): Promise<{ error?: string }
     }
 }
 
-export async function createFormAction(spaceId: string, input: unknown): Promise<{ error?: string }> {
+export async function createFormAction(
+    spaceId: string,
+    input: unknown
+): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.formSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the form and try again" };
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await forms.createForm(spaceId, caller.id, parsed.data);
@@ -1735,10 +1945,15 @@ export async function createFormAction(spaceId: string, input: unknown): Promise
     }
 }
 
-export async function updateFormAction(spaceId: string, formId: string, input: unknown): Promise<{ error?: string }> {
+export async function updateFormAction(
+    spaceId: string,
+    formId: string,
+    input: unknown
+): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.formSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the form and try again" };
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await forms.updateForm(formId, parsed.data);
@@ -1749,7 +1964,10 @@ export async function updateFormAction(spaceId: string, formId: string, input: u
     }
 }
 
-export async function deleteFormAction(spaceId: string, formId: string): Promise<{ error?: string }> {
+export async function deleteFormAction(
+    spaceId: string,
+    formId: string
+): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         await access.requireSpace(caller, spaceId, "admin");

@@ -189,7 +189,11 @@ export async function searchAccounts(
     // These fields store "a username or an address" and the handle is the one
     // everybody has, so hiding the address costs the picker nothing - and an
     // account with neither is left out, since there would be nothing to store.
-    const contacts = await allowedBy({ id: actor.id, isAdmin: actor.isAdmin }, "email", users.map((user) => user.id));
+    const contacts = await allowedBy(
+        { id: actor.id, isAdmin: actor.isAdmin },
+        "email",
+        users.map((user) => user.id)
+    );
     return users
         .map((user) => ({
             id: user.id,
@@ -207,12 +211,18 @@ async function reachablePeople(actor: access.TaskActor): Promise<string[]> {
     const spaceIds = access.scopeSpaceIds(scope);
     const orgIds = await memberOrgIds(actor.id);
     const [members, folderGrants, roster] = await Promise.all([
-        prisma.taskSpaceMember.findMany({ where: { spaceId: { in: spaceIds } }, select: { userId: true } }),
+        prisma.taskSpaceMember.findMany({
+            where: { spaceId: { in: spaceIds } },
+            select: { userId: true }
+        }),
         prisma.taskFolderMember.findMany({
             where: { folder: { spaceId: { in: spaceIds } } },
             select: { userId: true }
         }),
-        prisma.organizationMember.findMany({ where: { orgId: { in: orgIds } }, select: { userId: true } })
+        prisma.organizationMember.findMany({
+            where: { orgId: { in: orgIds } },
+            select: { userId: true }
+        })
     ]);
     return [
         actor.id,
@@ -223,7 +233,11 @@ async function reachablePeople(actor: access.TaskActor): Promise<string[]> {
 }
 
 /** Teams are an organization's groups, so the roster is the boundary. */
-async function searchTeams(actor: access.TaskActor, term: string, limit: number): Promise<MentionCandidate[]> {
+async function searchTeams(
+    actor: access.TaskActor,
+    term: string,
+    limit: number
+): Promise<MentionCandidate[]> {
     const orgIds = await memberOrgIds(actor.id);
     if (orgIds.length === 0 && !actor.isAdmin) return [];
     const teams = await prisma.team.findMany({
@@ -257,7 +271,8 @@ export async function resolveReferences(
     targets: readonly { kind: ReferenceKind; id: string }[]
 ): Promise<Record<string, string>> {
     if (targets.length === 0) return {};
-    const idsOf = (kind: ReferenceKind) => targets.filter((target) => target.kind === kind).map((target) => target.id);
+    const idsOf = (kind: ReferenceKind) =>
+        targets.filter((target) => target.kind === kind).map((target) => target.id);
     const scope = await access.visibleScope(actor);
 
     const [users, teams, tasks, docs, notes] = await Promise.all([
@@ -265,7 +280,10 @@ export async function resolveReferences(
             where: { id: { in: idsOf("user") } },
             select: { id: true, name: true, username: true }
         }),
-        prisma.team.findMany({ where: { id: { in: idsOf("team") } }, select: { id: true, name: true } }),
+        prisma.team.findMany({
+            where: { id: { in: idsOf("team") } },
+            select: { id: true, name: true }
+        }),
         prisma.task.findMany({
             where: { AND: [{ id: { in: idsOf("task") } }, access.scopeTaskWhere(scope)] },
             select: { id: true, name: true }
@@ -273,7 +291,10 @@ export async function resolveReferences(
         prisma.taskDoc.findMany({
             where: {
                 id: { in: idsOf("doc") },
-                OR: [{ spaceId: { in: access.scopeSpaceIds(scope) } }, { spaceId: null, createdById: actor.id }]
+                OR: [
+                    { spaceId: { in: access.scopeSpaceIds(scope) } },
+                    { spaceId: null, createdById: actor.id }
+                ]
             },
             select: { id: true, title: true }
         }),
@@ -346,7 +367,11 @@ async function searchWork(
             : [],
         wanted.has("note")
             ? prisma.note.findMany({
-                  where: { userId: actor.id, archived: false, ...(term ? { title: contains } : {}) },
+                  where: {
+                      userId: actor.id,
+                      archived: false,
+                      ...(term ? { title: contains } : {})
+                  },
                   select: { id: true, title: true },
                   orderBy: { updatedAt: "desc" },
                   take: limit

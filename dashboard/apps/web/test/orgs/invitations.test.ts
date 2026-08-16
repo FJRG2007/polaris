@@ -31,16 +31,14 @@ const state = vi.hoisted(() => ({
     role: { id: "role-1" } as { id: string } | null,
     memberCount: 0,
     invitationCount: 0,
-    invitation: null as
-        | {
-              id: string;
-              role: string;
-              userId: string;
-              expiresAt: Date;
-              invitedById: string;
-              org: { id: string; name: string; slug: string };
-          }
-        | null,
+    invitation: null as {
+        id: string;
+        role: string;
+        userId: string;
+        expiresAt: Date;
+        invitedById: string;
+        org: { id: string; name: string; slug: string };
+    } | null,
     /** Whose invitation the room check left out of its count. */
     countedExcluding: null as string | null,
     /** How many rows a delete matched, so a withdrawal can be asked to hit
@@ -222,7 +220,9 @@ describe("answering one", () => {
 
     it("refuses one that has run out, and clears it away", async () => {
         state.invitation = { ...state.invitation!, expiresAt: new Date(Date.now() - hour) };
-        await expect(respondToInvitation("invitee", "inv-1", true)).rejects.toBeInstanceOf(OrgError);
+        await expect(respondToInvitation("invitee", "inv-1", true)).rejects.toBeInstanceOf(
+            OrgError
+        );
         expect(state.written).toEqual(["invitation-gone"]);
     });
 
@@ -230,7 +230,9 @@ describe("answering one", () => {
         // Otherwise the membership would name a slug nothing defines, which
         // resolves to the seeded fallback - granting something nobody chose.
         state.role = null;
-        await expect(respondToInvitation("invitee", "inv-1", true)).rejects.toBeInstanceOf(OrgError);
+        await expect(respondToInvitation("invitee", "inv-1", true)).rejects.toBeInstanceOf(
+            OrgError
+        );
         expect(state.written).toEqual([]);
     });
 });
