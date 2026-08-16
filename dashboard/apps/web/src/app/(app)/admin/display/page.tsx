@@ -7,14 +7,18 @@ import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { savePlatformDisplayAction } from "./actions";
 import { resolveDisplayPreferences } from "@polaris/core";
-import { getPlatformDisplayPreferences } from "@/lib/display-prefs-service";
+import { ThemePolicyCard } from "./theme-policy";
+import { getPlatformDisplayPreferences, usersMayChooseTheme } from "@/lib/display-prefs-service";
 import { DisplayPreferencesForm } from "@/components/display-preferences-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function DisplayAdminPage() {
     await requireAdmin();
-    const platform = await getPlatformDisplayPreferences();
+    const [platform, mayChooseTheme] = await Promise.all([
+        getPlatformDisplayPreferences(),
+        usersMayChooseTheme()
+    ]);
 
     return (
         // Narrow page: centre the column in the content area, header included, so
@@ -22,7 +26,7 @@ export default async function DisplayAdminPage() {
         <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader
                 title="Display defaults"
-                description="Units and formats for the whole deployment. Each account can override them under Account > Preferences."
+                description="The theme, units and formats for the whole deployment. Each account can override them under Account > Preferences."
             />
             <DisplayPreferencesForm
                 initial={resolveDisplayPreferences(platform)}
@@ -30,6 +34,7 @@ export default async function DisplayAdminPage() {
                 allowInherit={false}
                 save={savePlatformDisplayAction}
             />
+            <ThemePolicyCard allowed={mayChooseTheme} />
         </div>
     );
 }

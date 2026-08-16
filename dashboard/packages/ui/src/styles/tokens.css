@@ -125,6 +125,103 @@
     --shadow-modal: 0 24px 56px -12px hsl(225 30% 20% / 0.2), 0 8px 20px -8px hsl(225 30% 20% / 0.12);
 }
 
+/*
+ * Follow the machine.
+ *
+ * The same two palettes, chosen by the browser rather than by a preference, so
+ * a laptop that turns dark at sunset takes Polaris with it. Dark needs nothing -
+ * it is what `:root` already says - and the light half is the light theme's own
+ * block repeated inside the query. Repeated rather than shared because CSS has
+ * no way to apply one rule set from another, and the alternative (a class the
+ * browser cannot set on its own) would need JavaScript and would flash the wrong
+ * colours before it ran.
+ */
+@media (prefers-color-scheme: light) {
+    :root.system {
+        --background: 225 24% 97%;
+        --surface: 0 0% 100%;
+        --card: 0 0% 100%;
+        --card-hover: 225 20% 96%;
+        --elevated: 0 0% 100%;
+
+        --foreground: 225 22% 12%;
+        --muted-foreground: 225 10% 40%;
+        --subtle-foreground: 225 8% 48%;
+
+        --muted: 225 20% 94%;
+        --field: 225 20% 95%;
+        --border: 225 16% 89%;
+        --border-strong: 225 16% 78%;
+        --ring: 258 78% 56%;
+
+        --primary: 258 78% 55%;
+        --primary-foreground: 0 0% 100%;
+        --accent: 275 68% 52%;
+        --accent-foreground: 0 0% 100%;
+
+        --success: 152 50% 34%;
+        --warning: 34 88% 44%;
+        --danger: 356 64% 48%;
+        --danger-foreground: 0 0% 100%;
+
+        --shadow-popover: 0 8px 24px -6px hsl(225 30% 20% / 0.14), 0 2px 6px -2px hsl(225 30% 20% / 0.1);
+        --shadow-modal: 0 24px 56px -12px hsl(225 30% 20% / 0.2), 0 8px 20px -8px hsl(225 30% 20% / 0.12);
+    }
+}
+
+/*
+ * Midnight: the dark theme with the lights off.
+ *
+ * Every surface a step or two lower and the gaps between them wider, so panels
+ * separate by tone rather than by their border. For a dark room and for the
+ * screens that are mostly one big panel, where the default's mid-grey reads as
+ * flat.
+ */
+:root.midnight {
+    --background: 225 16% 3%;
+    --surface: 225 14% 5%;
+    --card: 225 13% 7%;
+    --card-hover: 225 13% 10%;
+    --elevated: 225 13% 11%;
+
+    --foreground: 220 16% 97%;
+    --muted-foreground: 222 10% 62%;
+    --subtle-foreground: 222 9% 44%;
+
+    --muted: 225 12% 12%;
+    --field: 225 13% 5%;
+    --border: 225 12% 13%;
+    --border-strong: 225 12% 21%;
+}
+
+/*
+ * Graphite: the same depths with the blue taken out.
+ *
+ * The default palette washes every surface in a little hue, which is what stops
+ * a dark interface reading as a switched-off television - and which some people
+ * see as a cast they cannot unsee. This is the neutral version: the same steps,
+ * the same contrast, four percent of saturation instead of twelve. The accent
+ * stays violet; a grey interface with no colour at all in it is a different
+ * decision and not one worth making by accident.
+ */
+:root.graphite {
+    --background: 220 5% 7%;
+    --surface: 220 4% 9%;
+    --card: 220 4% 11%;
+    --card-hover: 220 4% 14%;
+    --elevated: 220 4% 15%;
+
+    --foreground: 220 8% 96%;
+    --muted-foreground: 220 5% 68%;
+    --subtle-foreground: 220 4% 50%;
+
+    --muted: 220 4% 16%;
+    --field: 220 4% 9%;
+    --border: 220 4% 18%;
+    --border-strong: 220 4% 27%;
+}
+
+
 * {
     border-color: hsl(var(--border));
 }

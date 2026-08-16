@@ -30,6 +30,12 @@
     color-scheme: light;
 }
 
+/* Follow the machine: the browser decides, and it needs telling what the page
+   will look like so it draws its own scrollbars and controls to match. */
+:root.system {
+    color-scheme: light dark;
+}
+
 html,
 body {
     height: 100%;
@@ -137,6 +143,22 @@ body {
     --code-attr: 330 62% 44%;
 }
 
+/* The same palette for a machine set to light, which is what `system` follows.
+   Repeated inside the query rather than added to the selector above: a
+   `:root.system` outside it would paint the light syntax colours on a dark
+   machine. */
+@media (prefers-color-scheme: light) {
+    :root.system {
+        --code-comment: 225 8% 46%;
+        --code-keyword: 285 64% 44%;
+        --code-string: 152 58% 30%;
+        --code-number: 26 82% 40%;
+        --code-function: 214 78% 44%;
+        --code-type: 191 72% 32%;
+        --code-attr: 330 62% 44%;
+    }
+}
+
 .hljs-comment,
 .hljs-quote {
     color: hsl(var(--code-comment));
@@ -226,4 +248,10 @@ body {
 
 :root.light .db-mark-mariadb {
     color: #003545;
+}
+
+@media (prefers-color-scheme: light) {
+    :root.system .db-mark-mariadb {
+        color: #003545;
+    }
 }

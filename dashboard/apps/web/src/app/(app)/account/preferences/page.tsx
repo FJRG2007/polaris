@@ -9,15 +9,20 @@ import { saveDisplayPreferencesAction } from "./actions";
 import { resolveDisplayPreferences } from "@polaris/core";
 import { DeviceCacheCard } from "@/components/device-cache-card";
 import { DisplayPreferencesForm } from "@/components/display-preferences-form";
-import { getPlatformDisplayPreferences, getUserDisplayPreferences } from "@/lib/display-prefs-service";
+import {
+    getPlatformDisplayPreferences,
+    getUserDisplayPreferences,
+    usersMayChooseTheme
+} from "@/lib/display-prefs-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function PreferencesPage() {
     const session = await requireUser();
-    const [platform, mine] = await Promise.all([
+    const [platform, mine, mayChooseTheme] = await Promise.all([
         getPlatformDisplayPreferences(),
-        getUserDisplayPreferences(session.id)
+        getUserDisplayPreferences(session.id),
+        usersMayChooseTheme()
     ]);
 
     return (
@@ -25,13 +30,14 @@ export default async function PreferencesPage() {
             <div>
                 <h1 className="text-[17px] font-semibold tracking-tight">Preferences</h1>
                 <p className="text-sm text-muted-foreground">
-                    Units and formats used across Polaris for your account.
+                    How Polaris looks for your account, and the units and formats it writes in.
                 </p>
             </div>
             <DisplayPreferencesForm
                 initial={mine}
                 fallback={resolveDisplayPreferences(platform)}
                 allowInherit
+                allowTheme={mayChooseTheme}
                 save={saveDisplayPreferencesAction}
             />
             <DeviceCacheCard />

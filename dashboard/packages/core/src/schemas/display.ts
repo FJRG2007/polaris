@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import { THEME_IDS } from "./themes.js";
 
 export const TEMPERATURE_UNITS = ["c", "f"] as const;
 export const DATE_ORDERS = ["dmy", "mdy"] as const;
@@ -70,7 +71,8 @@ export const displayPreferencesSchema = z.object({
     clock: z.enum(CLOCK_FORMATS),
     weekStart: z.enum(WEEK_STARTS),
     currency: z.enum(CURRENCY_CODES),
-    language: z.enum(LANGUAGES)
+    language: z.enum(LANGUAGES),
+    theme: z.enum(THEME_IDS)
 });
 
 export type DisplayPreferences = z.infer<typeof displayPreferencesSchema>;
@@ -89,7 +91,8 @@ export const DISPLAY_DEFAULTS: DisplayPreferences = {
     clock: "24h",
     weekStart: "sun",
     currency: "EUR",
-    language: "en"
+    language: "en",
+    theme: "dark"
 };
 
 /** Drop the keys that were not chosen, so a spread cannot overwrite a lower

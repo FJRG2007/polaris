@@ -14,6 +14,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { Button, Card, CardBody, Select, type SelectOption } from "@polaris/ui";
 import {
     CURRENCIES,
+    THEMES,
     weekdayOrder,
     createDisplayFormat,
     WEEKDAY_SHORT_NAMES,
@@ -48,6 +49,16 @@ interface FieldSpec {
 }
 
 const FIELDS: FieldSpec[] = [
+    {
+        key: "theme",
+        label: "Theme",
+        hint: "Applied the moment it is saved, on every screen.",
+        options: THEMES.map((theme) => ({
+            value: theme.id,
+            label: `${theme.label} - ${theme.description}`,
+            short: theme.label
+        }))
+    },
     {
         key: "dateOrder",
         label: "Date order",
@@ -121,6 +132,7 @@ export function DisplayPreferencesForm({
     initial,
     fallback,
     allowInherit,
+    allowTheme = true,
     save
 }: {
     /** What is stored today. Partial when a user may inherit. */
@@ -128,6 +140,10 @@ export function DisplayPreferencesForm({
     /** What an unset field resolves to: the platform's choices, or the built-in ones. */
     fallback: DisplayPreferences;
     allowInherit: boolean;
+    /** False on an account whose instance keeps one theme for everybody. The
+     *  field is left out rather than shown disabled: a control that cannot be
+     *  used is a question nobody answered. */
+    allowTheme?: boolean;
     save: (values: UserDisplayPreferences) => Promise<{ error?: string }>;
 }) {
     const [values, setValues] = useState<UserDisplayPreferences>(initial);
@@ -136,6 +152,10 @@ export function DisplayPreferencesForm({
     const [error, setError] = useState<string | null>(null);
     const [done, setDone] = useState(false);
 
+    const fields = useMemo(
+        () => (allowTheme ? FIELDS : FIELDS.filter((field) => field.key !== "theme")),
+        [allowTheme]
+    );
     const effective = useMemo(() => resolveDisplayPreferences(fallback, values), [fallback, values]);
     const format = useMemo(() => createDisplayFormat(effective), [effective]);
     const changed = !same(values, saved);
@@ -172,7 +192,7 @@ export function DisplayPreferencesForm({
             <CardBody>
                 <form onSubmit={onSubmit} className="flex flex-col gap-4">
                     <div className="grid gap-4 sm:grid-cols-2">
-                        {FIELDS.map((field) => {
+                        {fields.map((field) => {
                             const inherited = values[field.key] === undefined;
                             const options = allowInherit
                                 ? [

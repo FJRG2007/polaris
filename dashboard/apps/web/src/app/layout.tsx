@@ -5,6 +5,9 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import localFont from "next/font/local";
 import { DropGuard } from "@/components/drop-guard";
+import { themeClass } from "@polaris/core";
+import { resolveSession } from "@/lib/session";
+import { resolveTheme } from "@/lib/display-prefs-service";
 
 /**
  * The typeface. Self-hosted rather than fetched from a font service: a build must
@@ -44,9 +47,26 @@ export const metadata: Metadata = {
     description: "Home-lab control plane - drive, connections, and more."
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+/**
+ * The theme is resolved here, on the server, and written into the class the
+ * document is served with.
+ *
+ * Which means there is no flash: the first paint is already in the right
+ * palette, with no script to run and nothing to correct afterwards. It costs one
+ * cached settings read per request - and it answers "dark" for anything with no
+ * session and no database, which is what keeps a build that prerenders a page
+ * from needing one.
+ */
+export default async function RootLayout({ children }: { children: ReactNode }) {
+    const session = await resolveSession().catch(() => null);
+    const theme = await resolveTheme(session?.id ?? null);
+
     return (
-        <html lang="en" className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
+        <html
+            lang="en"
+            className={`${sans.variable} ${mono.variable} ${themeClass(theme)}`.trim()}
+            suppressHydrationWarning
+        >
             <body>
                 <DropGuard />
                 {children}
