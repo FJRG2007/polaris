@@ -25,11 +25,11 @@ import { setEnvVars } from "@/lib/env-var-service";
 import * as arkAccess from "@/lib/apps/ark/access";
 import * as arkAdmins from "@/lib/apps/ark/admins";
 import { readAppRuntimeLog } from "@/lib/deploy-service";
+import { arkExperienceCommand } from "@/lib/apps/ark/experience";
 import { withServerContainer } from "@/lib/apps/minecraft/service";
-import { parseArkProfile, type ArkProfile } from "@/lib/apps/ark/profile";
+import { parseProfileDump, type ArkProfile } from "@/lib/apps/ark/profile";
 import { readCrashLoop, readRestartWatch } from "@/lib/apps/games-health";
 import { ARK_ROOT, readArkFile, writeArkFile } from "@/lib/apps/ark/files";
-import { arkExperienceCommand } from "@/lib/apps/ark/experience";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "@/lib/apps/crash-loop";
 import { isRconRefusal, parseArkPlayers, type ArkPlayer } from "@/lib/apps/ark/parse";
@@ -706,15 +706,46 @@ export async function setArkAdmin(
 }
 
 /**
- * What level each of these survivors is on, and what they called themselves.
+ * Where this server keeps its player files, once it has been seen.
+ *
+ * Remembered because the alternative is a `find` across the save folder on every
+ * read, and that folder is the world: tens of gigabytes on a server anybody has
+ * played on. The players screen reads profiles on a poll and every give and kill
+ * reads one to get the number the game knows somebody by, so the walk was being
+ * paid several times a minute for a path that changes about never.
+ *
+ * A path rather than the numbers inside those files, deliberately. A survivor's
+ * id changes when somebody starts a new character, and a remembered id would then
+ * aim a command at a survivor who no longer exists - which ARK would carry out on
+ * nobody and report as nothing. A remembered path either has the file or does not,
+ * and the fallback is the search it replaced.
+ */
+const PROFILE_DIR_KEY = "arkProfileDir";
+
+/** A path this is willing to put in a shell script: inside the save folder, and
+ *  free of anything that could end the quoting around it. Belt and braces - it is
+ *  a value Polaris wrote itself, from `dirname` - but it is read back out of a
+ *  JSON column, so it is proved rather than trusted. */
+function usableProfileDir(raw: unknown): string | null {
+    if (typeof raw !== "string") return null;
+    const path = raw.trim();
+    if (!path.startsWith(`${SAVE_DIR}/`) && path !== SAVE_DIR) return null;
+    return /^[A-Za-z0-9_./-]{1,200}$/.test(path) ? path : null;
+}
+
+/**
+ * What level each of these survivors is on, what they called themselves, and the
+ * number the game knows them by.
  *
  * Read out of the per-player files the server writes, because ARK has no command
- * that answers it. Only the ids asked for are looked up - the folder also holds
- * the world and every tribe - and a player who has never joined has no file and is
- * simply absent from the result.
+ * that answers any of it. Only the ids asked for are looked up - the folder also
+ * holds the world and every tribe - and a player who has never joined has no file
+ * and is simply absent from the result.
  *
  * One shell for all of them: on a registered machine each exec is its own SSH
- * handshake, and a full server would be twenty of them for one column.
+ * handshake, and a full server would be twenty of them for one column. Each id is
+ * looked for where the last one was found before anything is searched for, which
+ * is what turns the common case into a read rather than a walk.
  */
 export async function readArkProfiles(
     ownerId: string,
@@ -723,41 +754,36 @@ export async function readArkProfiles(
 ): Promise<Record<string, ArkProfile>> {
     const wanted = [...new Set(steamIds)].filter((id) => arkAccess.isSteamId(id)).slice(0, MAX_PROFILE_READS);
     if (wanted.length === 0) return {};
-    return withServerContainer(ownerId, installedAppId, async (server) => {
+    const install = await prisma.installedApp.findUnique({
+        where: { id: installedAppId },
+        select: { config: true }
+    });
+    const known = usableProfileDir(readInstallConfig(install?.config)[PROFILE_DIR_KEY]);
+
+    const found = await withServerContainer(ownerId, installedAppId, async (server) => {
         // The ids are seventeen digits and nothing else, which is what makes them
         // safe to name in the loop below.
         const script = [
+            known ? `d='${known}';` : "d='';",
             `for id in ${wanted.join(" ")}; do`,
-            `f=$(find ${SAVE_DIR} -maxdepth 3 -name "$id.arkprofile" 2>/dev/null | head -n 1);`,
-            'if [ -n "$f" ]; then echo "== $id"; base64 "$f" | tr -d \'\\n\'; echo; fi;',
-            "done"
+            'f=""; if [ -n "$d" ] && [ -f "$d/$id.arkprofile" ]; then f="$d/$id.arkprofile"; fi;',
+            `if [ -z "$f" ]; then f=$(find ${SAVE_DIR} -maxdepth 3 -name "$id.arkprofile" 2>/dev/null | head -n 1); fi;`,
+            'if [ -n "$f" ]; then d=$(dirname "$f"); echo "== $id"; base64 "$f" | tr -d \'\\n\'; echo; fi;',
+            "done;",
+            // Last, and on its own line, so the parser above it is untouched by it.
+            'if [ -n "$d" ]; then echo "@@ $d"; fi'
         ].join(" ");
         const result = await server.run(["sh", "-c", script]);
-        if (result.code !== 0) return {};
-        return readProfileDump(result.output);
+        return result.code === 0 ? result.output : "";
     });
-}
 
-/** The profiles out of that dump: a line naming the player, then one line of
- *  base64. Anything else in the output - a warning from `find`, a shell notice -
- *  is skipped rather than parsed. */
-function readProfileDump(output: string): Record<string, ArkProfile> {
-    const found: Record<string, ArkProfile> = {};
-    const lines = output.split(/\r?\n/);
-    for (let index = 0; index < lines.length; index += 1) {
-        const header = /^== (\d{17})$/.exec(lines[index] ?? "");
-        if (!header?.[1]) continue;
-        const encoded = (lines[index + 1] ?? "").trim();
-        index += 1;
-        if (!/^[A-Za-z0-9+/=]+$/.test(encoded)) continue;
-        try {
-            found[header[1]] = parseArkProfile(Buffer.from(encoded, "base64"));
-        } catch {
-            // A file that cannot be read is a player with no level, not a screen
-            // that fails to draw.
-        }
+    const directory = usableProfileDir(/^@@ (.+)$/m.exec(found)?.[1]?.trim());
+    // Only when it moved. A write per read would be a database round trip for a
+    // value that is the same one every time.
+    if (directory && directory !== known) {
+        await patchInstallConfig(installedAppId, { [PROFILE_DIR_KEY]: directory }).catch(() => undefined);
     }
-    return found;
+    return parseProfileDump(found);
 }
 
 /** Whether an install is an ARK server, for the callers that dispatch on it. */

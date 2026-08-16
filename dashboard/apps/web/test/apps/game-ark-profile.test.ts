@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
     parseArkProfile,
+    parseProfileDump,
     readProfileDataId,
     readProfileLevel,
     readProfileName,
@@ -149,5 +150,41 @@ describe("steamIdOfProfileFile", () => {
     it("ignores everything else in the folder", () => {
         expect(steamIdOfProfileFile("/app/server/ShooterGame/Saved/TheIsland.ark")).toBeNull();
         expect(steamIdOfProfileFile("/app/server/ShooterGame/Saved/12345.arktribe")).toBeNull();
+    });
+});
+
+describe("parseProfileDump", () => {
+    /** What the read hands back: a header per player, one line of base64 under it,
+     *  and a last line saying where the files were. */
+    const dump = (entries: [string, Buffer][], directory?: string) =>
+        [
+            ...entries.flatMap(([id, bytes]) => [`== ${id}`, bytes.toString("base64")]),
+            ...(directory ? [`@@ ${directory}`] : [])
+        ].join("\n");
+
+    it("reads several survivors out of one read", () => {
+        const output = dump([
+            ["76561198000000001", Buffer.concat([NOISE, level(9), dataId(11n)])],
+            ["76561198000000002", Buffer.concat([NOISE, survivorName("Grace")])]
+        ]);
+        expect(parseProfileDump(output)).toEqual({
+            "76561198000000001": { characterName: null, level: 10, dataId: "11" },
+            "76561198000000002": { characterName: "Grace", level: null, dataId: null }
+        });
+    });
+
+    it("ignores the line saying where the files are", () => {
+        // It is there for the caller, which remembers it so the next read is a
+        // file it can name rather than a search of the whole world folder.
+        const output = dump(
+            [["76561198000000001", Buffer.concat([NOISE, level(0)])]],
+            "/app/server/ShooterGame/Saved/SavedArks"
+        );
+        expect(Object.keys(parseProfileDump(output))).toEqual(["76561198000000001"]);
+    });
+
+    it("skips whatever else the shell printed", () => {
+        const output = ["find: permission denied", "== 76561198000000001", "not base64 at all", "@@ /x"].join("\n");
+        expect(parseProfileDump(output)).toEqual({});
     });
 });

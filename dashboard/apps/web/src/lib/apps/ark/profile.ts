@@ -144,6 +144,37 @@ export function parseArkProfile(bytes: Buffer): ArkProfile {
     };
 }
 
+/**
+ * Several survivors out of one read.
+ *
+ * The server hands them over as a header naming the player and a line of base64
+ * under it, because one shell for twenty players is one SSH handshake rather than
+ * twenty. Everything else in that output is skipped rather than parsed: a warning
+ * from `find`, a shell notice, and the line at the end that says where the files
+ * were - which is the shape the read pays attention to and this deliberately does
+ * not.
+ *
+ * A file that cannot be read is a player with no level, never a screen that fails
+ * to draw.
+ */
+export function parseProfileDump(output: string): Record<string, ArkProfile> {
+    const found: Record<string, ArkProfile> = {};
+    const lines = output.split(/\r?\n/);
+    for (let index = 0; index < lines.length; index += 1) {
+        const header = /^== (\d{17})$/.exec(lines[index] ?? "");
+        if (!header?.[1]) continue;
+        const encoded = (lines[index + 1] ?? "").trim();
+        index += 1;
+        if (!/^[A-Za-z0-9+/=]+$/.test(encoded)) continue;
+        try {
+            found[header[1]] = parseArkProfile(Buffer.from(encoded, "base64"));
+        } catch {
+            // Unreadable, which is a survivor nobody can say anything about.
+        }
+    }
+    return found;
+}
+
 /** The Steam id a profile file is named after: `76561198…​.arkprofile`. Null for
  *  anything else in the folder, which is how the tribe files and the world itself
  *  are skipped without a second listing. */

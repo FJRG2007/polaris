@@ -41,6 +41,7 @@ import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import type { ArkAccessView, ArkStatus } from "@/lib/apps/ark/service";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
+import { loadArkCatalog } from "./ark-item-picker";
 import { PlayerTimeoutDialog } from "@/components/player-timeout-dialog";
 import { PlayerIconAction, PlayersTable } from "@/components/game-players-table";
 import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs";
@@ -924,6 +925,28 @@ function PlayersTab({
      *  the reader has stopped looking at. */
     const [dialogError, setDialogError] = useState<string | null>(null);
 
+    /**
+     * Fetch what the item grid needs before anybody asks for it.
+     *
+     * Two thousand items and the list of what was handed out lately are both
+     * wanted by one dialog, and both used to be fetched at the moment it opened -
+     * so the first give of a session opened on "Loading the items..." for as long
+     * as that took. Started here instead, while somebody is still reading the
+     * table: by the time a row's menu has been opened and an item chosen, it has
+     * been in memory for several seconds.
+     *
+     * Only for somebody who could give anything. A viewer who may just read the
+     * list pays nothing for a grid they will never open.
+     */
+    useEffect(() => {
+        if (!canModerate) return;
+        void loadArkCatalog().catch(() => undefined);
+        void actions
+            .recentArkItemsAction(installedAppId)
+            .then((answer) => setRecentItems(answer.items))
+            .catch(() => undefined);
+    }, [canModerate, installedAppId]);
+
     const players = useMemo(
         () => foldArkPlayers(status?.players ?? [], access?.players ?? []),
         [status?.players, access?.players]
@@ -963,6 +986,41 @@ function PlayersTab({
         });
     }
 
+    /**
+     * Say it happened, then make it happen.
+     *
+     * For the verbs that reach a running server through two container calls - one
+     * to find the number the game knows a player by, one to run the command - which
+     * together take seconds. Waiting them out with a spinner in an open dialog made
+     * handing somebody a stack of wood feel like a deploy, and the wait bought
+     * nothing: ARK answers a give with silence either way, so there was never a
+     * confirmation at the end of it to be worth waiting for.
+     *
+     * So the dialog closes and the line appears at once. What is genuinely
+     * uncertain - whether the server took it - is what the line already says. A
+     * refusal replaces it with the reason, in the same place, naming what was being
+     * attempted: this is the rollback, and it has to be as loud as the claim it
+     * withdraws.
+     */
+    function runOptimistic(
+        work: () => Promise<{ error?: string }>,
+        said: string,
+        /** The failure, worded so it stands on its own - by the time it lands, the
+         *  form that asked for it is closed and gone. */
+        failed: (reason: string) => string
+    ): void {
+        setActing(null);
+        setDialogError(null);
+        setError(null);
+        setNote(said);
+        startTransition(async () => {
+            const result = await work();
+            if (!result.error) return;
+            setNote(null);
+            setError(failed(result.error));
+        });
+    }
+
     /** The same for the forms: what failed is shown inside the dialog, and the
      *  dialog only closes once the server has agreed. */
     function runInDialog(
@@ -994,8 +1052,8 @@ function PlayersTab({
     ): void {
         setDialogError(null);
         setActing({ entry, dialog });
-        // Asked for when the form that uses it opens, not on every poll: it is a
-        // read of the audit log and nothing on the table shows it.
+        // Normally already in hand - see the warm-up above. This is the second
+        // chance for a tab where that failed, and it costs nothing when it did not.
         if (dialog === "give" && recentItems.length === 0) {
             void actions.recentArkItemsAction(installedAppId).then((answer) => setRecentItems(answer.items));
         }
@@ -1139,14 +1197,15 @@ function PlayersTab({
                                 danger: true
                             }).then((agreed) => {
                                 if (agreed) {
-                                    run(
+                                    runOptimistic(
                                         () =>
                                             actions.actOnArkSurvivorAction(
                                                 installedAppId,
                                                 entry.steamId,
                                                 "kill"
                                             ),
-                                        "Sent to the server. ARK does not answer a kill, so watch the game."
+                                        "Sent to the server. ARK does not answer a kill, so watch the game.",
+                                        (reason) => `${entry.name} was not killed: ${reason}`
                                     );
                                 }
                             })
@@ -1159,14 +1218,15 @@ function PlayersTab({
                                 danger: true
                             }).then((agreed) => {
                                 if (agreed) {
-                                    run(
+                                    runOptimistic(
                                         () =>
                                             actions.actOnArkSurvivorAction(
                                                 installedAppId,
                                                 entry.steamId,
                                                 "strip"
                                             ),
-                                        "Sent to the server."
+                                        "Sent to the server.",
+                                        (reason) => `${entry.name}'s inventory was left alone: ${reason}`
                                     );
                                 }
                             })
@@ -1296,24 +1356,26 @@ function PlayersTab({
                     error={dialogError}
                     recent={recentItems}
                     onClose={() => setActing(null)}
-                    onGive={(input) =>
-                        runInDialog(async () => {
-                            const given = await actions.giveArkItemAction({
-                                installedAppId,
-                                steamId: target.steamId,
-                                ...input
-                            });
-                            if (given.error) return { error: given.error };
+                    onGive={(input) => {
+                        // In front of the list before the server has been asked,
+                        // so the next give opens on what was just handed out.
+                        setRecentItems((was) =>
+                            [input.key, ...was.filter((id) => id !== input.key)].slice(0, 12)
+                        );
+                        runOptimistic(
+                            () =>
+                                actions.giveArkItemAction({
+                                    installedAppId,
+                                    steamId: target.steamId,
+                                    ...input
+                                }),
                             // Said rather than claimed: the server takes the
                             // command and answers nothing either way, so the note
                             // is about what was sent.
-                            setNote(
-                                `Sent ${input.quantity} ${given.item ?? "of it"} to ${target.name}. ARK does not confirm a give - ask them to look.`
-                            );
-                            setRecentItems((was) => [input.key, ...was.filter((id) => id !== input.key)].slice(0, 12));
-                            return {};
-                        })
-                    }
+                            `Sent ${input.quantity} to ${target.name}. ARK does not confirm a give - ask them to look.`,
+                            (reason) => `${target.name} was not given anything: ${reason}`
+                        );
+                    }}
                 />
             )}
             {acting?.dialog === "experience" && target && (
@@ -1323,14 +1385,15 @@ function PlayersTab({
                     error={dialogError}
                     onClose={() => setActing(null)}
                     onGive={(amount) =>
-                        runInDialog(
+                        runOptimistic(
                             () =>
                                 actions.giveArkExperienceAction(
                                     installedAppId,
                                     target.steamId,
                                     amount
                                 ),
-                            `Sent ${amount} experience to ${target.name}.`
+                            `Sent ${amount} experience to ${target.name}.`,
+                            (reason) => `${target.name} was given no experience: ${reason}`
                         )
                     }
                 />
