@@ -33,7 +33,14 @@ import { applyAllowList, ARK_CATALOG_ID, mintJoinPassword } from "@/lib/apps/ark
 import { isMapResourcePack, mapFor, pinnedRelease, type WorldMap } from "@/lib/apps/minecraft/maps";
 import { commonVersions, knownUnsupported, wantsLatest } from "@/lib/apps/minecraft/blueprint-version";
 import { formatProjectList, loaderForType, parseProjectList, projectSlug } from "@/lib/apps/minecraft/modrinth";
-import { DEFAULT_BIOME, DEFAULT_LEVEL_TYPE, levelEnvKey, levelTypeEnv, seedEnvKey } from "@/lib/apps/minecraft/world";
+import {
+    DEFAULT_BIOME,
+    DEFAULT_LEVEL_TYPE,
+    levelEnvKey,
+    levelTypeEnv,
+    randomSeed,
+    seedEnvKey
+} from "@/lib/apps/minecraft/world";
 import type {
     CreateArkServerInput,
     CreateGameServerInput,
@@ -187,8 +194,15 @@ export async function minecraftShapeEnv(
     // not stored in the world at all, and a dedicated server that finds nothing
     // there falls back to its own `level-type` - so "the default" is not inert on
     // an old map, it is an instruction to generate ordinary terrain through it.
+    //
+    // A world nobody gave a seed for gets one minted here rather than an empty
+    // value the image is left to interpret. An empty seed is not "surprise me"
+    // to every image: somewhere between unset, empty and zero, and zero is a
+    // valid seed that generates the same world every time. Which is exactly what
+    // people saw - every new server, the same map.
     const generated = map === undefined;
-    env.set(seedEnvKey(edition), generated ? (shape.seed?.trim() ?? "") : "");
+    const chosen = shape.seed?.trim() ?? "";
+    env.set(seedEnvKey(edition), generated ? chosen || randomSeed() : "");
     for (const [key, value] of Object.entries(
         map?.generator
             ? levelTypeEnv(edition, map.generator.levelType, DEFAULT_BIOME, map.generator.settings ?? "")

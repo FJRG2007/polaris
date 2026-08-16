@@ -552,9 +552,16 @@ export async function newWorld(
         }
         await setEnvVars("application", server.applicationId, ownerId, [
             { key: world.levelEnvKey(server.edition), value: target, isSecret: false },
-            // Cleared rather than left behind when no seed was given: the stored
-            // one would otherwise generate the same map again and read as a bug.
-            { key: world.seedEnvKey(server.edition), value: generating ? seed : "", isSecret: false },
+            // A new one every time, and never an empty value: the stored seed
+            // would otherwise generate the same map again, and an empty one
+            // leaves the image to decide what "no seed" means - which for at
+            // least one of them is zero, a real seed that gives the same world
+            // to everybody who ever asks for a random one.
+            {
+                key: world.seedEnvKey(server.edition),
+                value: generating ? seed || world.randomSeed() : "",
+                isSecret: false
+            },
             // Written every time, blank included, for the same reason: a shape left
             // over from the last world would quietly generate the previous one.
             //

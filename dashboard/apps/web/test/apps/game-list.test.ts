@@ -195,14 +195,27 @@ describe("the line under the badge", () => {
 });
 
 describe("whether the files can be browsed", () => {
-    it("refuses a stopped server, whose listing would come back empty", () => {
-        expect(canBrowseFiles(server("a", { facts: facts({ running: false }), live: live({ answering: false }) }))).toBe(
-            false
-        );
+    it("refuses a stopped container, whose listing would come back empty", () => {
+        expect(
+            canBrowseFiles(
+                server("a", { facts: facts({ running: false }), live: live({ containerRunning: false }) })
+            )
+        ).toBe(false);
     });
 
-    it("refuses one Polaris means to be up and that is not", () => {
-        expect(canBrowseFiles(server("a", { live: live({ containerRunning: false, answering: false }) }))).toBe(false);
+    it("allows a container that is up while the game inside it is not", () => {
+        // The case that matters, and the one this used to refuse: a server that
+        // crashed, a world that will not load, a plugin that killed the process
+        // on boot. Those are the three moments somebody most needs the files,
+        // and the listing runs in the container, which is still there.
+        expect(
+            canBrowseFiles(
+                server("a", {
+                    facts: facts({ running: false }),
+                    live: live({ containerRunning: true, answering: false })
+                })
+            )
+        ).toBe(true);
     });
 
     it("allows a running server, and one whose live read has not landed yet", () => {

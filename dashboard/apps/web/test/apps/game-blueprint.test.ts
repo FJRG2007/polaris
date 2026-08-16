@@ -201,11 +201,24 @@ describe("the world a blueprint opens on", () => {
         );
     });
 
-    it("writes the seed every time, blank included", async () => {
-        // A seed left over from the last world would quietly generate the previous
-        // one under the new one's name.
-        expect((await envFor("survival", {}, { SEED: "12345" })).get("SEED")).toBe("");
+    it("writes the seed every time, and never leaves the last one behind", async () => {
+        // A seed left over from the last world would quietly generate the
+        // previous one under the new one's name.
+        const rolled = (await envFor("survival", {}, { SEED: "12345" })).get("SEED");
+        expect(rolled).not.toBe("12345");
+        // And never blank. An empty value is not "surprise me" to an image: it
+        // is somewhere between unset, empty and zero - and zero is a real seed
+        // that hands everybody the same world. One is minted instead.
+        expect(rolled).toMatch(/^-?[0-9]+$/);
         expect((await envFor("survival", { seed: "spawn island" })).get("SEED")).toBe("spawn island");
+    });
+
+    it("gives two servers two different worlds", async () => {
+        // The one people actually noticed: every server they made came out the
+        // same map.
+        const first = (await envFor("survival")).get("SEED");
+        const second = (await envFor("survival")).get("SEED");
+        expect(first).not.toBe(second);
     });
 
     it("loads the blueprint's plugins into the software they need", async () => {

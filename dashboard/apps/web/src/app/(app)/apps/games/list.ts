@@ -181,13 +181,24 @@ export function uptimeLine(server: ServerView): { prefix: string; at: string } |
 /**
  * Whether this server's files can be browsed at all.
  *
- * The explorer runs its listing inside the container, so a server that is not
- * running has nothing to list - and it answered with an empty directory, which
- * reads as a world that has been deleted. A server Polaris means to be up and that
- * is not counts as down for this: the container is what would be read.
+ * One question, and it is not "is the server up": the explorer lists from inside
+ * the container, so what decides is whether the *container* is running. Those
+ * come apart exactly when somebody needs the files most - a game that crashed, a
+ * world that will not load, a plugin that killed the process on boot - and this
+ * used to refuse all three, because it asked whether Polaris considered the
+ * server up and the game was not answering.
+ *
+ * The observation wins where there is one. `facts.running` is what Polaris means
+ * to be true and is the fallback for a server nothing has probed yet; a probe
+ * that came back saying the container is up is the better answer even when the
+ * game inside it is not.
+ *
+ * A container that is genuinely stopped still cannot be listed - `docker exec`
+ * has nothing to run in - and the menu says so rather than opening an empty
+ * directory that reads as a world somebody deleted.
  */
 export function canBrowseFiles(server: ServerView): boolean {
-    return (server.facts?.running ?? false) && server.live?.containerRunning !== false;
+    return server.live?.containerRunning ?? server.facts?.running ?? false;
 }
 
 /** What the server runs, in the two words an operator would say: "Paper 1.21.4",

@@ -152,6 +152,33 @@ export function isSeed(value: string): boolean {
     return value.length > 0 && value.length <= 64 && !/[\0-\x1f\x7f]/.test(value);
 }
 
+/**
+ * A seed for a world nobody chose one for.
+ *
+ * Minted here rather than left blank and handed to the server as "you pick". The
+ * empty value went into the image's `SEED`, and what an image does with an empty
+ * property is its own business - somewhere between leaving `level-seed` unset,
+ * writing it empty, and writing a zero, which is a perfectly valid seed that
+ * generates the same world every single time. Which is what people saw: every
+ * new map the same map.
+ *
+ * A number rather than words, and the game's own range: Minecraft takes a signed
+ * 64-bit seed as itself and hashes anything else, so a number is the one form
+ * that means exactly what it says. It is written down, so the world can be made
+ * again on purpose - a random world whose seed nobody kept is a world that
+ * cannot be reproduced.
+ */
+export function randomSeed(): string {
+    const bytes = new Uint8Array(8);
+    crypto.getRandomValues(bytes);
+    let value = 0n;
+    for (const byte of bytes) value = (value << 8n) | BigInt(byte);
+    // Back into the signed range the game reads it in, so what is stored is what
+    // the world will report when somebody runs `/seed`.
+    const signed = value >= 1n << 63n ? value - (1n << 64n) : value;
+    return signed.toString();
+}
+
 /** The name of an archive this feature wrote, and nothing else. Checked before a
  *  name from a request is ever joined onto a path. */
 export function isBackupName(value: string): boolean {
