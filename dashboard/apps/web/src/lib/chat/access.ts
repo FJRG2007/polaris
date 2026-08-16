@@ -21,6 +21,7 @@
 
 import { can } from "@polaris/auth";
 import { prisma } from "@polaris/db";
+import { groupOwnerId } from "./ownership";
 import { memberOrgIds } from "@/lib/orgs/org-service";
 import { findPeople, type FoundPeople } from "@/lib/people-search";
 
@@ -146,6 +147,7 @@ export async function channelAccess(
             kind: true,
             spaceId: true,
             ownerId: true,
+            createdById: true,
             private: true,
             archived: true,
             space: { select: { archived: true } }
@@ -174,7 +176,7 @@ export async function channelAccess(
             member: true,
             mayPost: live,
             mayAdminister: false,
-            mayModerate: channel.kind === "group" && channel.ownerId === actor.id
+            mayModerate: channel.kind === "group" && groupOwnerId(channel) === actor.id
         };
     }
 
@@ -352,6 +354,7 @@ export function picturesAllowed(
     channel: {
         readonly kind: string;
         readonly ownerId: string | null;
+        readonly createdById?: string | null;
         readonly membersMayEdit: boolean;
         readonly mayAdminister: boolean;
     },
@@ -362,7 +365,7 @@ export function picturesAllowed(
     // The owner always, and everybody else only if the owner said so. Both the
     // name and the picture answer to this: they are the two things a group looks
     // like, and splitting them would be two switches for one decision.
-    return channel.ownerId === actorId || channel.membersMayEdit;
+    return groupOwnerId(channel) === actorId || channel.membersMayEdit;
 }
 
 export async function messageable(userIds: readonly string[]): Promise<Set<string>> {

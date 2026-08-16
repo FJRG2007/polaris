@@ -12,6 +12,7 @@ import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
 import { publishChatChange } from "./live";
 import { prisma, type Prisma } from "@polaris/db";
+import { groupOwnerId } from "./ownership";
 import { nicknamesFor } from "@/lib/contact-names";
 import { postNotice, postSpaceNotice } from "./notices";
 import {
@@ -387,6 +388,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             archived: true,
             lastMessageAt: true,
             ownerId: true,
+            createdById: true,
             membersMayEdit: true,
             members: { select: { userId: true, user: { select: { name: true } } } }
         }
@@ -437,12 +439,12 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             // out of it. Not `mayAdminister`, which would also hand them the
             // channel controls a group does not have.
             mayModerate:
-                mayAdminister || (channel.kind === "group" && channel.ownerId === actor.id),
+                mayAdminister || (channel.kind === "group" && groupOwnerId(channel) === actor.id),
             // Whether the screen offers this reader the picture control. The
             // same predicate the route enforces with, asked here so the rule
             // has one implementation rather than two that drift.
             mayPicture: picturesAllowed({ ...channel, mayAdminister }, actor.id),
-            ownerId: channel.ownerId,
+            ownerId: groupOwnerId(channel),
             membersMayEdit: channel.membersMayEdit,
             others: channel.spaceId ? [] : others
         };
@@ -697,7 +699,7 @@ export async function renameGroup(
     if (access.kind !== "group") throw new ChatAccessError("That conversation has no name to set");
     const group = await prisma.chatChannel.findUnique({
         where: { id: channelId },
-        select: { kind: true, ownerId: true, membersMayEdit: true }
+        select: { kind: true, ownerId: true, createdById: true, membersMayEdit: true }
     });
     if (!group || !picturesAllowed({ ...group, mayAdminister: access.mayAdminister }, actor.id)) {
         throw new ChatAccessError("Only the owner of this group can rename it");
@@ -759,10 +761,12 @@ async function requireGroupOwner(actor: ChatActor, channelId: string): Promise<v
     await requireChannel(actor, channelId);
     const group = await prisma.chatChannel.findUnique({
         where: { id: channelId },
-        select: { kind: true, ownerId: true }
+        select: { kind: true, ownerId: true, createdById: true }
     });
     if (!group || group.kind !== "group") throw new ChatAccessError("That is not a group");
-    if (group.ownerId !== actor.id) throw new ChatAccessError("Only the owner of this group can do that");
+    if (groupOwnerId(group) !== actor.id) {
+        throw new ChatAccessError("Only the owner of this group can do that");
+    }
 }
 
 export async function deleteChannel(actor: ChatActor, channelId: string): Promise<void> {
@@ -882,9 +886,9 @@ export async function removeChannelMember(
 async function passOnOwnership(channelId: string, leftId: string): Promise<void> {
     const channel = await prisma.chatChannel.findUnique({
         where: { id: channelId },
-        select: { ownerId: true }
+        select: { ownerId: true, createdById: true }
     });
-    if (channel?.ownerId !== leftId) return;
+    if (!channel || groupOwnerId(channel) !== leftId) return;
 
     const eldest = await prisma.chatChannelMember.findFirst({
         where: { channelId },
@@ -1029,6 +1033,11 @@ export async function openDirect(actor: ChatActor, userIds: readonly string[]): 
             name: "",
             private: true,
             createdById: actor.id,
+            // Whoever starts a group runs it. Left unset, a group had no owner at
+            // all: its creator was told they were not the owner when they tried to
+            // name it, no crown showed against anybody, and nobody could hand it
+            // over - it could only be abandoned.
+            ownerId: actor.id,
             members: { createMany: { data: everyone.map((userId) => ({ userId })) } }
         },
         select: { id: true }
@@ -1048,12 +1057,27 @@ export async function listChannelMembers(
 ): Promise<ChatMemberView[]> {
     const access = await requireChannel(actor, channelId);
     if (!access.spaceId || (await isPrivate(channelId))) {
-        const members = await prisma.chatChannelMember.findMany({
-            where: { channelId },
-            orderBy: { createdAt: "asc" },
-            select: { userId: true, role: true, user: { select: { name: true } } }
-        });
-        return members.map((row) => ({ userId: row.userId, name: row.user.name, role: row.role }));
+        const [members, channel] = await Promise.all([
+            prisma.chatChannelMember.findMany({
+                where: { channelId },
+                orderBy: { createdAt: "asc" },
+                select: { userId: true, role: true, user: { select: { name: true } } }
+            }),
+            prisma.chatChannel.findUnique({
+                where: { id: channelId },
+                select: { ownerId: true, createdById: true }
+            })
+        ]);
+        // Worked out rather than stored. A member row is a member or an admin -
+        // owning the group is a fact about the group, not about the row - and
+        // reading it off the channel is also what puts a crown against the owner
+        // of a group made before the column was being filled in.
+        const owner = channel ? groupOwnerId(channel) : null;
+        return members.map((row) => ({
+            userId: row.userId,
+            name: row.user.name,
+            role: row.userId === owner ? "owner" : row.role
+        }));
     }
     // An open channel in a space is everybody in the space, and saying so is
     // more truthful than listing the handful who happen to have a row.

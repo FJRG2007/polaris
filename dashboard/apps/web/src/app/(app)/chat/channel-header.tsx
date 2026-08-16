@@ -126,9 +126,25 @@ export function ChannelHeader({
     }, [renaming, channel.name]);
     const Icon = channel.private ? Lock : named ? Hash : Users;
 
-    const act = async (run: () => Promise<{ error?: string }>) => {
+    /**
+     * Run one of these actions and say what happened.
+     *
+     * A refusal comes back as a value rather than as a throw - which is the shape
+     * an action should have - so it has to be read out of the result. Left to
+     * `runAction`, which only catches what was thrown, every refusal from this
+     * header was silent: the dialog closed, nothing changed, and the screen said
+     * nothing about why. Returns whether it worked, so a form can stay open.
+     */
+    const act = async (run: () => Promise<{ error?: string }>): Promise<boolean> => {
+        setError("");
         const result = await runAction(run, setError);
-        if (!result?.error) onChanged();
+        if (!result) return false;
+        if (result.error) {
+            setError(result.error);
+            return false;
+        }
+        onChanged();
+        return true;
     };
 
     return (
@@ -287,10 +303,17 @@ export function ChannelHeader({
                             )}
                             {group && (
                                 <>
-                                    <DropdownMenuItem onSelect={() => setRenaming(true)}>
-                                        <Pencil className="size-3.5" />
-                                        Name this group
-                                    </DropdownMenuItem>
+                                    {/* The same permission as the picture, and now
+                                        gated on it: the name and the picture are
+                                        one decision, and offering a rename the
+                                        server goes on to refuse is worse than not
+                                        offering it. */}
+                                    {channel.mayPicture && (
+                                        <DropdownMenuItem onSelect={() => setRenaming(true)}>
+                                            <Pencil className="size-3.5" />
+                                            Name this group
+                                        </DropdownMenuItem>
+                                    )}
                                     {channel.mayPicture && (
                                         <DropdownMenuItem onSelect={() => setPicturing(true)}>
                                             <ImageIcon className="size-3.5" />
@@ -474,6 +497,10 @@ export function ChannelHeader({
                         aria-label="What this group is called"
                         onChange={(event) => setName(event.target.value)}
                     />
+                    {/* Inside the dialog, not only in the banner behind it: the
+                        banner is covered by this while it is open, which is how a
+                        refusal used to reach nobody. */}
+                    {error && <p className="text-sm text-danger">{error}</p>}
                     <DialogFooter>
                         <Button variant="ghost" size="sm" onClick={() => setRenaming(false)}>
                             Cancel
@@ -481,13 +508,16 @@ export function ChannelHeader({
                         <Button
                             size="sm"
                             onClick={async () => {
-                                await act(() =>
+                                // Closed only once it worked. A dialog that closes
+                                // on a refusal takes the typed name with it and
+                                // leaves the reader looking at an unchanged group.
+                                const done = await act(() =>
                                     actions.renameGroupAction({
                                         channelId: channel.id,
                                         name
                                     })
                                 );
-                                setRenaming(false);
+                                if (done) setRenaming(false);
                             }}
                         >
                             Save

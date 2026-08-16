@@ -18,6 +18,9 @@ let kind = "group";
 /** Who runs the group, and whether they have let the rest of it change how the
  *  group looks. Both default to "the owner and nobody else". */
 let ownerId: string | null = "ada";
+/** Who started it. Groups made before the owner column was filled in have only
+ *  this, and it is the same person. */
+let createdById: string | null = "ada";
 let membersMayEdit = false;
 let members = ["ada", "grace", "alan"];
 let written: { name?: string; removed?: string[]; added?: string[] } = {};
@@ -39,6 +42,7 @@ vi.mock("@polaris/db", () => ({
                 archived: false,
                 space: null,
                 ownerId,
+                createdById,
                 membersMayEdit
             }),
             update: async ({ data }: { data: { name?: string } }) => {
@@ -83,6 +87,7 @@ const ada = { id: "ada" };
 
 beforeEach(() => {
     ownerId = "ada";
+    createdById = "ada";
     membersMayEdit = false;
     kind = "group";
     members = ["ada", "grace", "alan"];
@@ -118,6 +123,23 @@ describe("naming a group", () => {
 
     it("is refused to somebody not in it", async () => {
         members = ["grace", "alan"];
+        await expect(chat.renameGroup(ada, "channel-1", "Mine now")).rejects.toBeInstanceOf(
+            ChatAccessError
+        );
+    });
+
+    it("is still the creator's on a group that was made without an owner", async () => {
+        // Groups were created with the owner column left null, so the person who
+        // made one was told they were not its owner. Whoever created it is the
+        // answer, and reading it that way fixes the ones already out there.
+        ownerId = null;
+        await chat.renameGroup(ada, "channel-1", "Mine after all");
+        expect(written.name).toBe("Mine after all");
+    });
+
+    it("is still refused to somebody who neither owns nor made it", async () => {
+        ownerId = null;
+        createdById = "grace";
         await expect(chat.renameGroup(ada, "channel-1", "Mine now")).rejects.toBeInstanceOf(
             ChatAccessError
         );
