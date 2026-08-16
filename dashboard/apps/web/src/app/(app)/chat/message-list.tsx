@@ -284,9 +284,13 @@ function Message({
     const [showingHistory, setShowingHistory] = useState(false);
     const author = message.authorName ?? "Somebody who has left";
 
+    // Something Polaris said rather than somebody: joined, left, was added.
+    // Indented to where message text starts rather than to the avatar gutter,
+    // so a room reads as one column of sentences with the occasional quiet one
+    // among them - the gutter is for faces, and this line has none.
     if (message.kind === "system") {
         return (
-            <p className="px-4 py-1 text-xs text-muted-foreground">
+            <p className="py-1 pl-14 pr-4 text-xs text-muted-foreground">
                 {message.body} <RelativeTime iso={message.createdAt} />
             </p>
         );

@@ -28,6 +28,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { randomBytes } from "node:crypto";
 import { publishChatChange } from "./live";
+import { postSpaceNotice } from "./notices";
 import { ChatAccessError, type ChatActor } from "./access";
 
 /** One invitation, as the panel that made it draws it. */
@@ -228,6 +229,10 @@ export async function acceptInvite(actor: ChatActor, code: string): Promise<{ sp
     await prisma.chatSpaceMember.create({
         data: { spaceId: invite.spaceId, userId: actor.id, role: "member" }
     });
+    // "joined" rather than "added": nobody put them here, they walked in with a
+    // link. Who made the link is not part of it - an invitation can pass through
+    // several hands before it is used.
+    await postSpaceNotice(invite.spaceId, "joined", { subjectId: actor.id });
     // The rail is what changes for them, and nothing else would tell it.
     publishChatChange({
         channelId: "",

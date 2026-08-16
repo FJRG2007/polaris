@@ -48,6 +48,12 @@ vi.mock("@polaris/db", () => ({
         },
         chatChannelMember: {
             findFirst: async () => ({ userId: members[0] ?? null }),
+            // Who is already in it, which the service asks before adding so it
+            // only announces the people who really are new.
+            findMany: async ({ where }: { where: { userId?: { in: string[] } } }) =>
+                members
+                    .filter((id) => where.userId?.in?.includes(id) ?? true)
+                    .map((userId) => ({ userId })),
             findUnique: async ({ where }: { where: { channelId_userId: { userId: string } } }) =>
                 members.includes(where.channelId_userId.userId) ? { role: "member" } : null,
             // Two different counts are asked for: how many are in it, and how

@@ -13,6 +13,7 @@ import * as core from "@polaris/core";
 import { publishChatChange } from "./live";
 import { prisma, type Prisma } from "@polaris/db";
 import { nicknamesFor } from "@/lib/contact-names";
+import { postNotice, postSpaceNotice } from "./notices";
 import {
     ChatAccessError,
     channelAccess,
@@ -265,10 +266,26 @@ export async function addSpaceMembers(
     const wanted = [...new Set(userIds)].filter((id) => id !== space?.ownerId);
     if (wanted.length === 0) return;
 
+    // Who is actually new, worked out before the write rather than counted
+    // after it: `createMany` skips the duplicates silently, and a notice saying
+    // somebody joined a space they have been in for a month is worse than none.
+    const already = new Set(
+        (
+            await prisma.chatSpaceMember.findMany({
+                where: { spaceId, userId: { in: wanted } },
+                select: { userId: true }
+            })
+        ).map((row) => row.userId)
+    );
+    const fresh = wanted.filter((userId) => !already.has(userId));
+
     await prisma.chatSpaceMember.createMany({
         data: wanted.map((userId) => ({ spaceId, userId })),
         skipDuplicates: true
     });
+    for (const userId of fresh) {
+        await postSpaceNotice(spaceId, "added", { subjectId: userId, byId: actor.id });
+    }
     publishChatChange({
         channelId: spaceId,
         kind: "channels",
@@ -277,10 +294,19 @@ export async function addSpaceMembers(
     });
 }
 
+/**
+ * Leaving a space, or being turned out of one.
+ *
+ * @param quietly - Leave without the space being told. Only honoured for
+ *   somebody leaving of their own accord: an administrator removing somebody
+ *   cannot also decide that the room does not get to know, because the people
+ *   left behind are the ones who need the line.
+ */
 export async function removeSpaceMember(
     actor: ChatActor,
     spaceId: string,
-    userId: string
+    userId: string,
+    quietly = false
 ): Promise<void> {
     // Leaving is always allowed; removing somebody else takes an admin.
     if (userId !== actor.id) await requireSpace(actor, spaceId, "admin");
@@ -298,6 +324,13 @@ export async function removeSpaceMember(
             where: { userId, channelId: { in: channels.map((row) => row.id) } }
         });
     });
+    const own = userId === actor.id;
+    if (!own || !quietly) {
+        await postSpaceNotice(spaceId, own ? "left" : "removed", {
+            subjectId: userId,
+            byId: actor.id
+        });
+    }
     publishChatChange({
         channelId: spaceId,
         kind: "channels",
@@ -772,10 +805,28 @@ export async function addChannelMembers(
     const missing = wanted.filter((userId) => !reachable.has(userId));
     if (missing.length > 0) throw new ChatAccessError(NO_CHAT);
 
+    const already = new Set(
+        (
+            await prisma.chatChannelMember.findMany({
+                where: { channelId, userId: { in: wanted } },
+                select: { userId: true }
+            })
+        ).map((row) => row.userId)
+    );
+
     await prisma.chatChannelMember.createMany({
         data: wanted.map((userId) => ({ channelId, userId })),
         skipDuplicates: true
     });
+    // Said in a group and nowhere else. A channel in a space announces its
+    // arrivals where the space does; adding somebody to a room the whole space
+    // could already read is a change to their list rather than to the room, and
+    // a line about it would be a line about nothing.
+    if (group) {
+        for (const userId of wanted.filter((id) => !already.has(id))) {
+            await postNotice(channelId, "added", { subjectId: userId, byId: actor.id });
+        }
+    }
     publishChatChange({ channelId, kind: "channels", actorId: actor.id, audience: wanted });
 }
 
@@ -787,11 +838,15 @@ export async function addChannelMembers(
  * says two names. A group can, by whoever is leaving and by nobody else -
  * turning somebody out of a group is a thing groups do not do, and a member with
  * the power to do it would change what a group is.
+ *
+ * @param quietly - Walk out without the group being told. Theirs to choose, and
+ *   only when it is their own seat: see `removeSpaceMember`.
  */
 export async function removeChannelMember(
     actor: ChatActor,
     channelId: string,
-    userId: string
+    userId: string,
+    quietly = false
 ): Promise<void> {
     const access = await requireChannel(actor, channelId);
     const group = access.kind === "group";
@@ -802,8 +857,14 @@ export async function removeChannelMember(
     if (userId !== actor.id && !access.mayAdminister) {
         throw new ChatAccessError("You cannot remove people from that channel");
     }
-    await prisma.chatChannelMember.deleteMany({ where: { channelId, userId } });
+    const removed = await prisma.chatChannelMember.deleteMany({ where: { channelId, userId } });
     if (group) await passOnOwnership(channelId, userId);
+    // A group only, because in a group the membership is the room: the people
+    // in it are who it is. Leaving a channel is leaving the space around it,
+    // and that is announced where the space announces everything else.
+    if (group && removed.count > 0 && !quietly) {
+        await postNotice(channelId, "left", { subjectId: userId });
+    }
     publishChatChange({ channelId, kind: "channels", actorId: actor.id, audience: [userId] });
 }
 
@@ -1037,6 +1098,10 @@ async function unreadCounts(
             channelId: { in: channels.map((channel) => channel.id) },
             deletedAt: null,
             authorId: { not: actor.id },
+            // Somebody joining is not somebody talking. A room that lit up
+            // because a person walked into it is a badge that gets ignored,
+            // which costs the messages that really are waiting.
+            kind: { not: "system" },
             // A thread reply is unread inside the thread, not in the channel:
             // counting both would double every conversation that has one.
             parentId: null
@@ -1057,6 +1122,7 @@ async function unreadCounts(
                     deletedAt: null,
                     parentId: null,
                     authorId: { not: actor.id },
+                    kind: { not: "system" },
                     createdAt: { gt: mark }
                 }
             });

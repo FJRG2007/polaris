@@ -17,6 +17,7 @@ import { rulesForChannel } from "./rules";
 import { publishChatChange } from "./live";
 import { nicknamesFor } from "@/lib/contact-names";
 import { announceRoomMention } from "./room-mentions";
+import { noticePeople, renderNotice } from "./notice-text";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { isBlankMarkdown } from "@/components/rich-text/markdown";
 import { allowedBy, maySee, receiptsBetween } from "@/lib/privacy-service";
@@ -906,6 +907,15 @@ export async function decorateMessages(actor: ChatActor, rows: readonly Row[]): 
     const quotedIds = [
         ...new Set(rows.map((row) => row.replyToId).filter((id): id is string => id !== null))
     ];
+    // The people a line Polaris wrote itself names - "Ada added Grace". They
+    // have no author row to be found through, so they join the same lookup and
+    // are resolved the same way, which is what keeps a notice calling somebody
+    // what they are called now rather than what they were called in March.
+    const noticeIds = [
+        ...new Set(
+            rows.filter((row) => row.kind === "system").flatMap((row) => noticePeople(row.body))
+        )
+    ];
     // The links in the page, looked up in one query rather than one per message.
     // Nothing is fetched here: a read path that could reach out to a third party
     // is a read path that hangs when they are slow.
@@ -922,9 +932,9 @@ export async function decorateMessages(actor: ChatActor, rows: readonly Row[]): 
     const receipts = await receiptStateFor(actor, rows);
 
     const [authors, reactions, files, stars, quoted, previews] = await Promise.all([
-        authorIds.length
+        authorIds.length || noticeIds.length
             ? prisma.user.findMany({
-                  where: { id: { in: authorIds } },
+                  where: { id: { in: [...new Set([...authorIds, ...noticeIds])] } },
                   select: { id: true, name: true }
               })
             : Promise.resolve([]),
@@ -974,7 +984,7 @@ export async function decorateMessages(actor: ChatActor, rows: readonly Row[]): 
     // What this reader calls people, laid over what those people are called.
     // One query for the page: a nickname is per reader, so it cannot be resolved
     // where the names are, and a lookup per message would be fifty of them.
-    const called = await nicknamesFor(actor.id, [...authorIds, ...quoteAuthorIds]);
+    const called = await nicknamesFor(actor.id, [...authorIds, ...quoteAuthorIds, ...noticeIds]);
     // Who lets this reader pass their messages on. Not an administrator question
     // and deliberately not given one: chat has no instance-wide override, and a
     // setting about your own words is the last place to introduce the first.
@@ -1017,7 +1027,11 @@ export async function decorateMessages(actor: ChatActor, rows: readonly Row[]): 
         authorId: row.authorId,
         authorName: row.authorId ? (names.get(row.authorId) ?? null) : null,
         kind: row.kind as core.ChatMessageKind,
-        body: row.deletedAt ? "" : row.body,
+        body: row.deletedAt
+            ? ""
+            : row.kind === "system"
+              ? renderNotice(row.body, names, actor.id)
+              : row.body,
         parentId: row.parentId,
         replyCount: row.replyCount,
         lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
