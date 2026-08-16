@@ -20,12 +20,15 @@ export default async function UploadsPage() {
     ]);
 
     return (
-        <>
+        // Narrow page: three settings cards and nothing wide, so the column is
+        // centred in the content area, header included, rather than left against
+        // the rail with the width beside it empty.
+        <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader
                 title="Uploads"
                 description="Where files, photos and things sent in chat are stored, and how big one may be."
             />
             <UploadsView uploads={uploads} avatars={avatars} chat={chat} />
-        </>
+        </div>
     );
 }

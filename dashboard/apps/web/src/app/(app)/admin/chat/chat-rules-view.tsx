@@ -52,6 +52,10 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
     return (
         <div className="flex flex-col gap-4">
             <SegmentedControl
+                // Its own width. The page is a column, so without this the
+                // picker is stretched to the whole content area and three short
+                // words sit in a track as wide as the screen.
+                className="self-start"
                 aria-label="Which conversations these rules cover"
                 value={scope}
                 onValueChange={(next) => setScope(next)}

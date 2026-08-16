@@ -95,7 +95,14 @@ export function SegmentedControl<T extends string>({
                             event.preventDefault();
                         }}
                         className={cn(
-                            "min-w-0 flex-1 truncate rounded font-medium transition-colors duration-fast disabled:pointer-events-none disabled:opacity-50",
+                            // `basis-auto`, not the `flex-1` default of zero: with
+                            // a basis of zero every option is given the same width
+                            // whatever it says, so a set like "Data" and "SQL" is
+                            // sized for the shorter one and the longer one comes
+                            // out as "D..." - by half a pixel, which is the worst
+                            // kind of wrong. Options size to their labels and share
+                            // what is left over.
+                            "min-w-0 flex-1 basis-auto truncate rounded font-medium transition-colors duration-fast disabled:pointer-events-none disabled:opacity-50",
                             size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-[13px]",
                             active
                                 ? "border border-border-strong bg-card-hover text-foreground"
