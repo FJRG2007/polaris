@@ -29,6 +29,7 @@ import { withServerContainer } from "@/lib/apps/minecraft/service";
 import { parseArkProfile, type ArkProfile } from "@/lib/apps/ark/profile";
 import { readCrashLoop, readRestartWatch } from "@/lib/apps/games-health";
 import { ARK_ROOT, readArkFile, writeArkFile } from "@/lib/apps/ark/files";
+import { arkExperienceCommand } from "@/lib/apps/ark/experience";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "@/lib/apps/crash-loop";
 import { isRconRefusal, parseArkPlayers, type ArkPlayer } from "@/lib/apps/ark/parse";
@@ -645,13 +646,8 @@ export async function giveArkExperience(
     playerId: string,
     amount: number
 ): Promise<string> {
-    const points = Math.max(1, Math.min(MAX_ARK_EXPERIENCE, Math.trunc(amount)));
-    return runArkCommand(ownerId, installedAppId, `GiveExpToPlayer ${assertPlayerId(playerId)} ${points} 0 1`);
+    return runArkCommand(ownerId, installedAppId, arkExperienceCommand(assertPlayerId(playerId), amount));
 }
-
-/** Enough to take somebody most of the way up on a fast server, and short of the
- *  typo that would put them at the level cap in one go. */
-export const MAX_ARK_EXPERIENCE = 1_000_000;
 
 /** An in-game player id is digits and nothing else. It comes from a file Polaris
  *  read rather than from a form, so this is the second line of defence rather than

@@ -25,6 +25,7 @@ import { ArkItemPicker, loadArkCatalog } from "./ark-item-picker";
 import type { PlayerRecord } from "@/lib/apps/games-activity-service";
 import { PlayerFormDialog, PlayerFormField } from "@/components/player-form-dialog";
 import { arkStackCount, MAX_ARK_GIVE, MAX_ARK_QUALITY, type ArkItem } from "@/lib/apps/ark/items";
+import { MAX_ARK_EXPERIENCE } from "@/lib/apps/ark/experience";
 import {
     Button,
     Dialog,
@@ -354,6 +355,61 @@ export function ArkGiveDialog({
                     </label>
                 </>
             )}
+        </PlayerFormDialog>
+    );
+}
+
+/**
+ * Hand a player experience.
+ *
+ * Only handing it over, because that is the only verb ARK has: there is no
+ * command that takes experience away and none that sets it, and a negative amount
+ * is ignored rather than subtracted. Said out loud in the form rather than left
+ * as two options that quietly do nothing.
+ */
+export function ArkExperienceDialog({
+    name,
+    pending,
+    error,
+    onClose,
+    onGive
+}: {
+    name: string;
+    pending: boolean;
+    error: string | null;
+    onClose: () => void;
+    onGive: (amount: number) => void;
+}) {
+    const [amount, setAmount] = useState(1000);
+
+    return (
+        <PlayerFormDialog
+            title={`Give ${name} experience`}
+            description="Goes to their survivor, not to their tribe."
+            confirmLabel="Give it"
+            ready={amount >= 1}
+            pending={pending}
+            error={error}
+            onClose={onClose}
+            onConfirm={() => onGive(amount)}
+        >
+            <PlayerFormField
+                label="How much"
+                hint="ARK can only hand experience over: it has no command that takes it away or sets a level."
+            >
+                <Input
+                    autoFocus
+                    type="number"
+                    min={1}
+                    max={MAX_ARK_EXPERIENCE}
+                    value={amount}
+                    aria-label="How much"
+                    className="w-32"
+                    onChange={(event) =>
+                        setAmount(Math.max(1, Math.min(MAX_ARK_EXPERIENCE, Number(event.target.value) || 1)))
+                    }
+                />
+            </PlayerFormField>
         </PlayerFormDialog>
     );
 }

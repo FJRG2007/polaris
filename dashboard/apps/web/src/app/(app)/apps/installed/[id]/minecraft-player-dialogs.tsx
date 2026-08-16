@@ -17,12 +17,12 @@
 
 import * as actions from "./minecraft-actions";
 import { CopyButton } from "@/components/copy-button";
-import { PlayerRecordPanel } from "@/components/player-history";
-import type { PlayerStats } from "@/lib/apps/games-activity";
-import type { PlayerRecord } from "@/lib/apps/games-activity-service";
 import { AccountInput } from "@/components/account-input";
+import type { PlayerStats } from "@/lib/apps/games-activity";
 import { InventoryEditor } from "./minecraft-inventory-editor";
+import { PlayerRecordPanel } from "@/components/player-history";
 import type { MinecraftEdition } from "@/lib/apps/minecraft/service";
+import type { PlayerRecord } from "@/lib/apps/games-activity-service";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
 import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
@@ -41,11 +41,111 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    Select
 } from "@polaris/ui";
+import {
+    MAX_EXPERIENCE,
+    type ExperienceMode,
+    type ExperienceUnit
+} from "@/lib/apps/minecraft/experience";
 
 /** Which of the forms is open, or none. */
-export type PlayerDialog = "teleport" | "timeout" | "inventory" | "location" | "history" | "access";
+export type PlayerDialog =
+    | "teleport"
+    | "timeout"
+    | "inventory"
+    | "location"
+    | "history"
+    | "access"
+    | "experience";
+
+/**
+ * Changing what experience a player has.
+ *
+ * Three verbs and two units, because the game has three and two - see
+ * `minecraft/experience`. The one worth having a form for at all is "set": after
+ * a death nobody could avoid, what an operator knows is the number they want the
+ * player to be on, not the difference between that and whatever they are on now.
+ */
+export function ExperienceDialog({
+    player,
+    pending,
+    error,
+    onClose,
+    onApply
+}: {
+    player: string;
+    pending: boolean;
+    error: string | null;
+    onClose: () => void;
+    onApply: (change: { mode: ExperienceMode; amount: number; unit: ExperienceUnit }) => void;
+}) {
+    const [mode, setMode] = useState<ExperienceMode>("add");
+    const [unit, setUnit] = useState<ExperienceUnit>("levels");
+    const [amount, setAmount] = useState(1);
+
+    return (
+        <PlayerFormDialog
+            title={`${player}'s experience`}
+            description="Applied to the player standing on the server, so they see it happen."
+            confirmLabel={mode === "set" ? "Set it" : mode === "remove" ? "Take it away" : "Give it"}
+            ready={amount >= 0}
+            pending={pending}
+            error={error}
+            danger={mode === "remove"}
+            onClose={onClose}
+            onConfirm={() => onApply({ mode, amount, unit })}
+        >
+            <PlayerFormField label="What to do">
+                <Select
+                    value={mode}
+                    aria-label="What to do"
+                    onValueChange={(next) => setMode(next as ExperienceMode)}
+                    options={[
+                        { value: "add", label: "Give them" },
+                        { value: "remove", label: "Take away" },
+                        { value: "set", label: "Put them on" }
+                    ]}
+                />
+            </PlayerFormField>
+
+            <PlayerFormField
+                label="How much"
+                hint={
+                    unit === "levels"
+                        ? "Levels are what the player sees over their hotbar."
+                        : "Points are what a level is made of, and a level costs more of them the higher it is."
+                }
+            >
+                <div className="flex items-center gap-2">
+                    <Input
+                        autoFocus
+                        type="number"
+                        min={0}
+                        max={MAX_EXPERIENCE}
+                        value={amount}
+                        aria-label="How much"
+                        className="w-28"
+                        onChange={(event) =>
+                            setAmount(Math.max(0, Math.min(MAX_EXPERIENCE, Number(event.target.value) || 0)))
+                        }
+                    />
+                    <Select
+                        value={unit}
+                        className="w-32"
+                        aria-label="Levels or points"
+                        onValueChange={(next) => setUnit(next as ExperienceUnit)}
+                        options={[
+                            { value: "levels", label: "levels" },
+                            { value: "points", label: "points" }
+                        ]}
+                    />
+                </div>
+            </PlayerFormField>
+        </PlayerFormDialog>
+    );
+}
 
 /** Three coordinates, absolute or `~` relative. */
 const COORDINATES =

@@ -19,6 +19,16 @@ export interface SearchableItem {
     readonly label: string;
     /** Lowercase words, so "diamond sword" and "diamond_sword" both match. */
     readonly search: string;
+    /**
+     * How far down to put it among equally good matches. Zero unless a catalogue
+     * says otherwise.
+     *
+     * What it is actually for: an entry nobody has a picture of draws as an empty
+     * box, and a grid whose first rows are empty boxes looks broken even when
+     * every one of them is a real thing. So a catalogue can push those behind the
+     * ones that draw, without either of them being a better answer to the query.
+     */
+    readonly rank?: number;
 }
 
 /**
@@ -81,9 +91,15 @@ export function searchCatalog<T extends SearchableItem>(items: readonly T[], que
         const score = item.label.toLowerCase() === needle ? 0 : at === 0 ? 1 : haystack[at - 1] === " " ? 2 : 3;
         scored.push({ item, score });
     }
-    scored.sort((left, right) => left.score - right.score || left.item.label.localeCompare(right.item.label));
+    scored.sort(
+        (left, right) =>
+            left.score - right.score ||
+            (left.item.rank ?? 0) - (right.item.rank ?? 0) ||
+            left.item.label.localeCompare(right.item.label)
+    );
     if (scored.length > 0) return scored.slice(0, limit).map((entry) => entry.item);
     return fuzzyIndex(items)
         .search(needle, { limit })
-        .map((hit) => hit.item);
+        .map((hit) => hit.item)
+        .sort((left, right) => (left.rank ?? 0) - (right.rank ?? 0));
 }

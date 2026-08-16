@@ -17,20 +17,23 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import * as ark from "@/lib/apps/ark/service";
+import { imageTypeOfBytes } from "@/lib/mime";
 import { recordAudit } from "@/lib/audit-service";
 import { isModId, MAX_MODS } from "@/lib/apps/ark/mods";
 import { deployApplication } from "@/lib/deploy-service";
+import { warmModImages } from "@/lib/apps/mod-image-cache";
 import { findGameIdentity } from "@/lib/apps/game-identity";
 import { recentlyGivenItems } from "@/lib/apps/recent-items";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/player-timeout";
 import { GAME_LOG, isJoinPassword, isSteamId } from "@/lib/apps/ark/access";
-import { parseWorkshopId, type WorkshopItem } from "@/lib/apps/ark/workshop";
 import { giveArkItem, requireArkPlayerId } from "@/lib/apps/ark/item-service";
 import { liftArkTimeout, timeoutArkPlayer } from "@/lib/apps/ark/timeout-service";
 import { ARK_ITEM_KEY, MAX_ARK_GIVE, MAX_ARK_QUALITY } from "@/lib/apps/ark/items";
+import { MAX_ARK_EXPERIENCE } from "@/lib/apps/ark/experience";
 import { requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
 import { readPlayerRecord, type PlayerRecord } from "@/lib/apps/games-activity-service";
 import { readArkRules, setArkRules, type ArkRules } from "@/lib/apps/ark/settings-service";
+import { isWorkshopImage, parseWorkshopId, type WorkshopItem } from "@/lib/apps/ark/workshop";
 import { ARK_MOD_SHELVES, shelfModIds, type ArkModSuggestion } from "@/lib/apps/ark/mod-catalog";
 import { readWorkshopItem, readWorkshopItems, searchWorkshop } from "@/lib/apps/ark/workshop-service";
 import { readArkMods, setArkMapMod, setArkMods, type ArkModsView } from "@/lib/apps/ark/mods-service";
@@ -318,6 +321,53 @@ export async function actOnArkSurvivorAction(
     }
 }
 
+const experienceSchema = z.object({
+    installedAppId: z.string().trim().min(1),
+    steamId: z.string().trim().refine(isSteamId, "That is not a Steam id"),
+    amount: z.number().int().min(1).max(MAX_ARK_EXPERIENCE)
+});
+
+/**
+ * Hand a player experience.
+ *
+ * Only handing it over. ARK has no command that takes experience away and none
+ * that sets it - a negative amount is ignored rather than subtracted - so the
+ * screen offers the one verb the game has and says so, rather than a form with
+ * two options that quietly do nothing.
+ */
+export async function giveArkExperienceAction(
+    installedAppId: string,
+    steamId: string,
+    amount: number
+): Promise<{ error?: string }> {
+    const parsed = experienceSchema.safeParse({ installedAppId, steamId, amount });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        const playerId = await requireArkPlayerId(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.steamId
+        );
+        await ark.giveArkExperience(
+            access.ownerId,
+            parsed.data.installedAppId,
+            playerId,
+            parsed.data.amount
+        );
+        await recordAudit({
+            actorId: user.id,
+            action: "games.ark.experience",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { steamId: parsed.data.steamId, amount: parsed.data.amount }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+    }
+}
+
 const giveSchema = z.object({
     installedAppId: z.string().trim().min(1),
     steamId: z.string().trim().refine(isSteamId, "That is not a Steam id"),
@@ -472,7 +522,17 @@ export async function setArkModsAction(
             targetId: parsed.data.installedAppId,
             metadata: { mods: parsed.data.ids }
         });
-        return { mods: await readArkMods(access.ownerId, parsed.data.installedAppId) };
+        const mods = await readArkMods(access.ownerId, parsed.data.installedAppId);
+        // Their pictures are kept on this machine from here on. Until now they
+        // were fetched from Steam whenever a screen wanted one, so an item taken
+        // down took its picture off a panel for a mod that is still installed and
+        // still running. Not awaited: it is a copy, not part of the save.
+        void warmModImages(
+            mods.items.map((item) => item.previewUrl),
+            isWorkshopImage,
+            imageTypeOfBytes
+        );
+        return { mods };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "The mods could not be saved" };
     }

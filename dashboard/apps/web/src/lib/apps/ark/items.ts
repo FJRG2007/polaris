@@ -51,6 +51,10 @@ export interface ArkItem extends SearchableItem {
     /** How many the game puts in one stack, which is what turns a quantity into
      *  "three stacks" on the way past. */
     readonly stack: number;
+    /** Behind the ones there is a picture of. About one item in eight has none -
+     *  event portals, boss summons, things that were never released - and a grid
+     *  led by empty boxes reads as a broken screen rather than as a real list. */
+    readonly rank: number;
 }
 
 /** The manifest as the picker uses it. Anything that is not a list of items is an
@@ -61,7 +65,12 @@ export function readArkItemCatalog(manifest: unknown): ArkItem[] {
     const items: ArkItem[] = [];
     for (const entry of manifest) {
         if (typeof entry !== "object" || entry === null) continue;
-        const { key, name, stack } = entry as { key?: unknown; name?: unknown; stack?: unknown };
+        const { key, name, stack, icon } = entry as {
+            key?: unknown;
+            name?: unknown;
+            stack?: unknown;
+            icon?: unknown;
+        };
         if (typeof key !== "string" || !ARK_ITEM_KEY.test(key)) continue;
         if (typeof name !== "string" || name.length === 0) continue;
         items.push({
@@ -71,10 +80,16 @@ export function readArkItemCatalog(manifest: unknown): ArkItem[] {
             // "ArrowTranq" in a mod's notes and types that, and the name on the
             // wiki is "Tranquilizer Arrow".
             search: `${name.toLowerCase()} ${key.toLowerCase()}`,
-            stack: typeof stack === "number" && Number.isFinite(stack) ? Math.max(1, Math.trunc(stack)) : 1
+            stack: typeof stack === "number" && Number.isFinite(stack) ? Math.max(1, Math.trunc(stack)) : 1,
+            // The manifest only says so when there is no picture, so anything that
+            // does not deny it has one.
+            rank: icon === false ? 1 : 0
         });
     }
-    return items;
+    // The ones that draw first, and alphabetically within that. This is the order
+    // the grid opens on before anybody searches, and it is the difference between
+    // a first screen of items and a first screen of placeholders.
+    return items.sort((left, right) => left.rank - right.rank || left.label.localeCompare(right.label));
 }
 
 /** The picture for an item's class. Always a URL: an item the set has no picture

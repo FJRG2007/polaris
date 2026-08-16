@@ -41,6 +41,7 @@ import { setGameHostname, setGameRouted } from "@/lib/apps/minecraft/address";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import { liftTimeout, timeoutPlayer } from "@/lib/apps/minecraft/timeout-service";
 import { MAX_BACKUP_BYTES, MAX_KEEP_LAST } from "@/lib/apps/minecraft/backup-policy";
+import { EXPERIENCE_UNITS, MAX_EXPERIENCE } from "@/lib/apps/minecraft/experience";
 import { readPlayerRecord, type PlayerRecord } from "@/lib/apps/games-activity-service";
 import { cancelAction, pendingFor, queueAction } from "@/lib/apps/minecraft/queue-service";
 import { isBackupName, isBiome, isLevelName, isLevelType } from "@/lib/apps/minecraft/world";
@@ -63,6 +64,7 @@ import {
     getServerPlayers,
     runConsoleLine,
     runServerCommand,
+    setPlayerExperience,
     withServerContainer
 } from "@/lib/apps/minecraft/service";
 import {
@@ -281,6 +283,51 @@ export async function givePlayerItemAction(
             metadata: { player, item, count: given }
         });
         return { output: output.trim() };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+    }
+}
+
+const experienceSchema = z.object({
+    installedAppId: z.string().uuid(),
+    player: playerNameSchema,
+    mode: z.enum(["add", "remove", "set"]),
+    amount: z.number().int().min(0).max(MAX_EXPERIENCE),
+    unit: z.enum(EXPERIENCE_UNITS)
+});
+
+export type ExperienceInput = z.infer<typeof experienceSchema>;
+
+/**
+ * Give a player experience, take it away, or say what they are on.
+ *
+ * Only while they are on, unlike an item: the game changes a bar on a player who
+ * is standing there, and there is nothing to write down for somebody who is not -
+ * a level saved for later would have to be applied at a join, at which point it
+ * is a different number than the one somebody meant.
+ */
+export async function setPlayerExperienceAction(
+    input: ExperienceInput
+): Promise<{ output?: string; error?: string }> {
+    const parsed = experienceSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const { installedAppId, player, mode, amount, unit } = parsed.data;
+    try {
+        const { user, access } = await requireGameServer("games.moderate", installedAppId);
+        const output = await setPlayerExperience(access.ownerId, installedAppId, {
+            player,
+            mode,
+            amount,
+            unit
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.experience",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { player, mode, amount, unit }
+        });
+        return { output };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
     }

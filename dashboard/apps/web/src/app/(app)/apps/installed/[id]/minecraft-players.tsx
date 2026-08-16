@@ -42,6 +42,7 @@ import {
     playerStanding
 } from "@/lib/apps/player-vocabulary";
 import {
+    ExperienceDialog,
     HistoryDialog,
     InventoryDialog,
     LocationDialog,
@@ -80,6 +81,7 @@ import {
     ShieldMinus,
     ShieldPlus,
     Skull,
+    Sparkles,
     Timer,
     UserMinus,
     UserPlus,
@@ -516,6 +518,21 @@ export function MinecraftPlayers({
                     }}
                 />
             )}
+            {acting?.dialog === "experience" && target && (
+                <ExperienceDialog
+                    player={target.name}
+                    pending={pending}
+                    error={null}
+                    onClose={() => setActing(null)}
+                    onApply={(change) => {
+                        const player = target.name;
+                        setActing(null);
+                        run(() =>
+                            actions.setPlayerExperienceAction({ installedAppId, player, ...change })
+                        );
+                    }}
+                />
+            )}
             {acting?.dialog === "timeout" && target && (
                 <PlayerTimeoutDialog
                     player={target.name}
@@ -892,6 +909,15 @@ function MoreActions({
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={!live || bedrock || !player.online} onSelect={() => onOpen("teleport")}>
                     <MapPin className="size-4" /> Teleport
+                </DropdownMenuItem>
+                {/* Only while they are on: the game changes a bar on a player who
+                    is standing there, and there is nothing to write down for
+                    somebody who is not. */}
+                <DropdownMenuItem
+                    disabled={!live || bedrock || !player.online}
+                    onSelect={() => onOpen("experience")}
+                >
+                    <Sparkles className="size-4" /> Experience
                 </DropdownMenuItem>
                 {/* Never disabled any more: the record of who played is kept by
                     Polaris now rather than read out of a log that may not reach

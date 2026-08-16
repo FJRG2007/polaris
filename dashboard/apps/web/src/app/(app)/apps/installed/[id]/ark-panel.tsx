@@ -49,7 +49,13 @@ import { timeoutFor, timeoutRemaining, type PlayerTimeout } from "@/lib/apps/pla
 import { foldArkPlayers, matchesArkPlayer, type ArkPlayerEntry } from "@/lib/apps/ark/players";
 import { generateJoinPassword, isJoinPassword, JOIN_PASSWORD_HINT } from "@/lib/apps/ark/access";
 import { CONSUMPTION_METRICS, MetricsHistory, PLAYER_METRICS } from "@/components/metrics-history";
-import { ArkGiveDialog, ArkHistoryDialog, ArkMessageDialog, ArkPlayerDialog } from "./ark-player-dialogs";
+import {
+    ArkExperienceDialog,
+    ArkGiveDialog,
+    ArkHistoryDialog,
+    ArkMessageDialog,
+    ArkPlayerDialog
+} from "./ark-player-dialogs";
 import {
     playerAction,
     playerConfirm,
@@ -93,6 +99,7 @@ import {
     Save,
     ShieldAlert,
     Skull,
+    Sparkles,
     ShieldMinus,
     ShieldPlus,
     UserMinus,
@@ -908,7 +915,7 @@ function PlayersTab({
      *  about nobody yet. */
     const [acting, setActing] = useState<{
         entry: ArkPlayerEntry | null;
-        dialog: "player" | "message" | "timeout" | "history" | "give";
+        dialog: "player" | "message" | "timeout" | "history" | "give" | "experience";
     } | null>(null);
     /** What has been handed out here lately, so the item grid opens on something
      *  worth looking at rather than on the first hundred of two thousand. */
@@ -982,7 +989,7 @@ function PlayersTab({
     }
 
     function open(
-        dialog: "player" | "message" | "timeout" | "history" | "give",
+        dialog: "player" | "message" | "timeout" | "history" | "give" | "experience",
         entry: ArkPlayerEntry | null
     ): void {
         setDialogError(null);
@@ -1123,6 +1130,7 @@ function PlayersTab({
                         onHistory={() => open("history", entry)}
                         onMessage={() => open("message", entry)}
                         onGive={() => open("give", entry)}
+                        onExperience={() => open("experience", entry)}
                         onKill={() =>
                             void confirm({
                                 title: `Kill ${entry.name}?`,
@@ -1308,6 +1316,25 @@ function PlayersTab({
                     }
                 />
             )}
+            {acting?.dialog === "experience" && target && (
+                <ArkExperienceDialog
+                    name={target.name}
+                    pending={pending}
+                    error={dialogError}
+                    onClose={() => setActing(null)}
+                    onGive={(amount) =>
+                        runInDialog(
+                            () =>
+                                actions.giveArkExperienceAction(
+                                    installedAppId,
+                                    target.steamId,
+                                    amount
+                                ),
+                            `Sent ${amount} experience to ${target.name}.`
+                        )
+                    }
+                />
+            )}
             {acting?.dialog === "timeout" && target && (
                 <PlayerTimeoutDialog
                     player={target.name}
@@ -1424,6 +1451,7 @@ function ArkPlayerRow({
     onHistory,
     onMessage,
     onGive,
+    onExperience,
     onKill,
     onStrip,
     onKick,
@@ -1457,6 +1485,7 @@ function ArkPlayerRow({
     onHistory: () => void;
     onMessage: () => void;
     onGive: () => void;
+    onExperience: () => void;
     onKill: () => void;
     onStrip: () => void;
     onKick: () => void;
@@ -1687,6 +1716,12 @@ function ArkPlayerRow({
                                     onSelect={onGive}
                                 >
                                     <PackagePlus className="size-4" /> Give them something
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    disabled={!live || !entry.online}
+                                    onSelect={onExperience}
+                                >
+                                    <Sparkles className="size-4" /> Give them experience
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 {/* The two that act on the survivor rather than on

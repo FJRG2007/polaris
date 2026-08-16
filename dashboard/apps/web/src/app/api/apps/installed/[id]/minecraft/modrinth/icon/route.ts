@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { imageTypeOfBytes } from "@/lib/mime";
 import { requireGameServer } from "@/lib/apps/install-access";
 import { isModrinthIcon } from "@/lib/apps/minecraft/modrinth";
+import { cachedModImage, keepModImage } from "@/lib/apps/mod-image-cache";
 
 export const runtime = "nodejs";
 
@@ -34,6 +35,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     // whatever somebody puts in a query string.
     if (!isModrinthIcon(url)) return new NextResponse(null, { status: 400 });
 
+    // Polaris's own copy first: it is faster, it tells Modrinth nothing about who
+    // is looking, and it is what keeps the picture for an installed mod on the
+    // screen after the project is deleted.
+    const kept = await cachedModImage(url);
+    if (kept) return picture(kept.bytes, kept.type);
+
     try {
         const answer = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
         if (!answer.ok) return new NextResponse(null, { status: 404 });
@@ -49,18 +56,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             ? declared
             : imageTypeOfBytes(new Uint8Array(bytes.slice(0, 16)));
         if (!type) return new NextResponse(null, { status: 404 });
-        return new NextResponse(bytes, {
-            headers: {
-                "Content-Type": type,
-                "Cache-Control": `private, max-age=${CACHE_SECONDS}`,
-                // It is somebody else's image file, rendered inside a dashboard
-                // somebody is logged into. An SVG is a document that can carry
-                // script, so nothing here is allowed to be treated as one.
-                "Content-Security-Policy": "default-src 'none'; sandbox",
-                "X-Content-Type-Options": "nosniff"
-            }
-        });
+        await keepModImage(url, new Uint8Array(bytes), type);
+        return picture(bytes, type);
     } catch {
         return new NextResponse(null, { status: 404 });
     }
+}
+
+function picture(bytes: ArrayBuffer | Buffer, type: string): NextResponse {
+    return new NextResponse(bytes as ArrayBuffer, {
+        headers: {
+            "Content-Type": type,
+            "Cache-Control": `private, max-age=${CACHE_SECONDS}`,
+            // It is somebody else's image file, rendered inside a dashboard
+            // somebody is logged into. An SVG is a document that can carry
+            // script, so nothing here is allowed to be treated as one.
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+            "X-Content-Type-Options": "nosniff"
+        }
+    });
 }

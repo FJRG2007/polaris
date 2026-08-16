@@ -29,7 +29,8 @@ describe("readArkItemCatalog", () => {
                 id: "PrimalItemResource_Wood",
                 label: "Wood",
                 search: "wood primalitemresource_wood",
-                stack: 100
+                stack: 100,
+                rank: 0
             }
         ]);
     });
@@ -72,6 +73,22 @@ describe("searchArkItems", () => {
 
     it("still answers a typo", () => {
         expect(searchArkItems(items, "wodo", 5).map((item) => item.label)).toContain("Wood");
+    });
+
+    it("puts the items nobody has a picture of behind the ones it can draw", () => {
+        // A first screen of empty boxes reads as a broken panel, even when every
+        // one of them is a real item.
+        const mixed = readArkItemCatalog([
+            { key: "PrimalItemStructure_PortalA", name: "Aaa Portal", stack: 1, icon: false },
+            { key: "PrimalItemResource_Wood", name: "Wood", stack: 100 }
+        ]);
+        expect(mixed.map((item) => item.label)).toEqual(["Wood", "Aaa Portal"]);
+        // And among equally good matches for a query, too.
+        const both = readArkItemCatalog([
+            { key: "PrimalItemStructure_PortalWood", name: "Wood Portal", stack: 1, icon: false },
+            { key: "PrimalItemStructure_WoodWall", name: "Wood Wall", stack: 100 }
+        ]);
+        expect(searchArkItems(both, "wood ", 5)[0]?.label).toBe("Wood Wall");
     });
 });
 

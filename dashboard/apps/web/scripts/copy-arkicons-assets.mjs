@@ -26,7 +26,15 @@ mkdirSync(target, { recursive: true });
 cpSync(source, target, { recursive: true });
 
 const catalog = JSON.parse(readFileSync(catalogFile, "utf8"));
-const items = catalog.items.map((item) => ({ key: item.key, name: item.name, stack: item.stack }));
+// The blueprint path is left behind on purpose; `icon: false` is carried across
+// because the picker puts the items nobody has a picture of behind the ones it
+// can draw.
+const items = catalog.items.map((item) => ({
+    key: item.key,
+    name: item.name,
+    stack: item.stack,
+    ...(item.icon === false ? { icon: false } : {})
+}));
 
 writeFileSync(join(target, "items.json"), `${JSON.stringify(items)}\n`);
 

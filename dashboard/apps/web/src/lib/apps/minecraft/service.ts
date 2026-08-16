@@ -23,6 +23,7 @@ import { getHostLanIp } from "@/lib/host-address";
 import { currentReleaseRef } from "@/lib/deploy/releases";
 import type { ExecResult, RuntimePorts } from "@polaris/deploy";
 import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
+import { experienceCommand, type ExperienceChange } from "./experience";
 import { hostPortForApp, readAppRuntimeLog } from "@/lib/deploy-service";
 import { readCrashLoop, readRestartWatch } from "@/lib/apps/games-health";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
@@ -623,6 +624,30 @@ export async function getPlayerLevels(
         const script = wanted.map((name) => `rcon-cli data get entity ${name} XpLevel`).join("; ");
         const result = await server.run(["sh", "-c", script]);
         return Object.fromEntries(parse.parsePlayerLevels(result.output));
+    });
+}
+
+/**
+ * Give somebody experience, take it away, or say what they are on.
+ *
+ * Java only, like everything else that goes through a command with a subcommand:
+ * Bedrock's console has `xp` but not the `add`/`set` split, and guessing at the
+ * older spelling would be a command that silently does nothing.
+ *
+ * Hands back whatever the server said, which is the sentence a screen shows: the
+ * game answers this one properly, including when it refuses because a player
+ * cannot go below nothing.
+ */
+export async function setPlayerExperience(
+    ownerId: string,
+    installedAppId: string,
+    change: ExperienceChange
+): Promise<string> {
+    return withServerContainer(ownerId, installedAppId, async (server) => {
+        if (server.edition !== "java") {
+            throw new Error("Bedrock's console does not have the command that changes experience");
+        }
+        return parse.stripFormatting(await server.say(experienceCommand(change))).trim();
     });
 }
 

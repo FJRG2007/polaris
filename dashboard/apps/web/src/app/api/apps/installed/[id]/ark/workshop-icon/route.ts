@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { imageTypeOfBytes } from "@/lib/mime";
 import { isWorkshopImage } from "@/lib/apps/ark/workshop";
 import { requireGameServer } from "@/lib/apps/install-access";
+import { cachedModImage, keepModImage } from "@/lib/apps/mod-image-cache";
 
 export const runtime = "nodejs";
 
@@ -32,6 +33,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     // fetch whatever somebody puts in a query string.
     if (!isWorkshopImage(url)) return new NextResponse(null, { status: 400 });
 
+    // Polaris's own copy first. It is faster, it does not tell Steam that
+    // somebody opened a mods screen, and it is the whole reason the picture for
+    // an installed mod still draws after the item is taken down.
+    const kept = await cachedModImage(url);
+    if (kept) return picture(kept.bytes, kept.type);
+
     try {
         const answer = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
         if (!answer.ok) return new NextResponse(null, { status: 404 });
@@ -45,15 +52,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         // file that is not an image is refused whatever the header claimed.
         const type = imageTypeOfBytes(new Uint8Array(bytes.slice(0, 16)));
         if (!type) return new NextResponse(null, { status: 404 });
-        return new NextResponse(bytes, {
-            headers: {
-                "Content-Type": type,
-                "Cache-Control": `private, max-age=${CACHE_SECONDS}`,
-                "Content-Security-Policy": "default-src 'none'; sandbox",
-                "X-Content-Type-Options": "nosniff"
-            }
-        });
+        await keepModImage(url, new Uint8Array(bytes), type);
+        return picture(bytes, type);
     } catch {
         return new NextResponse(null, { status: 404 });
     }
+}
+
+function picture(bytes: ArrayBuffer | Buffer, type: string): NextResponse {
+    return new NextResponse(bytes as ArrayBuffer, {
+        headers: {
+            "Content-Type": type,
+            "Cache-Control": `private, max-age=${CACHE_SECONDS}`,
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+            "X-Content-Type-Options": "nosniff"
+        }
+    });
 }
