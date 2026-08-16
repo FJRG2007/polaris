@@ -57,6 +57,13 @@ env:
   NEXT_TELEMETRY_DISABLED: "1"
   NPM_CONFIG_FUND: "false"
   NPM_CONFIG_AUDIT: "false"
+  # `whatsapp-web.js` brings in puppeteer, whose install step downloads a copy of
+  # Chrome from Google's CDN - which answered 403 for the pinned build and took
+  # `npm ci` down with it, on a commit that touched neither. Nothing in this
+  # workflow drives a browser: it typechecks, lints, and runs tests that render
+  # to markup. So the download is skipped, and CI stops depending on a third
+  # party being in a good mood.
+  PUPPETEER_SKIP_DOWNLOAD: "true"
 
 jobs:
   checks:
