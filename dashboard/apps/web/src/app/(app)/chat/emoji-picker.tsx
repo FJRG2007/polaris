@@ -381,7 +381,7 @@ export function EmojiPicker({
                                       ? "Search stickers"
                                       : "Search GIFs"
                             }
-                            className="h-7 w-full rounded-md border border-border bg-background pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
+                            className="h-7 w-full rounded-md border border-border bg-field pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
                         />
                     </div>
 
@@ -602,7 +602,7 @@ function ByLink({ onSend }: { onSend: (address: string) => void }) {
                     value={address}
                     onChange={(event) => setAddress(event.target.value)}
                     placeholder="https://"
-                    className="h-7 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs hover:border-border-strong focus:border-border-strong"
+                    className="h-7 min-w-0 flex-1 rounded-md border border-border bg-field px-2 text-xs hover:border-border-strong focus:border-border-strong"
                 />
                 <button
                     type="submit"

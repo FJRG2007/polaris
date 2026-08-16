@@ -186,7 +186,7 @@ export function PropertyRows({
                         placeholder="Why, if it is not a task or a date"
                         onChange={(event) => hold?.({ blockedNote: event.target.value.trim() })}
                         onBlur={(event) => patch({ blockedNote: event.target.value.trim() })}
-                        className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs hover:border-border-strong focus:border-border-strong disabled:opacity-50"
+                        className="min-w-0 flex-1 rounded-md border border-border bg-field px-2 py-1 text-xs hover:border-border-strong focus:border-border-strong disabled:opacity-50"
                     />
                     {waitingOn > 0 && (
                         <span className="text-[11px] text-amber-600">
@@ -208,7 +208,7 @@ export function PropertyRows({
                     placeholder="Empty"
                     onChange={(event) => hold?.({ points: pointsOf(event.target.value) })}
                     onBlur={(event) => patch({ points: pointsOf(event.target.value) })}
-                    className="w-20 rounded-md border border-border bg-background px-2 py-1 text-xs hover:border-border-strong focus:border-border-strong"
+                    className="w-20 rounded-md border border-border bg-field px-2 py-1 text-xs hover:border-border-strong focus:border-border-strong"
                 />
             </Property>
 

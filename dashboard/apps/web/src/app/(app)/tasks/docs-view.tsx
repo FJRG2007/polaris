@@ -148,7 +148,7 @@ export function DocsView({
                         onChange={(event) => setQuery(event.target.value)}
                         placeholder="Find a page"
                         aria-label="Find a page"
-                        className="h-8 w-full rounded-md border border-border bg-background pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
+                        className="h-8 w-full rounded-md border border-border bg-field pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
                     />
                 </div>
 

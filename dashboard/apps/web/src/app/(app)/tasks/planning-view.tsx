@@ -91,7 +91,7 @@ export function SprintsView({
                                 type="date"
                                 value={start}
                                 onChange={(event) => setStart(event.target.value)}
-                                className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+                                className="h-8 rounded-md border border-border bg-field px-2 text-xs"
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -100,7 +100,7 @@ export function SprintsView({
                                 type="date"
                                 value={end}
                                 onChange={(event) => setEnd(event.target.value)}
-                                className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+                                className="h-8 rounded-md border border-border bg-field px-2 text-xs"
                             />
                         </label>
                         <Button
@@ -386,7 +386,7 @@ export function GoalsView({
                                                         );
                                                         if (result?.error) setError(result.error);
                                                     }}
-                                                    className="h-7 w-20 rounded-md border border-border bg-background px-2 text-xs"
+                                                    className="h-7 w-20 rounded-md border border-border bg-field px-2 text-xs"
                                                 />
                                             )}
                                             <span className="w-10 text-right text-muted-foreground">{target.percent}%</span>

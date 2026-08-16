@@ -845,7 +845,7 @@ function NumberField({
                     if (Number.isFinite(next))
                         onChange(Math.min(max, Math.max(min, Math.round(next))));
                 }}
-                className="h-8 w-24 rounded-md border border-border bg-background px-2 text-sm text-foreground"
+                className="h-8 w-24 rounded-md border border-border bg-field px-2 text-sm text-foreground"
             />
         </label>
     );

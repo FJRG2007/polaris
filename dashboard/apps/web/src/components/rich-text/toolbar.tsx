@@ -94,7 +94,7 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
                         onKeyDown={(event) => {
                             if (event.key === "Escape") setLinking(false);
                         }}
-                        className="h-7 w-56 rounded border border-border bg-background px-2 text-xs hover:border-border-strong focus:border-border-strong"
+                        className="h-7 w-56 rounded border border-border bg-field px-2 text-xs hover:border-border-strong focus:border-border-strong"
                     />
                     <Control label="Apply the link" onClick={commit}>
                         <Link2 className="size-4" />

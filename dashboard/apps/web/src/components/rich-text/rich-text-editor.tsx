@@ -245,7 +245,7 @@ function surfaceClass(bordered: boolean, disabled: boolean): string {
     return cn(
         "w-full",
         bordered
-            ? "rounded-md border border-border bg-background px-3 py-2 focus-within:border-border-strong"
+            ? "rounded-md border border-border bg-field px-3 py-2 focus-within:border-border-strong"
             // Camouflaged until you point at it, and plain again once the caret
             // is in: the tint says "this is editable", and once you are editing
             // it is only a box around what you are writing. Written as one

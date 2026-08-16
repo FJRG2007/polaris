@@ -156,7 +156,7 @@ function SprintDialog({
                                 type="date"
                                 value={start}
                                 onChange={(event) => setStart(event.target.value)}
-                                className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+                                className="h-9 rounded-md border border-border bg-field px-2 text-sm"
                             />
                         </label>
                         <label className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
@@ -165,7 +165,7 @@ function SprintDialog({
                                 type="date"
                                 value={end}
                                 onChange={(event) => setEnd(event.target.value)}
-                                className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+                                className="h-9 rounded-md border border-border bg-field px-2 text-sm"
                             />
                         </label>
                     </div>

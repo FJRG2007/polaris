@@ -148,7 +148,7 @@ export function ModelPicker({
                 type="button"
                 disabled={disabled}
                 onClick={() => setOpen((was) => !was)}
-                className="border-border bg-background flex h-9 w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                className="border-border bg-field flex h-9 w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
                 <span className="min-w-0 truncate text-left">
                     {chosen ? chosen.name : (value ?? inheritLabel ?? placeholder)}

@@ -352,7 +352,7 @@ const SETUP_VALUE_LABEL: Record<IntegrationSetupValue, string> = {
  *  rather than a string, so it is offered as a download instead of a copy. */
 function SetupValue({ kind, value }: { kind: IntegrationSetupValue; value: string }) {
     return (
-        <div className="flex items-center gap-2 rounded border border-border bg-background px-2 py-1">
+        <div className="flex items-center gap-2 rounded border border-border bg-field px-2 py-1">
             <span className="shrink-0 text-xs text-muted-foreground">{SETUP_VALUE_LABEL[kind]}</span>
             <code className="min-w-0 flex-1 truncate text-xs" title={value}>
                 {value}

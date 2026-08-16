@@ -257,7 +257,7 @@ export function FilterBar({
                                             onChange={(event) => update(index, { values: [event.target.value] })}
                                             placeholder="Value"
                                             aria-label="Value"
-                                            className="h-7 w-40 rounded-md border border-border bg-background px-2 text-xs hover:border-border-strong focus:border-border-strong"
+                                            className="h-7 w-40 rounded-md border border-border bg-field px-2 text-xs hover:border-border-strong focus:border-border-strong"
                                         />
                                     ))}
 

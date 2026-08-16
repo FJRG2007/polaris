@@ -325,7 +325,7 @@ function StatusesTab({
                                 onChange={(event) =>
                                     setDraft({ ...draft, color: event.target.value })
                                 }
-                                className="h-8 w-12 shrink-0 rounded border border-border bg-background"
+                                className="h-8 w-12 shrink-0 rounded border border-border bg-field"
                             />
                             <Input
                                 autoFocus
@@ -456,7 +456,7 @@ function StatusesTab({
                         value={color}
                         aria-label="Status colour"
                         onChange={(event) => setColor(event.target.value)}
-                        className="h-8 w-12 rounded border border-border bg-background"
+                        className="h-8 w-12 rounded border border-border bg-field"
                     />
                     <Button
                         size="sm"
@@ -676,7 +676,7 @@ function TagsTab({
                         value={color}
                         aria-label="Tag colour"
                         onChange={(event) => setColor(event.target.value)}
-                        className="h-8 w-12 rounded border border-border bg-background"
+                        className="h-8 w-12 rounded border border-border bg-field"
                     />
                     <Button
                         size="sm"
