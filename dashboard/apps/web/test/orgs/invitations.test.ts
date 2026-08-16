@@ -43,6 +43,9 @@ const state = vi.hoisted(() => ({
         | null,
     /** Whose invitation the room check left out of its count. */
     countedExcluding: null as string | null,
+    /** How many rows a delete matched, so a withdrawal can be asked to hit
+     *  nothing. */
+    deleted: 1,
     /** What was written, in order, so a test can say what did and did not
      *  happen. */
     written: [] as string[]
@@ -78,7 +81,7 @@ vi.mock("@polaris/db", () => ({
             },
             deleteMany: async () => {
                 state.written.push("invitation-gone");
-                return { count: 1 };
+                return { count: state.deleted };
             }
         },
         orgRole: { findUnique: async () => state.role },
@@ -91,7 +94,9 @@ vi.mock("@/lib/orgs/role-service", () => ({ ensureSystemRoles: async () => undef
 vi.mock("@/lib/notifications/dispatch", () => ({ notify: async () => undefined }));
 vi.mock("@/lib/privacy-service", () => ({ contactLines: async () => new Map<string, string>() }));
 
-const { inviteToOrg, respondToInvitation } = await import("@/lib/orgs/invitation-service");
+const { inviteToOrg, respondToInvitation, revokeOrgInvitation } = await import(
+    "@/lib/orgs/invitation-service"
+);
 const { OrgError } = await import("@/lib/orgs/errors");
 
 const hour = 60 * 60 * 1000;
@@ -112,6 +117,7 @@ beforeEach(() => {
         org: { id: "org-1", name: "Acme", slug: "acme" }
     };
     state.countedExcluding = null;
+    state.deleted = 1;
     state.written = [];
 });
 
@@ -165,6 +171,20 @@ describe("inviting somebody", () => {
             OrgError
         );
         expect(state.written).toEqual([]);
+    });
+});
+
+describe("withdrawing one", () => {
+    it("says so when there was nothing to withdraw", async () => {
+        // An id from another organization, or one answered a moment ago, matches
+        // no row. Reporting that as a withdrawal leaves the screen and the
+        // organization's history both describing something that never happened.
+        state.deleted = 0;
+        await expect(revokeOrgInvitation("org-1", "inv-1")).rejects.toBeInstanceOf(OrgError);
+    });
+
+    it("goes through when the invitation was this organization's", async () => {
+        await expect(revokeOrgInvitation("org-1", "inv-1")).resolves.toBeUndefined();
     });
 });
 

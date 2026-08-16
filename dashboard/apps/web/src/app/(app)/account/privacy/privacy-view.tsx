@@ -191,7 +191,9 @@ function Who({
     onEdit: () => void;
 }) {
     const list = rule.listId ? lists.find((entry) => entry.id === rule.listId) : null;
-    const shown = list ? list.members.map((member) => member.name) : rule.people.map(nameOf);
+    // Kept as people rather than names: two colleagues share a first name often
+    // enough, and everybody whose name has not been resolved yet is "Somebody".
+    const shown = list ? list.members : rule.people.map((id) => ({ id, name: nameOf(id) }));
     const first = shown.slice(0, 3);
     const rest = shown.length - first.length;
 
@@ -209,12 +211,12 @@ function Who({
                     {list && (
                         <span className="text-[11px] text-muted-foreground">{list.name}:</span>
                     )}
-                    {first.map((name) => (
+                    {first.map((person) => (
                         <span
-                            key={name}
+                            key={person.id}
                             className="max-w-[10rem] truncate rounded-full bg-muted px-2 py-0.5 text-[11px]"
                         >
-                            {name}
+                            {person.name}
                         </span>
                     ))}
                     {rest > 0 && (

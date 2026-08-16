@@ -170,8 +170,11 @@ export async function deleteOrgAction(orgId: string, proof: unknown): Promise<{ 
 /**
  * Ask somebody to join, rather than putting them on the roster.
  *
- * The identifier goes into the record and the address does not go anywhere else:
- * whoever is invited is named by the account it resolved to from here on.
+ * The identifier goes no further than the lookup it is for: whoever is invited
+ * is named by the account it resolved to from here on, and the record says that
+ * id. An organization's history is readable by everybody holding `activity.read`
+ * on it, so an address typed into this box would be an address published to the
+ * roster - the one thing the invitation itself is careful never to do.
  */
 export async function inviteOrgMemberAction(
     orgId: string,
@@ -181,8 +184,8 @@ export async function inviteOrgMemberAction(
     const caller = await actor();
     try {
         await orgs.requireOrgPermission(caller, orgId, "people.manage");
-        await invitations.inviteToOrg(orgId, identifier, role, caller.id);
-        await record(caller.id, orgId, "org.member.invite", { identifier, role });
+        const userId = await invitations.inviteToOrg(orgId, identifier, role, caller.id);
+        await record(caller.id, orgId, "org.member.invite", { userId, role });
         refresh();
         return {};
     } catch (caught) {
@@ -328,8 +331,8 @@ export async function addTeamMemberAction(
     const caller = await actor();
     try {
         const { orgId } = await orgs.requireTeam(caller, teamId, "manage");
-        await orgs.addTeamMember(teamId, identifier, role);
-        await record(caller.id, orgId, "org.team.member.add", { teamId, identifier, role });
+        const userId = await orgs.addTeamMember(teamId, identifier, role);
+        await record(caller.id, orgId, "org.team.member.add", { teamId, userId, role });
         refresh();
         return {};
     } catch (caught) {

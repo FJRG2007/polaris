@@ -73,13 +73,17 @@ function live() {
  * Asking again replaces the invitation rather than failing: changing your mind
  * about the role you offered is the same act, and a second row for the same pair
  * is a roster with two answers to one question.
+ *
+ * Answers with the account it resolved to, which is what anything downstream is
+ * allowed to keep: the identifier is somebody's address as often as not, and it
+ * stops here.
  */
 export async function inviteToOrg(
     orgId: string,
     identifier: string,
     role: string,
     invitedById: string
-): Promise<void> {
+): Promise<string> {
     await ensureSystemRoles(orgId);
     await assertRoleExists(orgId, role);
 
@@ -127,6 +131,8 @@ export async function inviteToOrg(
         href: "/account/organizations",
         actionRequired: true
     }).catch(() => undefined);
+
+    return user.id;
 }
 
 /**
@@ -242,11 +248,21 @@ function drawn(row: InvitationRow, contact: string): OrgInvitationView {
     };
 }
 
-/** Withdraw one. The organization's own act, so it names the organization as
- *  well as the invitation - an id on its own would let anybody who has one
- *  cancel an invitation somewhere they cannot see. */
+/**
+ * Withdraw one. The organization's own act, so it names the organization as
+ * well as the invitation - an id on its own would let anybody who has one
+ * cancel an invitation somewhere they cannot see.
+ *
+ * Refused when nothing matched, rather than reported as done: an id belonging
+ * to another organization, or to an invitation that was answered a moment ago,
+ * would otherwise leave the screen saying it was withdrawn and the history
+ * saying somebody withdrew it.
+ */
 export async function revokeOrgInvitation(orgId: string, invitationId: string): Promise<void> {
-    await prisma.organizationInvitation.deleteMany({ where: { id: invitationId, orgId } });
+    const gone = await prisma.organizationInvitation.deleteMany({
+        where: { id: invitationId, orgId }
+    });
+    if (gone.count === 0) throw new OrgError("That invitation is no longer waiting");
 }
 
 /**

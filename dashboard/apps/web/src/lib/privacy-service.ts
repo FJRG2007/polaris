@@ -230,12 +230,20 @@ export async function discoverableBy(
  * A list id arriving from a form is a claim like any other, so every one of them
  * has to be this account's own - pointing a setting at somebody else's list would
  * let anybody decide who counts as an exception for anybody.
+ *
+ * Only the audiences that name people keep any. A row moved to "everybody" or
+ * "nobody" is a row that no longer means anybody in particular, and keeping the
+ * names it used to carry would be somebody's answer to a question they stopped
+ * being asked - held indefinitely, and put back silently the day the audience
+ * changes again.
  */
 export async function setPrivacy(userId: string, settings: core.PrivacySettings): Promise<void> {
-    const saved = core.PRIVACY_FIELDS.map((field) => ({
-        field,
-        listId: settings[field].listId
-    })).filter((entry): entry is { field: core.PrivacyField; listId: string } => entry.listId !== null);
+    const naming = core.PRIVACY_FIELDS.filter((field) =>
+        core.audienceNeedsList(settings[field].audience)
+    );
+    const saved = naming
+        .map((field) => ({ field, listId: settings[field].listId }))
+        .filter((entry): entry is { field: core.PrivacyField; listId: string } => entry.listId !== null);
     await assertOwnLists(
         userId,
         saved.map((entry) => entry.listId)
@@ -244,7 +252,7 @@ export async function setPrivacy(userId: string, settings: core.PrivacySettings)
     // The rows keeping their own set of people. Written before the links below,
     // which have to name a list that exists.
     const own: { field: core.PrivacyField; listId: string }[] = [];
-    for (const field of core.PRIVACY_FIELDS) {
+    for (const field of naming) {
         const rule = settings[field];
         if (rule.listId !== null || rule.people.length === 0) continue;
         own.push({ field, listId: await ownListFor(userId, field, rule.people) });

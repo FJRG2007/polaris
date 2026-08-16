@@ -877,8 +877,15 @@ export async function deleteTeam(teamId: string): Promise<void> {
 }
 
 /** Put somebody on a team. Only people already on the organization's roster:
- *  a team is a subset of the organization, never a way around joining it. */
-export async function addTeamMember(teamId: string, identifier: string, role: core.TeamRole): Promise<void> {
+ *  a team is a subset of the organization, never a way around joining it.
+ *
+ *  Answers with the account the identifier resolved to, so nothing downstream
+ *  has to keep the address somebody typed. */
+export async function addTeamMember(
+    teamId: string,
+    identifier: string,
+    role: core.TeamRole
+): Promise<string> {
     const team = await prisma.team.findUnique({ where: { id: teamId }, select: { orgId: true } });
     if (!team) throw new OrgError("That team no longer exists");
 
@@ -903,6 +910,8 @@ export async function addTeamMember(teamId: string, identifier: string, role: co
         update: { role },
         create: { teamId, userId: user.id, role }
     });
+
+    return user.id;
 }
 
 export async function setTeamMemberRole(teamId: string, userId: string, role: core.TeamRole): Promise<void> {
