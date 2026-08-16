@@ -29,9 +29,8 @@ export interface GameTab {
     /** What the viewer needs on this server to open it. */
     readonly permission: Permission;
     /** The games that actually have this screen. A Minecraft world can be
-     *  regenerated from a seed and an ARK one cannot; ARK has no mod loader Polaris
-     *  drives and no gamerules to toggle. Offering a screen the game has nothing
-     *  behind is worse than not offering it - it opens on an error. */
+     *  regenerated from a seed and an ARK one cannot. Offering a screen the game
+     *  has nothing behind is worse than not offering it - it opens on an error. */
     readonly games: readonly GameId[];
 }
 
@@ -42,8 +41,8 @@ export const GAME_TABS: readonly GameTab[] = [
     { slug: "console", label: "Console", permission: "games.console", games: EVERY_GAME },
     { slug: "players", label: "Players", permission: "games.read", games: EVERY_GAME },
     { slug: "world", label: "World", permission: "games.manage", games: ["minecraft"] },
-    { slug: "rules", label: "Rules", permission: "games.read", games: ["minecraft"] },
-    { slug: "mods", label: "Mods", permission: "games.manage", games: ["minecraft"] },
+    { slug: "rules", label: "Rules", permission: "games.read", games: EVERY_GAME },
+    { slug: "mods", label: "Mods", permission: "games.manage", games: EVERY_GAME },
     { slug: "usage", label: "Usage", permission: "games.read", games: EVERY_GAME },
     { slug: "security", label: "Security", permission: "games.manage", games: EVERY_GAME },
     { slug: "access", label: "Access", permission: "games.read", games: EVERY_GAME },

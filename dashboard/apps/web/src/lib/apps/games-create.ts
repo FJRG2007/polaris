@@ -30,9 +30,15 @@ import { grantPlayerAccess } from "@/lib/apps/minecraft/player-access";
 import { findGame, type GameDefinition } from "@/lib/apps/games-catalog";
 import { arkServerEnv, expectedArkMemoryMb } from "@/lib/apps/ark/config";
 import { applyAllowList, ARK_CATALOG_ID, mintJoinPassword } from "@/lib/apps/ark/service";
+import { ARK_PENDING_SETTINGS_KEY, RECOMMENDED_ARK_SETTINGS } from "@/lib/apps/ark/settings";
 import { isMapResourcePack, mapFor, pinnedRelease, type WorldMap } from "@/lib/apps/minecraft/maps";
 import { commonVersions, knownUnsupported, wantsLatest } from "@/lib/apps/minecraft/blueprint-version";
 import { formatProjectList, loaderForType, parseProjectList, projectSlug } from "@/lib/apps/minecraft/modrinth";
+import type {
+    CreateArkServerInput,
+    CreateGameServerInput,
+    CreateMinecraftServerInput
+} from "@/lib/apps/games-schema";
 import {
     DEFAULT_BIOME,
     DEFAULT_LEVEL_TYPE,
@@ -41,11 +47,6 @@ import {
     randomSeed,
     seedEnvKey
 } from "@/lib/apps/minecraft/world";
-import type {
-    CreateArkServerInput,
-    CreateGameServerInput,
-    CreateMinecraftServerInput
-} from "@/lib/apps/games-schema";
 import {
     CROSSPLAY_PROJECTS,
     findBlueprint,
@@ -411,7 +412,14 @@ async function createArkServer(
         // What the machine picker bills this server at. ARK has no heap to set, so
         // without this a machine running four of them looks empty on the form that
         // decides where the fifth goes.
-        memoryMb: expectedArkMemoryMb(input.concurrentPlayers)
+        memoryMb: expectedArkMemoryMb(input.concurrentPlayers),
+        // The handful of settings that are only off because ARK's defaults were
+        // written for public servers a decade ago: a map that shows you where you
+        // are, a camera you can turn round, a crosshair, and a brightness slider so
+        // the nights are playable. Recorded rather than applied for the same reason
+        // the allow list is - there is no server yet - and handed over by the same
+        // sweep, which leaves anything the operator has since chosen alone.
+        [ARK_PENDING_SETTINGS_KEY]: RECOMMENDED_ARK_SETTINGS
     });
     // Almost certainly too early - the server is still installing - but free when
     // it is, and the difference between "the sweep will get to it" and "it is

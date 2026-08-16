@@ -18,12 +18,18 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import * as ark from "@/lib/apps/ark/service";
 import { recordAudit } from "@/lib/audit-service";
+import { isModId, MAX_MODS } from "@/lib/apps/ark/mods";
+import { deployApplication } from "@/lib/deploy-service";
 import { findGameIdentity } from "@/lib/apps/game-identity";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/player-timeout";
 import { GAME_LOG, isJoinPassword, isSteamId } from "@/lib/apps/ark/access";
 import { liftArkTimeout, timeoutArkPlayer } from "@/lib/apps/ark/timeout-service";
 import { requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
 import { readPlayerRecord, type PlayerRecord } from "@/lib/apps/games-activity-service";
+import { readArkRules, setArkRules, type ArkRules } from "@/lib/apps/ark/settings-service";
+import { readArkMods, setArkMapMod, setArkMods, type ArkModsView } from "@/lib/apps/ark/mods-service";
+import { parseWorkshopId, type WorkshopItem } from "@/lib/apps/ark/workshop";
+import { readWorkshopItem, searchWorkshop } from "@/lib/apps/ark/workshop-service";
 
 const playerSchema = z.object({
     installedAppId: z.string().trim().min(1),
@@ -262,6 +268,199 @@ export async function moderateArkPlayerAction(
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+    }
+}
+
+const rulesSchema = z.object({
+    installedAppId: z.string().trim().min(1),
+    // A value of null unpins a setting, which is not the same as writing the
+    // game's default into it.
+    changes: z.record(z.string().trim().max(32), z.string().trim().max(32).nullable()).refine(
+        (value) => Object.keys(value).length <= 64,
+        "Too many settings at once"
+    )
+});
+
+/** What the server is set to, and what its own file says it is running with. */
+export async function readArkRulesAction(installedAppId: string): Promise<ArkRules> {
+    try {
+        const { access } = await requireGameServer("games.read", installedAppId);
+        return await readArkRules(access.ownerId, installedAppId);
+    } catch (caught) {
+        return {
+            overrides: {},
+            live: {},
+            reason: caught instanceof Error ? caught.message : "The settings could not be read"
+        };
+    }
+}
+
+/**
+ * Pin some settings, and hand back what the server now holds.
+ *
+ * Written to the launch options rather than to the game's own settings file: ARK
+ * rewrites that file when it stops, so an edit made there while the server is up
+ * is thrown away at the moment it was meant to take effect.
+ */
+export async function setArkRulesAction(
+    installedAppId: string,
+    changes: Record<string, string | null>
+): Promise<{ rules?: ArkRules; error?: string }> {
+    const parsed = rulesSchema.safeParse({ installedAppId, changes });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the settings and try again" };
+    try {
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const rules = await setArkRules(access.ownerId, parsed.data.installedAppId, parsed.data.changes);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.ark.settings",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { changed: Object.keys(parsed.data.changes) }
+        });
+        return { rules };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+    }
+}
+
+/** What this server runs, what it has downloaded, and what Steam says about each. */
+export async function readArkModsAction(
+    installedAppId: string
+): Promise<{ mods?: ArkModsView; error?: string }> {
+    try {
+        const { access } = await requireGameServer("games.read", installedAppId);
+        return { mods: await readArkMods(access.ownerId, installedAppId) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The mods could not be read" };
+    }
+}
+
+const modListSchema = z.object({
+    installedAppId: z.string().trim().min(1),
+    ids: z.array(z.string().trim().refine(isModId, "That is not a Steam Workshop id")).max(MAX_MODS)
+});
+
+/**
+ * Replace the mod list, in the order given.
+ *
+ * The whole list at once because the order is part of it - ARK loads them in
+ * turn and later ones win - so adding, removing and reordering are one write.
+ */
+export async function setArkModsAction(
+    installedAppId: string,
+    ids: string[]
+): Promise<{ mods?: ArkModsView; error?: string }> {
+    const parsed = modListSchema.safeParse({ installedAppId, ids });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the mods and try again" };
+    try {
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        await setArkMods(access.ownerId, parsed.data.installedAppId, parsed.data.ids);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.ark.mods",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { mods: parsed.data.ids }
+        });
+        return { mods: await readArkMods(access.ownerId, parsed.data.installedAppId) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The mods could not be saved" };
+    }
+}
+
+/** Run a custom map from the Workshop, or go back to the one the settings name. */
+export async function setArkMapModAction(
+    installedAppId: string,
+    id: string | null
+): Promise<{ mods?: ArkModsView; error?: string }> {
+    const parsed = z
+        .object({
+            installedAppId: z.string().trim().min(1),
+            id: z.string().trim().refine(isModId, "That is not a Steam Workshop id").nullable()
+        })
+        .safeParse({ installedAppId, id });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the map and try again" };
+    try {
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        await setArkMapMod(access.ownerId, parsed.data.installedAppId, parsed.data.id);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.ark.mapmod",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { mapModId: parsed.data.id }
+        });
+        return { mods: await readArkMods(access.ownerId, parsed.data.installedAppId) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The map could not be saved" };
+    }
+}
+
+/** What Steam says about one id somebody pasted, before it is added to anything. */
+export async function lookUpArkModAction(
+    installedAppId: string,
+    query: string
+): Promise<{ item?: WorkshopItem; error?: string }> {
+    try {
+        await requireGameServer("games.manage", installedAppId);
+        const id = parseWorkshopId(query);
+        if (!id) return { error: "Paste a Workshop link or its id" };
+        const item = await readWorkshopItem(id);
+        if (!item) return { error: "Steam does not know that id" };
+        if (item.gone) return { error: "That item has been taken down on Steam" };
+        if (!item.forArk) return { error: `${item.title} is not an ARK mod` };
+        return { item };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Steam could not be reached" };
+    }
+}
+
+/** Mods matching what somebody typed. Needs the optional Steam Web API key, and
+ *  says so rather than answering with nothing. */
+export async function searchArkModsAction(
+    installedAppId: string,
+    query: string
+): Promise<{ items?: WorkshopItem[]; needsKey?: boolean; error?: string }> {
+    try {
+        await requireGameServer("games.manage", installedAppId);
+        const found = await searchWorkshop(query.slice(0, 100));
+        return { items: [...found.items], needsKey: found.needsKey };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Steam could not be reached" };
+    }
+}
+
+/**
+ * Restart the server onto the settings it has been given.
+ *
+ * Everything on the Rules screen is read when ARK starts, so this is the other
+ * half of changing one. It goes through the deploy layer rather than through
+ * arkmanager: stopping the game process from inside would end the container the
+ * image's entrypoint is waiting on, and what comes back would be a restart nobody
+ * asked for.
+ */
+export async function restartArkServerAction(installedAppId: string): Promise<{ error?: string }> {
+    const parsed = z.string().trim().min(1).safeParse(installedAppId);
+    if (!parsed.success) return { error: "That server does not exist" };
+    try {
+        const { user, access } = await requireGameServer("games.manage", parsed.data);
+        if (!access.install.applicationId) throw new Error("This server has not been deployed yet");
+        // The world first. A restart that lost the last few minutes of everybody's
+        // evening because a settings change was applied is not a trade anybody
+        // agreed to.
+        await ark.saveArkWorld(access.ownerId, parsed.data).catch(() => undefined);
+        await deployApplication(access.install.applicationId, access.ownerId, user.id);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.ark.restart",
+            targetType: "installedApp",
+            targetId: parsed.data
+        });
+        revalidatePath(`/apps/installed/${parsed.data}`);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The server could not be restarted" };
     }
 }
 

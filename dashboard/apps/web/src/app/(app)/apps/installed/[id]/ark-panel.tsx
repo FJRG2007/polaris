@@ -19,6 +19,8 @@
  */
 
 import Link from "next/link";
+import { ArkMods } from "./ark-mods";
+import { ArkRules } from "./ark-rules";
 import * as actions from "./ark-actions";
 import { GameConsole } from "./game-console";
 import type { Permission } from "@polaris/core";
@@ -117,6 +119,11 @@ const PRESENCE_STALE_MS = 25000;
 /** Managed by the Access screen's own controls rather than offered twice as raw
  *  fields - the two would quietly disagree about what the server is running on. */
 const SECURITY_GROUP = "Security";
+
+/** The same, for the mod list and the map mod: the Mods screen owns both, and a
+ *  second free-text field for a comma-separated list of ids is how a load order
+ *  somebody arranged gets flattened by accident. */
+const MODS_GROUP = "Mods";
 
 interface ServerReading {
     status: ArkStatus | null;
@@ -360,6 +367,20 @@ export function ArkPanel({
                     }}
                 />
             )}
+            {tab === "mods" && (
+                <ArkMods
+                    installedAppId={installedAppId}
+                    canManage={held.includes("games.manage")}
+                    running={isRunning}
+                />
+            )}
+            {tab === "rules" && (
+                <ArkRules
+                    installedAppId={installedAppId}
+                    canManage={held.includes("games.manage")}
+                    running={isRunning}
+                />
+            )}
             {tab === "usage" &&
                 (applicationId ? (
                     <div className="space-y-4">
@@ -418,7 +439,9 @@ export function ArkPanel({
                     />
                     <MinecraftSettings
                         installedAppId={installedAppId}
-                        settings={settings.filter((setting) => setting.group !== SECURITY_GROUP)}
+                        settings={settings.filter(
+                            (setting) => setting.group !== SECURITY_GROUP && setting.group !== MODS_GROUP
+                        )}
                         playersOnline={status?.players.length ?? 0}
                         onSaved={reloadSettings}
                     />

@@ -3,6 +3,7 @@ import { gameServerFacts } from "@/lib/apps/games-service";
 import { reachAdviceFor } from "@/lib/apps/minecraft/reach";
 import { requireGameServer } from "@/lib/apps/install-access";
 import { sweepArkTimeouts } from "@/lib/apps/ark/timeout-service";
+import { applyPendingArkRules } from "@/lib/apps/ark/settings-service";
 import { readPlayerTimeouts } from "@/lib/apps/player-timeout-service";
 import { sweepGameSchedules } from "@/lib/apps/minecraft/schedule-service";
 import {
@@ -48,6 +49,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             // this page and the row in the list cannot disagree about it.
             gameServerFacts(server.ownerId, id).catch(() => null)
         ]);
+        // The settings a new server was created with, handed over as soon as it has
+        // files to write them into - the same bargain the allow list makes, and for
+        // the same reason: at create time there was no container yet.
+        if (status.containerRunning) await applyPendingArkRules(server.ownerId, id).catch(() => 0);
         // Only worth trying against a server that is answering; against one that is
         // not it is a failing exec on every poll.
         const access = status.answering

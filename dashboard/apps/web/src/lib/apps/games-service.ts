@@ -28,6 +28,7 @@ import { wantsLatest } from "@/lib/apps/minecraft/blueprint-version";
 import { gameOfServer, type GameId } from "@/lib/apps/games-catalog";
 import { sweepTimeouts } from "@/lib/apps/minecraft/timeout-service";
 import { applyAllowList, getArkPlayers } from "@/lib/apps/ark/service";
+import { applyPendingArkRules } from "@/lib/apps/ark/settings-service";
 import { syncMinecraftRoutes } from "@/lib/apps/minecraft/router-service";
 import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
 import { enforcePlayerAddresses } from "@/lib/apps/minecraft/player-access";
@@ -630,6 +631,10 @@ export async function syncFirewallBans(
         if (gameOfServer(install.catalogId)?.id === "ark") {
             servers += 1;
             allowed += await applyAllowList(ownerId, install.id).catch(() => 0);
+            // The settings it was created with are in the same position as the
+            // allow list: written down before there was a server, and handed over
+            // by whichever of the two walks reaches it first.
+            await applyPendingArkRules(ownerId, install.id).catch(() => 0);
             // It does have timeouts, though - Polaris' own, built on the ban it
             // does have - and this walk is what comes back to lift them.
             await sweepArkTimeouts(ownerId, install.id).catch(() => 0);
