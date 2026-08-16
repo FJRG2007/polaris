@@ -144,6 +144,8 @@ model User {
     chatSpaceInvites     ChatSpaceInvite[]
     chatSavedMedia       ChatSavedMedia[]
     chatChannelMemberships ChatChannelMember[]
+    chatReportsMade     ChatReport[]         @relation("ChatReportsMade")
+    chatReportsHandled  ChatReport[]         @relation("ChatReportsHandled")
     searches            SearchHistory[]
     backupDestinations  BackupDestination[]
     backupPlans         BackupPlan[]
@@ -5844,10 +5846,72 @@ model ChatMessage {
     attachments ChatAttachment[]
     stars       ChatStar[]
     edits       ChatMessageEdit[]
+    reports     ChatReport[]
 
     @@index([channelId, createdAt])
     @@index([parentId, createdAt])
     @@index([replyToId])
+}
+
+// Something somebody said was wrong with a message.
+//
+// The row is the reader's, not the message's: a report is one person saying
+// this, and two people objecting to the same message is two reports and not a
+// counter. One each, so pressing it twice does not stack, and the second press
+// finds their own report still open rather than making another.
+//
+// The message is kept whichever way it is settled. A moderator who deletes it
+// deletes the message; the report stays as the record of why, which is the half
+// people go looking for a month later - and it is why `status` is settled rather
+// than the row removed.
+//
+// Nothing here is a permission. Being able to report something is being able to
+// see it, and what a moderator may do about it is decided where every other
+// moderation decision is.
+model ChatReport {
+    id         String  @id @default(uuid(7)) @db.Uuid
+    // Null once the message it named is gone. An instance set to leave no trace
+    // deletes the row outright, and a moderation record that vanished with the
+    // thing it was about would be a record of nothing - so what was reported is
+    // copied onto the report below, and this becomes a link that used to work.
+    messageId  String? @db.Uuid
+    // Denormalized so the queue can be filtered and read without walking to the
+    // message for every row - and so a report survives being looked at after the
+    // message it names was deleted.
+    channelId  String  @db.Uuid
+    reporterId String  @db.Uuid
+    // spam | abuse | sexual | violence | illegal | other - see core's list.
+    reason     String
+    // What they added in their own words, which is most of what makes a report
+    // actionable. Optional: making somebody write an essay is how a report does
+    // not get made at all.
+    note       String  @default("")
+    // Who wrote the message and the first of what it said, taken when the report
+    // was made. Not a convenience: it is what the queue reads instead of walking
+    // into every conversation, and it is what is left when the message is gone.
+    //
+    // It does mean a line of a private conversation sits in a moderation table.
+    // That is what reporting something is - the reader handing it over - and it
+    // is only ever read by somebody who already administers the instance.
+    authorId   String? @db.Uuid
+    excerpt    String  @default("")
+    // open | kept | removed - what a moderator decided, and nothing else. There
+    // is no "in progress": a queue with a middle state is a queue with rows
+    // nobody owns.
+    status     String  @default("open")
+    // Who settled it and when, so the record answers "who decided this".
+    handledById String?   @db.Uuid
+    handledAt   DateTime?
+    createdAt   DateTime  @default(now())
+
+    message  ChatMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+    reporter User        @relation("ChatReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+    handledBy User?      @relation("ChatReportsHandled", fields: [handledById], references: [id], onDelete: SetNull)
+
+    // One report per person per message. A second press is the same report.
+    @@unique([messageId, reporterId])
+    @@index([status, createdAt])
+    @@index([channelId])
 }
 
 // An emoji somebody put on a message. One row per person per emoji per message,

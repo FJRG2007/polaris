@@ -22,6 +22,8 @@ import * as actions from "./actions";
 import { VoiceNote } from "./voice-note";
 import { Avatar } from "@/components/avatar";
 import { MessageMenu } from "./message-menu";
+import { ReportDialog } from "./report-dialog";
+import { ImageViewer, type ViewedImage } from "./image-viewer";
 import { usableAccent } from "@/lib/chat/accent";
 import { useEffect, useRef, useState } from "react";
 import { autoplaying, embedFor } from "@/lib/chat/embeds";
@@ -97,6 +99,11 @@ export function MessageList({
 }: MessageListProps) {
     useEditKey({ messages, viewerId, canPost, onEdit });
 
+    // The picture being looked at, held here rather than in each message: one
+    // viewer is open at a time, and it is drawn over the whole conversation.
+    const [viewing, setViewing] = useState<ViewedImage | null>(null);
+    const [reporting, setReporting] = useState<string | null>(null);
+
     return (
         <ol className="flex flex-col">
             {messages.map((message, index) => {
@@ -126,6 +133,8 @@ export function MessageList({
                             message={message}
                             grouped={grouped}
                             mine={message.authorId === viewerId}
+                            onOpenImage={setViewing}
+                            onReport={(target) => setReporting(target.id)}
                             canPost={canPost}
                             canModerate={canModerate}
                             onOpenThread={onOpenThread}
@@ -139,6 +148,26 @@ export function MessageList({
                     </li>
                 );
             })}
+
+            <ImageViewer
+                image={viewing}
+                onClose={() => setViewing(null)}
+                onForward={(messageId) => {
+                    const found = messages.find((entry) => entry.id === messageId);
+                    if (!found) return;
+                    setViewing(null);
+                    onForward(found);
+                }}
+                onReport={(messageId) => {
+                    setViewing(null);
+                    setReporting(messageId);
+                }}
+            />
+            <ReportDialog
+                messageId={reporting}
+                open={reporting !== null}
+                onOpenChange={(next) => !next && setReporting(null)}
+            />
         </ol>
     );
 }
@@ -214,7 +243,9 @@ function Message({
     onReply,
     onForward,
     onEdit,
-    onDelete
+    onDelete,
+    onOpenImage,
+    onReport
 }: {
     message: ChatMessageView;
     grouped: boolean;
@@ -228,6 +259,11 @@ function Message({
     onForward: (message: ChatMessageView) => void;
     onEdit: (message: ChatMessageView) => void;
     onDelete: (message: ChatMessageView) => void;
+    /** A picture on this message was pressed. Opened over the conversation
+     *  rather than in a tab: a tab is the browser's viewer, with no way back and
+     *  nothing to do with the picture but look at it. */
+    onOpenImage: (image: ViewedImage) => void;
+    onReport: (message: ChatMessageView) => void;
 }) {
     const format = useDisplayFormat();
     const [showingHistory, setShowingHistory] = useState(false);
@@ -253,7 +289,8 @@ function Message({
                 onOpenThread,
                 onStar,
                 onEdit,
-                onDelete
+                onDelete,
+                onReport
             }}
         >
         {/* `data-state` arrives from the right-click menu's trigger, which this
@@ -350,6 +387,13 @@ function Message({
                                         alt={file.name}
                                         source={`attachment:${file.id}`}
                                         name={file.name}
+                                        onOpen={() =>
+                                            onOpenImage({
+                                                url: `/api/chat/attachments/${file.id}`,
+                                                name: file.name,
+                                                messageId: message.id
+                                            })
+                                        }
                                     />
                                 ) : isPlayable(file.contentType) ? (
                                     <VoiceNote
@@ -521,13 +565,17 @@ function KeepableImage({
     href,
     alt,
     source,
-    name
+    name,
+    onOpen
 }: {
     href: string;
     alt: string;
     /** What is stored: `attachment:<id>`, or the address for a remote one. */
     source: string;
     name: string;
+    /** Pressed. Absent for a picture that has nowhere to open - a link preview's
+     *  thumbnail, whose whole job is the link under it. */
+    onOpen?: () => void;
 }) {
     const [kept, setKept] = useState<boolean | null>(null);
     const [busy, setBusy] = useState(false);
@@ -547,14 +595,19 @@ function KeepableImage({
 
     return (
         <span className="group/pic relative inline-block max-w-full">
-            <a href={href} target="_blank" rel="noreferrer">
+            <button
+                type="button"
+                onClick={onOpen}
+                aria-label={`Open ${name}`}
+                className="block cursor-zoom-in"
+            >
                 {/* eslint-disable-next-line @next/next/no-img-element -- one image per attachment, no loader wanted */}
                 <img
                     src={href}
                     alt={alt}
                     className="max-h-72 max-w-full rounded-md border border-border object-contain"
                 />
-            </a>
+            </button>
             <button
                 type="button"
                 disabled={busy}

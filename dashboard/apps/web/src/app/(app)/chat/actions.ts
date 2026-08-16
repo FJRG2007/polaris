@@ -20,6 +20,7 @@ import { revalidatePath } from "next/cache";
 import * as invites from "@/lib/chat/invites";
 import * as saved from "@/lib/chat/saved-media";
 import * as chat from "@/lib/chat/chat-service";
+import * as reports from "@/lib/chat/reports";
 import * as messages from "@/lib/chat/messages";
 import { allChatRules } from "@/lib/chat/rules";
 import { requirePermission } from "@/lib/session";
@@ -357,6 +358,22 @@ export async function markReadAction(input: unknown): Promise<{ error?: string }
     // scrolling, and there is nowhere on the screen a failure would belong.
     if (!parsed.success) return {};
     return guard(() => messages.markRead(me, parsed.data));
+}
+
+/**
+ * Report a message.
+ *
+ * No permission of its own: being able to see something is being able to say
+ * something is wrong with it, and a report that had to be unlocked is a report
+ * nobody makes. The service proves the conversation, which is the same check
+ * that let them read it.
+ */
+export async function reportMessageAction(input: unknown): Promise<{ already?: boolean; error?: string }> {
+    const me = await actor();
+    const parsed = core.chatReportSchema.safeParse(input);
+    if (!parsed.success) return { error: "Say what is wrong with it" };
+    const result = await guard(() => reports.reportMessage(me, parsed.data));
+    return result.error ? { error: result.error } : { already: result.value?.already };
 }
 
 export async function typingAction(channelId: string, activity?: unknown): Promise<void> {

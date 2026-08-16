@@ -559,7 +559,16 @@ export async function editHistory(
  * trace instead, and then the row goes and so do its files - "no trace" that
  * left the bytes on the NAS would be a claim the storage does not back.
  */
-export async function remove(actor: ChatActor, messageId: string): Promise<void> {
+export async function remove(
+    actor: ChatActor,
+    messageId: string,
+    /** Answering a report, where the authority is the instance's rather than the
+     *  conversation's. It skips the two checks that ask about *this* room - being
+     *  the author, and the window an author may take their own words back in -
+     *  and nothing else. Only ever passed from behind an administrator gate: it
+     *  is the whole check, so the caller is the whole check. */
+    options?: { readonly asModerator?: boolean }
+): Promise<void> {
     const message = await prisma.chatMessage.findUnique({
         where: { id: messageId },
         select: {
@@ -571,9 +580,15 @@ export async function remove(actor: ChatActor, messageId: string): Promise<void>
         }
     });
     if (!message) return;
-    const access = await requireChannel(actor, message.channelId);
+    // The conversation is not asked at all when the instance has decided:
+    // somebody answering a report is acting on a room they are not in, which is
+    // the whole point of an instance-wide queue.
+    const moderating = options?.asModerator === true;
+    const mayAdminister = moderating
+        ? true
+        : (await requireChannel(actor, message.channelId)).mayAdminister;
     const mine = message.authorId === actor.id;
-    if (!mine && !access.mayAdminister) {
+    if (!mine && !mayAdminister) {
         throw new ChatAccessError("You cannot delete that message");
     }
 
@@ -581,7 +596,7 @@ export async function remove(actor: ChatActor, messageId: string): Promise<void>
     // The window binds the author, not a moderator. Somebody removing a message
     // from a room they run is not taking back their own words, and a rule that
     // stopped them would turn moderation into a race against a clock.
-    if (mine && !access.mayAdminister && !core.withinEditWindow(rules, message.createdAt)) {
+    if (mine && !mayAdminister && !core.withinEditWindow(rules, message.createdAt)) {
         throw new ChatRuleError(
             `Messages here can be deleted for ${core.editWindowLabel(rules.editWindowMinutes)} after they are sent`
         );

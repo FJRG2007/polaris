@@ -38,6 +38,7 @@ import {
     Link2,
     ListTodo,
     Mail,
+    Flag,
     MessageCircle,
     MessageSquare,
     MessagesSquare,
@@ -769,6 +770,13 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "direct messages",
                 "group chats"
             ],
+            group: ADMIN_COMMUNICATION_GROUP
+        },
+        {
+            label: "Reported messages",
+            href: "/admin/reports",
+            icon: Flag,
+            keywords: ["reports", "moderation", "abuse", "spam", "flagged", "chat"],
             group: ADMIN_COMMUNICATION_GROUP
         },
         {

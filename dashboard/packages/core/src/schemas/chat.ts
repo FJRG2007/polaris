@@ -69,6 +69,51 @@ export const CHAT_ACTIVITIES = ["typing", "recording"] as const;
 
 export type ChatActivity = (typeof CHAT_ACTIVITIES)[number];
 
+/**
+ * Why somebody is reporting a message.
+ *
+ * A short list, because a long one is a list nobody reads to the end of and a
+ * free-text box is a report nobody can sort. What does not fit is "something
+ * else" plus the note, which is where the useful ones end up anyway.
+ */
+export const CHAT_REPORT_REASONS = [
+    "spam",
+    "abuse",
+    "sexual",
+    "violence",
+    "illegal",
+    "other"
+] as const;
+
+export type ChatReportReason = (typeof CHAT_REPORT_REASONS)[number];
+
+/** What each one is called where somebody picks it. */
+export const CHAT_REPORT_LABELS: Record<ChatReportReason, string> = {
+    spam: "Spam or a scam",
+    abuse: "Harassment or hate",
+    sexual: "Sexual content",
+    violence: "Violence or self-harm",
+    illegal: "Something illegal",
+    other: "Something else"
+};
+
+/** How a moderator settled it. There is no middle state: a queue with one is a
+ *  queue with rows nobody owns. */
+export const CHAT_REPORT_STATUSES = ["open", "kept", "removed"] as const;
+
+export type ChatReportStatus = (typeof CHAT_REPORT_STATUSES)[number];
+
+/** The longest a note may be. Room to explain, not room to paste a log. */
+export const MAX_CHAT_REPORT_NOTE = 1000;
+
+export const chatReportSchema = z.object({
+    messageId: z.string().uuid(),
+    reason: z.enum(CHAT_REPORT_REASONS),
+    note: z.string().trim().max(MAX_CHAT_REPORT_NOTE).default("")
+});
+
+export type ChatReportInput = z.infer<typeof chatReportSchema>;
+
 /** Typing when a tab does not say - one running a build from before recordings
  *  were announced still sends the bare call. */
 export const chatActivitySchema = z.enum(CHAT_ACTIVITIES).catch("typing").default("typing");

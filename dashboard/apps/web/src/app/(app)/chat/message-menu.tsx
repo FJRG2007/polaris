@@ -19,6 +19,7 @@ import { plainText } from "@/components/rich-text/excerpt";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import {
     Copy,
+    Flag,
     CornerUpLeft,
     Forward,
     Link2,
@@ -46,6 +47,9 @@ export interface MessageActions {
     readonly onStar: (message: ChatMessageView) => void;
     readonly onEdit: (message: ChatMessageView) => void;
     readonly onDelete: (message: ChatMessageView) => void;
+    /** Say something is wrong with it. Not offered on your own message: the
+     *  thing to do about your own words is take them back, which is Delete. */
+    readonly onReport: (message: ChatMessageView) => void;
 }
 
 export function MessageMenu({
@@ -105,6 +109,16 @@ export function MessageMenu({
                         <Copy className="size-3.5" />
                         Copy text
                     </ContextMenuItem>
+                )}
+
+                {!mine && !message.deleted && (
+                    <>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem onSelect={() => actions.onReport(message)}>
+                            <Flag className="size-3.5" />
+                            Report
+                        </ContextMenuItem>
+                    </>
                 )}
 
                 {canPost && !message.deleted && (mine || canModerate) && (
