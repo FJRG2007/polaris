@@ -22,10 +22,17 @@
  * Both paths need the account's password, because arming a factor is a change to
  * how the account is signed into and better-auth asks to see it again before
  * making one. That is right for somebody who has been signed in since yesterday
- * and wrong for somebody who typed it four seconds ago to register - so when
- * registering renders this itself it hands the password over, and neither path
- * asks for it. Nothing is stored anywhere to make that work: it is the same value
- * still sitting in the form's own state, on the page that never navigated away.
+ * and wrong for somebody who typed it four seconds ago - so every screen that
+ * already holds it renders this itself and hands it over: registering, accepting
+ * an invite, and signing in. Nothing is stored anywhere to make that work: it is
+ * the same value still sitting in that form's own state, on a page that never
+ * navigated away.
+ *
+ * What is left asking is a session that cannot produce one - somebody who signed
+ * in with a passkey, or who was already signed in when the requirement was turned
+ * on. better-auth validates the password against the credential account itself,
+ * so a passkey cannot stand in for it and there is no honest way around the box;
+ * it says why it is there instead.
  */
 
 import { QRCodeSVG } from "qrcode.react";
@@ -54,6 +61,17 @@ function secretFromUri(uri: string): string {
 }
 
 const FACTOR_ICON = { totp: KeyRound, email: Mail } as const;
+
+/**
+ * Why the box is there at all.
+ *
+ * Only shown when it really is being asked for - which, after this screen
+ * learned to take the password from the sign-in that led to it, is somebody
+ * who got here with a passkey or with a session from yesterday. Asking without
+ * saying why reads as a form that forgot what just happened.
+ */
+const PASSWORD_REASON =
+    "Asked because this changes how you sign in. A passkey does not answer for it.";
 
 export function EnrollView({
     account,
@@ -216,10 +234,13 @@ function EmailFactor({
                             <Input name="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required />
                         </label>
                         {password === undefined ? (
-                            <label className="flex flex-col gap-1 text-sm">
-                                Your password
-                                <Input name="password" type="password" autoComplete="current-password" required />
-                            </label>
+                            <>
+                                <label className="flex flex-col gap-1 text-sm">
+                                    Your password
+                                    <Input name="password" type="password" autoComplete="current-password" required />
+                                </label>
+                                <p className="text-xs text-muted-foreground">{PASSWORD_REASON}</p>
+                            </>
                         ) : null}
                         <div className="flex items-center gap-2">
                             <Button type="submit" disabled={busy}>
@@ -333,6 +354,7 @@ function AuthenticatorFactor({
                                 Your password
                                 <Input name="password" type="password" autoComplete="current-password" required />
                             </label>
+                            <p className="text-xs text-muted-foreground">{PASSWORD_REASON}</p>
                             <Button type="submit" disabled={busy}>
                                 {busy ? "Starting..." : "Continue"}
                             </Button>

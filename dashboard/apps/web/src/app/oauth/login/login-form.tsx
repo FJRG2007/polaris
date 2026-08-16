@@ -10,7 +10,9 @@ import { IntegrationLogo } from "@/components/logos";
 import { postLoginTarget } from "./post-login-target";
 import { authClient, signIn } from "@/lib/auth-client";
 import { useEffect, useState, type FormEvent } from "react";
+import { EnrollView } from "@/app/oauth/enroll/enroll-view";
 import { accountHasPasskey, magicLinkAvailable, resolveIdentifier } from "./actions";
+import { pendingEnrollmentAction, type PendingEnrollment } from "@/app/oauth/enroll/actions";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
 
 /** Where the last-used identifier is remembered so the field is prefilled. */
@@ -79,6 +81,9 @@ export function LoginForm({
     const [canEmailLink, setCanEmailLink] = useState(false);
     const [linkSent, setLinkSent] = useState(false);
     const [hasPasskey, setHasPasskey] = useState(false);
+    /** Set when signing in worked and this deployment still wants a second
+     *  factor from the account. The whole screen becomes that step. */
+    const [enrollment, setEnrollment] = useState<PendingEnrollment | null>(null);
 
     // Prefill the identifier with the one used last on this device, and explain
     // why the last session ended if it ended for a reason.
@@ -193,8 +198,40 @@ export function LoginForm({
             router.push(`/oauth/2fa?redirect=${encodeURIComponent(postLoginTarget())}`);
             return;
         }
+        // An account that owes this deployment a second factor is about to be
+        // sent to the enrollment screen by the session guard - and arming one
+        // costs the password, which that screen would have to ask for again.
+        // Asked here instead, so it happens on the page still holding the
+        // password typed two seconds ago. Nothing is stored to make that work:
+        // it is the value in this form's own state, and the page never
+        // navigates. The same hand-off registering and accepting an invite
+        // already do.
+        // Held busy across the question: the screen is about to change either
+        // way, and a form that goes live again for half a second invites a
+        // second sign-in nobody meant to make.
+        setPending(true);
+        const owed = await pendingEnrollmentAction().catch(() => null);
+        if (owed) {
+            setEnrollment(owed);
+            return;
+        }
         router.push(postLoginTarget());
         router.refresh();
+    }
+
+    if (enrollment) {
+        return (
+            <EnrollView
+                account={enrollment.account}
+                name={enrollment.name}
+                options={enrollment.options}
+                password={values.password}
+                onDone={() => {
+                    router.push(postLoginTarget());
+                    router.refresh();
+                }}
+            />
+        );
     }
 
     return (
