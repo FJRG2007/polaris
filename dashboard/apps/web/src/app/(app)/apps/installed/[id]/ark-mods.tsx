@@ -417,6 +417,10 @@ function Candidate({
             <Preview installedAppId={installedAppId} item={item} />
             <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium" title={item.title}>{item.title}</p>
+                {/* The author's own description, quoted rather than rendered: it is
+                    somebody else's text and it arrives with the Workshop's own
+                    markup in it. */}
+                {item.summary && <p className="truncate text-xs text-muted-foreground">{item.summary}</p>}
                 <p className="truncate text-xs text-muted-foreground">
                     {[size(item.sizeBytes), item.subscriptions ? `${item.subscriptions.toLocaleString()} subscribers` : ""]
                         .filter(Boolean)
