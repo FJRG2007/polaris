@@ -23,12 +23,30 @@
  * address a person gave us - a preview, a picture posted as a link, a GIF from
  * somewhere else - has to pass exactly these checks, and a second copy of them
  * is a second place for one of them to be missing.
+ *
+ * Two rules about the plumbing, both learned the hard way and both silent when
+ * broken - every request here fails, and a failure looks exactly like a site
+ * that would not answer:
+ *
+ * - **The dispatcher and the fetch come from the same package.** The runtime's
+ *   own `fetch` is built on the undici it ships with, and it refuses an `Agent`
+ *   built by the one in `node_modules` ("invalid onError method"). So this calls
+ *   undici's `fetch` rather than the global one, which is the only way the two
+ *   halves are the same version.
+ * - **A custom resolver has to answer the question it was asked.** Node asks for
+ *   every address at once while it is happy-eyeballing (`options.all`) and for
+ *   one otherwise; handing back a single address to the first form is an
+ *   "Invalid IP address: undefined" at connect time.
  */
 
 import * as core from "@polaris/core";
-import { Agent } from "undici";
 import { lookup } from "node:dns/promises";
 import { lookup as resolveHost } from "node:dns";
+import { Agent, fetch as guardedFetch } from "undici";
+
+/** What undici's fetch answers with. Named off the function so this cannot drift
+ *  from the version installed. */
+type GuardedResponse = Awaited<ReturnType<typeof guardedFetch>>;
 
 /** How long Polaris waits for an answer before giving up. */
 export const FETCH_TIMEOUT_MS = 5000;
@@ -90,36 +108,50 @@ export async function reachable(hostname: string): Promise<boolean> {
  * The hostname is left untouched for TLS, so certificate verification is
  * unaffected.
  */
+/** One address a socket may be opened to. */
+export interface VettedAddress {
+    readonly address: string;
+    readonly family: number;
+}
+
 /**
- * The one address a connection may open to, chosen from everything a name
- * resolved to - or an error when it may not be reached at all.
+ * Every address a connection may open to, or an error when the name may not be
+ * reached at all.
  *
  * The rule is `reachable`'s, applied at the moment of connecting rather than a
  * moment before it: every address the name answers with has to be public, not
  * merely the first the stack would pick, so one private answer refuses the whole
  * name. Pulled out on its own so the check at the point of the socket can be read
  * and tested as the plain decision it is.
+ *
+ * The whole list comes back rather than one of them because that is what Node
+ * asks for while it is happy-eyeballing, and because a host with eight addresses
+ * should not be unreachable when the first is having a bad afternoon. They have
+ * all passed the same check, so handing over any of them is the same decision.
  */
-export function pinnedAddress(
+export function vettedAddresses(
     hostname: string,
-    addresses: readonly { readonly address: string; readonly family: number }[]
-): { address: string; family: number } | Error {
+    addresses: readonly VettedAddress[]
+): VettedAddress[] | Error {
     if (addresses.length === 0) return new Error(`${hostname} does not resolve`);
     if (addresses.some((entry) => core.isPrivateIp(entry.address))) {
         return new Error(`${hostname} resolves to a private address`);
     }
-    const chosen = addresses[0]!;
-    return { address: chosen.address, family: chosen.family };
+    return addresses.map((entry) => ({ address: entry.address, family: entry.family }));
 }
 
 const dispatcher = new Agent({
     connect: {
-        lookup(hostname, _options, callback) {
+        lookup(hostname, options, callback) {
             resolveHost(hostname, { all: true }, (error, addresses) => {
                 if (error) return callback(error, "", 0);
-                const chosen = pinnedAddress(hostname, addresses);
-                if (chosen instanceof Error) return callback(chosen, "", 0);
-                callback(null, chosen.address, chosen.family);
+                const vetted = vettedAddresses(hostname, addresses);
+                if (vetted instanceof Error) return callback(vetted, "", 0);
+                // Answered in the shape it was asked in. `all` is what a socket
+                // opening with happy eyeballs wants, and the single address is
+                // what everything else does.
+                if (options.all) return callback(null, vetted);
+                callback(null, vetted[0]!.address, vetted[0]!.family);
             });
         }
     }
@@ -129,19 +161,18 @@ const dispatcher = new Agent({
 export async function follow(
     start: URL,
     accept = "text/html,application/xhtml+xml"
-): Promise<Response | null> {
+): Promise<GuardedResponse | null> {
     let url = start;
     for (let hop = 0; hop <= MAX_HOPS; hop += 1) {
         if (!(await reachable(url.hostname))) return null;
 
-        let response: Response;
+        let response: GuardedResponse;
         try {
             // The dispatcher re-resolves and re-checks the name as it connects, so
             // the address vetted a line ago cannot be swapped for a private one
             // underneath the fetch.
-            const init: RequestInit & { dispatcher?: Agent } = {
-                redirect: "manual",
-                cache: "no-store",
+            const init = {
+                redirect: "manual" as const,
                 signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
                 dispatcher,
                 headers: {
@@ -157,7 +188,7 @@ export async function follow(
                     accept
                 }
             };
-            response = await fetch(url, init);
+            response = await guardedFetch(url, init);
         } catch {
             return null;
         }
@@ -179,7 +210,10 @@ export async function follow(
 }
 
 /** Read at most `maxBytes`, whatever the other end says it is sending. */
-export async function readCapped(response: Response, maxBytes: number): Promise<Uint8Array | null> {
+export async function readCapped(
+    response: GuardedResponse,
+    maxBytes: number
+): Promise<Uint8Array | null> {
     const declared = response.headers.get("content-length");
     if (declared && Number(declared) > maxBytes) return null;
 
@@ -217,7 +251,10 @@ export async function readCapped(response: Response, maxBytes: number): Promise<
  * page was too long to look at. `readCapped` is the other rule and the right one
  * for a picture or a JSON document, where half the bytes are not half the thing.
  */
-export async function readAtMost(response: Response, maxBytes: number): Promise<Uint8Array | null> {
+export async function readAtMost(
+    response: GuardedResponse,
+    maxBytes: number
+): Promise<Uint8Array | null> {
     const reader = response.body?.getReader();
     if (!reader) return null;
 
