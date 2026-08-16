@@ -14,6 +14,8 @@ import { AppShell, CapabilityProvider, ToastProvider } from "@polaris/ui";
 import { ScopeSwitcher } from "@/components/scope-switcher";
 import { IncomingCalls } from "@/components/incoming-calls";
 import { CallHolder } from "@/components/call-holder";
+import { PresenceProvider } from "@/components/presence-store";
+import { presenceChoiceOf } from "@/lib/presence-service";
 import { MessageToasts } from "@/components/message-toasts";
 import { CommandPalette } from "@/components/command-palette";
 import { listNotifications } from "@/lib/notification-service";
@@ -44,13 +46,14 @@ import { NotificationsProvider } from "@/components/notifications/notifications-
 export default async function AppLayout({ children }: { children: ReactNode }) {
     const user = await requireUser();
     const capabilities = getCapabilities();
-    const [notifications, display, baseUrl, apps, scope, organizations] = await Promise.all([
+    const [notifications, display, baseUrl, apps, scope, organizations, presence] = await Promise.all([
         listNotifications(user.id),
         resolveDisplayPreferencesFor(user.id),
         appBaseUrl(),
         reachableAppNav(accessFor(user)),
         resolveScope(user.id),
-        scopeChoices(user.id)
+        scopeChoices(user.id),
+        presenceChoiceOf(user.id)
     ]);
 
     return (
@@ -60,6 +63,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                     <SessionScopeProvider userId={user.id}>
                         <NotificationsProvider initial={notifications}>
                             <ToastProvider>
+                                {/* Where everybody on screen is, asked once for
+                                    the page rather than once per face. Above
+                                    everything, because faces are drawn on every
+                                    screen there is. */}
+                                <PresenceProvider>
                                 {/* The call is held above every screen rather
                                     than by the conversation that started it, so
                                     walking off to look something up shrinks it
@@ -97,7 +105,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                                         <>
                                             {user.isAdmin ? <UpdateIndicator /> : null}
                                             <NotificationBell />
-                                            <AccountMenu id={user.id} name={user.name} email={user.email} />
+                                            <AccountMenu
+                                                id={user.id}
+                                                name={user.name}
+                                                email={user.email}
+                                                presence={presence}
+                                            />
                                         </>
                                     }
                                 >
@@ -112,6 +125,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                                     ) : null}
                                 </AppShell>
                                 </CallHolder>
+                                </PresenceProvider>
                             </ToastProvider>
                         </NotificationsProvider>
                     </SessionScopeProvider>

@@ -17,6 +17,9 @@
 
 import { cn } from "@polaris/ui";
 import { useState } from "react";
+import { Volume2 } from "lucide-react";
+import { usePresence } from "@/components/presence-store";
+import { PRESENCE_WORDS, type Presence } from "@polaris/core";
 import { avatarUrl, orgAvatarUrl } from "@/lib/avatar-url";
 
 export interface AvatarPerson {
@@ -100,7 +103,8 @@ export function Avatar({
     person,
     size = 24,
     className,
-    square = false
+    square = false,
+    status = true
 }: {
     person: AvatarPerson;
     size?: number;
@@ -109,14 +113,29 @@ export function Avatar({
      *  and a person appear side by side in the same lists, and the shape is what
      *  tells them apart before either name is read. */
     square?: boolean;
+    /**
+     * Whether to draw the dot that says where they are, and the badge that says
+     * they are on a call.
+     *
+     * On by default and everywhere, which is the point: knowing whether somebody
+     * is at their desk is worth as much beside their name on a task as it is in
+     * a conversation, and a status that only exists in the chat is a status
+     * nobody trusts. Off where the face is not a person - an organization - and
+     * where one is drawn at a size the dot would swallow.
+     */
+    status?: boolean;
 }) {
     const source = person.image ?? (person.id ? avatarUrl(person.id) : null);
+    const where = usePresence(status && !square ? person.id : null);
     // A 404 is the ordinary answer for somebody with no picture anywhere, so it
     // is not an error state - it just means the initials underneath stay.
     const [failed, setFailed] = useState(false);
     const shape = square ? "rounded-md" : "rounded-full";
 
-    return (
+    // The dot sits outside the picture, so it is not clipped by the circle the
+    // face is cut into - which is why the face has a wrapper at all when there
+    // is something to say about where somebody is.
+    const face = (
         <span
             title={person.name}
             className={cn(
@@ -143,7 +162,63 @@ export function Avatar({
             )}
         </span>
     );
+
+    // Nothing until it is known: a grey dot that turns green a moment later
+    // reads as somebody's status changing rather than as an answer arriving.
+    // And nothing on a face too small to carry one - below this the dot is
+    // larger than the initials it covers.
+    if (!where || size < PRESENCE_FLOOR) return face;
+
+    return (
+        <span className="relative inline-flex shrink-0 align-middle">
+            {face}
+            {where.inCall ? (
+                // A call they are in and this reader could walk into. It takes
+                // the dot's place rather than sitting beside it: somebody on a
+                // call is by definition here, and two marks on one face is a
+                // face nobody reads.
+                <span
+                    aria-label="On a call you can join"
+                    title="On a call you can join"
+                    className="absolute -bottom-0.5 -right-0.5 grid place-items-center rounded-full bg-background ring-1 ring-background"
+                    style={{ width: dotSize(size) + 3, height: dotSize(size) + 3 }}
+                >
+                    <Volume2 className="size-full p-px text-success" />
+                </span>
+            ) : (
+                <span
+                    aria-label={PRESENCE_WORDS[where.status]}
+                    title={PRESENCE_WORDS[where.status]}
+                    className={cn(
+                        "absolute -bottom-0.5 -right-0.5 rounded-full ring-2 ring-background",
+                        PRESENCE_COLOURS[where.status]
+                    )}
+                    style={{ width: dotSize(size), height: dotSize(size) }}
+                />
+            )}
+        </span>
+    );
 }
+
+/** Below this a face is smaller than the dot would need to be legible on, so it
+ *  goes without one rather than wearing a blob. */
+const PRESENCE_FLOOR = 20;
+
+/** A fifth of the face, floored so the smallest one is still a dot. */
+function dotSize(size: number): number {
+    return Math.max(8, Math.round(size * 0.28));
+}
+
+const PRESENCE_COLOURS: Record<Presence, string> = {
+    online: "bg-success",
+    idle: "bg-warning",
+    busy: "bg-danger",
+    // Drawn rather than omitted: an absent dot is "not asked yet", and the two
+    // must not look the same.
+    offline: "bg-border-strong"
+};
+
+
 
 /** An organization's face, wherever one is drawn. The same component underneath,
  *  pointed at the organization's own picture and drawn as a square. */

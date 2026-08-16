@@ -56,6 +56,13 @@ model User {
     // Owned by the better-auth two-factor plugin; flipped on once the user has
     // verified their authenticator, and back off when they disable it.
     twoFactorEnabled Boolean @default(false)
+    // What this account wants everybody else to see: auto | busy | away |
+    // invisible. `auto` is the default and means "work it out from whether I am
+    // here", which is what it says for almost everybody almost always. The other
+    // three are deliberate - a person saying do not disturb, or stepping away,
+    // or choosing not to be seen at all - and they outrank what the sessions
+    // say, because that is the whole point of choosing one.
+    presence      String   @default("auto")
     // Second gate for admin-only routes, independent of role permissions.
     isAdmin       Boolean  @default(false)
     // When set, the account is banned: sign-in is refused and sessions are void.

@@ -237,3 +237,39 @@ export function createDisplayFormat(preferences: DisplayPreferences): DisplayFor
 
 /** Formatters for the built-in defaults, for code with no preferences at hand. */
 export const DEFAULT_DISPLAY_FORMAT: DisplayFormat = createDisplayFormat(DISPLAY_DEFAULTS);
+
+/**
+ * What somebody may choose to appear as, and what a dot may say.
+ *
+ * Here rather than beside the service that resolves it, because the picker is a
+ * client component: a menu that imported the resolver would drag Prisma into the
+ * browser bundle, and the words are the half both sides need.
+ *
+ * `auto` is what almost everybody keeps and means "work it out from whether I am
+ * at the screen". The other three are somebody deciding, and a decision outranks
+ * an observation - a green dot over the top of "do not disturb" would make the
+ * setting a lie.
+ */
+export const PRESENCE_CHOICES = ["auto", "busy", "away", "invisible"] as const;
+
+export type PresenceChoice = (typeof PRESENCE_CHOICES)[number];
+
+export const PRESENCE_LABELS: Record<PresenceChoice, string> = {
+    auto: "Online",
+    busy: "Do not disturb",
+    away: "Away",
+    invisible: "Invisible"
+};
+
+/** What is actually drawn. Invisible is not one of these: there is no colour for
+ *  it, and a state that renders differently is a state that gives itself away. */
+export const PRESENCE_STATES = ["online", "idle", "busy", "offline"] as const;
+
+export type Presence = (typeof PRESENCE_STATES)[number];
+
+export const PRESENCE_WORDS: Record<Presence, string> = {
+    online: "Online",
+    idle: "Away",
+    busy: "Do not disturb",
+    offline: "Offline"
+};
