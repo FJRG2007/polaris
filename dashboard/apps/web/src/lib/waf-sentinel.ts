@@ -16,6 +16,7 @@ import { runSshJails } from "@/lib/waf-ssh-service";
 import { armPolarisPresets } from "@/lib/waf-service";
 import { syncDashboardRoute } from "@/lib/domain-edge";
 import { runWafAnomalies } from "@/lib/waf-anomaly-service";
+import { pruneAddressReputation } from "@/lib/address-reputation";
 import { publishWafIntel, pruneWafBans, refreshWafFeeds } from "@/lib/waf-intel-service";
 
 /** How often the log is scanned. Fast enough that a scanner is stopped mid-sweep,
@@ -60,6 +61,7 @@ export function startWafSentinel(): void {
             if (ticks % MAINTENANCE_EVERY_TICKS === 0) {
                 await refreshWafFeeds();
                 await pruneWafBans();
+                await pruneAddressReputation();
             }
             // Republish every tick, not only when a ban is written. The snapshot also
             // carries the accounts Polaris has re-decided - a membership change, a ban,

@@ -3384,6 +3384,7 @@ model ManagedDatabase {
     @@index([parentId])
 }
 
+
 // One deploy run: a status row plus a pointer to its streamed log file. The log
 // itself lives on disk (tailed live), not in the database.
 model Deployment {
@@ -3574,6 +3575,30 @@ model WafBan {
 /// A bulk address list Polaris fetches and republishes to the edge: the Tor exit
 /// list today, any other feed later. One row per feed, holding the whole list, so a
 /// refresh is one write and a stale feed is one timestamp to look at.
+// What a reputation provider last said about one address, whatever it said.
+//
+// The firewall used to remember only the addresses a provider flagged, because a
+// flag becomes a ban and a ban is a row. An address that came back clean left
+// nothing behind, so it was "not seen before" on the very next sweep - and the
+// sweep runs every thirty seconds over the same log window. Twenty-five lookups a
+// pass, twice a minute, forever: the same handful of ordinary visitors, asked
+// about seventy thousand times a day. This table is the other half of that
+// answer, and it is what makes a lookup something that happens once per address
+// rather than once per pass.
+//
+// `rules` is the deny list the verdict was reached under, so changing what counts
+// as bad re-asks rather than serving an answer to a different question.
+model AddressReputation {
+    ip        String   @id
+    provider  String
+    allow     Boolean
+    reason    String?
+    rules     String
+    checkedAt DateTime @default(now())
+
+    @@index([checkedAt])
+}
+
 model WafIpFeed {
     /// Feed id ("tor").
     id        String   @id

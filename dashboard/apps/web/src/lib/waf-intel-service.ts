@@ -20,6 +20,7 @@ import { EDGE_TOKEN_TTL_SECONDS } from "@polaris/core/waf";
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { readDymoConfig } from "@/lib/integrations/registry";
+import { rememberedVerdict, rememberVerdict } from "@/lib/address-reputation";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 import { checkCriminalIp, readCriminalIpConfig } from "@/lib/integrations/criminalip";
 import { buildWafIntel, type WafIntelEntry, type WafIntelReason } from "@polaris/core";
@@ -130,6 +131,9 @@ export async function refreshWafFeeds(force = false): Promise<void> {
 /** One reputation provider, reduced to the only thing the firewall needs from it. */
 interface ReputationProvider {
     readonly slug: string;
+    /** The deny rules the operator set, carried so a verdict can be remembered
+     *  against them - a cached answer to a different question is not an answer. */
+    readonly deny: readonly string[];
     check(ip: string): Promise<{ allow: boolean; reasons: string[] }>;
 }
 
@@ -143,7 +147,11 @@ async function reputationProviders(): Promise<ReputationProvider[]> {
         const config = readDymoConfig(dymo.config);
         const apiKey = await getIntegrationSecret("dymo");
         if (apiKey && config.deny.length > 0) {
-            providers.push({ slug: "dymo", check: (ip) => verifyIp(apiKey, ip, config.deny) });
+            providers.push({
+                slug: "dymo",
+                deny: config.deny,
+                check: (ip) => verifyIp(apiKey, ip, config.deny)
+            });
         }
     }
 
@@ -152,7 +160,11 @@ async function reputationProviders(): Promise<ReputationProvider[]> {
         const config = readCriminalIpConfig(criminalIp.config);
         const apiKey = await getIntegrationSecret("criminalip");
         if (apiKey && config.deny.length > 0) {
-            providers.push({ slug: "criminalip", check: (ip) => checkCriminalIp(apiKey, ip, config.deny) });
+            providers.push({
+                slug: "criminalip",
+                deny: config.deny,
+                check: (ip) => checkCriminalIp(apiKey, ip, config.deny)
+            });
         }
     }
 
@@ -163,11 +175,18 @@ async function reputationProviders(): Promise<ReputationProvider[]> {
  * Ask the configured reputation providers about addresses seen in traffic, and
  * record a ban for the ones they flag.
  *
- * Only addresses that are new to us are asked about, and only a bounded number per
- * pass, because a provider charges per lookup and a traffic spike must not turn into
- * a bill. The first provider to flag an address ends the question for it. Failures
- * are ignored entirely: not knowing whether an address is bad is the same as not
- * blocking it, which is the only safe direction for something that runs unattended.
+ * Only addresses nothing is known about are asked about, and only a bounded
+ * number per pass, because a provider charges per lookup and a traffic spike must
+ * not turn into a bill. The first provider to flag an address ends the question
+ * for it. Failures are ignored entirely: not knowing whether an address is bad is
+ * the same as not blocking it, which is the only safe direction for something
+ * that runs unattended.
+ *
+ * "Nothing is known" used to mean "has no ban", which quietly meant every address
+ * that came back clean was asked about again on the next pass - thirty seconds
+ * later, over a log window that had barely changed. The clean answers are now
+ * remembered too, which is the difference between a lookup per address and a
+ * lookup per address per pass.
  */
 export async function checkReputation(ips: readonly string[]): Promise<void> {
     const providers = await reputationProviders();
@@ -175,16 +194,36 @@ export async function checkReputation(ips: readonly string[]): Promise<void> {
 
     const candidates = [...new Set(ips.filter(routable))];
     if (candidates.length === 0) return;
-    const known = new Set(
+    const banned = new Set(
         (await prisma.wafBan.findMany({ where: { ip: { in: candidates } }, select: { ip: true } })).map(
             (row) => row.ip
         )
     );
-    const unknown = candidates.filter((ip) => !known.has(ip)).slice(0, REPUTATION_BATCH);
-    for (const ip of unknown) {
+
+    let asked = 0;
+    for (const ip of candidates) {
+        if (asked >= REPUTATION_BATCH) break;
+        if (banned.has(ip)) continue;
         for (const provider of providers) {
+            const remembered = await rememberedVerdict(ip, provider.slug, provider.deny);
+            if (remembered) {
+                if (remembered.allow) continue;
+                await recordWafBan({
+                    ip,
+                    reason: "reputation",
+                    source: provider.slug,
+                    note: remembered.reason ?? "flagged",
+                    until: new Date(Date.now() + REPUTATION_TTL_MS)
+                });
+                break;
+            }
             try {
+                asked += 1;
                 const { allow, reasons } = await provider.check(ip);
+                await rememberVerdict(ip, provider.slug, provider.deny, {
+                    allow,
+                    reason: reasons[0] ?? null
+                });
                 if (allow) continue;
                 await recordWafBan({
                     ip,
@@ -196,7 +235,8 @@ export async function checkReputation(ips: readonly string[]): Promise<void> {
                 break;
             } catch {
                 // A provider that cannot answer does not get to block anyone, and does
-                // not stop the next one from being asked.
+                // not stop the next one from being asked. Nothing is remembered
+                // either: an outage is not a verdict.
             }
         }
     }
