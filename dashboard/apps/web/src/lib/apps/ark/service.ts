@@ -583,6 +583,84 @@ export async function unbanArkPlayer(ownerId: string, installedAppId: string, st
     await runArkCommand(ownerId, installedAppId, `UnbanPlayer ${steamId.trim()}`);
 }
 
+/**
+ * The number the game knows a player by, or null when there is none to read.
+ *
+ * ARK's admin commands come in two families: the ones that take a Steam id
+ * (kicking, banning, the allow list) and the ones that take an in-game player id
+ * (killing somebody, giving them something, handing them experience). Nothing
+ * turns one into the other reliably - the command for it, `GetPlayerIDForSteamID`,
+ * has answered with the wrong number for years - so the id is read out of the
+ * survivor's own file, which is the only place it is written down.
+ *
+ * Null is the ordinary answer for somebody who has never played here: their file
+ * is written the first time they join.
+ */
+export async function readArkPlayerId(
+    ownerId: string,
+    installedAppId: string,
+    steamId: string
+): Promise<string | null> {
+    if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
+    const profiles = await readArkProfiles(ownerId, installedAppId, [steamId.trim()]);
+    return profiles[steamId.trim()]?.dataId ?? null;
+}
+
+/**
+ * Kill somebody's survivor.
+ *
+ * The verb every moderator reaches for before they reach for a ban: a player stuck
+ * inside the world geometry, or one standing somewhere they should not be. It
+ * costs them what they are carrying, so the screen asks first.
+ */
+export async function killArkPlayer(ownerId: string, installedAppId: string, playerId: string): Promise<string> {
+    return runArkCommand(ownerId, installedAppId, `KillPlayer ${assertPlayerId(playerId)}`);
+}
+
+/**
+ * Empty somebody's inventory.
+ *
+ * All three of what the game counts separately - the bag, the item slots and what
+ * they are wearing - because a moderator asking for this wants them empty, and
+ * leaving the armour on is the version of it nobody meant.
+ */
+export async function clearArkPlayerInventory(
+    ownerId: string,
+    installedAppId: string,
+    playerId: string
+): Promise<string> {
+    return runArkCommand(ownerId, installedAppId, `ClearPlayerInventory ${assertPlayerId(playerId)} 1 1 1`);
+}
+
+/**
+ * Hand somebody experience.
+ *
+ * The two flags are the game's: whether it counts as tribe-shared experience, and
+ * whether the tribe gets a cut. Neither, here - an operator handing a player a
+ * level means that player.
+ */
+export async function giveArkExperience(
+    ownerId: string,
+    installedAppId: string,
+    playerId: string,
+    amount: number
+): Promise<string> {
+    const points = Math.max(1, Math.min(MAX_ARK_EXPERIENCE, Math.trunc(amount)));
+    return runArkCommand(ownerId, installedAppId, `GiveExpToPlayer ${assertPlayerId(playerId)} ${points} 0 1`);
+}
+
+/** Enough to take somebody most of the way up on a fast server, and short of the
+ *  typo that would put them at the level cap in one go. */
+export const MAX_ARK_EXPERIENCE = 1_000_000;
+
+/** An in-game player id is digits and nothing else. It comes from a file Polaris
+ *  read rather than from a form, so this is the second line of defence rather than
+ *  the first - but it is what stops a malformed one reaching the console. */
+function assertPlayerId(playerId: string): string {
+    if (!/^\d{1,20}$/.test(playerId)) throw new Error("That is not an in-game player id");
+    return playerId;
+}
+
 /** Where the game keeps the world, the profiles and the admin list. */
 const SAVE_DIR = `${ARK_ROOT}/ShooterGame/Saved`;
 

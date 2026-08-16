@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
     parseArkProfile,
+    readProfileDataId,
     readProfileLevel,
     readProfileName,
     steamIdOfProfileFile
@@ -84,18 +85,56 @@ describe("readProfileName", () => {
     });
 });
 
+/** The number the game's own admin commands take, which is nowhere else but here. */
+function dataId(value: bigint): Buffer {
+    const bytes = Buffer.alloc(8);
+    bytes.writeBigUInt64LE(value, 0);
+    return property("PlayerDataID", "UInt64Property", bytes);
+}
+
+describe("readProfileDataId", () => {
+    it("reads the id the game knows them by", () => {
+        expect(readProfileDataId(Buffer.concat([NOISE, dataId(1_234_567_890n)]))).toBe("1234567890");
+    });
+
+    it("keeps every digit of one too wide for a number", () => {
+        // Sixty-four bits wide, and a float would round the end off it - which is
+        // an admin command aimed at nobody.
+        expect(readProfileDataId(Buffer.concat([NOISE, dataId(18_446_744_073_709_551_615n)]))).toBe(
+            "18446744073709551615"
+        );
+    });
+
+    it("reads an unwritten field as no id rather than as player zero", () => {
+        expect(readProfileDataId(Buffer.concat([NOISE, dataId(0n)]))).toBeNull();
+    });
+
+    it("is not fooled by the field that merely ends with the same word", () => {
+        const decoy = property("LinkedPlayerDataID", "UInt64Property", Buffer.alloc(8, 9));
+        expect(readProfileDataId(Buffer.concat([decoy, dataId(42n)]))).toBe("42");
+    });
+
+    it("says nothing for a file that does not carry one", () => {
+        expect(readProfileDataId(NOISE)).toBeNull();
+    });
+});
+
 describe("parseArkProfile", () => {
-    it("reads both, in either order", () => {
-        expect(parseArkProfile(Buffer.concat([level(11), NOISE, survivorName("Ada")]))).toEqual({
+    it("reads all three, in any order", () => {
+        expect(
+            parseArkProfile(Buffer.concat([level(11), NOISE, survivorName("Ada"), dataId(7n)]))
+        ).toEqual({
             characterName: "Ada",
-            level: 12
+            level: 12,
+            dataId: "7"
         });
     });
 
     it("reads a file it understands none of as knowing nothing", () => {
         expect(parseArkProfile(Buffer.from("not an ark profile at all"))).toEqual({
             characterName: null,
-            level: null
+            level: null,
+            dataId: null
         });
     });
 });

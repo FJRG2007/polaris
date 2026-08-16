@@ -15,9 +15,16 @@
  */
 
 import * as actions from "./ark-actions";
+import { isSteamId } from "@/lib/apps/ark/access";
+import { Loader2, UserSearch } from "lucide-react";
+import { AccountInput } from "@/components/account-input";
 import { useEffect, useState, useTransition } from "react";
+import type { ArkAllowedPlayer } from "@/lib/apps/ark/access";
 import { PlayerRecordPanel } from "@/components/player-history";
+import { ArkItemPicker, loadArkCatalog } from "./ark-item-picker";
 import type { PlayerRecord } from "@/lib/apps/games-activity-service";
+import { PlayerFormDialog, PlayerFormField } from "@/components/player-form-dialog";
+import { arkStackCount, MAX_ARK_GIVE, MAX_ARK_QUALITY, type ArkItem } from "@/lib/apps/ark/items";
 import {
     Button,
     Dialog,
@@ -26,13 +33,9 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    Switch
 } from "@polaris/ui";
-import { isSteamId } from "@/lib/apps/ark/access";
-import { Loader2, UserSearch } from "lucide-react";
-import { AccountInput } from "@/components/account-input";
-import type { ArkAllowedPlayer } from "@/lib/apps/ark/access";
-import { PlayerFormDialog, PlayerFormField } from "@/components/player-form-dialog";
 
 /** What the id has to look like, said the way it is refused. */
 const STEAM_ID_HINT =
@@ -219,6 +222,138 @@ export function ArkMessageDialog({
                     aria-label="Message"
                 />
             </PlayerFormField>
+        </PlayerFormDialog>
+    );
+}
+
+/**
+ * Hand a player something.
+ *
+ * ARK gives an operator no way to do this from outside the game: the two commands
+ * everybody knows put the item in the inventory of whoever typed them, and over
+ * RCON that is nobody. The third names its player - by a number out of their own
+ * survivor file, which is what Polaris reads - so this is a give that works with
+ * nobody logged in, which is the whole reason the screen has it.
+ *
+ * What it cannot do is confirm. ARK answers a give with silence whether it landed
+ * or not, so the dialog says what was sent and to whom, and never that it arrived.
+ */
+export function ArkGiveDialog({
+    name,
+    pending,
+    error,
+    recent,
+    onClose,
+    onGive
+}: {
+    name: string;
+    pending: boolean;
+    error: string | null;
+    /** What was handed out on this server lately, for the grid to open on. */
+    recent?: readonly string[];
+    onClose: () => void;
+    onGive: (input: { key: string; quantity: number; quality: number; blueprint: boolean }) => void;
+}) {
+    const [picked, setPicked] = useState<string | null>(null);
+    const [query, setQuery] = useState("");
+    const [quantity, setQuantity] = useState(1);
+    const [quality, setQuality] = useState(0);
+    const [blueprint, setBlueprint] = useState(false);
+    const [items, setItems] = useState<readonly ArkItem[]>([]);
+
+    useEffect(() => {
+        let live = true;
+        void loadArkCatalog().then(
+            (loaded) => live && setItems(loaded),
+            () => undefined
+        );
+        return () => {
+            live = false;
+        };
+    }, []);
+
+    const item = picked === null ? undefined : items.find((entry) => entry.id === picked);
+    // One to a stack is what every piece of gear in the game is, and gear is
+    // exactly what has a quality and a blueprint. Anything that stacks has
+    // neither, and the game ignores both arguments for it - so the two fields are
+    // only drawn where they mean something.
+    const gear = item !== undefined && item.stack === 1;
+    const stacks = item ? arkStackCount(item.stack, quantity) : 1;
+
+    return (
+        <PlayerFormDialog
+            title={`Give ${name} something`}
+            description="Goes straight into their inventory. They have to have played on this server before."
+            confirmLabel="Give it to them"
+            ready={picked !== null}
+            pending={pending}
+            error={error}
+            onClose={onClose}
+            onConfirm={() =>
+                picked &&
+                onGive({ key: picked, quantity, quality: gear ? quality : 0, blueprint: gear && blueprint })
+            }
+        >
+            <ArkItemPicker
+                value={picked}
+                query={query}
+                onQueryChange={setQuery}
+                onSelect={setPicked}
+                {...(recent ? { recent } : {})}
+            />
+
+            <PlayerFormField
+                label="How many"
+                hint={
+                    item && !blueprint && stacks > 1
+                        ? `${stacks} stacks of ${item.stack}.`
+                        : "Straight into their inventory, wherever they are standing."
+                }
+            >
+                <Input
+                    type="number"
+                    min={1}
+                    max={MAX_ARK_GIVE}
+                    value={quantity}
+                    aria-label="How many"
+                    className="w-24"
+                    onChange={(event) =>
+                        setQuantity(Math.max(1, Math.min(MAX_ARK_GIVE, Number(event.target.value) || 1)))
+                    }
+                />
+            </PlayerFormField>
+
+            {gear && (
+                <>
+                    <PlayerFormField
+                        label="Quality"
+                        hint="0 is what a survivor crafts with no skill. Higher is better gear, the way a drop from a red crate is."
+                    >
+                        <Input
+                            type="number"
+                            min={0}
+                            max={MAX_ARK_QUALITY}
+                            value={quality}
+                            aria-label="Quality"
+                            className="w-24"
+                            onChange={(event) =>
+                                setQuality(
+                                    Math.max(0, Math.min(MAX_ARK_QUALITY, Number(event.target.value) || 0))
+                                )
+                            }
+                        />
+                    </PlayerFormField>
+                    <label className="flex items-center justify-between gap-3 text-sm">
+                        <span>
+                            The blueprint instead
+                            <span className="block text-xs text-muted-foreground">
+                                They craft it themselves, with the materials it costs.
+                            </span>
+                        </span>
+                        <Switch checked={blueprint} onChange={setBlueprint} aria-label="The blueprint instead" />
+                    </label>
+                </>
+            )}
         </PlayerFormDialog>
     );
 }

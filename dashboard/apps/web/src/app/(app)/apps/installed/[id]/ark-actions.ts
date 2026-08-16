@@ -21,10 +21,13 @@ import { recordAudit } from "@/lib/audit-service";
 import { isModId, MAX_MODS } from "@/lib/apps/ark/mods";
 import { deployApplication } from "@/lib/deploy-service";
 import { findGameIdentity } from "@/lib/apps/game-identity";
+import { recentlyGivenItems } from "@/lib/apps/recent-items";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/player-timeout";
 import { GAME_LOG, isJoinPassword, isSteamId } from "@/lib/apps/ark/access";
 import { parseWorkshopId, type WorkshopItem } from "@/lib/apps/ark/workshop";
+import { giveArkItem, requireArkPlayerId } from "@/lib/apps/ark/item-service";
 import { liftArkTimeout, timeoutArkPlayer } from "@/lib/apps/ark/timeout-service";
+import { ARK_ITEM_KEY, MAX_ARK_GIVE, MAX_ARK_QUALITY } from "@/lib/apps/ark/items";
 import { requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
 import { readPlayerRecord, type PlayerRecord } from "@/lib/apps/games-activity-service";
 import { readArkRules, setArkRules, type ArkRules } from "@/lib/apps/ark/settings-service";
@@ -269,6 +272,111 @@ export async function moderateArkPlayerAction(
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+    }
+}
+
+/**
+ * The verbs that act on a survivor rather than on an account.
+ *
+ * Kicking and banning take a Steam id; these take the number the game knows a
+ * player by, which is read out of their own survivor file - so all of them fail
+ * the same way for somebody who has never played here, and the message says so
+ * rather than reporting a command the server ignored.
+ */
+const survivorSchema = z.object({
+    installedAppId: z.string().trim().min(1),
+    steamId: z.string().trim().refine(isSteamId, "That is not a Steam id"),
+    verb: z.enum(["kill", "strip"])
+});
+
+export async function actOnArkSurvivorAction(
+    installedAppId: string,
+    steamId: string,
+    verb: "kill" | "strip"
+): Promise<{ error?: string }> {
+    const parsed = survivorSchema.safeParse({ installedAppId, steamId, verb });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        const playerId = await requireArkPlayerId(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.steamId
+        );
+        const run = parsed.data.verb === "kill" ? ark.killArkPlayer : ark.clearArkPlayerInventory;
+        await run(access.ownerId, parsed.data.installedAppId, playerId);
+        await recordAudit({
+            actorId: user.id,
+            action: `games.ark.${parsed.data.verb}`,
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { steamId: parsed.data.steamId }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+    }
+}
+
+const giveSchema = z.object({
+    installedAppId: z.string().trim().min(1),
+    steamId: z.string().trim().refine(isSteamId, "That is not a Steam id"),
+    /** An item's class, which is the only thing a browser is allowed to name: the
+     *  blueprint path the command carries is looked up from it on this side. */
+    key: z.string().trim().regex(ARK_ITEM_KEY, "That is not an item"),
+    quantity: z.number().int().min(1).max(MAX_ARK_GIVE),
+    quality: z.number().int().min(0).max(MAX_ARK_QUALITY).default(0),
+    blueprint: z.boolean().default(false)
+});
+
+export type ArkGiveInput = z.infer<typeof giveSchema>;
+
+/**
+ * Put items in a player's inventory.
+ *
+ * Nothing here can confirm it landed: ARK answers a give with silence whether it
+ * worked or not, so the result says what was sent rather than what happened, and
+ * the screen words it that way.
+ */
+export async function giveArkItemAction(
+    input: ArkGiveInput
+): Promise<{ item?: string; stacks?: number; output?: string; error?: string }> {
+    const parsed = giveSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const { installedAppId, steamId, key, quantity, quality, blueprint } = parsed.data;
+    try {
+        const { user, access } = await requireGameServer("games.moderate", installedAppId);
+        const given = await giveArkItem(access.ownerId, installedAppId, steamId, {
+            key,
+            quantity,
+            quality,
+            blueprint
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "games.ark.give",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { steamId, item: key, count: quantity, blueprint }
+        });
+        return { item: given.item.name, stacks: given.stacks, output: given.output };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+    }
+}
+
+/** What was handed out on this server lately, for the picker to open on rather
+ *  than on two thousand tiles in the order a data file happens to list them. */
+export async function recentArkItemsAction(installedAppId: string): Promise<{ items: string[] }> {
+    try {
+        await requireGameServer("games.read", installedAppId);
+        return {
+            items: await recentlyGivenItems("games.ark.give", installedAppId, (raw) =>
+                ARK_ITEM_KEY.test(raw) ? raw : null
+            )
+        };
+    } catch {
+        return { items: [] };
     }
 }
 

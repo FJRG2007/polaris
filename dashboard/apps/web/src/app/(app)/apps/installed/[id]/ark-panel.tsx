@@ -45,11 +45,11 @@ import { PlayerTimeoutDialog } from "@/components/player-timeout-dialog";
 import { PlayerIconAction, PlayersTable } from "@/components/game-players-table";
 import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ArkHistoryDialog, ArkMessageDialog, ArkPlayerDialog } from "./ark-player-dialogs";
 import { timeoutFor, timeoutRemaining, type PlayerTimeout } from "@/lib/apps/player-timeout";
 import { foldArkPlayers, matchesArkPlayer, type ArkPlayerEntry } from "@/lib/apps/ark/players";
 import { generateJoinPassword, isJoinPassword, JOIN_PASSWORD_HINT } from "@/lib/apps/ark/access";
 import { CONSUMPTION_METRICS, MetricsHistory, PLAYER_METRICS } from "@/components/metrics-history";
+import { ArkGiveDialog, ArkHistoryDialog, ArkMessageDialog, ArkPlayerDialog } from "./ark-player-dialogs";
 import {
     playerAction,
     playerConfirm,
@@ -86,10 +86,13 @@ import {
     Megaphone,
     MessageSquare,
     MoreHorizontal,
+    PackageMinus,
+    PackagePlus,
     Pencil,
     RefreshCw,
     Save,
     ShieldAlert,
+    Skull,
     ShieldMinus,
     ShieldPlus,
     UserMinus,
@@ -905,8 +908,11 @@ function PlayersTab({
      *  about nobody yet. */
     const [acting, setActing] = useState<{
         entry: ArkPlayerEntry | null;
-        dialog: "player" | "message" | "timeout" | "history";
+        dialog: "player" | "message" | "timeout" | "history" | "give";
     } | null>(null);
+    /** What has been handed out here lately, so the item grid opens on something
+     *  worth looking at rather than on the first hundred of two thousand. */
+    const [recentItems, setRecentItems] = useState<readonly string[]>([]);
     /** A refusal belongs in the dialog that asked for it, not behind it on a page
      *  the reader has stopped looking at. */
     const [dialogError, setDialogError] = useState<string | null>(null);
@@ -975,9 +981,17 @@ function PlayersTab({
         run(() => actions.setArkExclusiveJoinAction(installedAppId, closed));
     }
 
-    function open(dialog: "player" | "message" | "timeout" | "history", entry: ArkPlayerEntry | null): void {
+    function open(
+        dialog: "player" | "message" | "timeout" | "history" | "give",
+        entry: ArkPlayerEntry | null
+    ): void {
         setDialogError(null);
         setActing({ entry, dialog });
+        // Asked for when the form that uses it opens, not on every poll: it is a
+        // read of the audit log and nothing on the table shows it.
+        if (dialog === "give" && recentItems.length === 0) {
+            void actions.recentArkItemsAction(installedAppId).then((answer) => setRecentItems(answer.items));
+        }
     }
 
     const answering = status?.answering ?? false;
@@ -1108,6 +1122,47 @@ function PlayersTab({
                         onEdit={() => open("player", entry)}
                         onHistory={() => open("history", entry)}
                         onMessage={() => open("message", entry)}
+                        onGive={() => open("give", entry)}
+                        onKill={() =>
+                            void confirm({
+                                title: `Kill ${entry.name}?`,
+                                description: "Their survivor dies where they are standing and drops everything they were carrying. The body can be looted by anybody who reaches it first.",
+                                confirmLabel: "Kill them",
+                                danger: true
+                            }).then((agreed) => {
+                                if (agreed) {
+                                    run(
+                                        () =>
+                                            actions.actOnArkSurvivorAction(
+                                                installedAppId,
+                                                entry.steamId,
+                                                "kill"
+                                            ),
+                                        "Sent to the server. ARK does not answer a kill, so watch the game."
+                                    );
+                                }
+                            })
+                        }
+                        onStrip={() =>
+                            void confirm({
+                                title: `Empty ${entry.name}'s inventory?`,
+                                description: "Everything they are carrying, wearing and holding in a slot is destroyed rather than dropped. There is no undo.",
+                                confirmLabel: "Empty it",
+                                danger: true
+                            }).then((agreed) => {
+                                if (agreed) {
+                                    run(
+                                        () =>
+                                            actions.actOnArkSurvivorAction(
+                                                installedAppId,
+                                                entry.steamId,
+                                                "strip"
+                                            ),
+                                        "Sent to the server."
+                                    );
+                                }
+                            })
+                        }
                         onKick={() =>
                             void confirm({
                                 ...playerConfirm.kick(entry.name),
@@ -1226,6 +1281,33 @@ function PlayersTab({
                     }
                 />
             )}
+            {acting?.dialog === "give" && target && (
+                <ArkGiveDialog
+                    name={target.name}
+                    pending={pending}
+                    error={dialogError}
+                    recent={recentItems}
+                    onClose={() => setActing(null)}
+                    onGive={(input) =>
+                        runInDialog(async () => {
+                            const given = await actions.giveArkItemAction({
+                                installedAppId,
+                                steamId: target.steamId,
+                                ...input
+                            });
+                            if (given.error) return { error: given.error };
+                            // Said rather than claimed: the server takes the
+                            // command and answers nothing either way, so the note
+                            // is about what was sent.
+                            setNote(
+                                `Sent ${input.quantity} ${given.item ?? "of it"} to ${target.name}. ARK does not confirm a give - ask them to look.`
+                            );
+                            setRecentItems((was) => [input.key, ...was.filter((id) => id !== input.key)].slice(0, 12));
+                            return {};
+                        })
+                    }
+                />
+            )}
             {acting?.dialog === "timeout" && target && (
                 <PlayerTimeoutDialog
                     player={target.name}
@@ -1341,6 +1423,9 @@ function ArkPlayerRow({
     onEdit,
     onHistory,
     onMessage,
+    onGive,
+    onKill,
+    onStrip,
     onKick,
     onBan,
     onUnban,
@@ -1371,6 +1456,9 @@ function ArkPlayerRow({
     onEdit: () => void;
     onHistory: () => void;
     onMessage: () => void;
+    onGive: () => void;
+    onKill: () => void;
+    onStrip: () => void;
     onKick: () => void;
     onBan: () => void;
     onUnban: () => void;
@@ -1587,6 +1675,38 @@ function ArkPlayerRow({
                                     onSelect={onMessage}
                                 >
                                     <MessageSquare className="size-4" /> {playerMenuItem.message}
+                                </DropdownMenuItem>
+                                {/* Only while they are on. Unlike Minecraft, where
+                                    a give to somebody asleep is written down and
+                                    handed over when they join, ARK puts the item
+                                    into a character that has to be loaded in the
+                                    world - so an offline give would be a command
+                                    the server takes and drops. */}
+                                <DropdownMenuItem
+                                    disabled={!live || !entry.online}
+                                    onSelect={onGive}
+                                >
+                                    <PackagePlus className="size-4" /> Give them something
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                {/* The two that act on the survivor rather than on
+                                    the account. Both need the number the game knows
+                                    them by, which is read out of their own file -
+                                    so both refuse, with a reason, for somebody who
+                                    has never played here. */}
+                                <DropdownMenuItem
+                                    className="text-danger"
+                                    disabled={!live || !entry.online}
+                                    onSelect={onKill}
+                                >
+                                    <Skull className="size-4" /> Kill their survivor
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    className="text-danger"
+                                    disabled={!live || !entry.online}
+                                    onSelect={onStrip}
+                                >
+                                    <PackageMinus className="size-4" /> Empty their inventory
                                 </DropdownMenuItem>
                                 {/* Offered to anybody, because ARK does not say who
                                     is banned: the ban list is the server's own and

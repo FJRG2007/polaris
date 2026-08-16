@@ -26,6 +26,19 @@ export interface ArkProfile {
     readonly characterName: string | null;
     /** The level they are on, counting the one they start at. */
     readonly level: number | null;
+    /**
+     * The number the game knows them by, as a string.
+     *
+     * ARK's admin commands take this rather than the Steam id, and there is no
+     * reliable command that turns one into the other - `GetPlayerIDForSteamID` has
+     * been broken for years and answers with something else. The file is where it
+     * actually lives, so everything on the panel that reaches a particular player -
+     * giving them an item, killing them - comes back to this one read.
+     *
+     * A string, not a number: it is 64 bits wide and only ever printed or passed
+     * on, so putting it through a float would be a rounding waiting to happen.
+     */
+    readonly dataId: string | null;
 }
 
 /** How far a level can plausibly be from the file before the read is treated as a
@@ -35,6 +48,7 @@ const MAX_LEVEL = 1000;
 
 const LEVEL_PROPERTY = "CharacterStatusComponent_ExtraCharacterLevel";
 const NAME_PROPERTY = "PlayerCharacterName";
+const DATA_ID_PROPERTY = "PlayerDataID";
 
 /**
  * One length-prefixed, null-terminated string, and where the next byte is.
@@ -106,8 +120,28 @@ export function readProfileName(bytes: Buffer): string | null {
     return name.length > 0 && name.length <= 64 ? name : null;
 }
 
+/**
+ * The id the game knows this survivor by, or null.
+ *
+ * Eight bytes, unsigned, little-endian like everything else in the file. Read as a
+ * BigInt and handed on as digits: nothing here does arithmetic on it, and the
+ * value is wider than a JavaScript number can hold exactly.
+ */
+export function readProfileDataId(bytes: Buffer): string | null {
+    const found = findProperty(bytes, DATA_ID_PROPERTY, "UInt64Property");
+    if (!found || found.size !== 8) return null;
+    if (found.at + 8 > bytes.length) return null;
+    const value = bytes.readBigUInt64LE(found.at);
+    // Zero is what an unwritten field reads as, and it is not a player.
+    return value > 0n ? value.toString() : null;
+}
+
 export function parseArkProfile(bytes: Buffer): ArkProfile {
-    return { characterName: readProfileName(bytes), level: readProfileLevel(bytes) };
+    return {
+        characterName: readProfileName(bytes),
+        level: readProfileLevel(bytes),
+        dataId: readProfileDataId(bytes)
+    };
 }
 
 /** The Steam id a profile file is named after: `76561198…​.arkprofile`. Null for
