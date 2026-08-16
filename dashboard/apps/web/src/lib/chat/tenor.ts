@@ -1,13 +1,20 @@
 /**
- * GIFs and stickers, from Tenor.
+ * GIFs and stickers, from whichever service this instance has connected.
  *
- * Server-side only, and that is the point of the module existing at all: the API
+ * Server-side only, and that is the point of the module existing at all: an API
  * key is instance configuration and must not reach a browser, where it would be
  * one view-source away from being somebody else's quota.
  *
- * The key is an integration an administrator connects, like every other outside
- * service. An environment variable is still read as a fallback, so an instance
- * that set one before this screen existed keeps working.
+ * Two services, and the picker never knows which answered. Tenor and Giphy have
+ * the same shape of catalogue and differ only in whose account the quota comes
+ * out of, so this asks whichever is connected rather than making an operator
+ * choose twice - once by pasting a key and again by picking a name from a list.
+ * When both are connected, Giphy answers, because it is the one somebody
+ * connected second.
+ *
+ * A key is an integration an administrator connects, like every other outside
+ * service. The environment variable is still read for Tenor, so an instance that
+ * set one before this screen existed keeps working.
  *
  * Nothing is stored here. What comes back is a list of addresses the picker
  * draws; choosing one is what stores something, and what it stores is an
@@ -17,6 +24,8 @@
  */
 
 import { loadEnv } from "@polaris/config";
+import { GiphyFetch } from "@giphy/js-fetch-api";
+import type { IGif } from "@giphy/js-types";
 import { fetchImage } from "@/lib/safe-fetch";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
@@ -54,8 +63,18 @@ async function tenorKey(): Promise<string> {
     return loadEnv().POLARIS_TENOR_KEY ?? "";
 }
 
+/** The key for Giphy, which has no environment fallback: it arrived with the
+ *  integrations screen and has never been configured any other way. */
+async function giphyKey(): Promise<string> {
+    const state = await getIntegrationState("giphy").catch(() => null);
+    if (!state?.enabled) return "";
+    return (await getIntegrationSecret("giphy").catch(() => null)) ?? "";
+}
+
+/** Whether the picker has a search tab at all. */
 export async function tenorConfigured(): Promise<boolean> {
-    return (await tenorKey()) !== "";
+    const [giphy, tenor] = await Promise.all([giphyKey(), tenorKey()]);
+    return giphy !== "" || tenor !== "";
 }
 
 /**
@@ -66,6 +85,9 @@ export async function tenorConfigured(): Promise<boolean> {
  * not be an error somebody has to dismiss to carry on typing.
  */
 export async function searchTenor(query: string, kind: TenorKind): Promise<TenorResult[]> {
+    const giphy = await giphyKey();
+    if (giphy) return searchGiphy(giphy, query, kind);
+
     const key = await tenorKey();
     if (!key) return [];
 
@@ -90,6 +112,52 @@ export async function searchTenor(query: string, kind: TenorKind): Promise<Tenor
     } catch {
         return [];
     }
+}
+
+/**
+ * The same search, asked of Giphy.
+ *
+ * Through their own SDK rather than by hand, which is what they ask callers to
+ * do and is the difference between one dependency and a private copy of their
+ * URL shapes that goes stale quietly. It runs here and never in a browser: the
+ * key is the instance's.
+ *
+ * Stickers are a type rather than a filter there, which is the one place the two
+ * services genuinely differ - and it is spelled out here so the picker does not
+ * have to know.
+ */
+async function searchGiphy(key: string, query: string, kind: TenorKind): Promise<TenorResult[]> {
+    const term = query.trim();
+    const type = kind === "sticker" ? "stickers" : "gifs";
+
+    try {
+        const gf = new GiphyFetch(key);
+        const answer = term
+            ? await gf.search(term, { limit: PAGE, type, rating: "pg-13" })
+            : await gf.trending({ limit: PAGE, type, rating: "pg-13" });
+        return (answer.data ?? []).flatMap(fromGiphy);
+    } catch {
+        // Same rule as Tenor's: a third party being slow is not an error
+        // somebody has to dismiss to carry on typing.
+        return [];
+    }
+}
+
+/** One Giphy result in the shape the picker already draws. */
+function fromGiphy(raw: IGif): TenorResult[] {
+    const small = raw.images?.fixed_width_small ?? raw.images?.fixed_width;
+    const full = raw.images?.original ?? small;
+    if (!small?.url || !full?.url) return [];
+    return [
+        {
+            id: String(raw.id),
+            preview: small.url,
+            full: full.url,
+            description: raw.alt_text || raw.title || "",
+            width: Number(small.width) || 0,
+            height: Number(small.height) || 0
+        }
+    ];
 }
 
 /**

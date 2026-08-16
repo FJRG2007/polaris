@@ -450,6 +450,25 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         apiKeyHelp: "A Google Cloud API key with the Tenor API enabled on its project."
     },
     {
+        slug: "giphy",
+        name: "Giphy",
+        category: "Productivity",
+        summary: "Search GIFs and stickers from the chat composer.",
+        description:
+            "The same search as Tenor, out of a Giphy account instead. Connect either one - the picker does not say which answered, and if both are connected Giphy does. A chosen GIF is fetched once and stored here like any other attachment, so a conversation never asks Giphy for anything and nobody is told who read what.",
+        docsUrl: "https://developers.giphy.com/docs/api",
+        setupLinks: [
+            {
+                label: "Create an API key",
+                url: "https://developers.giphy.com/dashboard/",
+                help: "An API key from a Giphy app. The free tier is rate-limited per day, which is ordinarily far more than a chat uses."
+            }
+        ],
+        requiresApiKey: true,
+        apiKeyLabel: "API key",
+        apiKeyHelp: "The API key from your Giphy app, not the SDK key from a client-side example."
+    },
+    {
         slug: "cloudflare",
         name: "Cloudflare",
         category: "Automation",

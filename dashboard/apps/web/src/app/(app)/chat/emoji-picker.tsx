@@ -30,6 +30,7 @@ import { createPortal } from "react-dom";
 import type { TenorResult } from "@/lib/chat/tenor";
 import { Loader2, Search, Smile } from "lucide-react";
 import { EMOJI_GROUPS, searchEmoji } from "@/lib/chat/emoji";
+import { recentEmoji, recentMedia, rememberEmoji, rememberMedia, type RecentMedia } from "./recents";
 import type { SavedMediaView } from "@/lib/chat/saved-media";
 import { listSavedMediaAction, searchTenorAction, tenorReadyAction } from "./actions";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -105,6 +106,12 @@ export function EmojiPicker({
     const [saved, setSaved] = useState<readonly SavedMediaView[] | null>(null);
     const [searching, setSearching] = useState(false);
     const [at, setAt] = useState<Placement | null>(null);
+    // Read when the panel opens rather than on every render: it lives in local
+    // storage, and the answer only changes because of a press inside here.
+    const [recent, setRecent] = useState<{ emoji: string[]; media: RecentMedia[] }>({
+        emoji: [],
+        media: []
+    });
     const trigger = useRef<HTMLButtonElement>(null);
     const panel = useRef<HTMLDivElement>(null);
 
@@ -118,6 +125,11 @@ export function EmojiPicker({
     useLayoutEffect(() => {
         if (open) reposition();
     }, [open, reposition]);
+
+    useEffect(() => {
+        if (!open) return;
+        setRecent({ emoji: recentEmoji(), media: recentMedia() });
+    }, [open]);
 
     // The panel is not in the flow, so nothing moves it when the window does.
     useEffect(() => {
@@ -276,26 +288,52 @@ export function EmojiPicker({
                                     <Grid
                                         entries={found}
                                         onPick={(char) => {
+                                            rememberEmoji(char);
                                             onEmoji(char);
                                             setOpen(false);
                                         }}
                                     />
                                 )
                             ) : (
-                                EMOJI_GROUPS.map((group) => (
-                                    <section key={group.name} className="mb-2">
-                                        <h3 className="px-1 pb-1 text-[10px] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                                            {group.name}
-                                        </h3>
-                                        <Grid
-                                            entries={group.emoji}
-                                            onPick={(char) => {
-                                                onEmoji(char);
-                                                setOpen(false);
-                                            }}
-                                        />
-                                    </section>
-                                ))
+                                <>
+                                    {/* First, because nine emoji out of two
+                                        thousand are almost everything anybody
+                                        sends - and they are not the same nine
+                                        for any two people. */}
+                                    {recent.emoji.length > 0 && (
+                                        <section className="mb-2">
+                                            <h3 className="px-1 pb-1 text-[10px] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                                                Recent
+                                            </h3>
+                                            <Grid
+                                                entries={recent.emoji.map((char) => ({
+                                                    char,
+                                                    words: ""
+                                                }))}
+                                                onPick={(char) => {
+                                                    rememberEmoji(char);
+                                                    onEmoji(char);
+                                                    setOpen(false);
+                                                }}
+                                            />
+                                        </section>
+                                    )}
+                                    {EMOJI_GROUPS.map((group) => (
+                                        <section key={group.name} className="mb-2">
+                                            <h3 className="px-1 pb-1 text-[10px] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                                                {group.name}
+                                            </h3>
+                                            <Grid
+                                                entries={group.emoji}
+                                                onPick={(char) => {
+                                                    rememberEmoji(char);
+                                                    onEmoji(char);
+                                                    setOpen(false);
+                                                }}
+                                            />
+                                        </section>
+                                    ))}
+                                </>
                             )
                         ) : tab === "saved" ? (
                             saved === null ? (
@@ -351,6 +389,40 @@ export function EmojiPicker({
                                 <Loader2 className="size-3.5 animate-spin" />
                                 Looking
                             </p>
+                        ) : !query.trim() && recent.media.length > 0 ? (
+                            // Before anything has been typed, the ones already
+                            // sent from this browser. Somebody opening the GIF
+                            // tab is usually reaching for the same one again.
+                            <>
+                                <h3 className="px-1 pb-1 text-[10px] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                                    Recent
+                                </h3>
+                                <MediaGrid
+                                    entries={recent.media}
+                                    onPick={(media) => {
+                                        rememberMedia(media);
+                                        onMedia(media.full);
+                                        setOpen(false);
+                                    }}
+                                />
+                                {results.length > 0 && (
+                                    <h3 className="px-1 pb-1 pt-2 text-[10px] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                                        Trending
+                                    </h3>
+                                )}
+                                <MediaGrid
+                                    entries={results.map((result) => ({
+                                        preview: result.preview,
+                                        full: result.full,
+                                        description: result.description
+                                    }))}
+                                    onPick={(media) => {
+                                        rememberMedia(media);
+                                        onMedia(media.full);
+                                        setOpen(false);
+                                    }}
+                                />
+                            </>
                         ) : results.length === 0 ? (
                             <p className="px-2 py-6 text-center text-xs text-muted-foreground">
                                 Nothing came back for that.
@@ -362,6 +434,11 @@ export function EmojiPicker({
                                         <button
                                             type="button"
                                             onClick={() => {
+                                                rememberMedia({
+                                                    preview: result.preview,
+                                                    full: result.full,
+                                                    description: result.description
+                                                });
                                                 onMedia(result.full);
                                                 setOpen(false);
                                             }}
@@ -428,6 +505,45 @@ function ByLink({ onSend }: { onSend: (address: string) => void }) {
                 </button>
             </span>
         </form>
+    );
+}
+
+/**
+ * A grid of GIFs, drawn the same way whether they came back from a search or out
+ * of what this browser sent last.
+ *
+ * Its own component because there are three of those places now, and three
+ * copies of a grid is three places for the one that is wrong to hide.
+ */
+function MediaGrid({
+    entries,
+    onPick
+}: {
+    entries: readonly RecentMedia[];
+    onPick: (media: RecentMedia) => void;
+}) {
+    if (entries.length === 0) return null;
+    return (
+        <ul className="grid grid-cols-2 gap-1 pb-1">
+            {entries.map((entry) => (
+                <li key={entry.full}>
+                    <button
+                        type="button"
+                        title={entry.description || "Send this"}
+                        onClick={() => onPick(entry)}
+                        className="block w-full overflow-hidden rounded-md ring-border transition-shadow hover:ring-2"
+                    >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- a remote preview grid, no loader wanted */}
+                        <img
+                            src={entry.preview}
+                            alt={entry.description}
+                            loading="lazy"
+                            className="h-24 w-full bg-muted object-cover"
+                        />
+                    </button>
+                </li>
+            ))}
+        </ul>
     );
 }
 

@@ -137,7 +137,9 @@ export function dialogFor(card: IntegrationCard): ComponentType<IntegrationDialo
     if (card.slug === "cloudflare" || card.slug === "ngrok") return TunnelDialog;
     if (card.slug === "duckdns") return DuckDnsDialog;
     if (card.slug === "steam") return SteamDialog;
-    if (card.slug === "tenor") return TenorDialog;
+    // Both GIF services are a key and a switch, so they share the dialog and
+    // the action; which one the picker asks is decided where the search is made.
+    if (card.slug === "tenor" || card.slug === "giphy") return TenorDialog;
     if (card.slug === "krisp") return LicensedFilterDialog;
     if (OAUTH_APPS[card.slug]) return OAuthAppDialog;
     // The gateway asks for an endpoint rather than a provider key, so it is told
@@ -831,7 +833,7 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
         setError(null);
         startSave(async () => {
             const result = await runAction(
-                () => integrationActions.saveTenorAction({ enabled, apiKey }),
+                () => integrationActions.saveTenorAction({ enabled, apiKey, slug: card.slug }),
                 setError
             );
             if (!result) return;

@@ -300,19 +300,27 @@ export async function saveLicensedFilterAction(input: {
  * Nothing else in Polaris changes when this is off: the picker still offers
  * emoji, what each person has kept, and anything sent by its address. This is
  * one tab in one popover, which is why it is a key and a switch and no settings.
+ *
+ * Two services can answer that tab and they are configured identically - a key
+ * and a switch - so this takes the slug rather than existing twice. Which of
+ * them the picker actually asks is decided where the search is made, not here.
  */
 export async function saveTenorAction(input: {
     enabled: boolean;
     apiKey?: string;
+    /** `tenor` or `giphy`. Anything else is refused rather than written: this
+     *  writes an integration row, and the slug is the row. */
+    slug?: string;
 }): Promise<{ error?: string }> {
     const user = await requireAdmin();
+    const slug = input.slug === "giphy" ? "giphy" : "tenor";
     const apiKey = input.apiKey?.trim() ? input.apiKey.trim() : undefined;
     try {
-        const existing = await getIntegrationState("tenor");
+        const existing = await getIntegrationState(slug);
         if (input.enabled && !apiKey && !existing?.hasSecret) {
             return { error: "Add the API key before turning it on" };
         }
-        await upsertIntegration("tenor", {
+        await upsertIntegration(slug, {
             enabled: input.enabled,
             secret: apiKey,
             installedById: user.id
@@ -321,7 +329,7 @@ export async function saveTenorAction(input: {
             actorId: user.id,
             action: "integration.configure",
             targetType: "integration",
-            targetId: "tenor",
+            targetId: slug,
             metadata: { enabled: input.enabled }
         });
     } catch (caught) {
