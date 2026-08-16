@@ -58,6 +58,18 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
     );
 }
 
+/** The lengths worth offering. A day first, because a suspension is nearly always
+ *  "come back tomorrow"; the rest are the shapes a moderation decision actually
+ *  takes, plus the one that does not end. */
+const BAN_LENGTHS = [
+    { minutes: 60, label: "For an hour" },
+    { minutes: 1440, label: "For a day" },
+    { minutes: 4320, label: "For three days" },
+    { minutes: 10080, label: "For a week" },
+    { minutes: 43200, label: "For a month" },
+    { minutes: 0, label: "Until lifted" }
+] as const;
+
 export function AccountView({
     user,
     groups,
@@ -75,6 +87,10 @@ export function AccountView({
     const [confirm, confirmElement] = useConfirm();
     const [limits, setLimits] = useState<AccessRulesValue>(user.enforced);
     const [banReason, setBanReason] = useState("");
+    /** How long the ban runs for, in minutes. Zero is a ban with no end, which is
+     *  what this control was before it existed and stays the deliberate choice
+     *  rather than the default. */
+    const [banFor, setBanFor] = useState("1440");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     // Null until the list arrives, so the section holds its shape rather than the
@@ -267,7 +283,15 @@ export function AccountView({
                     {user.banned ? (
                         <div className="flex items-center justify-between gap-3">
                             <p className="text-xs text-muted-foreground">
-                                Banned {user.bannedAt ? format.dateTime(user.bannedAt) : ""}
+                                {user.bannedUntil ? "Suspended" : "Banned"}{" "}
+                                {user.bannedAt ? format.dateTime(user.bannedAt) : ""}
+                                {/* When it ends, for one that does. Said here
+                                    because "banned" and "back on Tuesday" are
+                                    different answers to what an administrator
+                                    opened this page to ask. */}
+                                {user.bannedUntil
+                                    ? `, back ${format.dateTime(user.bannedUntil)}`
+                                    : ""}
                                 {user.banReason ? `: ${user.banReason}` : ""}
                             </p>
                             <Button
@@ -281,23 +305,49 @@ export function AccountView({
                             </Button>
                         </div>
                     ) : (
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <Input
-                                className="flex-1"
-                                placeholder="Reason (optional, kept for the record)"
-                                value={banReason}
-                                disabled={isSelf}
-                                onChange={(event) => setBanReason(event.target.value)}
-                            />
-                            <Button
-                                size="sm"
-                                variant="danger"
-                                disabled={busy || isSelf}
-                                onClick={() => void run(() => banUserAction(user.id, banReason))}
-                            >
-                                <Ban className="size-4" />
-                                Ban
-                            </Button>
+                        <div className="flex flex-col gap-2">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                <Input
+                                    className="flex-1"
+                                    placeholder="Reason (optional, kept for the record)"
+                                    value={banReason}
+                                    disabled={isSelf}
+                                    onChange={(event) => setBanReason(event.target.value)}
+                                />
+                                {/* How long, beside the button that does it. A
+                                    ban that has to be lifted by somebody
+                                    remembering a week later is the one every
+                                    administrator actually wanted to be a
+                                    suspension. */}
+                                <Select
+                                    value={banFor}
+                                    className="sm:w-44"
+                                    aria-label="How long"
+                                    disabled={isSelf}
+                                    onValueChange={setBanFor}
+                                    options={BAN_LENGTHS.map((length) => ({
+                                        value: String(length.minutes),
+                                        label: length.label
+                                    }))}
+                                />
+                                <Button
+                                    size="sm"
+                                    variant="danger"
+                                    disabled={busy || isSelf}
+                                    onClick={() =>
+                                        void run(() =>
+                                            banUserAction(user.id, banReason, Number(banFor) || 0)
+                                        )
+                                    }
+                                >
+                                    <Ban className="size-4" />
+                                    {Number(banFor) > 0 ? "Suspend" : "Ban"}
+                                </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Either one signs them out everywhere at once. A suspension lifts
+                                itself when its time is up; a ban stays until somebody lifts it.
+                            </p>
                         </div>
                     )}
                     <div className="flex items-center justify-between gap-3">

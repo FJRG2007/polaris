@@ -82,9 +82,20 @@ export async function revokeInviteAction(id: string): Promise<void> {
     revalidatePath("/admin/users");
 }
 
-export async function banUserAction(userId: string, reason: string): Promise<{ error?: string }> {
+/**
+ * Shut an account, for a while or for good.
+ *
+ * The length is what makes it a suspension: with one, the account comes back on
+ * its own, which is the outcome an administrator nearly always means and used to
+ * have to remember to perform by hand a week later.
+ */
+export async function banUserAction(
+    userId: string,
+    reason: string,
+    minutes?: number
+): Promise<{ error?: string }> {
     const admin = await requireAdmin();
-    const result = await banUser(admin.id, userId, reason);
+    const result = await banUser(admin.id, userId, reason, minutes);
     revalidatePath("/admin/users");
     return result;
 }

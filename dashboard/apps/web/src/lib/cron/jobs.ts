@@ -21,6 +21,7 @@ import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
 import { sweepExpiredSends } from "@/lib/vault/sends";
+import { liftExpiredSuspensions } from "@/lib/user-admin-service";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { sweepGameActivity } from "@/lib/apps/games-activity-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
@@ -247,6 +248,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // only when somebody opens the link would mean a Send nobody opened
         // sitting there forever, which is the case it was set for.
         run: () => sweepExpiredSends()
+    },
+    {
+        key: "suspensions",
+        // A minute, because the thing waiting on it is a person being told they
+        // are still shut out of an account that is due back.
+        everyMs: Number(process.env.POLARIS_SUSPENSION_SWEEP_MS) || MINUTE,
+        // Unleased: it names the rows it would change, so a second runner finds
+        // nothing left to do.
+        leaseMs: null,
+        run: liftExpiredSuspensions
     }
 ];
 

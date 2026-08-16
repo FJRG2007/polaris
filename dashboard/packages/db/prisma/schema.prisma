@@ -74,6 +74,14 @@ model User {
     // When set, the account is banned: sign-in is refused and sessions are void.
     bannedAt      DateTime?
     banReason     String?
+    // When a ban ends, for one that was meant to. Null is a ban with no end.
+    //
+    // Nothing reads this to decide whether somebody is banned - `bannedAt` alone
+    // says that, in the fifteen places that ask - so a suspension is lifted by
+    // clearing that column when this moment passes. The sweep that does it is
+    // `suspensions`; until it runs, the account stays out, which is the safe way
+    // round for the ten seconds it can be wrong by.
+    bannedUntil   DateTime?
     // When this account's groups or roles last moved. An edge token states the
     // principals its holder had when it was minted and the guard trusts that offline
     // for hours, so without this a membership change would not reach a service that is
@@ -3385,7 +3393,6 @@ model ManagedDatabase {
     @@index([targetId])
     @@index([parentId])
 }
-
 
 // One deploy run: a status row plus a pointer to its streamed log file. The log
 // itself lives on disk (tailed live), not in the database.

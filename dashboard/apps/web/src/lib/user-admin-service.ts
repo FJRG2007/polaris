@@ -31,6 +31,8 @@ export interface DirectoryUser {
     banned: boolean;
     banReason: string | null;
     bannedAt: string | null;
+    /** When the ban lifts by itself, for a suspension rather than a ban. */
+    bannedUntil: string | null;
     emailVerified: boolean;
     twoFactorEnabled: boolean;
     /** Roles held directly, and the groups they belong to. */
@@ -62,6 +64,7 @@ const DIRECTORY_SELECT = {
     isAdmin: true,
     bannedAt: true,
     banReason: true,
+    bannedUntil: true,
     emailVerified: true,
     twoFactorEnabled: true,
     createdAt: true,
@@ -97,6 +100,7 @@ function toDirectoryUser(row: DirectoryRow): DirectoryUser {
         banned: row.bannedAt !== null,
         banReason: row.banReason,
         bannedAt: row.bannedAt?.toISOString() ?? null,
+        bannedUntil: row.bannedUntil?.toISOString() ?? null,
         emailVerified: row.emailVerified,
         twoFactorEnabled: row.twoFactorEnabled,
         roles: row.roles.map((entry) => entry.role.name),
@@ -167,26 +171,90 @@ async function dropSessions(userId: string): Promise<number> {
     return count;
 }
 
-export async function banUser(actorId: string, userId: string, reason: string): Promise<{ error?: string }> {
+/** The longest a suspension can run before it is simply a ban. A year, so a
+ *  season-long exclusion is expressible and a typo is not permanent. */
+export const MAX_SUSPENSION_MINUTES = 365 * 24 * 60;
+
+/**
+ * Shut an account, for a while or for good.
+ *
+ * The difference is one column. `bannedAt` is what fifteen other places read to
+ * decide whether somebody is banned, and it goes on meaning exactly that; a
+ * suspension is the same ban plus a note of when it lifts, which the sweep below
+ * acts on. Doing it the other way round - teaching every one of those places
+ * about an end date - is fifteen chances to let a suspended account in.
+ */
+export async function banUser(
+    actorId: string,
+    userId: string,
+    reason: string,
+    /** How long it lasts. Absent, or zero, is a ban with no end. */
+    minutes?: number
+): Promise<{ error?: string }> {
     if (userId === actorId) return { error: "You can't ban yourself." };
     const target = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
     if (!target) return { error: "User not found." };
     if (await wouldStrandInstance(userId)) return { error: "This is the last administrator." };
 
+    const length = Math.trunc(minutes ?? 0);
+    if (length < 0 || length > MAX_SUSPENSION_MINUTES) return { error: "That is not a length." };
+    // Both from one instant: taken separately, a suspension's length is off by
+    // however long the two calls were apart, which is the sort of thing that is
+    // fine until somebody is comparing the two columns.
+    const now = new Date();
+    const until = length > 0 ? new Date(now.getTime() + length * 60_000) : null;
+
     await prisma.user.update({
         where: { id: userId },
-        data: { bannedAt: new Date(), banReason: reason.trim() || null }
+        data: { bannedAt: now, banReason: reason.trim() || null, bannedUntil: until }
     });
     // Immediate, rather than only on their next sign-in.
     await dropSessions(userId);
-    await recordAudit({ actorId, action: "user.ban", targetType: "user", targetId: userId });
+    await recordAudit({
+        actorId,
+        action: until ? "user.suspend" : "user.ban",
+        targetType: "user",
+        targetId: userId,
+        ...(until ? { metadata: { minutes: length, until: until.toISOString() } } : {})
+    });
     return {};
 }
 
 export async function unbanUser(actorId: string, userId: string): Promise<{ error?: string }> {
-    await prisma.user.update({ where: { id: userId }, data: { bannedAt: null, banReason: null } });
+    await prisma.user.update({
+        where: { id: userId },
+        data: { bannedAt: null, banReason: null, bannedUntil: null }
+    });
     await recordAudit({ actorId, action: "user.unban", targetType: "user", targetId: userId });
     return {};
+}
+
+/**
+ * Let back in everybody whose suspension has run out.
+ *
+ * A sweep rather than a check at sign-in, because "banned" is asked in fifteen
+ * places and only one of them is a sign-in: an account whose suspension expired
+ * should also be findable, mentionable and invitable again, and none of those
+ * would notice a date. It is idempotent and cheap - the query names the rows it
+ * would change - so running it twice at once costs nothing.
+ *
+ * Returns how many were let back in, which is what the job line says.
+ */
+export async function liftExpiredSuspensions(now = new Date()): Promise<number> {
+    const due = await prisma.user.findMany({
+        where: { bannedAt: { not: null }, bannedUntil: { not: null, lte: now } },
+        select: { id: true }
+    });
+    if (due.length === 0) return 0;
+    await prisma.user.updateMany({
+        where: { id: { in: due.map((row) => row.id) } },
+        data: { bannedAt: null, banReason: null, bannedUntil: null }
+    });
+    for (const row of due) {
+        // Nobody did this: the clock did, which is what a null actor means.
+        await recordAudit({ actorId: null, action: "user.unsuspend", targetType: "user", targetId: row.id });
+    }
+    return due.length;
 }
 
 /** Grant or withdraw the administrator gate on operator surfaces. */
