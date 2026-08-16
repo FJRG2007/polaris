@@ -271,7 +271,7 @@ export async function listFolderMembersAction(folderId: string): Promise<{
         await access.requireFolder(caller, folderId, "guest");
         const [folder, members] = await Promise.all([
             spaces.getFolder(folderId),
-            spaces.listFolderMembers(folderId)
+            spaces.listFolderMembers(folderId, caller)
         ]);
         return folder ? { folder, members } : { error: "That folder no longer exists" };
     } catch (caught) {

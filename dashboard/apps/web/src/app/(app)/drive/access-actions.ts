@@ -44,12 +44,23 @@ export async function getAccessSettingsAction(connectionId: string): Promise<Acc
     const [acls, locks, users, groups] = await Promise.all([
         listDriveAcls(connectionId),
         listLocks(connectionId),
-        prisma.user.findMany({ select: { id: true, name: true, email: true }, orderBy: { name: "asc" } }),
+        prisma.user.findMany({
+            select: { id: true, name: true, username: true },
+            orderBy: { name: "asc" }
+        }),
         prisma.group.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } })
     ]);
     const principals: AccessPrincipal[] = [
         ...groups.map((group) => ({ type: "group" as const, id: group.id, label: group.name })),
-        ...users.map((user) => ({ type: "user" as const, id: user.id, label: user.name, sublabel: user.email }))
+        // The handle under the name rather than the address: whoever manages a
+        // connection is not owed the address of everybody on the instance, and
+        // the handle tells two people with one name apart just as well.
+        ...users.map((user) => ({
+            type: "user" as const,
+            id: user.id,
+            label: user.name,
+            sublabel: user.username ? `@${user.username}` : ""
+        }))
     ];
     return { acls, locks, principals };
 }

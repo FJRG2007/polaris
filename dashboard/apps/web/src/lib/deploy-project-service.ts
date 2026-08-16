@@ -13,6 +13,7 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { slugify } from "@polaris/deploy";
 import { createApiKey } from "@polaris/auth";
+import { contactLines } from "@/lib/privacy-service";
 import { sendWebhook } from "./notifications/webhook-sender";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import {
@@ -159,7 +160,9 @@ export interface ProjectMemberView {
     id: string;
     userId: string;
     name: string;
-    email: string;
+    /** Their address if they show it to whoever is looking, their handle
+     *  otherwise - a project's member list is other people's screen. */
+    contact: string;
     role: ProjectRole;
     createdAt: string;
     /** True for the synthetic row standing in for the project's owner. */
@@ -171,26 +174,33 @@ export interface ProjectMemberView {
  * a members list that does not show who owns the thing is a list that reads as
  * if nobody does - so they are rendered in, marked, and not removable.
  */
-export async function listProjectMembers(projectId: string): Promise<ProjectMemberView[]> {
+export async function listProjectMembers(
+    projectId: string,
+    viewer: { id: string; isAdmin: boolean }
+): Promise<ProjectMemberView[]> {
     const project = await prisma.project.findUnique({
         where: { id: projectId },
         select: {
             ownerId: true,
             createdAt: true,
-            owner: { select: { name: true, email: true } },
+            owner: { select: { id: true, name: true, email: true, username: true } },
             members: {
                 orderBy: { createdAt: "asc" },
-                include: { user: { select: { name: true, email: true } } }
+                include: { user: { select: { id: true, name: true, email: true, username: true } } }
             }
         }
     });
     if (!project) throw new Error("Project not found");
+    const contacts = await contactLines(viewer, [
+        project.owner,
+        ...project.members.map((member) => member.user)
+    ]);
     return [
         {
             id: `owner:${project.ownerId}`,
             userId: project.ownerId,
             name: project.owner.name,
-            email: project.owner.email,
+            contact: contacts.get(project.ownerId) ?? "",
             role: "admin",
             createdAt: project.createdAt.toISOString(),
             isOwner: true
@@ -199,7 +209,7 @@ export async function listProjectMembers(projectId: string): Promise<ProjectMemb
             id: member.id,
             userId: member.userId,
             name: member.user.name,
-            email: member.user.email,
+            contact: contacts.get(member.userId) ?? "",
             role: member.role as ProjectRole,
             createdAt: member.createdAt.toISOString(),
             isOwner: false

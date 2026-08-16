@@ -115,7 +115,7 @@ export function MembersSection({ projectId }: { projectId: string }) {
                                         )}
                                     </p>
                                     <p className="truncate text-xs text-muted-foreground">
-                                        {member.email}
+                                        {member.contact}
                                         {member.isOwner ? "" : ` - added ${display.date(member.createdAt)}`}
                                     </p>
                                 </div>

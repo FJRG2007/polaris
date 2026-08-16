@@ -68,12 +68,19 @@ async function labelsFor(
     const byType = (type: string) =>
         grants.filter((grant) => grant.principalType === type).map((grant) => grant.principalId);
     const [users, groups, roles] = await Promise.all([
-        prisma.user.findMany({ where: { id: { in: byType("user") } }, select: { id: true, name: true, email: true } }),
+        prisma.user.findMany({
+            where: { id: { in: byType("user") } },
+            select: { id: true, name: true, username: true }
+        }),
         prisma.group.findMany({ where: { id: { in: byType("group") } }, select: { id: true, name: true } }),
         prisma.role.findMany({ where: { id: { in: byType("role") } }, select: { id: true, name: true } })
     ]);
     const labels = new Map<string, string>();
-    for (const user of users) labels.set(`user:${user.id}`, `${user.name} (${user.email})`);
+    // The handle rather than the address: this list is read by everybody
+    // the server was shared with.
+    for (const user of users) {
+        labels.set(`user:${user.id}`, user.username ? `${user.name} (@${user.username})` : user.name);
+    }
     for (const group of groups) labels.set(`group:${group.id}`, `${group.name} (group)`);
     for (const role of roles) labels.set(`role:${role.id}`, `${role.name} (role)`);
     return labels;
@@ -88,7 +95,10 @@ export async function listInstallAccess(installedAppId: string): Promise<Install
         gamePermissionsFor(user, installedAppId),
         sharingRightsFor(user, installedAppId, access.ownerId),
         sharingPolicy(),
-        prisma.user.findUnique({ where: { id: access.ownerId }, select: { name: true, email: true } })
+        prisma.user.findUnique({
+            where: { id: access.ownerId },
+            select: { name: true, username: true }
+        })
     ]);
     const verdict = await canDelegateShare({ isAdmin: user.isAdmin, mayPassOn: rights.mayPassOn });
     const labels = await labelsFor(grants);
@@ -98,7 +108,7 @@ export async function listInstallAccess(installedAppId: string): Promise<Install
         {
             grantId: null,
             principalType: "owner",
-            label: owner ? `${owner.name} (${owner.email})` : "The owner",
+            label: owner ? (owner.username ? `${owner.name} (@${owner.username})` : owner.name) : "The owner",
             actions: ["games.read", "games.moderate", "games.manage"],
             canShare: true,
             expiresAt: null,

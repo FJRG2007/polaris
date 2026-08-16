@@ -57,7 +57,7 @@ export default async function SpacePage({
         spaces.listStatuses(spaceId),
         spaces.listCustomFields(spaceId),
         spaces.listTags(spaceId),
-        spaces.listSpaceMembers(spaceId),
+        spaces.listSpaceMembers(spaceId, { id: user.id, isAdmin: user.isAdmin }),
         listAutomations(spaceId),
         listForms(spaceId),
         // A form is filled in by somebody outside Polaris, so its link is built on the

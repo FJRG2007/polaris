@@ -133,7 +133,13 @@ export default async function SecurityPage() {
                 }}
                 otherSessions={sessions.filter((session) => !session.current).length}
                 successor={
-                    successor ? { userId: successor.userId, name: successor.name, email: successor.email } : null
+                    successor
+                        ? {
+                              userId: successor.userId,
+                              name: successor.name,
+                              contact: successor.contact
+                          }
+                        : null
                 }
             />
         </div>

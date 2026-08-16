@@ -14,13 +14,17 @@
  */
 
 import { prisma } from "@polaris/db";
+import { contactLines } from "@/lib/privacy-service";
 import { notify } from "@/lib/notifications/dispatch";
 
 /** Somebody, as a friends list draws them. */
 export interface FriendView {
     readonly id: string;
     readonly name: string;
-    readonly email: string;
+    /** Their address if they show it to this account, their handle otherwise.
+     *  Being friends is not consent to hand over an address - the setting for
+     *  that is on their own privacy screen, and it may well say nobody. */
+    readonly contact: string;
 }
 
 /** A request waiting on somebody. */
@@ -48,13 +52,25 @@ export async function listFriends(userId: string): Promise<FriendView[]> {
             OR: [{ requesterId: userId }, { addresseeId: userId }]
         },
         select: {
-            requester: { select: { id: true, name: true, email: true } },
-            addressee: { select: { id: true, name: true, email: true } }
+            requester: { select: { id: true, name: true, email: true, username: true } },
+            addressee: { select: { id: true, name: true, email: true, username: true } }
         }
     });
-    return rows
-        .map((row) => (row.requester.id === userId ? row.addressee : row.requester))
-        .sort((left, right) => left.name.localeCompare(right.name));
+    const people = rows.map((row) => (row.requester.id === userId ? row.addressee : row.requester));
+    return (await drawn(userId, people)).sort((left, right) => left.name.localeCompare(right.name));
+}
+
+/** The people, with whatever each of them lets this account see. */
+async function drawn(
+    viewerId: string,
+    people: readonly { id: string; name: string; email: string; username: string | null }[]
+): Promise<FriendView[]> {
+    const contacts = await contactLines({ id: viewerId, isAdmin: false }, people);
+    return people.map((person) => ({
+        id: person.id,
+        name: person.name,
+        contact: contacts.get(person.id) ?? ""
+    }));
 }
 
 /** Just the ids, for the privacy check that asks about one person. */
@@ -99,13 +115,17 @@ export async function listRequests(userId: string): Promise<FriendRequestView[]>
             id: true,
             createdAt: true,
             requesterId: true,
-            requester: { select: { id: true, name: true, email: true } },
-            addressee: { select: { id: true, name: true, email: true } }
+            requester: { select: { id: true, name: true, email: true, username: true } },
+            addressee: { select: { id: true, name: true, email: true, username: true } }
         }
     });
-    return rows.map((row) => ({
+    const people = await drawn(
+        userId,
+        rows.map((row) => (row.requesterId === userId ? row.addressee : row.requester))
+    );
+    return rows.map((row, index) => ({
         id: row.id,
-        person: row.requesterId === userId ? row.addressee : row.requester,
+        person: people[index]!,
         outgoing: row.requesterId === userId,
         askedAt: row.createdAt.toISOString()
     }));
@@ -164,9 +184,11 @@ const FRIENDS_PATH = "/account/friends";
 async function announce(userId: string, aboutId: string, what: "asked" | "accepted"): Promise<void> {
     const person = await prisma.user.findUnique({
         where: { id: aboutId },
-        select: { name: true, email: true }
+        select: { name: true, username: true }
     });
-    const name = person?.name || person?.email || "Somebody";
+    // Never the address. An alert naming somebody is still a screen showing one
+    // account something about another, and this one goes out by mail as well.
+    const name = person?.name || (person?.username ? `@${person.username}` : "") || "Somebody";
     await notify({
         userId,
         event: "account.friend",

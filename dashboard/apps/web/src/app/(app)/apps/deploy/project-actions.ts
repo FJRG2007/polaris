@@ -190,7 +190,10 @@ export async function listProjectMembersAction(
         const user = await requirePermission("deploy.read");
         const access = await requireProjectAccess(projectId, user.id, "viewer");
         return {
-            members: await projectService.listProjectMembers(projectId),
+            members: await projectService.listProjectMembers(projectId, {
+                id: user.id,
+                isAdmin: user.isAdmin
+            }),
             canManage: accessAtLeast(access, "admin")
         };
     });

@@ -15,6 +15,7 @@
 
 import { prisma } from "@polaris/db";
 import { normalizePersonName } from "@polaris/core";
+import { contactLines } from "@/lib/privacy-service";
 
 /** Raised when the person named cannot be resolved to exactly one account. The
  *  message is written to be shown; nothing here leaks whether an address that
@@ -25,7 +26,9 @@ export class SuccessorError extends Error {}
 export interface SuccessorView {
     readonly userId: string;
     readonly name: string;
-    readonly email: string;
+    /** What the screen may say under their name: their address only when they
+     *  show it to the account that named them. */
+    readonly contact: string;
     readonly username: string | null;
     /** When the holder clicked through the acknowledgement. */
     readonly acknowledgedAt: Date;
@@ -40,10 +43,11 @@ export async function getSuccessor(userId: string): Promise<SuccessorView | null
         }
     });
     if (!row) return null;
+    const contacts = await contactLines({ id: userId, isAdmin: false }, [row.successor]);
     return {
         userId: row.successor.id,
         name: row.successor.name,
-        email: row.successor.email,
+        contact: contacts.get(row.successor.id) ?? "",
         username: row.successor.username,
         acknowledgedAt: row.acknowledgedAt
     };

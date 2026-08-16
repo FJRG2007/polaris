@@ -14,18 +14,18 @@
  * wearing one name.
  */
 
-import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
+import { useEffect, useRef, useState } from "react";
+import { Button, Card, CardBody, Input } from "@polaris/ui";
 import { Loader2, Search, UserMinus, UserPlus, X } from "lucide-react";
 import type { FriendRequestView, FriendView } from "@/lib/friends-service";
-import { Button, Card, CardBody, Input } from "@polaris/ui";
 import {
     removeFriendAction,
     requestFriendAction,
     requestFriendByUsernameAction,
     respondToRequestAction,
-    searchForFriendAction
+    searchPeopleAction
 } from "../privacy/actions";
 
 /** Below this nothing is asked at all - the floor the server keeps, said here
@@ -132,7 +132,7 @@ function FriendsCard({
                                 <span className="min-w-0 flex-1">
                                     <span className="block truncate text-sm" title={friend.name}>{friend.name}</span>
                                     <span className="block truncate text-xs text-muted-foreground">
-                                        {friend.email}
+                                        {friend.contact}
                                     </span>
                                 </span>
                                 <Button
@@ -198,7 +198,7 @@ function AddFriend({
         }
         setLooking(true);
         const timer = setTimeout(async () => {
-            const result = await searchForFriendAction(term);
+            const result = await searchPeopleAction(term);
             if (mine !== asked.current) return;
             setFound(result.results ?? []);
             setLooking(false);

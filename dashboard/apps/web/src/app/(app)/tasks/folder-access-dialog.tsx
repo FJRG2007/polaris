@@ -125,7 +125,7 @@ export function FolderAccessDialog({
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm">{member.name}</p>
                                     <p className="truncate text-xs text-muted-foreground">
-                                        {member.inherited ? `Through ${member.folderName}` : member.email}
+                                        {member.inherited ? `Through ${member.folderName}` : member.contact}
                                     </p>
                                 </div>
                                 {member.inherited || !canManage ? (

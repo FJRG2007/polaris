@@ -150,9 +150,9 @@ export async function listActivityFeed(limit = 200): Promise<ActivityEntry[]> {
             ? []
             : await prisma.user.findMany({
                   where: { id: { in: actorIds } },
-                  select: { id: true, name: true, email: true }
+                  select: { id: true, name: true, username: true }
               });
-    const nameById = new Map(actors.map((actor) => [actor.id, actor.name || actor.email]));
+    const nameById = new Map(actors.map((actor) => [actor.id, actor.name || (actor.username ? `@${actor.username}` : "somebody")]));
     return events.map((event) => ({
         id: event.id,
         at: event.at.toISOString(),
@@ -266,9 +266,9 @@ export async function listOrgActivity(
             ? []
             : await prisma.user.findMany({
                   where: { id: { in: actorIds } },
-                  select: { id: true, name: true, email: true }
+                  select: { id: true, name: true, username: true }
               });
-    const nameById = new Map(actors.map((actor) => [actor.id, actor.name || actor.email]));
+    const nameById = new Map(actors.map((actor) => [actor.id, actor.name || (actor.username ? `@${actor.username}` : "somebody")]));
 
     return rows.map((row) => ({
         id: row.id,
@@ -292,10 +292,10 @@ export async function listOrgActivityActors(orgId: string): Promise<{ id: string
     if (ids.length === 0) return [];
     const actors = await prisma.user.findMany({
         where: { id: { in: ids } },
-        select: { id: true, name: true, email: true }
+        select: { id: true, name: true, username: true }
     });
     return actors
-        .map((actor) => ({ id: actor.id, name: actor.name || actor.email }))
+        .map((actor) => ({ id: actor.id, name: actor.name || (actor.username ? `@${actor.username}` : "somebody") }))
         .sort((left, right) => left.name.localeCompare(right.name));
 }
 

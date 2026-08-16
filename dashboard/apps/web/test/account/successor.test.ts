@@ -22,9 +22,17 @@ vi.mock("@polaris/db", () => ({
             upsert: successorUpsert,
             findUnique: successorFindUnique,
             deleteMany: successorDeleteMany
-        }
+        },
+        // What the card may say under the successor's name is a privacy
+        // question now, and it is answered from these. Nobody here has settings,
+        // so everybody is on the defaults - which keep an address to themselves.
+        userPrivacy: { findMany: async () => [] },
+        privacyFieldList: { findMany: async () => [] },
+        privacyListMember: { findMany: async () => [] }
     }
 }));
+
+vi.mock("@/lib/friends-service", () => ({ friendIds: async () => new Set<string>() }));
 
 const { clearSuccessor, isSuccessorOf, setSuccessor, SuccessorError } = await import(
     "../../src/lib/successor-service"

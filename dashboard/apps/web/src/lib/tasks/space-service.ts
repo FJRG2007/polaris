@@ -11,6 +11,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import type { SpaceAccess, TaskScope } from "./access";
+import { contactLines } from "@/lib/privacy-service";
 
 // ---------------------------------------------------------------------------
 // The sidebar tree
@@ -302,35 +303,48 @@ export async function deleteSpace(spaceId: string): Promise<void> {
 export interface SpaceMemberView {
     readonly userId: string;
     readonly name: string;
-    readonly email: string;
+    /** Their address if they show it to whoever is looking, their handle
+     *  otherwise. Never the address itself - see `contactLines`. */
+    readonly contact: string;
     readonly image: string | null;
     readonly role: core.SpaceRole | "owner";
 }
 
-export async function listSpaceMembers(spaceId: string): Promise<SpaceMemberView[]> {
+export async function listSpaceMembers(
+    spaceId: string,
+    viewer: { id: string; isAdmin: boolean }
+): Promise<SpaceMemberView[]> {
     const space = await prisma.taskSpace.findUnique({
         where: { id: spaceId },
         select: {
-            owner: { select: { id: true, name: true, email: true, image: true } },
+            owner: { select: { id: true, name: true, email: true, username: true, image: true } },
             members: {
                 orderBy: { createdAt: "asc" },
-                select: { role: true, user: { select: { id: true, name: true, email: true, image: true } } }
+                select: {
+                    role: true,
+                    user: {
+                        select: { id: true, name: true, email: true, username: true, image: true }
+                    }
+                }
             }
         }
     });
     if (!space) return [];
+
+    const people = [space.owner, ...space.members.map((member) => member.user)];
+    const contacts = await contactLines(viewer, people);
     return [
         {
             userId: space.owner.id,
             name: space.owner.name,
-            email: space.owner.email,
+            contact: contacts.get(space.owner.id) ?? "",
             image: space.owner.image,
             role: "owner" as const
         },
         ...space.members.map((member) => ({
             userId: member.user.id,
             name: member.user.name,
-            email: member.user.email,
+            contact: contacts.get(member.user.id) ?? "",
             image: member.user.image,
             role: member.role as core.SpaceRole
         }))
@@ -375,8 +389,17 @@ export async function removeSpaceMember(spaceId: string, userId: string): Promis
  * personal one and work nobody can be assigned is work the team cannot run.
  */
 export async function spacePeople(spaceId: string): Promise<{ id: string; name: string; image: string | null }[]> {
-    const [members, grantees, spaceTeams, folderTeams] = await Promise.all([
-        listSpaceMembers(spaceId),
+    const [space, grantees, spaceTeams, folderTeams] = await Promise.all([
+        // Its own read rather than `listSpaceMembers`: a picker needs a name and
+        // a face, and asking for the roster would work out what each of them is
+        // willing to show for a line this never draws.
+        prisma.taskSpace.findUnique({
+            where: { id: spaceId },
+            select: {
+                owner: { select: { id: true, name: true, image: true } },
+                members: { select: { user: { select: { id: true, name: true, image: true } } } }
+            }
+        }),
         prisma.taskFolderMember.findMany({
             where: { folder: { spaceId } },
             select: { user: { select: { id: true, name: true, image: true } } }
@@ -390,7 +413,8 @@ export async function spacePeople(spaceId: string): Promise<{ id: string; name: 
             select: { team: { select: { members: { select: { user: { select: { id: true, name: true, image: true } } } } } } }
         })
     ]);
-    const people = new Map(members.map((member) => [member.userId, { id: member.userId, name: member.name, image: member.image }]));
+    const roster = space ? [space.owner, ...space.members.map((member) => member.user)] : [];
+    const people = new Map(roster.map((person) => [person.id, person]));
     for (const grant of grantees) {
         if (!people.has(grant.user.id)) people.set(grant.user.id, grant.user);
     }
@@ -409,7 +433,8 @@ export async function spacePeople(spaceId: string): Promise<{ id: string; name: 
 export interface FolderMemberView {
     readonly userId: string;
     readonly name: string;
-    readonly email: string;
+    /** As on a space: their address only if they show it to whoever is looking. */
+    readonly contact: string;
     readonly image: string | null;
     readonly role: core.SpaceRole;
     /** The folder the grant was actually made on. Equal to the folder being
@@ -453,7 +478,10 @@ export async function getFolder(folderId: string): Promise<FolderDetail | null> 
  * without them somebody reads an empty list and re-invites a person who is
  * already there through the client above.
  */
-export async function listFolderMembers(folderId: string): Promise<FolderMemberView[]> {
+export async function listFolderMembers(
+    folderId: string,
+    viewer: { id: string; isAdmin: boolean }
+): Promise<FolderMemberView[]> {
     const folder = await prisma.taskFolder.findUnique({ where: { id: folderId }, select: { spaceId: true } });
     if (!folder) return [];
     const folders = await prisma.taskFolder.findMany({
@@ -467,14 +495,18 @@ export async function listFolderMembers(folderId: string): Promise<FolderMemberV
         select: {
             folderId: true,
             role: true,
-            user: { select: { id: true, name: true, email: true, image: true } }
+            user: { select: { id: true, name: true, email: true, username: true, image: true } }
         }
     });
     const names = new Map(chain.map((entry) => [entry.id, entry.name]));
+    const contacts = await contactLines(
+        viewer,
+        grants.map((grant) => grant.user)
+    );
     return grants.map((grant) => ({
         userId: grant.user.id,
         name: grant.user.name,
-        email: grant.user.email,
+        contact: contacts.get(grant.user.id) ?? "",
         image: grant.user.image,
         role: grant.role as core.SpaceRole,
         folderId: grant.folderId,
