@@ -18,11 +18,13 @@ import { Avatar } from "@/components/avatar";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { OrgMemberView } from "@/lib/orgs/org-service";
 import { useDisplayFormat } from "@/components/display-format";
-import { LogOut, Search, Trash2, UserPlus, Users } from "lucide-react";
+import { LogOut, MailQuestion, Search, Trash2, UserPlus, Users, X } from "lucide-react";
+import type { OrgInvitationView } from "@/lib/orgs/invitation-service";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import {
-    addOrgMemberAction,
+    inviteOrgMemberAction,
     removeOrgMemberAction,
+    revokeOrgInvitationAction,
     setOrgMemberRoleAction
 } from "@/app/(app)/account/organizations/actions";
 
@@ -40,6 +42,7 @@ export function PeopleView({
     orgId,
     orgSlug,
     members,
+    invitations,
     roles,
     currentUserId,
     canManage,
@@ -48,6 +51,9 @@ export function PeopleView({
     orgId: string;
     orgSlug: string;
     members: OrgMemberView[];
+    /** People asked and not yet answered. They are not on the roster and reach
+     *  nothing here until they accept. */
+    invitations: OrgInvitationView[];
     roles: RoleOption[];
     currentUserId: string;
     canManage: boolean;
@@ -59,7 +65,9 @@ export function PeopleView({
     const [error, setError] = useState("");
     const [query, setQuery] = useState("");
 
-    const full = memberLimit > 0 && members.length >= memberLimit;
+    // Invitations count against the cap: they are people who have been promised
+    // a place, and the moment to say the room is full is before asking.
+    const full = memberLimit > 0 && members.length + invitations.length >= memberLimit;
     const options = roles.map((role) => ({ value: role.slug, label: role.name }));
 
     const needle = query.trim().toLowerCase();
@@ -67,7 +75,7 @@ export function PeopleView({
         ? members.filter(
               (member) =>
                   member.name.toLowerCase().includes(needle) ||
-                  member.email.toLowerCase().includes(needle) ||
+                  member.contact.toLowerCase().includes(needle) ||
                   member.teams.some((team) => team.toLowerCase().includes(needle))
           )
         : members;
@@ -133,8 +141,13 @@ export function PeopleView({
                                             {member.name}
                                             {self ? <span className="text-muted-foreground"> (you)</span> : null}
                                         </p>
-                                        <p className="text-muted-foreground truncate text-xs" title={member.email}>
-                                            {member.teams.length > 0 ? member.teams.join(", ") : member.email}
+                                        <p
+                                            className="text-muted-foreground truncate text-xs"
+                                            title={member.contact}
+                                        >
+                                            {member.teams.length > 0
+                                                ? member.teams.join(", ")
+                                                : member.contact}
                                         </p>
                                     </div>
                                     {member.joinedAt && (
@@ -195,8 +208,68 @@ export function PeopleView({
                 </CardBody>
             </Card>
 
+            {invitations.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <MailQuestion className="size-4 shrink-0" /> Waiting to accept
+                            <span className="text-muted-foreground text-xs font-normal">
+                                {invitations.length}
+                            </span>
+                        </CardTitle>
+                    </CardHeader>
+                    <CardBody className="flex flex-col gap-1">
+                        {invitations.map((invitation) => (
+                            <div
+                                key={invitation.id}
+                                className="hover:bg-muted flex flex-wrap items-center gap-3 rounded-md px-2 py-1.5"
+                            >
+                                <Avatar
+                                    person={{ id: invitation.userId, name: invitation.name }}
+                                    size={32}
+                                />
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm" title={invitation.name}>{invitation.name}</p>
+                                    <p className="text-muted-foreground truncate text-xs">
+                                        Invited by {invitation.invitedBy}
+                                        {invitation.contact ? ` - ${invitation.contact}` : ""}
+                                    </p>
+                                </div>
+                                <span className="text-muted-foreground hidden shrink-0 text-xs lg:inline">
+                                    Until {format.date(invitation.expiresAt)}
+                                </span>
+                                <Badge variant="neutral">{invitation.roleName}</Badge>
+                                {canManage && (
+                                    <button
+                                        type="button"
+                                        title="Withdraw"
+                                        aria-label={`Withdraw the invitation to ${invitation.name}`}
+                                        className="text-muted-foreground hover:bg-danger/10 hover:text-danger rounded p-1 transition-colors"
+                                        onClick={async () => {
+                                            const ok = await confirm({
+                                                title: `Withdraw the invitation to ${invitation.name}?`,
+                                                description:
+                                                    "They are not told. You can invite them again at any time.",
+                                                confirmLabel: "Withdraw",
+                                                danger: true
+                                            });
+                                            if (!ok) return;
+                                            await run(() =>
+                                                revokeOrgInvitationAction(orgId, invitation.id)
+                                            );
+                                        }}
+                                    >
+                                        <X className="size-4 shrink-0" />
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </CardBody>
+                </Card>
+            )}
+
             {canManage && (
-                <AddPerson
+                <InvitePerson
                     orgId={orgId}
                     orgSlug={orgSlug}
                     roles={roles}
@@ -211,7 +284,7 @@ export function PeopleView({
     );
 }
 
-function AddPerson({
+function InvitePerson({
     orgId,
     orgSlug,
     roles,
@@ -239,7 +312,7 @@ function AddPerson({
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Add somebody</CardTitle>
+                <CardTitle>Invite somebody</CardTitle>
             </CardHeader>
             <CardBody>
                 <form
@@ -247,7 +320,7 @@ function AddPerson({
                     onSubmit={async (event) => {
                         event.preventDefault();
                         if (!identifier.trim()) return;
-                        const done = await onRun(() => addOrgMemberAction(orgId, identifier.trim(), role));
+                        const done = await onRun(() => inviteOrgMemberAction(orgId, identifier.trim(), role));
                         if (done) setIdentifier("");
                     }}
                 >
@@ -269,11 +342,11 @@ function AddPerson({
                         onValueChange={setRole}
                     />
                     <Button type="submit" size="sm" disabled={!identifier.trim() || full}>
-                        <UserPlus className="size-4 shrink-0" /> Add
+                        <UserPlus className="size-4 shrink-0" /> Invite
                     </Button>
                     <p className="text-muted-foreground w-full text-xs">
                         {full
-                            ? `This Polaris allows ${memberLimit} members per organization.`
+                            ? `This Polaris allows ${memberLimit} members per organization, counting invitations nobody has answered.`
                             : hint || (
                                   <>
                                       What this role may do is set under{" "}

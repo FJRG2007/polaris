@@ -16,6 +16,7 @@ import * as core from "@polaris/core";
 import { organizationPolicy } from "./policy";
 import { ensureSystemRoles } from "./role-service";
 import { OrgAccessError, OrgError } from "./errors";
+import { contactLines } from "@/lib/privacy-service";
 import { isSuccessorOf } from "@/lib/successor-service";
 
 export { OrgAccessError, OrgError } from "./errors";
@@ -445,7 +446,15 @@ export async function orgTotals(orgId: string): Promise<OrgTotals> {
 export interface OrgMemberView {
     readonly userId: string;
     readonly name: string;
-    readonly email: string;
+    /**
+     * The line under their name: their address if they let this reader see it,
+     * their handle otherwise.
+     *
+     * Never the address itself. A roster is the widest audience a person has
+     * here - everybody invited into the organization, for as long as they are in
+     * it - and it used to hand every one of them everybody's address.
+     */
+    readonly contact: string;
     readonly image: string | null;
     /** The role's slug, or "owner". */
     readonly role: string;
@@ -458,18 +467,20 @@ export interface OrgMemberView {
     readonly teams: string[];
 }
 
-export async function listOrgMembers(orgId: string): Promise<OrgMemberView[]> {
+export async function listOrgMembers(orgId: string, viewer: OrgActor): Promise<OrgMemberView[]> {
     const org = await prisma.organization.findUnique({
         where: { id: orgId },
         select: {
             createdAt: true,
-            owner: { select: { id: true, name: true, email: true, image: true } },
+            owner: { select: { id: true, name: true, email: true, username: true, image: true } },
             members: {
                 orderBy: { createdAt: "asc" },
                 select: {
                     role: true,
                     createdAt: true,
-                    user: { select: { id: true, name: true, email: true, image: true } }
+                    user: {
+                        select: { id: true, name: true, email: true, username: true, image: true }
+                    }
                 }
             },
             roles: { select: { slug: true, name: true } },
@@ -487,14 +498,19 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberView[]> {
         }
     }
 
+    const contacts = await contactLines({ id: viewer.id, isAdmin: viewer.isAdmin }, [
+        org.owner,
+        ...org.members.map((member) => member.user)
+    ]);
+
     const row = (
-        user: { id: string; name: string; email: string; image: string | null },
+        user: { id: string; name: string; image: string | null },
         role: string,
         joinedAt: Date
     ): OrgMemberView => ({
         userId: user.id,
         name: user.name,
-        email: user.email,
+        contact: contacts.get(user.id) ?? "",
         image: user.image,
         role,
         roleName: role === "owner" ? "Owner" : roleDisplayName(org.roles, role),
@@ -589,21 +605,29 @@ export async function listTeams(orgId: string): Promise<TeamView[]> {
 export interface TeamMemberView {
     readonly userId: string;
     readonly name: string;
-    readonly email: string;
+    /** As on the roster: their address only if they allow this reader it. */
+    readonly contact: string;
     readonly image: string | null;
     readonly role: core.TeamRole;
 }
 
-export async function listTeamMembers(teamId: string): Promise<TeamMemberView[]> {
+export async function listTeamMembers(teamId: string, viewer: OrgActor): Promise<TeamMemberView[]> {
     const rows = await prisma.teamMember.findMany({
         where: { teamId },
-        select: { role: true, user: { select: { id: true, name: true, email: true, image: true } } }
+        select: {
+            role: true,
+            user: { select: { id: true, name: true, email: true, username: true, image: true } }
+        }
     });
+    const contacts = await contactLines(
+        { id: viewer.id, isAdmin: viewer.isAdmin },
+        rows.map((row) => row.user)
+    );
     return rows
         .map((row) => ({
             userId: row.user.id,
             name: row.user.name,
-            email: row.user.email,
+            contact: contacts.get(row.user.id) ?? "",
             image: row.user.image,
             role: row.role as core.TeamRole
         }))
@@ -792,43 +816,13 @@ async function assertRoleExists(orgId: string, slug: string): Promise<void> {
     if (!role) throw new OrgError("This organization has no role by that name");
 }
 
-/** Add somebody by email or username, which is what the person doing it has in
- *  front of them rather than an id. */
-export async function addOrgMember(orgId: string, identifier: string, role: string): Promise<void> {
-    await ensureSystemRoles(orgId);
-    await assertRoleExists(orgId, role);
-
-    const needle = identifier.trim().toLowerCase();
-    const user = await prisma.user.findFirst({
-        where: { OR: [{ email: needle }, { username: needle }] },
-        select: { id: true }
-    });
-    if (!user) throw new OrgError("No account matches that email or username");
-
-    const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { ownerId: true } });
-    if (org?.ownerId === user.id) throw new OrgError("That person already owns this organization");
-
-    const policy = await organizationPolicy();
-    const existing = await prisma.organizationMember.findUnique({
-        where: { orgId_userId: { orgId, userId: user.id } },
-        select: { id: true }
-    });
-    // Only a genuinely new member counts against the cap; changing somebody's
-    // role must not be refused because the roster is full.
-    if (!existing) {
-        const count = await prisma.organizationMember.count({ where: { orgId } });
-        if (!core.withinLimit(policy.maxMembers, count + 1)) {
-            throw new OrgError(`This organization is at the ${policy.maxMembers}-member limit for this Polaris`);
-        }
-    }
-
-    await prisma.organizationMember.upsert({
-        where: { orgId_userId: { orgId, userId: user.id } },
-        update: { role },
-        create: { orgId, userId: user.id, role }
-    });
-}
-
+/**
+ * Nobody is added to a roster here.
+ *
+ * Joining an organization takes an invitation and an answer - see
+ * `invitation-service`. This module writes a membership row only when one is
+ * accepted, and when the organization is handed to somebody else below.
+ */
 export async function setOrgMemberRole(orgId: string, userId: string, role: string): Promise<void> {
     await ensureSystemRoles(orgId);
     await assertRoleExists(orgId, role);

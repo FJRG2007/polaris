@@ -22,6 +22,7 @@ import * as orgs from "@/lib/orgs/org-service";
 import * as roles from "@/lib/orgs/role-service";
 import { recordAudit } from "@/lib/audit-service";
 import { canCreateOrganization } from "@/lib/orgs/policy";
+import * as invitations from "@/lib/orgs/invitation-service";
 
 const ORGS_PATH = "/account/organizations";
 
@@ -166,7 +167,13 @@ export async function deleteOrgAction(orgId: string, proof: unknown): Promise<{ 
 // Roster
 // ---------------------------------------------------------------------------
 
-export async function addOrgMemberAction(
+/**
+ * Ask somebody to join, rather than putting them on the roster.
+ *
+ * The identifier goes into the record and the address does not go anywhere else:
+ * whoever is invited is named by the account it resolved to from here on.
+ */
+export async function inviteOrgMemberAction(
     orgId: string,
     identifier: string,
     role: string
@@ -174,12 +181,59 @@ export async function addOrgMemberAction(
     const caller = await actor();
     try {
         await orgs.requireOrgPermission(caller, orgId, "people.manage");
-        await orgs.addOrgMember(orgId, identifier, role);
-        await record(caller.id, orgId, "org.member.add", { identifier, role });
+        await invitations.inviteToOrg(orgId, identifier, role, caller.id);
+        await record(caller.id, orgId, "org.member.invite", { identifier, role });
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not add that person");
+        return failure(caught, "Could not invite that person");
+    }
+}
+
+export async function revokeOrgInvitationAction(
+    orgId: string,
+    invitationId: string
+): Promise<{ error?: string }> {
+    const caller = await actor();
+    try {
+        await orgs.requireOrgPermission(caller, orgId, "people.manage");
+        await invitations.revokeOrgInvitation(orgId, invitationId);
+        await record(caller.id, orgId, "org.member.invite.revoke", { invitationId });
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not withdraw that invitation");
+    }
+}
+
+/**
+ * Accept or turn down an invitation.
+ *
+ * The one write here that nobody in the organization may make: it is checked
+ * against the invitation's own account rather than against a permission, because
+ * the whole point of an invitation is that the person asked is the only one who
+ * can answer it.
+ */
+export async function respondToOrgInvitationAction(
+    invitationId: string,
+    accept: boolean
+): Promise<{ slug?: string; error?: string }> {
+    const caller = await actor();
+    try {
+        const answered = await invitations.respondToInvitation(
+            caller.id,
+            String(invitationId),
+            Boolean(accept)
+        );
+        await record(
+            caller.id,
+            answered.orgId,
+            accept ? "org.member.invite.accept" : "org.member.invite.decline"
+        );
+        refresh();
+        return accept ? { slug: answered.orgSlug } : {};
+    } catch (caught) {
+        return failure(caught, "Could not answer that invitation");
     }
 }
 
@@ -376,7 +430,10 @@ export async function teamDetailAction(teamId: string): Promise<{
     const caller = await actor();
     try {
         const { canManage } = await orgs.requireTeam(caller, teamId, "read");
-        const [members, grants] = await Promise.all([orgs.listTeamMembers(teamId), orgs.listTeamGrants(teamId)]);
+        const [members, grants] = await Promise.all([
+            orgs.listTeamMembers(teamId, caller),
+            orgs.listTeamGrants(teamId)
+        ]);
         return { members, grants, canManage };
     } catch (caught) {
         return failure(caught, "Could not read the team");

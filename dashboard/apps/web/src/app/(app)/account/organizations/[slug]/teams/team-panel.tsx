@@ -134,7 +134,12 @@ export function TeamPanel({
                                                     <span className="text-muted-foreground"> (you)</span>
                                                 ) : null}
                                             </p>
-                                            <p className="text-muted-foreground truncate text-xs" title={member.email}>{member.email}</p>
+                                            <p
+                                                className="text-muted-foreground truncate text-xs"
+                                                title={member.contact}
+                                            >
+                                                {member.contact}
+                                            </p>
                                         </div>
                                         {canManage ? (
                                             <Select

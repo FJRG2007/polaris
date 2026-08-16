@@ -9,14 +9,16 @@
 import { requireUser } from "@/lib/session";
 import { OrganizationsView } from "./organizations-view";
 import { listMyOrgs, ownedOrgCount } from "@/lib/orgs/org-service";
+import { listMyInvitations } from "@/lib/orgs/invitation-service";
 import { canCreateOrganization, organizationPolicy } from "@/lib/orgs/policy";
 
 export const dynamic = "force-dynamic";
 
 export default async function OrganizationsPage() {
     const user = await requireUser();
-    const [orgs, owned, policy] = await Promise.all([
+    const [orgs, invitations, owned, policy] = await Promise.all([
         listMyOrgs(user.id),
+        listMyInvitations(user.id),
         ownedOrgCount(user.id),
         organizationPolicy()
     ]);
@@ -33,6 +35,7 @@ export default async function OrganizationsPage() {
             </div>
             <OrganizationsView
                 orgs={orgs}
+                invitations={invitations}
                 canCreate={creation.ok}
                 blockedReason={creation.ok ? null : creation.reason}
                 memberLimit={policy.maxMembers}

@@ -147,6 +147,8 @@ model User {
     taskGoals           TaskGoal[]
     ownedOrgs           Organization[]       @relation("OrganizationOwner")
     orgMemberships      OrganizationMember[]
+    orgInvitations      OrganizationInvitation[] @relation("OrganizationInvitee")
+    orgInvitesSent      OrganizationInvitation[] @relation("OrganizationInviter")
     teamMemberships     TeamMember[]
     ownedDomains        OwnerDomain[]
     successor           AccountSuccessor?    @relation("AccountSuccessorHolder")
@@ -3783,6 +3785,7 @@ model Organization {
 
     owner       User                     @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: Cascade)
     members     OrganizationMember[]
+    invitations OrganizationInvitation[]
     teams    Team[]
     roles    OrgRole[]
     spaces   TaskSpace[]
@@ -3902,6 +3905,45 @@ model OrganizationMember {
 
     org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
     user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([orgId, userId])
+    @@index([userId])
+}
+
+// Somebody asked to join an organization, waiting on their answer.
+//
+// Being added to a group is not something that should happen to a person. An
+// organization's roster is published to everybody on it - who you work with,
+// under what role - and appearing on one you never agreed to join is both a
+// surprise and a disclosure. So the row here is the ask, and the membership is
+// only written when the person accepts, the same way GitHub has always done it.
+//
+// The row IS the pending state: accepting deletes it and writes a membership,
+// declining and revoking delete it. There is no `status` column, because a
+// stored "no" is a thing somebody has to clean up and it would stop the same
+// person ever being asked again.
+//
+// It names an account rather than an address. Polaris only ever adds people who
+// already have one here, and storing the address would put a copy of the very
+// thing the privacy settings withhold on a row any admin of the organization can
+// read.
+model OrganizationInvitation {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    orgId       String   @db.Uuid
+    userId      String   @db.Uuid
+    // The role they take on if they accept - checked again then, since the
+    // organization may have deleted it in the meantime.
+    role        String   @default("member")
+    invitedById String   @db.Uuid
+    // Invitations go stale. One that has sat unanswered for a fortnight is a
+    // decision somebody made by not making it, and it must not still be usable
+    // a year later when the roster means something else entirely.
+    expiresAt   DateTime
+    createdAt   DateTime @default(now())
+
+    org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user      User         @relation("OrganizationInvitee", fields: [userId], references: [id], onDelete: Cascade)
+    invitedBy User         @relation("OrganizationInviter", fields: [invitedById], references: [id], onDelete: Cascade)
 
     @@unique([orgId, userId])
     @@index([userId])

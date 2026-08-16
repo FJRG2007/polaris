@@ -343,6 +343,13 @@ Code (pull requests and issues):
 - An organization is not a second kind of account. Nobody signs in as one - no
   password, no session, no permission set - so the authentication surface never
   learns about it. It owns spaces and holds a roster, and that is all.
+- Nobody is put on a roster. Somebody who runs the people in an organization
+  invites an account and it waits there until that person accepts or turns it
+  down - the same shape GitHub has always had, and for the reason that outlasts
+  the comparison: a roster is published to everybody on it, so appearing on one
+  you never agreed to join is both a surprise and a disclosure. An unanswered
+  invitation stands for a week, counts against the size the instance allows, and
+  leaves nothing behind when it is refused.
 - Being on an organization's roster reaches no work, exactly as being in a
   GitHub organization hands you no repositories. Access comes from a team grant,
   a direct space membership, or administering the organization that owns the

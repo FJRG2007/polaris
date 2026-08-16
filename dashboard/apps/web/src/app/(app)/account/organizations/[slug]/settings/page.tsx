@@ -36,7 +36,9 @@ export default async function OrganizationSettingsPage({ params }: { params: Pro
 
     // Each half's inputs are only fetched for somebody who will be shown it.
     const [members, impact] = await Promise.all([
-        access.isOwner ? listOrgMembers(org.id) : Promise.resolve([]),
+        access.isOwner
+            ? listOrgMembers(org.id, { id: user.id, isAdmin: user.isAdmin })
+            : Promise.resolve([]),
         canDelete ? orgDeletionImpact(org.id) : Promise.resolve({ spaces: 0, tasks: 0, projects: 0 })
     ]);
 
