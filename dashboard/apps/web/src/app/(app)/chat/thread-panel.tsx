@@ -16,6 +16,7 @@ import { X } from "lucide-react";
 import * as core from "@polaris/core";
 import * as actions from "./actions";
 import { Composer } from "./composer";
+import { useChat } from "./chat-context";
 import { Skeleton } from "@polaris/ui";
 import { MessageList } from "./message-list";
 import { runAction } from "@/lib/run-action";
@@ -44,6 +45,7 @@ export function ThreadPanel({
      *  on the message this thread hangs off. */
     onChanged: () => void;
 }) {
+    const { may } = useChat();
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
     const [error, setError] = useState("");
 
@@ -144,6 +146,7 @@ export function ThreadPanel({
                 channelId={root.channelId}
                 rules={rules}
                 disabled={!canPost}
+                attachable={may.attach}
                 placeholder="Reply in this thread"
                 onMedia={async (address) => {
                     await runAction(

@@ -113,6 +113,18 @@ export interface ChannelAccess {
     readonly mayPost: boolean;
     /** Whether they may rename it, set the topic, or add people. */
     readonly mayAdminister: boolean;
+    /**
+     * Whether they may take down somebody else's message here.
+     *
+     * Wider than `mayAdminister` by exactly one case: the person whose group it
+     * is. A group has no administrators - there is no roster of roles to be on -
+     * so without this the only thing anybody could do about a message posted
+     * into a group they started was leave it there. It is deliberately not the
+     * same flag: running a channel in a space is a standing that comes with
+     * renaming it, deleting it and removing people, and none of that follows
+     * from being the one who started a group chat.
+     */
+    readonly mayModerate: boolean;
 }
 
 /**
@@ -131,8 +143,9 @@ export async function channelAccess(
         where: { id: channelId },
         select: {
             id: true,
-            spaceId: true,
             kind: true,
+            spaceId: true,
+            ownerId: true,
             private: true,
             archived: true,
             space: { select: { archived: true } }
@@ -149,8 +162,9 @@ export async function channelAccess(
     const live = !channel.archived && !spaceArchived;
 
     if (!channel.spaceId) {
-        // A direct message. There is no space to fall back on, so the row is
-        // the whole answer, and everybody in one is equal in it.
+        // A direct message or a group. There is no space to fall back on, so the
+        // row is the whole answer, and everybody in a two-person conversation is
+        // equal in it - a group is the one exception, and only over messages.
         if (!membership) return null;
         return {
             channelId: channel.id,
@@ -159,7 +173,8 @@ export async function channelAccess(
             archived: channel.archived,
             member: true,
             mayPost: live,
-            mayAdminister: false
+            mayAdminister: false,
+            mayModerate: channel.kind === "group" && channel.ownerId === actor.id
         };
     }
 
@@ -175,7 +190,8 @@ export async function channelAccess(
         archived: channel.archived,
         member: Boolean(membership),
         mayPost: live,
-        mayAdminister: admin
+        mayAdminister: admin,
+        mayModerate: admin
     };
 }
 

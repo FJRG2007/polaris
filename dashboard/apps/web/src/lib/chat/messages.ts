@@ -15,11 +15,11 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { rulesForChannel } from "./rules";
 import { publishChatChange } from "./live";
-import { announceRoomMention } from "./room-mentions";
 import { nicknamesFor } from "@/lib/contact-names";
-import { receiptsBetween } from "@/lib/privacy-service";
+import { announceRoomMention } from "./room-mentions";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { isBlankMarkdown } from "@/components/rich-text/markdown";
+import { allowedBy, maySee, receiptsBetween } from "@/lib/privacy-service";
 import { discardAttachments, isInlineImage, type StoredAttachment } from "./attachments";
 import { knownPreviews, unfurl, type KnownPreview, type LinkPreviewView } from "./link-preview";
 import {
@@ -55,6 +55,15 @@ export interface ChatMessageView {
     /** Whether this reader kept it. Private to them - starring is a bookmark,
      *  not a signal to the room. */
     readonly starred: boolean;
+    /**
+     * Whether this reader may send it into another conversation.
+     *
+     * The author's own setting, resolved for this reader. Carried on the message
+     * rather than asked when the menu opens, because a menu that offers Forward
+     * and then refuses is worse than one that does not offer it - and the answer
+     * is per author, so a page of messages is a page of different answers.
+     */
+    readonly forwardable: boolean;
     /** The first web address in it, whatever came of looking it up. The list
      *  needs it even when nothing did: a video Polaris knows how to play still
      *  plays when the site refused to describe itself. */
@@ -274,7 +283,11 @@ export async function send(
     // this is the same question asked of the written text: a few spaces and some
     // shift-enters come out of the editor as a lone backslash, which is a
     // message that passes both and reads as a mistake to the whole room.
-    if (attachments.length === 0 && isBlankMarkdown(input.body)) {
+    //
+    // A forward is the exception, and it was a bug: the message being passed on
+    // is the content, the note on top is optional and says so on the dialog -
+    // and this refused every forward somebody sent without typing one.
+    if (attachments.length === 0 && !quote?.forwarded && isBlankMarkdown(input.body)) {
         throw new ChatRuleError("Write something first");
     }
 
@@ -585,9 +598,12 @@ export async function remove(
     // somebody answering a report is acting on a room they are not in, which is
     // the whole point of an instance-wide queue.
     const moderating = options?.asModerator === true;
+    // Moderation rather than administration: the person whose group it is may
+    // take a message out of it without that making them an administrator of a
+    // conversation which has none.
     const mayAdminister = moderating
         ? true
-        : (await requireChannel(actor, message.channelId)).mayAdminister;
+        : (await requireChannel(actor, message.channelId)).mayModerate;
     const mine = message.authorId === actor.id;
     if (!mine && !mayAdminister) {
         throw new ChatAccessError("You cannot delete that message");
@@ -723,17 +739,30 @@ export async function markRead(actor: ChatActor, input: core.ChatMarkReadInput):
  * The body is the forwarder's own note, and the original travels as the quote
  * rather than as copied text. Copying would strip who said it and when, which is
  * most of what makes a forwarded message worth anything.
+ *
+ * The author's own setting is the third thing proved. The screen already hides
+ * the action for a message that does not allow it, which is where somebody finds
+ * out; this is where it is true, because a hidden button is a decoration and an
+ * action anybody can call is the actual interface.
  */
 export async function forward(actor: ChatActor, input: core.ChatForwardInput): Promise<string> {
     const original = await prisma.chatMessage.findUnique({
         where: { id: input.messageId },
-        select: { id: true, deletedAt: true }
+        select: { id: true, authorId: true, deletedAt: true }
     });
     if (!original || original.deletedAt) throw new ChatAccessError("That message is gone");
+    if (
+        original.authorId &&
+        !(await maySee(original.authorId, "forwarding", { id: actor.id, isAdmin: false }))
+    ) {
+        throw new ChatAccessError("They do not allow their messages to be passed on");
+    }
 
+    // The note as written, empty included: a space was here to get past the
+    // blank-body rule, and it left a message whose text was one space.
     return send(
         actor,
-        { channelId: input.channelId, body: input.note || " ", parentId: null },
+        { channelId: input.channelId, body: input.note, parentId: null },
         [],
         { messageId: input.messageId, forwarded: true }
     );
@@ -931,6 +960,10 @@ export async function decorateMessages(actor: ChatActor, rows: readonly Row[]): 
     // One query for the page: a nickname is per reader, so it cannot be resolved
     // where the names are, and a lookup per message would be fifty of them.
     const called = await nicknamesFor(actor.id, [...authorIds, ...quoteAuthorIds]);
+    // Who lets this reader pass their messages on. Not an administrator question
+    // and deliberately not given one: chat has no instance-wide override, and a
+    // setting about your own words is the last place to introduce the first.
+    const mayForward = await allowedBy({ id: actor.id, isAdmin: false }, "forwarding", authorIds);
     const names = new Map(
         [...authors, ...quoteAuthors].map((author) => [
             author.id,
@@ -985,6 +1018,10 @@ export async function decorateMessages(actor: ChatActor, rows: readonly Row[]): 
         attachments: onMessageFiles.get(row.id) ?? [],
         quote: quoteViewOf(row, quotes, names),
         starred: kept.has(row.id),
+        // A message whose author has since deleted their account carries no
+        // setting to honour, and a deleted one has nothing left to send.
+        forwardable:
+            row.deletedAt === null && (row.authorId === null || mayForward.has(row.authorId)),
         link: links.get(row.id) ?? null,
         preview: previewOf(row, links, previews),
         previewPending: pendingOf(row, links, previews),

@@ -50,6 +50,8 @@ const GATHER_MS = 60;
 interface Store {
     readonly people: ReadonlyMap<string, PresenceOf>;
     readonly watch: (id: string) => void;
+    /** Ask again now, for everything on screen. */
+    readonly refresh: () => void;
 }
 
 const Context = createContext<Store | null>(null);
@@ -110,8 +112,28 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
         return () => clearInterval(beat);
     }, [ask]);
 
-    const store = useMemo<Store>(() => ({ people, watch }), [people, watch]);
+    const refresh = useCallback(() => {
+        void ask([...watched.current]);
+    }, [ask]);
+
+    const store = useMemo<Store>(() => ({ people, watch, refresh }), [people, watch, refresh]);
     return <Context.Provider value={store}>{children}</Context.Provider>;
+}
+
+/**
+ * Ask again, now.
+ *
+ * For the one case the interval is wrong for: somebody changing their own
+ * status. Their face is the one they are looking at, and waiting most of a
+ * minute to see the dot move reads as a setting that did not take - which is
+ * exactly what it looked like before this existed.
+ *
+ * A no-op outside the provider, so a screen with no faces on it can still call
+ * it without knowing whether there is a store above.
+ */
+export function usePresenceRefresh(): () => void {
+    const store = useContext(Context);
+    return store?.refresh ?? (() => undefined);
 }
 
 /**

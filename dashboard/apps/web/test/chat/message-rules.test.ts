@@ -13,7 +13,7 @@
  *   than trusted to a comment.
  */
 
-import { ChatRuleError } from "@/lib/chat/access";
+import { ChatAccessError, ChatRuleError } from "@/lib/chat/access";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CHAT_RULES, type ChatRules } from "@polaris/core";
 
@@ -48,6 +48,15 @@ let written: {
  */
 let moderator = false;
 
+/**
+ * Whether the conversation is a group this actor started.
+ *
+ * The one standing that is not a space's: a group has no administrators, so
+ * without its owner being able to take a message down, nothing could be done
+ * about what anybody posts into one.
+ */
+let groupOwner = false;
+
 /** How many messages the actor has sent in the last minute. */
 let recent = 0;
 
@@ -70,7 +79,8 @@ vi.mock("@polaris/db", () => {
             findUnique: async () => ({
                 id: "channel-1",
                 spaceId: moderator ? "space-1" : null,
-                kind: moderator ? "text" : "dm",
+                kind: moderator ? "text" : groupOwner ? "group" : "dm",
+                ownerId: groupOwner ? "ada" : null,
                 private: false,
                 archived: false,
                 space: { archived: false }
@@ -121,6 +131,7 @@ const actor = { id: "ada" };
 beforeEach(() => {
     rules = DEFAULT_CHAT_RULES;
     moderator = false;
+    groupOwner = false;
     recent = 0;
     written = { updates: [], deletes: [], edits: [], discarded: [] };
     message = {
@@ -228,6 +239,20 @@ describe("deleting", () => {
         const { remove } = await import("@/lib/chat/messages");
         rules = { ...DEFAULT_CHAT_RULES, editWindowMinutes: 15 };
         await expect(remove(actor, "message-1")).rejects.toBeInstanceOf(ChatRuleError);
+    });
+
+    it("is somebody else's message to take down in a group you started", async () => {
+        const { remove } = await import("@/lib/chat/messages");
+        groupOwner = true;
+        message.authorId = "grace";
+        await remove(actor, "message-1");
+        expect(written.updates.at(-1)?.data).toMatchObject({ body: "" });
+    });
+
+    it("is not, in a group somebody else started", async () => {
+        const { remove } = await import("@/lib/chat/messages");
+        message.authorId = "grace";
+        await expect(remove(actor, "message-1")).rejects.toBeInstanceOf(ChatAccessError);
     });
 
     it("never binds somebody moderating the room", async () => {

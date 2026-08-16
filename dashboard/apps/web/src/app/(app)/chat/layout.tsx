@@ -13,6 +13,7 @@
  * regions genuinely waiting on an answer carry a skeleton.
  */
 
+import { can } from "@polaris/auth";
 import type { ReactNode } from "react";
 import { ChatShell } from "./chat-shell";
 import { requirePermission } from "@/lib/session";
@@ -25,12 +26,23 @@ export default async function ChatLayout({ children }: { children: ReactNode }) 
     // The shelf somebody is working from, so a space they start belongs to the
     // organization they are standing in rather than to them personally. It is
     // already memoized for this request by the app shell above.
-    const scope = await resolveScope(user.id);
+    //
+    // The four grants beside it are what the screens draw from: resolved once
+    // here rather than asked for by each button, which would be four policy
+    // evaluations per render of a rail.
+    const [scope, spaces, groups, attach, call] = await Promise.all([
+        resolveScope(user.id),
+        can(user.id, "chat.spaces"),
+        can(user.id, "chat.groups"),
+        can(user.id, "chat.attach"),
+        can(user.id, "chat.call")
+    ]);
 
     return (
         <ChatShell
             viewerId={user.id}
             viewerName={user.name}
+            may={{ spaces, groups, attach, call }}
             orgId={scope.org?.id ?? null}
             orgName={scope.org?.name ?? null}
         >

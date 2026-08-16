@@ -21,7 +21,7 @@
  * can open, which is what somebody quoting it in a ticket means.
  */
 
-import { copyText } from "./links";
+import { copyText, downloadFile } from "./links";
 import { useAppUrl } from "@/components/app-url";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -63,6 +63,9 @@ export interface ViewedImage {
     readonly name: string;
     /** The message it is on, for forwarding and reporting. */
     readonly messageId: string;
+    /** Whether whoever sent it lets it be passed on. The viewer offers the
+     *  action or does not; it never offers one that would be refused. */
+    readonly forwardable: boolean;
 }
 
 export function ImageViewer({
@@ -138,16 +141,6 @@ export function ImageViewer({
         }
     };
 
-    const download = () => {
-        // A plain link with a name on it: the route serves it with the name it
-        // was uploaded under, and this is what makes the browser save rather
-        // than navigate.
-        const anchor = document.createElement("a");
-        anchor.href = `${image.url}?download=1`;
-        anchor.download = image.name;
-        anchor.click();
-    };
-
     const items = (
         Item: typeof DropdownMenuItem,
         Separator: typeof DropdownMenuSeparator
@@ -166,7 +159,7 @@ export function ImageViewer({
                 <Link2 className="size-3.5" />
                 Copy media link
             </Item>
-            <Item onSelect={download}>
+            <Item onSelect={() => downloadFile(image.url, image.name)}>
                 <Download className="size-3.5" />
                 Download
             </Item>
@@ -174,7 +167,7 @@ export function ImageViewer({
                 <ExternalLink className="size-3.5" />
                 Open in the browser
             </Item>
-            {onForward && (
+            {onForward && image.forwardable && (
                 <Item onSelect={() => onForward(image.messageId)}>
                     <Forward className="size-3.5" />
                     Forward

@@ -5,19 +5,18 @@ import { getCapabilities } from "@polaris/config";
 import { reachableAppNav } from "@/lib/app-access";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppUrlProvider } from "@/components/app-url";
+import { CallHolder } from "@/components/call-holder";
 import { accessFor, requireUser } from "@/lib/session";
 import { AccountMenu } from "@/components/account-menu";
 import { DeniedNotice } from "@/components/denied-notice";
+import { presenceChoiceOf } from "@/lib/presence-service";
 import { ViewAsBanner } from "@/components/view-as-banner";
 import { AppNavDrawer } from "@/components/app-nav-drawer";
-import { AppShell, CapabilityProvider, ToastProvider } from "@polaris/ui";
 import { ScopeSwitcher } from "@/components/scope-switcher";
 import { IncomingCalls } from "@/components/incoming-calls";
-import { CallHolder } from "@/components/call-holder";
-import { PresenceProvider } from "@/components/presence-store";
-import { presenceChoiceOf } from "@/lib/presence-service";
 import { MessageToasts } from "@/components/message-toasts";
 import { CommandPalette } from "@/components/command-palette";
+import { PresenceProvider } from "@/components/presence-store";
 import { listNotifications } from "@/lib/notification-service";
 import { UpdateIndicator } from "@/components/update-indicator";
 import { SessionScopeProvider } from "@/components/session-scope";
@@ -26,6 +25,7 @@ import { resolveScope, scopeChoices } from "@/lib/workspace-scope";
 import { RouteSkeletonCapture } from "@/components/route-skeleton";
 import { DisplayFormatProvider } from "@/components/display-format";
 import { VisitRecorder } from "@/components/overview/visit-recorder";
+import { AppShell, CapabilityProvider, ToastProvider } from "@polaris/ui";
 import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 import { PresenceReporter } from "@/components/notifications/presence-reporter";
 import { NotificationFavicon } from "@/components/notifications/notification-favicon";
@@ -109,7 +109,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                                                 id={user.id}
                                                 name={user.name}
                                                 email={user.email}
-                                                presence={presence}
+                                                presence={presence.choice}
+                                                presenceUntil={presence.until}
                                             />
                                         </>
                                     }

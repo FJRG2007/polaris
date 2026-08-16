@@ -23,10 +23,10 @@
  */
 
 import { prisma } from "@polaris/db";
-import { PRESENCE_CHOICES, type Presence, type PresenceChoice } from "@polaris/core";
 import { maySee } from "@/lib/privacy-service";
 import { reachableChannelIds } from "@/lib/chat/access";
 import { PARTICIPANT_TTL_MS } from "@/lib/chat/meetings";
+import { PRESENCE_CHOICES, type Presence, type PresenceChoice } from "@polaris/core";
 
 // The vocabulary lives in core, because the picker that sets it is a client
 // component and this file reaches for Prisma the moment it is imported.
@@ -67,7 +67,7 @@ export async function presenceFor(
     const [people, sessions, calls] = await Promise.all([
         prisma.user.findMany({
             where: { id: { in: wanted } },
-            select: { id: true, presence: true }
+            select: { id: true, presence: true, presenceUntil: true }
         }),
         // The freshest session per account, from one query rather than one each:
         // ordering and taking the first per id in memory is cheaper than a
@@ -106,23 +106,75 @@ export async function presenceFor(
             continue;
         }
         answer.set(person.id, {
-            status: statusOf(person.presence, seen.get(person.id), now, mine),
+            status: statusOf(
+                inForce(person.presence, person.presenceUntil, now),
+                seen.get(person.id),
+                now,
+                mine
+            ),
             inCall
         });
     }
     return answer;
 }
 
-/** One person's own, for the picker that sets it. */
-export async function presenceChoiceOf(userId: string): Promise<PresenceChoice> {
-    const row = await prisma.user.findUnique({ where: { id: userId }, select: { presence: true } });
-    return (PRESENCE_CHOICES as readonly string[]).includes(row?.presence ?? "")
-        ? (row!.presence as PresenceChoice)
-        : "auto";
+/** One person's own, for the picker that sets it, with the moment it lapses. */
+export interface PresenceChoiceView {
+    readonly choice: PresenceChoice;
+    /** When it goes back to `auto`, or null for "until I change it". Null too
+     *  for a choice that has already lapsed, which reads as `auto`. */
+    readonly until: string | null;
 }
 
-export async function setPresenceChoice(userId: string, choice: PresenceChoice): Promise<void> {
-    await prisma.user.update({ where: { id: userId }, data: { presence: choice } });
+export async function presenceChoiceOf(userId: string): Promise<PresenceChoiceView> {
+    const row = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { presence: true, presenceUntil: true }
+    });
+    if (!row) return { choice: "auto", until: null };
+
+    const held = inForce(row.presence, row.presenceUntil, Date.now());
+    // Tidied on the way past rather than by anything that runs on a schedule.
+    // This is the account's own screen, so it is one write, at the one moment
+    // somebody is looking at the thing that would otherwise be a lie.
+    if (row.presenceUntil && held === "auto") {
+        await prisma.user.update({
+            where: { id: userId },
+            data: { presence: "auto", presenceUntil: null }
+        });
+        return { choice: "auto", until: null };
+    }
+    return { choice: held, until: held === "auto" ? null : (row.presenceUntil?.toISOString() ?? null) };
+}
+
+/**
+ * Say what to appear as, and for how long.
+ *
+ * `minutes` null is "until I change it", which is what a status was before there
+ * was a window - so the old behaviour is still one of the options rather than
+ * something that was taken away. Going back to `auto` clears the window with it:
+ * a lapse time on "work it out from whether I am here" would be a rule about
+ * nothing.
+ */
+export async function setPresenceChoice(
+    userId: string,
+    choice: PresenceChoice,
+    minutes: number | null = null
+): Promise<void> {
+    const until =
+        choice === "auto" || minutes === null ? null : new Date(Date.now() + minutes * 60_000);
+    await prisma.user.update({
+        where: { id: userId },
+        data: { presence: choice, presenceUntil: until }
+    });
+}
+
+/** What a stored choice actually is now. A window that has passed is not a
+ *  choice: the account is back on `auto`, whatever the column still says. */
+function inForce(chosen: string, until: Date | null, now: number): PresenceChoice {
+    if (!(PRESENCE_CHOICES as readonly string[]).includes(chosen)) return "auto";
+    if (until && until.getTime() <= now) return "auto";
+    return chosen as PresenceChoice;
 }
 
 /** The rule, on its own so it can be read in one place. */

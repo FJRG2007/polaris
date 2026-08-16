@@ -60,6 +60,7 @@ export function Composer({
     channelId,
     rules,
     disabled,
+    attachable = true,
     placeholder,
     editing,
     replyingTo,
@@ -77,6 +78,11 @@ export function Composer({
      *  40 MB upload somebody waited for. */
     rules: core.ChatRules;
     disabled: boolean;
+    /** Whether this account may put files in a conversation at all - a grant,
+     *  where the rules above are the instance's ceiling for everybody. Passed in
+     *  rather than read from the chat's own context, because this composer is
+     *  also the one under a task, where there is no such context. */
+    attachable?: boolean;
     placeholder: string;
     /** The message being rewritten, if any. */
     editing?: ChatMessageView | null;
@@ -105,6 +111,11 @@ export function Composer({
     const [body, setBody] = useState("");
     const [files, setFiles] = useState<readonly File[]>([]);
     const [refused, setRefused] = useState("");
+    // Two different noes with one answer on screen: the instance allows no files
+    // in this kind of conversation, or this account may not send them anywhere.
+    // Gone rather than disabled either way - a permanently dead button is a
+    // promise the room cannot keep.
+    const mayAttach = attachable && rules.maxAttachments > 0;
     const [dragging, setDragging] = useState(false);
     const picker = useRef<HTMLInputElement>(null);
     const gallery = useRef<HTMLInputElement>(null);
@@ -250,6 +261,12 @@ export function Composer({
      */
     const stage = (picked: FileList | null): void => {
         if (!picked || picked.length === 0) return;
+        // Said rather than ignored: a file dropped onto a box that quietly does
+        // nothing with it reads as a broken composer.
+        if (!attachable) {
+            setRefused("You are not allowed to send files here.");
+            return;
+        }
         const chosen = Array.from(picked);
         const room = Math.max(0, rules.maxAttachments - files.length);
         const small = chosen.filter((file) => file.size <= maxBytes);
@@ -498,7 +515,7 @@ export function Composer({
                             {/* Gone rather than disabled where the instance
                                 allows no files at all: a permanently dead
                                 button is a promise the room cannot keep. */}
-                            {rules.maxAttachments > 0 && (
+                            {mayAttach && (
                                 <button
                                     type="button"
                                     disabled={disabled || files.length >= rules.maxAttachments}
@@ -515,7 +532,7 @@ export function Composer({
                                 every document on the device is the long way
                                 round. Filtered to images and video, which is
                                 what a phone answers with its gallery. */}
-                            {rules.maxAttachments > 0 && (
+                            {mayAttach && (
                                 <button
                                     type="button"
                                     disabled={disabled || files.length >= rules.maxAttachments}
@@ -530,7 +547,7 @@ export function Composer({
                             {/* Straight to the camera, on the devices that have
                                 one worth opening. The picture is staged like any
                                 other so it can still be thought better of. */}
-                            {rules.maxAttachments > 0 && handheld && (
+                            {mayAttach && handheld && (
                                 <button
                                     type="button"
                                     disabled={disabled || files.length >= rules.maxAttachments}
@@ -546,7 +563,7 @@ export function Composer({
                                 recording is one - and only in a browser that can
                                 record, rather than as a button that apologises
                                 when it is pressed. */}
-                            {rules.maxAttachments > 0 && recordable && (
+                            {mayAttach && recordable && (
                                 <button
                                     type="button"
                                     disabled={disabled || files.length >= rules.maxAttachments}

@@ -22,23 +22,34 @@ import { ChatSidebar } from "./chat-sidebar";
 import { usePathname } from "next/navigation";
 import { useChatStream } from "./use-chat-stream";
 import { useCallback, type ReactNode } from "react";
-import { ChatProvider, useChat } from "./chat-context";
+import { ChatProvider, useChat, type ChatAllowances } from "./chat-context";
 
 export function ChatShell({
     viewerId,
     viewerName,
     orgId,
     orgName,
+    may,
     children
 }: {
     viewerId: string;
     viewerName: string;
     orgId: string | null;
     orgName: string | null;
+    /** What this account is allowed to do beyond talking, resolved once by the
+     *  layout. The screens read it to decide what to offer; every one of them is
+     *  checked again where it happens. */
+    may: ChatAllowances;
     children: ReactNode;
 }) {
     return (
-        <ChatProvider viewerId={viewerId} viewerName={viewerName} orgId={orgId} orgName={orgName}>
+        <ChatProvider
+            may={may}
+            orgId={orgId}
+            orgName={orgName}
+            viewerId={viewerId}
+            viewerName={viewerName}
+        >
             <ChatColumns>{children}</ChatColumns>
         </ChatProvider>
     );

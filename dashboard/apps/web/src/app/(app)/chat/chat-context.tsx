@@ -15,12 +15,12 @@
  */
 
 import * as core from "@polaris/core";
+import { chatRulesAction, listCategoriesAction, listChannelsAction, listSpacesAction } from "./actions";
 import type {
     ChatCategoryView,
     ChatChannelView,
     ChatSpaceView
 } from "@/lib/chat/chat-service";
-import { chatRulesAction, listCategoriesAction, listChannelsAction, listSpacesAction } from "./actions";
 import {
     createContext,
     useCallback,
@@ -31,9 +31,30 @@ import {
     type ReactNode
 } from "react";
 
+/**
+ * What this account may do in the chat beyond reading and writing in it.
+ *
+ * Four grants that used to come with the app itself. The screen reads them to
+ * decide what to draw: a button somebody is not allowed to press is worse than
+ * no button, because they press it and are told no by a dialog they opened for
+ * nothing. None of this is the enforcement - every one is checked again where it
+ * happens - and it is deliberately not treated as if it were.
+ */
+export interface ChatAllowances {
+    /** Start servers. */
+    readonly spaces: boolean;
+    /** Start a conversation with more than one other person. */
+    readonly groups: boolean;
+    /** Put files and voice messages in one. */
+    readonly attach: boolean;
+    /** Be in a call. */
+    readonly call: boolean;
+}
+
 interface ChatContextValue {
     readonly viewerId: string;
     readonly viewerName: string;
+    readonly may: ChatAllowances;
     /** The organization shelf this browser is on, or null on the personal one.
      *  What a new space is filed under. */
     readonly orgId: string | null;
@@ -63,12 +84,14 @@ export function ChatProvider({
     viewerName,
     orgId,
     orgName,
+    may,
     children
 }: {
     viewerId: string;
     viewerName: string;
     orgId: string | null;
     orgName: string | null;
+    may: ChatAllowances;
     children: ReactNode;
 }) {
     const [channels, setChannels] = useState<readonly ChatChannelView[]>([]);
@@ -122,6 +145,7 @@ export function ChatProvider({
         () => ({
             viewerId,
             viewerName,
+            may,
             orgId,
             orgName,
             channels,
@@ -136,6 +160,7 @@ export function ChatProvider({
         [
             viewerId,
             viewerName,
+            may,
             orgId,
             orgName,
             channels,

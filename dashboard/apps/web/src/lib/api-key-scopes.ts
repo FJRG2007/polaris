@@ -25,6 +25,10 @@ export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
     "vault.use": "Use the vault",
     "notes.use": "Keep notes",
     "chat.use": "Use chat",
+    "chat.spaces": "Create chat servers",
+    "chat.groups": "Start group conversations",
+    "chat.attach": "Send files in chat",
+    "chat.call": "Join chat calls",
     "deploy.read": "Read deployments",
     "deploy.manage": "Manage deployments",
     "games.read": "Read game servers",
@@ -60,6 +64,10 @@ export const SCOPE_HINTS: Readonly<Record<Permission, string>> = {
     "vault.use": "Sync the vault. The items stay encrypted; a key cannot read them.",
     "notes.use": "Read and write the owner's own notes.",
     "chat.use": "Read and post in the channels the owner is in.",
+    "chat.spaces": "Create servers and the channels inside them.",
+    "chat.groups": "Open a conversation with several people at once.",
+    "chat.attach": "Put files and voice messages on a message.",
+    "chat.call": "Start a call in a conversation, and join one.",
     "deploy.read": "Inspect apps, deployments, and logs.",
     "deploy.manage": "Deploy, restart, and remove apps.",
     "games.read": "See game servers, their addresses, and who is playing.",
@@ -93,7 +101,10 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
     { title: "Snippets", scopes: ["snippets.read", "snippets.write"] },
     { title: "Vault", scopes: ["vault.use"] },
     { title: "Notes", scopes: ["notes.use"] },
-    { title: "Chat", scopes: ["chat.use"] },
+    {
+        title: "Chat",
+        scopes: ["chat.use", "chat.spaces", "chat.groups", "chat.attach", "chat.call"]
+    },
     { title: "Deployments", scopes: ["deploy.read", "deploy.manage"] },
     {
         title: "Game servers",

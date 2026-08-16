@@ -15,19 +15,20 @@
  */
 
 import { z } from "zod";
+import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import * as invites from "@/lib/chat/invites";
+import * as reports from "@/lib/chat/reports";
 import * as saved from "@/lib/chat/saved-media";
 import * as chat from "@/lib/chat/chat-service";
-import * as reports from "@/lib/chat/reports";
 import * as messages from "@/lib/chat/messages";
 import { allChatRules } from "@/lib/chat/rules";
-import { MAX_NICKNAME, setNickname } from "@/lib/contact-names";
 import { requirePermission } from "@/lib/session";
 import { storeAttachment } from "@/lib/chat/attachments";
 import type { SavedMediaView } from "@/lib/chat/saved-media";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
+import { MAX_NICKNAME, setNickname } from "@/lib/contact-names";
 import { messageToasts, type MessageToast } from "@/lib/chat/toasts";
 import { searchMessages, type ChatSearchHit } from "@/lib/chat/search";
 import { voicePresence, type VoicePresence } from "@/lib/chat/meetings";
@@ -442,6 +443,12 @@ export async function typingAction(channelId: string, activity?: unknown): Promi
 
 export async function createSpaceAction(input: unknown): Promise<{ id?: string; error?: string }> {
     const me = await actor();
+    // Holding the chat is not being allowed to start servers in it. Answered
+    // with a sentence rather than a redirect: this is a dialog with somewhere to
+    // put it, and the screen already hides the button.
+    if (!(await can(me.id, "chat.spaces"))) {
+        return { error: "You are not allowed to create servers here" };
+    }
     const parsed = core.chatSpaceCreateSchema.safeParse(input);
     if (!parsed.success)
         return { error: parsed.error.issues[0]?.message ?? "That space could not be made" };

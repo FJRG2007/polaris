@@ -63,6 +63,12 @@ model User {
     // or choosing not to be seen at all - and they outrank what the sessions
     // say, because that is the whole point of choosing one.
     presence      String   @default("auto")
+    // When that choice stops applying, after which the account is back on `auto`.
+    // Null means "until I change it", which is what a status set with no window
+    // is. It exists because of the status people forget: do not disturb put on
+    // for a meeting and still on two days later is worse than never setting one,
+    // since everybody around them stops expecting an answer and nobody is told.
+    presenceUntil DateTime?
     // Second gate for admin-only routes, independent of role permissions.
     isAdmin       Boolean  @default(false)
     // When set, the account is banned: sign-in is refused and sessions are void.
@@ -6102,6 +6108,11 @@ model UserPrivacy {
     lastSeen     String   @default("everyone")
     readReceipts String   @default("everyone")
     avatar       String   @default("everyone")
+    // Who may send something this account wrote into another conversation. Open
+    // by default, like the rest: a messenger where nothing can be passed on is
+    // not what anybody expects, and a default that removed a button would read
+    // as a bug rather than as a setting.
+    forwarding   String   @default("everyone")
     updatedAt    DateTime @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)

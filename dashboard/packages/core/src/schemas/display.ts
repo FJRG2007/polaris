@@ -273,3 +273,36 @@ export const PRESENCE_WORDS: Record<Presence, string> = {
     busy: "Do not disturb",
     offline: "Offline"
 };
+
+/**
+ * How long a chosen status holds before it goes back to being worked out.
+ *
+ * The reason this exists is the status people forget they set. "Do not disturb"
+ * put on for a meeting and still on two days later is worse than never having
+ * set it: everybody around them stops expecting an answer, and they are not
+ * told. So the same list every application that solved this settled on, and the
+ * last entry is the old behaviour rather than an absence - somebody who means
+ * "until I say otherwise" should be able to say it.
+ *
+ * Minutes rather than a timestamp, because it is chosen relative to now and the
+ * moment it lands on is the server's to work out.
+ */
+export const PRESENCE_DURATIONS = [
+    { minutes: 15, label: "For 15 minutes" },
+    { minutes: 60, label: "For 1 hour" },
+    { minutes: 8 * 60, label: "For 8 hours" },
+    { minutes: 24 * 60, label: "For 24 hours" },
+    { minutes: 3 * 24 * 60, label: "For 3 days" },
+    { minutes: null, label: "Until I change it" }
+] as const;
+
+export type PresenceDuration = (typeof PRESENCE_DURATIONS)[number]["minutes"];
+
+/** Whether a number is one of the durations offered, which is what stops a
+ *  request naming a window nobody was given. */
+export function isPresenceDuration(minutes: unknown): minutes is number {
+    return (
+        typeof minutes === "number" &&
+        PRESENCE_DURATIONS.some((duration) => duration.minutes === minutes)
+    );
+}

@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
 import { cookies } from "next/headers";
 import * as chat from "@/lib/chat/chat-service";
@@ -22,6 +23,17 @@ import { requirePermission } from "@/lib/session";
 import type { MeetingView } from "@/lib/chat/meetings";
 import { ChatAccessError, requireChannel } from "@/lib/chat/access";
 import { GUEST_COOKIE, GUEST_COOKIE_MAX_AGE, resolveSeat } from "@/lib/chat/meeting-seat";
+
+/**
+ * Whether this account may be in a call at all.
+ *
+ * Its own grant rather than part of holding the chat: a call is the one thing in
+ * here that takes somebody's microphone and everybody else's attention, and an
+ * instance that wants text and no voice had no way to say so. Guests are not
+ * asked - they arrive on a link somebody with the grant created, which is the
+ * decision.
+ */
+const NO_CALLS = "You are not allowed to be in calls here";
 
 async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: string }> {
     try {
@@ -37,6 +49,7 @@ export async function startCallAction(
     channelId: string
 ): Promise<{ meetingId?: string; error?: string }> {
     const user = await requirePermission("chat.use");
+    if (!(await can(user.id, "chat.call"))) return { error: NO_CALLS };
     const result = await guard(() =>
         meetings.startOrJoin({ id: user.id, name: user.name }, channelId)
     );
@@ -59,6 +72,7 @@ export async function inviteToCallAction(
     input: unknown
 ): Promise<{ meetingId?: string; channelId?: string; moved?: boolean; error?: string }> {
     const user = await requirePermission("chat.use");
+    if (!(await can(user.id, "chat.call"))) return { error: NO_CALLS };
     const parsed = inviteSchema.safeParse(input);
     if (!parsed.success) return { error: "Pick somebody to bring in" };
 
@@ -77,6 +91,7 @@ export async function inviteToCallAction(
 /** Join a call by id, as an account. */
 export async function joinCallAction(meetingId: string): Promise<{ error?: string }> {
     const user = await requirePermission("chat.use");
+    if (!(await can(user.id, "chat.call"))) return { error: NO_CALLS };
     const result = await guard(() => meetings.join({ id: user.id, name: user.name }, meetingId));
     return result.error ? { error: result.error } : {};
 }

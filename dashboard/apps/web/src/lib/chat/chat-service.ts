@@ -8,10 +8,11 @@
  * volume changes by two orders of magnitude.
  */
 
+import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
 import { publishChatChange } from "./live";
-import { nicknamesFor } from "@/lib/contact-names";
 import { prisma, type Prisma } from "@polaris/db";
+import { nicknamesFor } from "@/lib/contact-names";
 import {
     ChatAccessError,
     channelAccess,
@@ -73,6 +74,11 @@ export interface ChatChannelView {
      *  whether the screen offers them anything only a moderator may do. Always
      *  false in a direct message, where everybody in one is equal in it. */
     readonly mayAdminister: boolean;
+    /** Whether this reader may take somebody else's message out of it. The same
+     *  as administering it, plus the person whose group it is - a group has no
+     *  administrators, so without this nobody could do anything about what is
+     *  posted into one. */
+    readonly mayModerate: boolean;
     /** Whether this reader may put a picture on it - the space's people for a
      *  channel, whoever started it for a group. Only decides what the screen
      *  offers; the route that stores the bytes asks the same question again. */
@@ -394,6 +400,11 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             mutedUntil: membership?.mutedUntil?.toISOString() ?? null,
             pinned: membership?.pinnedAt !== null && membership?.pinnedAt !== undefined,
             mayAdminister,
+            // The one standing a group confers: its owner may take a message
+            // out of it. Not `mayAdminister`, which would also hand them the
+            // channel controls a group does not have.
+            mayModerate:
+                mayAdminister || (channel.kind === "group" && channel.ownerId === actor.id),
             // Whether the screen offers this reader the picture control. The
             // same predicate the route enforces with, asked here so the rule
             // has one implementation rather than two that drift.
@@ -901,6 +912,14 @@ export async function openDirect(actor: ChatActor, userIds: readonly string[]): 
     // convenience and this is the check.
     const reachable = await messageable(others);
     if (reachable.size !== others.length) throw new ChatAccessError(NO_CHAT);
+
+    // Two people is a conversation and three is a group, which is a thing an
+    // instance may withhold. Checked here rather than at the action, because a
+    // group is also made on the way out of a call taking a third person - and a
+    // rule with two implementations is a rule with one hole in it.
+    if (others.length > 1 && !(await can(actor.id, "chat.groups"))) {
+        throw new ChatAccessError("You are not allowed to start group conversations");
+    }
 
     const everyone = [actor.id, ...others];
     if (others.length === 1) {

@@ -35,7 +35,7 @@ export const dynamic = "force-dynamic";
 const CACHE = "private, max-age=86400, immutable";
 
 export async function GET(
-    _request: Request,
+    request: Request,
     { params }: { params: Promise<{ attachmentId: string }> }
 ): Promise<Response> {
     const user = await requirePermission("chat.use");
@@ -78,7 +78,12 @@ export async function GET(
         );
     }
 
-    const shown = isInlineImage(file.contentType) || isPlayableMedia(file.contentType);
+    // Asked for as a file rather than to be looked at or played. The menus that
+    // offer "download" say so here as well as on the anchor, so what the browser
+    // does with it does not rest on an attribute alone.
+    const asFile = new URL(request.url).searchParams.get("download") === "1";
+    const shown =
+        !asFile && (isInlineImage(file.contentType) || isPlayableMedia(file.contentType));
     return new Response(file.bytes as unknown as BodyInit, {
         headers: {
             "Content-Type": shown ? file.contentType : "application/octet-stream",

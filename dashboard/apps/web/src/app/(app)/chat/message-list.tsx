@@ -23,7 +23,6 @@ import { VoiceNote } from "./voice-note";
 import { Avatar } from "@/components/avatar";
 import { MessageMenu } from "./message-menu";
 import { ReportDialog } from "./report-dialog";
-import { ImageViewer, type ViewedImage } from "./image-viewer";
 import { usableAccent } from "@/lib/chat/accent";
 import { useEffect, useRef, useState } from "react";
 import { autoplaying, embedFor } from "@/lib/chat/embeds";
@@ -32,6 +31,7 @@ import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
 import { isPlayable, isVoiceMessage } from "./voice-recorder";
+import { ImageViewer, type ViewedImage } from "./image-viewer";
 import { useDisplayFormat } from "@/components/display-format";
 import {
     cn,
@@ -97,7 +97,7 @@ export function MessageList({
     onEdit,
     onDelete
 }: MessageListProps) {
-    useEditKey({ messages, viewerId, canPost, onEdit });
+    useMessageKeys({ messages, viewerId, canPost, canModerate, onEdit, onDelete });
 
     // The picture being looked at, held here rather than in each message: one
     // viewer is open at a time, and it is drawn over the whole conversation.
@@ -173,36 +173,45 @@ export function MessageList({
 }
 
 /**
- * F2 rewrites the message under the pointer.
+ * F2 rewrites the message under the pointer, and Delete takes it back.
  *
- * The row already lights up on hover and already carries a pencil, so the thing
- * being pointed at is unambiguous - this is a shortcut to the control that is
- * visibly there, not a hidden gesture. Focus counts as well as hover, so the
- * same key reaches the same message for somebody using a keyboard.
+ * The row already lights up on hover and already carries a pencil and a bin, so
+ * the thing being pointed at is unambiguous - these are shortcuts to controls
+ * that are visibly there, not hidden gestures. Focus counts as well as hover, so
+ * the same keys reach the same message for somebody using a keyboard.
  *
- * Ignored while a field has focus. F2 does nothing in a text box, but a shortcut
- * that fired while somebody was typing would be one that fired at the wrong
- * message.
+ * Delete opens the confirmation rather than doing it, exactly as the menu item
+ * does. A key that removed a message on a single press would be the one gesture
+ * in a conversation with no undo, reachable by leaning on a keyboard.
+ *
+ * Both are ignored while a field has focus. Neither key does anything useful in
+ * a text box, but a shortcut that fired while somebody was typing would be one
+ * that fired at the wrong message.
  */
-function useEditKey({
+function useMessageKeys({
     messages,
     viewerId,
     canPost,
-    onEdit
+    canModerate,
+    onEdit,
+    onDelete
 }: {
     messages: readonly ChatMessageView[];
     viewerId: string;
     canPost: boolean;
+    canModerate: boolean;
     onEdit: (message: ChatMessageView) => void;
+    onDelete: (message: ChatMessageView) => void;
 }) {
     // Held in a ref so the listener is bound once rather than rebuilt on every
     // message that arrives.
-    const latest = useRef({ messages, viewerId, canPost, onEdit });
-    latest.current = { messages, viewerId, canPost, onEdit };
+    const latest = useRef({ messages, viewerId, canPost, canModerate, onEdit, onDelete });
+    latest.current = { messages, viewerId, canPost, canModerate, onEdit, onDelete };
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
-            if (event.key !== "F2" || event.metaKey || event.ctrlKey || event.altKey) return;
+            const wanted = event.key === "F2" ? "edit" : event.key === "Delete" ? "delete" : null;
+            if (!wanted || event.metaKey || event.ctrlKey || event.altKey) return;
             const active = document.activeElement;
             if (
                 active instanceof HTMLElement &&
@@ -212,19 +221,24 @@ function useEditKey({
                 return;
             }
 
-            const { messages: shown, viewerId: me, canPost: allowed, onEdit: edit } = latest.current;
-            if (!allowed) return;
+            const shown = latest.current;
+            if (!shown.canPost) return;
             const row =
                 document.querySelector("li[id^='message-']:hover") ??
                 active?.closest("li[id^='message-']");
             const id = row?.id.replace(/^message-/, "");
-            const message = shown.find((entry) => entry.id === id);
-            // Only your own, and not one that has been taken back. The same rule
-            // the pencil is drawn under, so the key can never do something the
-            // screen does not offer.
-            if (!message || message.deleted || message.authorId !== me) return;
+            const message = shown.messages.find((entry) => entry.id === id);
+            if (!message || message.deleted) return;
+
+            const mine = message.authorId === shown.viewerId;
+            // The same rules the pencil and the bin are drawn under, so a key can
+            // never do something the screen does not offer: your own to rewrite,
+            // and your own or anybody's here to take down.
+            if (wanted === "edit" && !mine) return;
+            if (wanted === "delete" && !mine && !shown.canModerate) return;
             event.preventDefault();
-            edit(message);
+            if (wanted === "edit") shown.onEdit(message);
+            else shown.onDelete(message);
         };
         document.addEventListener("keydown", onKey);
         return () => document.removeEventListener("keydown", onKey);
@@ -391,7 +405,8 @@ function Message({
                                             onOpenImage({
                                                 url: `/api/chat/attachments/${file.id}`,
                                                 name: file.name,
-                                                messageId: message.id
+                                                messageId: message.id,
+                                                forwardable: message.forwardable
                                             })
                                         }
                                     />

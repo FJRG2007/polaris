@@ -43,7 +43,7 @@ export function NewDirectDialog({
     onOpenChange: (open: boolean) => void;
 }) {
     const router = useRouter();
-    const { viewerId, refresh } = useChat();
+    const { viewerId, refresh, may } = useChat();
     const [kind, setKind] = useState<"direct" | "group">("direct");
     const [picked, setPicked] = useState<readonly PickedPerson[]>([]);
     const [busy, setBusy] = useState(false);
@@ -70,36 +70,45 @@ export function NewDirectDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>New message</DialogTitle>
-                    <DialogDescription>One person, or several for a group.</DialogDescription>
+                    <DialogDescription>
+                        {may.groups
+                            ? "One person, or several for a group."
+                            : "Pick who to write to."}
+                    </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex gap-1 rounded-md bg-muted p-0.5">
-                    {(["direct", "group"] as const).map((option) => (
-                        <button
-                            key={option}
-                            type="button"
-                            aria-pressed={kind === option}
-                            onClick={() => {
-                                setKind(option);
-                                setPicked([]);
-                                setError("");
-                            }}
-                            className={cn(
-                                "flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors",
-                                kind === option
-                                    ? "bg-card text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            {option === "direct" ? (
-                                <MessageSquare className="size-3.5" />
-                            ) : (
-                                <Users className="size-3.5" />
-                            )}
-                            {option === "direct" ? "Direct message" : "Group"}
-                        </button>
-                    ))}
-                </div>
+                {/* The choice only exists where a group can be started. An
+                    account without that grant gets the screen it can use rather
+                    than a tab that refuses. */}
+                {may.groups && (
+                    <div className="flex gap-1 rounded-md bg-muted p-0.5">
+                        {(["direct", "group"] as const).map((option) => (
+                            <button
+                                key={option}
+                                type="button"
+                                aria-pressed={kind === option}
+                                onClick={() => {
+                                    setKind(option);
+                                    setPicked([]);
+                                    setError("");
+                                }}
+                                className={cn(
+                                    "flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors",
+                                    kind === option
+                                        ? "bg-card text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {option === "direct" ? (
+                                    <MessageSquare className="size-3.5" />
+                                ) : (
+                                    <Users className="size-3.5" />
+                                )}
+                                {option === "direct" ? "Direct message" : "Group"}
+                            </button>
+                        ))}
+                    </div>
+                )}
 
                 <PeoplePicker
                     search={searchPeopleAction}

@@ -77,7 +77,13 @@ vi.mock("@/lib/chat/access", () => ({
     ChatRuleError: class extends Error {}
 }));
 
-vi.mock("@/lib/privacy-service", () => ({ receiptsBetween: async () => null }));
+// Nobody here has said anything about forwarding, so everybody may - which is
+// what an account that has never opened the privacy screen is on.
+vi.mock("@/lib/privacy-service", () => ({
+    receiptsBetween: async () => null,
+    maySee: async () => true,
+    allowedBy: async (_viewer: unknown, _field: string, ids: readonly string[]) => new Set(ids)
+}));
 vi.mock("@/lib/chat/live", () => ({ publishChatChange: () => undefined }));
 vi.mock("@/lib/chat/rules", () => ({ rulesForChannel: async () => ({ keepEditHistory: false }) }));
 vi.mock("@/lib/chat/room-mentions", () => ({ announceRoomMention: async () => undefined }));

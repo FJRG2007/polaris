@@ -36,3 +36,22 @@ export async function copyText(value: string): Promise<void> {
         // Refused. Nothing useful to say about it.
     }
 }
+
+/**
+ * Save a file out of a conversation.
+ *
+ * A link with a name on it and nothing else: the route serves the bytes under
+ * the name they were uploaded with, and `download` is what makes the browser
+ * keep them rather than navigate to them. The query says the same thing to the
+ * server, which sets the disposition to match - a recording is served to be
+ * played, and this is the one request that wants it as a file.
+ *
+ * Here rather than beside either of the two menus that offer it, because both do
+ * and a second copy would be the one that forgets the query.
+ */
+export function downloadFile(url: string, name: string): void {
+    const anchor = document.createElement("a");
+    anchor.href = `${url}${url.includes("?") ? "&" : "?"}download=1`;
+    anchor.download = name;
+    anchor.click();
+}

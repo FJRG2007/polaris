@@ -21,6 +21,10 @@ export const PERMISSIONS = [
     "vault.use",
     "notes.use",
     "chat.use",
+    "chat.spaces",
+    "chat.groups",
+    "chat.attach",
+    "chat.call",
     "deploy.read",
     "deploy.manage",
     "games.read",
@@ -39,6 +43,22 @@ export const PERMISSIONS = [
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
+
+/**
+ * What holding the chat used to mean on its own.
+ *
+ * Named as a set because three places need the same list: the roles seeded on a
+ * fresh instance, the one-time carry-forward that gives them to roles written
+ * before they existed, and anything that wants to say "everything about chat".
+ * Granting the chat and none of these would be an account that can read a
+ * conversation and do nothing in it, which is not what "add the chat" means.
+ */
+export const CHAT_CAPABILITIES = [
+    "chat.spaces",
+    "chat.groups",
+    "chat.attach",
+    "chat.call"
+] as const satisfies readonly Permission[];
 
 /** A wildcard a role may hold to mean "all current and future permissions". */
 export const ALL_PERMISSIONS = "*" as const;
@@ -69,6 +89,10 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "vault.use",
         "notes.use",
         "chat.use",
+        "chat.spaces",
+        "chat.groups",
+        "chat.attach",
+        "chat.call",
         "deploy.read",
         "deploy.manage",
         "games.read",
@@ -93,6 +117,10 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         // them, so read-only has nothing to say about them.
         "notes.use",
         "chat.use",
+        "chat.spaces",
+        "chat.groups",
+        "chat.attach",
+        "chat.call",
         "deploy.read",
         "games.read",
         "agents.read",
@@ -130,6 +158,16 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     "vault.use": { area: "Vault", label: "Keep a password vault and connect a client to it" },
     "notes.use": { area: "Notes", label: "Keep private notes" },
     "chat.use": { area: "Chat", label: "Talk in channels and direct messages" },
+    // The four things somebody with the chat can do beyond talking in it. Split
+    // out because "has the chat" and "may start a server in it" are different
+    // decisions in every instance that has more than a handful of people, and
+    // there was no way to say the second before this. All four are granted with
+    // the chat by default, so nothing an account could do yesterday needs
+    // granting today.
+    "chat.spaces": { area: "Chat", label: "Create servers and their channels" },
+    "chat.groups": { area: "Chat", label: "Start group conversations" },
+    "chat.attach": { area: "Chat", label: "Attach files and send voice messages" },
+    "chat.call": { area: "Chat", label: "Start and join calls" },
     "deploy.read": { area: "Apps", label: "See deployments, servers and containers" },
     "deploy.manage": { area: "Apps", label: "Deploy, restart and configure apps" },
     "games.read": { area: "Game servers", label: "See game servers and who is playing" },

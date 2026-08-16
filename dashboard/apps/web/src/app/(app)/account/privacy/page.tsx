@@ -17,8 +17,8 @@ export default async function PrivacyPage() {
             <div>
                 <h1 className="text-[17px] font-semibold tracking-tight">Privacy</h1>
                 <p className="text-sm text-muted-foreground">
-                    Whether people can find you, and who sees when you were last here, that you
-                    have read a message, and your photo.
+                    Whether people can find you, who sees when you were last here, that you have
+                    read a message and your photo, and who may pass on what you wrote.
                 </p>
             </div>
             <PrivacyView settings={settings} />

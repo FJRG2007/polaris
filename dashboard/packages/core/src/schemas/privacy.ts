@@ -42,7 +42,8 @@ export const PRIVACY_FIELD_LABELS = {
     discoverable: "Whether people can find you",
     lastSeen: "When you were last here",
     readReceipts: "That you have read a message",
-    avatar: "Your photo"
+    avatar: "Your photo",
+    forwarding: "Passing your messages on"
 } as const;
 
 export const PRIVACY_FIELD_NOTES = {
@@ -51,8 +52,19 @@ export const PRIVACY_FIELD_NOTES = {
     lastSeen: "Whether other people can see that you are here now, or when you last were.",
     readReceipts:
         "The ticks under a message in a direct conversation. Turning this down also stops you seeing anybody else's.",
-    avatar: "Who sees your photo. Anybody who cannot gets your initials instead."
+    avatar: "Who sees your photo. Anybody who cannot gets your initials instead.",
+    forwarding:
+        "Who may forward something you wrote into another conversation. Anybody who cannot is not offered it, and they can still copy the text - this is a rule about the button, not a lock on your words."
 } as const;
+
+/** The order the settings are read in, so the screen does not have its own. */
+export const PRIVACY_FIELDS = [
+    "discoverable",
+    "lastSeen",
+    "readReceipts",
+    "avatar",
+    "forwarding"
+] as const;
 
 export const privacySettingsSchema = z.object({
     /**
@@ -71,7 +83,23 @@ export const privacySettingsSchema = z.object({
     discoverable: z.enum(PRIVACY_AUDIENCES).default("everyone"),
     lastSeen: z.enum(PRIVACY_AUDIENCES).default("everyone"),
     readReceipts: z.enum(PRIVACY_AUDIENCES).default("everyone"),
-    avatar: z.enum(PRIVACY_AUDIENCES).default("everyone")
+    avatar: z.enum(PRIVACY_AUDIENCES).default("everyone"),
+    /**
+     * Whether somebody else may send what you wrote into a room you are not in.
+     *
+     * An audience like the rest rather than a switch, because "my friends may,
+     * strangers may not" is the answer most people actually want and the
+     * vocabulary for it already exists. Open by default: a conversation where
+     * nothing can be passed on is not what anybody expects from a messenger, and
+     * a default that quietly removed a button would read as a bug.
+     *
+     * What it is honestly worth is said in the note beside it. Anybody who can
+     * read a message can retype it, and this does not pretend otherwise - it
+     * takes away the one-press way, which is the difference between something
+     * travelling because somebody meant it to and something travelling because
+     * it was easy.
+     */
+    forwarding: z.enum(PRIVACY_AUDIENCES).default("everyone")
 });
 
 export type PrivacySettings = z.infer<typeof privacySettingsSchema>;

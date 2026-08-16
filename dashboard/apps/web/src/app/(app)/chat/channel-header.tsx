@@ -19,6 +19,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { channelLink, copyText } from "./links";
+import { useChat } from "./chat-context";
 import { useAppUrl } from "@/components/app-url";
 import { Avatar } from "@/components/avatar";
 import { AddPeopleDialog } from "./add-people-dialog";
@@ -97,6 +98,8 @@ export function ChannelHeader({
 }) {
     const router = useRouter();
     const baseUrl = useAppUrl();
+    const { may } = useChat();
+    const mayCall = may.call;
     const [adding, setAdding] = useState(false);
     const [renaming, setRenaming] = useState(false);
     const [picturing, setPicturing] = useState(false);
@@ -176,7 +179,10 @@ export function ChannelHeader({
                             <Search className="size-4" />
                         </button>
                     )}
-                    {call ? (
+                    {/* An account that may not be in calls is not shown the way
+                        in, and is not told a call is running either: it is a room
+                        it cannot enter. */}
+                    {!mayCall ? null : call ? (
                         // One button once a call is running: joining is joining,
                         // and the camera is a switch inside the room.
                         <button

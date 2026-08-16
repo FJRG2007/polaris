@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import { ipAllowed, ipInCidr } from "../src/cidr.js";
 import { normalizeRelPath, UnsafePathError, extName, joinUnderRoot } from "../src/paths.js";
 import { generateToken, hashToken, tokenMatchesHash } from "../src/tokens.js";
-import { expandPermissions, hasPermission, mergeRolePermissions, DEFAULT_ROLES } from "../src/permissions.js";
+import {
+    expandPermissions,
+    hasPermission,
+    mergeRolePermissions,
+    CHAT_CAPABILITIES,
+    DEFAULT_ROLES,
+    PERMISSIONS,
+    PERMISSION_META
+} from "../src/permissions.js";
 import {
     checkUploadCandidate,
     createFileRequestSchema,
@@ -83,6 +91,23 @@ describe("permissions", () => {
         expect(hasPermission(admin, "users.manage")).toBe(true);
         expect(hasPermission(viewer, "users.manage")).toBe(false);
         expect(hasPermission(viewer, "drive.read")).toBe(true);
+    });
+
+    it("gives a role with the chat everything the chat used to mean", () => {
+        // `chat.use` carried servers, groups, attachments and calls before they
+        // were separate grants. A seeded role that held the chat and lost the
+        // attach button would read as a regression, not as a new setting.
+        const member = mergeRolePermissions([DEFAULT_ROLES.member as never]);
+        for (const capability of CHAT_CAPABILITIES) {
+            expect(hasPermission(member, capability)).toBe(true);
+        }
+    });
+
+    it("says what every permission is, so none is a bare key on a screen", () => {
+        for (const permission of PERMISSIONS) {
+            expect(PERMISSION_META[permission]?.label).toBeTruthy();
+            expect(PERMISSION_META[permission]?.area).toBeTruthy();
+        }
     });
 
     it("completes a grant with what it implies, in canonical order", () => {

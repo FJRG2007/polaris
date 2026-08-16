@@ -16,6 +16,7 @@
  */
 
 import { z } from "zod";
+import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
 import { send } from "@/lib/chat/messages";
 import { requirePermission } from "@/lib/session";
@@ -103,6 +104,16 @@ export async function POST(
     const files = form.getAll("files").filter((entry): entry is File => entry instanceof File);
     if (files.length === 0 && !fields.data.body) {
         return Response.json({ error: "Write something, or attach a file" }, { status: 400 });
+    }
+    // Whether this account may put files in a conversation at all, which is a
+    // grant rather than a rule: the rules below are the instance's ceiling for
+    // everybody, and this is one account's standing. Asked before a byte is
+    // read off the request.
+    if (files.length > 0 && !(await can(user.id, "chat.attach"))) {
+        return Response.json(
+            { error: "You are not allowed to send files here" },
+            { status: 403 }
+        );
     }
     // How many files and how big is the instance's decision, and it is answered
     // per kind of conversation: an operator may reasonably allow a screenshot in

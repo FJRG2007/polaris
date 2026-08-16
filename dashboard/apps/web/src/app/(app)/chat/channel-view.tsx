@@ -97,7 +97,7 @@ export function ChannelView({
 }) {
     const router = useRouter();
     const params = useSearchParams();
-    const { viewerId, channels, refresh, rulesFor } = useChat();
+    const { viewerId, channels, refresh, rulesFor, may } = useChat();
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
     const [pending, setPending] = useState<readonly ChatMessageView[]>([]);
     const [olderThan, setOlderThan] = useState<string | null>(null);
@@ -186,7 +186,7 @@ export function ChannelView({
             : channel.name
         : "Call";
     const canPost = channel ? !channel.archived : true;
-    const canModerate = channel?.mayAdminister ?? false;
+    const canModerate = channel?.mayModerate ?? false;
     // What the instance allows in a conversation of this shape. Until the list
     // has arrived there is no channel to ask about, and the defaults are the
     // permissive ones, so nothing is briefly refused that would be allowed.
@@ -694,6 +694,8 @@ export function ChannelView({
             attachments: [],
             quote: null,
             starred: false,
+            // Your own words, which your own setting never stands between you and.
+            forwardable: true,
             // The server has not looked at any link in it yet. Left as settled
             // rather than pending on purpose: this draft is replaced by the real
             // message a moment later, and that one asks.
@@ -991,6 +993,7 @@ export function ChannelView({
                     channelId={channelId}
                     rules={rules}
                     disabled={!canPost}
+                    attachable={may.attach}
                     placeholder={
                         canPost
                             ? `Message ${channel.kind === "text" ? `#${channel.name}` : channel.name}`

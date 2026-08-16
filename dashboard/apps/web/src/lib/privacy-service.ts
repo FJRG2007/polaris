@@ -22,7 +22,13 @@ import { areFriends, friendIds } from "@/lib/friends-service";
 export async function privacyFor(userId: string): Promise<core.PrivacySettings> {
     const row = await prisma.userPrivacy.findUnique({
         where: { userId },
-        select: { discoverable: true, lastSeen: true, readReceipts: true, avatar: true }
+        select: {
+            avatar: true,
+            lastSeen: true,
+            forwarding: true,
+            discoverable: true,
+            readReceipts: true
+        }
     });
     if (!row) return core.DEFAULT_PRIVACY;
     const parsed = core.privacySettingsSchema.safeParse(row);
@@ -30,27 +36,39 @@ export async function privacyFor(userId: string): Promise<core.PrivacySettings> 
 }
 
 /**
- * Which of these accounts this viewer is allowed to find.
+ * Which of these accounts let this viewer do one thing.
  *
- * Asked of a set rather than one at a time because it is asked by a search: one
- * query for the settings, one for the friendships, and the rule itself is the
- * same pure function everything else here uses.
+ * Asked of a set rather than one at a time because that is how it comes up: a
+ * search asks about a page of results, and a conversation asks about the authors
+ * of fifty messages. One query for the settings, one for the friendships, and
+ * the rule itself is the same pure function everything else here uses.
  *
  * Absence is the open answer, as everywhere else: an account that has never
- * opened the screen has not asked to be hidden.
+ * opened the screen has not asked for anything.
  */
-export async function discoverableBy(
+export async function allowedBy(
     viewer: PrivacyViewer,
+    field: keyof core.PrivacySettings,
     userIds: readonly string[]
 ): Promise<Set<string>> {
     const wanted = [...new Set(userIds)];
     if (wanted.length === 0) return new Set();
 
+    // The whole row rather than the one column: which column is a parameter
+    // here, and a computed key in a `select` is a type Prisma cannot check. Five
+    // short strings, on a table with one row per account.
     const rows = await prisma.userPrivacy.findMany({
         where: { userId: { in: wanted } },
-        select: { userId: true, discoverable: true }
+        select: {
+            userId: true,
+            avatar: true,
+            lastSeen: true,
+            forwarding: true,
+            discoverable: true,
+            readReceipts: true
+        }
     });
-    const settings = new Map(rows.map((row) => [row.userId, row.discoverable]));
+    const settings = new Map(rows.map((row) => [row.userId, row[field]]));
 
     // Only looked up when somebody's answer actually turns on it, which is the
     // uncommon case.
@@ -59,7 +77,7 @@ export async function discoverableBy(
 
     return new Set(
         wanted.filter((userId) => {
-            const audience = core.privacySettingsSchema.shape.discoverable.safeParse(
+            const audience = core.privacySettingsSchema.shape[field].safeParse(
                 settings.get(userId)
             );
             return core.audienceAllows(audience.success ? audience.data : "everyone", {
@@ -69,6 +87,14 @@ export async function discoverableBy(
             });
         })
     );
+}
+
+/** Which of these accounts this viewer is allowed to find. */
+export async function discoverableBy(
+    viewer: PrivacyViewer,
+    userIds: readonly string[]
+): Promise<Set<string>> {
+    return allowedBy(viewer, "discoverable", userIds);
 }
 
 export async function setPrivacy(

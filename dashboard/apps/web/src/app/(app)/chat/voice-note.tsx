@@ -29,6 +29,10 @@ import { barsOf, spokenLength } from "./voice-recorder";
  *  still reads as a strip of sound rather than a gap in one. */
 const QUIETEST = 12;
 
+/** How far an arrow key moves through a recording. Five seconds is a sentence,
+ *  which is the unit people actually skip in. */
+const STEP_SECONDS = 5;
+
 /**
  * The speeds, in the order the button walks through them.
  *
@@ -180,6 +184,17 @@ export function VoiceNote({
         setAt(wanted);
     };
 
+    /** The same, from a pointer somewhere over the shape. */
+    const seekToPointer = (clientX: number, shape: HTMLElement) => {
+        const box = shape.getBoundingClientRect();
+        seekTo((clientX - box.left) / box.width);
+    };
+
+    /** Whether the pointer is down on the shape, which is what turns a press into
+     *  a scrub. Held in a ref rather than in state: it changes on every frame of
+     *  a drag, and nothing on screen is drawn from it. */
+    const scrubbing = useRef(false);
+
     const done = length > 0 ? Math.min(1, at / length) : 0;
 
     return (
@@ -213,17 +228,43 @@ export function VoiceNote({
 
                 {bars.length > 0 ? (
                     // The shape is the control. Every player people already use
-                    // lets you press into the middle of a sentence, and a
-                    // waveform that could not be pressed would be a picture of
-                    // one.
+                    // lets you press into the middle of a sentence and then drag
+                    // along it to find the word, and a waveform that only took a
+                    // press would be half of one.
+                    //
+                    // The pointer is captured on the way down, so the drag keeps
+                    // working past the ends of the shape and past the edge of the
+                    // message - letting go anywhere finishes it, which is what
+                    // stops a scrub getting stuck on a fast movement.
                     <button
                         type="button"
                         aria-label="Skip to a point in this message"
-                        onClick={(event) => {
-                            const box = event.currentTarget.getBoundingClientRect();
-                            seekTo((event.clientX - box.left) / box.width);
+                        onPointerDown={(event) => {
+                            scrubbing.current = true;
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                            seekToPointer(event.clientX, event.currentTarget);
                         }}
-                        className="flex h-7 w-44 max-w-[45vw] shrink-0 items-end gap-px"
+                        onPointerMove={(event) => {
+                            if (!scrubbing.current) return;
+                            seekToPointer(event.clientX, event.currentTarget);
+                        }}
+                        onPointerUp={() => {
+                            scrubbing.current = false;
+                        }}
+                        onPointerCancel={() => {
+                            scrubbing.current = false;
+                        }}
+                        onKeyDown={(event) => {
+                            const way =
+                                event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
+                            if (!way || length <= 0) return;
+                            event.preventDefault();
+                            seekTo((at + way * STEP_SECONDS) / length);
+                        }}
+                        // Nothing selects and nothing scrolls under the finger:
+                        // a drag along a waveform on a phone is a drag along a
+                        // waveform, not a scroll of the conversation.
+                        className="flex h-7 w-44 max-w-[45vw] shrink-0 touch-none select-none items-end gap-px"
                     >
                         {bars.map((level, index) => (
                             <span

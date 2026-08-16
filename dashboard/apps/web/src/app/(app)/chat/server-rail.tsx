@@ -56,7 +56,7 @@ function hex(color: string | undefined): string | null {
 }
 
 export function ServerRail() {
-    const { spaces, channels, activeSpaceId, setActiveSpaceId, refresh } = useChat();
+    const { spaces, channels, activeSpaceId, setActiveSpaceId, refresh, may } = useChat();
     const [newSpace, setNewSpace] = useState(false);
     const [newChannelIn, setNewChannelIn] = useState<ChatSpaceView | null>(null);
     const [inviting, setInviting] = useState<ChatSpaceView | null>(null);
@@ -113,15 +113,19 @@ export function ServerRail() {
                 ))}
             </div>
 
-            <button
-                type="button"
-                aria-label="New space"
-                title="New space"
-                onClick={() => setNewSpace(true)}
-                className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors duration-fast hover:border-border-strong hover:bg-card-hover hover:text-foreground"
-            >
-                <Plus className="size-4" />
-            </button>
+            {/* Absent for an account that may not start one, rather than a
+                button that opens a dialog to say no. */}
+            {may.spaces && (
+                <button
+                    type="button"
+                    aria-label="New space"
+                    title="New space"
+                    onClick={() => setNewSpace(true)}
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors duration-fast hover:border-border-strong hover:bg-card-hover hover:text-foreground"
+                >
+                    <Plus className="size-4" />
+                </button>
+            )}
 
             {/* Creating a space posts nothing, so nothing would tell the rail
                 about it. Asking again is what puts it in the column. */}

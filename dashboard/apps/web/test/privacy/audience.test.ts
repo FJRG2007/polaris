@@ -16,6 +16,9 @@ import { describe, expect, it } from "vitest";
 import {
     DEFAULT_PRIVACY,
     PRIVACY_AUDIENCES,
+    PRIVACY_FIELDS,
+    PRIVACY_FIELD_LABELS,
+    PRIVACY_FIELD_NOTES,
     audienceAllows,
     privacySettingsSchema
 } from "@polaris/core";
@@ -82,5 +85,32 @@ describe("the setting itself", () => {
         const parsed = privacySettingsSchema.parse({ avatar: "nobody" });
         expect(parsed.avatar).toBe("nobody");
         expect(parsed.lastSeen).toBe("everyone");
+    });
+});
+
+describe("the screen's own list", () => {
+    it("is every setting there is, and no more", () => {
+        // The screen reads this rather than keeping an order of its own, so a
+        // setting added to the schema and forgotten here would be a setting
+        // nobody could reach.
+        expect([...PRIVACY_FIELDS].sort()).toEqual(
+            Object.keys(privacySettingsSchema.shape).sort()
+        );
+    });
+
+    it("says what each one is and what it does", () => {
+        for (const field of PRIVACY_FIELDS) {
+            expect(PRIVACY_FIELD_LABELS[field]).toBeTruthy();
+            expect(PRIVACY_FIELD_NOTES[field]).toBeTruthy();
+        }
+    });
+});
+
+describe("passing a message on", () => {
+    it("is allowed until somebody says otherwise", () => {
+        // A messenger where nothing can be forwarded is not what anybody
+        // expects, so the default is the open one like every other audience
+        // here.
+        expect(DEFAULT_PRIVACY.forwarding).toBe("everyone");
     });
 });

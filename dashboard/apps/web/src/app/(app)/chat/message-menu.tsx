@@ -13,12 +13,21 @@
  */
 
 import type { ReactNode } from "react";
-import { copyText, messageLink } from "./links";
+import { isPlayable } from "./voice-recorder";
 import { useAppUrl } from "@/components/app-url";
 import { plainText } from "@/components/rich-text/excerpt";
 import type { ChatMessageView } from "@/lib/chat/messages";
+import { copyText, downloadFile, messageLink } from "./links";
+import {
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuSeparator,
+    ContextMenuTrigger
+} from "@polaris/ui";
 import {
     Copy,
+    Download,
     Flag,
     CornerUpLeft,
     Forward,
@@ -28,13 +37,6 @@ import {
     Star,
     Trash2
 } from "lucide-react";
-import {
-    ContextMenu,
-    ContextMenuContent,
-    ContextMenuItem,
-    ContextMenuSeparator,
-    ContextMenuTrigger
-} from "@polaris/ui";
 
 export interface MessageActions {
     readonly message: ChatMessageView;
@@ -61,21 +63,30 @@ export function MessageMenu({
 }) {
     const { message, mine, canPost, canModerate } = actions;
     const baseUrl = useAppUrl();
+    // A recording is the one attachment with no way to save it from the message
+    // itself: a picture opens into a viewer that offers it and a document is a
+    // link, but a player is a player. So the menu is where it lives.
+    const recordings = message.attachments.filter((file) => isPlayable(file.contentType));
 
     return (
         <ContextMenu>
             <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-            <ContextMenuContent className="w-48">
+            <ContextMenuContent className="w-52">
                 {canPost && !message.deleted && (
                     <>
                         <ContextMenuItem onSelect={() => actions.onReply(message)}>
                             <CornerUpLeft className="size-3.5" />
                             Reply
                         </ContextMenuItem>
-                        <ContextMenuItem onSelect={() => actions.onForward(message)}>
-                            <Forward className="size-3.5" />
-                            Forward
-                        </ContextMenuItem>
+                        {/* Absent rather than refused when whoever wrote it does
+                            not allow it. A menu that offers something and then
+                            says no is worse than one that offers less. */}
+                        {message.forwardable && (
+                            <ContextMenuItem onSelect={() => actions.onForward(message)}>
+                                <Forward className="size-3.5" />
+                                Forward
+                            </ContextMenuItem>
+                        )}
                         {actions.onOpenThread && (
                             <ContextMenuItem onSelect={() => actions.onOpenThread?.(message)}>
                                 <MessageSquare className="size-3.5" />
@@ -110,6 +121,22 @@ export function MessageMenu({
                         Copy text
                     </ContextMenuItem>
                 )}
+                {!message.deleted &&
+                    recordings.map((file) => (
+                        <ContextMenuItem
+                            key={file.id}
+                            onSelect={() =>
+                                downloadFile(`/api/chat/attachments/${file.id}`, file.name)
+                            }
+                        >
+                            <Download className="size-3.5" />
+                            {/* Named only when there is more than one, since a
+                                voice message has no name worth reading. */}
+                            <span className="min-w-0 truncate">
+                                {recordings.length === 1 ? "Download the audio" : file.name}
+                            </span>
+                        </ContextMenuItem>
+                    ))}
 
                 {!mine && !message.deleted && (
                     <>
@@ -124,10 +151,16 @@ export function MessageMenu({
                 {canPost && !message.deleted && (mine || canModerate) && (
                     <>
                         <ContextMenuSeparator />
+                        {/* The keys said out loud, because a shortcut nobody is
+                            told about is a shortcut nobody uses. Both act on the
+                            message under the pointer, which is this one. */}
                         {mine && (
                             <ContextMenuItem onSelect={() => actions.onEdit(message)}>
                                 <Pencil className="size-3.5" />
                                 Edit
+                                <span className="ml-auto pl-6 text-[11px] text-foreground-subtle">
+                                    F2
+                                </span>
                             </ContextMenuItem>
                         )}
                         <ContextMenuItem
@@ -136,6 +169,9 @@ export function MessageMenu({
                         >
                             <Trash2 className="size-3.5" />
                             Delete
+                            <span className="ml-auto pl-6 text-[11px] text-foreground-subtle">
+                                Del
+                            </span>
                         </ContextMenuItem>
                     </>
                 )}
