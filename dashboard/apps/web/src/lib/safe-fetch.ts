@@ -26,7 +26,9 @@
  */
 
 import * as core from "@polaris/core";
+import { Agent } from "undici";
 import { lookup } from "node:dns/promises";
+import { lookup as resolveHost } from "node:dns";
 
 /** How long Polaris waits for an answer before giving up. */
 export const FETCH_TIMEOUT_MS = 5000;
@@ -74,6 +76,55 @@ export async function reachable(hostname: string): Promise<boolean> {
     }
 }
 
+/**
+ * The dispatcher every fetch here connects through.
+ *
+ * The check and the connection share one resolution. `reachable` above is a fast
+ * refusal, but on its own it cannot be the whole guard: it resolves the name, and
+ * then `fetch` resolves it a second time to open the socket - two independent
+ * lookups of the same name. A name that answers a public address to the check and
+ * a private one to the connect (DNS rebinding) slips between them. So the same
+ * rule is enforced *inside the connector*, where the address that is validated is
+ * the exact one the socket opens to: the name is resolved once, refused when any
+ * address it answers with is private, and connected to the address just checked.
+ * The hostname is left untouched for TLS, so certificate verification is
+ * unaffected.
+ */
+/**
+ * The one address a connection may open to, chosen from everything a name
+ * resolved to - or an error when it may not be reached at all.
+ *
+ * The rule is `reachable`'s, applied at the moment of connecting rather than a
+ * moment before it: every address the name answers with has to be public, not
+ * merely the first the stack would pick, so one private answer refuses the whole
+ * name. Pulled out on its own so the check at the point of the socket can be read
+ * and tested as the plain decision it is.
+ */
+export function pinnedAddress(
+    hostname: string,
+    addresses: readonly { readonly address: string; readonly family: number }[]
+): { address: string; family: number } | Error {
+    if (addresses.length === 0) return new Error(`${hostname} does not resolve`);
+    if (addresses.some((entry) => core.isPrivateIp(entry.address))) {
+        return new Error(`${hostname} resolves to a private address`);
+    }
+    const chosen = addresses[0]!;
+    return { address: chosen.address, family: chosen.family };
+}
+
+const dispatcher = new Agent({
+    connect: {
+        lookup(hostname, _options, callback) {
+            resolveHost(hostname, { all: true }, (error, addresses) => {
+                if (error) return callback(error, "", 0);
+                const chosen = pinnedAddress(hostname, addresses);
+                if (chosen instanceof Error) return callback(chosen, "", 0);
+                callback(null, chosen.address, chosen.family);
+            });
+        }
+    }
+});
+
 /** Fetch, following redirects by hand and re-checking every hop. */
 export async function follow(
     start: URL,
@@ -85,10 +136,14 @@ export async function follow(
 
         let response: Response;
         try {
-            response = await fetch(url, {
+            // The dispatcher re-resolves and re-checks the name as it connects, so
+            // the address vetted a line ago cannot be swapped for a private one
+            // underneath the fetch.
+            const init: RequestInit & { dispatcher?: Agent } = {
                 redirect: "manual",
                 cache: "no-store",
                 signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+                dispatcher,
                 headers: {
                     // Named honestly, in the form crawlers are conventionally
                     // named: `Mozilla/5.0 (compatible; <name>)`, the same shape
@@ -101,7 +156,8 @@ export async function follow(
                     "user-agent": "Mozilla/5.0 (compatible; PolarisBot/1.0; +link preview)",
                     accept
                 }
-            });
+            };
+            response = await fetch(url, init);
         } catch {
             return null;
         }

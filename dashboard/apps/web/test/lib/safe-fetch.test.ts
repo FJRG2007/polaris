@@ -25,7 +25,7 @@ vi.mock("node:dns/promises", () => ({
     }
 }));
 
-const { fetchImage } = await import("@/lib/safe-fetch");
+const { fetchImage, pinnedAddress } = await import("@/lib/safe-fetch");
 
 const CAP = 1024;
 
@@ -123,5 +123,39 @@ describe("what it refuses", () => {
     it("refuses a link carrying credentials", async () => {
         expect(await fetchImage("https://user:secret@pictures.example/x.gif", CAP)).toBeNull();
         expect(fetched).toEqual([]);
+    });
+});
+
+/**
+ * The check the connector makes as it opens the socket, which is the address the
+ * fetch actually connects to. The pre-check a moment earlier resolves the name
+ * too, and the two resolutions are independent - so a name that answers public to
+ * the pre-check and private to the connect (DNS rebinding) has to be caught here
+ * or not at all. This is that catch, as the plain decision it is.
+ */
+describe("the address the socket is pinned to", () => {
+    it("takes the first when every answer is public", () => {
+        const chosen = pinnedAddress("host.example", [
+            { address: "93.184.216.34", family: 4 },
+            { address: "93.184.216.35", family: 4 }
+        ]);
+        expect(chosen).toEqual({ address: "93.184.216.34", family: 4 });
+    });
+
+    it("refuses when any answer is private, even behind a public first one", () => {
+        // The rebinding shape: a real public record, and a private one the stack
+        // might pick instead. One private answer refuses the whole name.
+        const chosen = pinnedAddress("rebind.example", [
+            { address: "93.184.216.34", family: 4 },
+            { address: "169.254.169.254", family: 4 }
+        ]);
+        expect(chosen).toBeInstanceOf(Error);
+    });
+
+    it("refuses loopback and a name that resolves to nothing", () => {
+        expect(pinnedAddress("evil.example", [{ address: "127.0.0.1", family: 4 }])).toBeInstanceOf(
+            Error
+        );
+        expect(pinnedAddress("nowhere.example", [])).toBeInstanceOf(Error);
     });
 });
