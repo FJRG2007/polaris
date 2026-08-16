@@ -664,7 +664,17 @@ fn deploy_fs_read<R: Read>(req: &Request, body: &mut R) -> Response {
             return Response::bad_request("argv element too long or contains a NUL");
         }
     }
-    match deploy::exec_run(&request.container, &request.argv, None, false) {
+    // A stopped container has no process to enter, so the same read is served by
+    // borrowing its volumes instead. Which one applies is asked here rather than
+    // by the caller: whether a container is up is the daemon's to know, and a
+    // control plane that decided from what it last saw would refuse exactly when
+    // somebody needs the files most.
+    let result = if deploy::container_running(&request.container) {
+        deploy::exec_run(&request.container, &request.argv, None, false)
+    } else {
+        deploy::exec_stopped(&request.container, &request.argv, None, false)
+    };
+    match result {
         Ok(reader) => Response::stream(200, "OK", reader)
             .with_header("Content-Type", "application/octet-stream"),
         Err(_) => Response::text(502, "Bad Gateway", "could not run the command"),
@@ -800,7 +810,15 @@ fn deploy_fs_write<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Re
         "polaris".to_string(),
         path.to_string(),
     ];
-    match deploy::exec_run(container, &argv, Some(reopened), true) {
+    // Written into the volumes of a stopped container the same way they are read
+    // from one: editing a config while the server is off is the ordinary reason
+    // to be in these files at all.
+    let written = if deploy::container_running(container) {
+        deploy::exec_run(container, &argv, Some(reopened), true)
+    } else {
+        deploy::exec_stopped(container, &argv, Some(reopened), true)
+    };
+    match written {
         Ok(reader) => stream_response(reader),
         Err(_) => Response::text(502, "Bad Gateway", "could not write the file"),
     }

@@ -195,19 +195,19 @@ describe("the line under the badge", () => {
 });
 
 describe("whether the files can be browsed", () => {
-    it("refuses a stopped container, whose listing would come back empty", () => {
+    it("allows a stopped server, which is when somebody most wants them", () => {
+        // A world that will not load, a config that killed the process on boot,
+        // a plugin to pull out before starting it again. The daemon reads them
+        // out of the volumes the stopped container leaves behind, so being off
+        // is not being empty.
         expect(
             canBrowseFiles(
                 server("a", { facts: facts({ running: false }), live: live({ containerRunning: false }) })
             )
-        ).toBe(false);
+        ).toBe(true);
     });
 
     it("allows a container that is up while the game inside it is not", () => {
-        // The case that matters, and the one this used to refuse: a server that
-        // crashed, a world that will not load, a plugin that killed the process
-        // on boot. Those are the three moments somebody most needs the files,
-        // and the listing runs in the container, which is still there.
         expect(
             canBrowseFiles(
                 server("a", {
@@ -221,6 +221,12 @@ describe("whether the files can be browsed", () => {
     it("allows a running server, and one whose live read has not landed yet", () => {
         expect(canBrowseFiles(server("a"))).toBe(true);
         expect(canBrowseFiles(server("b", { live: null }))).toBe(true);
+    });
+
+    it("refuses only a server that was never deployed", () => {
+        // No container, so nothing on disk to open - the empty directory this
+        // guard exists to avoid.
+        expect(canBrowseFiles(server("a", { applicationId: null }))).toBe(false);
     });
 });
 

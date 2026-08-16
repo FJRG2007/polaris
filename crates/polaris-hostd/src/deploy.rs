@@ -550,6 +550,96 @@ pub fn exec_run(
     stream_command_ext(cmd, merge_stderr)
 }
 
+/// Whether a container is running right now.
+///
+/// Read from the daemon rather than remembered: what a container is doing is not
+/// something a control plane can know from what it last asked for, and the whole
+/// point of the caller below is that the two disagree.
+pub fn container_running(container: &str) -> bool {
+    let output = Command::new("docker")
+        .arg("inspect")
+        .arg("-f")
+        .arg("{{.State.Running}}")
+        .arg(container)
+        .stdin(Stdio::null())
+        .output();
+    match output {
+        Ok(result) if result.status.success() => {
+            String::from_utf8_lossy(&result.stdout).trim() == "true"
+        }
+        _ => false,
+    }
+}
+
+/// The image a container was made from, which is the one image guaranteed to
+/// exist on this machine that can read that container's files.
+fn container_image(container: &str) -> io::Result<String> {
+    let output = Command::new("docker")
+        .arg("inspect")
+        .arg("-f")
+        .arg("{{.Config.Image}}")
+        .arg(container)
+        .stdin(Stdio::null())
+        .output()?;
+    if !output.status.success() {
+        return Err(io::Error::other("container inspect failed"));
+    }
+    let image = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if image.is_empty() {
+        return Err(io::Error::other("container reports no image"));
+    }
+    Ok(image)
+}
+
+/// Run a read-only command against the files of a container that is NOT running.
+///
+/// `docker exec` needs a process to enter, so a stopped container has nothing to
+/// read - which is exactly when somebody wants to look: a world that will not
+/// load, a config that killed the process on boot, a server switched off on
+/// purpose while its files are edited. The files are still there, in the volumes
+/// the container mounts, so this borrows them: a throwaway container from the
+/// stopped one's own image, with its volumes attached and the command run inside.
+///
+/// Its own image rather than a fixed helper one, because that image is on this
+/// machine by definition - a helper would have to be pulled, and a machine with
+/// no network would be a machine where a stopped server's files became
+/// unreachable. Networking is off and the container removes itself; it exists for
+/// as long as `ls` takes.
+pub fn exec_stopped(
+    container: &str,
+    argv: &[String],
+    stdin: Option<std::fs::File>,
+    merge_stderr: bool,
+) -> io::Result<Box<dyn Read + Send>> {
+    let image = container_image(container)?;
+    let (program, rest) = argv.split_first().ok_or_else(|| io::Error::other("empty argv"))?;
+
+    let mut cmd = Command::new("docker");
+    cmd.arg("run").arg("--rm");
+    if stdin.is_some() {
+        cmd.arg("-i");
+    }
+    cmd.arg("--network")
+        .arg("none")
+        .arg("--volumes-from")
+        .arg(container)
+        .arg("--entrypoint")
+        .arg(program)
+        .arg(&image);
+    for arg in rest {
+        cmd.arg(arg);
+    }
+    match stdin {
+        Some(file) => {
+            cmd.stdin(Stdio::from(file));
+        }
+        None => {
+            cmd.stdin(Stdio::null());
+        }
+    }
+    stream_command_ext(cmd, merge_stderr)
+}
+
 fn pump<R: Read>(mut reader: R, tx: mpsc::Sender<Vec<u8>>) {
     let mut buf = [0u8; 8192];
     loop {

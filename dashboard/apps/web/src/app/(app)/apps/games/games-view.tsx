@@ -609,11 +609,10 @@ function filesHref(applicationId: string | null, game: GameId | null): string | 
         : null;
 }
 
-/** Why the files of a stopped server cannot be browsed. The explorer reads them
- *  from inside the container, so one that is not running has nothing to read - it
- *  used to answer with an empty directory, which reads as a server whose world has
- *  been deleted. */
-const FILES_NEED_RUNNING = "Start the server to browse its files";
+/** Why a server has no files to browse: it has never been deployed, so there is
+ *  no container and nothing on disk. A stopped one is browsable - its files are
+ *  read out of the volumes it leaves behind. */
+const FILES_NEED_DEPLOY = "Deploy the server to browse its files";
 
 function ServerRow({
     server,
@@ -717,7 +716,7 @@ function ServerRow({
                                     label={
                                         browsable
                                             ? `Browse the files of ${server.name}`
-                                            : FILES_NEED_RUNNING
+                                            : FILES_NEED_DEPLOY
                                     }
                                     href={files}
                                     disabled={!browsable}
@@ -775,7 +774,7 @@ function ServerRow({
                         // tooltip nobody can reach.
                         <ContextMenuItem disabled>
                             <FolderOpen className="size-4" /> Files
-                            <span className="ml-auto pl-3 text-xs">{FILES_NEED_RUNNING}</span>
+                            <span className="ml-auto pl-3 text-xs">{FILES_NEED_DEPLOY}</span>
                         </ContextMenuItem>
                     ))}
                 {address && (

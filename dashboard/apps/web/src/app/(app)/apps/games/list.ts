@@ -181,24 +181,22 @@ export function uptimeLine(server: ServerView): { prefix: string; at: string } |
 /**
  * Whether this server's files can be browsed at all.
  *
- * One question, and it is not "is the server up": the explorer lists from inside
- * the container, so what decides is whether the *container* is running. Those
- * come apart exactly when somebody needs the files most - a game that crashed, a
- * world that will not load, a plugin that killed the process on boot - and this
- * used to refuse all three, because it asked whether Polaris considered the
- * server up and the game was not answering.
+ * Anything with a container has files, whether or not it is running. That was
+ * not always true: the explorer reads from inside the container, `docker exec`
+ * needs a process to enter, and so a stopped server answered with nothing and
+ * the button was disabled rather than opening an empty directory that reads as a
+ * world somebody deleted.
  *
- * The observation wins where there is one. `facts.running` is what Polaris means
- * to be true and is the fallback for a server nothing has probed yet; a probe
- * that came back saying the container is up is the better answer even when the
- * game inside it is not.
+ * The host daemon borrows the volumes of a stopped container instead, so the
+ * files are there either way - and it is when a server is off that somebody most
+ * wants them: a world that will not load, a config that killed the process on
+ * boot, a plugin to remove before starting it again.
  *
- * A container that is genuinely stopped still cannot be listed - `docker exec`
- * has nothing to run in - and the menu says so rather than opening an empty
- * directory that reads as a world somebody deleted.
+ * What is left is the one case with nothing to browse: a server that has never
+ * been deployed, and so has no container to have files in.
  */
 export function canBrowseFiles(server: ServerView): boolean {
-    return server.live?.containerRunning ?? server.facts?.running ?? false;
+    return server.applicationId !== null;
 }
 
 /** What the server runs, in the two words an operator would say: "Paper 1.21.4",
