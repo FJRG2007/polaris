@@ -6,16 +6,60 @@
  * Commands go over RCON, which answers - so the reply is shown against the
  * command that caused it rather than left for the operator to find in the log,
  * where a command that was refused looks exactly like one that was never sent.
+ *
+ * Two things sit around the input, and they are deliberately not the same thing.
+ * The kept commands are the server's: the handful of lines this particular server
+ * is run with, stored on the install, so they survive a reload, a different
+ * browser and a second operator. The history is one person's typing at one
+ * keyboard, so it stays in that browser - but it is on screen now rather than
+ * only reachable by pressing the up arrow, which is a feature nobody finds.
  */
 
 import { useRuntimeLog } from "./use-runtime-log";
 import { LogViewer } from "@/components/log-viewer";
 import { GAME_RULES } from "@/lib/apps/minecraft/rules";
-import { CornerDownLeft, RefreshCw } from "lucide-react";
-import { Button, Card, CardBody, Input, cn } from "@polaris/ui";
-import { recentItemsAction, sendConsoleCommandAction } from "./minecraft-actions";
 import { applyCompletion, completeConsole } from "@/lib/apps/console-complete";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type KeyboardEvent } from "react";
+import { recentItemsAction, sendConsoleCommandAction } from "./minecraft-actions";
+import { CornerDownLeft, History, MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
+import {
+    deleteConsoleCommandAction,
+    listConsoleCommandsAction,
+    saveConsoleCommandAction
+} from "./console-actions";
+import {
+    MAX_SAVED_COMMAND,
+    MAX_SAVED_LABEL,
+    placeholderRange,
+    type SavedCommand
+} from "@/lib/apps/console-commands";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useTransition,
+    type KeyboardEvent
+} from "react";
+import {
+    Button,
+    Card,
+    CardBody,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    Input,
+    cn
+} from "@polaris/ui";
 
 /** One command and what the server said back. */
 interface Reply {
@@ -43,6 +87,15 @@ function readHistory(installedAppId: string): string[] {
         return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
     } catch {
         return [];
+    }
+}
+
+function writeHistory(installedAppId: string, history: readonly string[]): void {
+    try {
+        window.localStorage.setItem(historyKey(installedAppId), JSON.stringify(history));
+    } catch {
+        // A browser with storage turned off still gets the history for this
+        // sitting; it simply does not outlive the tab.
     }
 }
 
@@ -74,8 +127,11 @@ export function GameConsole({
     const [replies, setReplies] = useState<Reply[]>([]);
     const [pending, startTransition] = useTransition();
     // Command history, newest last, walked with the arrow keys like a shell. Read
-    // back from the browser, so it survives the reload that used to empty it.
+    // back from the browser, so it survives the reload that used to empty it. Held
+    // as a ref for the arrows - which must not re-render on every keystroke - and
+    // mirrored into state for the menu that draws it.
     const history = useRef<string[]>([]);
+    const [past, setPast] = useState<readonly string[]>([]);
     const cursor = useRef<number | null>(null);
     const input = useRef<HTMLInputElement | null>(null);
     const [caret, setCaret] = useState(0);
@@ -83,9 +139,18 @@ export function GameConsole({
     /** Which suggestion is highlighted, or none - when none, the arrows walk the
      *  history instead, which is what they did before any of this. */
     const [choice, setChoice] = useState<number | null>(null);
+    const [saved, setSaved] = useState<readonly SavedCommand[]>([]);
+    /** The kept command being written, or null while the dialog is shut. */
+    const [keeping, setKeeping] = useState<{ id?: string; label: string; command: string } | null>(null);
+    const [keepError, setKeepError] = useState("");
 
     useEffect(() => {
         history.current = readHistory(installedAppId);
+        setPast(history.current);
+    }, [installedAppId]);
+
+    useEffect(() => {
+        void listConsoleCommandsAction(installedAppId).then((answer) => setSaved(answer.commands));
     }, [installedAppId]);
 
     // The items this server has actually been handing out, which is a far better
@@ -116,6 +181,21 @@ export function GameConsole({
         requestAnimationFrame(() => input.current?.setSelectionRange(next.caret, next.caret));
     }, []);
 
+    /** Put a whole command in the box, with the blank to fill in selected when it
+     *  has one - which is the only reason anybody would want the caret anywhere
+     *  but the end. */
+    const load = useCallback((command: string) => {
+        setLine(command);
+        setChoice(null);
+        const blank = placeholderRange(command);
+        setCaret(blank ? blank.end : command.length);
+        requestAnimationFrame(() => {
+            input.current?.focus();
+            if (blank) input.current?.setSelectionRange(blank.start, blank.end);
+            else input.current?.setSelectionRange(command.length, command.length);
+        });
+    }, []);
+
     const accept = useCallback(
         (option: string) => {
             put(applyCompletion(line, completion, option));
@@ -124,28 +204,73 @@ export function GameConsole({
         [line, completion, put]
     );
 
-    function send(): void {
-        const command = line.trim();
-        if (command.length === 0) return;
-        history.current = [...history.current.filter((item) => item !== command), command].slice(-KEPT_HISTORY);
-        cursor.current = null;
-        setChoice(null);
-        try {
-            window.localStorage.setItem(historyKey(installedAppId), JSON.stringify(history.current));
-        } catch {
-            // A browser with storage turned off still gets the history for this
-            // sitting; it simply does not outlive the tab.
-        }
-        setLine("");
-        setCaret(0);
+    const submit = useCallback(
+        (raw: string) => {
+            const command = raw.trim();
+            if (command.length === 0) return;
+            history.current = [...history.current.filter((item) => item !== command), command].slice(-KEPT_HISTORY);
+            setPast(history.current);
+            cursor.current = null;
+            setChoice(null);
+            writeHistory(installedAppId, history.current);
+            setLine("");
+            setCaret(0);
+            startTransition(async () => {
+                const result = await sendConsoleCommandAction(installedAppId, command);
+                const output = result.error ?? (result.output || "Done");
+                setReplies((current) =>
+                    [...current, { command, output, failed: Boolean(result.error) }].slice(-KEPT_REPLIES)
+                );
+                // The command usually produced log output too; show it without
+                // waiting for the next poll.
+                void refresh();
+            });
+        },
+        [installedAppId, refresh]
+    );
+
+    /** Pressing a kept command. One that is complete runs; one with a blank in it
+     *  lands in the box with the blank selected, because sending
+     *  `Broadcast <message>` verbatim is never what anybody meant. */
+    const pressSaved = useCallback(
+        (entry: SavedCommand) => {
+            if (placeholderRange(entry.command)) load(entry.command);
+            else submit(entry.command);
+        },
+        [load, submit]
+    );
+
+    function keep(): void {
+        if (!keeping) return;
+        setKeepError("");
         startTransition(async () => {
-            const result = await sendConsoleCommandAction(installedAppId, command);
-            const output = result.error ?? (result.output || "Done");
-            setReplies((current) => [...current, { command, output, failed: Boolean(result.error) }].slice(-KEPT_REPLIES));
-            // The command usually produced log output too; show it without waiting
-            // for the next poll.
-            void refresh();
+            const result = await saveConsoleCommandAction({
+                installedAppId,
+                id: keeping.id,
+                label: keeping.label,
+                command: keeping.command
+            });
+            if (result.error || !result.commands) {
+                setKeepError(result.error ?? "That command could not be kept");
+                return;
+            }
+            setSaved(result.commands);
+            setKeeping(null);
         });
+    }
+
+    function forget(id: string): void {
+        startTransition(async () => {
+            const result = await deleteConsoleCommandAction(installedAppId, id);
+            if (result.commands) setSaved(result.commands);
+        });
+    }
+
+    function clearHistory(): void {
+        history.current = [];
+        setPast([]);
+        cursor.current = null;
+        writeHistory(installedAppId, []);
     }
 
     function onKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
@@ -171,7 +296,7 @@ export function GameConsole({
                 accept(suggestions[choice] ?? "");
                 return;
             }
-            send();
+            submit(line);
             return;
         }
         if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
@@ -231,6 +356,76 @@ export function GameConsole({
                     </div>
                 )}
 
+                {/* The commands this server is run with, above the box they would
+                    otherwise be typed into. */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                    {saved.map((entry) => (
+                        <span
+                            key={entry.id}
+                            className="flex items-stretch overflow-hidden rounded-md border border-border bg-surface"
+                        >
+                            <button
+                                type="button"
+                                disabled={!running || pending}
+                                onClick={() => pressSaved(entry)}
+                                title={entry.command}
+                                className="max-w-56 truncate px-2 py-1 text-xs transition-colors hover:bg-muted disabled:opacity-50"
+                            >
+                                {entry.label}
+                            </button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button
+                                        type="button"
+                                        aria-label={`More for ${entry.label}`}
+                                        className="border-l border-border px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                    >
+                                        <MoreHorizontal className="size-3.5" />
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start">
+                                    <DropdownMenuLabel className="font-mono text-xs">
+                                        {entry.command}
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        onSelect={() => {
+                                            setKeepError("");
+                                            setKeeping({
+                                                id: entry.id,
+                                                label: entry.label,
+                                                command: entry.command
+                                            });
+                                        }}
+                                    >
+                                        Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => load(entry.command)}>
+                                        Put it in the box
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        className="text-danger"
+                                        onSelect={() => forget(entry.id)}
+                                    >
+                                        <Trash2 className="size-4" /> Forget it
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </span>
+                    ))}
+                    <Button
+                        size="xs"
+                        variant="ghost"
+                        disabled={pending}
+                        onClick={() => {
+                            setKeepError("");
+                            setKeeping({ label: "", command: line.trim() });
+                        }}
+                    >
+                        <Plus className="size-3.5" /> Keep a command
+                    </Button>
+                </div>
+
                 <div className="relative flex items-center gap-2">
                     {suggestions.length > 0 && (
                         // Above the box rather than at the caret. A list anchored to
@@ -274,10 +469,107 @@ export function GameConsole({
                         aria-label="Server command"
                         className="font-mono"
                     />
-                    <Button onClick={send} disabled={!running || pending || line.trim().length === 0}>
+                    {/* What was typed here before, including before the last
+                        reload. The arrows still walk it; this is so somebody who
+                        does not know that can see it. */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label="Commands you have run"
+                                title="Commands you have run"
+                            >
+                                <History className="size-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+                            <DropdownMenuLabel>Commands you have run</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {past.length === 0 ? (
+                                <DropdownMenuItem disabled>Nothing yet</DropdownMenuItem>
+                            ) : (
+                                [...past].reverse().map((command, index) => (
+                                    <DropdownMenuItem
+                                        key={`${command}-${index}`}
+                                        className="font-mono text-xs"
+                                        onSelect={() => load(command)}
+                                    >
+                                        <span className="max-w-72 truncate" title={command}>{command}</span>
+                                    </DropdownMenuItem>
+                                ))
+                            )}
+                            {past.length > 0 && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="text-danger" onSelect={clearHistory}>
+                                        <Trash2 className="size-4" /> Clear the history
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button onClick={() => submit(line)} disabled={!running || pending || line.trim().length === 0}>
                         <CornerDownLeft className="size-4" /> Send
                     </Button>
                 </div>
+
+                {keeping && (
+                    <Dialog open onOpenChange={(open: boolean) => !open && setKeeping(null)}>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>{keeping.id ? "Edit the command" : "Keep a command"}</DialogTitle>
+                                <DialogDescription>
+                                    It sits above the console for everybody who runs this server. Put
+                                    a blank in angle brackets - <code>Broadcast &lt;message&gt;</code>{" "}
+                                    - and pressing it fills the box instead of sending.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="flex flex-col gap-3">
+                                <label className="flex flex-col gap-1">
+                                    <span className="text-sm font-medium">Command</span>
+                                    <Input
+                                        autoFocus
+                                        value={keeping.command}
+                                        maxLength={MAX_SAVED_COMMAND}
+                                        className="font-mono"
+                                        placeholder={hint}
+                                        onChange={(event) =>
+                                            setKeeping({ ...keeping, command: event.target.value })
+                                        }
+                                    />
+                                </label>
+                                <label className="flex flex-col gap-1">
+                                    <span className="text-sm font-medium">Name</span>
+                                    <Input
+                                        value={keeping.label}
+                                        maxLength={MAX_SAVED_LABEL}
+                                        placeholder="The command itself, if you leave this empty"
+                                        onChange={(event) =>
+                                            setKeeping({ ...keeping, label: event.target.value })
+                                        }
+                                    />
+                                </label>
+                                {keepError && (
+                                    <p role="alert" className="text-sm text-danger">
+                                        {keepError}
+                                    </p>
+                                )}
+                            </div>
+                            <DialogFooter>
+                                <Button variant="ghost" onClick={() => setKeeping(null)}>
+                                    Cancel
+                                </Button>
+                                <Button
+                                    onClick={keep}
+                                    disabled={pending || keeping.command.trim().length === 0}
+                                >
+                                    Keep it
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                )}
             </CardBody>
         </Card>
     );
