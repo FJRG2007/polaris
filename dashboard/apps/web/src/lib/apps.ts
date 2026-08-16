@@ -462,7 +462,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Backups",
             href: "/apps/backups",
-            icon: Database,
+            icon: Archive,
             group: OPERATIONS_GROUP,
             keywords: ["restore", "snapshots"]
         }
