@@ -145,6 +145,11 @@ export async function GET(request: Request): Promise<Response> {
                         // changed, go and look" - it is what makes a browser
                         // ring, and a ring that arrives after the caller gave
                         // up is worse than none.
+                        //
+                        // Addressed, when it is addressed: bringing one person
+                        // into a group call rings that person, not the nine who
+                        // are in the group and already decided not to join.
+                        if (change.audience && !change.audience.includes(actor.id)) return;
                         if (change.call) {
                             send({
                                 kind: "call",
@@ -153,7 +158,8 @@ export async function GET(request: Request): Promise<Response> {
                                 state: change.call.state,
                                 count: change.call.count,
                                 userId: change.actorId,
-                                name: change.actorName ?? ""
+                                name: change.actorName ?? "",
+                                ...(change.movedTo ? { movedTo: change.movedTo } : {})
                             });
                         }
                         return;

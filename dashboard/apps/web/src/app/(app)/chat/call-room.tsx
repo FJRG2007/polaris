@@ -29,7 +29,10 @@
 import type { CallState } from "./use-call";
 import * as actions from "./meeting-actions";
 import { Avatar } from "@/components/avatar";
+import { runAction } from "@/lib/run-action";
 import { playCallSound } from "@/lib/call-sounds";
+import { searchPeopleAction } from "./actions";
+import { PeoplePicker, type PickedPerson } from "./people-picker";
 import { useEffect, useRef, useState } from "react";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
@@ -39,11 +42,13 @@ import {
     Headphones,
     HeadphoneOff,
     Link2,
+    Loader2,
     Mic,
     MicOff,
     MonitorUp,
     MonitorX,
     PhoneOff,
+    UserPlus,
     Video,
     VideoOff,
     Volume2,
@@ -58,6 +63,12 @@ import {
     ContextMenuLabel,
     ContextMenuSeparator,
     ContextMenuTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -79,6 +90,7 @@ export function CallRoom({
     meetingId,
     call,
     onLeave,
+    onMoved,
     /** Whoever is watching, when they have an account. The guest link is the
      *  host's to open and nobody else's, so the control is drawn from who the
      *  call says its host is rather than from who opened this screen - offering
@@ -88,8 +100,13 @@ export function CallRoom({
     meetingId: string;
     call: CallState;
     onLeave: () => void;
+    /** Told when bringing somebody in has taken the call somewhere else - a
+     *  one-to-one cannot hold three people, so it becomes a group and this
+     *  browser has to follow it there. Absent for a guest, who cannot invite. */
+    onMoved?: (to: { meetingId: string; channelId: string }) => void;
     viewerId?: string;
 }) {
+    const [inviting, setInviting] = useState(false);
     const [guestLink, setGuestLink] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [shareError, setShareError] = useState("");
@@ -276,6 +293,18 @@ export function CallRoom({
                     {call.sharing ? "Stop sharing" : "Share screen"}
                 </Button>
 
+                {/* Bringing somebody in. In a group they are added and their
+                    telephone rings; in a one-to-one the call becomes a group,
+                    because a direct message is between the two people it is
+                    keyed by. Not offered to a guest, who is in one room on a
+                    link and has no conversation to add anybody to. */}
+                {viewerId && (
+                    <Button size="sm" variant="secondary" onClick={() => setInviting(true)}>
+                        <UserPlus className="size-4" />
+                        Add people
+                    </Button>
+                )}
+
                 <Button
                     size="sm"
                     variant={call.deafened ? "danger" : "secondary"}
@@ -333,6 +362,22 @@ export function CallRoom({
                     Leave
                 </Button>
             </div>
+
+            {viewerId && (
+                <InviteToCallDialog
+                    open={inviting}
+                    onOpenChange={setInviting}
+                    meetingId={meetingId}
+                    already={(admitted ?? [])
+                        .map((person) => person.userId)
+                        .filter((id): id is string => Boolean(id))}
+                    onDone={(to) => {
+                        setInviting(false);
+                        if (to) onMoved?.(to);
+                        call.refresh();
+                    }}
+                />
+            )}
 
             {canShare && guestLink && (
                 <p className="text-center text-xs text-muted-foreground">
@@ -702,6 +747,92 @@ function Tile({
                 </ContextMenuItem>
             </ContextMenuContent>
         </ContextMenu>
+    );
+}
+
+/**
+ * Bringing somebody into a call that is already running.
+ *
+ * Its own dialog rather than the one the header uses, because the two do
+ * different things: that one adds people to a conversation, and this one adds
+ * them to a call - which in a one-to-one means the conversation changes under
+ * everybody, and the browser that asked has to be told where the call went.
+ */
+function InviteToCallDialog({
+    open,
+    onOpenChange,
+    meetingId,
+    already,
+    onDone
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    meetingId: string;
+    /** Who is in the call, so nobody is offered a person that picking would do
+     *  nothing about. */
+    already: readonly string[];
+    onDone: (movedTo: { meetingId: string; channelId: string } | null) => void;
+}) {
+    const [picked, setPicked] = useState<readonly PickedPerson[]>([]);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState("");
+
+    const bring = async () => {
+        setBusy(true);
+        setError("");
+        const result = await runAction(
+            () =>
+                actions.inviteToCallAction({
+                    meetingId,
+                    userIds: picked.map((person) => person.id)
+                }),
+            setError
+        );
+        setBusy(false);
+        if (!result || result.error) return;
+        setPicked([]);
+        onDone(
+            result.moved && result.meetingId && result.channelId
+                ? { meetingId: result.meetingId, channelId: result.channelId }
+                : null
+        );
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Add people</DialogTitle>
+                    <DialogDescription>
+                        Their telephone rings. Bringing somebody into a one-to-one call makes it a
+                        group with the three of you in it.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <PeoplePicker
+                    picked={picked}
+                    onChange={setPicked}
+                    exclude={already}
+                    search={searchPeopleAction}
+                />
+
+                {error && (
+                    <p role="alert" className="text-sm text-danger">
+                        {error}
+                    </p>
+                )}
+
+                <DialogFooter>
+                    <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                        Cancel
+                    </Button>
+                    <Button disabled={busy || picked.length === 0} onClick={() => void bring()}>
+                        {busy && <Loader2 className="size-4 animate-spin" />}
+                        Add
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 

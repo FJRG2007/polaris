@@ -21,6 +21,7 @@
 
 import Link from "next/link";
 import { CallAudio } from "./call-audio";
+import { useChatStream } from "./use-chat-stream";
 import { Button, cn } from "@polaris/ui";
 import { useCall, type CallState } from "./use-call";
 import { Headphones, HeadphoneOff, Mic, MicOff, PhoneOff } from "lucide-react";
@@ -67,6 +68,36 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
     }, []);
 
     const leave = useCallback(() => setSession(null), []);
+
+    /**
+     * The call moved, so this browser moves with it.
+     *
+     * Somebody brought a third person into a one-to-one, which a direct message
+     * cannot hold - it is keyed by the pair - so the call became a group. The
+     * person who was on the line is told where it went rather than left in a
+     * room that quietly empties around them.
+     *
+     * The new room is entered with the microphone and camera settings this
+     * browser was already using: it is the same conversation to the person in
+     * it, and turning somebody's camera on because their call moved would be a
+     * surprise of the worst kind.
+     */
+    useChatStream(
+        useCallback(
+            (frame) => {
+                if (frame.kind !== "call" || !frame.movedTo) return;
+                setSession((current) => {
+                    if (!current || current.channelId !== frame.channelId) return current;
+                    return {
+                        meetingId: frame.movedTo!.meetingId,
+                        channelId: frame.movedTo!.channelId,
+                        title: current.title
+                    };
+                });
+            },
+            []
+        )
+    );
 
     const hold = useMemo<CallHold>(
         () => ({ call, session, viewerId, enter, leave, withVideo }),

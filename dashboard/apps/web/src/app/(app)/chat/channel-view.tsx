@@ -120,7 +120,7 @@ export function ChannelView({
     // up. Being in one is not the same question as one running here: somebody
     // can watch a channel with a call in it without joining, and must not have
     // their camera opened for them.
-    const { call, session, enter, leave: leaveCall } = useCallHold();
+    const { call, session, enter, leave: leaveCall, withVideo } = useCallHold();
     const inCall = session?.channelId === channelId ? session.meetingId : null;
 
     const scroller = useRef<HTMLDivElement>(null);
@@ -874,6 +874,21 @@ export function ChannelView({
                             onLeave={() => {
                                 leaveCall();
                                 checkCall();
+                            }}
+                            // A one-to-one that took a third person is a group
+                            // now, and the call is in it. This browser started
+                            // that, so nothing will tell it - it follows on the
+                            // answer, with the camera it already had.
+                            onMoved={(to) => {
+                                enter(
+                                    {
+                                        meetingId: to.meetingId,
+                                        channelId: to.channelId,
+                                        title: callTitle
+                                    },
+                                    withVideo
+                                );
+                                router.push(`/chat/c/${to.channelId}`);
                             }}
                         />
                     </div>

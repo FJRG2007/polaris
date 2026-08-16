@@ -43,7 +43,10 @@ const frameSchema = z.discriminatedUnion("kind", [
         state: z.enum(["ringing", "moved", "ended"]),
         count: z.number(),
         userId: z.string(),
-        name: z.string()
+        name: z.string(),
+        // Where the call has gone, when a one-to-one had to become a group to
+        // take a third person. The browser in the old room follows it.
+        movedTo: z.object({ meetingId: z.string(), channelId: z.string() }).optional()
     })
 ]);
 

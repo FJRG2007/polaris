@@ -42,9 +42,25 @@ export interface ChatChange {
     /** Only on `typing`: which of the two things that take a while they are
      *  doing. A recording is silence from the other side otherwise. */
     readonly activity?: core.ChatActivity;
-    /** Only on `channels`: who should redraw, when the change is about one
-     *  person joining or leaving rather than about the channel itself. */
+    /**
+     * Who this is for, when it is not for everybody in the channel.
+     *
+     * On `channels`: who should redraw, when the change is about one person
+     * joining or leaving rather than about the channel itself. On `call`: whose
+     * telephone should ring - adding somebody to a group call rings them, and
+     * would otherwise ring the nine people who were already in the group and had
+     * decided not to join.
+     */
     readonly audience?: readonly string[];
+    /**
+     * Only on `call`: where the call has gone.
+     *
+     * A one-to-one call cannot take a third person - a direct message is between
+     * the two it is keyed by - so bringing somebody in makes a group and moves
+     * the call into it. This is what tells the other person's browser to follow
+     * rather than to sit in a room that has quietly emptied.
+     */
+    readonly movedTo?: { readonly meetingId: string; readonly channelId: string };
     /**
      * Only on `call`.
      *

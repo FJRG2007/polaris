@@ -14,7 +14,9 @@
  */
 
 import { z } from "zod";
+import * as core from "@polaris/core";
 import { cookies } from "next/headers";
+import * as chat from "@/lib/chat/chat-service";
 import * as meetings from "@/lib/chat/meetings";
 import { requirePermission } from "@/lib/session";
 import type { MeetingView } from "@/lib/chat/meetings";
@@ -39,6 +41,37 @@ export async function startCallAction(
         meetings.startOrJoin({ id: user.id, name: user.name }, channelId)
     );
     return result.error ? { error: result.error } : { meetingId: result.value!.meetingId };
+}
+
+/**
+ * Bring somebody into the call.
+ *
+ * Answers where the call is now, because it may not be where it was: a
+ * one-to-one that takes a third person becomes a group, and the browser that
+ * asked has to follow it there.
+ */
+const inviteSchema = z.object({
+    meetingId: z.string().uuid(),
+    userIds: z.array(z.string().uuid()).min(1).max(core.MAX_GROUP_MEMBERS)
+});
+
+export async function inviteToCallAction(
+    input: unknown
+): Promise<{ meetingId?: string; channelId?: string; moved?: boolean; error?: string }> {
+    const user = await requirePermission("chat.use");
+    const parsed = inviteSchema.safeParse(input);
+    if (!parsed.success) return { error: "Pick somebody to bring in" };
+
+    const result = await guard(() =>
+        meetings.inviteToCall(
+            { id: user.id, name: user.name },
+            parsed.data.meetingId,
+            parsed.data.userIds,
+            (channelId, userIds) => chat.addChannelMembers({ id: user.id }, channelId, userIds),
+            (userIds) => chat.openDirect({ id: user.id }, userIds)
+        )
+    );
+    return result.error ? { error: result.error } : { ...result.value! };
 }
 
 /** Join a call by id, as an account. */

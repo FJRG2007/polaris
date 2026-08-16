@@ -172,6 +172,102 @@ export async function startOrJoin(
     return seat;
 }
 
+/**
+ * Bring somebody else into a call that is already running.
+ *
+ * In a group or a channel this is what it sounds like: they are added to the
+ * conversation if they are not in it, and their telephone rings. Only theirs -
+ * a group of ten whose members already decided not to join this call must not
+ * ring again every time somebody is invited.
+ *
+ * In a one-to-one it cannot stay where it is. A direct message is between the
+ * two people it is keyed by; a third person in it is a different conversation,
+ * which is why every messenger answers this the same way. So a group is made
+ * with the people who were talking and the people being brought in, the call
+ * moves into it, and the person who was already on the line follows - their
+ * browser is told where it went rather than left in a room that quietly empties.
+ *
+ * @returns the call to be in now, which is the same one unless it moved.
+ */
+export async function inviteToCall(
+    actor: ChatActor & { name: string },
+    meetingId: string,
+    userIds: readonly string[],
+    /** Adding people to a conversation, which this needs and which lives next
+     *  door. Passed in rather than imported: `chat-service` already imports this
+     *  module's neighbours, and a cycle between the two is the one thing that
+     *  would make either untestable. */
+    addMembers: (channelId: string, userIds: readonly string[]) => Promise<void>,
+    /** Opening the group the call moves into. Same reason. */
+    openGroup: (userIds: readonly string[]) => Promise<string>
+): Promise<{ meetingId: string; channelId: string; moved: boolean }> {
+    const wanted = [...new Set(userIds)].filter((id) => id !== actor.id);
+    if (wanted.length === 0) throw new ChatAccessError("Pick somebody to bring in");
+
+    const meeting = await prisma.meeting.findUnique({
+        where: { id: meetingId },
+        select: { channelId: true, endedAt: true }
+    });
+    if (!meeting?.channelId || meeting.endedAt) throw new ChatAccessError("That call has ended");
+    const from = meeting.channelId;
+    await requireChannel(actor, from);
+
+    const channel = await prisma.chatChannel.findUnique({
+        where: { id: from },
+        select: { kind: true, members: { select: { userId: true } } }
+    });
+    if (!channel) throw new ChatAccessError("That call has ended");
+
+    if (channel.kind !== "dm") {
+        await addMembers(from, wanted);
+        // Rung, and rung at the people being brought in. `startOrJoin` decides
+        // between ringing and moving from whether the room was empty, which is
+        // the right question for somebody walking in and the wrong one here:
+        // the room is not empty, and these are exactly the people who should
+        // hear a telephone.
+        await ring(meetingId, from, actor, wanted);
+        return { meetingId, channelId: from, moved: false };
+    }
+
+    // The two who were talking, plus whoever is being brought in. Taken from the
+    // conversation rather than from the call: somebody who stepped out a minute
+    // ago is still part of it, and a group that left them behind would be a
+    // second conversation nobody asked for.
+    const everyone = [...new Set([...channel.members.map((row) => row.userId), ...wanted])];
+    const groupId = await openGroup(everyone.filter((id) => id !== actor.id));
+
+    const seat = await startOrJoin(actor, groupId);
+    // The person still sitting in the old room, told where it went. Their own
+    // browser does the moving; nothing here can take a microphone from them.
+    publishChatChange({
+        channelId: from,
+        kind: "call",
+        actorId: actor.id,
+        actorName: actor.name,
+        call: { meetingId, state: "moved", count: await admittedCount(meetingId) },
+        movedTo: { meetingId: seat.meetingId, channelId: groupId }
+    });
+    await ring(seat.meetingId, groupId, actor, wanted);
+    return { meetingId: seat.meetingId, channelId: groupId, moved: true };
+}
+
+/** Ring exactly these people about this call. */
+async function ring(
+    meetingId: string,
+    channelId: string,
+    actor: ChatActor & { name: string },
+    audience: readonly string[]
+): Promise<void> {
+    publishChatChange({
+        channelId,
+        kind: "call",
+        actorId: actor.id,
+        actorName: actor.name,
+        audience,
+        call: { meetingId, state: "ringing", count: await admittedCount(meetingId) }
+    });
+}
+
 /** Join a call by id, as an account. The conversation it is in decides. */
 export async function join(
     actor: ChatActor & { name: string },
