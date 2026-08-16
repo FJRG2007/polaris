@@ -32,7 +32,7 @@ import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { playCallSound } from "@/lib/call-sounds";
 import { searchPeopleAction } from "./actions";
-import { PeoplePicker, type PickedPerson } from "./people-picker";
+import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import { useEffect, useRef, useState } from "react";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
@@ -502,13 +502,12 @@ function Split({
                                 )}
                             </>
                         )}
-                        {devices.length > 1 && <DropdownMenuLabel>{devicesLabel}</DropdownMenuLabel>}
+                        {devices.length > 1 && (
+                            <DropdownMenuLabel>{devicesLabel}</DropdownMenuLabel>
+                        )}
                         {devices.length > 1 && <DropdownMenuSeparator />}
                         {devices.map((device) => (
-                            <DropdownMenuItem
-                                key={device.id}
-                                onSelect={() => onChoose(device.id)}
-                            >
+                            <DropdownMenuItem key={device.id} onSelect={() => onChoose(device.id)}>
                                 <Check
                                     className={cn(
                                         "size-3.5 shrink-0",
@@ -735,9 +734,7 @@ function Tile({
                         className="w-full accent-primary"
                     />
                 </ContextMenuItem>
-                <ContextMenuItem
-                    onSelect={() => setVolume(volume === 0 ? DEFAULT_VOLUME : 0)}
-                >
+                <ContextMenuItem onSelect={() => setVolume(volume === 0 ? DEFAULT_VOLUME : 0)}>
                     {volume === 0 ? (
                         <Volume2 className="size-3.5" />
                     ) : (

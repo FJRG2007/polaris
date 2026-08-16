@@ -44,7 +44,9 @@ import {
 export interface SuccessorPerson {
     userId: string;
     name: string;
-    email: string;
+    /** Their handle, or their address when they show it to this account. Whom
+     *  you named is your business; their address is still theirs. */
+    contact: string;
 }
 
 /** Which of the two things the dialog is open for. Null is closed. */
@@ -111,9 +113,9 @@ export function SuccessorCard({
                             </p>
                             <p
                                 className="text-muted-foreground truncate text-xs"
-                                title={successor.email}
+                                title={successor.contact}
                             >
-                                {successor.email}
+                                {successor.contact}
                             </p>
                         </div>
                     </div>

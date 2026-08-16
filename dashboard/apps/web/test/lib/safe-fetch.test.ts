@@ -14,8 +14,31 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 let dns = new Map<string, string[]>();
-let fetched: string[] = [];
-let responses = new Map<string, { status: number; headers: Record<string, string>; body: string }>();
+
+/**
+ * What the module reaches the network through.
+ *
+ * undici's own `fetch` rather than the global one, and that is not an
+ * implementation detail worth mocking around: the runtime's `fetch` refuses an
+ * `Agent` built by the installed undici, so a stub on the global would test a
+ * path the module no longer takes - and every request would fail in production
+ * while the suite stayed green.
+ */
+const network = vi.hoisted(() => ({
+    fetched: [] as string[],
+    responses: new Map<string, { status: number; headers: Record<string, string>; body: string }>()
+}));
+
+vi.mock("undici", () => ({
+    Agent: class {},
+    fetch: async (input: URL | string) => {
+        const address = String(input);
+        network.fetched.push(address);
+        const canned = network.responses.get(address);
+        if (!canned) throw new Error("nothing there");
+        return new Response(canned.body, { status: canned.status, headers: canned.headers });
+    }
+}));
 
 vi.mock("node:dns/promises", () => ({
     lookup: async (hostname: string) => {
@@ -25,9 +48,11 @@ vi.mock("node:dns/promises", () => ({
     }
 }));
 
-const { fetchImage, pinnedAddress } = await import("@/lib/safe-fetch");
+const { fetchImage, vettedAddresses } = await import("@/lib/safe-fetch");
 
 const CAP = 1024;
+const fetched = network.fetched;
+const responses = network.responses;
 
 beforeEach(() => {
     dns = new Map([
@@ -35,16 +60,8 @@ beforeEach(() => {
         ["inside.test", ["10.0.0.5"]],
         ["redirector.test", ["93.184.216.34"]]
     ]);
-    fetched = [];
-    responses = new Map();
-
-    vi.stubGlobal("fetch", async (input: URL | string) => {
-        const address = String(input);
-        fetched.push(address);
-        const canned = responses.get(address);
-        if (!canned) throw new Error("nothing there");
-        return new Response(canned.body, { status: canned.status, headers: canned.headers });
-    });
+    fetched.length = 0;
+    responses.clear();
 });
 
 const picture = (body = "GIF89a", type = "image/gif") => ({
@@ -133,19 +150,25 @@ describe("what it refuses", () => {
  * the pre-check and private to the connect (DNS rebinding) has to be caught here
  * or not at all. This is that catch, as the plain decision it is.
  */
-describe("the address the socket is pinned to", () => {
-    it("takes the first when every answer is public", () => {
-        const chosen = pinnedAddress("host.example", [
+describe("the addresses the socket may be pinned to", () => {
+    it("hands back every answer when they are all public", () => {
+        // All of them, because that is what a socket opening with happy
+        // eyeballs asks for - and a host with eight addresses should not be
+        // unreachable because the first is having a bad afternoon.
+        const chosen = vettedAddresses("host.example", [
             { address: "93.184.216.34", family: 4 },
             { address: "93.184.216.35", family: 4 }
         ]);
-        expect(chosen).toEqual({ address: "93.184.216.34", family: 4 });
+        expect(chosen).toEqual([
+            { address: "93.184.216.34", family: 4 },
+            { address: "93.184.216.35", family: 4 }
+        ]);
     });
 
     it("refuses when any answer is private, even behind a public first one", () => {
         // The rebinding shape: a real public record, and a private one the stack
         // might pick instead. One private answer refuses the whole name.
-        const chosen = pinnedAddress("rebind.example", [
+        const chosen = vettedAddresses("rebind.example", [
             { address: "93.184.216.34", family: 4 },
             { address: "169.254.169.254", family: 4 }
         ]);
@@ -153,9 +176,9 @@ describe("the address the socket is pinned to", () => {
     });
 
     it("refuses loopback and a name that resolves to nothing", () => {
-        expect(pinnedAddress("evil.example", [{ address: "127.0.0.1", family: 4 }])).toBeInstanceOf(
-            Error
-        );
-        expect(pinnedAddress("nowhere.example", [])).toBeInstanceOf(Error);
+        expect(
+            vettedAddresses("evil.example", [{ address: "127.0.0.1", family: 4 }])
+        ).toBeInstanceOf(Error);
+        expect(vettedAddresses("nowhere.example", [])).toBeInstanceOf(Error);
     });
 });

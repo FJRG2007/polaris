@@ -24,7 +24,7 @@ import type { ChatInviteView } from "@/lib/chat/invites";
 import type { ChatSpaceView } from "@/lib/chat/chat-service";
 import { Check, Link2, Loader2, Send, X } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
-import { PeoplePicker, type PickedPerson } from "./people-picker";
+import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
     Button,
     Dialog,
@@ -128,7 +128,9 @@ export function InviteDialog({
                                 />
                             </label>
                             <label className="flex min-w-32 flex-1 flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">Number of uses</span>
+                                <span className="text-xs text-muted-foreground">
+                                    Number of uses
+                                </span>
                                 <Select
                                     value={uses}
                                     onValueChange={setUses}

@@ -126,22 +126,32 @@ HTML or an image, or a metadata/admin endpoint that acts on a GET.
 
 ## Remediation
 
-Resolve the hostname once and connect to that exact vetted address - do not let
-`fetch` re-resolve. Concretely, in `follow()` resolve the name (as `reachable()`
-already does), reject if any/all addresses are private, then pass the chosen
-public IP to the connection so the check and the connect use the same address.
+Resolve the hostname once and connect to an address from that resolution - do
+not let `fetch` re-resolve. Concretely, in `follow()` resolve the name (as
+`reachable()` already does), reject if any/all addresses are private, then
+pass the vetted address(es) to the connection so the check and the connect use
+the same resolution.
 With undici this is a per-request `Agent`/dispatcher whose `connect.lookup` (or
-`lookup`) returns the pre-vetted IP, keeping the original hostname for TLS SNI and
-the `Host` header. Apply it on every hop, and on `previewImage`/`fetchImage`, since
-all three reach the network through `follow`. Pinning the resolved address is the
-fix; re-validating the hostname string alone cannot close a TOCTOU.
+`lookup`) returns the pre-vetted address(es), keeping the original hostname for
+TLS SNI and the `Host` header. Apply it on every hop, and on
+`previewImage`/`fetchImage`, since all three reach the network through `follow`.
+Vetting the resolved address before the connect is the fix; re-validating the
+hostname string alone cannot close a TOCTOU.
 
 ## History
 - 2026-08-16: discovered by Helio (source audit), status open.
 - 2026-08-16: fixed. The guard now resolves the hostname inside the undici
-  connector and connects to the exact address it validated, so the check and the
-  socket share one resolution and a rebound answer cannot slip between them. The
-  `reachable` pre-check is kept as a fast refusal. `pinnedAddress` carries the
-  decision and is unit-tested. Behavior for every already-covered case
+  connector and connects to the exact address(es) it validated, so the check and
+  the socket share one resolution and a rebound answer cannot slip between them.
+  The `reachable` pre-check is kept as a fast refusal. `vettedAddresses` carries
+  the decision and is unit-tested. Behavior for every already-covered case
   (private address, mixed public/private answer, redirect to private, credentials,
-  non-http scheme, caps) is unchanged: 37 tests pass.
+  non-http scheme, caps) is unchanged.
+- 2026-08-16: the guard's own fetch and dispatcher were built from different
+  copies of undici (the runtime's built-in one refuses an `Agent` it did not
+  construct itself), and the connector's custom resolver returned one address to
+  a caller happy-eyeballing for all of them - both broke every fetch through this
+  path (link previews, their images, and Tenor GIFs) the same way a dead site
+  would. Fixed by calling undici's own `fetch` alongside its `Agent`, and by
+  answering the resolver's `all` option with the whole address list rather than
+  the first one. See `dashboard/apps/web/src/lib/safe-fetch.ts`.

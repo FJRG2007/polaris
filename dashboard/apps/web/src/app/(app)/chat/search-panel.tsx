@@ -18,7 +18,7 @@
 
 import * as core from "@polaris/core";
 import { useChat } from "./chat-context";
-import { PeoplePicker, type PickedPerson } from "./people-picker";
+import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import { searchMessagesAction, searchPeopleAction } from "./actions";
 import { useEffect, useMemo, useState } from "react";
 import type { ChatSearchHit } from "@/lib/chat/search";

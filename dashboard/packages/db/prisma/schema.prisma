@@ -147,6 +147,8 @@ model User {
     taskGoals           TaskGoal[]
     ownedOrgs           Organization[]       @relation("OrganizationOwner")
     orgMemberships      OrganizationMember[]
+    orgInvitations      OrganizationInvitation[] @relation("OrganizationInvitee")
+    orgInvitesSent      OrganizationInvitation[] @relation("OrganizationInviter")
     teamMemberships     TeamMember[]
     ownedDomains        OwnerDomain[]
     successor           AccountSuccessor?    @relation("AccountSuccessorHolder")
@@ -168,6 +170,9 @@ model User {
     backupJobs          BackupJob[]
     ownedVaults         VaultOrganization[]  @relation("VaultOwner")
     privacy             UserPrivacy?
+    privacyLists        PrivacyList[]
+    privacyListedOn     PrivacyListMember[]
+    privacyFieldLists   PrivacyFieldList[]
     friendshipsAsked    Friendship[]         @relation("FriendshipRequester")
     friendshipsReceived Friendship[]         @relation("FriendshipAddressee")
 }
@@ -3778,8 +3783,9 @@ model Organization {
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
-    owner    User                 @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-    members  OrganizationMember[]
+    owner       User                     @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+    members     OrganizationMember[]
+    invitations OrganizationInvitation[]
     teams    Team[]
     roles    OrgRole[]
     spaces   TaskSpace[]
@@ -3899,6 +3905,45 @@ model OrganizationMember {
 
     org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
     user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([orgId, userId])
+    @@index([userId])
+}
+
+// Somebody asked to join an organization, waiting on their answer.
+//
+// Being added to a group is not something that should happen to a person. An
+// organization's roster is published to everybody on it - who you work with,
+// under what role - and appearing on one you never agreed to join is both a
+// surprise and a disclosure. So the row here is the ask, and the membership is
+// only written when the person accepts, the same way GitHub has always done it.
+//
+// The row IS the pending state: accepting deletes it and writes a membership,
+// declining and revoking delete it. There is no `status` column, because a
+// stored "no" is a thing somebody has to clean up and it would stop the same
+// person ever being asked again.
+//
+// It names an account rather than an address. Polaris only ever adds people who
+// already have one here, and storing the address would put a copy of the very
+// thing the privacy settings withhold on a row any admin of the organization can
+// read.
+model OrganizationInvitation {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    orgId       String   @db.Uuid
+    userId      String   @db.Uuid
+    // The role they take on if they accept - checked again then, since the
+    // organization may have deleted it in the meantime.
+    role        String   @default("member")
+    invitedById String   @db.Uuid
+    // Invitations go stale. One that has sat unanswered for a fortnight is a
+    // decision somebody made by not making it, and it must not still be usable
+    // a year later when the roster means something else entirely.
+    expiresAt   DateTime
+    createdAt   DateTime @default(now())
+
+    org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user      User         @relation("OrganizationInvitee", fields: [userId], references: [id], onDelete: Cascade)
+    invitedBy User         @relation("OrganizationInviter", fields: [invitedById], references: [id], onDelete: Cascade)
 
     @@unique([orgId, userId])
     @@index([userId])
@@ -6108,6 +6153,12 @@ model UserPrivacy {
     lastSeen     String   @default("everyone")
     readReceipts String   @default("everyone")
     avatar       String   @default("everyone")
+    // The two that are shut until somebody opens them, and the only ones. An
+    // address and a number are not details of a presence: they are what spam,
+    // password resets and impersonation start from, and nothing in Polaris needs
+    // either to name somebody, mention them or write to them.
+    email        String   @default("nobody")
+    phone        String   @default("nobody")
     // Who may send something this account wrote into another conversation. Open
     // by default, like the rest: a messenger where nothing can be passed on is
     // not what anybody expects, and a default that removed a button would read
@@ -6116,6 +6167,65 @@ model UserPrivacy {
     updatedAt    DateTime @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// A set of people one account names in its privacy settings.
+//
+// Saved and reused rather than picked per setting: the same three or four names
+// are usually the answer to more than one question, and re-picking them is how
+// two settings that were meant to agree drift apart.
+//
+// A list with an empty name is one picked for a single setting rather than kept -
+// it belongs to that setting, is edited from its row, and is never offered
+// anywhere else. Same table because it is the same thing; the name is what makes
+// one worth showing in the list of lists.
+model PrivacyList {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    name      String   @default("")
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+    members PrivacyListMember[]
+    usedBy  PrivacyFieldList[]
+
+    @@index([userId])
+}
+
+model PrivacyListMember {
+    listId String @db.Uuid
+    userId String @db.Uuid
+
+    list PrivacyList @relation(fields: [listId], references: [id], onDelete: Cascade)
+    user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([listId, userId])
+    @@index([userId])
+}
+
+// Which set one of an account's settings names.
+//
+// Its own row rather than a column per setting: the settings are a list that
+// grows, and a table that grows a pair of columns every time one is added is a
+// migration nobody remembers to write. One row per setting that names a list at
+// all, which is the uncommon case.
+//
+// A rule left pointing at nothing reads as one naming nobody, which is why a
+// list that is still in use cannot be deleted from the screen: "only these
+// people" would go on meaning nobody, quietly, and "everybody except" would go
+// on meaning everybody. The rule is asked about, never assumed.
+model PrivacyFieldList {
+    userId String @db.Uuid
+    // One of PRIVACY_FIELDS in @polaris/core.
+    field  String
+    listId String @db.Uuid
+
+    user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+    list PrivacyList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+    @@id([userId, field])
+    @@index([listId])
 }
 
 // Two accounts that know each other.

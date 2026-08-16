@@ -15,6 +15,13 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Each test lazily imports "@/lib/chat/messages" so the mocks above are in
+// place first; the module graph behind it is large, and the first import in
+// the file pays the full transform cost. Under the parallel load of the full
+// suite that first import can outrun the default 5s timeout even though
+// nothing is actually hanging.
+vi.setConfig({ testTimeout: 15000 });
+
 /** Who lets the reader pass their messages on. Everybody, unless a test says
  *  otherwise - which is the default an account that never opened the screen has. */
 let refusing: string[] = [];

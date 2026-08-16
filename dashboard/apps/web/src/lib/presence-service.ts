@@ -23,7 +23,7 @@
  */
 
 import { prisma } from "@polaris/db";
-import { maySee } from "@/lib/privacy-service";
+import { allowedBy } from "@/lib/privacy-service";
 import { reachableChannelIds } from "@/lib/chat/access";
 import { PARTICIPANT_TTL_MS } from "@/lib/chat/meetings";
 import { PRESENCE_CHOICES, type Presence, type PresenceChoice } from "@polaris/core";
@@ -64,7 +64,7 @@ export async function presenceFor(
     const wanted = [...new Set(ids.filter(Boolean))];
     if (wanted.length === 0) return new Map();
 
-    const [people, sessions, calls] = await Promise.all([
+    const [people, sessions, calls, visible] = await Promise.all([
         prisma.user.findMany({
             where: { id: { in: wanted } },
             select: { id: true, presence: true, presenceUntil: true }
@@ -77,7 +77,11 @@ export async function presenceFor(
             orderBy: { lastSeenAt: "desc" },
             select: { userId: true, lastSeenAt: true }
         }),
-        callsFor(viewer, wanted)
+        callsFor(viewer, wanted),
+        // Asked about the whole page at once rather than once per face: the
+        // privacy check is a row read and a rule, and thirty of them one at a
+        // time is thirty queries for one avatar strip.
+        allowedBy(viewer, "lastSeen", wanted)
     ]);
 
     const seen = new Map<string, Date>();
@@ -85,21 +89,12 @@ export async function presenceFor(
         if (!seen.has(session.userId)) seen.set(session.userId, session.lastSeenAt);
     }
 
-    // Asked once per person rather than once per screen: the privacy check is a
-    // row read and a rule, and a page of faces is a page of them.
-    const visible = new Map<string, boolean>();
-    await Promise.all(
-        wanted.map(async (id) => {
-            visible.set(id, await maySee(id, "lastSeen", viewer));
-        })
-    );
-
     const now = Date.now();
     const answer = new Map<string, PresenceView>();
     for (const person of people) {
         const mine = person.id === viewer.id;
         const inCall = calls.get(person.id) ?? null;
-        if (!mine && !visible.get(person.id)) {
+        if (!mine && !visible.has(person.id)) {
             // Not "unknown": there is no third colour, and a dot that is absent
             // for some people and grey for others says which is which.
             answer.set(person.id, { status: "offline", inCall });
@@ -144,7 +139,10 @@ export async function presenceChoiceOf(userId: string): Promise<PresenceChoiceVi
         });
         return { choice: "auto", until: null };
     }
-    return { choice: held, until: held === "auto" ? null : (row.presenceUntil?.toISOString() ?? null) };
+    return {
+        choice: held,
+        until: held === "auto" ? null : (row.presenceUntil?.toISOString() ?? null)
+    };
 }
 
 /**

@@ -21,7 +21,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AutomationsPanel, FormsPanel } from "./automations-panel";
 import type { AutomationView } from "@/lib/tasks/automation-service";
 import { ChevronDown, ChevronUp, Hash, Pencil, Plus, Trash2 } from "lucide-react";
-import { Button, Card, CardBody, ConfirmDeleteDialog, EmptyState, Input, Select, cn } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    ConfirmDeleteDialog,
+    EmptyState,
+    Input,
+    Select,
+    cn
+} from "@polaris/ui";
 import type {
     CustomFieldView,
     ListSummary,
@@ -124,10 +133,7 @@ export function SpaceScreen(props: SpaceScreenProps) {
             </nav>
 
             {error && (
-                <p
-                    role="alert"
-                    className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger"
-                >
+                <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
                     {error}
                 </p>
             )}
@@ -183,7 +189,10 @@ export function SpaceScreen(props: SpaceScreenProps) {
 function OverviewTab({ lists }: { lists: readonly ListSummary[] }) {
     if (lists.length === 0) {
         return (
-            <EmptyState title="No lists yet." description="Add one from the sidebar and its tasks appear here." />
+            <EmptyState
+                title="No lists yet."
+                description="Add one from the sidebar and its tasks appear here."
+            />
         );
     }
     return (
@@ -713,8 +722,15 @@ function PeopleTab({
                 {members.map((member) => (
                     <li key={member.userId} className="flex flex-wrap items-center gap-3 px-3 py-2">
                         <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm">{member.name}</p>
-                            <p className="truncate text-xs text-muted-foreground">{member.email}</p>
+                            <p className="truncate text-sm" title={member.name}>
+                                {member.name}
+                            </p>
+                            <p
+                                className="truncate text-xs text-muted-foreground"
+                                title={member.contact}
+                            >
+                                {member.contact}
+                            </p>
                         </div>
                         {member.role === "owner" ? (
                             <span className="text-xs text-muted-foreground">Owner</span>

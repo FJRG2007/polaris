@@ -21,11 +21,33 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /** What DNS says, per hostname. */
 let dns = new Map<string, string[]>();
 
-/** Every address actually fetched, in order. */
-let fetched: string[] = [];
+/**
+ * Every address actually fetched, in order, and what the network answers with.
+ *
+ * Mocked at `undici` rather than at the global `fetch`, because that is what
+ * `safe-fetch` calls: the runtime's own fetch refuses a dispatcher built by the
+ * installed undici, so the module uses undici's fetch with undici's Agent. A
+ * stub on the global would leave this suite green while every real request
+ * failed.
+ */
+const network = vi.hoisted(() => ({
+    fetched: [] as string[],
+    responses: new Map<string, { status: number; headers: Record<string, string>; body: string }>()
+}));
 
-/** Canned responses, by URL. */
-let responses = new Map<string, { status: number; headers: Record<string, string>; body: string }>();
+const fetched = network.fetched;
+const responses = network.responses;
+
+vi.mock("undici", () => ({
+    Agent: class {},
+    fetch: async (input: URL | string) => {
+        const address = String(input);
+        fetched.push(address);
+        const canned = responses.get(address);
+        if (!canned) throw new Error("nothing there");
+        return new Response(canned.body, { status: canned.status, headers: canned.headers });
+    }
+}));
 
 vi.mock("node:dns/promises", () => ({
     lookup: async (hostname: string) => {
@@ -83,17 +105,9 @@ beforeEach(() => {
         ["split.test", ["93.184.216.34", "10.0.0.5"]],
         ["redirector.test", ["93.184.216.34"]]
     ]);
-    fetched = [];
-    responses = new Map();
+    fetched.length = 0;
+    responses.clear();
     stored.length = 0;
-
-    vi.stubGlobal("fetch", async (input: URL | string) => {
-        const address = String(input);
-        fetched.push(address);
-        const canned = responses.get(address);
-        if (!canned) throw new Error("nothing there");
-        return new Response(canned.body, { status: canned.status, headers: canned.headers });
-    });
 });
 
 describe("where it will not go", () => {

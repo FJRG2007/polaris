@@ -57,7 +57,7 @@ export default async function SpacePage({
         spaces.listStatuses(spaceId),
         spaces.listCustomFields(spaceId),
         spaces.listTags(spaceId),
-        spaces.listSpaceMembers(spaceId),
+        spaces.listSpaceMembers(spaceId, { id: user.id, isAdmin: user.isAdmin }),
         listAutomations(spaceId),
         listForms(spaceId),
         // A form is filled in by somebody outside Polaris, so its link is built on the
@@ -66,7 +66,9 @@ export default async function SpacePage({
     ]);
 
     const lists = tree.find((entry) => entry.id === spaceId);
-    const allLists = lists ? [...lists.lists, ...lists.folders.flatMap((folder) => folder.lists)] : [];
+    const allLists = lists
+        ? [...lists.lists, ...lists.folders.flatMap((folder) => folder.lists)]
+        : [];
 
     return (
         <div className="flex w-full flex-col gap-6 md:flex-row">
@@ -85,7 +87,11 @@ export default async function SpacePage({
                 members={members}
                 automations={automations}
                 forms={forms}
-                people={members.map((member) => ({ id: member.userId, name: member.name, image: member.image }))}
+                people={members.map((member) => ({
+                    id: member.userId,
+                    name: member.name,
+                    image: member.image
+                }))}
                 canManage={canManage}
                 baseUrl={baseUrl}
                 initialTab={tab}

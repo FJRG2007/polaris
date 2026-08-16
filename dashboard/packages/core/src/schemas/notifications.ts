@@ -221,6 +221,20 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "account.orgInvite",
+        group: "people",
+        // Both halves again, and for the same reason: whoever sent it wants to
+        // know it was accepted as much as the person asked wants to know it is
+        // there.
+        label: "Organization invitations",
+        description: "You were invited to an organization, or somebody accepted yours.",
+        level: "info",
+        // Mail as well, unlike a friend request: nothing happens until this one
+        // is answered, and an invitation that expires unseen in a bell nobody
+        // opened is an invitation that was never sent.
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "account.security",
         group: "security",
         label: "Account security changed",

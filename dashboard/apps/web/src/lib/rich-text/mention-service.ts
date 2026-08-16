@@ -15,6 +15,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { loadEnv } from "@polaris/config";
 import * as access from "@/lib/tasks/access";
+import { allowedBy } from "@/lib/privacy-service";
 import { memberOrgIds } from "@/lib/orgs/org-service";
 import { conversationAudience } from "@/lib/chat/access";
 import type { ReferenceKind } from "@/components/rich-text/references";
@@ -129,17 +130,26 @@ async function searchPeople(
             ...(scope ? { id: { in: scope } } : {}),
             ...(contains ? { OR: [{ name: contains }, { email: contains }] } : {})
         },
-        select: { id: true, name: true, email: true, image: true },
+        select: { id: true, name: true, username: true, image: true },
         orderBy: { name: "asc" },
         take: limit
     });
+    // The handle under the name rather than the address. It is what tells two
+    // people with the same name apart, it is public by design - it is how
+    // somebody is mentioned and found - and it is not the thing a picker open to
+    // everybody in the room should be handing out.
     return users.map((user) => ({
         kind: "user" as const,
         id: user.id,
-        label: user.name || user.email,
-        detail: user.name ? user.email : "",
+        label: user.name || handle(user.username),
+        detail: user.name ? handle(user.username) : "",
         image: user.image
     }));
+}
+
+/** Somebody's handle, written the way it is elsewhere, or nothing. */
+function handle(username: string | null): string {
+    return username ? `@${username}` : "";
 }
 
 /**
@@ -174,13 +184,25 @@ export async function searchAccounts(
         orderBy: { name: "asc" },
         take: limit
     });
-    return users.map((user) => ({
-        id: user.id,
-        name: user.name || user.email,
-        username: user.username,
-        email: user.email,
-        image: user.image
-    }));
+
+    // The address comes back only from somebody who shows it to this account.
+    // These fields store "a username or an address" and the handle is the one
+    // everybody has, so hiding the address costs the picker nothing - and an
+    // account with neither is left out, since there would be nothing to store.
+    const contacts = await allowedBy(
+        { id: actor.id, isAdmin: actor.isAdmin },
+        "email",
+        users.map((user) => user.id)
+    );
+    return users
+        .map((user) => ({
+            id: user.id,
+            name: user.name || handle(user.username),
+            username: user.username,
+            email: contacts.has(user.id) ? user.email : "",
+            image: user.image
+        }))
+        .filter((candidate) => candidate.username || candidate.email);
 }
 
 /** The ids of everybody reachable, resolved once for the query above. */
@@ -189,12 +211,18 @@ async function reachablePeople(actor: access.TaskActor): Promise<string[]> {
     const spaceIds = access.scopeSpaceIds(scope);
     const orgIds = await memberOrgIds(actor.id);
     const [members, folderGrants, roster] = await Promise.all([
-        prisma.taskSpaceMember.findMany({ where: { spaceId: { in: spaceIds } }, select: { userId: true } }),
+        prisma.taskSpaceMember.findMany({
+            where: { spaceId: { in: spaceIds } },
+            select: { userId: true }
+        }),
         prisma.taskFolderMember.findMany({
             where: { folder: { spaceId: { in: spaceIds } } },
             select: { userId: true }
         }),
-        prisma.organizationMember.findMany({ where: { orgId: { in: orgIds } }, select: { userId: true } })
+        prisma.organizationMember.findMany({
+            where: { orgId: { in: orgIds } },
+            select: { userId: true }
+        })
     ]);
     return [
         actor.id,
@@ -205,7 +233,11 @@ async function reachablePeople(actor: access.TaskActor): Promise<string[]> {
 }
 
 /** Teams are an organization's groups, so the roster is the boundary. */
-async function searchTeams(actor: access.TaskActor, term: string, limit: number): Promise<MentionCandidate[]> {
+async function searchTeams(
+    actor: access.TaskActor,
+    term: string,
+    limit: number
+): Promise<MentionCandidate[]> {
     const orgIds = await memberOrgIds(actor.id);
     if (orgIds.length === 0 && !actor.isAdmin) return [];
     const teams = await prisma.team.findMany({
@@ -239,12 +271,19 @@ export async function resolveReferences(
     targets: readonly { kind: ReferenceKind; id: string }[]
 ): Promise<Record<string, string>> {
     if (targets.length === 0) return {};
-    const idsOf = (kind: ReferenceKind) => targets.filter((target) => target.kind === kind).map((target) => target.id);
+    const idsOf = (kind: ReferenceKind) =>
+        targets.filter((target) => target.kind === kind).map((target) => target.id);
     const scope = await access.visibleScope(actor);
 
     const [users, teams, tasks, docs, notes] = await Promise.all([
-        prisma.user.findMany({ where: { id: { in: idsOf("user") } }, select: { id: true, name: true, email: true } }),
-        prisma.team.findMany({ where: { id: { in: idsOf("team") } }, select: { id: true, name: true } }),
+        prisma.user.findMany({
+            where: { id: { in: idsOf("user") } },
+            select: { id: true, name: true, username: true }
+        }),
+        prisma.team.findMany({
+            where: { id: { in: idsOf("team") } },
+            select: { id: true, name: true }
+        }),
         prisma.task.findMany({
             where: { AND: [{ id: { in: idsOf("task") } }, access.scopeTaskWhere(scope)] },
             select: { id: true, name: true }
@@ -252,7 +291,10 @@ export async function resolveReferences(
         prisma.taskDoc.findMany({
             where: {
                 id: { in: idsOf("doc") },
-                OR: [{ spaceId: { in: access.scopeSpaceIds(scope) } }, { spaceId: null, createdById: actor.id }]
+                OR: [
+                    { spaceId: { in: access.scopeSpaceIds(scope) } },
+                    { spaceId: null, createdById: actor.id }
+                ]
             },
             select: { id: true, title: true }
         }),
@@ -263,7 +305,7 @@ export async function resolveReferences(
     ]);
 
     const labels: Record<string, string> = {};
-    for (const user of users) labels[`user/${user.id}`] = user.name || user.email;
+    for (const user of users) labels[`user/${user.id}`] = user.name || handle(user.username);
     for (const team of teams) labels[`team/${team.id}`] = team.name;
     for (const task of tasks) labels[`task/${task.id}`] = task.name;
     for (const doc of docs) labels[`doc/${doc.id}`] = doc.title;
@@ -325,7 +367,11 @@ async function searchWork(
             : [],
         wanted.has("note")
             ? prisma.note.findMany({
-                  where: { userId: actor.id, archived: false, ...(term ? { title: contains } : {}) },
+                  where: {
+                      userId: actor.id,
+                      archived: false,
+                      ...(term ? { title: contains } : {})
+                  },
                   select: { id: true, title: true },
                   orderBy: { updatedAt: "desc" },
                   take: limit

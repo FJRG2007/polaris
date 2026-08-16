@@ -46,7 +46,8 @@ async function connectedSignIns(userId: string): Promise<ConnectedSignIn[]> {
     const allowed = new Map<string, boolean>(
         await Promise.all(
             CONNECTION_PROVIDERS.map(
-                async (provider) => [provider.slug, await connectionSignInAllowed(provider.slug)] as const
+                async (provider) =>
+                    [provider.slug, await connectionSignInAllowed(provider.slug)] as const
             )
         )
     );
@@ -133,7 +134,13 @@ export default async function SecurityPage() {
                 }}
                 otherSessions={sessions.filter((session) => !session.current).length}
                 successor={
-                    successor ? { userId: successor.userId, name: successor.name, email: successor.email } : null
+                    successor
+                        ? {
+                              userId: successor.userId,
+                              name: successor.name,
+                              contact: successor.contact
+                          }
+                        : null
                 }
             />
         </div>

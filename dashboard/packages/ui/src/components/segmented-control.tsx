@@ -56,7 +56,13 @@ export function SegmentedControl<T extends string>({
         <div
             role="radiogroup"
             aria-label={ariaLabel}
-            className={cn("inline-flex items-center gap-0.5 rounded-md bg-muted p-0.5", className)}
+            // `min-w-0` and the truncation below are what keep a set of long
+            // labels inside a narrow column: without them the track keeps its
+            // natural width and runs off the side of whatever holds it.
+            className={cn(
+                "inline-flex min-w-0 max-w-full items-center gap-0.5 rounded-md bg-muted p-0.5",
+                className
+            )}
         >
             {options.map((option, index) => {
                 const active = option.value === value;
@@ -66,22 +72,30 @@ export function SegmentedControl<T extends string>({
                         type="button"
                         role="radio"
                         aria-checked={active}
-                        title={option.title}
+                        // Its own label when there is nothing more to say: a
+                        // narrow column truncates, and a truncated option that
+                        // cannot be hovered for the rest of it is a guess.
+                        title={
+                            option.title ??
+                            (typeof option.label === "string" ? option.label : undefined)
+                        }
                         disabled={option.disabled}
                         // Only the chosen option is in the tab order: one stop for
                         // the group, then the arrow keys choose within it.
                         tabIndex={active ? 0 : -1}
                         onClick={() => onValueChange(option.value)}
                         onKeyDown={(event) => {
-                            if (event.key === "ArrowRight" || event.key === "ArrowDown") move(index, 1);
-                            else if (event.key === "ArrowLeft" || event.key === "ArrowUp") move(index, -1);
+                            if (event.key === "ArrowRight" || event.key === "ArrowDown")
+                                move(index, 1);
+                            else if (event.key === "ArrowLeft" || event.key === "ArrowUp")
+                                move(index, -1);
                             else if (event.key === "Home") move(-1, 1);
                             else if (event.key === "End") move(0, -1);
                             else return;
                             event.preventDefault();
                         }}
                         className={cn(
-                            "flex-1 whitespace-nowrap rounded font-medium transition-colors duration-fast disabled:pointer-events-none disabled:opacity-50",
+                            "min-w-0 flex-1 truncate rounded font-medium transition-colors duration-fast disabled:pointer-events-none disabled:opacity-50",
                             size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-[13px]",
                             active
                                 ? "border border-border-strong bg-card-hover text-foreground"

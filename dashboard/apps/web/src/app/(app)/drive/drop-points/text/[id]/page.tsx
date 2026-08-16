@@ -27,7 +27,11 @@ export default async function TextDropPointPage({ params }: { params: Promise<{ 
         title: snippet.title,
         sealed: snippet.clientSealed,
         at: snippet.createdAt.toISOString(),
-        from: snippet.submittedBy?.name ?? snippet.submittedBy?.email ?? null,
+        // Their name or their handle. Never the address they sign in with:
+        // whoever runs a drop point is not owed it by everybody who uses one.
+        from:
+            snippet.submittedBy?.name ||
+            (snippet.submittedBy?.username ? `@${snippet.submittedBy.username}` : null),
         size: snippet.files.reduce((total, file) => total + file.size, 0)
     }));
 

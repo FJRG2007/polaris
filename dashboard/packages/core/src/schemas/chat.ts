@@ -316,11 +316,14 @@ export const CHAT_SEARCH_ATTACHMENTS = ["any", "file", "image", "link"] as const
 
 export type ChatSearchAttachment = (typeof CHAT_SEARCH_ATTACHMENTS)[number];
 
+/** One word each, because they are read under the word "Carrying" in a column
+ *  the width of a sidebar - "With an image" said the same thing and pushed the
+ *  row off the side of the panel. */
 export const CHAT_SEARCH_ATTACHMENT_LABELS: Record<ChatSearchAttachment, string> = {
     any: "Anything",
-    file: "With a file",
-    image: "With an image",
-    link: "With a link"
+    file: "Files",
+    image: "Images",
+    link: "Links"
 };
 
 /** How many hits one search comes back with. Past this the answer is a better
@@ -564,7 +567,9 @@ export const chatInviteCreateSchema = z.object({
     expiresMinutes: z
         .number()
         .refine((value) => inviteMinutes.includes(value), "That is not a length to offer"),
-    maxUses: z.number().refine((value) => inviteUses.includes(value), "That is not a limit to offer")
+    maxUses: z
+        .number()
+        .refine((value) => inviteUses.includes(value), "That is not a limit to offer")
 });
 
 export type ChatInviteCreateInput = z.infer<typeof chatInviteCreateSchema>;

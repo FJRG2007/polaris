@@ -59,7 +59,7 @@ export async function findPeople(
             bannedAt: null,
             OR: [{ name: contains }, { email: contains }, { username: contains }]
         },
-        select: { id: true, name: true, email: true },
+        select: { id: true, name: true, username: true },
         orderBy: { name: "asc" },
         take: Math.min(limit * 4, 40)
     });
@@ -82,7 +82,11 @@ export async function findPeople(
     return {
         people: people.slice(0, limit).map((person) => ({
             id: person.id,
-            name: person.name || person.email
+            // The handle rather than the address when an account has no name.
+            // A search that can be typed into by anybody is the last place to
+            // hand one back - and it matches on the address above, so a result
+            // shaped like one would confirm a guess.
+            name: person.name || (person.username ? `@${person.username}` : "Somebody")
         })),
         withheld: candidates.length - people.length
     };

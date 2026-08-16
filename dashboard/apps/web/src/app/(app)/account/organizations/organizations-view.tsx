@@ -14,11 +14,12 @@ import Link from "next/link";
 import { useState } from "react";
 import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
-import { createOrgAction } from "./actions";
 import { runAction } from "@/lib/run-action";
 import { OrgAvatar } from "@/components/avatar";
-import { Building2, Plus, Users } from "lucide-react";
 import type { OrgSummary } from "@/lib/orgs/org-service";
+import { Building2, Check, Plus, Users, X } from "lucide-react";
+import type { OrgInvitationView } from "@/lib/orgs/invitation-service";
+import { createOrgAction, respondToOrgInvitationAction } from "./actions";
 import {
     Badge,
     Button,
@@ -33,13 +34,104 @@ import {
     Textarea
 } from "@polaris/ui";
 
+/**
+ * The organizations waiting on an answer.
+ *
+ * Above the list rather than in a bell, because it is the one thing on this
+ * screen that is somebody else's move on your account - and because an
+ * invitation nobody answers expires, which is a worse outcome than either
+ * answer.
+ *
+ * Accepting takes you to the organization. Turning one down says nothing to
+ * anybody: it simply stops being there.
+ */
+function Invitations({ invitations }: { invitations: readonly OrgInvitationView[] }) {
+    const router = useRouter();
+    const [busy, setBusy] = useState("");
+    const [error, setError] = useState("");
+
+    if (invitations.length === 0) return null;
+
+    const answer = async (invitation: OrgInvitationView, accept: boolean) => {
+        setBusy(invitation.id);
+        setError("");
+        const result = await runAction(
+            () => respondToOrgInvitationAction(invitation.id, accept),
+            setError
+        );
+        setBusy("");
+        if (!result || result.error) return;
+        if (accept && result.slug) router.push(`/account/organizations/${result.slug}`);
+        else router.refresh();
+    };
+
+    return (
+        <Card>
+            <CardBody className="flex flex-col gap-2">
+                <p className="text-sm font-medium">
+                    {invitations.length === 1
+                        ? "You have an invitation"
+                        : `You have ${invitations.length} invitations`}
+                </p>
+                <ul className="flex flex-col gap-2">
+                    {invitations.map((invitation) => (
+                        <li
+                            key={invitation.id}
+                            className="border-border flex flex-wrap items-center gap-3 rounded-md border px-3 py-2"
+                        >
+                            <OrgAvatar
+                                org={{ id: invitation.orgId, name: invitation.orgName }}
+                                size={32}
+                            />
+                            <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm" title={invitation.orgName}>
+                                    {invitation.orgName}
+                                </span>
+                                <span className="text-muted-foreground block truncate text-xs">
+                                    {invitation.invitedBy} asked you to join as{" "}
+                                    {invitation.roleName.toLowerCase()}
+                                </span>
+                            </span>
+                            <Button
+                                size="xs"
+                                disabled={busy === invitation.id}
+                                onClick={() => void answer(invitation, true)}
+                            >
+                                <Check className="size-3.5 shrink-0" /> Accept
+                            </Button>
+                            <Button
+                                size="xs"
+                                variant="ghost"
+                                disabled={busy === invitation.id}
+                                aria-label={`Turn down the invitation to ${invitation.orgName}`}
+                                onClick={() => void answer(invitation, false)}
+                            >
+                                <X className="size-3.5 shrink-0" />
+                            </Button>
+                        </li>
+                    ))}
+                </ul>
+                {error && (
+                    <p role="alert" className="text-danger text-sm">
+                        {error}
+                    </p>
+                )}
+            </CardBody>
+        </Card>
+    );
+}
+
 export function OrganizationsView({
     orgs,
+    invitations,
     canCreate,
     blockedReason,
     memberLimit
 }: {
     orgs: OrgSummary[];
+    /** Organizations waiting on this account's answer. Above the list, because
+     *  they are the only thing on this screen anybody is waiting for. */
+    invitations: OrgInvitationView[];
     canCreate: boolean;
     /** Why the button is not there, in the words the policy uses. */
     blockedReason: string | null;
@@ -85,6 +177,8 @@ export function OrganizationsView({
 
     return (
         <div className="flex flex-col gap-3">
+            <Invitations invitations={invitations} />
+
             <div className="flex items-center justify-between gap-3">
                 <p className="text-muted-foreground text-sm">
                     {orgs.length === 0
@@ -106,8 +200,9 @@ export function OrganizationsView({
                         <Building2 className="text-muted-foreground size-6" />
                         <p className="text-sm">An organization owns spaces on behalf of a group.</p>
                         <p className="text-muted-foreground max-w-sm text-xs">
-                            Put people on its roster, group them into teams, and give a team a space. Joining the
-                            team is then the only thing anybody has to do to reach the work.
+                            Put people on its roster, group them into teams, and give a team a
+                            space. Joining the team is then the only thing anybody has to do to
+                            reach the work.
                         </p>
                     </CardBody>
                 </Card>
@@ -125,8 +220,15 @@ export function OrganizationsView({
                                 <OrgAvatar org={org} size={36} />
                                 <span className="min-w-0 flex-1">
                                     <span className="flex items-center gap-2">
-                                        <span className="truncate text-sm font-medium" title={org.name}>{org.name}</span>
-                                        <Badge variant={org.role === "owner" ? "primary" : "neutral"}>
+                                        <span
+                                            className="truncate text-sm font-medium"
+                                            title={org.name}
+                                        >
+                                            {org.name}
+                                        </span>
+                                        <Badge
+                                            variant={org.role === "owner" ? "primary" : "neutral"}
+                                        >
                                             {org.roleName}
                                         </Badge>
                                     </span>
@@ -164,7 +266,9 @@ export function OrganizationsView({
                         <DialogTitle>New organization</DialogTitle>
                         <DialogDescription>
                             You own it. Add people to its roster afterwards and put them on teams.
-                            {memberLimit > 0 ? ` This Polaris allows up to ${memberLimit} members.` : ""}
+                            {memberLimit > 0
+                                ? ` This Polaris allows up to ${memberLimit} members.`
+                                : ""}
                         </DialogDescription>
                     </DialogHeader>
                     <form className="flex flex-col gap-3" onSubmit={submit}>
@@ -204,12 +308,19 @@ export function OrganizationsView({
                             />
                         </label>
                         {(issue || error) && (
-                            <p role="alert" className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
+                            <p
+                                role="alert"
+                                className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm"
+                            >
                                 {error || issue}
                             </p>
                         )}
                         <div className="flex justify-end gap-2">
-                            <Button type="button" variant="ghost" onClick={() => setCreating(false)}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => setCreating(false)}
+                            >
                                 Cancel
                             </Button>
                             <Button type="submit" disabled={!parsed.success || saving}>

@@ -16,7 +16,12 @@ import { useEffect, useState, useTransition } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import type { ProjectMemberView } from "@/lib/deploy-project-service";
 import { Button, ConfirmDeleteDialog, Input, Select } from "@polaris/ui";
-import { PROJECT_ROLES, PROJECT_ROLE_HINTS, PROJECT_ROLE_LABELS, type ProjectRole } from "@polaris/core";
+import {
+    PROJECT_ROLES,
+    PROJECT_ROLE_HINTS,
+    PROJECT_ROLE_LABELS,
+    type ProjectRole
+} from "@polaris/core";
 import {
     addProjectMemberAction,
     listProjectMembersAction,
@@ -54,7 +59,11 @@ export function MembersSection({ projectId }: { projectId: string }) {
         if (!identifier.trim()) return;
         setError(null);
         startTransition(async () => {
-            const result = await addProjectMemberAction({ projectId, identifier: identifier.trim(), role });
+            const result = await addProjectMemberAction({
+                projectId,
+                identifier: identifier.trim(),
+                role
+            });
             if (result.error) {
                 setError(result.error);
                 return;
@@ -67,7 +76,11 @@ export function MembersSection({ projectId }: { projectId: string }) {
     function changeRole(member: ProjectMemberView, next: ProjectRole) {
         setError(null);
         startTransition(async () => {
-            const result = await setProjectMemberRoleAction({ projectId, memberId: member.id, role: next });
+            const result = await setProjectMemberRoleAction({
+                projectId,
+                memberId: member.id,
+                role: next
+            });
             if (result.error) setError(result.error);
             load();
         });
@@ -115,21 +128,29 @@ export function MembersSection({ projectId }: { projectId: string }) {
                                         )}
                                     </p>
                                     <p className="truncate text-xs text-muted-foreground">
-                                        {member.email}
-                                        {member.isOwner ? "" : ` - added ${display.date(member.createdAt)}`}
+                                        {member.contact}
+                                        {member.isOwner
+                                            ? ""
+                                            : ` - added ${display.date(member.createdAt)}`}
                                     </p>
                                 </div>
                                 <div className="flex shrink-0 items-center gap-2">
                                     <Select
                                         value={member.role}
                                         disabled={member.isOwner || !canManage || pending}
-                                        onValueChange={(value) => changeRole(member, value as ProjectRole)}
+                                        onValueChange={(value) =>
+                                            changeRole(member, value as ProjectRole)
+                                        }
                                         options={ROLE_OPTIONS}
                                         className="h-8 w-36"
                                         aria-label={`Role for ${member.name}`}
                                     />
                                     {canManage && !member.isOwner && (
-                                        <Button variant="ghost" size="sm" onClick={() => setRemoving(member)}>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setRemoving(member)}
+                                        >
                                             Remove
                                         </Button>
                                     )}
@@ -142,7 +163,9 @@ export function MembersSection({ projectId }: { projectId: string }) {
                 <dl className="flex flex-col gap-1">
                     {PROJECT_ROLES.map((entry) => (
                         <div key={entry} className="flex gap-2 text-xs">
-                            <dt className="w-20 shrink-0 font-medium">{PROJECT_ROLE_LABELS[entry]}</dt>
+                            <dt className="w-20 shrink-0 font-medium">
+                                {PROJECT_ROLE_LABELS[entry]}
+                            </dt>
                             <dd className="text-muted-foreground">{PROJECT_ROLE_HINTS[entry]}</dd>
                         </div>
                     ))}
@@ -150,10 +173,15 @@ export function MembersSection({ projectId }: { projectId: string }) {
             </SettingsCard>
 
             {canManage && (
-                <SettingsCard title="Add a member" description="They need an account on this Polaris already.">
+                <SettingsCard
+                    title="Add a member"
+                    description="They need an account on this Polaris already."
+                >
                     <div className="flex flex-wrap items-end gap-2">
                         <label className="flex min-w-48 flex-1 flex-col gap-1.5">
-                            <span className="text-xs font-medium text-muted-foreground">Email or username</span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                                Email or username
+                            </span>
                             <Input
                                 value={identifier}
                                 onChange={(event) => setIdentifier(event.target.value)}
@@ -172,7 +200,11 @@ export function MembersSection({ projectId }: { projectId: string }) {
                             />
                         </label>
                         <Button onClick={add} disabled={pending || !identifier.trim()}>
-                            {pending ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
+                            {pending ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <UserPlus className="size-4" />
+                            )}
                             Add
                         </Button>
                     </div>

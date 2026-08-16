@@ -45,7 +45,10 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-vi.mock("@/lib/privacy-service", () => ({ maySee: async () => true }));
+vi.mock("@/lib/privacy-service", () => ({
+    allowedBy: async (_viewer: unknown, _field: string, userIds: readonly string[]) =>
+        new Set(userIds)
+}));
 vi.mock("@/lib/chat/access", () => ({ reachableChannelIds: async () => new Set<string>() }));
 vi.mock("@/lib/chat/meetings", () => ({ PARTICIPANT_TTL_MS: 60_000 }));
 

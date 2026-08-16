@@ -55,7 +55,10 @@ type Result<T extends object = Record<never, never>> = { error?: string } & Part
 
 /** Run the body, turning a thrown message into the error field. Keeps each
  *  action to its actual work instead of an identical try/catch apiece. */
-async function attempt<T>(fallback: string, body: () => Promise<T>): Promise<T | { error: string }> {
+async function attempt<T>(
+    fallback: string,
+    body: () => Promise<T>
+): Promise<T | { error: string }> {
     try {
         return await body();
     } catch (caught) {
@@ -141,7 +144,10 @@ export async function setProjectVisibilityAction(input: {
     });
 }
 
-export async function setProjectFlagsAction(input: { projectId: string; flags: ProjectFlags }): Promise<Result> {
+export async function setProjectFlagsAction(input: {
+    projectId: string;
+    flags: ProjectFlags;
+}): Promise<Result> {
     return attempt("Could not save the flags", async () => {
         const user = await requirePermission("deploy.manage");
         const parsed = projectFlagsSchema.safeParse(input.flags);
@@ -157,13 +163,20 @@ export async function setProjectFlagsAction(input: { projectId: string; flags: P
 // Environments
 // ---------------------------------------------------------------------------
 
-export async function renameEnvironmentAction(input: { environmentId: string; name: string }): Promise<Result> {
+export async function renameEnvironmentAction(input: {
+    environmentId: string;
+    name: string;
+}): Promise<Result> {
     return attempt("Could not rename the environment", async () => {
         const user = await requirePermission("deploy.manage");
         const parsed = environmentNameSchema.safeParse(input);
         if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the name" };
         const access = await requireEnvironmentAccess(parsed.data.environmentId, user.id, "admin");
-        await deployService.renameEnvironment(parsed.data.environmentId, access.ownerId, parsed.data.name);
+        await deployService.renameEnvironment(
+            parsed.data.environmentId,
+            access.ownerId,
+            parsed.data.name
+        );
         refresh(access.projectId);
         return {};
     });
@@ -190,7 +203,10 @@ export async function listProjectMembersAction(
         const user = await requirePermission("deploy.read");
         const access = await requireProjectAccess(projectId, user.id, "viewer");
         return {
-            members: await projectService.listProjectMembers(projectId),
+            members: await projectService.listProjectMembers(projectId, {
+                id: user.id,
+                isAdmin: user.isAdmin
+            }),
             canManage: accessAtLeast(access, "admin")
         };
     });
@@ -238,7 +254,10 @@ export async function setProjectMemberRoleAction(input: {
     });
 }
 
-export async function removeProjectMemberAction(input: { projectId: string; memberId: string }): Promise<Result> {
+export async function removeProjectMemberAction(input: {
+    projectId: string;
+    memberId: string;
+}): Promise<Result> {
     return attempt("Could not remove the member", async () => {
         const user = await requirePermission("deploy.manage");
         await requireProjectAccess(input.projectId, user.id, "admin");
@@ -268,13 +287,18 @@ export async function listProjectTokensAction(
     });
 }
 
-export async function createProjectTokenAction(input: ProjectTokenInput): Promise<Result<{ secret: string }>> {
+export async function createProjectTokenAction(
+    input: ProjectTokenInput
+): Promise<Result<{ secret: string }>> {
     return attempt("Could not create the token", async () => {
         const user = await requirePermission("deploy.manage");
         const parsed = projectTokenInputSchema.safeParse(input);
         if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
         const access = await requireProjectAccess(parsed.data.projectId, user.id, "admin");
-        const created = await projectService.createProjectToken({ ...parsed.data, ownerId: access.ownerId });
+        const created = await projectService.createProjectToken({
+            ...parsed.data,
+            ownerId: access.ownerId
+        });
         await recordAudit({
             actorId: user.id,
             action: "deploy.project.token.create",
@@ -286,7 +310,10 @@ export async function createProjectTokenAction(input: ProjectTokenInput): Promis
     });
 }
 
-export async function revokeProjectTokenAction(input: { projectId: string; tokenId: string }): Promise<Result> {
+export async function revokeProjectTokenAction(input: {
+    projectId: string;
+    tokenId: string;
+}): Promise<Result> {
     return attempt("Could not revoke the token", async () => {
         const user = await requirePermission("deploy.manage");
         await requireProjectAccess(input.projectId, user.id, "admin");
@@ -301,7 +328,10 @@ export async function revokeProjectTokenAction(input: { projectId: string; token
     });
 }
 
-export async function deleteProjectTokenAction(input: { projectId: string; tokenId: string }): Promise<Result> {
+export async function deleteProjectTokenAction(input: {
+    projectId: string;
+    tokenId: string;
+}): Promise<Result> {
     return attempt("Could not delete the token", async () => {
         const user = await requirePermission("deploy.manage");
         await requireProjectAccess(input.projectId, user.id, "admin");
@@ -357,7 +387,10 @@ export async function setProjectWebhookEnabledAction(input: {
     });
 }
 
-export async function deleteProjectWebhookAction(input: { projectId: string; id: string }): Promise<Result> {
+export async function deleteProjectWebhookAction(input: {
+    projectId: string;
+    id: string;
+}): Promise<Result> {
     return attempt("Could not remove the webhook", async () => {
         const user = await requirePermission("deploy.manage");
         await requireProjectAccess(input.projectId, user.id, "admin");
@@ -366,7 +399,10 @@ export async function deleteProjectWebhookAction(input: { projectId: string; id:
     });
 }
 
-export async function testProjectWebhookAction(input: { projectId: string; id: string }): Promise<Result> {
+export async function testProjectWebhookAction(input: {
+    projectId: string;
+    id: string;
+}): Promise<Result> {
     return attempt("Could not reach the endpoint", async () => {
         const user = await requirePermission("deploy.manage");
         await requireProjectAccess(input.projectId, user.id, "admin");
@@ -378,7 +414,9 @@ export async function testProjectWebhookAction(input: { projectId: string; id: s
 // Usage and template
 // ---------------------------------------------------------------------------
 
-export async function projectUsageAction(projectId: string): Promise<Result<{ usage: projectService.ProjectUsage }>> {
+export async function projectUsageAction(
+    projectId: string
+): Promise<Result<{ usage: projectService.ProjectUsage }>> {
     return attempt("Could not load the usage", async () => {
         const user = await requirePermission("deploy.read");
         await requireProjectAccess(projectId, user.id, "viewer");
@@ -386,7 +424,9 @@ export async function projectUsageAction(projectId: string): Promise<Result<{ us
     });
 }
 
-export async function exportProjectTemplateAction(projectId: string): Promise<Result<{ template: string }>> {
+export async function exportProjectTemplateAction(
+    projectId: string
+): Promise<Result<{ template: string }>> {
     return attempt("Could not build the template", async () => {
         const user = await requirePermission("deploy.read");
         await requireProjectAccess(projectId, user.id, "admin");
@@ -448,7 +488,9 @@ export async function stageServiceDeleteAction(input: {
     });
 }
 
-export async function stageDatabaseDeleteAction(input: { databaseId: string }): Promise<Result<{ staged: boolean }>> {
+export async function stageDatabaseDeleteAction(input: {
+    databaseId: string;
+}): Promise<Result<{ staged: boolean }>> {
     return attempt("Could not remove the database", async () => {
         const user = await requirePermission("deploy.manage");
         const database = await deployService.getDatabaseSummary(input.databaseId);
@@ -493,7 +535,9 @@ export async function stageVolumeDeleteAction(input: {
 
         if (!(await staged.projectStagesChanges(access.projectId))) {
             await deleteVolume(input.volumeId, access.ownerId, { wipe: input.wipe });
-            void deployService.redeployForEnvScope("application", volume.applicationId, access.ownerId).catch(() => undefined);
+            void deployService
+                .redeployForEnvScope("application", volume.applicationId, access.ownerId)
+                .catch(() => undefined);
             refresh(access.projectId);
             return { staged: false };
         }
@@ -512,11 +556,16 @@ export async function stageVolumeDeleteAction(input: {
     });
 }
 
-export async function discardStagedChangeAction(input: { projectId: string; id: string }): Promise<Result> {
+export async function discardStagedChangeAction(input: {
+    projectId: string;
+    id: string;
+}): Promise<Result> {
     return attempt("Could not discard the change", async () => {
         const user = await requirePermission("deploy.manage");
         await requireProjectAccess(input.projectId, user.id, "developer");
-        const change = (await staged.listProjectStagedChanges(input.projectId)).find((entry) => entry.id === input.id);
+        const change = (await staged.listProjectStagedChanges(input.projectId)).find(
+            (entry) => entry.id === input.id
+        );
         if (!change) return { error: "That change is no longer pending" };
         await staged.discardStagedChange(input.id, change.environmentId);
         refresh(input.projectId);
@@ -549,7 +598,8 @@ export async function applyStagedChangesAction(input: {
     return attempt("Could not deploy the changes", async () => {
         const user = await requirePermission("deploy.manage");
         const access = await requireEnvironmentAccess(input.environmentId, user.id, "developer");
-        if (access.projectId !== input.projectId) return { error: "That environment is not in this project" };
+        if (access.projectId !== input.projectId)
+            return { error: "That environment is not in this project" };
         const result = await staged.applyStagedChanges(input.environmentId, access.ownerId);
         await recordAudit({
             actorId: user.id,
@@ -602,7 +652,9 @@ export async function volumeDetailAction(
 
 /** How full a volume is, measured from inside the service that mounts it. Null
  *  when it cannot be measured now (nothing running, no `du`, or too slow). */
-export async function volumeUsageAction(volumeId: string): Promise<Result<{ usedBytes: number | null }>> {
+export async function volumeUsageAction(
+    volumeId: string
+): Promise<Result<{ usedBytes: number | null }>> {
     return attempt("Could not measure the volume", async () => {
         const user = await requirePermission("deploy.read");
         await volumeFor(volumeId, user.id);

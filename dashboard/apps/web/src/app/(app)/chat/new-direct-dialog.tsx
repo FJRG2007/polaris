@@ -24,7 +24,7 @@ import { useChat } from "./chat-context";
 import { useRouter } from "next/navigation";
 import { openDirectAction, searchPeopleAction } from "./actions";
 import { runAction } from "@/lib/run-action";
-import { PeoplePicker, type PickedPerson } from "./people-picker";
+import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
     Button,
     Dialog,
@@ -53,10 +53,7 @@ export function NewDirectDialog({
         if (userIds.length === 0) return;
         setBusy(true);
         setError("");
-        const result = await runAction(
-            () => openDirectAction({ userIds: [...userIds] }),
-            setError
-        );
+        const result = await runAction(() => openDirectAction({ userIds: [...userIds] }), setError);
         setBusy(false);
         if (result?.error || !result?.id) return;
         setPicked([]);

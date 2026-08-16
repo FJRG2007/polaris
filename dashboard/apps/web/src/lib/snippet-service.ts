@@ -201,7 +201,7 @@ export async function listSnippetsForRequest(ownerId: string, requestId: string)
             clientSealed: true,
             createdAt: true,
             submittedIpHash: true,
-            submittedBy: { select: { id: true, name: true, email: true } },
+            submittedBy: { select: { id: true, name: true, username: true } },
             files: { select: { name: true, size: true }, orderBy: { position: "asc" } }
         }
     });
