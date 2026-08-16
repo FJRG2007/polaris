@@ -32,7 +32,7 @@ import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { playCallSound } from "@/lib/call-sounds";
 import { searchPeopleAction } from "./actions";
-import { PeoplePicker, type PickedPerson } from "./people-picker";
+import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import { useEffect, useRef, useState } from "react";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";

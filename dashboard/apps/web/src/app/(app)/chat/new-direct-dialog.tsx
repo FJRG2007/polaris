@@ -24,7 +24,7 @@ import { useChat } from "./chat-context";
 import { useRouter } from "next/navigation";
 import { openDirectAction, searchPeopleAction } from "./actions";
 import { runAction } from "@/lib/run-action";
-import { PeoplePicker, type PickedPerson } from "./people-picker";
+import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
     Button,
     Dialog,

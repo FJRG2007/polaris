@@ -12,7 +12,7 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
-import { PeoplePicker, type PickedPerson } from "./people-picker";
+import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import { addChannelMembersAction, listMembersAction, searchPeopleAction } from "./actions";
 import {
     Button,

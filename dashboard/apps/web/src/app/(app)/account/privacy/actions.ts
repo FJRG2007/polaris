@@ -12,7 +12,13 @@ import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { findPeople } from "@/lib/people-search";
-import { setPrivacy } from "@/lib/privacy-service";
+import {
+    PrivacyError,
+    createList,
+    deleteList,
+    setPrivacy,
+    updateList
+} from "@/lib/privacy-service";
 import {
     FriendError,
     removeFriend,
@@ -29,7 +35,9 @@ async function guard(run: () => Promise<void>): Promise<{ error?: string }> {
         revalidatePath(PRIVACY_PATH);
         return {};
     } catch (caught) {
-        if (caught instanceof FriendError) return { error: caught.message };
+        if (caught instanceof FriendError || caught instanceof PrivacyError) {
+            return { error: caught.message };
+        }
         throw caught;
     }
 }
@@ -39,21 +47,50 @@ export async function savePrivacyAction(input: unknown): Promise<{ error?: strin
     const parsed = core.privacySettingsSchema.safeParse(input);
     if (!parsed.success) return { error: "Those settings could not be saved" };
 
-    await setPrivacy(user.id, parsed.data);
-    revalidatePath(PRIVACY_PATH);
-    return {};
+    return guard(() => setPrivacy(user.id, parsed.data));
+}
+
+// ---------------------------------------------------------------------------
+// The lists a setting names
+// ---------------------------------------------------------------------------
+
+export async function createPrivacyListAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = core.privacyListSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the list" };
+
+    return guard(async () => {
+        await createList(user.id, parsed.data);
+    });
+}
+
+export async function updatePrivacyListAction(
+    listId: string,
+    input: unknown
+): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = core.privacyListSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the list" };
+
+    return guard(() => updateList(user.id, String(listId), parsed.data));
+}
+
+export async function deletePrivacyListAction(listId: string): Promise<{ error?: string }> {
+    const user = await requireUser();
+    return guard(() => deleteList(user.id, String(listId)));
 }
 
 /**
- * Who this account may ask to be friends with.
+ * Who this account may name: ask to be friends with, or put on one of its lists.
  *
  * Its own search rather than the chat one, and the reason is a bug this fixed:
  * the friends card borrowed Chat's, whose first act is to check `chat.use` - so
  * an account without the chat was sent away from its own privacy screen the
- * moment the picker mounted, by a redirect it never asked for. Being friends is
- * not a chat feature; it decides what the settings above this mean.
+ * moment the picker mounted, by a redirect it never asked for. Neither being
+ * friends nor naming an exception is a chat feature; both decide what the
+ * settings on this screen mean.
  */
-export async function searchForFriendAction(
+export async function searchPeopleAction(
     query: string
 ): Promise<{ results?: { id: string; name: string }[]; withheld?: number }> {
     const user = await requireUser();

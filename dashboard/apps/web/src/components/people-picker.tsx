@@ -1,7 +1,12 @@
 "use client";
 
 /**
- * Picking people, wherever Chat needs some.
+ * Picking people, wherever a screen needs some.
+ *
+ * It began in Chat and now also builds the list a privacy setting names, which
+ * is why it takes the search rather than choosing one: who may be offered is the
+ * caller's question, and it has different answers in a room and on an account's
+ * own settings screen.
  *
  * **It lists nobody.** An empty box shows an empty list, and so does a single
  * letter: a picker that fills itself with everybody on the instance the moment
@@ -139,6 +144,10 @@ export function PeoplePicker({
                 cannot receive a message. */}
             {!searching && withheld > 0 && query.trim().length >= SHORTEST && (
                 <p className="px-2 text-xs text-muted-foreground">
+                    {/* Chat's is the only search that holds anybody back today,
+                        and it holds back accounts with no chat to receive the
+                        message. Every other caller answers with `withheld: 0`,
+                        so this never appears where it would not be true. */}
                     {withheld === 1
                         ? "One account matches but does not have Chat."
                         : `${withheld} accounts match but do not have Chat.`}{" "}

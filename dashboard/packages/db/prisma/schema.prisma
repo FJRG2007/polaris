@@ -168,6 +168,9 @@ model User {
     backupJobs          BackupJob[]
     ownedVaults         VaultOrganization[]  @relation("VaultOwner")
     privacy             UserPrivacy?
+    privacyLists        PrivacyList[]
+    privacyListedOn     PrivacyListMember[]
+    privacyFieldLists   PrivacyFieldList[]
     friendshipsAsked    Friendship[]         @relation("FriendshipRequester")
     friendshipsReceived Friendship[]         @relation("FriendshipAddressee")
 }
@@ -3778,8 +3781,8 @@ model Organization {
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
-    owner    User                 @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-    members  OrganizationMember[]
+    owner       User                     @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+    members     OrganizationMember[]
     teams    Team[]
     roles    OrgRole[]
     spaces   TaskSpace[]
@@ -6108,6 +6111,12 @@ model UserPrivacy {
     lastSeen     String   @default("everyone")
     readReceipts String   @default("everyone")
     avatar       String   @default("everyone")
+    // The two that are shut until somebody opens them, and the only ones. An
+    // address and a number are not details of a presence: they are what spam,
+    // password resets and impersonation start from, and nothing in Polaris needs
+    // either to name somebody, mention them or write to them.
+    email        String   @default("nobody")
+    phone        String   @default("nobody")
     // Who may send something this account wrote into another conversation. Open
     // by default, like the rest: a messenger where nothing can be passed on is
     // not what anybody expects, and a default that removed a button would read
@@ -6116,6 +6125,64 @@ model UserPrivacy {
     updatedAt    DateTime @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// A set of people one account names in its privacy settings.
+//
+// Saved and reused rather than picked per setting: the same three or four names
+// are usually the answer to more than one question, and re-picking them is how
+// two settings that were meant to agree drift apart.
+//
+// A list with an empty name is one picked for a single setting rather than kept -
+// it belongs to that setting, is edited from its row, and is never offered
+// anywhere else. Same table because it is the same thing; the name is what makes
+// one worth showing in the list of lists.
+model PrivacyList {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    name      String   @default("")
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+    members PrivacyListMember[]
+    usedBy  PrivacyFieldList[]
+
+    @@index([userId])
+}
+
+model PrivacyListMember {
+    listId String @db.Uuid
+    userId String @db.Uuid
+
+    list PrivacyList @relation(fields: [listId], references: [id], onDelete: Cascade)
+    user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([listId, userId])
+    @@index([userId])
+}
+
+// Which set one of an account's settings names.
+//
+// Its own row rather than a column per setting: the settings are a list that
+// grows, and a table that grows a pair of columns every time one is added is a
+// migration nobody remembers to write. One row per setting that names a list at
+// all, which is the uncommon case.
+//
+// Losing the list is the safe direction on purpose. The rule left behind names a
+// set that no longer exists, and `audienceAllows` shows nothing for it - a
+// deleted list must never widen who can see something.
+model PrivacyFieldList {
+    userId String @db.Uuid
+    // One of PRIVACY_FIELDS in @polaris/core.
+    field  String
+    listId String @db.Uuid
+
+    user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+    list PrivacyList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+    @@id([userId, field])
+    @@index([listId])
 }
 
 // Two accounts that know each other.

@@ -24,7 +24,7 @@ import type { ChatInviteView } from "@/lib/chat/invites";
 import type { ChatSpaceView } from "@/lib/chat/chat-service";
 import { Check, Link2, Loader2, Send, X } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
-import { PeoplePicker, type PickedPerson } from "./people-picker";
+import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
     Button,
     Dialog,
