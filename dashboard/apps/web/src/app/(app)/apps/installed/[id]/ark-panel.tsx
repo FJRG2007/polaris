@@ -29,6 +29,7 @@ import { CopyButton } from "@/components/copy-button";
 import { useConfirm } from "@/components/confirm-dialog";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
+import type { ArkProfile } from "@/lib/apps/ark/profile";
 import { RelativeTime } from "@/components/relative-time";
 import { ToolbarSwitch } from "@/components/toolbar-switch";
 import type { ServerPresence } from "@/lib/apps/games-service";
@@ -56,25 +57,6 @@ import {
     playerStanding
 } from "@/lib/apps/player-vocabulary";
 import {
-    Ban,
-    Clock,
-    DoorOpen,
-    Eye,
-    FolderOpen,
-    Timer,
-    Loader2,
-    Megaphone,
-    MessageSquare,
-    MoreHorizontal,
-    Pencil,
-    RefreshCw,
-    Save,
-    ShieldAlert,
-    UserMinus,
-    UserPlus,
-    Users
-} from "lucide-react";
-import {
     Badge,
     Button,
     Card,
@@ -90,6 +72,28 @@ import {
     Switch,
     cn
 } from "@polaris/ui";
+import {
+    Ban,
+    Clock,
+    Crown,
+    DoorOpen,
+    Eye,
+    FolderOpen,
+    Timer,
+    Loader2,
+    Megaphone,
+    MessageSquare,
+    MoreHorizontal,
+    Pencil,
+    RefreshCw,
+    Save,
+    ShieldAlert,
+    ShieldMinus,
+    ShieldPlus,
+    UserMinus,
+    UserPlus,
+    Users
+} from "lucide-react";
 
 /**
  * How long after one read finishes before the next one starts. Measured from the
@@ -126,6 +130,11 @@ interface ServerReading {
     /** Bans with an end, and when each one lifts. Keyed by Steam id, which is what
      *  ARK bans by. */
     timeouts: readonly PlayerTimeout[];
+    /** The Steam ids that may administer the server without its password, as the
+     *  file on disk has them. */
+    admins: readonly string[];
+    /** What each survivor's own file says about them, by Steam id. */
+    profiles: Readonly<Record<string, ArkProfile>>;
 }
 
 export function ArkPanel({
@@ -174,7 +183,9 @@ export function ArkPanel({
         address: game?.address ?? null,
         reach: null,
         access: game?.arkAccess ?? null,
-        timeouts: []
+        timeouts: [],
+        admins: [],
+        profiles: {}
     });
     const [error, setError] = useState<string | null>(null);
     /** What Polaris last said it intends the server to do. Kept so the page can
@@ -182,17 +193,24 @@ export function ArkPanel({
      *  schedule that fired while somebody was looking at the screen. */
     const intended = useRef(running);
 
+    // The survivors and the admin list are two more reads inside the container, so
+    // they are only asked for by the screen that draws them.
+    const wantsPlayers = tab === "players";
+
     const load = useCallback(async () => {
         try {
-            const response = await fetch(`/api/apps/installed/${installedAppId}/ark`, {
-                cache: "no-store"
-            });
+            const response = await fetch(
+                `/api/apps/installed/${installedAppId}/ark${wantsPlayers ? "?players=1" : ""}`,
+                { cache: "no-store" }
+            );
             const data = (await response.json()) as {
                 status?: ArkStatus;
                 address?: string | null;
                 reach?: GameReachAdvice | null;
                 access?: ArkAccessView | null;
                 timeouts?: PlayerTimeout[];
+                admins?: string[];
+                profiles?: Record<string, ArkProfile>;
                 error?: string;
             };
             if (!response.ok || !data.status) {
@@ -207,7 +225,12 @@ export function ArkPanel({
                 // warning would flicker on every failed read.
                 reach: data.reach ?? current.reach,
                 access: data.access ?? current.access,
-                timeouts: data.timeouts ?? current.timeouts
+                timeouts: data.timeouts ?? current.timeouts,
+                // Kept between polls of the same screen rather than dropped, so a
+                // column does not blink empty on a read the container was too busy
+                // to answer.
+                admins: data.admins ?? (wantsPlayers ? current.admins : []),
+                profiles: data.profiles ?? (wantsPlayers ? current.profiles : {})
             }));
             // The header's Start and Stop, and everything else the page rendered
             // on the server, come from the install row. A poll that finds the
@@ -220,7 +243,7 @@ export function ArkPanel({
         } catch {
             // Transient; the next poll retries.
         }
-    }, [installedAppId, router]);
+    }, [installedAppId, wantsPlayers, router]);
 
     // Scheduled from the end of a read rather than on a fixed interval: asking an
     // ARK server anything is a command inside its container, and a slow one would
@@ -327,6 +350,8 @@ export function ArkPanel({
                     status={status}
                     access={reading.access}
                     timeouts={reading.timeouts}
+                    admins={reading.admins}
+                    profiles={reading.profiles}
                     canModerate={held.includes("games.moderate")}
                     canManage={held.includes("games.manage")}
                     onChanged={(next) => {
@@ -823,6 +848,8 @@ function PlayersTab({
     status,
     access,
     timeouts,
+    admins,
+    profiles,
     canModerate,
     canManage,
     onChanged
@@ -832,6 +859,11 @@ function PlayersTab({
     access: ArkAccessView | null;
     /** Bans with an end, so a row can say how much of one is left. */
     timeouts: readonly PlayerTimeout[];
+    /** Who may administer the server from inside the game, as its own file has it. */
+    admins: readonly string[];
+    /** What each survivor's file says: their level, and the name they gave
+     *  themselves rather than the one Steam knows them by. */
+    profiles: Readonly<Record<string, ArkProfile>>;
     canModerate: boolean;
     /** Whether they may change what the list means, which is a heavier grant than
      *  being allowed to add somebody to it. */
@@ -867,9 +899,13 @@ function PlayersTab({
                         ? entry.online
                         : filter === "allowed"
                           ? entry.standing !== "not-allowed"
-                          : true
+                          : filter === "operators"
+                            ? admins.includes(entry.steamId)
+                            : filter === "banned"
+                              ? timeoutFor(timeouts, entry.steamId) !== null
+                              : true
                 ),
-        [players, query, filter]
+        [players, query, filter, admins, timeouts]
     );
 
     function run(
@@ -958,6 +994,7 @@ function PlayersTab({
             <PlayersTable
                 columns={[
                     { label: "Player" },
+                    { label: "Level" },
                     { label: "Steam id", className: "hidden md:table-cell" },
                     { label: "Status" },
                     { label: "May join" }
@@ -967,11 +1004,10 @@ function PlayersTab({
                 searchPlaceholder="Search by name or Steam id"
                 filter={filter}
                 onFilter={setFilter}
-                // Named once for every game - see `player-vocabulary`. No
-                // operators and no banned: ARK's admins are a password rather than
-                // a list, and its ban list cannot be read back, so both would be
-                // filters that always came back empty.
-                filters={playerFilters()}
+                // Named once for every game - see `player-vocabulary`. Operators
+                // are offered because ARK does have a list of them after all - the
+                // Steam ids allowed to run admin commands without the password.
+                filters={playerFilters({ operators: true })}
                 toolbar={
                     <>
                         {/* Whether the list underneath is enforced at all, above
@@ -1008,8 +1044,19 @@ function PlayersTab({
                         entry={entry}
                         live={status !== null}
                         canModerate={canModerate}
+                        canManage={canManage}
                         answering={answering}
                         pending={pending}
+                        profile={profiles[entry.steamId] ?? null}
+                        admin={admins.includes(entry.steamId)}
+                        onAdmin={(next) =>
+                            run(
+                                () => actions.setArkAdminAction(installedAppId, entry.steamId, next),
+                                next
+                                    ? `${entry.name} administers this server from its next start.`
+                                    : `${entry.name} stops administering it at its next start.`
+                            )
+                        }
                         timeout={timeoutFor(timeouts, entry.steamId)}
                         onTimeout={() => open("timeout", entry)}
                         onAllow={() =>
@@ -1091,6 +1138,13 @@ function PlayersTab({
             <p className="text-xs text-muted-foreground">
                 Enforcing the list takes effect the next time the server starts, and is on top of the
                 join password. Adding and removing somebody reaches a running server at once.
+            </p>
+
+            <p className="text-xs text-muted-foreground">
+                An operator runs admin commands in game without typing the admin password. ARK reads
+                that list only when it starts, so somebody made an operator now becomes one at the
+                next restart. Levels come from each survivor&apos;s own file, so somebody who has
+                never played here has none.
             </p>
 
             <p className="text-xs text-muted-foreground">
@@ -1250,9 +1304,13 @@ function ArkPlayerRow({
     entry,
     live: read,
     canModerate,
+    canManage,
     answering,
     pending,
     timeout,
+    profile,
+    admin,
+    onAdmin,
     onAllow,
     onRemove,
     onEdit,
@@ -1269,11 +1327,20 @@ function ArkPlayerRow({
      *  name that is playing is worse than saying nothing. */
     live: boolean;
     canModerate: boolean;
+    /** Whether they may hand out the heavier of the two grants. Making somebody an
+     *  admin is not moderation - an admin can spawn and destroy anything. */
+    canManage: boolean;
     answering: boolean;
     pending: boolean;
     /** The timeout they are serving, when they are serving one. The only ban this
      *  screen can know about: ARK's own list cannot be read back. */
     timeout: PlayerTimeout | null;
+    /** What their own survivor file says, or null for somebody who has never
+     *  played here - and for every row while the server is down. */
+    profile: ArkProfile | null;
+    /** Whether they are on the server's admin list. */
+    admin: boolean;
+    onAdmin: (admin: boolean) => void;
     onAllow: () => void;
     onRemove: () => void;
     onEdit: () => void;
@@ -1298,12 +1365,39 @@ function ArkPlayerRow({
             )}
         >
             <td className="px-3 py-2">
-                <p className="truncate font-medium" title={entry.name}>
+                <p className="flex items-center gap-1.5 truncate font-medium" title={entry.name}>
+                    {/* The same mark the Minecraft table puts against an operator,
+                        because it is the same thing: somebody who may do anything
+                        on this server. */}
+                    {admin && <Crown className="size-3.5 text-warning" role="img" aria-label="Admin" />}
                     {entry.name}
                 </p>
+                {/* The name they gave their survivor, when it is not the Steam name
+                    the list came back with - a moderator recognises one of the two
+                    and it is not always the same one. */}
+                {profile?.characterName && profile.characterName !== entry.name && (
+                    <span className="block truncate text-xs text-muted-foreground">
+                        Plays as {profile.characterName}
+                    </span>
+                )}
                 <span className="block truncate text-xs text-muted-foreground md:hidden">
                     {entry.steamId}
                 </span>
+            </td>
+            {/* Out of the survivor's own file rather than out of the game: ARK has
+                no command that answers it, and a player who has never joined has no
+                file to read. */}
+            <td className="px-3 py-2 tabular-nums">
+                {profile?.level == null ? (
+                    <span
+                        className="text-muted-foreground"
+                        title="Read from the survivor's own file: a server that is off cannot be asked, and somebody who has never played here has no file yet."
+                    >
+                        -
+                    </span>
+                ) : (
+                    profile.level
+                )}
             </td>
             <td className="hidden px-3 py-2 md:table-cell">
                 <div className="flex items-center gap-1">
@@ -1342,6 +1436,11 @@ function ArkPlayerRow({
                     )}
                     {entry.standing === "not-allowed" && (
                         <Badge variant="warning">{playerStanding.notAllowed}</Badge>
+                    )}
+                    {admin && (
+                        <Badge title="May run admin commands in game without the password. In force from the server's next start.">
+                            {playerStanding.operator}
+                        </Badge>
                     )}
                     {/* The only ban this screen can be sure of. ARK keeps its ban
                         list to itself, so a permanent one leaves nothing to show;
@@ -1418,6 +1517,27 @@ function ArkPlayerRow({
                                 <DropdownMenuItem disabled={pending} onSelect={onEdit}>
                                     <Pencil className="size-4" /> {playerMenuItem.edit}
                                 </DropdownMenuItem>
+                                {/* ARK's nearest thing to an operator. Listing
+                                    somebody here lets them run admin commands
+                                    without being told the password - which is the
+                                    only way to take it back from one person
+                                    without changing it for everybody. Offered to
+                                    whoever may manage the server, not to every
+                                    moderator, and it is the file that is written:
+                                    the game reads it when it starts. */}
+                                {canManage && (
+                                    <DropdownMenuItem
+                                        disabled={pending}
+                                        onSelect={() => onAdmin(!admin)}
+                                    >
+                                        {admin ? (
+                                            <ShieldMinus className="size-4" />
+                                        ) : (
+                                            <ShieldPlus className="size-4" />
+                                        )}
+                                        {admin ? "Stop them administering it" : "Let them administer it"}
+                                    </DropdownMenuItem>
+                                )}
                                 {/* The id is a number, and the question behind it
                                     is always "who is this" - which only Steam can
                                     answer. Opening it here is the difference

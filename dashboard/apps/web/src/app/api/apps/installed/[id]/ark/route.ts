@@ -5,7 +5,13 @@ import { requireGameServer } from "@/lib/apps/install-access";
 import { sweepArkTimeouts } from "@/lib/apps/ark/timeout-service";
 import { readPlayerTimeouts } from "@/lib/apps/player-timeout-service";
 import { sweepGameSchedules } from "@/lib/apps/minecraft/schedule-service";
-import { applyAllowList, getArkStatus, readArkAccess } from "@/lib/apps/ark/service";
+import {
+    applyAllowList,
+    getArkStatus,
+    readArkAccess,
+    readArkAdmins,
+    readArkProfiles
+} from "@/lib/apps/ark/service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,9 +33,12 @@ export const dynamic = "force-dynamic";
  * player list and the port advice behind it - so a page whose facts were all in the
  * database sat empty anyway.
  */
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
     const { id } = await params;
     const { access: server } = await requireGameServer("games.read", id);
+    // The survivors and the admin list are two more reads inside the container, so
+    // they are gathered for the screen that shows them rather than on every poll.
+    const wantsPlayers = new URL(request.url).searchParams.get("players") === "1";
     try {
         const [status, reach, allow, facts] = await Promise.all([
             getArkStatus(server.ownerId, id),
@@ -63,7 +72,29 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         // that is answering - unbanning is a command inside the container.
         if (status.answering) await sweepArkTimeouts(server.ownerId, id).catch(() => 0);
         const timeouts = await readPlayerTimeouts(id).catch(() => []);
-        return NextResponse.json({ status, reach, access, timeouts, address: facts?.address ?? null });
+        // Who administers it, and what level each survivor is on. Both are files in
+        // the container, so neither is asked of a server that is not up - and
+        // neither is a reason to fail the poll: the screen draws without them.
+        const [admins, profiles] = await Promise.all([
+            wantsPlayers && status.containerRunning !== false
+                ? readArkAdmins(server.ownerId, id).catch(() => [])
+                : [],
+            wantsPlayers && status.containerRunning !== false
+                ? readArkProfiles(server.ownerId, id, [
+                      ...status.players.map((player) => player.steamId),
+                      ...(access?.players ?? []).map((player) => player.steamId)
+                  ]).catch(() => ({}))
+                : {}
+        ]);
+        return NextResponse.json({
+            status,
+            reach,
+            access,
+            timeouts,
+            admins,
+            profiles,
+            address: facts?.address ?? null
+        });
     } catch (caught) {
         return NextResponse.json(
             { error: caught instanceof Error ? caught.message : "Could not read the server" },

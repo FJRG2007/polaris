@@ -32,8 +32,10 @@ const BANNED: PlayerFilterOption = { value: "banned", label: "Banned" };
 /**
  * The filters a game offers, in one order.
  *
- * `operators` only where the game has them: ARK's admins are a password, not a
- * list, so a filter for them would always come back empty.
+ * `operators` only where the game has them. Minecraft ops by name; ARK has no
+ * operator command at all, but it does read a file of the Steam ids allowed to run
+ * admin commands without the password - which is the same idea and is what the
+ * filter cuts on there.
  */
 export function playerFilters(has: { operators?: boolean } = {}): PlayerFilterOption[] {
     return [ALL, ONLINE, ALLOWED, ...(has.operators ? [OPERATORS] : []), BANNED];

@@ -265,6 +265,51 @@ export async function moderateArkPlayerAction(
     }
 }
 
+const adminSchema = z.object({
+    installedAppId: z.string().trim().min(1),
+    steamId: z.string().trim().refine(isSteamId, "That is not a Steam id"),
+    admin: z.boolean()
+});
+
+/**
+ * Let somebody administer the server from inside the game, or take it back.
+ *
+ * The heavier of the two grants this screen hands out - an admin can spawn
+ * anything, destroy anything and see everything - so it takes `games.manage`
+ * rather than the moderation grant that adds somebody to the allow list.
+ *
+ * The game reads its admin list when it starts and not again, so the answer says
+ * what is now in the file rather than what is in force, and the screen says which
+ * is which.
+ */
+export async function setArkAdminAction(
+    installedAppId: string,
+    steamId: string,
+    admin: boolean
+): Promise<{ admins?: string[]; error?: string }> {
+    const parsed = adminSchema.safeParse({ installedAppId, steamId, admin });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const admins = await ark.setArkAdmin(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.steamId,
+            parsed.data.admin
+        );
+        await recordAudit({
+            actorId: user.id,
+            action: parsed.data.admin ? "games.ark.admin.grant" : "games.ark.admin.revoke",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { steamId: parsed.data.steamId }
+        });
+        return { admins };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
+    }
+}
+
 /**
  * Ban somebody until a moment, rather than for good.
  *

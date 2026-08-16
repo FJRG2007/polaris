@@ -23,9 +23,12 @@ import { withTimeout } from "@polaris/core";
 import { findApp } from "@/lib/apps/catalog";
 import { setEnvVars } from "@/lib/env-var-service";
 import * as arkAccess from "@/lib/apps/ark/access";
+import * as arkAdmins from "@/lib/apps/ark/admins";
 import { readAppRuntimeLog } from "@/lib/deploy-service";
 import { withServerContainer } from "@/lib/apps/minecraft/service";
+import { parseArkProfile, type ArkProfile } from "@/lib/apps/ark/profile";
 import { readCrashLoop, readRestartWatch } from "@/lib/apps/games-health";
+import { ARK_ROOT, readArkFile, writeArkFile } from "@/lib/apps/ark/files";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "@/lib/apps/crash-loop";
 import { isRconRefusal, parseArkPlayers, type ArkPlayer } from "@/lib/apps/ark/parse";
@@ -578,6 +581,109 @@ export async function banArkPlayer(ownerId: string, installedAppId: string, stea
 export async function unbanArkPlayer(ownerId: string, installedAppId: string, steamId: string): Promise<void> {
     if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
     await runArkCommand(ownerId, installedAppId, `UnbanPlayer ${steamId.trim()}`);
+}
+
+/** Where the game keeps the world, the profiles and the admin list. */
+const SAVE_DIR = `${ARK_ROOT}/ShooterGame/Saved`;
+
+const ADMIN_FILE = `${ARK_ROOT}/${arkAdmins.ADMIN_LIST_PATH}`;
+
+/** How many survivors one read will fetch. A profile is a few kilobytes and they
+ *  come back in one string, so this is a bound on that string rather than on
+ *  anybody's server. */
+const MAX_PROFILE_READS = 40;
+
+/**
+ * The Steam ids the server lets administer it without the password.
+ *
+ * Empty for a server that has never been given one, which is also what a server
+ * that cannot be reached reports - the caller decides whether that matters. The
+ * game reads this file when it starts, so what is in it and what is in force can
+ * differ until the next restart; the screen says so.
+ */
+export async function readArkAdmins(ownerId: string, installedAppId: string): Promise<string[]> {
+    return withServerContainer(ownerId, installedAppId, async (server) =>
+        arkAdmins.parseAdminList((await readArkFile(server, ADMIN_FILE)) ?? "")
+    );
+}
+
+/**
+ * Make somebody an admin of this server, or take it back.
+ *
+ * Read, changed and written rather than appended to: the file is edited by hand on
+ * plenty of servers, and appending to one that already holds a name would list
+ * them twice. Hands back the list as it now stands so the screen never has to
+ * guess.
+ */
+export async function setArkAdmin(
+    ownerId: string,
+    installedAppId: string,
+    steamId: string,
+    admin: boolean
+): Promise<string[]> {
+    if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
+    const id = steamId.trim();
+    return withServerContainer(ownerId, installedAppId, async (server) => {
+        const current = arkAdmins.parseAdminList((await readArkFile(server, ADMIN_FILE)) ?? "");
+        const next = admin ? arkAdmins.withAdmin(current, id) : arkAdmins.withoutAdmin(current, id);
+        await writeArkFile(server, ADMIN_FILE, arkAdmins.formatAdminList(next));
+        return next;
+    });
+}
+
+/**
+ * What level each of these survivors is on, and what they called themselves.
+ *
+ * Read out of the per-player files the server writes, because ARK has no command
+ * that answers it. Only the ids asked for are looked up - the folder also holds
+ * the world and every tribe - and a player who has never joined has no file and is
+ * simply absent from the result.
+ *
+ * One shell for all of them: on a registered machine each exec is its own SSH
+ * handshake, and a full server would be twenty of them for one column.
+ */
+export async function readArkProfiles(
+    ownerId: string,
+    installedAppId: string,
+    steamIds: readonly string[]
+): Promise<Record<string, ArkProfile>> {
+    const wanted = [...new Set(steamIds)].filter((id) => arkAccess.isSteamId(id)).slice(0, MAX_PROFILE_READS);
+    if (wanted.length === 0) return {};
+    return withServerContainer(ownerId, installedAppId, async (server) => {
+        // The ids are seventeen digits and nothing else, which is what makes them
+        // safe to name in the loop below.
+        const script = [
+            `for id in ${wanted.join(" ")}; do`,
+            `f=$(find ${SAVE_DIR} -maxdepth 3 -name "$id.arkprofile" 2>/dev/null | head -n 1);`,
+            'if [ -n "$f" ]; then echo "== $id"; base64 "$f" | tr -d \'\\n\'; echo; fi;',
+            "done"
+        ].join(" ");
+        const result = await server.run(["sh", "-c", script]);
+        if (result.code !== 0) return {};
+        return readProfileDump(result.output);
+    });
+}
+
+/** The profiles out of that dump: a line naming the player, then one line of
+ *  base64. Anything else in the output - a warning from `find`, a shell notice -
+ *  is skipped rather than parsed. */
+function readProfileDump(output: string): Record<string, ArkProfile> {
+    const found: Record<string, ArkProfile> = {};
+    const lines = output.split(/\r?\n/);
+    for (let index = 0; index < lines.length; index += 1) {
+        const header = /^== (\d{17})$/.exec(lines[index] ?? "");
+        if (!header?.[1]) continue;
+        const encoded = (lines[index + 1] ?? "").trim();
+        index += 1;
+        if (!/^[A-Za-z0-9+/=]+$/.test(encoded)) continue;
+        try {
+            found[header[1]] = parseArkProfile(Buffer.from(encoded, "base64"));
+        } catch {
+            // A file that cannot be read is a player with no level, not a screen
+            // that fails to draw.
+        }
+    }
+    return found;
 }
 
 /** Whether an install is an ARK server, for the callers that dispatch on it. */
