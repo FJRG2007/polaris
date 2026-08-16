@@ -19,12 +19,18 @@
  */
 
 import * as actions from "./ark-actions";
+import { RestartPlanner } from "./restart-planner";
 import { useCallback, useEffect, useState } from "react";
 import type { ArkRules } from "@/lib/apps/ark/settings-service";
-import { RestartPlanner } from "./restart-planner";
 import { AlertTriangle, Info, Loader2, RefreshCw, RotateCcw } from "lucide-react";
 import { Button, Card, CardBody, Input, Skeleton, Switch, cn } from "@polaris/ui";
-import { arkSettingGroups, normalizeArkValue, type ArkSetting } from "@/lib/apps/ark/settings";
+import {
+    arkSettingGroups,
+    normalizeArkValue,
+    switchIsOn,
+    switchValue,
+    type ArkSetting
+} from "@/lib/apps/ark/settings";
 
 export function ArkRules({
     installedAppId,
@@ -213,11 +219,15 @@ function SettingRow({
     const [draft, setDraft] = useState(shown);
     useEffect(() => setDraft(shown), [shown]);
 
+    // A switch is described as on or off rather than as the True or False in the
+    // file: for the settings ARK names `DisableSomething` those two words are
+    // opposites, and printing the raw one is the same trap as drawing it.
+    const said = setting.type === "boolean" ? (switchIsOn(setting, live ?? "") ? "on" : "off") : live;
     const source =
         pinned !== null
             ? null
             : live !== null
-              ? `The server's own file says ${live}.`
+              ? `The server's own file says ${said}.`
               : `Not set - the game uses ${setting.fallback}.`;
 
     return (
@@ -255,8 +265,12 @@ function SettingRow({
                     <Switch
                         aria-label={setting.label}
                         disabled={disabled || busy}
-                        checked={shown.toLowerCase() === "true"}
-                        onChange={(next: boolean) => onChange(next ? "True" : "False")}
+                        // Through the setting rather than straight off the text: a
+                        // few of ARK's switches are named `DisableSomething`, and
+                        // drawing those as they are stored is how somebody turns
+                        // gamma on and finds it off.
+                        checked={switchIsOn(setting, shown)}
+                        onChange={(next: boolean) => onChange(switchValue(setting, next))}
                     />
                 ) : (
                     <Input

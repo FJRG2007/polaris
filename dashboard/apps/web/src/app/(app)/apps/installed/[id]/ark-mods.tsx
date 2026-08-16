@@ -15,14 +15,17 @@
  *
  * Adding by link needs nothing configured - Steam answers for a Workshop id without
  * a key. Searching does need one, so the search box says that rather than pretending
- * there are no results.
+ * there are no results, and a shelf of the mods most private servers end up running
+ * is offered underneath it: an empty search box is not a catalogue, and an instance
+ * with no key would otherwise have nothing to browse at all.
  */
 
 import Image from "next/image";
 import * as actions from "./ark-actions";
-import { useCallback, useEffect, useState } from "react";
 import { RestartPlanner } from "./restart-planner";
+import { useCallback, useEffect, useState } from "react";
 import type { ArkModsView } from "@/lib/apps/ark/mods-service";
+import type { ArkModSuggestion } from "@/lib/apps/ark/mod-catalog";
 import { workshopUrl, type WorkshopItem } from "@/lib/apps/ark/workshop";
 import { MAX_MODS, movedMod, withoutMod, withMod } from "@/lib/apps/ark/mods";
 import { Badge, Button, Card, CardBody, Input, Skeleton, cn } from "@polaris/ui";
@@ -160,6 +163,19 @@ export function ArkMods({
                 />
             )}
 
+            {/* Something to install, for a server that has nothing. Steam's own
+                index cannot be browsed without a key, so this is Polaris' short
+                list with Steam's own names and pictures on it. */}
+            {canManage && (
+                <ModShelves
+                    installedAppId={installedAppId}
+                    busy={busy}
+                    installedIds={[...ids, ...(mods?.mapModId ? [mods.mapModId] : [])]}
+                    onAdd={(id) => void save(withMod(ids, id))}
+                    onSetMap={(id) => void setMap(id)}
+                />
+            )}
+
             {loading ? (
                 <div className="flex flex-col gap-2">
                     {Array.from({ length: 3 }, (_, index) => (
@@ -242,6 +258,128 @@ export function ArkMods({
                 server loading it; anything it added to the world goes with it.
             </p>
         </div>
+    );
+}
+
+/**
+ * What to install when you have installed nothing.
+ *
+ * Steam's index cannot be browsed without a Web API key, so an empty search box is
+ * all a fresh instance would have. This is Polaris' own short list - the mods a
+ * private server actually reaches for - with every name, size and picture read
+ * from Steam as the screen draws, so a row can never describe something that has
+ * since changed.
+ */
+function ModShelves({
+    installedAppId,
+    busy,
+    installedIds,
+    onAdd,
+    onSetMap
+}: {
+    installedAppId: string;
+    busy: boolean;
+    /** What this server already runs. Those rows are dropped: a shelf offering to
+     *  add what is already installed is a shelf nobody trusts. */
+    installedIds: readonly string[];
+    onAdd: (id: string) => void;
+    onSetMap: (id: string) => void;
+}) {
+    const [shelves, setShelves] = useState<
+        readonly { group: string; entries: { suggestion: ArkModSuggestion; item: WorkshopItem | null }[] }[]
+    >([]);
+    const [open, setOpen] = useState(true);
+
+    useEffect(() => {
+        void actions.readArkModShelvesAction(installedAppId).then((answer) => setShelves(answer.shelves));
+    }, [installedAppId]);
+
+    const shown = shelves
+        .map((shelf) => ({
+            ...shelf,
+            entries: shelf.entries.filter((entry) => !installedIds.includes(entry.suggestion.id))
+        }))
+        .filter((shelf) => shelf.entries.length > 0);
+    if (shown.length === 0) return null;
+
+    return (
+        <Card>
+            <CardBody className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                        <p className="text-sm font-medium">Worth a look</p>
+                        <p className="text-xs text-muted-foreground">
+                            The ones most private servers end up running. Anything else on the Workshop
+                            goes in above, by its link.
+                        </p>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => setOpen(!open)}>
+                        {open ? "Hide" : "Show"}
+                    </Button>
+                </div>
+
+                {open &&
+                    shown.map((shelf) => (
+                        <div key={shelf.group} className="flex flex-col gap-2">
+                            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                {shelf.group}
+                            </p>
+                            {shelf.entries.map(({ suggestion, item }) => (
+                                <div
+                                    key={suggestion.id}
+                                    className="flex flex-wrap items-center gap-3 rounded-md border border-border p-2"
+                                >
+                                    {item ? (
+                                        <Preview installedAppId={installedAppId} item={item} />
+                                    ) : (
+                                        <div className="size-12 shrink-0 rounded-md bg-muted" aria-hidden />
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-medium">
+                                            {item?.title ?? suggestion.name}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">{suggestion.why}</p>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            {[
+                                                size(item?.sizeBytes ?? null),
+                                                item?.subscriptions
+                                                    ? `${item.subscriptions.toLocaleString()} subscribers`
+                                                    : ""
+                                            ]
+                                                .filter(Boolean)
+                                                .join(" - ")}
+                                        </p>
+                                    </div>
+                                    <a
+                                        href={workshopUrl(suggestion.id)}
+                                        target="_blank"
+                                        rel="noreferrer noopener"
+                                        title="Open it on Steam"
+                                        aria-label={`Open ${item?.title ?? suggestion.name} on Steam`}
+                                        className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                    >
+                                        <ExternalLink className="size-4" />
+                                    </a>
+                                    {suggestion.kind === "map" ? (
+                                        <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            disabled={busy}
+                                            onClick={() => onSetMap(suggestion.id)}
+                                        >
+                                            Use as the map
+                                        </Button>
+                                    ) : (
+                                        <Button size="sm" disabled={busy} onClick={() => onAdd(suggestion.id)}>
+                                            <Plus className="size-4" /> Add
+                                        </Button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    ))}
+            </CardBody>
+        </Card>
     );
 }
 

@@ -23,13 +23,14 @@ import { deployApplication } from "@/lib/deploy-service";
 import { findGameIdentity } from "@/lib/apps/game-identity";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/player-timeout";
 import { GAME_LOG, isJoinPassword, isSteamId } from "@/lib/apps/ark/access";
+import { parseWorkshopId, type WorkshopItem } from "@/lib/apps/ark/workshop";
 import { liftArkTimeout, timeoutArkPlayer } from "@/lib/apps/ark/timeout-service";
 import { requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
 import { readPlayerRecord, type PlayerRecord } from "@/lib/apps/games-activity-service";
 import { readArkRules, setArkRules, type ArkRules } from "@/lib/apps/ark/settings-service";
+import { ARK_MOD_SHELVES, shelfModIds, type ArkModSuggestion } from "@/lib/apps/ark/mod-catalog";
+import { readWorkshopItem, readWorkshopItems, searchWorkshop } from "@/lib/apps/ark/workshop-service";
 import { readArkMods, setArkMapMod, setArkMods, type ArkModsView } from "@/lib/apps/ark/mods-service";
-import { parseWorkshopId, type WorkshopItem } from "@/lib/apps/ark/workshop";
-import { readWorkshopItem, searchWorkshop } from "@/lib/apps/ark/workshop-service";
 
 const playerSchema = z.object({
     installedAppId: z.string().trim().min(1),
@@ -413,6 +414,36 @@ export async function lookUpArkModAction(
         return { item };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Steam could not be reached" };
+    }
+}
+
+/**
+ * The shelf of mods to start from, with what Steam currently says about each.
+ *
+ * Needs no key: the ids are Polaris' own and Steam answers for an id without one.
+ * This is what the screen opens on, so a server with nothing installed shows
+ * something to install rather than an empty search box.
+ */
+export async function readArkModShelvesAction(installedAppId: string): Promise<{
+    shelves: { group: string; entries: { suggestion: ArkModSuggestion; item: WorkshopItem | null }[] }[];
+}> {
+    try {
+        await requireGameServer("games.manage", installedAppId);
+        const items = await readWorkshopItems(shelfModIds()).catch(() => []);
+        const byId = new Map(items.map((item) => [item.id, item]));
+        return {
+            shelves: ARK_MOD_SHELVES.map((shelf) => ({
+                group: shelf.group,
+                entries: shelf.entries
+                    // A suggestion Steam has taken down is dropped rather than
+                    // offered: the row would install nothing and say so only in a
+                    // log nobody opens.
+                    .filter((entry) => !byId.get(entry.id)?.gone)
+                    .map((entry) => ({ suggestion: entry, item: byId.get(entry.id) ?? null }))
+            })).filter((shelf) => shelf.entries.length > 0)
+        };
+    } catch {
+        return { shelves: [] };
     }
 }
 

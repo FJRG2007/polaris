@@ -21,6 +21,8 @@ import {
     ARK_PENDING_SETTINGS_KEY,
     ARK_SETTINGS_SEEDED_KEY,
     RECOMMENDED_ARK_SETTINGS,
+    RECOMMENDED_ARK_VERSION,
+    seededVersion,
     GAME_USER_SETTINGS_PATH,
     INSTANCE_CONFIG_PATH,
     findArkSetting,
@@ -170,12 +172,16 @@ export async function applyPendingArkRules(ownerId: string, installedAppId: stri
         select: { config: true }
     });
     const config = readInstallConfig(install?.config);
-    const seeded = config[ARK_SETTINGS_SEEDED_KEY] === true;
+    const seeded = seededVersion(config) >= RECOMMENDED_ARK_VERSION;
     const pending = seeded
         ? readPending(config)
         : { ...RECOMMENDED_ARK_SETTINGS, ...readPending(config) };
     if (Object.keys(pending).length === 0) {
-        if (!seeded) await patchInstallConfig(installedAppId, { [ARK_SETTINGS_SEEDED_KEY]: true });
+        if (!seeded) {
+            await patchInstallConfig(installedAppId, {
+                [ARK_SETTINGS_SEEDED_KEY]: RECOMMENDED_ARK_VERSION
+            });
+        }
         return 0;
     }
     try {
@@ -202,7 +208,7 @@ export async function applyPendingArkRules(ownerId: string, installedAppId: stri
         // recommended set a second time.
         await patchInstallConfig(installedAppId, {
             [ARK_PENDING_SETTINGS_KEY]: {},
-            [ARK_SETTINGS_SEEDED_KEY]: true
+            [ARK_SETTINGS_SEEDED_KEY]: RECOMMENDED_ARK_VERSION
         });
         return applied;
     } catch {

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
     ARK_SETTINGS,
+    RECOMMENDED_ARK_VERSION,
+    defaultRawValue,
+    seededVersion,
+    switchIsOn,
+    switchValue,
     arkSettingGroups,
     findArkSetting,
     normalizeArkValue,
@@ -178,5 +183,65 @@ describe("parseIniSection", () => {
 
     it("reads nothing out of a file without that section", () => {
         expect(parseIniSection(ini, "ShooterGameMode")).toEqual({});
+    });
+});
+
+describe("the switches ARK names the wrong way round", () => {
+    const gammaPvE = setting("DisablePvEGamma");
+
+    it("draws an inverted switch as the permission it grants", () => {
+        // The file says DisablePvEGamma=False, which is gamma allowed.
+        expect(switchIsOn(gammaPvE, "False")).toBe(true);
+        expect(switchIsOn(gammaPvE, "True")).toBe(false);
+    });
+
+    it("writes the value the game expects when one is moved", () => {
+        expect(switchValue(gammaPvE, true)).toBe("False");
+        expect(switchValue(gammaPvE, false)).toBe("True");
+    });
+
+    it("leaves an ordinary switch alone", () => {
+        expect(switchIsOn(setting("ServerPVE"), "True")).toBe(true);
+        expect(switchValue(setting("ServerPVE"), true)).toBe("True");
+    });
+
+    it("reads an unset switch as whatever the game does by itself", () => {
+        // Unset, PvE gamma is allowed and the PvP one is not.
+        expect(switchIsOn(gammaPvE, "")).toBe(true);
+        expect(switchIsOn(setting("EnablePvPGamma"), "")).toBe(false);
+        expect(defaultRawValue(gammaPvE)).toBe("False");
+    });
+});
+
+describe("the recommended set", () => {
+    it("covers both halves of the gamma question", () => {
+        // Only the PvP one was set once, which is a PvE server where turning gamma
+        // on demonstrably does nothing.
+        expect(RECOMMENDED_ARK_SETTINGS.EnablePvPGamma).toBe("True");
+        expect(RECOMMENDED_ARK_SETTINGS.DisablePvEGamma).toBe("False");
+    });
+
+    it("reads every recommended switch as on, whichever way the game names it", () => {
+        for (const [key, value] of Object.entries(RECOMMENDED_ARK_SETTINGS)) {
+            const found = findArkSetting(key);
+            expect(found && switchIsOn(found, value)).toBe(true);
+        }
+    });
+});
+
+describe("seededVersion", () => {
+    it("reads a server that has never been offered anything as nought", () => {
+        expect(seededVersion({})).toBe(0);
+    });
+
+    it("reads the flag the first rollout wrote as generation one", () => {
+        // Those servers were seeded before the set grew, and have to be offered
+        // what was added since.
+        expect(seededVersion({ arkSettingsSeeded: true })).toBe(1);
+        expect(seededVersion({ arkSettingsSeeded: true })).toBeLessThan(RECOMMENDED_ARK_VERSION);
+    });
+
+    it("reads a number back", () => {
+        expect(seededVersion({ arkSettingsSeeded: 2 })).toBe(2);
     });
 });

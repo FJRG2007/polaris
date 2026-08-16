@@ -46,6 +46,35 @@ export interface ArkSetting {
     /** Whether it takes a fraction. A multiplier does; a period in seconds does
      *  not. */
     readonly decimal?: boolean;
+    /**
+     * Whether the game's own switch is named the wrong way round.
+     *
+     * A handful of ARK's settings are `DisableSomething`, so writing True forbids
+     * the thing. The screen still draws every switch as "on means allowed" -
+     * mixing the two polarities in one list is how somebody turns gamma on and
+     * finds it off - and the value written to the file is flipped back here.
+     */
+    readonly invert?: boolean;
+}
+
+/** What a boolean setting is, as text, when nothing has set it: whatever the game
+ *  does by itself. `fallback` describes the behaviour, so an inverted setting's
+ *  raw default is the opposite of how it reads. */
+export function defaultRawValue(setting: ArkSetting): string {
+    if (setting.type !== "boolean") return "";
+    const on = setting.fallback === "on";
+    return (setting.invert ? !on : on) ? "True" : "False";
+}
+
+/** Whether a switch should be drawn as on, given the value in the file. */
+export function switchIsOn(setting: ArkSetting, raw: string): boolean {
+    const value = (raw || defaultRawValue(setting)).toLowerCase() === "true";
+    return setting.invert ? !value : value;
+}
+
+/** What to write for a switch somebody has just moved. */
+export function switchValue(setting: ArkSetting, on: boolean): string {
+    return (setting.invert ? !on : on) ? "True" : "False";
 }
 
 const RATES = "Rates";
@@ -368,11 +397,26 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "EnablePvPGamma",
-        label: "Let players change their gamma",
-        hint: "The brightness slider. Off, nights are genuinely dark - and unplayable for some people.",
+        label: "Let players change their gamma while PvP is on",
+        hint: "Their own brightness, set with the gamma command in game. Off, nights are genuinely dark - and unplayable for some people.",
         type: "boolean",
         group: PLAYING,
         fallback: "off"
+    },
+    {
+        // The other half of the same question, and the reason turning gamma on
+        // appears not to work: the two settings cover different modes and are
+        // named with opposite polarity, so a PvE server with only the PvP one set
+        // still refuses the command. Shown the right way round - on means allowed -
+        // because a switch labelled with a double negative is how this was got
+        // wrong in the first place.
+        key: "DisablePvEGamma",
+        label: "Let players change their gamma while PvE is on",
+        hint: "The same thing for a PvE server, which is a separate setting in the game. Both are worth leaving on.",
+        type: "boolean",
+        group: PLAYING,
+        fallback: "on",
+        invert: true
     },
     {
         key: "ShowFloatingDamageText",
@@ -481,17 +525,40 @@ export const RECOMMENDED_ARK_SETTINGS: Readonly<Record<string, string>> = {
     ShowMapPlayerLocation: "True",
     AllowThirdPersonPlayer: "True",
     ServerCrosshair: "True",
-    EnablePvPGamma: "True"
+    // Both halves of the gamma question. ARK covers PvP and PvE with two settings
+    // named the opposite way round, and setting only the first is a server where
+    // turning gamma on demonstrably does nothing.
+    EnablePvPGamma: "True",
+    DisablePvEGamma: "False"
 };
+
+/**
+ * Which generation of the recommended set a server has been given.
+ *
+ * A number rather than a flag because the set grows: when something is added to
+ * it - as the PvE half of the gamma pair was - every server that was seeded under
+ * the older list has to be offered the new entries once, and a boolean can only
+ * ever say "already done". Nothing already set is touched either way, so a raised
+ * version never overrides a decision.
+ */
+export const RECOMMENDED_ARK_VERSION = 2;
 
 /** Where the settings a server was created with, and has not been given yet, are
  *  kept on the install. A new server has no container to write them into. */
 export const ARK_PENDING_SETTINGS_KEY = "arkPendingSettings";
 
-/** Whether this server has already been offered the recommended set once. A
- *  server that has is never offered it again, so a setting somebody deliberately
- *  unpinned does not come back on the next sweep. */
+/** Which generation of the recommended set this server has been offered. A server
+ *  is never offered the same generation twice, so a setting somebody deliberately
+ *  unpinned does not come back on the next sweep. Servers seeded before this was a
+ *  number carry `true`, which reads as generation 1. */
 export const ARK_SETTINGS_SEEDED_KEY = "arkSettingsSeeded";
+
+/** What that key says, as a number. */
+export function seededVersion(config: Record<string, unknown>): number {
+    const raw = config[ARK_SETTINGS_SEEDED_KEY];
+    if (raw === true) return 1;
+    return typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
+}
 
 /** Where the overrides live, relative to the volume the image keeps its files in.
  *  arkmanager reads this file at every start and nothing else writes to it. */
