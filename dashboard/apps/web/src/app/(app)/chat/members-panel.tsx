@@ -1,0 +1,317 @@
+"use client";
+
+/**
+ * Who is in here, down the right-hand side.
+ *
+ * A conversation with more than two people in it is unreadable without this: a
+ * name appears, and the only way to find out whether that person is one of four
+ * or one of forty is to open a dialog meant for adding somebody. Every chat
+ * client with rooms in it has this column and it is not decoration - it is what
+ * makes "@everyone" a size you can picture before you press send.
+ *
+ * The list is the room's roster as the server draws it, which for an open
+ * channel is the whole space rather than the handful of people who happen to
+ * have a membership row. Anything narrower would be a lie: everybody in the
+ * space can read that channel.
+ *
+ * Ordered by standing and then by name - the owner, the administrators, then
+ * everybody else - because that ordering answers the second question people
+ * come here with, which is who to ask. Presence rides on the avatar the same way
+ * it does everywhere else in Polaris, so a room also says who is around.
+ *
+ * Pressing somebody opens a direct message with them, because that is what
+ * clicking a person's name in a room is for.
+ */
+
+import * as actions from "./actions";
+import { Users, X } from "lucide-react";
+import { useChat } from "./chat-context";
+import { useRouter } from "next/navigation";
+import { Avatar } from "@/components/avatar";
+import { runAction } from "@/lib/run-action";
+import { useChatStream } from "./use-chat-stream";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ChatChannelView, ChatMemberView } from "@/lib/chat/chat-service";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    Skeleton,
+    cn
+} from "@polaris/ui";
+
+/**
+ * Where the conversation is wide enough to give up 14rem of it.
+ *
+ * `lg`, not the `md` where the rest of the chat splits its columns: at `md` the
+ * spaces rail and the conversation list are already showing, so 768px of screen
+ * is 536px of furniture and a column here would leave the messages 232px - a
+ * conversation four words wide. At 1024 there is 488px left for it, which is a
+ * conversation. Below that the same list opens as a dialog instead.
+ */
+const WIDE_ENOUGH = "(min-width: 1024px)";
+
+/** Where the choice to hide it is kept. Per browser and nothing else: it is a
+ *  preference about a screen, not a fact about an account. */
+const REMEMBERED = "polaris.chat.members";
+
+/** Where a role sorts. Lower comes first; anything unrecognised sorts last
+ *  rather than crashing the list. */
+const RANK: Record<string, number> = { owner: 0, admin: 1, member: 2 };
+
+/** The caption beside a name. Members get none: a list where every second line
+ *  says "member" is a list nobody reads. */
+const ROLE_WORDS: Record<string, string> = { owner: "Owner", admin: "Admin" };
+
+interface Roster {
+    readonly members: readonly ChatMemberView[];
+    readonly loading: boolean;
+}
+
+/** True once the conversation has room for a column beside it. False on the
+ *  server and on the first paint, so nothing is drawn that is about to be
+ *  removed. */
+function useWideScreen(): boolean {
+    const [wide, setWide] = useState(false);
+    useEffect(() => {
+        const query = window.matchMedia(WIDE_ENOUGH);
+        setWide(query.matches);
+        const onChange = (event: MediaQueryListEvent) => setWide(event.matches);
+        query.addEventListener("change", onChange);
+        return () => query.removeEventListener("change", onChange);
+    }, []);
+    return wide;
+}
+
+/**
+ * Whether the panel is showing, and the switch that changes it.
+ *
+ * Open by default on a screen with room for it - that is what a roster is for,
+ * and a column you have to ask for every time you open a room is a column
+ * nobody uses. Closing it is remembered, so somebody who wants the width keeps
+ * it in every conversation and after a reload.
+ *
+ * Never open by itself on a narrow screen: there the same state opens a dialog
+ * over the conversation, and a dialog nobody asked for is not a default.
+ */
+export function useMembersPanel(): {
+    open: boolean;
+    setOpen: (open: boolean) => void;
+    toggle: () => void;
+} {
+    const wide = useWideScreen();
+    const [open, setShowing] = useState(false);
+
+    useEffect(() => {
+        if (!wide) return;
+        setShowing(window.localStorage.getItem(REMEMBERED) !== "hidden");
+    }, [wide]);
+
+    const setOpen = useCallback((next: boolean) => {
+        setShowing(next);
+        // Only the deliberate close is written down. A dialog opened on a phone
+        // says nothing about whether somebody wants the column on their laptop.
+        if (window.matchMedia(WIDE_ENOUGH).matches) {
+            window.localStorage.setItem(REMEMBERED, next ? "shown" : "hidden");
+        }
+    }, []);
+
+    return { open, setOpen, toggle: useCallback(() => setOpen(!open), [open, setOpen]) };
+}
+
+/**
+ * The people in one conversation, kept in step with who joins and leaves.
+ *
+ * @param showing - Whether anybody is looking. Nothing is fetched for a panel
+ *   that is closed: the roster would otherwise be read on every conversation
+ *   somebody clicks through, to draw a column that is not there.
+ */
+function useRoster(channelId: string, ownerId: string | null, showing: boolean): Roster {
+    const [members, setMembers] = useState<readonly ChatMemberView[] | null>(null);
+
+    const load = useCallback(async () => {
+        if (!showing) return;
+        const result = await actions.listMembersAction(channelId);
+        setMembers(result.members ?? []);
+    }, [channelId, showing]);
+
+    useEffect(() => {
+        setMembers(null);
+        void load();
+    }, [load]);
+
+    // Somebody joining or leaving is exactly the frame this list exists to
+    // follow, and it is the one the rail already listens for.
+    useChatStream(
+        useCallback(
+            (frame) => {
+                if (frame.kind === "channels") void load();
+            },
+            [load]
+        )
+    );
+
+    const sorted = useMemo(() => {
+        const rows = (members ?? []).map((member) =>
+            // A group has no roles of its own - the one thing there is to say
+            // about somebody in one is whether the group is theirs.
+            member.userId === ownerId && member.role === "member"
+                ? { ...member, role: "owner" }
+                : member
+        );
+        return rows.sort(
+            (left, right) =>
+                (RANK[left.role] ?? 9) - (RANK[right.role] ?? 9) ||
+                left.name.localeCompare(right.name)
+        );
+    }, [members, ownerId]);
+
+    return { members: sorted, loading: members === null };
+}
+
+function MemberRows({
+    members,
+    loading,
+    viewerId
+}: {
+    members: readonly ChatMemberView[];
+    loading: boolean;
+    viewerId: string;
+}) {
+    const router = useRouter();
+    const [busyId, setBusyId] = useState<string | null>(null);
+    const [error, setError] = useState("");
+
+    if (loading) {
+        return (
+            <div className="flex flex-col gap-2 p-3" aria-hidden="true">
+                {[0, 1, 2, 3].map((row) => (
+                    <div key={row} className="flex items-center gap-2">
+                        <Skeleton className="size-7 rounded-full" />
+                        <Skeleton className="h-3 w-24" />
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    return (
+        <>
+            {error && (
+                <p role="alert" className="px-3 pt-2 text-xs text-danger">
+                    {error}
+                </p>
+            )}
+            <ul className="flex flex-col gap-0.5 p-2">
+                {members.map((member) => {
+                    const you = member.userId === viewerId;
+                    const role = ROLE_WORDS[member.role];
+                    return (
+                        <li key={member.userId}>
+                            <button
+                                type="button"
+                                disabled={you || busyId !== null}
+                                title={you ? member.name : `Message ${member.name}`}
+                                onClick={async () => {
+                                    setBusyId(member.userId);
+                                    setError("");
+                                    const result = await runAction(
+                                        () =>
+                                            actions.openDirectAction({ userIds: [member.userId] }),
+                                        setError
+                                    );
+                                    setBusyId(null);
+                                    if (result?.error) setError(result.error);
+                                    else if (result?.id) router.push(`/chat/c/${result.id}`);
+                                }}
+                                className={cn(
+                                    "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors",
+                                    you ? "cursor-default" : "hover:bg-card-hover disabled:opacity-70"
+                                )}
+                            >
+                                <Avatar
+                                    person={{ id: member.userId, name: member.name }}
+                                    size={28}
+                                />
+                                <span className="min-w-0 flex-1">
+                                    <span className="block truncate text-sm">
+                                        {member.name}
+                                        {you && <span className="text-muted-foreground"> (you)</span>}
+                                    </span>
+                                    {role && (
+                                        <span className="block text-[11px] text-muted-foreground">
+                                            {role}
+                                        </span>
+                                    )}
+                                </span>
+                            </button>
+                        </li>
+                    );
+                })}
+            </ul>
+        </>
+    );
+}
+
+/**
+ * The roster, as a column beside the conversation or as a dialog over it.
+ *
+ * Which one is not a preference: a 14rem column beside a 4rem conversation
+ * helps nobody, so below the breakpoint where the two fit the same list is a
+ * dialog. One component decides it, because it is one question with one answer
+ * and two shapes.
+ */
+export function ChannelMembers({
+    channel,
+    open,
+    onOpenChange
+}: {
+    channel: ChatChannelView;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+}) {
+    const { viewerId } = useChat();
+    const wide = useWideScreen();
+    const { members, loading } = useRoster(channel.id, channel.ownerId, open);
+    const heading = `Members${loading ? "" : ` - ${members.length}`}`;
+
+    if (!open) return null;
+
+    if (!wide) {
+        return (
+            <Dialog open onOpenChange={onOpenChange}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Users className="size-4 text-muted-foreground" />
+                            {heading}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="max-h-[60vh] overflow-y-auto">
+                        <MemberRows members={members} loading={loading} viewerId={viewerId} />
+                    </div>
+                </DialogContent>
+            </Dialog>
+        );
+    }
+
+    return (
+        <aside className="flex w-56 shrink-0 flex-col border-l border-border">
+            <div className="flex h-header shrink-0 items-center justify-between gap-2 border-b border-border px-3">
+                <span className="text-sm font-semibold">{heading}</span>
+                <button
+                    type="button"
+                    aria-label="Hide the members"
+                    onClick={() => onOpenChange(false)}
+                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                    <X className="size-4" />
+                </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+                <MemberRows members={members} loading={loading} viewerId={viewerId} />
+            </div>
+        </aside>
+    );
+}

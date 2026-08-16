@@ -40,6 +40,7 @@ import type { RecordedSound } from "./voice-recorder";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useRouter, useSearchParams } from "next/navigation";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
+import { ChannelMembers, useMembersPanel } from "./members-panel";
 import { MessageCircle, Mic, Video, Volume2 } from "lucide-react";
 import { Button, ConfirmDeleteDialog, EmptyState, Skeleton } from "@polaris/ui";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -130,6 +131,7 @@ export function ChannelView({
     const [error, setError] = useState("");
     const [thread, setThread] = useState<ChatMessageView | null>(null);
     const [searching, setSearching] = useState(false);
+    const members = useMembersPanel();
     const [highlight, setHighlight] = useState<string | null>(null);
     // The same, for a message a link led to that turned out to be a reply: it is
     // pointed at inside the thread panel rather than in the channel.
@@ -916,6 +918,9 @@ export function ChannelView({
                         checkCall();
                     }}
                     onSearch={() => setSearching((current) => !current)}
+                    // A one-to-one conversation has no roster worth a panel:
+                    // it is the person named at the top of the screen and you.
+                    {...(channel.kind === "dm" ? {} : { onMembers: members.toggle })}
                 />
 
                 {/* A voice channel is a room AND a record. It used to be only
@@ -1115,6 +1120,17 @@ export function ChannelView({
                     }}
                 />
             </div>
+
+            {/* One side panel at a time on the right, and the roster is the one
+                that yields: a thread and a search are things somebody is doing,
+                the roster is something that is there. */}
+            {channel.kind !== "dm" && !thread && !searching && (
+                <ChannelMembers
+                    channel={channel}
+                    open={members.open}
+                    onOpenChange={members.setOpen}
+                />
+            )}
 
             {searching && !thread && (
                 <SearchPanel
