@@ -6211,9 +6211,10 @@ model PrivacyListMember {
 // migration nobody remembers to write. One row per setting that names a list at
 // all, which is the uncommon case.
 //
-// Losing the list is the safe direction on purpose. The rule left behind names a
-// set that no longer exists, and `audienceAllows` shows nothing for it - a
-// deleted list must never widen who can see something.
+// A rule left pointing at nothing reads as one naming nobody, which is why a
+// list that is still in use cannot be deleted from the screen: "only these
+// people" would go on meaning nobody, quietly, and "everybody except" would go
+// on meaning everybody. The rule is asked about, never assumed.
 model PrivacyFieldList {
     userId String @db.Uuid
     // One of PRIVACY_FIELDS in @polaris/core.

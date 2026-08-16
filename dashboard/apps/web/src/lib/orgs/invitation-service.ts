@@ -104,7 +104,7 @@ export async function inviteToOrg(
     });
     if (already) throw new OrgError("They are already on this roster");
 
-    await assertRoom(orgId);
+    await assertRoom(orgId, user.id);
 
     await prisma.organizationInvitation.upsert({
         where: { orgId_userId: { orgId, userId: user.id } },
@@ -135,12 +135,21 @@ export async function inviteToOrg(
  * Pending invitations count. Without that, twenty invitations against a
  * ten-member cap are ten people who accept and ten who are told the room is full
  * by an organization that asked them to come.
+ *
+ * The person being made room for is left out of that count, and it is the whole
+ * reason this takes an id. Their own invitation is still on the table while they
+ * accept it and while it is being re-issued at a different role, so counting it
+ * as well as the place it is asking for is counting one person twice - which
+ * refuses the last invitation an organization is allowed to make, and then
+ * refuses to let that person in at all.
  */
-async function assertRoom(orgId: string): Promise<void> {
+async function assertRoom(orgId: string, forUserId: string): Promise<void> {
     const policy = await organizationPolicy();
     const [members, invited] = await Promise.all([
         prisma.organizationMember.count({ where: { orgId } }),
-        prisma.organizationInvitation.count({ where: { orgId, ...live() } })
+        prisma.organizationInvitation.count({
+            where: { orgId, ...live(), userId: { not: forUserId } }
+        })
     ]);
     if (!core.withinLimit(policy.maxMembers, members + invited + 1)) {
         throw new OrgError(
@@ -282,7 +291,7 @@ export async function respondToInvitation(
     // A role deleted while the invitation sat unanswered would otherwise resolve
     // to the seeded fallback, quietly granting something nobody chose.
     await assertRoleExists(org.id, invitation.role);
-    await assertRoom(org.id);
+    await assertRoom(org.id, userId);
 
     await prisma.$transaction([
         prisma.organizationMember.upsert({

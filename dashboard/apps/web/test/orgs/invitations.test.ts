@@ -41,6 +41,8 @@ const state = vi.hoisted(() => ({
               org: { id: string; name: string; slug: string };
           }
         | null,
+    /** Whose invitation the room check left out of its count. */
+    countedExcluding: null as string | null,
     /** What was written, in order, so a test can say what did and did not
      *  happen. */
     written: [] as string[]
@@ -62,7 +64,12 @@ vi.mock("@polaris/db", () => ({
             }
         },
         organizationInvitation: {
-            count: async () => state.invitationCount,
+            // Every count here excludes the person being made room for, so a
+            // test says how many OTHER invitations are outstanding.
+            count: async ({ where }: { where: { userId?: { not: string } } }) => {
+                state.countedExcluding = where.userId?.not ?? null;
+                return state.invitationCount;
+            },
             findUnique: async () => state.invitation,
             findMany: async () => [],
             upsert: async () => {
@@ -104,6 +111,7 @@ beforeEach(() => {
         invitedById: "owner-1",
         org: { id: "org-1", name: "Acme", slug: "acme" }
     };
+    state.countedExcluding = null;
     state.written = [];
 });
 
@@ -135,6 +143,18 @@ describe("inviting somebody", () => {
         );
     });
 
+    it("leaves the invited person's own invitation out of the count", async () => {
+        // Re-inviting somebody at a different role is the same person asking for
+        // the same place. Counting the invitation already on the table as well
+        // refuses the change on a full roster, which the direct add it replaced
+        // explicitly did not do.
+        state.memberCount = 1;
+        state.invitationCount = 0;
+        await inviteToOrg("org-1", "ada", "admin", "owner-1");
+        expect(state.countedExcluding).toBe("invitee");
+        expect(state.written).toEqual(["invitation"]);
+    });
+
     it("counts invitations against the size limit", async () => {
         // Two members and one invitation is three places in a Polaris that
         // allows three - counting the owner, who is never a member row. Asking a
@@ -157,6 +177,18 @@ describe("answering one", () => {
     it("clears it and joins nothing when it is turned down", async () => {
         await respondToInvitation("invitee", "inv-1", false);
         expect(state.written).toEqual(["invitation-gone"]);
+    });
+
+    it("does not count the accepting person twice", async () => {
+        // Their own invitation is still on the table while they answer it, and
+        // counting it as well as the place it asks for is one person taking two.
+        // An owner, one member and this invitation is three places in a Polaris
+        // that allows three, so this must go through.
+        state.memberCount = 1;
+        state.invitationCount = 0;
+        await respondToInvitation("invitee", "inv-1", true);
+        expect(state.countedExcluding).toBe("invitee");
+        expect(state.written).toEqual(["member", "invitation-gone"]);
     });
 
     it("is refused to anybody but the person asked", async () => {

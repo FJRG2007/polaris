@@ -23,7 +23,8 @@ import {
     PRIVACY_SECTIONS,
     audienceAllows,
     audienceNeedsList,
-    privacySettingsSchema
+    privacySettingsSchema,
+    storedAudience
 } from "@polaris/core";
 
 const stranger = { self: false, friends: false, viewerIsAdmin: false };
@@ -136,6 +137,31 @@ describe("the setting itself", () => {
         expect(parsed.avatar.audience).toBe("nobody");
         expect(parsed.avatar.people).toEqual([]);
         expect(parsed.lastSeen.audience).toBe("everyone");
+    });
+
+    it("keeps a field's own default when the rule is there and the audience is not", () => {
+        // The trap this exists for: a default on the whole rule only fires when
+        // the rule is missing. A row with nothing stored for a field parses to
+        // `{ audience: undefined }` - a rule that IS there - so the default that
+        // decides is the one on the audience itself. Get that wrong and every
+        // setting that arrives shut arrives open instead.
+        const parsed = privacySettingsSchema.parse({
+            email: { audience: undefined },
+            phone: {},
+            avatar: {}
+        });
+        expect(parsed.email.audience).toBe("nobody");
+        expect(parsed.phone.audience).toBe("nobody");
+        expect(parsed.avatar.audience).toBe("everyone");
+    });
+
+    it("reads a stored value through the field it belongs to", () => {
+        expect(storedAudience("email", "friends")).toBe("friends");
+        // Nothing stored, and nothing anybody recognises, both fall to what the
+        // field itself starts at - never to something more open.
+        expect(storedAudience("email", undefined)).toBe("nobody");
+        expect(storedAudience("phone", "sometimes")).toBe("nobody");
+        expect(storedAudience("avatar", undefined)).toBe("everyone");
     });
 });
 

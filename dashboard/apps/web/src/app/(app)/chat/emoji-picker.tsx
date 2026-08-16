@@ -76,6 +76,12 @@ function answerKey(tab: Tab, query: string): string {
  * so a question is answered from what is known, joined to one already in flight,
  * or asked. Nothing came back is not remembered: that is usually the service
  * being slow, and keeping it would leave the tab empty until somebody typed.
+ *
+ * A question that fails is forgotten for the same reason, and the failure is
+ * answered with an empty list rather than left to reject. A rejected promise
+ * kept in the map would be handed to every later press, so one bad moment would
+ * break the tab for as long as the page stayed open - and nobody is waiting on
+ * the warm-up, so its rejection would have nowhere to go.
  */
 async function askFor(kind: "gif" | "sticker", query: string): Promise<readonly TenorResult[]> {
     const key = answerKey(kind, query);
@@ -85,11 +91,13 @@ async function askFor(kind: "gif" | "sticker", query: string): Promise<readonly 
     const already = asking.get(key);
     if (already) return already;
 
-    const question = searchTenorAction(query, kind).then((answer) => {
-        asking.delete(key);
-        if (answer.results.length > 0) answers.set(key, answer.results);
-        return answer.results;
-    });
+    const question = searchTenorAction(query, kind)
+        .then((answer) => {
+            if (answer.results.length > 0) answers.set(key, answer.results);
+            return answer.results as readonly TenorResult[];
+        })
+        .catch(() => [] as readonly TenorResult[])
+        .finally(() => asking.delete(key));
     asking.set(key, question);
     return question;
 }

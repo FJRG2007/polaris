@@ -71,7 +71,7 @@ export async function privacyFor(userId: string): Promise<core.PrivacySettings> 
         Object.fromEntries(
             core.PRIVACY_FIELDS.map((field) => [
                 field,
-                { audience: row?.[field], ...(linked.get(field) ?? {}) }
+                { audience: core.storedAudience(field, row?.[field]), ...(linked.get(field) ?? {}) }
             ])
         )
     );
@@ -109,13 +109,13 @@ export async function allowedBy(
         select: { userId: true, ...AUDIENCE_COLUMNS }
     });
     const stored = new Map(rows.map((row) => [row.userId, row[field]]));
-    const shape = core.privacySettingsSchema.shape[field];
-    const audienceOf = (userId: string): core.PrivacyAudience => {
-        const parsed = shape.safeParse({ audience: stored.get(userId), listId: null });
-        return parsed.success ? parsed.data.audience : core.DEFAULT_PRIVACY[field].audience;
-    };
-
-    const audiences = new Map(wanted.map((userId) => [userId, audienceOf(userId)]));
+    // An account with no row of its own falls to the field's own default, which
+    // for an address and a number is nobody. Read through `storedAudience` and
+    // never by parsing a rule around it: a default on the whole rule does not
+    // fire for a rule that is present with an empty audience.
+    const audiences = new Map(
+        wanted.map((userId) => [userId, core.storedAudience(field, stored.get(userId))])
+    );
     const [listed, friends] = await Promise.all([
         listingViewer(
             viewer.id,
@@ -182,8 +182,9 @@ export interface ContactPerson {
  * The line under somebody's name on a list of people.
  *
  * Their address when they allow this viewer to see it, and their handle when
- * they do not - never nothing, because the line is there to tell two people with
- * the same name apart and an empty one does not.
+ * they do not - the line is there to tell two people with the same name apart.
+ * An account with neither gets an empty line and the row simply leaves it out,
+ * which is the honest answer: there is nothing this reader may be told.
  *
  * It exists because every roster, every share dialog and every member list wants
  * the same thing and each of them used to reach for the address directly. One

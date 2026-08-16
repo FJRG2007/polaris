@@ -25,9 +25,11 @@
  *   fact: the person who runs the instance can read the database, and a setting
  *   that pretended otherwise would be a promise Polaris cannot keep. It is said
  *   in the copy on the screen for the same reason.
- * - **An audience that names a list and has none shows nothing.** A rule whose
- *   list was deleted is a rule nobody can read; falling back to "everybody"
- *   would turn losing a list into a disclosure.
+ * - **A missing list is an empty one, and `only` with an empty list is nobody.**
+ *   "Only these people" naming nobody shows nobody anything, which is the safe
+ *   reading and the one somebody would expect. "Everybody except" naming nobody
+ *   is everybody, which is also what it says - and it is what the screen warns
+ *   about the moment the audience is chosen and nobody has been picked yet.
  */
 
 import { z } from "zod";
@@ -160,10 +162,29 @@ export const privacyRuleSchema = z.object({
 
 export type PrivacyRule = z.infer<typeof privacyRuleSchema>;
 
-/** A rule that has never been set. Written out rather than parsed per field so
- *  the defaults below read as the decisions they are. */
-const open = privacyRuleSchema.default({ audience: "everyone", listId: null, people: [] });
-const closed = privacyRuleSchema.default({ audience: "nobody", listId: null, people: [] });
+/**
+ * A rule that has never been set, with its own audience baked in.
+ *
+ * The audience is defaulted on the inner field as well as on the whole rule,
+ * and that is not belt and braces - it is the difference between a setting that
+ * is shut by default and one that is not. A `.default()` on an object only fires
+ * when the object itself is missing; hand it `{ audience: undefined }` - which is
+ * exactly what a row with no stored value parses to - and the outer default is
+ * skipped and the inner one decides. With one inner default for every field,
+ * every field that arrives shut would quietly arrive open.
+ */
+function rule(audience: PrivacyAudience) {
+    return z
+        .object({
+            audience: z.enum(PRIVACY_AUDIENCES).default(audience),
+            listId: z.string().uuid().nullable().default(null),
+            people: z.array(z.string().uuid()).max(MOST_LISTED).default([])
+        })
+        .default({ audience, listId: null, people: [] });
+}
+
+const open = rule("everyone");
+const closed = rule("nobody");
 
 export const privacySettingsSchema = z.object({
     /**
@@ -223,6 +244,19 @@ export type PrivacySettings = z.infer<typeof privacySettingsSchema>;
 
 /** What an account that has never opened the screen is on. */
 export const DEFAULT_PRIVACY: PrivacySettings = privacySettingsSchema.parse({});
+
+/**
+ * What one stored value means, or what the field falls back to.
+ *
+ * The one way to read an audience off a row. A column holds a string somebody
+ * wrote years ago, a row may not exist at all, and neither may be allowed to
+ * resolve to something more open than the field's own default - which for an
+ * address and a number is nobody.
+ */
+export function storedAudience(field: PrivacyField, stored: unknown): PrivacyAudience {
+    const parsed = z.enum(PRIVACY_AUDIENCES).safeParse(stored);
+    return parsed.success ? parsed.data : DEFAULT_PRIVACY[field].audience;
+}
 
 /** What one account's list is called and who is on it. */
 export const privacyListSchema = z.object({
