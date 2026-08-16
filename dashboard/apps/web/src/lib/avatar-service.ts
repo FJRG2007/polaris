@@ -131,7 +131,13 @@ export async function setAvatarSettings(input: { target: string; gravatar: boole
  * storage target and the same size and format rules. Only the row differs, so
  * that is the only thing this discriminates.
  */
-export type AvatarOwner = { readonly kind: "user"; readonly id: string } | { readonly kind: "org"; readonly id: string };
+export type AvatarOwner =
+    | { readonly kind: "user"; readonly id: string }
+    | { readonly kind: "org"; readonly id: string }
+    /** A chat space - what a Discord server calls its icon. */
+    | { readonly kind: "space"; readonly id: string }
+    /** One conversation: a group, or a channel inside a space. */
+    | { readonly kind: "channel"; readonly id: string };
 
 interface AvatarRow {
     readonly connectionId: string | null;
@@ -141,9 +147,14 @@ interface AvatarRow {
 }
 
 async function readRow(owner: AvatarOwner): Promise<AvatarRow | null> {
-    return owner.kind === "user"
-        ? prisma.userAvatar.findUnique({ where: { userId: owner.id } })
-        : prisma.organizationAvatar.findUnique({ where: { orgId: owner.id } });
+    if (owner.kind === "user") return prisma.userAvatar.findUnique({ where: { userId: owner.id } });
+    if (owner.kind === "org") {
+        return prisma.organizationAvatar.findUnique({ where: { orgId: owner.id } });
+    }
+    if (owner.kind === "space") {
+        return prisma.chatSpaceAvatar.findUnique({ where: { spaceId: owner.id } });
+    }
+    return prisma.chatChannelAvatar.findUnique({ where: { channelId: owner.id } });
 }
 
 /**
@@ -188,10 +199,22 @@ export async function storeAvatar(owner: AvatarOwner, bytes: Uint8Array, mime: s
             create: { userId: owner.id, ...stored },
             update: stored
         });
-    } else {
+    } else if (owner.kind === "org") {
         await prisma.organizationAvatar.upsert({
             where: { orgId: owner.id },
             create: { orgId: owner.id, ...stored },
+            update: stored
+        });
+    } else if (owner.kind === "space") {
+        await prisma.chatSpaceAvatar.upsert({
+            where: { spaceId: owner.id },
+            create: { spaceId: owner.id, ...stored },
+            update: stored
+        });
+    } else {
+        await prisma.chatChannelAvatar.upsert({
+            where: { channelId: owner.id },
+            create: { channelId: owner.id, ...stored },
             update: stored
         });
     }
@@ -205,7 +228,13 @@ export async function deleteAvatar(owner: AvatarOwner): Promise<void> {
     const existing = await readRow(owner);
     if (!existing) return;
     if (owner.kind === "user") await prisma.userAvatar.delete({ where: { userId: owner.id } });
-    else await prisma.organizationAvatar.delete({ where: { orgId: owner.id } });
+    else if (owner.kind === "org") {
+        await prisma.organizationAvatar.delete({ where: { orgId: owner.id } });
+    } else if (owner.kind === "space") {
+        await prisma.chatSpaceAvatar.delete({ where: { spaceId: owner.id } });
+    } else {
+        await prisma.chatChannelAvatar.delete({ where: { channelId: owner.id } });
+    }
     await removeFile(existing.connectionId, existing.path);
 }
 
@@ -457,6 +486,20 @@ export async function resolveAvatar(userId: string): Promise<AvatarAnswer> {
  */
 export async function resolveOrgAvatar(orgId: string): Promise<AvatarRef | null> {
     return uploadedAvatar({ kind: "org", id: orgId });
+}
+
+/**
+ * The picture on a space or a conversation, or null when it has none.
+ *
+ * Null is an ordinary answer here rather than a failure: most conversations have
+ * no picture, and what is drawn instead - the faces of the people in it - is
+ * better than a photo would be for a group of three.
+ */
+export async function resolveChatAvatar(
+    kind: "space" | "channel",
+    id: string
+): Promise<AvatarRef | null> {
+    return uploadedAvatar({ kind, id });
 }
 
 /** The drivers speak in streams, because most of what they carry is far too big

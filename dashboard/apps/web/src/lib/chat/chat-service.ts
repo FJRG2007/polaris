@@ -15,6 +15,7 @@ import {
     ChatAccessError,
     channelAccess,
     messageable,
+    picturesAllowed,
     reachableSpaceIds,
     requireChannel,
     requireSpace,
@@ -71,6 +72,10 @@ export interface ChatChannelView {
      *  whether the screen offers them anything only a moderator may do. Always
      *  false in a direct message, where everybody in one is equal in it. */
     readonly mayAdminister: boolean;
+    /** Whether this reader may put a picture on it - the space's people for a
+     *  channel, whoever started it for a group. Only decides what the screen
+     *  offers; the route that stores the bytes asks the same question again. */
+    readonly mayPicture: boolean;
     /** The other people in a direct message, for the avatars beside it. Empty
      *  for a named channel, where the name is the whole label. */
     readonly others: readonly { id: string; name: string }[];
@@ -336,6 +341,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             private: true,
             archived: true,
             lastMessageAt: true,
+            createdById: true,
             members: { select: { userId: true, user: { select: { name: true } } } }
         }
     });
@@ -348,6 +354,10 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             .filter((member) => member.userId !== actor.id)
             .map((member) => ({ id: member.userId, name: member.user.name }));
         const membership = mine.get(channel.id);
+        const mayAdminister = Boolean(
+            channel.spaceId &&
+                (administered.has(channel.spaceId) || mine.get(channel.id)?.role === "admin")
+        );
         return {
             id: channel.id,
             spaceId: channel.spaceId,
@@ -366,10 +376,11 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             muted: membership ? core.muteInForce(membership) : false,
             mutedUntil: membership?.mutedUntil?.toISOString() ?? null,
             pinned: membership?.pinnedAt !== null && membership?.pinnedAt !== undefined,
-            mayAdminister: Boolean(
-                channel.spaceId &&
-                    (administered.has(channel.spaceId) || mine.get(channel.id)?.role === "admin")
-            ),
+            mayAdminister,
+            // Whether the screen offers this reader the picture control. The
+            // same predicate the route enforces with, asked here so the rule
+            // has one implementation rather than two that drift.
+            mayPicture: picturesAllowed({ ...channel, mayAdminister }, actor.id),
             others: channel.spaceId ? [] : others
         };
     });

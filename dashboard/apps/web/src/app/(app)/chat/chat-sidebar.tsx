@@ -25,6 +25,7 @@ import Link from "next/link";
 import * as actions from "./actions";
 import { useChat } from "./chat-context";
 import { Avatar } from "@/components/avatar";
+import { ChatAvatar } from "@/components/chat-avatar";
 import { channelLink, copyText } from "./links";
 import { useAppUrl } from "@/components/app-url";
 import { NewDirectDialog } from "./new-direct-dialog";
@@ -49,7 +50,6 @@ import {
     Settings2,
     Star,
     Trash2,
-    Users,
     Volume2
 } from "lucide-react";
 import {
@@ -325,7 +325,18 @@ export function ChatSidebar() {
                                         channel.others.length === 1 && channel.others[0] ? (
                                             <Avatar person={channel.others[0]} size={18} />
                                         ) : (
-                                            <Users className="size-3.5 shrink-0 text-muted-foreground" />
+                                            // A group is its picture, or the
+                                            // faces of the people in it. An
+                                            // icon shared by every group is
+                                            // the one thing that cannot tell
+                                            // two of them apart.
+                                            <ChatAvatar
+                                                kind="channel"
+                                                id={channel.id}
+                                                name={channel.name}
+                                                members={channel.others}
+                                                size={18}
+                                            />
                                         )
                                     }
                                 />

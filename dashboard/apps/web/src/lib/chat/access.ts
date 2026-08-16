@@ -317,6 +317,30 @@ async function isPrivate(channelId: string): Promise<boolean> {
     return channel?.private ?? false;
 }
 
+/**
+ * Whether this account may put a picture on one conversation.
+ *
+ * A predicate over facts rather than a query, because it is asked in two places
+ * that already hold them - the route that stores the bytes, and the list that
+ * decides whether to offer the control - and a rule with two implementations is
+ * a rule that will disagree with itself the first time either is edited.
+ *
+ * Somebody who administers the space runs its channels. A group has no
+ * administrators at all, so it is whoever started it: a group picture anybody
+ * can change is a group picture that changes.
+ */
+export function picturesAllowed(
+    channel: {
+        readonly kind: string;
+        readonly createdById: string | null;
+        readonly mayAdminister: boolean;
+    },
+    actorId: string
+): boolean {
+    if (channel.mayAdminister) return true;
+    return channel.kind === "group" && channel.createdById === actorId;
+}
+
 export async function messageable(userIds: readonly string[]): Promise<Set<string>> {
     const unique = [...new Set(userIds)];
     if (unique.length === 0) return new Set();

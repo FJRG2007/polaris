@@ -29,10 +29,12 @@
 import { useChat } from "./chat-context";
 import { useMemo, useState } from "react";
 import { InviteDialog } from "./invite-dialog";
+import { ChatPictureDialog } from "./picture-dialog";
+import { chatAvatarUrl } from "@/lib/avatar-url";
 import { NewSpaceDialog } from "./new-space-dialog";
 import { NewChannelDialog } from "./new-channel-dialog";
 import type { ChatSpaceView } from "@/lib/chat/chat-service";
-import { Hash, MessageSquare, Plus, UserPlus } from "lucide-react";
+import { Hash, Image as ImageIcon, MessageSquare, Plus, UserPlus } from "lucide-react";
 import {
     cn,
     ContextMenu,
@@ -58,6 +60,7 @@ export function ServerRail() {
     const [newSpace, setNewSpace] = useState(false);
     const [newChannelIn, setNewChannelIn] = useState<ChatSpaceView | null>(null);
     const [inviting, setInviting] = useState<ChatSpaceView | null>(null);
+    const [picturing, setPicturing] = useState<ChatSpaceView | null>(null);
 
     /** Unread, summed per space, so a space with something waiting says so
      *  without the list under it being open. */
@@ -94,6 +97,7 @@ export function ServerRail() {
                             setNewChannelIn(space);
                         }}
                         onInvite={() => setInviting(space)}
+                        onPicture={() => setPicturing(space)}
                     >
                         <Pill
                             label={space.name}
@@ -103,6 +107,7 @@ export function ServerRail() {
                             onClick={() => setActiveSpaceId(space.id)}
                         >
                             {initials(space)}
+                            <SpacePicture spaceId={space.id} />
                         </Pill>
                     </SpaceMenu>
                 ))}
@@ -129,7 +134,43 @@ export function ServerRail() {
                 space={inviting}
                 onOpenChange={(next: boolean) => !next && setInviting(null)}
             />
+            {picturing && (
+                <ChatPictureDialog
+                    open
+                    onOpenChange={(next: boolean) => !next && setPicturing(null)}
+                    kind="space"
+                    id={picturing.id}
+                    name={picturing.name}
+                    color={hex(picturing.color)}
+                    // The tile is drawn from one URL that nothing on screen will
+                    // ask for again by itself. The new bytes are already in the
+                    // browser, so this is a redraw rather than a round trip.
+                    onChanged={() => window.location.reload()}
+                />
+            )}
         </div>
+    );
+}
+
+/**
+ * The picture whoever runs the space put on it, over its initials.
+ *
+ * Nothing here knows whether there is one: the route answers a transparent pixel
+ * when there is not, and the letters underneath show straight through it. So the
+ * common case draws no request-shaped hole and needs no query to decide what to
+ * render.
+ */
+function SpacePicture({ spaceId }: { spaceId: string }) {
+    const [failed, setFailed] = useState(false);
+    if (failed) return null;
+    return (
+        // eslint-disable-next-line @next/next/no-img-element -- one small image per space, no loader wanted
+        <img
+            src={chatAvatarUrl("space", spaceId)}
+            alt=""
+            onError={() => setFailed(true)}
+            className="absolute inset-0 size-full object-cover"
+        />
     );
 }
 
@@ -183,7 +224,7 @@ function Pill({
                         : undefined
                 }
                 className={cn(
-                    "flex size-9 items-center justify-center overflow-hidden border text-xs font-semibold transition-all duration-fast",
+                    "relative flex size-9 items-center justify-center overflow-hidden border text-xs font-semibold transition-all duration-fast",
                     active ? "rounded-md" : "rounded-lg",
                     color
                         ? "hover:brightness-125"
@@ -222,11 +263,13 @@ function SpaceMenu({
     space,
     onNewChannel,
     onInvite,
+    onPicture,
     children
 }: {
     space: ChatSpaceView;
     onNewChannel: () => void;
     onInvite: () => void;
+    onPicture: () => void;
     children: React.ReactNode;
 }) {
     const administers = space.access !== "member";
@@ -248,6 +291,12 @@ function SpaceMenu({
                     <ContextMenuItem onSelect={onNewChannel}>
                         <Hash className="size-3.5" />
                         New channel
+                    </ContextMenuItem>
+                )}
+                {administers && (
+                    <ContextMenuItem onSelect={onPicture}>
+                        <ImageIcon className="size-3.5" />
+                        Space picture
                     </ContextMenuItem>
                 )}
                 {!mayInvite && !administers && (

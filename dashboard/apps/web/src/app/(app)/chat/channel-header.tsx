@@ -20,12 +20,16 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { channelLink, copyText } from "./links";
 import { useAppUrl } from "@/components/app-url";
+import { Avatar } from "@/components/avatar";
 import { AddPeopleDialog } from "./add-people-dialog";
+import { ChatPictureDialog } from "./picture-dialog";
+import { ChatAvatar } from "@/components/chat-avatar";
 import { MuteOptions, type MenuParts } from "./mute-menu";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import {
     ArrowLeft,
     Hash,
+    Image as ImageIcon,
     Link2,
     LogOut,
     Lock,
@@ -89,6 +93,7 @@ export function ChannelHeader({
     const baseUrl = useAppUrl();
     const [adding, setAdding] = useState(false);
     const [renaming, setRenaming] = useState(false);
+    const [picturing, setPicturing] = useState(false);
     const [name, setName] = useState("");
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [error, setError] = useState("");
@@ -119,7 +124,22 @@ export function ChannelHeader({
                     <ArrowLeft className="size-4" />
                 </Link>
 
-                <Icon className="size-4 shrink-0 text-muted-foreground" />
+                {/* A named channel is its hash; a conversation is who is in
+                    it - one face for a direct message, the group's picture or
+                    the faces of its people for a group. */}
+                {named ? (
+                    <Icon className="size-4 shrink-0 text-muted-foreground" />
+                ) : channel.others.length === 1 && channel.others[0] ? (
+                    <Avatar person={channel.others[0]} size={20} />
+                ) : (
+                    <ChatAvatar
+                        kind="channel"
+                        id={channel.id}
+                        name={channel.name}
+                        members={channel.others}
+                        size={20}
+                    />
+                )}
                 <span className="truncate text-sm font-semibold" title={channel.name}>
                     {channel.name}
                 </span>
@@ -229,6 +249,12 @@ export function ChannelHeader({
                                         <Pencil className="size-3.5" />
                                         Name this group
                                     </DropdownMenuItem>
+                                    {channel.mayPicture && (
+                                        <DropdownMenuItem onSelect={() => setPicturing(true)}>
+                                            <ImageIcon className="size-3.5" />
+                                            Group picture
+                                        </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem
                                         variant="danger"
@@ -284,6 +310,21 @@ export function ChannelHeader({
                     {error}
                 </p>
             )}
+
+            <ChatPictureDialog
+                open={picturing}
+                onOpenChange={setPicturing}
+                kind="channel"
+                id={channel.id}
+                name={channel.name}
+                members={channel.others}
+                // Drawn from one URL in half a dozen places, none of which will
+                // ask for it again on their own: the elements already on screen
+                // are pointed at exactly the address they were. The bytes in the
+                // browser have been replaced by now, so this is a redraw and not
+                // a round trip.
+                onChanged={() => window.location.reload()}
+            />
 
             <AddPeopleDialog
                 open={adding}

@@ -5565,6 +5565,7 @@ model ChatSpace {
 
     owner    User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
     org      Organization?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    avatar     ChatSpaceAvatar?
     members    ChatSpaceMember[]
     channels   ChatChannel[]
     categories ChatCategory[]
@@ -5687,6 +5688,7 @@ model ChatChannel {
 
     space    ChatSpace?          @relation(fields: [spaceId], references: [id], onDelete: Cascade)
     category ChatCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+    avatar   ChatChannelAvatar?
     members  ChatChannelMember[]
     messages ChatMessage[]
     meetings Meeting[]
@@ -5694,6 +5696,40 @@ model ChatChannel {
     @@index([spaceId, order])
     @@index([categoryId, order])
     @@index([lastMessageAt])
+}
+
+// The picture on a space, and the one on a conversation.
+//
+// Two tables rather than one keyed by a kind, so each cascades with the thing it
+// belongs to: a space that is deleted must not leave a row pointing at a file
+// nobody will ever ask for again. They are otherwise the same shape as an
+// account's photo and an organization's, and go through the same service and the
+// same storage target - a picture is a picture.
+//
+// A group with none is not blank: it is drawn from the faces of the people in
+// it, which is what every messenger does and what makes a list of groups
+// readable before any of them are named.
+model ChatSpaceAvatar {
+    spaceId      String   @id @db.Uuid
+    // Null when the bytes are on the disk Polaris runs on.
+    connectionId String?
+    path         String
+    mime         String
+    size         Int      @default(0)
+    updatedAt    DateTime @updatedAt
+
+    space ChatSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+}
+
+model ChatChannelAvatar {
+    channelId    String   @id @db.Uuid
+    connectionId String?
+    path         String
+    mime         String
+    size         Int      @default(0)
+    updatedAt    DateTime @updatedAt
+
+    channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 }
 
 // A heading inside a space, with channels under it.
