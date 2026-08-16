@@ -10,6 +10,7 @@
 
 import * as core from "@polaris/core";
 import { publishChatChange } from "./live";
+import { nicknamesFor } from "@/lib/contact-names";
 import { prisma, type Prisma } from "@polaris/db";
 import {
     ChatAccessError,
@@ -76,6 +77,11 @@ export interface ChatChannelView {
      *  channel, whoever started it for a group. Only decides what the screen
      *  offers; the route that stores the bytes asks the same question again. */
     readonly mayPicture: boolean;
+    /** Who runs a group, so the screen can offer them the things only they may
+     *  do. Null for everything that is not a group. */
+    readonly ownerId: string | null;
+    /** Whether the owner has let the rest of the group change how it looks. */
+    readonly membersMayEdit: boolean;
     /** The other people in a direct message, for the avatars beside it. Empty
      *  for a named channel, where the name is the whole label. */
     readonly others: readonly { id: string; name: string }[];
@@ -341,18 +347,29 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             private: true,
             archived: true,
             lastMessageAt: true,
-            createdById: true,
+            ownerId: true,
+            membersMayEdit: true,
             members: { select: { userId: true, user: { select: { name: true } } } }
         }
     });
     if (channels.length === 0) return [];
 
     const unread = await unreadCounts(actor, channels, mine);
+    // What this reader calls people, over what those people are called. A direct
+    // message is named after who is in it, so a nickname has to reach the list
+    // itself and not only the messages inside it.
+    const called = await nicknamesFor(
+        actor.id,
+        channels.flatMap((channel) => channel.members.map((member) => member.userId))
+    );
 
     return channels.map((channel) => {
         const others = channel.members
             .filter((member) => member.userId !== actor.id)
-            .map((member) => ({ id: member.userId, name: member.user.name }));
+            .map((member) => ({
+                id: member.userId,
+                name: called.get(member.userId) ?? member.user.name
+            }));
         const membership = mine.get(channel.id);
         const mayAdminister = Boolean(
             channel.spaceId &&
@@ -381,6 +398,8 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             // same predicate the route enforces with, asked here so the rule
             // has one implementation rather than two that drift.
             mayPicture: picturesAllowed({ ...channel, mayAdminister }, actor.id),
+            ownerId: channel.ownerId,
+            membersMayEdit: channel.membersMayEdit,
             others: channel.spaceId ? [] : others
         };
     });
@@ -619,9 +638,11 @@ export async function updateChannel(
  * capitalized differently is the same room - and a group's is a label somebody
  * wrote: "Weekend plans" is what they meant, not "weekend-plans".
  *
- * Anybody in the group may do it. A group belongs to everybody in it, and an
- * owner would make it a channel with extra steps. Emptying the name puts it back
- * to being called after the people in it.
+ * The owner does it, and everybody else only if the owner has said so - the same
+ * switch the picture answers to, because the name and the picture are the two
+ * things a group looks like and splitting them would be two settings for one
+ * decision. Emptying the name puts it back to being called after the people in
+ * it.
  */
 export async function renameGroup(
     actor: ChatActor,
@@ -630,9 +651,74 @@ export async function renameGroup(
 ): Promise<void> {
     const access = await requireChannel(actor, channelId);
     if (access.kind !== "group") throw new ChatAccessError("That conversation has no name to set");
+    const group = await prisma.chatChannel.findUnique({
+        where: { id: channelId },
+        select: { kind: true, ownerId: true, membersMayEdit: true }
+    });
+    if (!group || !picturesAllowed({ ...group, mayAdminister: access.mayAdminister }, actor.id)) {
+        throw new ChatAccessError("Only the owner of this group can rename it");
+    }
 
     await prisma.chatChannel.update({ where: { id: channelId }, data: { name } });
     publishChatChange({ channelId, kind: "channels", actorId: actor.id });
+}
+
+/**
+ * What the owner of a group has decided about it.
+ *
+ * One switch today, and it is the one people ask for first: whether the rest of
+ * the group may change its name and its picture. Off to begin with, because a
+ * group photo anybody can change is a group photo that changes - and on is a
+ * decision somebody made rather than the state everybody starts in.
+ */
+export async function setGroupOptions(
+    actor: ChatActor,
+    channelId: string,
+    options: { membersMayEdit: boolean }
+): Promise<void> {
+    await requireGroupOwner(actor, channelId);
+    await prisma.chatChannel.update({
+        where: { id: channelId },
+        data: { membersMayEdit: options.membersMayEdit }
+    });
+    publishChatChange({ channelId, kind: "channels", actorId: actor.id });
+}
+
+/**
+ * Hand a group over.
+ *
+ * To somebody already in it, because handing a group to a stranger is two acts
+ * and only one of them was asked for. The old owner stays a member: leaving is a
+ * separate decision, and doing it for them would be a surprise.
+ */
+export async function transferGroup(
+    actor: ChatActor,
+    channelId: string,
+    toUserId: string
+): Promise<void> {
+    await requireGroupOwner(actor, channelId);
+    if (toUserId === actor.id) return;
+
+    const member = await prisma.chatChannelMember.findUnique({
+        where: { channelId_userId: { channelId, userId: toUserId } },
+        select: { id: true }
+    });
+    if (!member) throw new ChatAccessError("That person is not in this group");
+
+    await prisma.chatChannel.update({ where: { id: channelId }, data: { ownerId: toUserId } });
+    publishChatChange({ channelId, kind: "channels", actorId: actor.id });
+}
+
+/** The owner of a group, refused loudly. Not "an administrator": a group has
+ *  none, which is why it has an owner at all. */
+async function requireGroupOwner(actor: ChatActor, channelId: string): Promise<void> {
+    await requireChannel(actor, channelId);
+    const group = await prisma.chatChannel.findUnique({
+        where: { id: channelId },
+        select: { kind: true, ownerId: true }
+    });
+    if (!group || group.kind !== "group") throw new ChatAccessError("That is not a group");
+    if (group.ownerId !== actor.id) throw new ChatAccessError("Only the owner of this group can do that");
 }
 
 export async function deleteChannel(actor: ChatActor, channelId: string): Promise<void> {
@@ -706,7 +792,37 @@ export async function removeChannelMember(
         throw new ChatAccessError("You cannot remove people from that channel");
     }
     await prisma.chatChannelMember.deleteMany({ where: { channelId, userId } });
+    if (group) await passOnOwnership(channelId, userId);
     publishChatChange({ channelId, kind: "channels", actorId: actor.id, audience: [userId] });
+}
+
+/**
+ * The owner walked out.
+ *
+ * A group with an owner who has left is a group nobody can rename, hand over or
+ * settle a setting on - and the person who would notice is whoever is still in
+ * it. So it passes to whoever has been in it longest, which is the one rule
+ * nobody has to be told and nobody can dispute.
+ *
+ * The last person out leaves it ownerless, which is correct: there is nobody to
+ * own it, and the row goes when the conversation does.
+ */
+async function passOnOwnership(channelId: string, leftId: string): Promise<void> {
+    const channel = await prisma.chatChannel.findUnique({
+        where: { id: channelId },
+        select: { ownerId: true }
+    });
+    if (channel?.ownerId !== leftId) return;
+
+    const eldest = await prisma.chatChannelMember.findFirst({
+        where: { channelId },
+        orderBy: { createdAt: "asc" },
+        select: { userId: true }
+    });
+    await prisma.chatChannel.update({
+        where: { id: channelId },
+        data: { ownerId: eldest?.userId ?? null }
+    });
 }
 
 /**

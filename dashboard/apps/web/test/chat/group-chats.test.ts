@@ -15,6 +15,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 let kind = "group";
+/** Who runs the group, and whether they have let the rest of it change how the
+ *  group looks. Both default to "the owner and nobody else". */
+let ownerId: string | null = "ada";
+let membersMayEdit = false;
 let members = ["ada", "grace", "alan"];
 let written: { name?: string; removed?: string[]; added?: string[] } = {};
 
@@ -33,7 +37,9 @@ vi.mock("@polaris/db", () => ({
                 kind,
                 private: true,
                 archived: false,
-                space: null
+                space: null,
+                ownerId,
+                membersMayEdit
             }),
             update: async ({ data }: { data: { name?: string } }) => {
                 written.name = data.name;
@@ -41,6 +47,7 @@ vi.mock("@polaris/db", () => ({
             }
         },
         chatChannelMember: {
+            findFirst: async () => ({ userId: members[0] ?? null }),
             findUnique: async ({ where }: { where: { channelId_userId: { userId: string } } }) =>
                 members.includes(where.channelId_userId.userId) ? { role: "member" } : null,
             // Two different counts are asked for: how many are in it, and how
@@ -69,13 +76,15 @@ const { ChatAccessError } = await import("@/lib/chat/access");
 const ada = { id: "ada" };
 
 beforeEach(() => {
+    ownerId = "ada";
+    membersMayEdit = false;
     kind = "group";
     members = ["ada", "grace", "alan"];
     written = {};
 });
 
 describe("naming a group", () => {
-    it("is anybody in it", async () => {
+    it("is the owner's", async () => {
         await chat.renameGroup(ada, "channel-1", "Weekend plans");
         // Kept as written, not slugged: a channel's name is an identifier and a
         // group's is a label somebody typed.
@@ -85,6 +94,20 @@ describe("naming a group", () => {
     it("can be taken off again, putting the names back", async () => {
         await chat.renameGroup(ada, "channel-1", "");
         expect(written.name).toBe("");
+    });
+
+    it("is refused to everybody else until the owner says otherwise", async () => {
+        // The default, and the reason it is the default: a group photo and a
+        // group name anybody can change are a group photo and a group name that
+        // change.
+        ownerId = "grace";
+        await expect(chat.renameGroup(ada, "channel-1", "Mine now")).rejects.toBeInstanceOf(
+            ChatAccessError
+        );
+
+        membersMayEdit = true;
+        await chat.renameGroup(ada, "channel-1", "Ours now");
+        expect(written.name).toBe("Ours now");
     });
 
     it("is refused to somebody not in it", async () => {

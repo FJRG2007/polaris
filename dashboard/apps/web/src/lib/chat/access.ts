@@ -318,27 +318,35 @@ async function isPrivate(channelId: string): Promise<boolean> {
 }
 
 /**
- * Whether this account may put a picture on one conversation.
+ * Whether this account may change how one conversation looks - its name and its
+ * picture, which are the same decision.
  *
- * A predicate over facts rather than a query, because it is asked in two places
- * that already hold them - the route that stores the bytes, and the list that
- * decides whether to offer the control - and a rule with two implementations is
- * a rule that will disagree with itself the first time either is edited.
+ * A predicate over facts rather than a query, because it is asked in three
+ * places that already hold them - the route that stores the bytes, the action
+ * that renames, and the list that decides whether to offer either - and a rule
+ * with three implementations is a rule that will disagree with itself the first
+ * time any of them is edited.
  *
  * Somebody who administers the space runs its channels. A group has no
- * administrators at all, so it is whoever started it: a group picture anybody
- * can change is a group picture that changes.
+ * administrators, so it has an owner: whoever started it, until they hand it
+ * over. Everybody else in the group only if the owner has said so, because a
+ * group photo anybody can change is a group photo that changes.
  */
 export function picturesAllowed(
     channel: {
         readonly kind: string;
-        readonly createdById: string | null;
+        readonly ownerId: string | null;
+        readonly membersMayEdit: boolean;
         readonly mayAdminister: boolean;
     },
     actorId: string
 ): boolean {
     if (channel.mayAdminister) return true;
-    return channel.kind === "group" && channel.createdById === actorId;
+    if (channel.kind !== "group") return false;
+    // The owner always, and everybody else only if the owner said so. Both the
+    // name and the picture answer to this: they are the two things a group looks
+    // like, and splitting them would be two switches for one decision.
+    return channel.ownerId === actorId || channel.membersMayEdit;
 }
 
 export async function messageable(userIds: readonly string[]): Promise<Set<string>> {

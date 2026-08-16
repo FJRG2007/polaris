@@ -188,7 +188,7 @@ async function mayWrite(userId: string, kind: Kind, id: string): Promise<boolean
 
     const channel = await prisma.chatChannel.findUnique({
         where: { id },
-        select: { kind: true, createdById: true }
+        select: { kind: true, ownerId: true, membersMayEdit: true }
     });
     if (!channel) return false;
     return picturesAllowed({ ...channel, mayAdminister: access.mayAdminister }, userId);

@@ -62,6 +62,7 @@ vi.mock("@polaris/db", () => ({
         chatReaction: { findMany: async () => [] },
         chatAttachment: { findMany: async () => [] },
         chatStar: { findMany: async () => [] },
+        contactName: { findMany: async () => [] },
         chatChannel: { findUnique: async () => ({ kind: "text" }) },
         chatChannelMember: { findMany: async () => [], updateMany: async () => ({ count: 0 }) },
         user: { findMany: async () => [] }

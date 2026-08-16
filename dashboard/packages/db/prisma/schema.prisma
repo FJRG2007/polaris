@@ -144,6 +144,8 @@ model User {
     chatSpaceInvites     ChatSpaceInvite[]
     chatSavedMedia       ChatSavedMedia[]
     chatChannelMemberships ChatChannelMember[]
+    contactNamesGiven    ContactName[]       @relation("ContactNamesGiven")
+    contactNamesReceived ContactName[]       @relation("ContactNamesReceived")
     chatReportsMade     ChatReport[]         @relation("ChatReportsMade")
     chatReportsHandled  ChatReport[]         @relation("ChatReportsHandled")
     searches            SearchHistory[]
@@ -5680,6 +5682,15 @@ model ChatChannel {
     private       Boolean   @default(false)
     dmKey         String?   @unique
     createdById   String?   @db.Uuid
+    // Who runs a group. The creator to begin with, and transferable - a group
+    // whose owner cannot hand it over is a group that dies with an account.
+    // Null for everything that is not a group: a channel is run by whoever
+    // administers its space, and a direct message is between equals.
+    ownerId       String?   @db.Uuid
+    // Whether anybody in the group may change its name and its picture, or only
+    // the owner. Off by default: a group photo anybody can change is a group
+    // photo that changes.
+    membersMayEdit Boolean  @default(false)
     // Denormalized so the rail can sort conversations by what is happening
     // without reading every message table.
     lastMessageAt DateTime?
@@ -5851,6 +5862,32 @@ model ChatMessage {
     @@index([channelId, createdAt])
     @@index([parentId, createdAt])
     @@index([replyToId])
+}
+
+// What one person calls another.
+//
+// Theirs alone and visible to nobody else, which is the whole feature: somebody
+// whose display name is a handle nobody recognises is "Dad" in one person's
+// list and unchanged in everybody else's. It replaces the name wherever Polaris
+// draws it *for that reader* - the conversation list, the message they wrote,
+// the roster - and never where it would be a claim about who somebody is: an
+// audit entry, a moderation queue, an invitation.
+//
+// No relation to anything but the two accounts. A nickname is not a fact about
+// the person named; it is a note the namer keeps.
+model ContactName {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    ownerId   String   @db.Uuid
+    subjectId String   @db.Uuid
+    nickname  String
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    owner   User @relation("ContactNamesGiven", fields: [ownerId], references: [id], onDelete: Cascade)
+    subject User @relation("ContactNamesReceived", fields: [subjectId], references: [id], onDelete: Cascade)
+
+    @@unique([ownerId, subjectId])
+    @@index([ownerId])
 }
 
 // Something somebody said was wrong with a message.

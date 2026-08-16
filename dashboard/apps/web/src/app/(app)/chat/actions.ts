@@ -23,6 +23,7 @@ import * as chat from "@/lib/chat/chat-service";
 import * as reports from "@/lib/chat/reports";
 import * as messages from "@/lib/chat/messages";
 import { allChatRules } from "@/lib/chat/rules";
+import { MAX_NICKNAME, setNickname } from "@/lib/contact-names";
 import { requirePermission } from "@/lib/session";
 import { storeAttachment } from "@/lib/chat/attachments";
 import type { SavedMediaView } from "@/lib/chat/saved-media";
@@ -374,6 +375,57 @@ export async function reportMessageAction(input: unknown): Promise<{ already?: b
     if (!parsed.success) return { error: "Say what is wrong with it" };
     const result = await guard(() => reports.reportMessage(me, parsed.data));
     return result.error ? { error: result.error } : { already: result.value?.already };
+}
+
+/**
+ * What the owner of a group has decided about it.
+ *
+ * The service refuses anybody else; this only shapes the input. A boolean from a
+ * browser is still a value from outside.
+ */
+export async function setGroupOptionsAction(
+    channelId: string,
+    membersMayEdit: unknown
+): Promise<{ error?: string }> {
+    const me = await actor();
+    const result = await guard(() =>
+        chat.setGroupOptions(me, channelId, { membersMayEdit: membersMayEdit === true })
+    );
+    return result.error ? { error: result.error } : {};
+}
+
+/** Hand a group over to somebody already in it. */
+export async function transferGroupAction(
+    channelId: string,
+    toUserId: string
+): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(toUserId);
+    if (!parsed.success) return { error: "Pick somebody in this group" };
+    const result = await guard(() => chat.transferGroup(me, channelId, parsed.data));
+    return result.error ? { error: result.error } : {};
+}
+
+/**
+ * What you call somebody.
+ *
+ * Yours alone: nothing is announced, nobody is told, and the person named goes
+ * on being called what they call themselves everywhere except your screen. An
+ * empty value takes the nickname back off.
+ */
+export async function setNicknameAction(
+    subjectId: string,
+    nickname: unknown
+): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = z
+        .object({ subjectId: z.string().uuid(), nickname: z.string().max(MAX_NICKNAME) })
+        .safeParse({ subjectId, nickname: typeof nickname === "string" ? nickname : "" });
+    if (!parsed.success) return { error: "That is not a name this can store" };
+
+    await setNickname(me.id, parsed.data.subjectId, parsed.data.nickname);
+    revalidatePath(CHAT_PATH);
+    return {};
 }
 
 export async function typingAction(channelId: string, activity?: unknown): Promise<void> {

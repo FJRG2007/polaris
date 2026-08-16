@@ -16,6 +16,7 @@ import * as core from "@polaris/core";
 import { rulesForChannel } from "./rules";
 import { publishChatChange } from "./live";
 import { announceRoomMention } from "./room-mentions";
+import { nicknamesFor } from "@/lib/contact-names";
 import { receiptsBetween } from "@/lib/privacy-service";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { isBlankMarkdown } from "@/components/rich-text/markdown";
@@ -926,7 +927,16 @@ export async function decorateMessages(actor: ChatActor, rows: readonly Row[]): 
           })
         : [];
 
-    const names = new Map([...authors, ...quoteAuthors].map((author) => [author.id, author.name]));
+    // What this reader calls people, laid over what those people are called.
+    // One query for the page: a nickname is per reader, so it cannot be resolved
+    // where the names are, and a lookup per message would be fifty of them.
+    const called = await nicknamesFor(actor.id, [...authorIds, ...quoteAuthorIds]);
+    const names = new Map(
+        [...authors, ...quoteAuthors].map((author) => [
+            author.id,
+            called.get(author.id) ?? author.name
+        ])
+    );
     const quotes = new Map(quoted.map((row) => [row.id, row]));
     const kept = new Set(stars.map((row) => row.messageId));
     const onMessageFiles = new Map<string, ChatAttachmentView[]>();

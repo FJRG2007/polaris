@@ -23,6 +23,7 @@ import { useAppUrl } from "@/components/app-url";
 import { Avatar } from "@/components/avatar";
 import { AddPeopleDialog } from "./add-people-dialog";
 import { ChatPictureDialog } from "./picture-dialog";
+import { GroupSettingsDialog } from "./group-settings-dialog";
 import { ChatAvatar } from "@/components/chat-avatar";
 import { MuteOptions, type MenuParts } from "./mute-menu";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
@@ -37,6 +38,7 @@ import {
     Pencil,
     Phone,
     Search,
+    Settings2,
     Trash2,
     UserPlus,
     Users,
@@ -71,12 +73,16 @@ const DROPDOWN_PARTS: MenuParts = {
 
 export function ChannelHeader({
     channel,
+    viewerId,
     onChanged,
     call,
     onStartCall,
     onSearch
 }: {
     channel: ChatChannelView;
+    /** Who is reading, which decides one thing here: a group's owner is the only
+     *  person for whom its settings are a question. */
+    viewerId: string;
     onChanged: () => void;
     /** The call running in this conversation, if there is one, so somebody who
      *  arrives late can see it rather than start a second one. */
@@ -94,6 +100,9 @@ export function ChannelHeader({
     const [adding, setAdding] = useState(false);
     const [renaming, setRenaming] = useState(false);
     const [picturing, setPicturing] = useState(false);
+    const [settings, setSettings] = useState(false);
+    const [naming, setNaming] = useState(false);
+    const [nickname, setNickname] = useState("");
     const [name, setName] = useState("");
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [error, setError] = useState("");
@@ -243,6 +252,16 @@ export function ChannelHeader({
                                     void act(() => actions.setMutedAction(channel.id, minutes))
                                 }
                             />
+                            {/* A conversation with one other person in it. What
+                                you call them is yours: nothing is announced, and
+                                they go on being called what they call themselves
+                                everywhere but here. */}
+                            {!named && !group && channel.others.length === 1 && (
+                                <DropdownMenuItem onSelect={() => setNaming(true)}>
+                                    <Pencil className="size-3.5" />
+                                    Nickname
+                                </DropdownMenuItem>
+                            )}
                             {group && (
                                 <>
                                     <DropdownMenuItem onSelect={() => setRenaming(true)}>
@@ -253,6 +272,15 @@ export function ChannelHeader({
                                         <DropdownMenuItem onSelect={() => setPicturing(true)}>
                                             <ImageIcon className="size-3.5" />
                                             Group picture
+                                        </DropdownMenuItem>
+                                    )}
+                                    {/* Only the owner's. Offering a switch the
+                                        server will refuse is worse than not
+                                        offering it. */}
+                                    {channel.ownerId === viewerId && (
+                                        <DropdownMenuItem onSelect={() => setSettings(true)}>
+                                            <Settings2 className="size-3.5" />
+                                            Group settings
                                         </DropdownMenuItem>
                                     )}
                                     <DropdownMenuSeparator />
@@ -309,6 +337,64 @@ export function ChannelHeader({
                 >
                     {error}
                 </p>
+            )}
+
+            {/* Opened on what they are called now, which is either the nickname
+                already set or their own name - so clearing the box is how the
+                nickname comes off. */}
+            <Dialog
+                open={naming}
+                onOpenChange={(next: boolean) => {
+                    setNaming(next);
+                    if (next) setNickname(channel.others[0]?.name ?? "");
+                }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>What you call them</DialogTitle>
+                    </DialogHeader>
+                    <Input
+                        value={nickname}
+                        autoFocus
+                        maxLength={60}
+                        aria-label="What you call them"
+                        placeholder="Leave it empty to use their own name"
+                        onChange={(event) => setNickname(event.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        Only you see this. They are not told, and everybody else goes on seeing
+                        their own name.
+                    </p>
+                    <DialogFooter>
+                        <Button variant="ghost" size="sm" onClick={() => setNaming(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            size="sm"
+                            onClick={async () => {
+                                const person = channel.others[0];
+                                if (!person) return;
+                                await runAction(
+                                    () => actions.setNicknameAction(person.id, nickname),
+                                    setError
+                                );
+                                setNaming(false);
+                                onChanged();
+                            }}
+                        >
+                            Save
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {group && (
+                <GroupSettingsDialog
+                    channel={channel}
+                    open={settings}
+                    onOpenChange={setSettings}
+                    onChanged={onChanged}
+                />
             )}
 
             <ChatPictureDialog
