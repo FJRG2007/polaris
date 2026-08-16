@@ -24,9 +24,9 @@
  */
 
 import { loadEnv } from "@polaris/config";
-import { GiphyFetch } from "@giphy/js-fetch-api";
 import type { IGif } from "@giphy/js-types";
 import { fetchImage } from "@/lib/safe-fetch";
+import { GiphyFetch } from "@giphy/js-fetch-api";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
 /** One result, as the picker draws it. */
@@ -47,6 +47,51 @@ export type TenorKind = "gif" | "sticker";
 /** How many one page of the picker holds. Enough to fill the grid twice over
  *  without asking Tenor for a hundred. */
 const PAGE = 24;
+
+/**
+ * Answers already given, so the same question is not put to a paid API twice.
+ *
+ * Every account on the instance shares it, which is the point: "trending" is the
+ * same list for everybody, and it is what the picker asks for every single time
+ * somebody opens the GIF tab. Held in memory rather than in the database because
+ * losing it costs one request - the row would be a table to migrate, prune and
+ * reason about for something that is stale within the hour either way.
+ *
+ * A search is worth keeping for less time than the featured list: somebody
+ * typing is exploring, and the same word an hour later can reasonably answer
+ * differently.
+ */
+const answers = new Map<string, { at: number; results: TenorResult[] }>();
+
+const TRENDING_FRESH_MS = 30 * 60 * 1000;
+const SEARCH_FRESH_MS = 10 * 60 * 1000;
+
+/** How many questions are remembered. A picker asks about a few dozen words in a
+ *  day; past this the oldest goes, which keeps a shared map from being somewhere
+ *  memory quietly accumulates. */
+const MOST_REMEMBERED = 200;
+
+function remembered(key: string, freshMs: number): TenorResult[] | null {
+    const known = answers.get(key);
+    if (!known) return null;
+    if (Date.now() - known.at > freshMs) {
+        answers.delete(key);
+        return null;
+    }
+    return known.results;
+}
+
+function remember(key: string, results: TenorResult[]): void {
+    // Nothing came back is not an answer worth keeping: it is usually the
+    // service being slow, and keeping it would leave the tab empty for half an
+    // hour over one bad moment.
+    if (results.length === 0) return;
+    if (answers.size >= MOST_REMEMBERED) {
+        const oldest = answers.keys().next().value;
+        if (oldest !== undefined) answers.delete(oldest);
+    }
+    answers.set(key, { at: Date.now(), results });
+}
 
 /** The biggest thing worth pulling down and keeping. Tenor's `tinygif` is well
  *  under this; the cap is here because the address is theirs, not ours. */
@@ -83,15 +128,32 @@ export async function tenorConfigured(): Promise<boolean> {
  * A failure comes back as an empty list rather than an exception: the picker is
  * a convenience beside a working emoji tab, and a third party being slow should
  * not be an error somebody has to dismiss to carry on typing.
+ *
+ * The answer is remembered for everybody. Opening the GIF tab asks for the same
+ * featured list every time, and both services charge for it - so the second
+ * person to open it today is answered from here rather than from their quota.
  */
 export async function searchTenor(query: string, kind: TenorKind): Promise<TenorResult[]> {
+    const term = query.trim();
+    const cacheKey = `${kind}:${term.toLowerCase()}`;
+    const freshMs = term ? SEARCH_FRESH_MS : TRENDING_FRESH_MS;
+
+    const known = remembered(cacheKey, freshMs);
+    if (known) return known;
+
+    const found = await askTheService(term, kind);
+    remember(cacheKey, found);
+    return found;
+}
+
+/** Whichever service is connected, asked directly. */
+async function askTheService(term: string, kind: TenorKind): Promise<TenorResult[]> {
     const giphy = await giphyKey();
-    if (giphy) return searchGiphy(giphy, query, kind);
+    if (giphy) return searchGiphy(giphy, term, kind);
 
     const key = await tenorKey();
     if (!key) return [];
 
-    const term = query.trim();
     const base = term ? "search" : "featured";
     const url = new URL(`https://tenor.googleapis.com/v2/${base}`);
     url.searchParams.set("key", key);

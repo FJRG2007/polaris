@@ -30,15 +30,69 @@ import { createPortal } from "react-dom";
 import type { TenorResult } from "@/lib/chat/tenor";
 import { Loader2, Search, Smile } from "lucide-react";
 import { EMOJI_GROUPS, searchEmoji } from "@/lib/chat/emoji";
-import { recentEmoji, recentMedia, rememberEmoji, rememberMedia, type RecentMedia } from "./recents";
 import type { SavedMediaView } from "@/lib/chat/saved-media";
 import { listSavedMediaAction, searchTenorAction, tenorReadyAction } from "./actions";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { recentEmoji, recentMedia, rememberEmoji, rememberMedia, type RecentMedia } from "./recents";
 
 type Tab = "emoji" | "saved" | "gif" | "sticker";
 
 /** How long the field sits still before Tenor is asked. */
 const SEARCH_AFTER = 300;
+
+/**
+ * What the search has already answered, for as long as this page is open.
+ *
+ * Outside the component on purpose: the picker is unmounted every time it is
+ * closed, and without this the GIF tab was a spinner and a fresh request every
+ * single time somebody opened it - for the same featured list they had just
+ * been looking at.
+ *
+ * The server keeps the same answers for everybody (see `searchTenor`); this is
+ * the half that also removes the round trip, so switching to the tab paints
+ * rather than loads.
+ */
+const answers = new Map<string, readonly TenorResult[]>();
+
+/** Asked once per page, when the picker is first opened: the featured list is
+ *  what the GIF tab shows before anything is typed, and fetching it while
+ *  somebody is still looking at the emoji is what makes that tab instant. Only
+ *  on a deliberate open, never on a schedule - a picker nobody touches costs
+ *  the instance nothing. */
+let warmed = false;
+
+/** Questions already on their way, so opening the tab that is being warmed does
+ *  not ask the same thing a second time. */
+const asking = new Map<string, Promise<readonly TenorResult[]>>();
+
+function answerKey(tab: Tab, query: string): string {
+    return `${tab}:${query.trim().toLowerCase()}`;
+}
+
+/**
+ * One search, asked at most once.
+ *
+ * Every route to the grid goes through here - the warm-up, the tab, the typing -
+ * so a question is answered from what is known, joined to one already in flight,
+ * or asked. Nothing came back is not remembered: that is usually the service
+ * being slow, and keeping it would leave the tab empty until somebody typed.
+ */
+async function askFor(kind: "gif" | "sticker", query: string): Promise<readonly TenorResult[]> {
+    const key = answerKey(kind, query);
+    const known = answers.get(key);
+    if (known) return known;
+
+    const already = asking.get(key);
+    if (already) return already;
+
+    const question = searchTenorAction(query, kind).then((answer) => {
+        asking.delete(key);
+        if (answer.results.length > 0) answers.set(key, answer.results);
+        return answer.results;
+    });
+    asking.set(key, question);
+    return question;
+}
 
 /** The panel's width, the tallest it grows to on a roomy window, and the least
  *  height worth opening upward into. */
@@ -183,15 +237,39 @@ export function EmojiPicker({
         void listSavedMediaAction().then((answer) => setSaved(answer.saved));
     }, [open, tab, saved]);
 
+    // The featured list, fetched while the emoji tab is still the one on screen.
+    // Nothing is drawn from this directly - it fills the same store the tab
+    // reads, so opening GIFs finds it already there.
+    useEffect(() => {
+        if (!open || !tenorReady || warmed) return;
+        warmed = true;
+        void askFor("gif", "");
+    }, [open, tenorReady]);
+
     useEffect(() => {
         if (!open || tab === "emoji" || tab === "saved" || !tenorReady) return;
+
+        const known = answers.get(answerKey(tab, query));
+        if (known) {
+            setResults(known);
+            setSearching(false);
+            return;
+        }
+
+        // Only now: a tab that has an answer already never shows a spinner, and
+        // a tab that does not is honest about waiting.
         setSearching(true);
+        let live = true;
         const timer = setTimeout(async () => {
-            const answer = await searchTenorAction(query, tab === "sticker" ? "sticker" : "gif");
-            setResults(answer.results);
+            const results = await askFor(tab, query);
+            if (!live) return;
+            setResults(results);
             setSearching(false);
         }, SEARCH_AFTER);
-        return () => clearTimeout(timer);
+        return () => {
+            live = false;
+            clearTimeout(timer);
+        };
     }, [open, tab, query, tenorReady]);
 
     const found = useMemo(() => searchEmoji(query), [query]);
@@ -244,7 +322,11 @@ export function EmojiPicker({
                                 type="button"
                                 onClick={() => {
                                     setTab(value);
-                                    setResults([]);
+                                    // Whatever is already known for the tab
+                                    // being opened, so switching paints rather
+                                    // than blanks - and never the other tab's
+                                    // results while this one is still asking.
+                                    setResults(answers.get(answerKey(value, query)) ?? []);
                                 }}
                                 className={cn(
                                     "flex-1 px-2 py-2 text-xs font-medium transition-colors",
