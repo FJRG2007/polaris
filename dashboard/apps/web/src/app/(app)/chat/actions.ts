@@ -566,6 +566,23 @@ export async function removeSpaceMemberAction(
     return result;
 }
 
+/**
+ * Walk out of a space.
+ *
+ * @param quietly - Skip the line in the space saying so. Only ever the leaver's
+ *   own choice, which is why this is a separate action from removing somebody:
+ *   the flag cannot be reached for anybody but yourself.
+ */
+export async function leaveSpaceAction(
+    spaceId: string,
+    quietly = false
+): Promise<{ error?: string }> {
+    const me = await actor();
+    const result = await guard(() => chat.removeSpaceMember(me, spaceId, me.id, quietly === true));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result;
+}
+
 export async function addChannelMembersAction(input: unknown): Promise<{ error?: string }> {
     const me = await actor();
     const parsed = core.chatMembersSchema.safeParse(input);
@@ -590,10 +607,20 @@ export async function renameGroupAction(input: unknown): Promise<{ error?: strin
     return result;
 }
 
-/** Walk out of a group. Nobody needs to be told which member they are. */
-export async function leaveChannelAction(channelId: string): Promise<{ error?: string }> {
+/**
+ * Walk out of a group. Nobody needs to be told which member they are.
+ *
+ * @param quietly - Leave without the group being told, which is the leaver's to
+ *   decide and nobody else's.
+ */
+export async function leaveChannelAction(
+    channelId: string,
+    quietly = false
+): Promise<{ error?: string }> {
     const me = await actor();
-    const result = await guard(() => chat.removeChannelMember(me, channelId, me.id));
+    const result = await guard(() =>
+        chat.removeChannelMember(me, channelId, me.id, quietly === true)
+    );
     if (!result.error) revalidatePath(CHAT_PATH);
     return result;
 }

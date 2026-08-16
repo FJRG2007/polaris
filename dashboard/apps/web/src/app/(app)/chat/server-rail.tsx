@@ -28,13 +28,17 @@
 
 import { useChat } from "./chat-context";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { runAction } from "@/lib/run-action";
+import { LeaveDialog } from "./leave-dialog";
+import { leaveSpaceAction } from "./actions";
 import { InviteDialog } from "./invite-dialog";
-import { ChatPictureDialog } from "./picture-dialog";
 import { chatAvatarUrl } from "@/lib/avatar-url";
 import { NewSpaceDialog } from "./new-space-dialog";
+import { ChatPictureDialog } from "./picture-dialog";
 import { NewChannelDialog } from "./new-channel-dialog";
 import type { ChatSpaceView } from "@/lib/chat/chat-service";
-import { Hash, Image as ImageIcon, MessageSquare, Plus, UserPlus } from "lucide-react";
+import { Hash, Image as ImageIcon, LogOut, MessageSquare, Plus, UserPlus } from "lucide-react";
 import {
     cn,
     ContextMenu,
@@ -56,11 +60,14 @@ function hex(color: string | undefined): string | null {
 }
 
 export function ServerRail() {
+    const router = useRouter();
     const { spaces, channels, activeSpaceId, setActiveSpaceId, refresh, may } = useChat();
     const [newSpace, setNewSpace] = useState(false);
     const [newChannelIn, setNewChannelIn] = useState<ChatSpaceView | null>(null);
     const [inviting, setInviting] = useState<ChatSpaceView | null>(null);
     const [picturing, setPicturing] = useState<ChatSpaceView | null>(null);
+    const [leaving, setLeaving] = useState<ChatSpaceView | null>(null);
+    const [error, setError] = useState("");
 
     /** Unread, summed per space, so a space with something waiting says so
      *  without the list under it being open. */
@@ -98,6 +105,7 @@ export function ServerRail() {
                         }}
                         onInvite={() => setInviting(space)}
                         onPicture={() => setPicturing(space)}
+                        onLeave={() => setLeaving(space)}
                     >
                         <Pill
                             label={space.name}
@@ -138,6 +146,33 @@ export function ServerRail() {
                 space={inviting}
                 onOpenChange={(next: boolean) => !next && setInviting(null)}
             />
+            {leaving && (
+                <LeaveDialog
+                    open
+                    onOpenChange={(next: boolean) => !next && setLeaving(null)}
+                    kind="space"
+                    name={leaving.name}
+                    error={error}
+                    onLeave={async (quietly) => {
+                        setError("");
+                        const result = await runAction(
+                            () => leaveSpaceAction(leaving.id, quietly),
+                            setError
+                        );
+                        if (!result || result.error) {
+                            if (result?.error) setError(result.error);
+                            return;
+                        }
+                        setLeaving(null);
+                        // Back to the direct messages: the column is about to
+                        // lose the space that is currently open, and a rail
+                        // pointing at a space that is gone shows nothing.
+                        setActiveSpaceId(null);
+                        refresh();
+                        router.push("/chat");
+                    }}
+                />
+            )}
             {picturing && (
                 <ChatPictureDialog
                     open
@@ -268,16 +303,24 @@ function SpaceMenu({
     onNewChannel,
     onInvite,
     onPicture,
+    onLeave,
     children
 }: {
     space: ChatSpaceView;
     onNewChannel: () => void;
     onInvite: () => void;
     onPicture: () => void;
+    onLeave: () => void;
     children: React.ReactNode;
 }) {
     const administers = space.access !== "member";
     const mayInvite = administers || space.visibility !== "private";
+    // Leaving is only real where the roster is what lets somebody in. An
+    // internal space is reachable by everybody who can see its owner, so
+    // deleting a membership row there would take nothing away and the space
+    // would still be in the column - an option that appears to do nothing is
+    // worse than no option. The owner's way out is deleting it.
+    const mayLeave = space.access !== "owner" && space.visibility === "private";
 
     return (
         <ContextMenu>
@@ -303,7 +346,16 @@ function SpaceMenu({
                         Space picture
                     </ContextMenuItem>
                 )}
-                {!mayInvite && !administers && (
+                {mayLeave && (
+                    <>
+                        {(mayInvite || administers) && <ContextMenuSeparator />}
+                        <ContextMenuItem variant="danger" onSelect={onLeave}>
+                            <LogOut className="size-3.5" />
+                            Leave this space
+                        </ContextMenuItem>
+                    </>
+                )}
+                {!mayInvite && !administers && !mayLeave && (
                     <ContextMenuItem disabled>
                         Only an administrator can change this space
                     </ContextMenuItem>

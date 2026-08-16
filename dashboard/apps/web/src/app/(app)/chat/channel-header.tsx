@@ -15,18 +15,19 @@
 import Link from "next/link";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
+import { useChat } from "./chat-context";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
-import { channelLink, copyText } from "./links";
-import { useChat } from "./chat-context";
-import { useAppUrl } from "@/components/app-url";
 import { Avatar } from "@/components/avatar";
-import { AddPeopleDialog } from "./add-people-dialog";
+import { LeaveDialog } from "./leave-dialog";
+import { channelLink, copyText } from "./links";
+import { useAppUrl } from "@/components/app-url";
 import { ChatPictureDialog } from "./picture-dialog";
-import { GroupSettingsDialog } from "./group-settings-dialog";
+import { AddPeopleDialog } from "./add-people-dialog";
 import { ChatAvatar } from "@/components/chat-avatar";
 import { MuteOptions, type MenuParts } from "./mute-menu";
+import { GroupSettingsDialog } from "./group-settings-dialog";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import {
     ArrowLeft,
@@ -78,7 +79,8 @@ export function ChannelHeader({
     onChanged,
     call,
     onStartCall,
-    onSearch
+    onSearch,
+    onMembers
 }: {
     channel: ChatChannelView;
     /** Who is reading, which decides one thing here: a group's owner is the only
@@ -95,6 +97,9 @@ export function ChannelHeader({
     /** Absent where there is nothing to search - a voice room holds no
      *  messages, and a button that does nothing is worse than no button. */
     onSearch?: () => void;
+    /** Show or hide who is in here. Absent in a one-to-one conversation, where
+     *  the roster is the two people already named at the top. */
+    onMembers?: () => void;
 }) {
     const router = useRouter();
     const baseUrl = useAppUrl();
@@ -108,6 +113,7 @@ export function ChannelHeader({
     const [nickname, setNickname] = useState("");
     const [name, setName] = useState("");
     const [confirmDelete, setConfirmDelete] = useState(false);
+    const [leaving, setLeaving] = useState(false);
     const [error, setError] = useState("");
 
     const named = channel.spaceId !== null;
@@ -168,6 +174,17 @@ export function ChannelHeader({
                 )}
 
                 <div className="ml-auto flex shrink-0 items-center gap-0.5">
+                    {onMembers && (
+                        <button
+                            type="button"
+                            onClick={onMembers}
+                            aria-label="Who is in here"
+                            title="Who is in here"
+                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            <Users className="size-4" />
+                        </button>
+                    )}
                     {onSearch && (
                         <button
                             type="button"
@@ -292,15 +309,7 @@ export function ChannelHeader({
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem
                                         variant="danger"
-                                        onSelect={async () => {
-                                            await runAction(
-                                                () =>
-                                                    actions.leaveChannelAction(channel.id),
-                                                setError
-                                            );
-                                            onChanged();
-                                            router.push("/chat");
-                                        }}
+                                        onSelect={() => setLeaving(true)}
                                     >
                                         <LogOut className="size-3.5" />
                                         Leave this group
@@ -393,6 +402,33 @@ export function ChannelHeader({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {group && (
+                <LeaveDialog
+                    open={leaving}
+                    onOpenChange={setLeaving}
+                    kind="group"
+                    name={channel.name}
+                    error={leaving ? error : ""}
+                    onLeave={async (quietly) => {
+                        setError("");
+                        const result = await runAction(
+                            () => actions.leaveChannelAction(channel.id, quietly),
+                            setError
+                        );
+                        // Left open on a refusal, with the reason on it: a
+                        // dialog that closes and leaves you in the group is a
+                        // dialog that looks like it worked.
+                        if (!result || result.error) {
+                            if (result?.error) setError(result.error);
+                            return;
+                        }
+                        setLeaving(false);
+                        onChanged();
+                        router.push("/chat");
+                    }}
+                />
+            )}
 
             {group && (
                 <GroupSettingsDialog
