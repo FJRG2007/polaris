@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
 import { cn } from "@polaris/ui";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth-client";
 import { Avatar } from "@/components/avatar";
@@ -93,9 +93,23 @@ export function AccountMenu({
     }
 
     return (
-        <DropdownMenu open={open} onOpenChange={setOpen}>
+        // Not modal, which is what makes the double press below possible: a
+        // modal menu takes the pointer away from everything behind it, its own
+        // trigger included, so the second press of a double never reaches the
+        // face it was aimed at.
+        <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
             <DropdownMenuTrigger
                 aria-label="Your account"
+                title="Your account. Press twice to open it."
+                // Straight there. Your own face is the way to your own account
+                // in every application that has one, and going through a menu to
+                // press the item named after the thing you just pressed is a step
+                // that exists for no reason. The menu opens and closes under the
+                // two presses, which is what every double-click on a menu does.
+                onDoubleClick={() => {
+                    setOpen(false);
+                    router.push("/account");
+                }}
                 className="rounded-full "
             >
                 <Avatar person={{ id, name }} size={32} />
