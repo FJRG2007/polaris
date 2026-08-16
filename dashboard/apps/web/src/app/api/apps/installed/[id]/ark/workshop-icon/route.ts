@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { imageTypeOfBytes } from "@/lib/mime";
 import { isWorkshopImage } from "@/lib/apps/ark/workshop";
 import { requireGameServer } from "@/lib/apps/install-access";
 
@@ -20,9 +21,7 @@ const CACHE_SECONDS = 24 * 3600;
 const TIMEOUT_MS = 8000;
 /** Enough for any preview Steam serves, and small enough that this can never be
  *  used to pull something large through the dashboard. */
-const MAX_BYTES = 2 * 1024 * 1024;
-
-const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+const MAX_BYTES = 4 * 1024 * 1024;
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
     const { id } = await params;
@@ -35,10 +34,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     try {
         const answer = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-        const type = (answer.headers.get("content-type") ?? "").split(";")[0]?.trim() ?? "";
-        if (!answer.ok || !ALLOWED_TYPES.includes(type)) return new NextResponse(null, { status: 404 });
+        if (!answer.ok) return new NextResponse(null, { status: 404 });
         const bytes = await answer.arrayBuffer();
         if (bytes.byteLength > MAX_BYTES) return new NextResponse(null, { status: 404 });
+        // What it is, read from the bytes rather than from what Steam called it.
+        // Most Workshop previews come back as `application/octet-stream` because
+        // that is how they were stored, and a proxy that trusted the header
+        // dropped nearly all of them - which is what an operator sees as a mods
+        // screen with no pictures on it. Reading the bytes is also stricter: a
+        // file that is not an image is refused whatever the header claimed.
+        const type = imageTypeOfBytes(new Uint8Array(bytes.slice(0, 16)));
+        if (!type) return new NextResponse(null, { status: 404 });
         return new NextResponse(bytes, {
             headers: {
                 "Content-Type": type,

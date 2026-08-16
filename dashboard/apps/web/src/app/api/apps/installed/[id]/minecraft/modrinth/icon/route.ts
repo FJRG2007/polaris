@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { imageTypeOfBytes } from "@/lib/mime";
 import { requireGameServer } from "@/lib/apps/install-access";
 import { isModrinthIcon } from "@/lib/apps/minecraft/modrinth";
 
@@ -35,10 +36,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     try {
         const answer = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-        const type = (answer.headers.get("content-type") ?? "").split(";")[0]?.trim() ?? "";
-        if (!answer.ok || !ALLOWED_TYPES.includes(type)) return new NextResponse(null, { status: 404 });
+        if (!answer.ok) return new NextResponse(null, { status: 404 });
+        const declared = (answer.headers.get("content-type") ?? "").split(";")[0]?.trim() ?? "";
         const bytes = await answer.arrayBuffer();
         if (bytes.byteLength > MAX_BYTES) return new NextResponse(null, { status: 404 });
+        // What it says it is, and failing that what it actually is. A content type
+        // is a claim, and a host that stores its pictures without one would
+        // otherwise have every icon dropped - which is what happened to the Steam
+        // Workshop previews. SVG is the one that cannot be read from its bytes
+        // here, so it is only served on its own say-so.
+        const type = ALLOWED_TYPES.includes(declared)
+            ? declared
+            : imageTypeOfBytes(new Uint8Array(bytes.slice(0, 16)));
+        if (!type) return new NextResponse(null, { status: 404 });
         return new NextResponse(bytes, {
             headers: {
                 "Content-Type": type,
