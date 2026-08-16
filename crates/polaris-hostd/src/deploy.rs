@@ -612,7 +612,9 @@ pub fn exec_stopped(
     merge_stderr: bool,
 ) -> io::Result<Box<dyn Read + Send>> {
     let image = container_image(container)?;
-    let (program, rest) = argv.split_first().ok_or_else(|| io::Error::other("empty argv"))?;
+    let (program, rest) = argv
+        .split_first()
+        .ok_or_else(|| io::Error::other("empty argv"))?;
 
     let mut cmd = Command::new("docker");
     cmd.arg("run").arg("--rm");
