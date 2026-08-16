@@ -13,11 +13,11 @@
  */
 
 import { X } from "lucide-react";
-import * as core from "@polaris/core";
 import * as actions from "./actions";
+import * as core from "@polaris/core";
 import { Composer } from "./composer";
-import { useChat } from "./chat-context";
 import { Skeleton } from "@polaris/ui";
+import { useChat } from "./chat-context";
 import { MessageList } from "./message-list";
 import { runAction } from "@/lib/run-action";
 import { useChatStream } from "./use-chat-stream";
@@ -30,6 +30,7 @@ export function ThreadPanel({
     viewerId,
     canPost,
     canModerate,
+    highlightId = null,
     onClose,
     onChanged
 }: {
@@ -40,6 +41,9 @@ export function ThreadPanel({
     viewerId: string;
     canPost: boolean;
     canModerate: boolean;
+    /** A reply to point at, for somebody who arrived from a link to it rather
+     *  than by opening the thread. Scrolled to once the thread has drawn. */
+    highlightId?: string | null;
     onClose: () => void;
     /** Called after a write, so the channel behind can update the reply count
      *  on the message this thread hangs off. */
@@ -63,6 +67,14 @@ export function ThreadPanel({
         setMessages(null);
         void load();
     }, [load]);
+
+    // A thread opened from a link to one of its replies. The panel draws the
+    // whole thread, so on a long one the reply somebody followed can be well
+    // below the fold - which would look like the link went to the wrong place.
+    useEffect(() => {
+        if (!highlightId || messages === null) return;
+        document.getElementById(`message-${highlightId}`)?.scrollIntoView({ block: "center" });
+    }, [highlightId, messages]);
 
     useChatStream(
         useCallback(
@@ -100,6 +112,7 @@ export function ThreadPanel({
                         viewerId={viewerId}
                         canPost={canPost}
                         canModerate={canModerate}
+                        highlightId={highlightId}
                         onReply={() => {
                             // A thread is already the reply. Quoting inside one
                             // would be a reply to a reply with no room to draw

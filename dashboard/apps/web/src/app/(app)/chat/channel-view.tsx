@@ -25,6 +25,7 @@ import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { Composer } from "./composer";
 import { CallRoom } from "./call-room";
+import { threadRootFor } from "./links";
 import { useChat } from "./chat-context";
 import * as calls from "./meeting-actions";
 import { ThreadPanel } from "./thread-panel";
@@ -66,6 +67,27 @@ const JUMP_PAGES = 20;
 
 /** How long the message a search led to stays lit. */
 const HIGHLIGHT_MS = 2500;
+
+/** How long to wait for a frame in a tab that is not drawing any. */
+const FRAME_TIMEOUT_MS = 50;
+
+/**
+ * One drawn frame.
+ *
+ * A page added to the window is state until React has put it in the document,
+ * and anything that looks for an element it has just fetched has to wait for
+ * that or it is searching the list from before. A hidden tab paints nothing, so
+ * the timer is what keeps a jump made in a background tab from hanging.
+ */
+function drawn(): Promise<void> {
+    return new Promise((resolve) => {
+        const timer = setTimeout(resolve, FRAME_TIMEOUT_MS);
+        requestAnimationFrame(() => {
+            clearTimeout(timer);
+            resolve();
+        });
+    });
+}
 
 /**
  * The most messages held at once - four pages.
@@ -109,6 +131,9 @@ export function ChannelView({
     const [thread, setThread] = useState<ChatMessageView | null>(null);
     const [searching, setSearching] = useState(false);
     const [highlight, setHighlight] = useState<string | null>(null);
+    // The same, for a message a link led to that turned out to be a reply: it is
+    // pointed at inside the thread panel rather than in the channel.
+    const [threadHighlight, setThreadHighlight] = useState<string | null>(null);
     const [editing, setEditing] = useState<ChatMessageView | null>(null);
     const [deleting, setDeleting] = useState<ChatMessageView | null>(null);
     const [replyingTo, setReplyingTo] = useState<ChatMessageView | null>(null);
@@ -414,6 +439,40 @@ export function ChannelView({
     // conversation changed.
     catchUpAgain.current = () => void catchUp();
 
+    /** Scroll to a message that is already drawn, and light it. */
+    const landOn = useCallback((messageId: string): boolean => {
+        const element = document.getElementById(`message-${messageId}`);
+        if (!element) return false;
+        following.current = false;
+        element.scrollIntoView({ block: "center" });
+        setHighlight(messageId);
+        setTimeout(() => setHighlight(null), HIGHLIGHT_MS);
+        return true;
+    }, []);
+
+    /**
+     * A message that was never in the channel's own list, opened where it does
+     * live: under the root of its thread.
+     *
+     * A reply is not in the channel - the list leaves it out on purpose, so its
+     * root's reply count is the only thing pointing at it - which means walking
+     * backwards for one can only ever end in "not found". A link to a reply is
+     * an ordinary thing to be handed, though: a mention inside a thread, a
+     * message toast, a reported message. So the last question the jump asks is
+     * the server's: is this a reply, or is it really out of reach.
+     *
+     * Answers whether it opened one.
+     */
+    const openThreadOf = useCallback(async (messageId: string): Promise<boolean> => {
+        const result = await actions.readThreadAction(messageId);
+        const root = threadRootFor(result.messages ?? [], messageId);
+        if (!root) return false;
+        setThread(root);
+        setThreadHighlight(messageId);
+        setTimeout(() => setThreadHighlight(null), HIGHLIGHT_MS);
+        return true;
+    }, []);
+
     /**
      * Scroll to a message, fetching backwards until it is there.
      *
@@ -421,23 +480,26 @@ export function ChannelView({
      * "scroll to it" means "load until it exists". Bounded, because a hit from
      * two years ago would otherwise walk the whole conversation into the browser
      * one page at a time.
+     *
+     * Each pass waits for a frame before it looks. A page that has just been
+     * fetched is state until React has drawn it, and this used to look before
+     * that: the walk stopped the moment a fetch said there was nothing further
+     * above, without ever searching the page it had just brought in. Which is
+     * how a link to a message sitting on screen answered that it was further
+     * back than this could reach.
      */
     const jumpTo = useCallback(
         async (messageId: string) => {
             for (let attempt = 0; attempt < JUMP_PAGES; attempt += 1) {
-                const element = document.getElementById(`message-${messageId}`);
-                if (element) {
-                    following.current = false;
-                    element.scrollIntoView({ block: "center" });
-                    setHighlight(messageId);
-                    setTimeout(() => setHighlight(null), HIGHLIGHT_MS);
-                    return;
-                }
-                if (!(await loadOlder())) break;
+                await drawn();
+                if (landOn(messageId)) return;
+                if (!olderThanRef.current) break;
+                await loadOlder();
             }
+            if (await openThreadOf(messageId)) return;
             setError("That message is further back than this can reach.");
         },
-        [loadOlder]
+        [landOn, loadOlder, openThreadOf]
     );
 
     /**
@@ -465,11 +527,16 @@ export function ChannelView({
     // A link straight to a message. Waits for the first page rather than racing
     // it: the message may well be on it, and walking backwards from an empty
     // list would ask for pages that are already on the way.
+    //
+    // And waits for the channel, which arrives from the rail's own fetch. Until
+    // it does this screen is a skeleton with no list in it, so a jump that
+    // started here searched a document the messages were not in yet and gave up
+    // on the first pass.
     useEffect(() => {
-        if (!messageId || messages === null || landed.current === messageId) return;
+        if (!channel || !messageId || messages === null || landed.current === messageId) return;
         landed.current = messageId;
         void jumpTo(messageId);
-    }, [messageId, messages, jumpTo]);
+    }, [channel, messageId, messages, jumpTo]);
 
     useChatStream(
         useCallback(
@@ -1059,6 +1126,7 @@ export function ChannelView({
                     viewerId={viewerId}
                     canPost={canPost}
                     canModerate={canModerate}
+                    highlightId={threadHighlight}
                     onClose={() => setThread(null)}
                     onChanged={() => void catchUp()}
                 />

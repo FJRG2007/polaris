@@ -22,6 +22,25 @@ export function messageLink(baseUrl: string, channelId: string, messageId: strin
 }
 
 /**
+ * The root of the thread a message belongs to, or null when it is not a reply.
+ *
+ * Where a link lands when the conversation itself does not hold the message. A
+ * reply is deliberately left out of the channel - it belongs under its root, and
+ * the root's reply count is what points at it - so a screen that walked the
+ * channel backwards looking for one would walk the whole of it and still report
+ * that the message was out of reach. Anything without a parent is a message the
+ * channel does hold, and not finding it there was the true answer.
+ */
+export function threadRootFor<T extends { readonly id: string; readonly parentId: string | null }>(
+    thread: readonly T[],
+    messageId: string
+): T | null {
+    const target = thread.find((entry) => entry.id === messageId);
+    if (!target?.parentId) return null;
+    return thread.find((entry) => entry.id === target.parentId) ?? null;
+}
+
+/**
  * Put something on the clipboard, or do nothing.
  *
  * There is no clipboard on an insecure origin and none in a document that is not
