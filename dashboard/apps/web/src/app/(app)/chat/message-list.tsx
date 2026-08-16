@@ -165,6 +165,7 @@ export function MessageList({
             />
             <ReportDialog
                 messageId={reporting}
+                body={messages.find((entry) => entry.id === reporting)?.body ?? ""}
                 open={reporting !== null}
                 onOpenChange={(next) => !next && setReporting(null)}
             />

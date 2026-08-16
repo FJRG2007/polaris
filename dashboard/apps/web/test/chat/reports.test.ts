@@ -43,9 +43,13 @@ vi.mock("@polaris/db", () => ({
         chatChannel: { findMany: vi.fn(async () => []) }
     }
 }));
+class FakeAccessError extends Error {}
 vi.mock("@/lib/chat/access", () => ({
     requireChannel,
-    ChatAccessError: class extends Error {}
+    ChatAccessError: FakeAccessError,
+    // A refusal by the instance's own rules rather than by who is asking, which
+    // is what a report of a greeting is.
+    ChatRuleError: class extends FakeAccessError {}
 }));
 vi.mock("@/lib/chat/messages", () => ({ remove }));
 
@@ -61,7 +65,9 @@ beforeEach(() => {
         channelId: CHANNEL,
         authorId: "bob",
         body: "**shouting** at everybody",
-        deletedAt: null
+        deletedAt: null,
+        replyToId: null,
+        _count: { attachments: 0 }
     }));
     findReport.mockImplementation(async () => null);
     createReport.mockImplementation(async () => ({ id: "r1" }));
@@ -98,6 +104,42 @@ describe("reporting a message", () => {
         // is reading the storage format rather than the message.
         expect(written.excerpt).toContain("shouting");
         expect(written.excerpt).not.toContain("**");
+    });
+
+    it("refuses a report of a message that is only a greeting", async () => {
+        // A row a moderator can only dismiss. Enough of them and the queue stops
+        // being read, which is what this protects.
+        findMessage.mockImplementation(async () => ({
+            id: MESSAGE,
+            channelId: CHANNEL,
+            authorId: "bob",
+            body: "Hola!",
+            deletedAt: null,
+            replyToId: null,
+            _count: { attachments: 0 }
+        }));
+
+        await expect(
+            reportMessage(actor, { messageId: MESSAGE, reason: "spam", note: "" })
+        ).rejects.toThrow(/greeting/i);
+        expect(createReport).not.toHaveBeenCalled();
+    });
+
+    it("takes a report of a picture whose caption is a greeting", async () => {
+        // The picture is what is being reported, and the word under it says
+        // nothing about that.
+        findMessage.mockImplementation(async () => ({
+            id: MESSAGE,
+            channelId: CHANNEL,
+            authorId: "bob",
+            body: "hola",
+            deletedAt: null,
+            replyToId: null,
+            _count: { attachments: 1 }
+        }));
+
+        await reportMessage(actor, { messageId: MESSAGE, reason: "abuse", note: "" });
+        expect(createReport).toHaveBeenCalled();
     });
 
     it("is the same report the second time somebody presses it", async () => {

@@ -17,7 +17,13 @@ import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { reportMessageAction } from "./actions";
 import type { ChatReportReason } from "@polaris/core";
-import { CHAT_REPORT_LABELS, CHAT_REPORT_REASONS, MAX_CHAT_REPORT_NOTE } from "@polaris/core";
+import {
+    CHAT_REPORT_LABELS,
+    CHAT_REPORT_REASONS,
+    MAX_CHAT_REPORT_NOTE,
+    PLEASANTRY_REFUSAL,
+    isPleasantry
+} from "@polaris/core";
 import {
     Button,
     Dialog,
@@ -33,14 +39,20 @@ import {
 
 export function ReportDialog({
     messageId,
+    body = "",
     open,
     onOpenChange
 }: {
     /** The message being reported, or null when nothing is. */
     messageId: string | null;
+    /** What it said, so the dialog can say up front that there is nothing here
+     *  to report. The server decides; this is the same rule, one step earlier,
+     *  so nobody writes a note about a message that will be refused. */
+    body?: string;
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const nothingToReport = isPleasantry(body);
     const [reason, setReason] = useState<ChatReportReason>("spam");
     const [note, setNote] = useState("");
     const [busy, setBusy] = useState(false);
@@ -79,11 +91,19 @@ export function ReportDialog({
                     <DialogDescription>
                         {sent
                             ? "It has gone to whoever runs this instance. Nobody in the conversation is told."
-                            : "It goes to whoever runs this instance. Nobody in the conversation is told you reported it."}
+                            : nothingToReport
+                              ? "There is nothing here for a moderator to decide about."
+                              : "It goes to whoever runs this instance. Nobody in the conversation is told you reported it."}
                     </DialogDescription>
                 </DialogHeader>
 
-                {!sent && (
+                {!sent && nothingToReport && (
+                    <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+                        {PLEASANTRY_REFUSAL}
+                    </p>
+                )}
+
+                {!sent && !nothingToReport && (
                     <div className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
                             <span className="font-medium">What is wrong with it</span>
@@ -119,9 +139,9 @@ export function ReportDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={() => close(false)}>
-                        {sent ? "Close" : "Cancel"}
+                        {sent || nothingToReport ? "Close" : "Cancel"}
                     </Button>
-                    {!sent && (
+                    {!sent && !nothingToReport && (
                         <Button
                             variant="danger"
                             disabled={busy || !messageId}

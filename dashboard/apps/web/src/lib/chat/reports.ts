@@ -27,7 +27,7 @@ import { remove } from "./messages";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
-import { ChatAccessError, requireChannel, type ChatActor } from "./access";
+import { ChatAccessError, ChatRuleError, requireChannel, type ChatActor } from "./access";
 
 /** How much of a message is copied onto the report. Enough to triage without
  *  opening the conversation, short of copying the conversation. */
@@ -67,9 +67,32 @@ export async function reportMessage(
 ): Promise<{ already: boolean }> {
     const message = await prisma.chatMessage.findUnique({
         where: { id: input.messageId },
-        select: { id: true, channelId: true, authorId: true, body: true, deletedAt: true }
+        select: {
+            id: true,
+            channelId: true,
+            authorId: true,
+            body: true,
+            deletedAt: true,
+            replyToId: true,
+            _count: { select: { attachments: true } }
+        }
     });
     if (!message || message.deletedAt) throw new ChatAccessError("That message is not there");
+
+    // A report of "hola" is a row a moderator can only dismiss, and a queue with
+    // enough of them in it is a queue nobody reads. Refused here rather than
+    // filed and triaged - the dialog says the same thing before anybody presses
+    // send, from the same rule.
+    //
+    // Only when the message really is nothing but the greeting: a picture with
+    // "hola" under it is the picture being reported, and so is a forward.
+    if (
+        message._count.attachments === 0 &&
+        !message.replyToId &&
+        core.isPleasantry(plainExcerpt(message.body, 200))
+    ) {
+        throw new ChatRuleError(core.PLEASANTRY_REFUSAL);
+    }
     // The same check that let them read it. Without this, an id somebody
     // guessed would be answered with "reported" or "not there", which is a way
     // to walk the message table one press at a time.
