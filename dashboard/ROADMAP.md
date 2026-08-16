@@ -358,6 +358,21 @@ Code (pull requests and issues):
   arrived as a person or as part of a team - and where both apply, the stronger
   wins. On an organization's space, `internal` means that roster rather than
   everybody on the instance.
+- A privacy setting names an audience from one shared vocabulary - everyone,
+  everyone except, friends, friends except, only, or nobody - never a switch
+  or a dropdown of its own, so "who sees this" is answered the same way for a
+  photo, an address or a last-seen time. The set of people an audience names
+  is a list, saved and reused across settings rather than picked over on each
+  one.
+- An address and a phone number arrive shut, the only two settings that do:
+  neither is a detail of somebody's presence, both are what spam, password
+  resets and impersonation start from, and nothing in Polaris needs either to
+  name, mention or write to somebody. Every roster, share dialog and member
+  list reads an address through one `contactLines` function rather than the
+  column directly, so a screen that has never heard of the setting cannot
+  leak past it. Read receipts stay the one reciprocal setting: hiding that
+  you read a message also hides whether yours was read, because a one-way
+  version is not a privacy setting, it is a mirror.
 - Accepted dependency risk: two moderate advisories remain against `postcss@8.4.31`
   bundled inside Next.js's private build toolchain (an XSS-in-CSS-stringify path
   that our app never exercises - build-time only, no untrusted CSS). The direct
