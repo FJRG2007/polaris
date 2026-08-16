@@ -41,12 +41,14 @@ async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: str
     }
 }
 
-export async function listConnectionsAction(): Promise<{
+/** Everything this account can open: what it saved, what Polaris runs for it,
+ *  and Polaris' own for whoever runs the instance. */
+export async function listDatabasesAction(): Promise<{
     connections?: connections.DataConnectionView[];
     error?: string;
 }> {
     const me = await actor();
-    const result = await guard(() => connections.listConnections(me.id));
+    const result = await guard(() => connections.listOpenable(me.id));
     return result.error ? { error: result.error } : { connections: result.value };
 }
 

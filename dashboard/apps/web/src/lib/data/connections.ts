@@ -15,20 +15,38 @@
  * target's address and that port, and one on another machine with no published
  * port cannot be reached at all - which is said in those words, with the setting
  * that would fix it named, rather than left as a connection that times out.
+ *
+ * A database Polaris already knows about is offered without anything being
+ * saved: the deploy row holds the address and the credentials, and Polaris' own
+ * database is in the environment, so making somebody re-enter either would be
+ * asking for what is already there. Those are opened under an id that says where
+ * it came from - `managed:<id>`, `polaris` - and each shape re-asks the question
+ * behind it in `addressOf`, because an id in a request is a request rather than
+ * a permission.
  */
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { loadEnv } from "@polaris/config";
+import { userHasPermission } from "@polaris/auth";
 import type { DataAddress, DataEngine } from "./driver";
 import { databaseCredentials } from "@/lib/database-service";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
 
-/** A saved connection as a screen may see it: no secret, ever. */
+/** A database Polaris runs, opened without a connection having been saved. */
+const MANAGED_PREFIX = "managed:";
+
+/** Polaris' own database, opened by whoever runs the instance. */
+const POLARIS_ID = "polaris";
+
+/** A database the browser may open, as a screen may see it: no secret, ever. */
 export interface DataConnectionView {
     readonly id: string;
     readonly name: string;
     readonly engine: DataEngine;
+    /** Where it came from. Only a saved one can be edited or removed - the other
+     *  two are read off what Polaris already knows and have nothing to store. */
+    readonly origin: "saved" | "managed" | "polaris";
     /** Set when this is a shortcut to a database Polaris runs. */
     readonly managedDatabaseId: string | null;
     /** Where it points, for the list to say so. A managed one says which
@@ -38,8 +56,11 @@ export interface DataConnectionView {
     readonly username: string | null;
     readonly readOnly: boolean;
     readonly tls: boolean;
+    /** Something the row has to say before it is opened - that it cannot be
+     *  reached from here, or why it is read-only. */
+    readonly note: string | null;
     readonly lastUsedAt: string | null;
-    readonly createdAt: string;
+    readonly createdAt: string | null;
 }
 
 /** What a browser may send to save one. Nothing here is trusted: the engine is
@@ -129,15 +150,125 @@ export async function listConnections(userId: string): Promise<DataConnectionVie
         id: row.id,
         name: row.name,
         engine: row.engine as DataEngine,
+        origin: "saved",
         managedDatabaseId: row.managedDatabaseId,
         where: row.managed ? row.managed.name : `${row.host ?? ""}:${row.port ?? ""}`,
         database: row.database,
         username: row.username,
         readOnly: row.readOnly,
         tls: row.tls,
+        note: null,
         lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
         createdAt: row.createdAt.toISOString()
     }));
+}
+
+/** Said in the form and again on the list, because it is the one reason a
+ *  database Polaris runs cannot be opened. */
+const UNREACHABLE =
+    "Runs on another server and is not published on a port, so Polaris cannot reach it from here.";
+
+/**
+ * Everything this account can open, saved or not.
+ *
+ * What somebody saved comes first, then the databases Polaris runs for them, then
+ * Polaris' own for whoever runs the instance. A managed database a saved
+ * connection already points at is left out of the offered half: the saved one has
+ * a name somebody chose and a read-only switch they set, and listing the same
+ * database twice under two names is how anybody would end up querying the wrong
+ * one.
+ */
+export async function listOpenable(userId: string): Promise<DataConnectionView[]> {
+    const [saved, managed, own] = await Promise.all([
+        listConnections(userId),
+        listManagedOptions(userId),
+        polarisDatabase(userId)
+    ]);
+
+    const pointedAt = new Set(saved.map((row) => row.managedDatabaseId).filter(Boolean));
+    const offered = managed
+        .filter((entry) => !pointedAt.has(entry.id))
+        .map<DataConnectionView>((entry) => ({
+            id: `${MANAGED_PREFIX}${entry.id}`,
+            name: entry.name,
+            engine: entry.engine,
+            origin: "managed",
+            managedDatabaseId: entry.id,
+            where: entry.where,
+            database: null,
+            username: null,
+            // Read-only until somebody saves a connection to it and says
+            // otherwise: opening a production database from a list should not be
+            // enough to write to it.
+            readOnly: true,
+            tls: false,
+            note: entry.reachable ? null : UNREACHABLE,
+            lastUsedAt: null,
+            createdAt: null
+        }));
+
+    return [...saved, ...(own ? [own] : []), ...offered];
+}
+
+/**
+ * Polaris' own database, for an account that runs the instance.
+ *
+ * Everything Polaris stores is in here - sessions, encrypted credentials, every
+ * app's rows - so it is offered on `system.manage` and never on the `deploy.read`
+ * that opens the app, and it is opened read-only: this is a place to look at what
+ * the instance holds, not to edit it out from under the running process.
+ */
+async function polarisDatabase(userId: string): Promise<DataConnectionView | null> {
+    const address = polarisAddress();
+    if (!address || !(await userHasPermission(userId, "system.manage"))) return null;
+    return {
+        id: POLARIS_ID,
+        name: "Polaris",
+        engine: address.engine,
+        origin: "polaris",
+        managedDatabaseId: null,
+        where: "The instance's own data",
+        database: address.database ?? null,
+        username: address.username ?? null,
+        readOnly: true,
+        tls: address.tls,
+        note: "Read-only. Polaris itself runs on this one.",
+        lastUsedAt: null,
+        createdAt: null
+    };
+}
+
+/**
+ * Where Polaris' own database is, read from the environment it connects with.
+ *
+ * Null when there is nothing the browser could open: an instance on SQLite keeps
+ * its data in a file rather than behind a socket, and the drivers here speak to
+ * servers.
+ */
+function polarisAddress(): DataAddress | null {
+    const env = loadEnv();
+    if (env.POLARIS_DB_PROVIDER !== "postgresql") return null;
+
+    let url: URL;
+    try {
+        url = new URL(env.POLARIS_DATABASE_URL);
+    } catch {
+        return null;
+    }
+
+    const database = decodeURIComponent(url.pathname.replace(/^\//, ""));
+    if (!database) return null;
+
+    return {
+        engine: "postgres",
+        host: url.hostname,
+        port: url.port ? Number(url.port) : core.DB_ENGINE_INFO.postgres.port,
+        database,
+        username: decodeURIComponent(url.username) || null,
+        password: decodeURIComponent(url.password) || null,
+        tls: (url.searchParams.get("sslmode") ?? "") !== "" && url.searchParams.get("sslmode") !== "disable",
+        readOnly: true
+    };
 }
 
 /** Save a new connection or rewrite one this account owns. */
@@ -222,6 +353,19 @@ export async function deleteConnection(userId: string, id: string): Promise<void
  * answered once rather than at each of a dozen call sites.
  */
 export async function addressOf(userId: string, id: string): Promise<DataAddress> {
+    // The two offered ids carry no row, so each re-asks its own question here
+    // rather than being trusted for having been in the list a moment ago.
+    if (id.startsWith(MANAGED_PREFIX)) {
+        return managedAddress(userId, id.slice(MANAGED_PREFIX.length), true);
+    }
+    if (id === POLARIS_ID) {
+        const address = polarisAddress();
+        if (!address || !(await userHasPermission(userId, "system.manage"))) {
+            throw new DataConnectionError("That database is not one you can open.");
+        }
+        return address;
+    }
+
     const row = await prisma.dataConnection.findFirst({ where: { id, ownerId: userId } });
     if (!row) throw new DataConnectionError("That connection is not there any more.");
 

@@ -43,22 +43,32 @@ interface Engine {
 
 export function ConnectionDialog({
     connection,
+    prefill = null,
     onClose,
     onSaved
 }: {
     /** The one being changed, or null for a new one. */
     connection: DataConnectionView | null;
+    /** A database Polaris runs that the list already offered, being saved so it
+     *  can be named or written to. Nothing is stored for it yet. */
+    prefill?: {
+        managedDatabaseId: string;
+        name: string;
+        engine: DataConnectionView["engine"];
+    } | null;
     onClose: () => void;
     onSaved: (id: string) => void;
 }) {
     const [engines, setEngines] = useState<Engine[]>([]);
     const [managed, setManaged] = useState<ManagedOption[]>([]);
     const [kind, setKind] = useState<"managed" | "manual">(
-        connection?.managedDatabaseId ? "managed" : "manual"
+        connection?.managedDatabaseId || prefill ? "managed" : "manual"
     );
-    const [name, setName] = useState(connection?.name ?? "");
-    const [engine, setEngine] = useState(connection?.engine ?? "postgres");
-    const [managedId, setManagedId] = useState(connection?.managedDatabaseId ?? "");
+    const [name, setName] = useState(connection?.name ?? prefill?.name ?? "");
+    const [engine, setEngine] = useState(connection?.engine ?? prefill?.engine ?? "postgres");
+    const [managedId, setManagedId] = useState(
+        connection?.managedDatabaseId ?? prefill?.managedDatabaseId ?? ""
+    );
     const [host, setHost] = useState(connection?.where.split(":")[0] ?? "");
     const [port, setPort] = useState(connection?.where.split(":")[1] ?? "");
     const [database, setDatabase] = useState(connection?.database ?? "");

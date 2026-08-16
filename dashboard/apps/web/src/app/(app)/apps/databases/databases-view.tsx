@@ -1,7 +1,14 @@
 "use client";
 
 /**
- * The database browser: the connections somebody has, and the one they opened.
+ * The database browser: the databases somebody can open, and the one they did.
+ *
+ * The list is not only what was saved here. A database Polaris runs for this
+ * account, and Polaris' own for whoever runs the instance, are already known -
+ * address, credentials and all - so they are listed as they stand, read-only,
+ * and saving a connection is what somebody does to rename one or to write to it.
+ * An empty screen asking for a host and a password that Polaris is holding two
+ * tables away is the thing this avoids.
  *
  * The list is the screen until something is opened, and the connection stays in
  * the address so a link to a database is a link to that database rather than to
@@ -32,13 +39,14 @@ export function DatabasesView() {
 
     const [connections, setConnections] = useState<DataConnectionView[] | null>(null);
     const [editing, setEditing] = useState<DataConnectionView | null>(null);
+    const [saving, setSaving] = useState<DataConnectionView | null>(null);
     const [adding, setAdding] = useState(false);
     const [tested, setTested] = useState<Record<string, string>>({});
     const [testing, setTesting] = useState<string | null>(null);
     const [error, setError] = useState("");
 
     const load = useCallback(async () => {
-        const result = await actions.listConnectionsAction();
+        const result = await actions.listDatabasesAction();
         if (result.error) {
             setError(result.error);
             setConnections([]);
@@ -105,8 +113,8 @@ export function DatabasesView() {
             ) : connections.length === 0 ? (
                 <EmptyState
                     icon={<Database />}
-                    title="No databases connected yet."
-                    description="Point one at a database Polaris runs, or at any PostgreSQL, MySQL, MariaDB, MongoDB or Redis you have the credentials for."
+                    title="Nothing to open yet."
+                    description="Polaris is not running a database for you, and none has been added. Point one at any PostgreSQL, MySQL, MariaDB, MongoDB or Redis you have the credentials for."
                     action={
                         <Button onClick={() => setAdding(true)}>
                             <Plus className="size-4" />
@@ -121,7 +129,11 @@ export function DatabasesView() {
                             <CardBody className="flex flex-col gap-3">
                                 <button
                                     type="button"
-                                    onClick={() => router.push(`/apps/databases?c=${connection.id}`)}
+                                    onClick={() =>
+                                        router.push(
+                                            `/apps/databases?c=${encodeURIComponent(connection.id)}`
+                                        )
+                                    }
                                     className="flex min-w-0 items-center gap-3 text-left"
                                 >
                                     <DbEngineIcon engine={connection.engine} className="size-8 shrink-0" />
@@ -130,7 +142,8 @@ export function DatabasesView() {
                                             <span className="truncate text-sm font-medium">
                                                 {connection.name}
                                             </span>
-                                            {connection.managedDatabaseId && <Badge>Polaris</Badge>}
+                                            {(connection.managedDatabaseId ||
+                                                connection.origin === "polaris") && <Badge>Polaris</Badge>}
                                             {connection.readOnly && <Badge>read-only</Badge>}
                                         </span>
                                         <span className="block truncate text-xs text-muted-foreground">
@@ -140,9 +153,15 @@ export function DatabasesView() {
                                 </button>
 
                                 <div className="flex items-center gap-1">
-                                    <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                                    <span
+                                        className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
+                                        title={connection.note ?? undefined}
+                                    >
                                         {tested[connection.id] ??
-                                            (connection.lastUsedAt ? (
+                                            connection.note ??
+                                            (connection.origin !== "saved" ? (
+                                                ""
+                                            ) : connection.lastUsedAt ? (
                                                 <>
                                                     opened <RelativeTime iso={connection.lastUsedAt} />
                                                 </>
@@ -176,34 +195,52 @@ export function DatabasesView() {
                                             <Plug className="size-4" />
                                         )}
                                     </Button>
-                                    <Button
-                                        size="icon-sm"
-                                        variant="ghost"
-                                        title="Edit"
-                                        aria-label={`Edit ${connection.name}`}
-                                        onClick={() => setEditing(connection)}
-                                    >
-                                        <Pencil className="size-4" />
-                                    </Button>
-                                    <Button
-                                        size="icon-sm"
-                                        variant="ghost"
-                                        title="Remove"
-                                        aria-label={`Remove ${connection.name}`}
-                                        onClick={async () => {
-                                            const sure = await confirm({
-                                                title: `Remove ${connection.name}?`,
-                                                description:
-                                                    "The connection goes; the database itself is untouched.",
-                                                confirmLabel: "Remove"
-                                            });
-                                            if (!sure) return;
-                                            await actions.deleteConnectionAction(connection.id);
-                                            await load();
-                                        }}
-                                    >
-                                        <Trash2 className="size-4" />
-                                    </Button>
+                                    {connection.origin === "saved" ? (
+                                        <>
+                                            <Button
+                                                size="icon-sm"
+                                                variant="ghost"
+                                                title="Edit"
+                                                aria-label={`Edit ${connection.name}`}
+                                                onClick={() => setEditing(connection)}
+                                            >
+                                                <Pencil className="size-4" />
+                                            </Button>
+                                            <Button
+                                                size="icon-sm"
+                                                variant="ghost"
+                                                title="Remove"
+                                                aria-label={`Remove ${connection.name}`}
+                                                onClick={async () => {
+                                                    const sure = await confirm({
+                                                        title: `Remove ${connection.name}?`,
+                                                        description:
+                                                            "The connection goes; the database itself is untouched.",
+                                                        confirmLabel: "Remove"
+                                                    });
+                                                    if (!sure) return;
+                                                    await actions.deleteConnectionAction(connection.id);
+                                                    await load();
+                                                }}
+                                            >
+                                                <Trash2 className="size-4" />
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        connection.origin === "managed" && (
+                                            // The way to give it a name of your own, or to write to
+                                            // it: what is listed here is read-only on purpose.
+                                            <Button
+                                                size="icon-sm"
+                                                variant="ghost"
+                                                title="Save it as a connection"
+                                                aria-label={`Save ${connection.name} as a connection`}
+                                                onClick={() => setSaving(connection)}
+                                            >
+                                                <Plus className="size-4" />
+                                            </Button>
+                                        )
+                                    )}
                                 </div>
                             </CardBody>
                         </Card>
@@ -211,18 +248,29 @@ export function DatabasesView() {
                 </div>
             )}
 
-            {(adding || editing) && (
+            {(adding || editing || saving) && (
                 <ConnectionDialog
                     connection={editing}
+                    prefill={
+                        saving?.managedDatabaseId
+                            ? {
+                                  managedDatabaseId: saving.managedDatabaseId,
+                                  name: saving.name,
+                                  engine: saving.engine
+                              }
+                            : null
+                    }
                     onClose={() => {
                         setAdding(false);
                         setEditing(null);
+                        setSaving(null);
                     }}
                     onSaved={async (id) => {
                         setAdding(false);
                         setEditing(null);
+                        setSaving(null);
                         await load();
-                        if (!editing) router.push(`/apps/databases?c=${id}`);
+                        if (!editing) router.push(`/apps/databases?c=${encodeURIComponent(id)}`);
                     }}
                 />
             )}
