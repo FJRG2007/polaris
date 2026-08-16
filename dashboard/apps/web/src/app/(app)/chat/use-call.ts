@@ -65,8 +65,30 @@ const signalSchema = z.discriminatedUnion("type", [
         candidate: z.string(),
         sdpMid: z.string().nullable(),
         sdpMLineIndex: z.number().nullable()
+    }),
+    /**
+     * Which of this sender's slots carries the camera and which carries the
+     * screen, named by the `mid` the two sides agreed on for each.
+     *
+     * A screen and a camera are two video tracks on one connection, and nothing
+     * in the media itself says which is which - so the sender says. The `mid` is
+     * the one identifier that means the same thing at both ends: the receiver
+     * reads it off the transceiver a track arrived on and looks it up here. A
+     * track id would not do, because the id a receiver sees is not the one the
+     * sender had.
+     */
+    z.object({
+        type: z.literal("media"),
+        camera: z.string().nullable(),
+        screen: z.string().nullable()
     })
 ]);
+
+/** One track that arrived, and the slot it arrived on. */
+interface InboundTrack {
+    readonly mid: string | null;
+    readonly track: MediaStreamTrack;
+}
 
 /** One microphone or camera, as the picker lists it. */
 export interface CallDevice {
@@ -89,6 +111,16 @@ interface Peer {
      */
     readonly audio: RTCRtpTransceiver | null;
     readonly video: RTCRtpTransceiver | null;
+    /**
+     * The screen's own slot.
+     *
+     * A shared screen used to go out in the camera's slot, which meant sharing
+     * turned your camera off for everybody else and a viewer had no way to tell
+     * a screen from a face. It is a second video slot instead - which is what
+     * every conferencing client does, and what makes "camera on while sharing"
+     * possible at all.
+     */
+    readonly screen: RTCRtpTransceiver | null;
     /** True while an offer of ours is in flight, which is half of what makes a
      *  collision a collision. */
     makingOffer: boolean;
@@ -101,8 +133,12 @@ export interface CallState {
     readonly meeting: MeetingView | null;
     readonly participantId: string | null;
     readonly localStream: MediaStream | null;
-    /** Remote video and audio, by the participant id it belongs to. */
+    /** Remote camera and audio, by the participant id it belongs to. */
     readonly remote: ReadonlyMap<string, MediaStream>;
+    /** Remote screens, by the participant id sharing one. Separate from their
+     *  camera, because they are two different pictures of two different things
+     *  and a room shows them differently. */
+    readonly screens: ReadonlyMap<string, MediaStream>;
     /** The participant ids talking right now, this browser's own included.
      *  Measured here rather than announced by anybody - see `useSpeaking`. */
     readonly speaking: ReadonlySet<string>;
@@ -153,6 +189,7 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
     const [participantId, setParticipantId] = useState<string | null>(null);
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const [remote, setRemote] = useState<ReadonlyMap<string, MediaStream>>(new Map());
+    const [screens, setScreens] = useState<ReadonlyMap<string, MediaStream>>(new Map());
     const [micOn, setMicOn] = useState(true);
     const [cameraOn, setCameraOn] = useState(withVideo);
     const [hasCamera, setHasCamera] = useState(false);
@@ -195,7 +232,53 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
     // What has arrived from each other participant, held as tracks rather than
     // as a stream: a track added without a stream arrives with none attached,
     // and a tile pointed at nothing shows nothing.
-    const inbound = useRef(new Map<string, MediaStreamTrack[]>());
+    //
+    // Each is remembered with the `mid` of the slot it came in on, which is what
+    // tells a camera from a screen once the sender has said which is which.
+    const inbound = useRef(new Map<string, InboundTrack[]>());
+    // What each sender said their slots carry. Arrives on its own signal and can
+    // arrive after the tracks do, which is why the sorting below is redone every
+    // time either changes rather than decided once when a track shows up.
+    const layout = useRef(new Map<string, { camera: string | null; screen: string | null }>());
+
+    /**
+     * Rebuild what one participant is sending, from the tracks held for them and
+     * whatever they last said about their slots.
+     *
+     * A new `MediaStream` object every time rather than a mutated one: React and
+     * every effect watching a tile compare by identity, and a stream that gained
+     * a track without changing identity is a picture nobody is told about.
+     *
+     * A video track on a slot nobody has claimed yet is drawn as the camera,
+     * which is what it almost always is - and it moves to the screen tile the
+     * moment the sender says otherwise, rather than being held back until then.
+     */
+    const resort = useCallback((otherId: string) => {
+        const held = inbound.current.get(otherId) ?? [];
+        const slots = layout.current.get(otherId);
+        const camera: MediaStreamTrack[] = [];
+        const screen: MediaStreamTrack[] = [];
+        for (const entry of held) {
+            const isScreen =
+                entry.track.kind === "video" &&
+                slots?.screen !== undefined &&
+                slots?.screen !== null &&
+                entry.mid === slots.screen;
+            if (isScreen) screen.push(entry.track);
+            else camera.push(entry.track);
+        }
+        setRemote((current) => new Map(current).set(otherId, new MediaStream(camera)));
+        setScreens((current) => {
+            const next = new Map(current);
+            // A screen slot with nothing live in it is not a screen: taken out,
+            // so the big tile closes when somebody stops sharing rather than
+            // freezing on the last frame they sent.
+            const live = screen.filter((track) => track.readyState === "live" && !track.muted);
+            if (live.length === 0) next.delete(otherId);
+            else next.set(otherId, new MediaStream(live));
+            return next;
+        });
+    }, []);
 
     /** What the call sends as this browser's voice: the filtered track when a
      *  model is running, and the microphone itself otherwise. */
@@ -269,6 +352,28 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
     );
 
     /**
+     * Tell one peer which of our slots carries what.
+     *
+     * Sent whenever it could have changed - a track published, a negotiation
+     * finished, a connection opened - because it is cheap, it is idempotent, and
+     * the alternative is a screen that arrives before the sentence explaining it
+     * and is drawn as somebody's face.
+     *
+     * The `mid` is null until the first negotiation assigns one, and a message
+     * saying so is still worth sending: it says "not that one yet".
+     */
+    const announce = useCallback(
+        (otherId: string, peer: Peer) => {
+            void send(otherId, {
+                type: "media",
+                camera: peer.video?.mid ?? null,
+                screen: peer.screen?.mid ?? null
+            });
+        },
+        [send]
+    );
+
+    /**
      * Put a track on every connection, or take one off.
      *
      * `replaceTrack` on its own changes nothing about the shape of the session,
@@ -276,10 +381,12 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
      * one on where there was none does, and the direction change is what asks
      * for it.
      */
-    const publishTrack = useCallback((kind: "audio" | "video", track: MediaStreamTrack | null) => {
-        for (const peer of peers.current.values()) {
+    const publishTrack = useCallback(
+        (kind: "audio" | "camera" | "screen", track: MediaStreamTrack | null) => {
+        for (const [otherId, peer] of peers.current) {
             if (peer.connection.connectionState === "closed") continue;
-            const transceiver = kind === "audio" ? peer.audio : peer.video;
+            const transceiver =
+                kind === "audio" ? peer.audio : kind === "camera" ? peer.video : peer.screen;
             if (!transceiver) continue;
             void transceiver.sender.replaceTrack(track).catch(() => undefined);
             // The direction is what actually opens the tap. `replaceTrack` on a
@@ -289,8 +396,14 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
             // the other side to expect it.
             const wanted = track ? "sendrecv" : "recvonly";
             if (transceiver.direction !== wanted) transceiver.direction = wanted;
+            // Said out loud, every time: the other side cannot tell a screen
+            // from a camera by looking at the media, and the answer changes
+            // whenever one of them is turned on or off.
+            announce(otherId, peer);
         }
-    }, []);
+        },
+        [announce]
+    );
 
     /** The connection to one other participant, made if it does not exist. */
     const peerFor = useCallback(
@@ -313,13 +426,31 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
             });
             if (voice) void audio.sender.replaceTrack(voice).catch(() => undefined);
 
-            const outgoing = screen.current ?? camera.current;
+            const face = camera.current;
             const video = connection.addTransceiver("video", {
-                direction: outgoing ? "sendrecv" : "recvonly"
+                direction: face ? "sendrecv" : "recvonly"
             });
-            if (outgoing) void video.sender.replaceTrack(outgoing).catch(() => undefined);
+            if (face) void video.sender.replaceTrack(face).catch(() => undefined);
 
-            const peer: Peer = { connection, audio, video, makingOffer: false, ignoring: false };
+            // The screen's own slot, always created and usually empty. Created up
+            // front for the same reason the other two are: a slot added later is
+            // a renegotiation that has to arrive before anything can be sent
+            // through it, and both sides having the same three from the start is
+            // what keeps the two lists lined up.
+            const shared = screen.current;
+            const display = connection.addTransceiver("video", {
+                direction: shared ? "sendrecv" : "recvonly"
+            });
+            if (shared) void display.sender.replaceTrack(shared).catch(() => undefined);
+
+            const peer: Peer = {
+                connection,
+                audio,
+                video,
+                screen: display,
+                makingOffer: false,
+                ignoring: false
+            };
             peers.current.set(otherId, peer);
 
             connection.onicecandidate = (event) => {
@@ -348,17 +479,30 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
              */
             connection.ontrack = (event) => {
                 const held = inbound.current.get(otherId) ?? [];
-                if (!held.some((track) => track.id === event.track.id)) held.push(event.track);
+                if (!held.some((entry) => entry.track.id === event.track.id)) {
+                    held.push({ mid: event.transceiver.mid, track: event.track });
+                }
                 inbound.current.set(otherId, held);
-                setRemote((current) =>
-                    new Map(current).set(otherId, new MediaStream(held))
-                );
+                // A remote video track arrives muted and unmutes when frames
+                // start flowing, and a screen that ends leaves a dead track
+                // behind. Both change which tile this belongs in, so both are
+                // listened to rather than read once.
+                for (const name of ["mute", "unmute", "ended"] as const) {
+                    event.track.addEventListener(name, () => resort(otherId));
+                }
+                resort(otherId);
             };
 
             connection.onconnectionstatechange = () => {
                 if (["failed", "closed"].includes(connection.connectionState)) {
                     inbound.current.delete(otherId);
+                    layout.current.delete(otherId);
                     setRemote((current) => {
+                        const next = new Map(current);
+                        next.delete(otherId);
+                        return next;
+                    });
+                    setScreens((current) => {
                         const next = new Map(current);
                         next.delete(otherId);
                         return next;
@@ -377,6 +521,9 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
                         type: "offer",
                         sdp: connection.localDescription?.sdp ?? ""
                     });
+                    // The mids exist now, which they did not before the local
+                    // description was set.
+                    announce(otherId, peer);
                 } catch {
                     // A connection torn down mid-negotiation. The teardown is
                     // the outcome; there is nothing to report.
@@ -387,7 +534,7 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
 
             return connection;
         },
-        [send]
+        [announce, resort, send]
     );
 
     /**
@@ -574,6 +721,17 @@ function refused(error: unknown, what: string): string {
             const peer = peers.current.get(fromId);
             if (!peer) return;
 
+            if (signal.data.type === "media") {
+                layout.current.set(fromId, {
+                    camera: signal.data.camera,
+                    screen: signal.data.screen
+                });
+                // Tracks may already be here, drawn as a camera because nothing
+                // had said otherwise. This is what moves them.
+                resort(fromId);
+                return;
+            }
+
             if (signal.data.type === "candidate") {
                 const candidate: RTCIceCandidateInit = {
                     candidate: signal.data.candidate,
@@ -618,6 +776,10 @@ function refused(error: unknown, what: string): string {
                     sdp: connection.localDescription?.sdp ?? ""
                 });
             }
+            // Either way the session just changed shape, so what our slots carry
+            // is said again. It is one small message and it is the thing that
+            // makes a screen a screen at the other end.
+            announce(fromId, peer);
         }
 
         void start();
@@ -669,7 +831,13 @@ function refused(error: unknown, what: string): string {
             peer.connection.close();
             peers.current.delete(otherId);
             inbound.current.delete(otherId);
+            layout.current.delete(otherId);
             setRemote((current) => {
+                const next = new Map(current);
+                next.delete(otherId);
+                return next;
+            });
+            setScreens((current) => {
                 const next = new Map(current);
                 next.delete(otherId);
                 return next;
@@ -709,7 +877,7 @@ function refused(error: unknown, what: string): string {
                 setHasCamera(track !== null);
                 setCameraOn(track !== null);
                 setCameraId(track?.getSettings().deviceId ?? null);
-                if (!screen.current) publishTrack("video", track);
+                publishTrack("camera", track);
                 publishLocalPreview();
                 void listDevices();
             })
@@ -729,7 +897,7 @@ function refused(error: unknown, what: string): string {
         if (screen.current) {
             screen.current.stop();
             screen.current = null;
-            publishTrack("video", camera.current);
+            publishTrack("screen", null);
             publishLocalPreview();
             setSharing(false);
             playCallSound("shareOff");
@@ -744,13 +912,13 @@ function refused(error: unknown, what: string): string {
                 // going through this hook, and the call has to notice.
                 track.onended = () => {
                     screen.current = null;
-                    publishTrack("video", camera.current);
+                    publishTrack("screen", null);
                     publishLocalPreview();
                     setSharing(false);
                     playCallSound("shareOff");
                 };
                 screen.current = track;
-                publishTrack("video", track);
+                publishTrack("screen", track);
                 publishLocalPreview();
                 setSharing(true);
                 playCallSound("shareOn");
@@ -802,9 +970,10 @@ function refused(error: unknown, what: string): string {
                         track.enabled = cameraOn;
                         camera.current = track;
                         setCameraId(deviceId);
-                        // A screen being shared stays on the wire: picking a
-                        // different camera is not a decision to stop sharing.
-                        if (!screen.current) publishTrack("video", track);
+                        // The screen has a slot of its own, so a camera swap
+                        // never touches it: picking a different camera is not a
+                        // decision to stop sharing.
+                        publishTrack("camera", track);
                     }
                     publishLocalPreview();
                 })
@@ -884,6 +1053,7 @@ function refused(error: unknown, what: string): string {
         participantId,
         localStream,
         remote,
+        screens,
         speaking,
         cleanMic,
         setCleanMic,

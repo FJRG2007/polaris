@@ -30,12 +30,12 @@ import type { CallState } from "./use-call";
 import * as actions from "./meeting-actions";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
-import { playCallSound } from "@/lib/call-sounds";
 import { searchPeopleAction } from "./actions";
-import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
+import { playCallSound } from "@/lib/call-sounds";
 import { useEffect, useRef, useState } from "react";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
+import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
     Check,
     ChevronUp,
@@ -213,6 +213,22 @@ export function CallRoom({
                     ))}
                 </ul>
             )}
+
+            {/* Somebody's screen, which is the thing everybody is looking at
+                while it is there. Above the faces and across the whole width
+                rather than in a tile the size of a head: a shared screen is
+                usually text, and text in a ninth of a window is not readable.
+                One per sharer, because a mesh has no reason to allow only one. */}
+            {[...call.screens].map(([personId, stream]) => (
+                <div key={personId} className="min-h-0 flex-[2]">
+                    <Tile
+                        stream={stream}
+                        name={`${nameOf(admitted, personId)} - screen`}
+                        personId={null}
+                        volumeKey={undefined}
+                    />
+                </div>
+            ))}
 
             <div className={cn("grid min-h-0 flex-1 gap-2", columns)}>
                 <Tile
@@ -621,23 +637,54 @@ function Tile({
             setHasVideo(false);
             return;
         }
-        const look = () =>
-            setHasVideo(
-                stream.getVideoTracks().some((track) => track.readyState === "live" && !track.muted)
-            );
+
+        // Every track this tile is currently listening to. A remote track arrives
+        // muted and unmutes when frames start flowing, so the unmute is the event
+        // that says there is a picture - and a track that joins the stream later,
+        // which is what turning a camera on mid-call sends, has to be listened to
+        // as well. Binding once over the tracks that happened to be there when the
+        // stream arrived is what left somebody's camera on at their end and blank
+        // at everybody else's: the new track was seen (still muted), never heard
+        // from again, and the tile stayed a black rectangle for the rest of the
+        // call.
+        const bound = new Set<MediaStreamTrack>();
+
+        const look = () => {
+            const tracks = stream.getVideoTracks();
+            for (const track of tracks) {
+                if (bound.has(track)) continue;
+                bound.add(track);
+                track.addEventListener("mute", look);
+                track.addEventListener("unmute", look);
+                track.addEventListener("ended", look);
+            }
+            for (const track of [...bound]) {
+                if (tracks.includes(track)) continue;
+                bound.delete(track);
+                track.removeEventListener("mute", look);
+                track.removeEventListener("unmute", look);
+                track.removeEventListener("ended", look);
+            }
+            setHasVideo(tracks.some((track) => track.readyState === "live" && !track.muted));
+        };
+
         look();
-        const tracks = stream.getVideoTracks();
         stream.addEventListener("addtrack", look);
         stream.addEventListener("removetrack", look);
-        for (const track of tracks) {
-            track.addEventListener("mute", look);
-            track.addEventListener("unmute", look);
-            track.addEventListener("ended", look);
-        }
+
+        // Asked again on a timer as well, because `addtrack` is the one signal
+        // here that browsers disagree about: a track a peer connection puts into
+        // a stream it created does not reliably announce itself, and the tile
+        // cannot tell the difference between "no camera" and "nobody told us".
+        // A second is invisible to somebody watching and cheap enough to run for
+        // as long as a call lasts.
+        const timer = setInterval(look, 1000);
+
         return () => {
+            clearInterval(timer);
             stream.removeEventListener("addtrack", look);
             stream.removeEventListener("removetrack", look);
-            for (const track of tracks) {
+            for (const track of bound) {
                 track.removeEventListener("mute", look);
                 track.removeEventListener("unmute", look);
                 track.removeEventListener("ended", look);
@@ -831,6 +878,15 @@ function InviteToCallDialog({
             </DialogContent>
         </Dialog>
     );
+}
+
+/** Whose screen it is, for the label over it. A participant who left mid-share
+ *  is named as somebody rather than as nothing. */
+function nameOf(
+    people: readonly { id: string; name: string }[] | undefined,
+    personId: string
+): string {
+    return people?.find((person) => person.id === personId)?.name ?? "Somebody";
 }
 
 /** Enough columns to keep the tiles roughly square at every size a mesh call can
