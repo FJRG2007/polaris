@@ -21,6 +21,7 @@
 import * as actions from "./ark-actions";
 import { useCallback, useEffect, useState } from "react";
 import type { ArkRules } from "@/lib/apps/ark/settings-service";
+import { RestartPlanner } from "./restart-planner";
 import { AlertTriangle, Info, Loader2, RefreshCw, RotateCcw } from "lucide-react";
 import { Button, Card, CardBody, Input, Skeleton, Switch, cn } from "@polaris/ui";
 import { arkSettingGroups, normalizeArkValue, type ArkSetting } from "@/lib/apps/ark/settings";
@@ -45,7 +46,6 @@ export function ArkRules({
      *  what makes the restart worth offering rather than a button that is always
      *  there. */
     const [changed, setChanged] = useState(false);
-    const [restarting, setRestarting] = useState(false);
 
     const load = useCallback(async () => {
         const result = await actions.readArkRulesAction(installedAppId);
@@ -74,18 +74,6 @@ export function ArkRules({
         }
         setRules(result.rules);
         setChanged(true);
-    }
-
-    async function restart(): Promise<void> {
-        setRestarting(true);
-        setError(null);
-        const result = await actions.restartArkServerAction(installedAppId);
-        setRestarting(false);
-        if (result.error) {
-            setError(result.error);
-            return;
-        }
-        setChanged(false);
     }
 
     const reason = rules?.reason ?? null;
@@ -131,28 +119,20 @@ export function ArkRules({
                 </Card>
             )}
 
-            {/* Only once something has actually been changed: a restart button that
-                is always on screen is one somebody presses by accident. */}
-            {changed && canManage && running && (
-                <Card className="border-warning/40 bg-warning/5">
-                    <CardBody className="flex flex-wrap items-center justify-between gap-3 py-3">
-                        <div className="min-w-0">
-                            <p className="text-sm font-medium">Saved, and not yet in force</p>
-                            <p className="text-xs text-muted-foreground">
-                                The world is saved first, and everybody playing is disconnected while it
-                                comes back.
-                            </p>
-                        </div>
-                        <Button variant="secondary" disabled={restarting} onClick={() => void restart()}>
-                            {restarting ? (
-                                <Loader2 className="size-4 animate-spin" />
-                            ) : (
-                                <RotateCcw className="size-4" />
-                            )}
-                            Restart it now
-                        </Button>
-                    </CardBody>
-                </Card>
+            {/* Only once something has actually been changed, or while a restart is
+                already booked: a restart button that is always on screen is one
+                somebody presses by accident. */}
+            {canManage && (
+                <RestartPlanner
+                    installedAppId={installedAppId}
+                    running={running}
+                    changed={changed}
+                    reason="a settings change"
+                    onRestarted={() => {
+                        setChanged(false);
+                        void load();
+                    }}
+                />
             )}
 
             {loading ? (

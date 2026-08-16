@@ -422,6 +422,7 @@ export function MinecraftPanel({
                         installedAppId={installedAppId}
                         settings={settings.filter((setting) => setting.group === SECURITY_GROUP)}
                         playersOnline={status?.players.online ?? 0}
+                        running={isRunning}
                         onSaved={reloadSettings}
                     />
                     {/* The firewall guards HTTP and a game server is not HTTP, so
@@ -470,6 +471,7 @@ export function MinecraftPanel({
                                 setting.key !== MOTD_KEY
                         )}
                         playersOnline={status?.players.online ?? 0}
+                        running={isRunning}
                         onSaved={reloadSettings}
                     />
                     <MinecraftReset

@@ -418,6 +418,7 @@ export function ArkPanel({
                         installedAppId={installedAppId}
                         settings={settings.filter((setting) => setting.group === SECURITY_GROUP)}
                         playersOnline={status?.players.length ?? 0}
+                        running={isRunning}
                         onSaved={reloadSettings}
                     />
                 </div>
@@ -443,6 +444,7 @@ export function ArkPanel({
                             (setting) => setting.group !== SECURITY_GROUP && setting.group !== MODS_GROUP
                         )}
                         playersOnline={status?.players.length ?? 0}
+                        running={isRunning}
                         onSaved={reloadSettings}
                     />
                 </div>

@@ -162,7 +162,7 @@ describe("sweepGameSchedules over an ARK server", () => {
         });
         // Three people on it, from the count the caller had already paid for, so
         // nothing is asked of the server and nothing is stopped.
-        expect(swept).toEqual({ started: 0, stopped: 0 });
+        expect(swept).toEqual({ started: 0, stopped: 0, restarted: 0 });
         expect(JSON.parse(install.config).emptySince ?? null).toBeNull();
     });
 });

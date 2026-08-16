@@ -15,13 +15,15 @@
 import { prisma } from "@polaris/db";
 import { withTimeout } from "@polaris/core";
 import { createWorldBackup } from "./world-service";
-import { getServerPlayers, runConsoleLine } from "./service";
 import { runArkCommand } from "@/lib/apps/ark/service";
 import { getArkPlayers } from "@/lib/apps/ark/service";
 import { gameOfServer } from "@/lib/apps/games-catalog";
 import { flushGameWorld } from "@/lib/apps/games-flush";
+import { getServerPlayers, runConsoleLine } from "./service";
 import { setApplicationRunning } from "@/lib/deploy-service";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
+import { readPendingRestart } from "@/lib/apps/games-restart";
+import { runDueRestart } from "@/lib/apps/games-restart-service";
 import {
     CHECKED_AT_KEY,
     EMPTY_SINCE_KEY,
@@ -61,6 +63,9 @@ function staleCheck(config: Record<string, unknown>, at: Date): boolean {
 export interface ScheduleSweep {
     readonly started: number;
     readonly stopped: number;
+    /** Servers put through a restart somebody booked for later - when the last
+     *  person left, or at a time they picked. */
+    readonly restarted: number;
 }
 
 /** Narrowings the callers that already know something can hand in. */
@@ -118,10 +123,16 @@ export async function sweepGameSchedules(
     });
     let started = 0;
     let stopped = 0;
+    let restarted = 0;
     for (const install of installs) {
         const config = readInstallConfig(install.config);
         const schedule = readSchedule(config);
-        if (!schedule.enabled) continue;
+        // A restart somebody booked for later rides on this walk. It is not part of
+        // the schedule and does not need one: a server with no schedule at all
+        // still has settings that only take effect when it comes back, and this is
+        // the pass that notices the last player has left.
+        const waiting = readPendingRestart(config);
+        if (!schedule.enabled && !waiting) continue;
         const app = await prisma.application
             .findFirst({ where: { id: install.applicationId as string }, select: { desiredState: true } })
             .catch(() => null);
@@ -140,6 +151,18 @@ export async function sweepGameSchedules(
               ? (known.get(install.id) ?? null)
               : await countOnline(ownerId, install);
         const emptySince = await trackEmptiness(install.id, config, running, playersOnline, at);
+
+        // Only against a server that is up: a stopped one applies whatever is
+        // waiting the next time somebody starts it, and starting it for them is not
+        // what "restart when nobody is playing" asked for.
+        if (waiting && running && (await runDueRestart(ownerId, install.id, playersOnline))) {
+            restarted += 1;
+            // Nothing else this pass. The server is on its way down and back, and a
+            // schedule that also fired would be acting on a state that no longer
+            // exists by the time it lands.
+            continue;
+        }
+        if (!schedule.enabled) continue;
         // Written whether or not anything is due, because "the sweep reached this
         // server" is exactly what somebody whose schedule appears to do nothing
         // cannot otherwise find out. Not on every pass though: a server's own page
@@ -164,7 +187,7 @@ export async function sweepGameSchedules(
         // not been empty for an hour, whatever it was doing before.
         await patchInstallConfig(install.id, { [EMPTY_SINCE_KEY]: null }).catch(() => undefined);
     }
-    return { started, stopped };
+    return { started, stopped, restarted };
 }
 
 /**

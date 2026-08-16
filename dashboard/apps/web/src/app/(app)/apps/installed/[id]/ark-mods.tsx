@@ -21,6 +21,7 @@
 import Image from "next/image";
 import * as actions from "./ark-actions";
 import { useCallback, useEffect, useState } from "react";
+import { RestartPlanner } from "./restart-planner";
 import type { ArkModsView } from "@/lib/apps/ark/mods-service";
 import { workshopUrl, type WorkshopItem } from "@/lib/apps/ark/workshop";
 import { MAX_MODS, movedMod, withoutMod, withMod } from "@/lib/apps/ark/mods";
@@ -33,7 +34,6 @@ import {
     Loader2,
     Plus,
     RefreshCw,
-    RotateCcw,
     Search,
     Trash2
 } from "lucide-react";
@@ -61,7 +61,6 @@ export function ArkMods({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [changed, setChanged] = useState(false);
-    const [restarting, setRestarting] = useState(false);
 
     const load = useCallback(async () => {
         const result = await actions.readArkModsAction(installedAppId);
@@ -105,19 +104,6 @@ export function ArkMods({
         setChanged(true);
     }
 
-    async function restart(): Promise<void> {
-        setRestarting(true);
-        setError(null);
-        const result = await actions.restartArkServerAction(installedAppId);
-        setRestarting(false);
-        if (result.error) {
-            setError(result.error);
-            return;
-        }
-        setChanged(false);
-        void load();
-    }
-
     const ids = mods?.ids ?? [];
 
     return (
@@ -152,26 +138,17 @@ export function ArkMods({
                 </Card>
             )}
 
-            {changed && canManage && running && (
-                <Card className="border-warning/40 bg-warning/5">
-                    <CardBody className="flex flex-wrap items-center justify-between gap-3 py-3">
-                        <div className="min-w-0">
-                            <p className="text-sm font-medium">Saved, and not yet installed</p>
-                            <p className="text-xs text-muted-foreground">
-                                The server downloads what it is missing while it comes back, which for a
-                                large mod is several minutes. The world is saved first.
-                            </p>
-                        </div>
-                        <Button variant="secondary" disabled={restarting} onClick={() => void restart()}>
-                            {restarting ? (
-                                <Loader2 className="size-4 animate-spin" />
-                            ) : (
-                                <RotateCcw className="size-4" />
-                            )}
-                            Restart it now
-                        </Button>
-                    </CardBody>
-                </Card>
+            {canManage && (
+                <RestartPlanner
+                    installedAppId={installedAppId}
+                    running={running}
+                    changed={changed}
+                    reason="a change to the mods"
+                    onRestarted={() => {
+                        setChanged(false);
+                        void load();
+                    }}
+                />
             )}
 
             {canManage && (
