@@ -488,6 +488,11 @@ export const RECOMMENDED_ARK_SETTINGS: Readonly<Record<string, string>> = {
  *  kept on the install. A new server has no container to write them into. */
 export const ARK_PENDING_SETTINGS_KEY = "arkPendingSettings";
 
+/** Whether this server has already been offered the recommended set once. A
+ *  server that has is never offered it again, so a setting somebody deliberately
+ *  unpinned does not come back on the next sweep. */
+export const ARK_SETTINGS_SEEDED_KEY = "arkSettingsSeeded";
+
 /** Where the overrides live, relative to the volume the image keeps its files in.
  *  arkmanager reads this file at every start and nothing else writes to it. */
 export const INSTANCE_CONFIG_PATH = "arkmanager/instances/main.cfg";

@@ -192,6 +192,16 @@ export function ArkRules({
                 file, because ARK rewrites that file when it stops - an edit made there while the
                 server is up is thrown away at the moment it was meant to count.
             </p>
+
+            {/* Two things people come to this screen for that are not here, because
+                the game does not have them. Saying so is the only useful answer:
+                the alternative is somebody reading forty rows looking for a switch
+                that was never written. */}
+            <p className="text-xs text-muted-foreground">
+                ARK has no setting for showing everyone on the map - a player sees themselves and
+                their tribe and nobody else - and none for how far away a name tag is readable. Both
+                come from mods; add one from the Mods screen.
+            </p>
         </div>
     );
 }

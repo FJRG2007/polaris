@@ -19,6 +19,8 @@ import { ARK_ROOT, readArkFile, writeArkFile } from "@/lib/apps/ark/files";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import {
     ARK_PENDING_SETTINGS_KEY,
+    ARK_SETTINGS_SEEDED_KEY,
+    RECOMMENDED_ARK_SETTINGS,
     GAME_USER_SETTINGS_PATH,
     INSTANCE_CONFIG_PATH,
     findArkSetting,
@@ -142,23 +144,40 @@ function readPending(config: Record<string, unknown>): Record<string, string> {
 }
 
 /**
- * Give a server the settings it was created with, once it has files to write them
- * into, and report how many that was.
+ * Give a server the settings it should have and has not been given yet, and report
+ * how many that was.
  *
- * Only the settings nothing has set since: this runs a poll or a sweep behind
- * somebody who may already have opened the Rules screen and chosen differently,
- * and a default that overwrote a decision would be a bug nobody could see.
+ * Two things arrive here. A server created since Polaris had these defaults
+ * carries them on its install row, written at create time because there was no
+ * container yet to write them into. A server that already existed carries nothing,
+ * and gets the same set once - the recommended handful are the ones that are only
+ * ever off because ARK's own defaults were written for public servers a decade
+ * ago, and a private server that cannot see itself on its own map is not a
+ * decision anybody made.
+ *
+ * Either way, only the settings nothing has set: this runs behind somebody who may
+ * already have opened the Rules screen and chosen differently, and a default that
+ * overwrote a decision would be a bug nobody could see. Once a server has been
+ * offered them it is never offered them again, so a setting deliberately unpinned
+ * stays unpinned.
  *
  * Never throws - the callers are a poll and a cron walk. A server that cannot be
- * reached keeps its pending settings and is tried again next time.
+ * reached is tried again next time.
  */
 export async function applyPendingArkRules(ownerId: string, installedAppId: string): Promise<number> {
     const install = await prisma.installedApp.findUnique({
         where: { id: installedAppId },
         select: { config: true }
     });
-    const pending = readPending(readInstallConfig(install?.config));
-    if (Object.keys(pending).length === 0) return 0;
+    const config = readInstallConfig(install?.config);
+    const seeded = config[ARK_SETTINGS_SEEDED_KEY] === true;
+    const pending = seeded
+        ? readPending(config)
+        : { ...RECOMMENDED_ARK_SETTINGS, ...readPending(config) };
+    if (Object.keys(pending).length === 0) {
+        if (!seeded) await patchInstallConfig(installedAppId, { [ARK_SETTINGS_SEEDED_KEY]: true });
+        return 0;
+    }
     try {
         const applied = await withServerContainer(ownerId, installedAppId, async (server) => {
             const config = await readArkFile(server, CONFIG_FILE);
@@ -178,8 +197,13 @@ export async function applyPendingArkRules(ownerId: string, installedAppId: stri
             return missing.length;
         });
         // Cleared whether or not anything was written: a pending setting the
-        // operator has already chosen for themselves is not still pending.
-        await patchInstallConfig(installedAppId, { [ARK_PENDING_SETTINGS_KEY]: {} });
+        // operator has already chosen for themselves is not still pending. The
+        // flag goes down at the same moment, so this server is never offered the
+        // recommended set a second time.
+        await patchInstallConfig(installedAppId, {
+            [ARK_PENDING_SETTINGS_KEY]: {},
+            [ARK_SETTINGS_SEEDED_KEY]: true
+        });
         return applied;
     } catch {
         return 0;
