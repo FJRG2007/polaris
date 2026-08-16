@@ -42,9 +42,17 @@
        than a raised surface, so it is darker than the card it sits on in both
        themes. It is its own token because an alpha of the page background is a
        recess on one theme and invisible on the other - in the light theme the
-       page is 97% and the card over it is white. */
+       page is 97% and the card over it is white.
+
+       How much darker is the whole question. It used to be 4%, below even the
+       page ground, which was a recess against a card and a hole against anything
+       raised: an input in a dialog was near-black on a panel eight steps lighter,
+       and that gap is the one thing on these screens that looked broken. Two
+       steps under the card and one over the ground reads as what it is on every
+       surface an input actually lands on - the page itself, a card, and the
+       elevated panel of a dialog. */
     --muted: 225 10% 14%;
-    --field: 225 12% 4%;
+    --field: 225 11% 7%;
     --border: 225 10% 16%;
     --border-strong: 225 10% 24%;
     --ring: 258 88% 66%;
