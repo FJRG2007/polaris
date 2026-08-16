@@ -7,6 +7,7 @@ import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service"
 import { readPlayerTimeouts, sweepTimeouts } from "@/lib/apps/minecraft/timeout-service";
 import { enforcePlayerAddresses, listPlayerAccess } from "@/lib/apps/minecraft/player-access";
 import {
+    getPlayerLevels,
     getPlayerSessions,
     getServerFirewall,
     getServerRoster,
@@ -91,6 +92,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             await drainQueue(server.ownerId, id, online).catch(() => null);
             await sweepInventorySnapshots(server.ownerId, id, online).catch(() => 0);
         }
+        // What level each of them is on. Only for the screen that has a column for
+        // it, and only for players who are actually standing on the server - it is
+        // one command each, and nobody who is offline has an answer.
+        const levels =
+            wantsRoster && online.length > 0
+                ? await getPlayerLevels(server.ownerId, id, online).catch(() => ({}))
+                : {};
         const pending = wantsRoster ? await pendingFor(id).catch(() => []) : [];
         // The schedule, on the server it belongs to and with the player count this
         // poll has already paid for. The cron sweeps every server on its own
@@ -114,6 +122,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             access,
             sessions,
             timeouts,
+            levels,
             pending,
             now: new Date().toISOString()
         });

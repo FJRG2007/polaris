@@ -187,3 +187,31 @@ describe("lastStartupSignal", () => {
         expect(parse.lastStartupSignal("")).toBeNull();
     });
 });
+
+describe("parsePlayerLevels", () => {
+    it("reads a level per player out of one batch of replies", () => {
+        const output = [
+            "Ada has the following entity data: 30",
+            "Grace has the following entity data: 7"
+        ].join("\n");
+        expect(Object.fromEntries(parse.parsePlayerLevels(output))).toEqual({ Ada: 30, Grace: 7 });
+    });
+
+    it("leaves out somebody who logged out between the list and the question", () => {
+        const output = [
+            "Ada has the following entity data: 30",
+            "No entity was found"
+        ].join("\n");
+        const found = parse.parsePlayerLevels(output);
+        expect(found.get("Ada")).toBe(30);
+        expect(found.size).toBe(1);
+    });
+
+    it("reads through the console's own colouring", () => {
+        expect(parse.parsePlayerLevels("\u001b[0;37mAda has the following entity data: 12").get("Ada")).toBe(12);
+    });
+
+    it("has nothing to say about a server that refused the command", () => {
+        expect(parse.parsePlayerLevels("Unknown or incomplete command").size).toBe(0);
+    });
+});

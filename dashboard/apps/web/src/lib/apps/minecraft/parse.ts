@@ -71,6 +71,30 @@ export function parsePlayerListFromLog(log: string): PlayerList | null {
     return null;
 }
 
+/**
+ * What each player's experience level came back as.
+ *
+ * One reply per player, in whatever order they arrived:
+ * `Ada has the following entity data: 30`. A player who logged out between the
+ * list and the question answers "No entity was found" and is simply absent from
+ * the map, which is what lets one read serve a list that changed underneath it.
+ *
+ * The name is taken from the reply rather than from the order of the commands:
+ * the replies are collected from one shell and nothing guarantees they come back
+ * in the order they were sent, and a level shown against the wrong player is
+ * worse than no level at all.
+ */
+export function parsePlayerLevels(output: string): Map<string, number> {
+    const found = new Map<string, number>();
+    for (const match of stripFormatting(output).matchAll(
+        /^(\w{1,16}) has the following entity data:\s*(\d{1,7})\b/gm
+    )) {
+        const [, name, level] = match;
+        if (name && level) found.set(name, Number(level));
+    }
+    return found;
+}
+
 /** The trailing "Alice, Bob" of a list answer. Essentials-style suffixes and
  *  blank entries are dropped; a name Minecraft accepts has no spaces. */
 function parseNameList(tail: string): string[] {

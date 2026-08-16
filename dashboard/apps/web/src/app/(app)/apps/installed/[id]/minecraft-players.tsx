@@ -102,6 +102,7 @@ export function MinecraftPlayers({
     sessions,
     now,
     timeouts,
+    levels,
     pending: waiting,
     onChanged
 }: {
@@ -116,6 +117,9 @@ export function MinecraftPlayers({
     now: number;
     /** Bans with an end, and when each one lifts. */
     timeouts: readonly PlayerTimeout[];
+    /** What experience level each player who is on has reached, by name. Only
+     *  players standing on the server have one, and only Java can be asked. */
+    levels: Readonly<Record<string, number>>;
     /** Decisions the server could not be told yet, oldest first. */
     pending: readonly QueuedAction[];
     onChanged: () => void;
@@ -400,6 +404,10 @@ export function MinecraftPlayers({
             <PlayersTable
                 columns={[
                     { label: "Player" },
+                    // Left out entirely on Bedrock rather than drawn empty: it has
+                    // no way to be asked what level somebody is on, and a column of
+                    // dashes reads as a server where nobody has levelled.
+                    ...(bedrock ? [] : [{ label: "Level" }]),
                     { label: "Status" },
                     { label: "Standing" },
                     { label: "Address", className: "hidden md:table-cell" }
@@ -451,6 +459,7 @@ export function MinecraftPlayers({
                         onModerate={moderate}
                         onModerateWithConfirm={moderateWithConfirm}
                         onGamemode={setGamemode}
+                        level={levels[player.name] ?? null}
                         timeout={timeoutFor(timeouts, player.name)}
                         waiting={
                             waiting.filter((entry) => entry.username.toLowerCase() === player.name.toLowerCase())
@@ -570,6 +579,7 @@ function PlayerRow({
     answering,
     pending,
     timeout,
+    level,
     waiting,
     onModerate,
     onModerateWithConfirm,
@@ -587,6 +597,9 @@ function PlayerRow({
     pending: boolean;
     /** The timeout they are serving, when they are serving one. */
     timeout: PlayerTimeout | null;
+    /** The experience level they are on, or null for somebody who is not standing
+     *  on the server - nobody who is away has one to report. */
+    level: number | null;
     /** How many decisions are still waiting to reach this player. */
     waiting: number;
     onModerate: (input: Omit<MinecraftModeration, "installedAppId">) => void;
@@ -620,6 +633,27 @@ function PlayerRow({
                     </p>
                 )}
             </td>
+            {/* Only the players who are standing on the server have a level to
+                report: it is read out of the running world, not out of a file. A
+                dash against somebody who is away is the truth rather than a gap. */}
+            {!bedrock && (
+                <td className="px-3 py-2 tabular-nums">
+                    {level === null ? (
+                        <span
+                            className="text-muted-foreground"
+                            title={
+                                player.online
+                                    ? "The server has not answered for this player yet."
+                                    : "Only players who are on the server report a level."
+                            }
+                        >
+                            -
+                        </span>
+                    ) : (
+                        level
+                    )}
+                </td>
+            )}
             <td className="px-3 py-2">
                 {read ? <StatusCell player={player} onOpen={onOpen} /> : <Skeleton className="h-5 w-16" />}
             </td>

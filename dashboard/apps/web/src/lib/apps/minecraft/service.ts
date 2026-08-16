@@ -14,6 +14,7 @@
  * the console text is prose that changes between versions.
  */
 
+import * as parse from "./parse";
 import { prisma } from "@polaris/db";
 import { withTimeout } from "@polaris/core";
 import { gameServerAddress } from "./address";
@@ -27,7 +28,6 @@ import { readCrashLoop, readRestartWatch } from "@/lib/apps/games-health";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "@/lib/apps/crash-loop";
 import { readAppContainerMetricsOrNull, readAppContainerRuntime } from "@/lib/app-container-metrics";
-import * as parse from "./parse";
 
 /** Where the server's data lives inside the container (the image's own /data). */
 const DATA_DIR = "/data";
@@ -586,6 +586,45 @@ async function readPlayerList(install: MinecraftInstall, ownerId: string): Promi
  *  evening on a quiet server; a busy one prints past it, and the history is then
  *  as long as the log is - which is what it says on the screen. */
 const SESSION_LOG_TAIL = 1500;
+
+/** A name the game will take as an argument, and this module's own guard before
+ *  one is put in a shell command. */
+const PLAYER_NAME = /^[A-Za-z0-9_]{1,16}$/;
+
+/** How many players one read will ask about. A full server is twenty; the cap is
+ *  there so a server with an unusual slot count cannot turn one screen into a
+ *  hundred commands. */
+const MAX_LEVEL_READS = 40;
+
+/**
+ * What experience level each of these players is on.
+ *
+ * Asked of the server rather than read from disk, because the number wanted is the
+ * one they are on right now - a level read out of a player file is whatever it was
+ * when they last logged out.
+ *
+ * One shell inside the container rather than one exec per player: on a registered
+ * machine each exec is its own SSH handshake, and a full server would be twenty of
+ * them for one column. A player who is not standing on the server answers with a
+ * refusal and is absent from the result, which is the honest answer for somebody
+ * who left while the screen was open.
+ *
+ * Empty for Bedrock, which has no `data get` and no way to be asked this.
+ */
+export async function getPlayerLevels(
+    ownerId: string,
+    installedAppId: string,
+    names: readonly string[]
+): Promise<Record<string, number>> {
+    const wanted = [...new Set(names)].filter((name) => PLAYER_NAME.test(name)).slice(0, MAX_LEVEL_READS);
+    if (wanted.length === 0) return {};
+    return withServerContainer(ownerId, installedAppId, async (server) => {
+        if (server.edition !== "java") return {};
+        const script = wanted.map((name) => `rcon-cli data get entity ${name} XpLevel`).join("; ");
+        const result = await server.run(["sh", "-c", script]);
+        return Object.fromEntries(parse.parsePlayerLevels(result.output));
+    });
+}
 
 /** Every join and leave the server's log still holds, oldest first. */
 export async function getPlayerSessions(

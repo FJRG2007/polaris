@@ -103,6 +103,9 @@ interface ServerReading {
     now: number;
     /** Bans with an end, and when each one lifts. */
     timeouts: readonly PlayerTimeout[];
+    /** What experience level each player who is on right now has reached. Only the
+     *  moderation screen asks for it, and only Java can answer. */
+    levels: Readonly<Record<string, number>>;
     /** Decisions the server could not be told yet. */
     pending: readonly QueuedAction[];
 }
@@ -167,6 +170,7 @@ export function MinecraftPanel({
         sessions: [],
         now: Date.now(),
         timeouts: [],
+        levels: {},
         pending: []
     });
     const [error, setError] = useState<string | null>(null);
@@ -192,6 +196,7 @@ export function MinecraftPanel({
                 access?: PlayerAccessView;
                 sessions?: PlayerSessionEvent[];
                 timeouts?: PlayerTimeout[];
+                levels?: Record<string, number>;
                 pending?: QueuedAction[];
                 now?: string;
                 error?: string;
@@ -229,6 +234,9 @@ export function MinecraftPanel({
                     : wantsRoster
                       ? current.pending
                       : [],
+                // Kept between polls of the same screen so the column does not
+                // blink empty on a read the server was too busy to answer.
+                levels: data.levels ?? (wantsRoster ? current.levels : {}),
                 now: data.now ? Date.parse(data.now) : current.now
             }));
             // The header's Start and Stop, and everything else the page rendered on
@@ -363,6 +371,7 @@ export function MinecraftPanel({
                     sessions={reading.sessions}
                     now={reading.now}
                     timeouts={reading.timeouts}
+                    levels={reading.levels}
                     pending={reading.pending}
                     onChanged={() => void load()}
                 />
