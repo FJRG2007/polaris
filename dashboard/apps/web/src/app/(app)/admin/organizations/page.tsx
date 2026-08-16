@@ -9,8 +9,8 @@ import { prisma } from "@polaris/db";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { organizationPolicy } from "@/lib/orgs/policy";
-import { OrganizationPolicyForm } from "./policy-form";
 import { saveOrganizationPolicyAction } from "./actions";
+import { OrganizationsAdmin } from "./organizations-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -32,12 +32,14 @@ export default async function OrganizationsAdminPage() {
     ]);
 
     return (
-        <div className="mx-auto flex w-full max-w-2xl flex-col">
+        // Full width, like the people directory: the list of organizations is a
+        // table and reads as one.
+        <>
             <PageHeader
                 title="Organizations"
                 description="Work owned by a group rather than by one person. Turn them off entirely, restrict who can start one, or cap how large they get."
             />
-            <OrganizationPolicyForm
+            <OrganizationsAdmin
                 initial={policy}
                 save={saveOrganizationPolicyAction}
                 orgs={orgs.map((org) => ({
@@ -52,6 +54,6 @@ export default async function OrganizationsAdminPage() {
                     spaceCount: org._count.spaces
                 }))}
             />
-        </div>
+        </>
     );
 }
