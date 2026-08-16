@@ -14,10 +14,10 @@ import { setUserRoleAction } from "../actions";
 import { CapabilitiesCard } from "./capabilities-card";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useDisplayFormat } from "@/components/display-format";
-import { ArrowLeft, ExternalLink, Loader2, Trash2 } from "lucide-react";
+import type { AccessExplanation } from "@/lib/access-explain-service";
+import { ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { Badge, Button, Card, CardBody, Checkbox, Select, Skeleton } from "@polaris/ui";
-import type { AccessExplanation } from "@/lib/access-explain-service";
 import { removeUserGrantAction, setUserGroupAction, setUserPolicyAction, userAccessAction } from "./actions";
 
 interface Named {
@@ -28,8 +28,6 @@ interface Named {
 
 export function UserAccessView({
     userId,
-    isAdmin,
-    banned,
     role,
     roles,
     groups,
@@ -38,8 +36,6 @@ export function UserAccessView({
     attachedPolicies
 }: {
     userId: string;
-    isAdmin: boolean;
-    banned: boolean;
     role: string | null;
     roles: string[];
     groups: Named[];
@@ -66,15 +62,10 @@ export function UserAccessView({
 
     return (
         <div className="flex flex-col gap-4">
+            {/* The way back and what this account is are the page's heading now,
+                above the name rather than half a screen below it. What is left
+                here is the one link that belongs beside the access itself. */}
             <div className="flex flex-wrap items-center gap-2">
-                <Link
-                    href="/admin/users"
-                    className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-                >
-                    <ArrowLeft className="size-4" /> People
-                </Link>
-                {isAdmin && <Badge>administrator</Badge>}
-                {banned && <Badge className="border-danger/40 text-danger">banned</Badge>}
                 <Link
                     href={`/admin/users?user=${userId}`}
                     className="ml-auto text-sm text-primary hover:underline"

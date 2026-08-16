@@ -16,7 +16,9 @@
  * to - loads after the paint, because nothing above it is waiting on the answer.
  */
 
+import Link from "next/link";
 import { prisma } from "@polaris/db";
+import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/session";
 import { AccountView } from "./account-view";
@@ -49,6 +51,15 @@ export default async function UserAccessPage({ params }: { params: Promise<{ id:
 
     return (
         <>
+            {/* Above the name, because that is where somebody looks for the way
+                back out of a record they opened from a list. */}
+            <Link
+                href="/admin/users"
+                className="mb-2 flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+                <ArrowLeft className="size-4 shrink-0" aria-hidden="true" />
+                People
+            </Link>
             <PageHeader
                 title={account.name}
                 description={account.email}
@@ -68,8 +79,6 @@ export default async function UserAccessPage({ params }: { params: Promise<{ id:
             <div className="mt-4">
                 <UserAccessView
                     userId={account.id}
-                    isAdmin={account.isAdmin}
-                    banned={account.banned}
                     role={account.roles[0] ?? null}
                     roles={roles.map((option) => option.name)}
                     groups={groups}
