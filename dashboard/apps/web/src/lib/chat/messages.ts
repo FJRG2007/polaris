@@ -117,6 +117,10 @@ export interface ChatQuoteView {
 /** How much of the quoted message the line carries. */
 const QUOTE_LENGTH = 160;
 
+/** Said when somebody answers a message that has been taken back. One sentence
+ *  for the reply, the thread and the forward, because it is one situation. */
+const GONE = "That message was deleted";
+
 /** One emoji on a message, already counted. */
 export interface ChatReactionView {
     readonly emoji: string;
@@ -294,11 +298,12 @@ export async function send(
     if (input.parentId) {
         const parent = await prisma.chatMessage.findUnique({
             where: { id: input.parentId },
-            select: { channelId: true, parentId: true }
+            select: { channelId: true, parentId: true, deletedAt: true }
         });
         if (!parent || parent.channelId !== input.channelId) {
             throw new ChatAccessError("That message is not in this conversation");
         }
+        if (parent.deletedAt) throw new ChatRuleError(GONE);
         // Threads are one level. A reply to a reply joins the same thread rather
         // than starting a second one nobody would find.
         input = { ...input, parentId: parent.parentId ?? input.parentId };
@@ -311,8 +316,18 @@ export async function send(
     if (quote) {
         const original = await prisma.chatMessage.findUnique({
             where: { id: quote.messageId },
-            select: { channelId: true }
+            select: { channelId: true, deletedAt: true }
         });
+        // Answering something that is no longer there. The menus already hide
+        // both actions on a deleted message, so this is the case they cannot
+        // cover: the message was taken back while somebody had the reply box
+        // open, or the forward dialog, and what would land is a quote of a
+        // tombstone - a line reading "message deleted" above a reply to nothing.
+        //
+        // Only for a NEW one. A reply written before the original was deleted
+        // keeps its quote and keeps saying "message deleted", which is what makes
+        // the rest of the conversation readable.
+        if (original?.deletedAt) throw new ChatRuleError(GONE);
         if (original) {
             // A forward is the one case where the two differ on purpose: it
             // carries a message out of where it was said. The reader is proved

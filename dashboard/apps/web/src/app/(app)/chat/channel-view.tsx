@@ -524,6 +524,18 @@ export function ChannelView({
         });
     }, [answering, channelId, router, checkCall, enter, callTitle]);
 
+    // The message being answered, taken back while the box was open.
+    //
+    // The server refuses the reply - answering something that is no longer there
+    // would land a quote of a tombstone - so the bar over the composer goes as
+    // soon as the deletion arrives, rather than waiting for somebody to finish
+    // typing and be told no.
+    useEffect(() => {
+        if (!replyingTo || !messages) return;
+        const still = messages.find((entry) => entry.id === replyingTo.id);
+        if (still?.deleted) setReplyingTo(null);
+    }, [messages, replyingTo]);
+
     // A link straight to a message. Waits for the first page rather than racing
     // it: the message may well be on it, and walking backwards from an empty
     // list would ask for pages that are already on the way.
