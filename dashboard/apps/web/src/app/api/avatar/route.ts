@@ -44,7 +44,14 @@ export async function POST(request: Request): Promise<Response> {
         // The reason is for the operator's log; the person gets a sentence they
         // can act on, without the storage layer's paths in it.
         console.error("avatars: could not store the photo:", error);
-        return new Response("Could not store that photo", { status: 502 });
+        // Named for an administrator, who is the one person who can act on it -
+        // it only reaches here when no storage at all would keep the file.
+        return new Response(
+            user.isAdmin
+                ? `Could not store that photo: ${error instanceof Error ? error.message : String(error)}`
+                : "Could not store that photo",
+            { status: 502 }
+        );
     }
 }
 

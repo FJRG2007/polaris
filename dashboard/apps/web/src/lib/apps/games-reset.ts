@@ -22,7 +22,7 @@
  */
 
 import { prisma } from "@polaris/db";
-import { findMap } from "@/lib/apps/minecraft/maps";
+import { findMap, pinnedRelease } from "@/lib/apps/minecraft/maps";
 import { editionOf } from "@/lib/apps/minecraft/service";
 import { hasCrossplay } from "@/lib/apps/minecraft/blueprints";
 import { patchInstallConfig } from "@/lib/apps/install-config";
@@ -30,7 +30,12 @@ import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import { DEFAULT_LEVEL_TYPE } from "@/lib/apps/minecraft/world";
 import type { ResetMinecraftServerInput } from "@/lib/apps/games-schema";
 import { parseProjectList, projectSlug } from "@/lib/apps/minecraft/modrinth";
-import { newWorld, setAsideRetiredPlugins, setAsideVersionedConfig } from "@/lib/apps/minecraft/world-service";
+import {
+    newWorld,
+    setAsideOtherLevels,
+    setAsideRetiredPlugins,
+    setAsideVersionedConfig
+} from "@/lib/apps/minecraft/world-service";
 import {
     BLUEPRINT_KEY,
     blueprintFor,
@@ -54,6 +59,10 @@ export interface ResetMinecraftServer {
     /** Whether the settings the previous release wrote were set aside, which is
      *  the difference between a server that starts and one that cannot. */
     readonly configReset: boolean;
+    /** Where the worlds this server can no longer open were moved to, or null
+     *  when none were - only a map pinned to an exact release moves any. Said
+     *  out loud because they are somebody's worlds and they are still there. */
+    readonly worldsAside: string | null;
 }
 
 /**
@@ -163,6 +172,23 @@ export async function resetMinecraftServer(
         [RELEASE_KEY]: env.get("VERSION") ?? ""
     });
 
+    // And the worlds this server will not be able to open.
+    //
+    // Only for a map that pins an exact release, and only because of what a
+    // plugin does: the server opens the one level it is pointed at, but a bed
+    // wars plugin walks the data directory for arenas and loads whatever it
+    // finds - including the world a 1.21 server wrote before this one was reset
+    // onto a map that runs on 1.19.4. The game refuses a chunk from ahead of it
+    // and the boot ends there, every time, with the reason four hundred lines
+    // into a log.
+    //
+    // Before the world is made, because making it deploys: a move that ran after
+    // would be racing the boot it exists to prevent. Moved, never deleted, and
+    // never on a map that runs on whatever is newest - there the old worlds are
+    // merely old, and they stay listed and switchable where their owner left
+    // them.
+    const worldsAside = pinnedRelease(mapped) ? await setAsideOtherLevels(ownerId, installedAppId) : null;
+
     // The map, and the restart that puts all of this on the server. Generating a
     // new level is the same act as the New world button and it is the same code:
     // it points LEVEL at a folder that does not exist yet, leaves the old one on
@@ -189,6 +215,7 @@ export async function resetMinecraftServer(
         level: created.level,
         carried: created.carried,
         version: env.get("VERSION") ?? input.version,
-        configReset: aside !== null
+        configReset: aside !== null,
+        worldsAside
     };
 }

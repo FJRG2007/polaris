@@ -1276,7 +1276,11 @@ export async function resetGameServerAction(
                 version: done.version,
                 level: done.level,
                 keptPlayers: done.carried,
-                configReset: done.configReset
+                configReset: done.configReset,
+                // Where the worlds this server can no longer open went. In the
+                // record because it is the answer to "where is my world" asked
+                // a week later, when nobody remembers the reset.
+                worldsAside: done.worldsAside
             }
         });
         revalidatePath(`/apps/installed/${installedAppId}`);

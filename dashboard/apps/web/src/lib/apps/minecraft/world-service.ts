@@ -675,6 +675,68 @@ export async function setAsideVersionedConfig(ownerId: string, installedAppId: s
  * Moved, never deleted, and the settings folder beside it is left alone: whatever
  * was configured is still there if the plugin comes back.
  */
+/**
+ * Take off the walk the worlds this server can no longer open.
+ *
+ * The other half of the failure `setAsideRetiredPlugins` describes, and the half
+ * it cannot reach: when the plugin is one the server is *meant* to run. A bed
+ * wars map pins Minecraft 1.19.4, BedWars1058 stays because that is the game,
+ * and it walks the data directory for arenas - straight into a `world-` folder
+ * some 1.21 server wrote a fortnight ago. The game refuses a chunk from a
+ * release ahead of it, the exception ends the boot, and what the log says is
+ * `4189 > 3337`.
+ *
+ * So the levels are moved out of the walk. Only for a map that pins an exact
+ * release, because that is the only case where the old worlds are unopenable
+ * rather than merely old - anywhere else they stay listed, switchable, and
+ * exactly where their owner left them.
+ *
+ * Moved, never deleted. They are somebody's worlds, they are still on the disk,
+ * and the folder they went to is returned so it can be said out loud.
+ */
+export async function setAsideOtherLevels(
+    ownerId: string,
+    installedAppId: string
+): Promise<string | null> {
+    try {
+        // An exec needs the container up, and a server being reset onto a map is
+        // very often one that is already crash-looping on the last one.
+        await startForFileAccess(ownerId, installedAppId);
+        return await withServerContainer(ownerId, installedAppId, async (server) => {
+            const levels = await readLevels(server);
+            if (levels.length === 0) return null;
+
+            const parent = world.levelParent(server.edition);
+            const listing = await server.run(["ls", "-1A", "--", parent]);
+            const present = new Set(listing.code === 0 ? world.parseListing(listing.output) : []);
+            // Every folder each level owns, including the dimensions Paper keeps
+            // beside it: half a world left behind is a plugin finding half a
+            // world. Filtered by what is actually there - `mv` given a name that
+            // is not fails the whole call, and vanilla keeps its dimensions
+            // inside the level folder rather than beside it.
+            const moving = levels.flatMap((level) =>
+                world
+                    .levelDirs(server.edition, level)
+                    .filter((dir) => present.has(dir.split("/").pop() as string))
+                    .map((dir) => `${parent}/${dir}`)
+            );
+            if (moving.length === 0) return null;
+
+            const aside = `${world.LEVEL_ASIDE_DIR}/${world.folderStamp(new Date())}`;
+            await makeServerDir(server, aside, "Could not set the old worlds aside");
+            // One move for the whole set: on a container that is crash-looping,
+            // every exec is a race against the next restart.
+            const moved = await server.run(["mv", "--", ...moving, aside]);
+            return moved.code === 0 ? aside : null;
+        });
+    } catch {
+        // A container that would not start, a volume that is not there. The reset
+        // carries on: this is a guard against a crash on the next boot, and
+        // failing the reset over it would guarantee the state it prevents.
+        return null;
+    }
+}
+
 export async function setAsideRetiredPlugins(
     ownerId: string,
     installedAppId: string,

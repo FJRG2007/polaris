@@ -27,7 +27,7 @@ import {
     AUTOMATIC_TARGET,
     driverForTarget,
     LOCAL_TARGET,
-    openForWriting,
+    placeFile,
     resolveStorageTarget,
     safeName,
     storageTargetOptions,
@@ -169,26 +169,28 @@ export async function storeAvatar(owner: AvatarOwner, bytes: Uint8Array, mime: s
     if (!extension) throw new Error("That kind of image is not accepted");
 
     const previous = await readRow(owner);
-    // Wherever photos are sent, or this server when that storage is not
-    // answering - a share somebody unplugged is not a reason a person cannot
-    // change their picture. Where it lands is what gets recorded.
-    const target = await openForWriting(await resolveStorageTarget(AVATAR_TARGET_KEY), LOCAL_FOLDER);
-    const driver = target.driver;
     // A name of its own rather than the owner's id: a photo replaced while
     // another browser still has the old one cached must not be served the new
     // bytes under the old name, and a name cannot escape the folder this way
     // either. The kind is in the name so the two never collide on one disk.
     const path = `${AVATAR_ROOT}/${owner.kind}-${safeName(owner.id)}-${crypto.randomUUID()}${extension}`;
 
-    try {
-        await driver.mkdir(AVATAR_ROOT).catch(() => undefined);
-        await driver.writeStream(path, streamOf(bytes), { mime, size: BigInt(bytes.length) });
-    } finally {
-        await driver.dispose().catch(() => undefined);
-    }
+    // Wherever photos are sent, or this server when that storage will not keep
+    // them - the same placement a voice message gets, through the same function,
+    // because they were two implementations of one rule and only one of them was
+    // right: a recording survived an unplugged NAS and a photo did not.
+    const placed = await placeFile({
+        target: await resolveStorageTarget(AVATAR_TARGET_KEY),
+        localFolder: LOCAL_FOLDER,
+        folder: AVATAR_ROOT,
+        path,
+        bytes,
+        mime,
+        what: "photo"
+    });
 
     const stored = {
-        connectionId: target.targetId === LOCAL_TARGET ? null : target.targetId,
+        connectionId: placed.targetId === LOCAL_TARGET ? null : placed.targetId,
         path,
         mime,
         size: bytes.length
@@ -502,16 +504,6 @@ export async function resolveChatAvatar(
     return uploadedAvatar({ kind, id });
 }
 
-/** The drivers speak in streams, because most of what they carry is far too big
- *  to hold; a profile photo is capped at 2 MB and is simpler as bytes. */
-function streamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
-    return new ReadableStream<Uint8Array>({
-        start(controller) {
-            controller.enqueue(bytes);
-            controller.close();
-        }
-    });
-}
 
 async function drain(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
     const chunks: Uint8Array[] = [];

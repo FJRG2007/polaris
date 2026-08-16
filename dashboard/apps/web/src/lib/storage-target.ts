@@ -17,6 +17,7 @@
 import { prisma } from "@polaris/db";
 import { mkdir } from "node:fs/promises";
 import { loadEnv } from "@polaris/config";
+import { withTimeout } from "@polaris/core";
 import { LocalDriver } from "@polaris/storage";
 import { getSetting } from "@/lib/setting-store";
 import type { StorageDriver } from "@polaris/storage";
@@ -158,6 +159,153 @@ export async function openForWriting(
         console.error(`storage: ${target.name} could not be opened for writing:`, error);
         return { ...(await here(localFolder)), fellBackFrom: target.name };
     }
+}
+
+/**
+ * A file that no storage would keep.
+ *
+ * Its own error because a caller has to say something different about it: not
+ * "that could not be saved", which reads as a bug in Polaris, but which storage
+ * refused the bytes and what it said.
+ */
+export class StorageRefused extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "StorageRefused";
+    }
+}
+
+/** How long one file may take to be written and read back before the storage is
+ *  treated as gone. Generous by an order of magnitude for anything Polaris puts
+ *  through here over a local network, and short enough that a share which has
+ *  stopped answering falls through while somebody is still on the screen. */
+const PLACE_TIMEOUT_MS = 60_000;
+
+/**
+ * Put bytes somewhere that will give them back, and say where that was.
+ *
+ * The whole of what an upload has to get right, in one place, because it was in
+ * two and only one of them was right: a voice message survived an unplugged NAS
+ * and a profile photo did not, which is one bug wearing two faces.
+ *
+ * Four things have to hold, and only the first is what "the write succeeded"
+ * usually means:
+ *
+ * - the storage answers at all. `openForWriting` handles that one, and falls
+ *   through to this server when it does not.
+ * - it does not hang. A storage that refuses is answered in a moment; one that
+ *   goes quiet would hold the request until the platform gave up on it.
+ * - it kept every byte. Drivers end a write by stat'ing what they wrote, so the
+ *   size is free to check.
+ * - it gives them back. A share that has gone away, a mount that accepts writes
+ *   into nothing and a handle still held open all stat perfectly and refuse the
+ *   read - so the file is opened once, now, while there is still another
+ *   storage to try.
+ *
+ * The caller records `targetId`. A caller whose rows cannot record where a file
+ * went must not use this: for it a fallback writes the file somewhere it will
+ * later look for in vain.
+ */
+export async function placeFile(input: {
+    readonly target: UploadTarget;
+    readonly localFolder: string;
+    /** Made if it is not there. */
+    readonly folder: string;
+    readonly path: string;
+    readonly bytes: Uint8Array;
+    readonly mime: string;
+    /** What to call this kind of file in a log line. */
+    readonly what: string;
+}): Promise<{ targetId: string; fellBackFrom: string | null }> {
+    const chosen = await openForWriting(input.target, input.localFolder);
+    const attempt = await writeThrough(chosen.driver, input);
+    if (attempt.ok) return { targetId: chosen.targetId, fellBackFrom: chosen.fellBackFrom };
+
+    // It answered and still would not keep the file. Worth knowing, worth
+    // fixing, and not worth losing what somebody just made: the disk Polaris
+    // runs on is always reachable, because Polaris is running.
+    if (chosen.targetId === LOCAL_TARGET) {
+        throw new StorageRefused(`${chosen.name} could not take the ${input.what}: ${attempt.detail}`);
+    }
+    console.warn(
+        `storage: ${chosen.name} could not take a ${input.what} (${attempt.detail}); writing it to this server instead.`
+    );
+
+    // Opening this server can fail too - a data directory that is not writable -
+    // and that throw has to arrive as the same sentence as any other refusal.
+    // Raw, it reads as a bug in Polaris rather than as two disks saying no.
+    const here = await openForWriting(
+        { id: LOCAL_TARGET, name: "this server", automatic: true },
+        input.localFolder
+    )
+        .then((local) => writeThrough(local.driver, input))
+        .catch((error: unknown) => ({ ok: false, detail: message(error) }));
+    if (here.ok) return { targetId: LOCAL_TARGET, fellBackFrom: chosen.name };
+    throw new StorageRefused(
+        `${chosen.name} could not take the ${input.what} (${attempt.detail}), and neither could this server (${here.detail}).`
+    );
+}
+
+/** One attempt on one open storage. Disposes of it either way; leaves nothing
+ *  behind when it fails, because an orphan on a NAS is somebody's disk quietly
+ *  filling up. */
+async function writeThrough(
+    driver: StorageDriver,
+    input: { folder: string; path: string; bytes: Uint8Array; mime: string }
+): Promise<{ ok: boolean; detail: string }> {
+    try {
+        await driver.mkdir(input.folder).catch(() => undefined);
+        const written = await withTimeout(
+            driver.writeStream(input.path, streamOf(input.bytes), {
+                mime: input.mime || "application/octet-stream",
+                size: BigInt(input.bytes.length)
+            }),
+            PLACE_TIMEOUT_MS,
+            "it stopped answering part-way through the file"
+        );
+        if (Number(written.size) !== input.bytes.length) {
+            await driver.delete(input.path).catch(() => undefined);
+            return {
+                ok: false,
+                detail: `it kept ${Number(written.size)} bytes of ${input.bytes.length}`
+            };
+        }
+
+        const stream = await withTimeout(
+            driver.readStream(input.path),
+            PLACE_TIMEOUT_MS,
+            "it would not open the file it had just taken"
+        );
+        const reader = stream.getReader();
+        try {
+            const { done, value } = await withTimeout(
+                reader.read(),
+                PLACE_TIMEOUT_MS,
+                "it opened the file and then said nothing"
+            );
+            if (input.bytes.length > 0 && (done || !value?.length)) {
+                await driver.delete(input.path).catch(() => undefined);
+                return { ok: false, detail: "it took the file and gave back nothing" };
+            }
+        } finally {
+            await reader.cancel().catch(() => undefined);
+        }
+        return { ok: true, detail: "" };
+    } catch (error) {
+        await driver.delete(input.path).catch(() => undefined);
+        return { ok: false, detail: message(error) };
+    } finally {
+        await driver.dispose().catch(() => undefined);
+    }
+}
+
+function streamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
+    return new ReadableStream<Uint8Array>({
+        start(controller) {
+            controller.enqueue(bytes);
+            controller.close();
+        }
+    });
 }
 
 /**

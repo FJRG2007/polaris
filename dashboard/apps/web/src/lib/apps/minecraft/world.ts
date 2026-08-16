@@ -49,6 +49,21 @@ export const PLUGINS_DIR = `${DATA_DIR}/plugins`;
 export const PLUGIN_ASIDE_DIR = `${DATA_DIR}/.polaris-plugins`;
 
 /**
+ * Where a level goes when it must not be loaded and must not be lost.
+ *
+ * The server only ever opens the one `level-name` points at, so a stray world
+ * beside it is harmless - to the server. It is not harmless to a plugin: a bed
+ * wars plugin walks the data directory for its arenas and loads every folder it
+ * finds, and a level written by a newer Minecraft than the map's pinned release
+ * is refused by the game with an exception that takes the boot down with it.
+ * Every start, forever, with the reason four hundred lines into a log.
+ *
+ * Hidden and outside the level parent, which is what makes it invisible to that
+ * walk. Moved rather than deleted: it is somebody's world.
+ */
+export const LEVEL_ASIDE_DIR = `${DATA_DIR}/.polaris-worlds`;
+
+/**
  * Whether this file is that project's plugin.
  *
  * The list of plugins is a list of project names and what is on the disk is a jar
