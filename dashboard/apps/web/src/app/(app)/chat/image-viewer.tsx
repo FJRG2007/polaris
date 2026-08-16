@@ -58,6 +58,10 @@ const MAX_ZOOM = 4;
 /** What one notch of the wheel does. */
 const WHEEL_STEP = 0.0015;
 
+/** How far a pointer may wander and still count as a press rather than a drag.
+ *  A hand on a trackpad or a thumb on glass never lands on exactly one pixel. */
+const DRAG_SLOP = 4;
+
 export interface ViewedImage {
     readonly url: string;
     readonly name: string;
@@ -87,6 +91,9 @@ export function ImageViewer({
     const [at, setAt] = useState({ x: 0, y: 0 });
     const [said, setSaid] = useState("");
     const dragging = useRef<{ x: number; y: number } | null>(null);
+    /** Where a press started and whether it started off the picture, so a press
+     *  on the dark around it can close and a drag across it cannot. */
+    const press = useRef<ViewerPress | null>(null);
 
     // Back to fit whenever a different picture is opened: reopening one at three
     // times the size, panned into a corner, is the last picture's state wearing
@@ -191,11 +198,6 @@ export function ImageViewer({
             aria-modal="true"
             aria-label={image.name}
             className="fixed inset-0 z-50 flex flex-col bg-background/95"
-            // A press on the backdrop closes, the way every viewer does. Not on
-            // the picture itself, which is the thing being looked at.
-            onPointerDown={(event) => {
-                if (event.target === event.currentTarget) onClose();
-            }}
         >
             <div className="flex shrink-0 items-center gap-2 px-3 py-2">
                 <span className="min-w-0 flex-1 truncate text-sm font-medium" title={image.name}>
@@ -263,6 +265,16 @@ export function ImageViewer({
                         }}
                         onPointerDown={(event) => {
                             dragging.current = { x: event.clientX - at.x, y: event.clientY - at.y };
+                            press.current = {
+                                x: event.clientX,
+                                y: event.clientY,
+                                // The stage is everything under the bar, so the
+                                // dark around the picture is this element itself
+                                // and the picture is a child of it. Recorded on
+                                // the press because the pointer is captured from
+                                // here on, and every later event says "stage".
+                                outside: event.target === event.currentTarget
+                            };
                             event.currentTarget.setPointerCapture(event.pointerId);
                         }}
                         onPointerMove={(event) => {
@@ -270,8 +282,19 @@ export function ImageViewer({
                             if (!from) return;
                             setAt({ x: event.clientX - from.x, y: event.clientY - from.y });
                         }}
-                        onPointerUp={() => {
+                        // A press on the dark closes, the way every viewer does -
+                        // but only a press. A drag that started there was somebody
+                        // moving the picture, and closing on it would undo the
+                        // gesture they were in the middle of.
+                        onPointerUp={(event) => {
+                            const from = press.current;
                             dragging.current = null;
+                            press.current = null;
+                            if (closesOnRelease(from, event)) onClose();
+                        }}
+                        onPointerCancel={() => {
+                            dragging.current = null;
+                            press.current = null;
                         }}
                     >
                         {/* eslint-disable-next-line @next/next/no-img-element -- one picture, sized by the viewer */}
@@ -295,6 +318,28 @@ export function ImageViewer({
             </ContextMenu>
         </div>
     );
+}
+
+/** Where a press landed, and whether it landed off the picture. */
+export interface ViewerPress {
+    readonly x: number;
+    readonly y: number;
+    readonly outside: boolean;
+}
+
+/**
+ * Whether letting go here closes the viewer.
+ *
+ * Its own function because the rule reads as one sentence and the bug was that
+ * it went unsaid: the press must have started on the dark around the picture,
+ * and it must have been a press rather than the end of a pan.
+ */
+export function closesOnRelease(
+    press: ViewerPress | null,
+    at: { readonly clientX: number; readonly clientY: number }
+): boolean {
+    if (!press?.outside) return false;
+    return Math.hypot(at.clientX - press.x, at.clientY - press.y) <= DRAG_SLOP;
 }
 
 function clamp(value: number): number {
