@@ -28,8 +28,12 @@ const ACCEPTED = "image/png,image/jpeg,image/webp,image/gif";
 
 /** A square of at most MAX_EDGE, centred. Cropped rather than squashed: these
  *  are drawn in square boxes, so a letterboxed portrait would be squashed
- *  anyway. */
-async function toSquare(file: File): Promise<Blob> {
+ *  anyway.
+ *
+ *  Exported because a picture chosen before the thing it belongs to exists - the
+ *  photo on a group being started - is resized here and posted once there is
+ *  somewhere to post it to. */
+export async function toSquare(file: File): Promise<Blob> {
     const bitmap = await createImageBitmap(file);
     try {
         const edge = Math.min(bitmap.width, bitmap.height);

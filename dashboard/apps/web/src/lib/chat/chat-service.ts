@@ -962,7 +962,13 @@ export async function setPinned(
  * history each. A group has no such key - three people can genuinely want two
  * different group conversations - so asking twice makes two.
  */
-export async function openDirect(actor: ChatActor, userIds: readonly string[]): Promise<string> {
+export async function openDirect(
+    actor: ChatActor,
+    userIds: readonly string[],
+    /** What to call it, for a group whose starter typed something. A one-to-one
+     *  conversation ignores it: it is named after the person in it. */
+    name = ""
+): Promise<string> {
     const others = [...new Set(userIds)].filter((id) => id !== actor.id);
     if (others.length === 0) throw new ChatAccessError("Pick somebody to message");
 
@@ -1030,7 +1036,7 @@ export async function openDirect(actor: ChatActor, userIds: readonly string[]): 
     const channel = await prisma.chatChannel.create({
         data: {
             kind: "group",
-            name: "",
+            name: name.trim().slice(0, core.MAX_CHAT_CHANNEL_NAME),
             private: true,
             createdById: actor.id,
             // Whoever starts a group runs it. Left unset, a group had no owner at

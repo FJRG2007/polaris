@@ -541,7 +541,7 @@ export async function openDirectAction(input: unknown): Promise<{ id?: string; e
     const parsed = core.chatDirectOpenSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Pick somebody first" };
 
-    const result = await guard(() => chat.openDirect(me, parsed.data.userIds));
+    const result = await guard(() => chat.openDirect(me, parsed.data.userIds, parsed.data.name ?? ""));
     if (!result.error) revalidatePath(CHAT_PATH);
     return result.error ? { error: result.error } : { id: result.value };
 }

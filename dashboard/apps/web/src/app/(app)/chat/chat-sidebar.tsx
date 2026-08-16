@@ -24,10 +24,11 @@
 import Link from "next/link";
 import * as actions from "./actions";
 import { useChat } from "./chat-context";
+import { rememberChannel } from "./recents";
 import { Avatar } from "@/components/avatar";
-import { ChatAvatar } from "@/components/chat-avatar";
 import { channelLink, copyText } from "./links";
 import { useAppUrl } from "@/components/app-url";
+import { ChatAvatar } from "@/components/chat-avatar";
 import { NewDirectDialog } from "./new-direct-dialog";
 import { NewChannelDialog } from "./new-channel-dialog";
 import { useParams, usePathname } from "next/navigation";
@@ -120,7 +121,11 @@ export function ChatSidebar() {
     useEffect(() => {
         if (!open) return;
         const channel = channels.find((entry) => entry.id === open);
-        if (channel) setActiveSpaceId(channel.spaceId);
+        if (!channel) return;
+        setActiveSpaceId(channel.spaceId);
+        // And remembered, so choosing this space again on this browser comes back
+        // here rather than to whatever is at the top of the list.
+        if (channel.spaceId) rememberChannel(channel.spaceId, channel.id);
     }, [open, channels, setActiveSpaceId]);
 
     // Pinned first, then whatever happened most recently. Pinning is why the

@@ -126,8 +126,11 @@ export function RichTextEditor({
     );
 
     const extensions = useMemo(
-        () => [...baseExtensions(placeholder), BlockMenu, mentionExtension(search)],
-        [placeholder, search]
+        // The room mentions only where there is a room: `mentionsIn` is a
+        // conversation, and offering "@everyone" in a task description would name
+        // a set of people nobody can point at.
+        () => [...baseExtensions(placeholder), BlockMenu, mentionExtension(search, mentionsIn !== null)],
+        [placeholder, search, mentionsIn]
     );
 
     const editor = useEditor({

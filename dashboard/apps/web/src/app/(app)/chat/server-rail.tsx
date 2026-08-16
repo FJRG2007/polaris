@@ -31,6 +31,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { LeaveDialog } from "./leave-dialog";
+import { lastChannelIn } from "./recents";
 import { leaveSpaceAction } from "./actions";
 import { InviteDialog } from "./invite-dialog";
 import { chatAvatarUrl } from "@/lib/avatar-url";
@@ -69,6 +70,28 @@ export function ServerRail() {
     const [leaving, setLeaving] = useState<ChatSpaceView | null>(null);
     const [error, setError] = useState("");
 
+    /**
+     * Open a space, and a conversation inside it.
+     *
+     * Choosing a space used to move the list on the left and leave the reader
+     * looking at whatever direct message was already open - a click that appears
+     * to do nothing. So it lands somewhere: where this browser was last in that
+     * space, and failing that its first channel, which is the one at the top of
+     * the list and the nearest thing a space has to a front door.
+     *
+     * A voice room is not it. Landing in one would put somebody in a call by
+     * navigating, which is not what picking a server means.
+     */
+    const openSpace = (spaceId: string): void => {
+        setActiveSpaceId(spaceId);
+        const inSpace = channels.filter(
+            (channel) => channel.spaceId === spaceId && !channel.archived && channel.kind !== "voice"
+        );
+        const remembered = lastChannelIn(spaceId);
+        const target = inSpace.find((channel) => channel.id === remembered) ?? inSpace[0];
+        if (target) router.push(`/chat/c/${target.id}`);
+    };
+
     /** Unread, summed per space, so a space with something waiting says so
      *  without the list under it being open. */
     const waiting = useMemo(() => {
@@ -100,7 +123,7 @@ export function ServerRail() {
                         key={space.id}
                         space={space}
                         onNewChannel={() => {
-                            setActiveSpaceId(space.id);
+                            openSpace(space.id);
                             setNewChannelIn(space);
                         }}
                         onInvite={() => setInviting(space)}
@@ -112,7 +135,7 @@ export function ServerRail() {
                             active={activeSpaceId === space.id}
                             unread={waiting.get(space.id) ?? 0}
                             color={hex(space.color)}
-                            onClick={() => setActiveSpaceId(space.id)}
+                            onClick={() => openSpace(space.id)}
                         >
                             {initials(space)}
                             <SpacePicture spaceId={space.id} />

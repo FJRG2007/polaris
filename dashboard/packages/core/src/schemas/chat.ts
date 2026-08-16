@@ -242,7 +242,11 @@ export const chatDirectOpenSchema = z.object({
     userIds: z
         .array(z.string().uuid())
         .min(1, "Pick somebody")
-        .max(MAX_GROUP_MEMBERS - 1)
+        .max(MAX_GROUP_MEMBERS - 1),
+    /** What to call a group, when whoever is starting it has something in mind.
+     *  Ignored for a one-to-one conversation, which is named after the person in
+     *  it. Empty is the ordinary case and leaves it named after its people. */
+    name: z.string().trim().max(MAX_CHAT_CHANNEL_NAME).optional()
 });
 
 export type ChatDirectOpenInput = z.infer<typeof chatDirectOpenSchema>;

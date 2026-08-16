@@ -65,6 +65,50 @@ export function rememberMedia(media: RecentMedia): void {
     );
 }
 
+/** Where each space's last-opened channel is kept, one entry per space. */
+const LAST_CHANNEL_KEY = "polaris.chat.lastChannel";
+
+/**
+ * The channel this browser last had open in a space, and the note that records
+ * it.
+ *
+ * Picking a space used to change the list on the left and nothing else, so
+ * somebody who chose a server went on looking at the direct message they had
+ * been reading - which reads as a click that did nothing. A space opens on a
+ * channel now, and the one it opens on is the one this person was last in.
+ *
+ * On the device rather than on the account, like everything else here: where
+ * somebody left off is a habit of that browser, and following them across
+ * machines would be a surprise rather than a service.
+ */
+export function lastChannelIn(spaceId: string): string | null {
+    if (typeof window === "undefined") return null;
+    try {
+        const raw = window.localStorage.getItem(LAST_CHANNEL_KEY);
+        if (!raw) return null;
+        const parsed: unknown = JSON.parse(raw);
+        if (typeof parsed !== "object" || parsed === null) return null;
+        const found = (parsed as Record<string, unknown>)[spaceId];
+        return typeof found === "string" ? found : null;
+    } catch {
+        return null;
+    }
+}
+
+export function rememberChannel(spaceId: string, channelId: string): void {
+    if (typeof window === "undefined") return;
+    try {
+        const raw = window.localStorage.getItem(LAST_CHANNEL_KEY);
+        const parsed: unknown = raw ? JSON.parse(raw) : {};
+        const map = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, string>) : {};
+        map[spaceId] = channelId;
+        window.localStorage.setItem(LAST_CHANNEL_KEY, JSON.stringify(map));
+    } catch {
+        // Storage disabled or full. The space still opens - on its first
+        // channel, which is where somebody who has never been in it lands.
+    }
+}
+
 /**
  * Whatever is stored, or nothing.
  *

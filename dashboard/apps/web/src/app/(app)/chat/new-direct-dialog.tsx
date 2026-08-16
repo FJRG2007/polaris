@@ -17,17 +17,21 @@
  * keeps its button.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@polaris/ui";
-import { Loader2, MessageSquare, Users } from "lucide-react";
 import { useChat } from "./chat-context";
 import { useRouter } from "next/navigation";
-import { openDirectAction, searchPeopleAction } from "./actions";
 import { runAction } from "@/lib/run-action";
+import { chatAvatarUrl } from "@/lib/avatar-url";
+import { toSquare } from "@/components/picture-field";
+import { MAX_CHAT_CHANNEL_NAME } from "@polaris/core";
+import { ImagePlus, Loader2, MessageSquare, Users } from "lucide-react";
+import { openDirectAction, searchPeopleAction } from "./actions";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
     Button,
     Dialog,
+    Input,
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -46,17 +50,60 @@ export function NewDirectDialog({
     const { viewerId, refresh, may } = useChat();
     const [kind, setKind] = useState<"direct" | "group">("direct");
     const [picked, setPicked] = useState<readonly PickedPerson[]>([]);
+    const [name, setName] = useState("");
+    /** Whether the name in the box is theirs or the one put there for them. It
+     *  decides both whether adding another person still updates it and whether
+     *  anything is sent at all. */
+    const [touched, setTouched] = useState(false);
+    /** Resized and held until there is a group to put it on. */
+    const [picture, setPicture] = useState<Blob | null>(null);
+    const [preview, setPreview] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+    const file = useRef<HTMLInputElement>(null);
+
+    /** What the group is called if nobody types anything: the people in it, which
+     *  is what the rail would show for one with no name. Shown rather than left
+     *  blank so it is clear what it will be called, and it is only sent if it was
+     *  edited - a group named after its people goes on renaming itself as people
+     *  join or leave, and freezing today's list into the name loses that. */
+    const fallbackName = picked.map((person) => person.name).join(", ");
+
+    // Written into the box rather than only hinted at, so what it will be called
+    // is there to be edited - and it follows the list until somebody edits it,
+    // because a name that still said "Ada, Grace" after Alan was added would be
+    // one somebody has to notice and fix.
+    useEffect(() => {
+        if (!touched) setName(fallbackName);
+    }, [fallbackName, touched]);
 
     const open_ = async (userIds: readonly string[]) => {
         if (userIds.length === 0) return;
         setBusy(true);
         setError("");
-        const result = await runAction(() => openDirectAction({ userIds: [...userIds] }), setError);
+        const chosen = kind === "group" && name.trim() !== fallbackName ? name.trim() : "";
+        const result = await runAction(
+            () => openDirectAction({ userIds: [...userIds], name: chosen }),
+            setError
+        );
+        if (result?.error || !result?.id) {
+            setBusy(false);
+            return;
+        }
+        // The picture last, because until now there was nothing to hang it on.
+        // A group that was made and a picture that did not upload is still the
+        // group somebody asked for, so this reports rather than unwinds.
+        if (picture) {
+            await fetch(chatAvatarUrl("channel", result.id), {
+                method: "POST",
+                headers: { "Content-Type": picture.type },
+                body: picture
+            }).catch(() => undefined);
+        }
         setBusy(false);
-        if (result?.error || !result?.id) return;
         setPicked([]);
+        setName("");
+        setPicture(null);
         onOpenChange(false);
         refresh();
         router.push(`/chat/c/${result.id}`);
@@ -125,6 +172,64 @@ export function NewDirectDialog({
                     exclude={[viewerId]}
                     label="Who to message"
                 />
+
+                {/* Only once there is a group to name. Both of these are the
+                    things a group looks like, and both are easier to settle now
+                    than to come back for from a menu - but neither is required,
+                    which is why the name arrives filled in with what it would be
+                    called anyway. */}
+                {kind === "group" && picked.length > 0 && (
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={() => file.current?.click()}
+                            className="relative size-12 shrink-0 overflow-hidden rounded-full border border-border bg-muted text-muted-foreground transition-colors hover:border-primary"
+                            aria-label={picture ? "Change the group picture" : "Add a group picture"}
+                            title={picture ? "Change the group picture" : "Add a group picture"}
+                        >
+                            {preview ? (
+                                <img src={preview} alt="" className="size-full object-cover" />
+                            ) : (
+                                <ImagePlus className="mx-auto size-5" />
+                            )}
+                        </button>
+                        <input
+                            ref={file}
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/gif"
+                            className="hidden"
+                            onChange={async (event) => {
+                                const chosen = event.target.files?.[0];
+                                event.target.value = "";
+                                if (!chosen) return;
+                                try {
+                                    // Resized here, like every other picture:
+                                    // it drops the EXIF block a phone photo
+                                    // carries, and nobody setting a group photo
+                                    // means to publish where it was taken.
+                                    const square = await toSquare(chosen);
+                                    setPicture(square);
+                                    setPreview((was) => {
+                                        if (was) URL.revokeObjectURL(was);
+                                        return URL.createObjectURL(square);
+                                    });
+                                } catch {
+                                    setError("That file could not be read as an image");
+                                }
+                            }}
+                        />
+                        <Input
+                            value={name}
+                            maxLength={MAX_CHAT_CHANNEL_NAME}
+                            aria-label="What this group is called"
+                            placeholder={fallbackName}
+                            onChange={(event) => {
+                                setTouched(true);
+                                setName(event.target.value);
+                            }}
+                        />
+                    </div>
+                )}
 
                 {error && (
                     <p role="alert" className="text-sm text-danger">

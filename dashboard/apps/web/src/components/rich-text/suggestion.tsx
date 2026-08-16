@@ -18,6 +18,7 @@ import { REFERENCE } from "./markdown";
 import { Extension } from "@tiptap/core";
 import { cn, Skeleton } from "@polaris/ui";
 import Suggestion from "@tiptap/suggestion";
+import { AtSign } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { ReactRenderer } from "@tiptap/react";
 import { PluginKey, type EditorState } from "@tiptap/pm/state";
@@ -73,6 +74,49 @@ export const POPUP_LAYER_CLASS = "z-[60] pointer-events-auto";
 export const POPUP_ITEM_CLASS =
     "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm";
 
+/**
+ * The two mentions that name the room rather than a person.
+ *
+ * They are stored as the words somebody typed - there is nothing to point at,
+ * because they mean "this conversation" - so they are not references and cannot
+ * be found by a search. They are offered here because a mention nobody can
+ * discover may as well not exist: everybody knows @everyone from somewhere else
+ * and expects the list to confirm it, and this is also where the difference
+ * between the two gets said out loud.
+ */
+const ROOM_MENTIONS: readonly RoomSuggestion[] = [
+    {
+        kind: "room",
+        id: "everyone",
+        label: "@everyone",
+        detail: "Everybody in this conversation",
+        image: null
+    },
+    { kind: "room", id: "here", label: "@here", detail: "Whoever is online now", image: null }
+];
+
+export interface RoomSuggestion {
+    readonly kind: "room";
+    readonly id: "everyone" | "here";
+    readonly label: string;
+    readonly detail: string;
+    readonly image: null;
+}
+
+/** What either popup can offer: something to point at, or the room itself. */
+export type SuggestionItem = MentionCandidate | RoomSuggestion;
+
+/** The room mentions matching what has been typed. `@all` is a spelling of
+ *  `@everyone` the parser already takes, so it finds it too. */
+function roomMatches(query: string): RoomSuggestion[] {
+    const needle = query.trim().toLowerCase();
+    if (needle.length === 0) return [...ROOM_MENTIONS];
+    return ROOM_MENTIONS.filter(
+        (room) =>
+            room.id.startsWith(needle) || (room.id === "everyone" && "all".startsWith(needle))
+    );
+}
+
 /** How a caller looks candidates up, so this file needs no server import. */
 export type MentionSearch = (
     kinds: readonly refs.ReferenceKind[],
@@ -80,7 +124,7 @@ export type MentionSearch = (
 ) => Promise<MentionCandidate[]>;
 
 /** The popup's own props on top of the ones the plugin supplies. */
-type ListProps = SuggestionProps<MentionCandidate> & { searching: boolean };
+type ListProps = SuggestionProps<SuggestionItem> & { searching: boolean };
 
 const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
     const [active, setActive] = useState(0);
@@ -151,6 +195,10 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
                                 person={{ id: item.id, name: item.label, image: item.image }}
                                 size={20}
                             />
+                        ) : item.kind === "room" ? (
+                            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-primary/10 text-[11px] text-primary">
+                                <AtSign className="size-3" />
+                            </span>
                         ) : (
                             <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[10px] uppercase text-muted-foreground">
                                 {item.kind.slice(0, 1)}
@@ -178,7 +226,7 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
  * them apart is what lets a description mention a task without notifying half a
  * team, and it means neither list has to be filtered by what the reader meant.
  */
-export function mentionExtension(search: MentionSearch) {
+export function mentionExtension(search: MentionSearch, rooms = false) {
     return Extension.create({
         name: "polarisMentions",
         addProseMirrorPlugins() {
@@ -186,7 +234,7 @@ export function mentionExtension(search: MentionSearch) {
                 Suggestion({
                     editor: this.editor,
                     pluginKey: POPUP_KEYS.people,
-                    ...mentionSuggestion("@", ["user", "team"], search)
+                    ...mentionSuggestion("@", ["user", "team"], search, rooms)
                 }),
                 Suggestion({
                     editor: this.editor,
@@ -241,8 +289,10 @@ export function queryFits(char: string, query: string): boolean {
 function mentionSuggestion(
     char: string,
     kinds: readonly refs.ReferenceKind[],
-    search: MentionSearch
-): Omit<SuggestionOptions<MentionCandidate>, "editor"> {
+    search: MentionSearch,
+    /** Whether this surface is a conversation, and so has a room to name. */
+    rooms = false
+): Omit<SuggestionOptions<SuggestionItem>, "editor"> {
     // Whether a lookup is in flight. The plugin opens the popup before the first
     // answer arrives, and an empty list is otherwise indistinguishable from a
     // search that genuinely found nothing.
@@ -258,16 +308,30 @@ function mentionSuggestion(
         shouldShow: ({ query }) => queryFits(char, query),
         items: async ({ query }) => {
             if (!queryFits(char, query)) return [];
+            // First, and without waiting for anything: they are a fixed pair, and
+            // somebody typing "@ev" is not going to want a person called Evan
+            // ahead of the mention they were reaching for.
+            const named = rooms && char === "@" ? roomMatches(query) : [];
             searching = true;
             try {
-                return await search(kinds, query);
+                return [...named, ...(await search(kinds, query))];
             } finally {
                 searching = false;
             }
         },
 
         command: ({ editor, range, props }) => {
-            const item = props as unknown as MentionCandidate;
+            const item = props as unknown as SuggestionItem;
+            // The room mentions are words rather than references: what makes them
+            // work is the text itself, read again when the message lands.
+            if (item.kind === "room") {
+                editor
+                    .chain()
+                    .focus()
+                    .insertContentAt(range, `${item.label} `)
+                    .run();
+                return;
+            }
             editor
                 .chain()
                 .focus()
