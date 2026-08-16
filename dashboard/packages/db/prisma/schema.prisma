@@ -92,6 +92,7 @@ model User {
     invitesSent  Invite[]                @relation("InviteInviter")
     connections       StorageConnection[]
     dockerConnections DockerConnection[]
+    dataConnections   DataConnection[]
     hosts             Host[]
     hostGroups        HostGroup[]
     shares            Share[]
@@ -3378,6 +3379,7 @@ model ManagedDatabase {
     // there is nothing left for them to be reached through.
     parent      ManagedDatabase?  @relation("DatabaseInstance", fields: [parentId], references: [id], onDelete: Cascade)
     children    ManagedDatabase[] @relation("DatabaseInstance")
+    dataConnections DataConnection[]
 
     @@unique([environmentId, slug])
     @@index([targetId])
@@ -3599,6 +3601,50 @@ model AddressReputation {
     @@index([checkedAt])
 }
 
+// A database somebody opens in the data browser.
+//
+// Two kinds in one table, told apart by `managedDatabaseId`. One Polaris already
+// runs is pointed at rather than copied: its address and its credentials are
+// read from the managed row every time, so rotating them or moving the container
+// does not leave a saved connection pointing at an address that stopped being
+// true. Anything else - a database on somebody's laptop, a managed cloud
+// instance, the company's own Postgres - is a host, a port and a secret this row
+// holds, envelope-encrypted the same way every other credential in Polaris is.
+//
+// `readOnly` defaults on. A browser opened on a production database must not be
+// one keystroke away from an UPDATE with no WHERE, and the person who wants to
+// write has to say so.
+model DataConnection {
+    id                  String    @id @default(uuid(7)) @db.Uuid
+    ownerId             String    @db.Uuid
+    name                String
+    // postgres | mysql | mariadb | mongo | redis
+    engine              String
+    // Set when this points at a database Polaris runs. The address and the
+    // credentials below are then unused and read from that row instead.
+    managedDatabaseId   String?   @db.Uuid
+    host                String?
+    port                Int?
+    database            String?
+    username            String?
+    // Envelope-encrypted secret (JSON: password).
+    encryptedCredential Bytes?
+    credentialNonce     Bytes?
+    credentialKeyId     String?
+    tls                 Boolean   @default(false)
+    readOnly            Boolean   @default(true)
+    lastUsedAt          DateTime?
+    createdAt           DateTime  @default(now())
+    updatedAt           DateTime  @updatedAt
+
+    owner   User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    // Losing the database it points at takes the shortcut with it: what is left
+    // is a name and an address that answers nothing.
+    managed ManagedDatabase? @relation(fields: [managedDatabaseId], references: [id], onDelete: Cascade)
+
+    @@index([ownerId])
+    @@index([managedDatabaseId])
+}
 model WafIpFeed {
     /// Feed id ("tor").
     id        String   @id

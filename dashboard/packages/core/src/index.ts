@@ -56,6 +56,7 @@ export * from "./schemas/storage.js";
 export * from "./schemas/deploy.js";
 export * from "./schemas/database.js";
 export * from "./schemas/database-statements.js";
+export * from "./data-sql.js";
 export * from "./schemas/project.js";
 export * from "./schemas/share.js";
 export * from "./schemas/link-rules.js";

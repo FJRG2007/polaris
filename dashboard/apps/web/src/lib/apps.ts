@@ -432,6 +432,27 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["visitors", "traffic", "pageviews", "referrers", "metrics", "umami"]
         },
         {
+            label: "Databases",
+            href: "/apps/databases",
+            icon: Database,
+            group: OPERATIONS_GROUP,
+            keywords: [
+                "sql",
+                "query",
+                "postgres",
+                "postgresql",
+                "mysql",
+                "mariadb",
+                "mongo",
+                "mongodb",
+                "redis",
+                "tables",
+                "rows",
+                "browse",
+                "client"
+            ]
+        },
+        {
             label: "Containers",
             href: "/apps/containers",
             icon: Container,
