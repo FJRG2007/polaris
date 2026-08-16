@@ -10,6 +10,7 @@
  */
 
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { passwordIsBreached } from "@/lib/pwned-passwords";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
@@ -22,9 +23,22 @@ import {
     requestRecoveryAction
 } from "./actions";
 
-/** How often the waiting screen asks whether a decision has been made. Slow: a
- *  person is deciding this, not a machine. */
-const POLL_MS = 15_000;
+/**
+ * How often the waiting screen asks whether a decision has been made.
+ *
+ * Fast while somebody is sitting in front of it, because the two people in this
+ * are usually in the same room or on the same call - an administrator says "done"
+ * and the person is looking at a screen that has not moved. Slow once the tab has
+ * been open long enough that nobody is watching it, and stopped entirely while it
+ * is in the background: a page left open for a day must not spend that day asking.
+ * Coming back to the tab checks straight away, so the slow tier is never the delay
+ * somebody actually experiences.
+ */
+const POLL_MS = 3000;
+const IDLE_POLL_MS = 30_000;
+
+/** How long the screen is treated as watched. */
+const ATTENTIVE_MS = 10 * 60 * 1000;
 
 /** Long enough that the corpus is not asked about every keystroke. */
 const BREACH_DEBOUNCE_MS = 500;
@@ -95,6 +109,9 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
     useEffect(() => {
         if (step !== "waiting" || !ticket) return;
         let current = true;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const opened = Date.now();
+
         const check = async () => {
             const next = await recoveryStatusAction(ticket);
             if (!current) return;
@@ -102,11 +119,29 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
             if (next === "approved") setStep("reset");
             if (next === "used") setStep("done");
         };
-        void check();
-        const timer = setInterval(() => void check(), POLL_MS);
+
+        // A chain of timeouts rather than an interval: the wait changes as the
+        // page ages, and a hidden tab schedules nothing at all until it is
+        // looked at again.
+        const ask = async () => {
+            await check();
+            if (!current || document.visibilityState === "hidden") return;
+            const wait = Date.now() - opened < ATTENTIVE_MS ? POLL_MS : IDLE_POLL_MS;
+            timer = setTimeout(() => void ask(), wait);
+        };
+
+        const onVisible = () => {
+            if (!current || document.visibilityState !== "visible") return;
+            clearTimeout(timer);
+            void ask();
+        };
+
+        void ask();
+        document.addEventListener("visibilitychange", onVisible);
         return () => {
             current = false;
-            clearInterval(timer);
+            clearTimeout(timer);
+            document.removeEventListener("visibilitychange", onVisible);
         };
     }, [step, ticket]);
 
@@ -269,14 +304,21 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
                     <>
                         <p className="text-sm text-muted-foreground">
                             If that account exists, the administrators have been asked to approve it.
-                            This page opens the password form as soon as one of them does.
+                            Leave this page open - it turns into the password form the moment one of
+                            them says yes.
+                        </p>
+                        {/* The ticket used to be printed here as a path to copy,
+                            which was a credential on a screen anybody walking past
+                            could read and told nobody anything the address bar was
+                            not already saying. It is in the URL of this very page,
+                            so the way back is to bookmark it or leave it open. */}
+                        <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                            <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                            Waiting for a decision. Nothing here needs doing.
                         </p>
                         <p className="mt-3 text-xs text-muted-foreground">
-                            Keep this link. It is the only way back to this request, and it expires in
-                            24 hours.
-                        </p>
-                        <p className="mt-1 break-all rounded-md border border-border bg-muted/40 px-2 py-1 text-xs">
-                            {ticket ? `/oauth/recover?ticket=${ticket}` : null}
+                            If you close this tab, the address of this page is the way back to the
+                            request - bookmark it. It expires in 24 hours either way.
                         </p>
                     </>
                 )}
