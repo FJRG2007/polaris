@@ -24,11 +24,11 @@
  */
 
 import * as actions from "./actions";
-import { Users, X } from "lucide-react";
 import { useChat } from "./chat-context";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
+import { Crown, Users, X } from "lucide-react";
 import { useChatStream } from "./use-chat-stream";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChatChannelView, ChatMemberView } from "@/lib/chat/chat-service";
@@ -61,8 +61,10 @@ const REMEMBERED = "polaris.chat.members";
 const RANK: Record<string, number> = { owner: 0, admin: 1, member: 2 };
 
 /** The caption beside a name. Members get none: a list where every second line
- *  says "member" is a list nobody reads. */
-const ROLE_WORDS: Record<string, string> = { owner: "Owner", admin: "Admin" };
+ *  says "member" is a list nobody reads. Neither does the owner - a crown sits
+ *  against their name instead, which is the mark every chat client uses for it
+ *  and which reads at a glance in a column of forty. */
+const ROLE_WORDS: Record<string, string> = { admin: "Admin" };
 
 interface Roster {
     readonly members: readonly ChatMemberView[];
@@ -235,9 +237,18 @@ function MemberRows({
                                     size={28}
                                 />
                                 <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-sm">
-                                        {member.name}
-                                        {you && <span className="text-muted-foreground"> (you)</span>}
+                                    <span className="flex items-center gap-1">
+                                        <span className="truncate text-sm">
+                                            {member.name}
+                                            {you && <span className="text-muted-foreground"> (you)</span>}
+                                        </span>
+                                        {member.role === "owner" && (
+                                            <Crown
+                                                role="img"
+                                                aria-label="Owner"
+                                                className="size-3.5 text-warning"
+                                            />
+                                        )}
                                     </span>
                                     {role && (
                                         <span className="block text-[11px] text-muted-foreground">
