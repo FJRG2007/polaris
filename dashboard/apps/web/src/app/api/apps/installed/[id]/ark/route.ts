@@ -5,6 +5,8 @@ import { requireGameServer } from "@/lib/apps/install-access";
 import { sweepArkTimeouts } from "@/lib/apps/ark/timeout-service";
 import { applyPendingArkRules } from "@/lib/apps/ark/settings-service";
 import { readPlayerTimeouts } from "@/lib/apps/player-timeout-service";
+import { readLastSeen } from "@/lib/apps/games-activity-service";
+import type { ArkProfile } from "@/lib/apps/ark/profile";
 import { sweepGameSchedules } from "@/lib/apps/minecraft/schedule-service";
 import {
     applyAllowList,
@@ -91,6 +93,21 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
                   ]).catch(() => ({}))
                 : {}
         ]);
+        // When each of them was last on. Polaris's own record rather than the
+        // game's: ARK reports who is connected this second and nothing about a
+        // minute ago, so without this a row for somebody offline could only say
+        // when they were added to the list - which is a fact about the list.
+        // Every name a row might be drawn under is asked about, since the one a
+        // visit was recorded under is whatever the server called them.
+        const seen = wantsPlayers
+            ? await readLastSeen(id, [
+                  ...status.players.map((player) => player.name),
+                  ...(access?.players ?? []).map((player) => player.label),
+                  ...Object.values(profiles as Record<string, ArkProfile>).map(
+                      (profile) => profile.characterName ?? ""
+                  )
+              ]).catch(() => ({}))
+            : {};
         return NextResponse.json({
             status,
             reach,
@@ -98,6 +115,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             timeouts,
             admins,
             profiles,
+            seen,
             address: facts?.address ?? null
         });
     } catch (caught) {

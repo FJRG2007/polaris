@@ -225,3 +225,42 @@ export function readPlayerStats(json: string): PlayerStats | null {
     if (ticks === 0 && deaths === 0 && mobKills === 0 && playerKills === 0) return null;
     return { playedMs: ticks * TICK_MS, deaths, mobKills, playerKills };
 }
+
+/**
+ * What the line under a player's status badge says.
+ *
+ * The question a row has to answer is "when were they last on", and for ARK there
+ * is no other source for it: the game reports who is connected this second and
+ * nothing about a minute ago, so what Polaris has watched is the whole of what can
+ * be said. The row used to say when it was added to the allow list instead, which
+ * is a fact about the list and not about the person - kept here only as the last
+ * resort it should always have been, for somebody nobody has ever seen play.
+ *
+ * Its own function so the three cases can be read at once and tested without a
+ * table around them.
+ */
+export type PresenceLine =
+    /** They are on now, and this is when they arrived. */
+    | { readonly kind: "since"; readonly iso: string }
+    /** They are not on, and this is when they last were. */
+    | { readonly kind: "last-on"; readonly iso: string }
+    /** Nobody has seen them play. When they were let in is all there is. */
+    | { readonly kind: "added"; readonly iso: string }
+    | null;
+
+export function presenceLine(input: {
+    readonly online: boolean;
+    readonly seen: { readonly since: string | null; readonly lastSeen: string | null } | null;
+    readonly addedAt: string | null;
+}): PresenceLine {
+    const { online, seen, addedAt } = input;
+    if (online && seen?.since) return { kind: "since", iso: seen.since };
+    if (!online) {
+        // The end of their last visit, or its start for one that was never closed:
+        // a server stopped while somebody was playing leaves a visit open forever,
+        // and "last on" is still a better answer than nothing.
+        const last = seen?.lastSeen ?? seen?.since ?? null;
+        if (last) return { kind: "last-on", iso: last };
+    }
+    return addedAt ? { kind: "added", iso: addedAt } : null;
+}

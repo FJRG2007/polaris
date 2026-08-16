@@ -25,6 +25,7 @@ import * as actions from "./ark-actions";
 import { GameConsole } from "./game-console";
 import type { Permission } from "@polaris/core";
 import type { GameContext } from "./game-context";
+import { loadArkCatalog } from "./ark-item-picker";
 import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
 import { CopyButton } from "@/components/copy-button";
@@ -32,16 +33,17 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
 import type { ArkProfile } from "@/lib/apps/ark/profile";
+import { presenceLine } from "@/lib/apps/games-activity";
 import { RelativeTime } from "@/components/relative-time";
 import { ToolbarSwitch } from "@/components/toolbar-switch";
 import type { ServerPresence } from "@/lib/apps/games-service";
 import { useGamePresence } from "@/components/use-game-presence";
+import type { PlayerSeen } from "@/lib/apps/games-activity-service";
 import { findArkMap, mapRequirementHint } from "@/lib/apps/ark/maps";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import type { ArkAccessView, ArkStatus } from "@/lib/apps/ark/service";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
-import { loadArkCatalog } from "./ark-item-picker";
 import { PlayerTimeoutDialog } from "@/components/player-timeout-dialog";
 import { PlayerIconAction, PlayersTable } from "@/components/game-players-table";
 import { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } from "./tabs";
@@ -153,6 +155,9 @@ interface ServerReading {
     admins: readonly string[];
     /** What each survivor's own file says about them, by Steam id. */
     profiles: Readonly<Record<string, ArkProfile>>;
+    /** When each of them was last on, by lowercased name. Polaris's own record:
+     *  the game knows who is connected and nothing about a minute ago. */
+    seen: Readonly<Record<string, PlayerSeen>>;
 }
 
 export function ArkPanel({
@@ -203,7 +208,8 @@ export function ArkPanel({
         access: game?.arkAccess ?? null,
         timeouts: [],
         admins: [],
-        profiles: {}
+        profiles: {},
+        seen: {}
     });
     const [error, setError] = useState<string | null>(null);
     /** What Polaris last said it intends the server to do. Kept so the page can
@@ -229,6 +235,7 @@ export function ArkPanel({
                 timeouts?: PlayerTimeout[];
                 admins?: string[];
                 profiles?: Record<string, ArkProfile>;
+                seen?: Record<string, PlayerSeen>;
                 error?: string;
             };
             if (!response.ok || !data.status) {
@@ -248,7 +255,8 @@ export function ArkPanel({
                 // column does not blink empty on a read the container was too busy
                 // to answer.
                 admins: data.admins ?? (wantsPlayers ? current.admins : []),
-                profiles: data.profiles ?? (wantsPlayers ? current.profiles : {})
+                profiles: data.profiles ?? (wantsPlayers ? current.profiles : {}),
+                seen: data.seen ?? (wantsPlayers ? current.seen : {})
             }));
             // The header's Start and Stop, and everything else the page rendered
             // on the server, come from the install row. A poll that finds the
@@ -370,6 +378,7 @@ export function ArkPanel({
                     timeouts={reading.timeouts}
                     admins={reading.admins}
                     profiles={reading.profiles}
+                    seen={reading.seen}
                     canModerate={held.includes("games.moderate")}
                     canManage={held.includes("games.manage")}
                     onChanged={(next) => {
@@ -886,6 +895,7 @@ function PlayersTab({
     timeouts,
     admins,
     profiles,
+    seen,
     canModerate,
     canManage,
     onChanged
@@ -900,6 +910,8 @@ function PlayersTab({
     /** What each survivor's file says: their level, and the name they gave
      *  themselves rather than the one Steam knows them by. */
     profiles: Readonly<Record<string, ArkProfile>>;
+    /** When each of them was last on, by lowercased name. */
+    seen: Readonly<Record<string, PlayerSeen>>;
     canModerate: boolean;
     /** Whether they may change what the list means, which is a heavier grant than
      *  being allowed to add somebody to it. */
@@ -1152,6 +1164,11 @@ function PlayersTab({
                         answering={answering}
                         pending={pending}
                         profile={profiles[entry.steamId] ?? null}
+                        seen={
+                            seen[entry.name.toLowerCase()] ??
+                            seen[(profiles[entry.steamId]?.characterName ?? "").toLowerCase()] ??
+                            null
+                        }
                         admin={admins.includes(entry.steamId)}
                         onAdmin={(next) =>
                             run(
@@ -1292,7 +1309,10 @@ function PlayersTab({
                 An operator runs admin commands in game without typing the admin password. ARK reads
                 that list only when it starts, so somebody made an operator now becomes one at the
                 next restart. Levels come from each survivor&apos;s own file, so somebody who has
-                never played here has none.
+                never played here has none - and neither has anybody the server has no file for,
+                which is what a dash in that column means. When they were last on is Polaris&apos;
+                own record: ARK can say who is connected this second and nothing about a minute
+                ago, so it starts from the day Polaris first watched this server.
             </p>
 
             <p className="text-xs text-muted-foreground">
@@ -1506,6 +1526,7 @@ function ArkPlayerRow({
     pending,
     timeout,
     profile,
+    seen,
     admin,
     onAdmin,
     onAllow,
@@ -1539,6 +1560,8 @@ function ArkPlayerRow({
     /** What their own survivor file says, or null for somebody who has never
      *  played here - and for every row while the server is down. */
     profile: ArkProfile | null;
+    /** When Polaris last saw them on, or null for somebody it never has. */
+    seen: PlayerSeen | null;
     /** Whether they are on the server's admin list. */
     admin: boolean;
     onAdmin: (admin: boolean) => void;
@@ -1559,6 +1582,9 @@ function ArkPlayerRow({
     // Every verb that reaches the game needs a server that is answering. Editing
     // the list is Polaris' own and does not.
     const live = answering && !pending;
+    // What the line under the badge says - see `presenceLine`, which is where the
+    // three cases are settled and tested.
+    const line = presenceLine({ online: entry.online, seen, addedAt: entry.addedAt });
 
     return (
         <tr
@@ -1611,10 +1637,12 @@ function ArkPlayerRow({
                 </div>
             </td>
             {/* Badge and a smaller line under it, the shape the Minecraft table
-                uses. What the line says is what ARK actually knows: it reports who
-                is on right now and nothing about a minute ago, so there is no
-                "last seen" to show and the honest second line is when this row
-                joined the list. */}
+                uses - and now saying the same thing it does: when they were last
+                on. ARK itself cannot answer that (it reports who is connected this
+                second and nothing about a minute ago), so it comes from Polaris's
+                own record of who it has watched. Only somebody Polaris has never
+                seen play falls back to when the row was added, which is a fact
+                about the list rather than about the person. */}
             <td className="px-3 py-2">
                 <div className="flex flex-col items-start gap-0.5">
                     {!read ? (
@@ -1624,10 +1652,28 @@ function ArkPlayerRow({
                     ) : (
                         <Badge>{playerPresence.offline}</Badge>
                     )}
-                    {entry.addedAt && (
-                        <span className="text-xs text-muted-foreground">
-                            Added <RelativeTime iso={entry.addedAt} />
+                    {/* The whole history is a click away wherever there is one,
+                        the way it is on the Minecraft table: what somebody asks
+                        after "last on yesterday" is "how often". */}
+                    {line?.kind === "added" ? (
+                        <span
+                            className="text-xs text-muted-foreground"
+                            title="Polaris has not watched them play here yet."
+                        >
+                            Added <RelativeTime iso={line.iso} />
                         </span>
+                    ) : (
+                        line && (
+                            <button
+                                type="button"
+                                onClick={onHistory}
+                                className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                                title={`When ${entry.name} joined and left`}
+                            >
+                                {line.kind === "since" ? "Playing since " : "Last on "}
+                                <RelativeTime iso={line.iso} />
+                            </button>
+                        )
                     )}
                 </div>
             </td>

@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { fillGaps, historyOf, readPlayerStats, rosterChange } from "@/lib/apps/games-activity";
+import { fillGaps, historyOf, presenceLine, readPlayerStats, rosterChange } from "@/lib/apps/games-activity";
 
 const NOW = new Date("2026-08-13T21:00:00.000Z");
 
@@ -175,5 +175,56 @@ describe("the game's own figures for a player", () => {
         expect(readPlayerStats("not json at all")).toBeNull();
         expect(readPlayerStats("null")).toBeNull();
         expect(readPlayerStats('{"stats":{"minecraft:custom":{"minecraft:play_time":"lots"}}}')).toBeNull();
+    });
+});
+
+/**
+ * The line under a player's status badge.
+ *
+ * It used to say when the row was added to the allow list, which is a fact about
+ * the list: an operator looking at a name wants to know when that person was last
+ * on, and on an ARK server nothing but Polaris's own record can say.
+ */
+describe("presenceLine", () => {
+    const seen = { since: "2026-08-13T19:00:00.000Z", lastSeen: "2026-08-13T20:00:00.000Z" };
+    const added = "2026-08-01T09:00:00.000Z";
+
+    it("says when somebody playing arrived, not when they were added", () => {
+        expect(presenceLine({ online: true, seen, addedAt: added })).toEqual({
+            kind: "since",
+            iso: seen.since
+        });
+    });
+
+    it("says when somebody offline was last on", () => {
+        expect(presenceLine({ online: false, seen, addedAt: added })).toEqual({
+            kind: "last-on",
+            iso: seen.lastSeen
+        });
+    });
+
+    it("falls back to when a visit started for one that was never closed", () => {
+        // A server stopped while somebody was playing leaves their visit open, and
+        // "last on when they arrived" beats saying nothing.
+        expect(
+            presenceLine({ online: false, seen: { since: seen.since, lastSeen: null }, addedAt: added })
+        ).toEqual({ kind: "last-on", iso: seen.since });
+    });
+
+    it("only says when they were added for somebody nobody has seen play", () => {
+        expect(presenceLine({ online: false, seen: null, addedAt: added })).toEqual({
+            kind: "added",
+            iso: added
+        });
+        // Somebody reported as playing before the first sweep has watched them:
+        // there is nothing truthful to say about a visit yet.
+        expect(presenceLine({ online: true, seen: null, addedAt: added })).toEqual({
+            kind: "added",
+            iso: added
+        });
+    });
+
+    it("says nothing at all when there is nothing to say", () => {
+        expect(presenceLine({ online: false, seen: null, addedAt: null })).toBeNull();
     });
 });

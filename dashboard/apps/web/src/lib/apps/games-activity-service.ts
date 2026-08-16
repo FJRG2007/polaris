@@ -173,6 +173,56 @@ export interface PlayerRecord {
 /** As many visits as a dialog can usefully show. */
 const VISIT_LIMIT = 50;
 
+/** When one player was last on, for the line under their row. */
+export interface PlayerSeen {
+    /** When their latest visit started - which is when they arrived, for
+     *  somebody who is still playing. */
+    readonly since: string | null;
+    /** When they were last seen leaving. Null for somebody whose only visit is
+     *  the one they are on. */
+    readonly lastSeen: string | null;
+}
+
+/**
+ * When each of these players was last on this server.
+ *
+ * For the second line of a players table, which used to say when a row was added
+ * to the allow list - a fact about the list rather than about the person, and one
+ * nobody asks. What is actually wanted is "playing for two hours" or "last on
+ * yesterday", and for ARK that answer exists nowhere but here: the game reports
+ * who is connected this second and nothing about a minute ago, so Polaris's own
+ * record of who it has watched is the whole of what can be said.
+ *
+ * One grouped query for the whole table rather than one per row, and by name
+ * because that is what a visit is recorded under.
+ */
+export async function readLastSeen(
+    installedAppId: string,
+    names: readonly string[]
+): Promise<Record<string, PlayerSeen>> {
+    const wanted = [...new Set(names.map((name) => name.trim()).filter((name) => name.length > 0))];
+    if (wanted.length === 0) return {};
+    const rows = await prisma.gamePlayerSession
+        .groupBy({
+            by: ["name"],
+            where: { installedAppId, name: { in: wanted } },
+            _max: { joinedAt: true, leftAt: true }
+        })
+        .catch(() => []);
+
+    const found: Record<string, PlayerSeen> = {};
+    for (const row of rows) {
+        // Keyed lowercased: the name on a row can be the one somebody typed into
+        // the allow list, and the one a visit was recorded under is whatever the
+        // server said - the same name in a different case, often enough.
+        found[row.name.toLowerCase()] = {
+            since: row._max.joinedAt?.toISOString() ?? null,
+            lastSeen: row._max.leftAt?.toISOString() ?? null
+        };
+    }
+    return found;
+}
+
 /** What Polaris has watched this player do on this server. */
 export async function readPlayerRecord(
     installedAppId: string,

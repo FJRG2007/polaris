@@ -137,10 +137,17 @@ export function readProfileDataId(bytes: Buffer): string | null {
 }
 
 export function parseArkProfile(bytes: Buffer): ArkProfile {
+    const dataId = readProfileDataId(bytes);
+    const level = readProfileLevel(bytes);
     return {
         characterName: readProfileName(bytes),
-        level: readProfileLevel(bytes),
-        dataId: readProfileDataId(bytes)
+        // A survivor who has never levelled has no level property at all, so the
+        // read comes back with nothing - and "nothing" is also what an unreadable
+        // file gives. The id tells them apart: a file this got a player number out
+        // of is a file it understood, and a survivor in one who has gained no
+        // levels is level 1 rather than unknown.
+        level: level ?? (dataId !== null ? 1 : null),
+        dataId
     };
 }
 

@@ -131,6 +131,17 @@ describe("parseArkProfile", () => {
         });
     });
 
+    it("reads a survivor who has never levelled as level 1", () => {
+        // The property is simply absent until they gain one, and the file having
+        // given up a player number is what says it was understood - as against a
+        // file that could not be read, which knows nothing.
+        expect(parseArkProfile(Buffer.concat([NOISE, dataId(7n)]))).toEqual({
+            characterName: null,
+            level: 1,
+            dataId: "7"
+        });
+    });
+
     it("reads a file it understands none of as knowing nothing", () => {
         expect(parseArkProfile(Buffer.from("not an ark profile at all"))).toEqual({
             characterName: null,
