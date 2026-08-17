@@ -266,8 +266,10 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // uses it, so this is the job that decides whether a disk fills.
         everyMs: Number(process.env.POLARIS_HOME_RETENTION_MS) || 15 * MINUTE,
         // Leased: it removes files, and two runners racing on the same clip means
-        // one of them fails on a file the other already dropped.
-        leaseMs: 10 * MINUTE,
+        // one of them fails on a file the other already dropped. Longer than the
+        // cadence, so a pass that runs over does not have the next one start
+        // beside it.
+        leaseMs: 30 * MINUTE,
         run: sweepHomeRetention
     },
     {
