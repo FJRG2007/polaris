@@ -14,6 +14,7 @@
 
 import { prisma } from "@polaris/db";
 import { faceEndpoint } from "@/lib/home/recognizer";
+import { FACE_EXTENSION, type FaceImageType } from "@/lib/home/face-image";
 
 export interface PersonView {
     readonly id: string;
@@ -147,14 +148,24 @@ export async function setNotify(installedAppId: string, id: string, notify: bool
  * It answers with nothing Polaris keeps either - the count on the screen is read
  * back from it, so what the screen says is what the recognizer actually holds.
  */
-export async function addFace(installedAppId: string, id: string, image: Uint8Array): Promise<void> {
+export async function addFace(
+    installedAppId: string,
+    id: string,
+    image: Uint8Array,
+    /** What the file is, already narrowed to a format the recognizer reads. */
+    contentType: FaceImageType = "image/jpeg"
+): Promise<void> {
     const person = await prisma.homePerson.findFirst({ where: { id, installedAppId }, select: { subjectId: true } });
     if (!person) throw new Error("Not found");
     const endpoint = await faceEndpoint();
     if (!endpoint) throw new Error("Face recognition is not set up yet");
 
     const form = new FormData();
-    form.append("file", new Blob([image], { type: "image/jpeg" }), "face.jpg");
+    // Sent as what it is, name and all. The recognizer Home installs reads the
+    // bytes and would not care, but the address field is still there for a house
+    // running its own - and a service handed WebP bytes labelled as a JPEG is
+    // entitled to refuse them.
+    form.append("file", new Blob([image], { type: contentType }), `face${FACE_EXTENSION[contentType]}`);
     const response = await fetch(
         `${endpoint.baseUrl}/api/v1/recognition/faces?subject=${encodeURIComponent(person.subjectId)}`,
         { method: "POST", headers: { "x-api-key": endpoint.apiKey }, body: form }

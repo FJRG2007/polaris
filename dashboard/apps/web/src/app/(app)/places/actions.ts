@@ -30,6 +30,7 @@ import { requireHome } from "@/lib/home/access";
 import * as recording from "@/lib/home/recording";
 import { footageTarget } from "@/lib/home/stills";
 import { cameraVendor } from "@/lib/home/vendors";
+import { faceImageType } from "@/lib/home/face-image";
 import { discoverCameras } from "@/lib/home/discovery";
 import { ensureVisionWorker } from "@/lib/home/vision";
 import * as defaults from "@/lib/home/detection-defaults";
@@ -491,10 +492,17 @@ export async function addPersonAction(name: string): Promise<{ person?: people.P
  * Polaris. Capped here as well as at the recognizer: an action that accepts an
  * arbitrarily large upload is a way to spend a server's memory.
  */
-export async function addFaceAction(id: string, image: Uint8Array): Promise<{ error?: string }> {
+export async function addFaceAction(
+    id: string,
+    image: Uint8Array,
+    /** What the browser said the file is. Checked against the formats the
+     *  recognizer reads rather than trusted, and anything unrecognised is sent
+     *  as a JPEG - which is what every photograph came in as before this. */
+    contentType?: string
+): Promise<{ error?: string }> {
     const { install } = await requireHome("home.manage");
     if (image.byteLength > 8_000_000) return { error: "That photograph is too large." };
-    const result = await guard(() => people.addFace(install.id, id, image));
+    const result = await guard(() => people.addFace(install.id, id, image, faceImageType(contentType)));
     return result.error ? { error: result.error } : {};
 }
 
