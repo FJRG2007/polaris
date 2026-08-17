@@ -12,11 +12,11 @@ const zone = (label: string, scope: "polaris" | "deploy", primary = false) => ({
 
 describe("zoneHost", () => {
     it("puts the label in front of the base domain", () => {
-        expect(zoneHost("fjrg2007.com", "polaris")).toBe("polaris.fjrg2007.com");
+        expect(zoneHost("example.com", "polaris")).toBe("polaris.example.com");
     });
 
     it("uses the base domain itself for an empty label", () => {
-        expect(zoneHost("fjrg2007.com", "")).toBe("fjrg2007.com");
+        expect(zoneHost("example.com", "")).toBe("example.com");
     });
 
     it("answers nothing without a base domain", () => {
@@ -26,36 +26,36 @@ describe("zoneHost", () => {
 
 describe("domainSuggestions", () => {
     it("proposes the Polaris zone for the dashboard", () => {
-        const config = { baseDomain: "fjrg2007.com", zones: [zone("polaris", "polaris", true)] };
-        expect(domainSuggestions(config).app).toBe("polaris.fjrg2007.com");
+        const config = { baseDomain: "example.com", zones: [zone("polaris", "polaris", true)] };
+        expect(domainSuggestions(config).app).toBe("polaris.example.com");
     });
 
     it("keeps the sharing name inside the zone, where the wildcard already answers", () => {
-        const config = { baseDomain: "fjrg2007.com", zones: [zone("polaris", "polaris", true)] };
-        // share.fjrg2007.com would need a record of its own; this one does not.
-        expect(domainSuggestions(config).sharing).toBe("share.polaris.fjrg2007.com");
+        const config = { baseDomain: "example.com", zones: [zone("polaris", "polaris", true)] };
+        // share.example.com would need a record of its own; this one does not.
+        expect(domainSuggestions(config).sharing).toBe("share.polaris.example.com");
     });
 
     it("follows the default when several Polaris zones exist", () => {
         const config = {
-            baseDomain: "fjrg2007.com",
+            baseDomain: "example.com",
             zones: [zone("old", "polaris"), zone("polaris", "polaris", true)]
         };
-        expect(domainSuggestions(config).app).toBe("polaris.fjrg2007.com");
+        expect(domainSuggestions(config).app).toBe("polaris.example.com");
     });
 
     it("falls back to the only Polaris zone when none is marked default", () => {
-        const config = { baseDomain: "fjrg2007.com", zones: [zone("polaris", "polaris")] };
-        expect(domainSuggestions(config).app).toBe("polaris.fjrg2007.com");
+        const config = { baseDomain: "example.com", zones: [zone("polaris", "polaris")] };
+        expect(domainSuggestions(config).app).toBe("polaris.example.com");
     });
 
     it("uses the base domain when the zone has no label", () => {
-        const config = { baseDomain: "fjrg2007.com", zones: [zone("", "polaris", true)] };
-        expect(domainSuggestions(config)).toEqual({ app: "fjrg2007.com", sharing: "share.fjrg2007.com" });
+        const config = { baseDomain: "example.com", zones: [zone("", "polaris", true)] };
+        expect(domainSuggestions(config)).toEqual({ app: "example.com", sharing: "share.example.com" });
     });
 
     it("proposes nothing when only deploy zones are configured", () => {
-        const config = { baseDomain: "fjrg2007.com", zones: [zone("plr", "deploy", true)] };
+        const config = { baseDomain: "example.com", zones: [zone("plr", "deploy", true)] };
         expect(domainSuggestions(config)).toEqual({ app: null, sharing: null });
     });
 

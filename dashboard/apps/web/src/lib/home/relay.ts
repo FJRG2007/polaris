@@ -196,7 +196,7 @@ export async function snapshot(
     endpoint: RelayEndpoint,
     cameraId: string,
     quality: "main" | "sub" = "sub",
-    options: { width?: number; cacheSeconds?: number; signal?: AbortSignal } = {}
+    options: { width?: number; cacheMs?: number; signal?: AbortSignal } = {}
 ): Promise<Buffer | null> {
     const query = new URLSearchParams({ src: streamName(cameraId, quality) });
     // Asking for the size it will be drawn at rather than the camera's own. A
@@ -206,7 +206,12 @@ export async function snapshot(
     // The relay decodes a frame to answer this, so a wall of tiles asking at the
     // same moment must not be a decode each. With a cache window they all get the
     // one frame, and the cost is per camera per window rather than per viewer.
-    if (options.cacheSeconds) query.set("cache", `${options.cacheSeconds}s`);
+    //
+    // In milliseconds because the window is also the ceiling on how many
+    // different pictures anybody can be shown: a second of cache is a second of
+    // the same frame, which is a slideshow however often it is asked for. The
+    // wall still asks for a second; one camera on its own asks for less.
+    if (options.cacheMs) query.set("cache", `${options.cacheMs}ms`);
     const response = await relayFetch(endpoint, `/api/frame.jpeg?${query.toString()}`, {
         // A camera that is asleep takes a moment to produce its first frame.
         timeoutMs: 8000,

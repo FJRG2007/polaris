@@ -1,11 +1,11 @@
 {
-  "providerId": "fjrg2007.com",
+  "providerId": "polaris.example",
   "providerName": "Polaris",
   "serviceId": "polaris-zone",
   "serviceName": "Polaris zone",
   "version": 1,
   "description": "Points a Polaris zone and every hostname under it at your server. Applied once per zone: at the zone's label for plr.example.com, or at the domain itself when the zone has no label.",
-  "syncPubKeyDomain": "dc.fjrg2007.com",
+  "syncPubKeyDomain": "dc.polaris.example",
   "syncBlock": false,
   "records": [
     {

@@ -93,6 +93,11 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
                                     camera={camera}
                                     live={live.has(camera.id)}
                                     canControl={canControl}
+                                    // Everything on the wall stands still while
+                                    // one camera is open, the one being watched
+                                    // included - it is behind a dialog, and its
+                                    // own stream is running in there.
+                                    idle={opened !== null}
                                     onOpen={() => setOpened(camera.id)}
                                 />
                             ))}

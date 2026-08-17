@@ -80,12 +80,28 @@ export function CameraTile({
     camera,
     live,
     canControl,
+    idle,
     onOpen
 }: {
     camera: CameraView;
     /** Whether the relay is serving this camera at all. */
     live: boolean;
     canControl: boolean;
+    /**
+     * Whether to stop and hold the last picture.
+     *
+     * Set while somebody has another camera open. A wall of six tiles is six
+     * connections to the relay and six cameras kept awake, and every one of them
+     * is competing with the one being watched - on the same link, through the
+     * same relay, for the same upstream. Somebody who opened one camera is
+     * looking at one camera.
+     *
+     * Stopped rather than hidden: the request really ends, so the relay lets go
+     * of the camera. What stays is the frame that was already on screen, held
+     * and blurred, which is enough to see that a tile is there and not enough to
+     * pretend it is live.
+     */
+    idle: boolean;
     /** Open it big. */
     onOpen: () => void;
 }) {
@@ -108,7 +124,7 @@ export function CameraTile({
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const showing = camera.enabled && live;
-    const wantFrames = showing && visible && !playing;
+    const wantFrames = showing && visible && !playing && !idle;
 
     // Only what somebody can actually see is worth a connection.
     useEffect(() => {
@@ -195,14 +211,28 @@ export function CameraTile({
     // Stopping has to end the request rather than hide it: a stream nobody is
     // watching still holds a slot on the relay.
     useEffect(() => {
-        if (visible && showing) return;
+        if (visible && showing && !idle) return;
         const element = video.current;
         if (!element) return;
         element.pause();
         element.removeAttribute("src");
         element.load();
         setPlaying(false);
-    }, [visible, showing]);
+    }, [visible, showing, idle]);
+
+    /**
+     * One last frame on the way to standing still.
+     *
+     * The picture that is held is whichever frame happened to be loaded last,
+     * and while the stream was playing that was minutes ago - the tile would
+     * freeze on a stale image and look like a camera that had stopped. Asking
+     * for one more costs a single request and makes the held frame the moment
+     * everything stopped.
+     */
+    useEffect(() => {
+        if (!idle || !showing) return;
+        setStamp((value) => value + 1);
+    }, [idle, showing]);
 
     return (
         <div ref={frame} className="group relative overflow-hidden rounded-lg border border-border bg-card">
@@ -216,7 +246,14 @@ export function CameraTile({
                         <img
                             src={stillSrc(camera.id, stamp, FRAME_WIDTH)}
                             alt={camera.name}
-                            className={cn("absolute inset-0 size-full object-cover", playing && "opacity-0")}
+                            className={cn(
+                                "absolute inset-0 size-full object-cover transition-[filter,opacity]",
+                                playing && "opacity-0",
+                                // Held rather than live, and it has to look it:
+                                // a still frame at full sharpness is a camera
+                                // that appears to be working and is not moving.
+                                idle && "opacity-60 blur-[3px] saturate-50"
+                            )}
                             onLoad={() => {
                                 setDrawn(true);
                                 if (wantFrames) after(attempt ? FRAME_GAP_MS : COLD_GAP_MS);
@@ -226,7 +263,7 @@ export function CameraTile({
                                 if (wantFrames) after(FRAME_RETRY_MS);
                             }}
                         />
-                        {attempt && visible ? (
+                        {attempt && visible && !idle ? (
                             <video
                                 ref={video}
                                 // Keyed so switching quality or format really
@@ -248,6 +285,15 @@ export function CameraTile({
                         ) : null}
                         {drawn === false && !playing ? (
                             <Placeholder icon={<Camera className="size-5 shrink-0" />} label="Not answering" />
+                        ) : null}
+                        {/* Said, not just drawn. A blurred still is ambiguous -
+                            it reads as a camera that has gone wrong as easily as
+                            one that was deliberately stopped - and the reader is
+                            the person who stopped it. */}
+                        {idle && drawn !== false ? (
+                            <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-elevated/90 px-2 py-0.5 text-[11px] text-muted-foreground">
+                                Paused
+                            </span>
                         ) : null}
                     </>
                 ) : (

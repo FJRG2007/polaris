@@ -115,7 +115,7 @@ let vacantProbe: { at: number; reachable: boolean } | null = null;
  * its own release cadence: one older than the control plane has the forwardAuth server
  * and not the proxy, and writing an upstream nothing listens on turns every obfuscated
  * route into a 502 with a healthy app behind it. The alternative - assume it is there -
- * is what took `orphion.plr.fjrg2007.com` down while its container served fine on the
+ * is what took `orphion.plr.example.com` down while its container served fine on the
  * host port.
  *
  * `/health` is the proxy's own endpoint and needs no signed origin, so a 200 means the
