@@ -11,11 +11,11 @@
  */
 
 import { prisma } from "@polaris/db";
-import { parseDetection } from "@/lib/home/cameras";
 import { raiseAlerts } from "@/lib/home/alerts";
+import { parseDetection } from "@/lib/home/cameras";
+import type { ObjectClass } from "@/lib/home/detection";
 import { deleteStill, storeStill } from "@/lib/home/stills";
 import { createNotification } from "@/lib/notification-service";
-import type { ObjectClass } from "@/lib/home/detection";
 import { MOTION_SECONDS, recordClip } from "@/lib/home/recording";
 
 /** What a detector reports. The kinds are the ladder's own vocabulary. */
@@ -199,12 +199,17 @@ async function announce(
 ): Promise<void> {
     if (detection.kind === "motion") return;
 
+    // Matched on the subject rather than the name: the label a recognizer sends
+    // is the subject it filed the photographs under, and somebody renamed here
+    // still answers to the one they were taught with. The name is read back at
+    // the same time, so the message says what they are called now.
+    let known: { name: string; notify: boolean } | null = null;
     if (detection.kind === "face" && detection.label) {
-        const person = await prisma.homePerson.findFirst({
-            where: { installedAppId, name: detection.label },
-            select: { notify: true }
+        known = await prisma.homePerson.findFirst({
+            where: { installedAppId, subjectId: detection.label },
+            select: { name: true, notify: true }
         });
-        if (!person?.notify) return;
+        if (!known?.notify) return;
     }
 
     const install = await prisma.installedApp.findFirst({
@@ -215,7 +220,7 @@ async function announce(
 
     const what =
         detection.kind === "face" && detection.label
-            ? `${detection.label} is at the ${cameraName}`
+            ? `${known?.name ?? detection.label} is at the ${cameraName}`
             : detection.kind === "tamper"
               ? `The ${cameraName} camera may have been tampered with`
               : detection.kind === "person"

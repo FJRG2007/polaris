@@ -18,6 +18,15 @@ import { faceEndpoint } from "@/lib/home/recognizer";
 export interface PersonView {
     readonly id: string;
     readonly name: string;
+    /**
+     * What the recognizer files their photographs under, and the label it puts on
+     * an event. Set from the name when they were written down and never changed
+     * afterwards: it is the recognizer's key, so renaming somebody here must not
+     * move it or every photograph already taught would belong to a stranger.
+     *
+     * On screen it is only ever a lookup key - what a person is called is `name`.
+     */
+    readonly subjectId: string;
     readonly notify: boolean;
     /** How many photographs the recognizer holds for them. The number that
      *  matters: one photograph recognizes somebody in that exact light, and four
@@ -36,6 +45,7 @@ export async function listPeople(installedAppId: string): Promise<PersonView[]> 
     return rows.map((row) => ({
         id: row.id,
         name: row.name,
+        subjectId: row.subjectId,
         notify: row.notify,
         faces: counts.get(row.subjectId) ?? 0
     }));
@@ -66,7 +76,35 @@ export async function addPerson(installedAppId: string, name: string): Promise<P
     const row = await prisma.homePerson.create({
         data: { installedAppId, name: trimmed, subjectId: trimmed }
     });
-    return { id: row.id, name: row.name, notify: row.notify, faces: 0 };
+    return { id: row.id, name: row.name, subjectId: row.subjectId, notify: row.notify, faces: 0 };
+}
+
+/**
+ * Change what somebody is called.
+ *
+ * Only the name: their subject in the recognizer stays exactly where it was, so
+ * the photographs already taught still belong to them and an event that arrives
+ * a second later still matches. It is the reason the two are separate columns at
+ * all - correcting a typo must not cost somebody their face.
+ *
+ * Events recorded before the change keep the subject they were written with, and
+ * they read back under the new name because the screen resolves the subject
+ * rather than storing the label twice.
+ */
+export async function renamePerson(installedAppId: string, id: string, name: string): Promise<PersonView> {
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error("Give them a name");
+    const person = await prisma.homePerson.findFirst({ where: { id, installedAppId }, select: { id: true } });
+    if (!person) throw new Error("Not found");
+    const row = await prisma.homePerson.update({ where: { id }, data: { name: trimmed } });
+    const counts = await faceCounts();
+    return {
+        id: row.id,
+        name: row.name,
+        subjectId: row.subjectId,
+        notify: row.notify,
+        faces: counts.get(row.subjectId) ?? 0
+    };
 }
 
 /** Whether seeing them is worth reporting. Off by default: a household is taught

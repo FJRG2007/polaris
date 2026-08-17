@@ -498,6 +498,19 @@ export async function addFaceAction(id: string, image: Uint8Array): Promise<{ er
     return result.error ? { error: result.error } : {};
 }
 
+/** Correct what somebody is called. Their face is untouched - see `renamePerson`
+ *  for why the two are not the same thing. */
+export async function renamePersonAction(
+    id: string,
+    name: string
+): Promise<{ person?: people.PersonView; error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const result = await guard(() => people.renamePerson(install.id, id, String(name)));
+    if (result.error || !result.value) return { error: result.error ?? "That name could not be saved." };
+    revalidatePath(`${PATH}/people`);
+    return { person: result.value };
+}
+
 export async function setPersonNotifyAction(id: string, notify: boolean): Promise<{ error?: string }> {
     const { install } = await requireHome("home.control");
     const result = await guard(() => people.setNotify(install.id, id, Boolean(notify)));

@@ -21,7 +21,21 @@ import { AlertDialog } from "./alert-dialog";
 import type { CameraView } from "@/lib/home/cameras";
 import type { AlertRuleView } from "@/lib/home/alerts";
 import { Bell, Pencil, Plus, Trash2 } from "lucide-react";
-import { Badge, Button, ConfirmDeleteDialog, EmptyState, Skeleton, Switch } from "@polaris/ui";
+import {
+    cn,
+    Badge,
+    Button,
+    Switch,
+    Skeleton,
+    EmptyState,
+    ContextMenu,
+    ContextMenuItem,
+    ContextMenuLabel,
+    ContextMenuContent,
+    ContextMenuTrigger,
+    ContextMenuSeparator,
+    ConfirmDeleteDialog
+} from "@polaris/ui";
 
 const KIND_LABEL: Record<string, string> = {
     motion: "movement",
@@ -41,6 +55,9 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
     const [adding, setAdding] = useState(false);
     const [removing, setRemoving] = useState<AlertRuleView | null>(null);
     const [error, setError] = useState<string | null>(null);
+    // The rule the keyboard is on. A rule is changed one at a time, so there is
+    // nothing here a multi-selection would be for.
+    const [focused, setFocused] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -90,6 +107,30 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
         }
     };
 
+    /**
+     * F2 and Enter open the rule (its name is the first field in that dialog),
+     * Delete removes it, the arrows walk the list. The same keys as the clips
+     * list, the camera table and Drive.
+     */
+    const onKeyDown = (event: React.KeyboardEvent) => {
+        const list = rules ?? [];
+        const index = list.findIndex((rule) => rule.id === focused);
+        const current = list[index];
+        if ((event.key === "F2" || event.key === "Enter") && current && canManage) {
+            event.preventDefault();
+            setEditing(current);
+        } else if (event.key === "Delete" && current && canManage) {
+            event.preventDefault();
+            setRemoving(current);
+        } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            const delta = event.key === "ArrowDown" ? 1 : -1;
+            const next = index < 0 ? (delta > 0 ? 0 : list.length - 1) : index + delta;
+            const landed = list[Math.max(0, Math.min(list.length - 1, next))];
+            if (landed) setFocused(landed.id);
+        }
+    };
+
     if (rules === null) return <Skeleton className="h-40 w-full" />;
 
     /** What a rule does, in one line somebody can check at a glance. */
@@ -121,52 +162,91 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                     description="An alert arrives as a message in a conversation with the people you choose, so it appears wherever they are rather than waiting on a badge."
                 />
             ) : (
-                <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
+                <ul
+                    tabIndex={0}
+                    onKeyDown={onKeyDown}
+                    aria-label="Alerts"
+                    className="flex flex-col divide-y divide-border rounded-lg border border-border"
+                >
                     {rules.map((rule) => (
-                        <li key={rule.id} className="flex items-start justify-between gap-3 px-3 py-2">
-                            <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                    <span className="truncate text-[13px] text-foreground" title={rule.name}>{rule.name}</span>
-                                    {rule.channelId ? null : <Badge variant="neutral">Never fired</Badge>}
-                                </div>
-                                <p className="truncate text-[11px] text-foreground-subtle">{describe(rule)}</p>
-                                <p className="truncate text-[11px] text-foreground-subtle">
-                                    Tells{" "}
-                                    {rule.recipients
-                                        .map((id) => people.find((person) => person.id === id)?.name ?? "somebody")
-                                        .join(", ")}
-                                </p>
-                            </div>
-                            <div className="flex shrink-0 items-center gap-2">
+                        <ContextMenu key={rule.id}>
+                            <ContextMenuTrigger asChild>
+                                <li
+                                    onClick={() => setFocused(rule.id)}
+                                    onContextMenu={() => setFocused(rule.id)}
+                                    onDoubleClick={() => canManage && setEditing(rule)}
+                                    className={cn(
+                                        "flex items-start justify-between gap-3 px-3 py-2",
+                                        focused === rule.id && "bg-primary/10"
+                                    )}
+                                >
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="truncate text-[13px] text-foreground" title={rule.name}>{rule.name}</span>
+                                            {rule.channelId ? null : <Badge variant="neutral">Never fired</Badge>}
+                                        </div>
+                                        <p className="truncate text-[11px] text-foreground-subtle">{describe(rule)}</p>
+                                        <p className="truncate text-[11px] text-foreground-subtle">
+                                            Tells{" "}
+                                            {rule.recipients
+                                                .map((id) => people.find((person) => person.id === id)?.name ?? "somebody")
+                                                .join(", ")}
+                                        </p>
+                                    </div>
+                                    <div className="flex shrink-0 items-center gap-2">
+                                        {canManage ? (
+                                            <>
+                                                <Switch
+                                                    checked={rule.enabled}
+                                                    aria-label={`Turn ${rule.name} ${rule.enabled ? "off" : "on"}`}
+                                                    onChange={(value) => void toggle(rule, value)}
+                                                />
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    aria-label={`Change ${rule.name}`}
+                                                    title="Change"
+                                                    onClick={() => setEditing(rule)}
+                                                >
+                                                    <Pencil className="size-4 shrink-0" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    aria-label={`Remove ${rule.name}`}
+                                                    title="Remove"
+                                                    onClick={() => setRemoving(rule)}
+                                                >
+                                                    <Trash2 className="size-4 shrink-0" />
+                                                </Button>
+                                            </>
+                                        ) : null}
+                                    </div>
+                                </li>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent>
+                                <ContextMenuLabel>{rule.name}</ContextMenuLabel>
                                 {canManage ? (
                                     <>
-                                        <Switch
-                                            checked={rule.enabled}
-                                            aria-label={`Turn ${rule.name} ${rule.enabled ? "off" : "on"}`}
-                                            onChange={(value) => void toggle(rule, value)}
-                                        />
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            aria-label={`Change ${rule.name}`}
-                                            title="Change"
-                                            onClick={() => setEditing(rule)}
-                                        >
+                                        <ContextMenuItem onSelect={() => setEditing(rule)}>
                                             <Pencil className="size-4 shrink-0" />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            aria-label={`Remove ${rule.name}`}
-                                            title="Remove"
-                                            onClick={() => setRemoving(rule)}
-                                        >
+                                            Rename and change
+                                        </ContextMenuItem>
+                                        <ContextMenuItem onSelect={() => void toggle(rule, !rule.enabled)}>
+                                            <Bell className="size-4 shrink-0" />
+                                            {rule.enabled ? "Turn off" : "Turn on"}
+                                        </ContextMenuItem>
+                                        <ContextMenuSeparator />
+                                        <ContextMenuItem variant="danger" onSelect={() => setRemoving(rule)}>
                                             <Trash2 className="size-4 shrink-0" />
-                                        </Button>
+                                            Remove
+                                        </ContextMenuItem>
                                     </>
-                                ) : null}
-                            </div>
-                        </li>
+                                ) : (
+                                    <ContextMenuItem disabled>Nothing to change here</ContextMenuItem>
+                                )}
+                            </ContextMenuContent>
+                        </ContextMenu>
                     ))}
                 </ul>
             )}

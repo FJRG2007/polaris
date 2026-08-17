@@ -19,7 +19,20 @@ import type { CameraView } from "@/lib/home/cameras";
 import type { DiscoveredCamera } from "@/lib/home/discovery";
 import { Cctv, Pencil, Plus, Radar, Trash2 } from "lucide-react";
 import { DETECTOR_META, type Detector } from "@/lib/home/detection";
-import { Badge, Button, ConfirmDeleteDialog, EmptyState, Skeleton } from "@polaris/ui";
+import {
+    cn,
+    Badge,
+    Button,
+    Skeleton,
+    EmptyState,
+    ContextMenu,
+    ContextMenuItem,
+    ContextMenuLabel,
+    ContextMenuContent,
+    ContextMenuTrigger,
+    ContextMenuSeparator,
+    ConfirmDeleteDialog
+} from "@polaris/ui";
 
 const RECORDING_LABEL: Record<string, string> = {
     off: "Nothing kept",
@@ -41,6 +54,9 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
     const [discovering, setDiscovering] = useState(false);
     const [removing, setRemoving] = useState<CameraView | null>(null);
     const [error, setError] = useState<string | null>(null);
+    // The row the keyboard is on. One at a time: there is no action here that
+    // takes several cameras, so a multi-selection would only be decoration.
+    const [focused, setFocused] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -89,6 +105,32 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
         setCameras((current) => (current ?? []).filter((item) => item.id !== camera.id));
     };
 
+    /**
+     * The keys a list of things has on every desktop: F2 renames, Delete
+     * removes, Enter opens, the arrows walk. Renaming a camera is the same
+     * dialog as changing one - its name is the first field in it - so F2 and
+     * Enter land in the same place rather than inventing a second way to type a
+     * name that only exists here.
+     */
+    const onKeyDown = (event: React.KeyboardEvent) => {
+        const list = cameras ?? [];
+        const index = list.findIndex((camera) => camera.id === focused);
+        const current = list[index];
+        if ((event.key === "F2" || event.key === "Enter") && current && canManage) {
+            event.preventDefault();
+            setEditing(current);
+        } else if (event.key === "Delete" && current && canManage) {
+            event.preventDefault();
+            setRemoving(current);
+        } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            const delta = event.key === "ArrowDown" ? 1 : -1;
+            const next = index < 0 ? (delta > 0 ? 0 : list.length - 1) : index + delta;
+            const landed = list[Math.max(0, Math.min(list.length - 1, next))];
+            if (landed) setFocused(landed.id);
+        }
+    };
+
     if (cameras === null) return <ListSkeleton />;
 
     return (
@@ -129,54 +171,84 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                 {canManage ? <th className="px-3 py-2" /> : null}
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-border">
+                        <tbody className="divide-y divide-border" tabIndex={0} onKeyDown={onKeyDown}>
                             {cameras.map((camera) => (
-                                <tr key={camera.id}>
-                                    <td className="w-full max-w-0 px-3 py-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className="truncate text-foreground" title={camera.name}>{camera.name}</span>
-                                            {!camera.enabled ? <Badge variant="neutral">Off</Badge> : null}
-                                        </div>
-                                        <p className="truncate text-[11px] text-foreground-subtle">
-                                            {[camera.zone, cameraVendor(camera.vendor).label, camera.address]
-                                                .filter(Boolean)
-                                                .join(" - ")}
-                                        </p>
-                                    </td>
-                                    <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
-                                        {DETECTOR_META[camera.detector as Detector]?.label ?? camera.detector}
-                                    </td>
-                                    <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
-                                        {RECORDING_LABEL[camera.recording] ?? camera.recording}
-                                        {camera.recording !== "off" ? (
-                                            <span className="text-foreground-subtle"> - {camera.retentionDays}d</span>
-                                        ) : null}
-                                    </td>
-                                    {canManage ? (
-                                        <td className="whitespace-nowrap px-3 py-2 text-right">
-                                            <div className="flex justify-end gap-1">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    aria-label={`Change ${camera.name}`}
-                                                    title="Change"
-                                                    onClick={() => setEditing(camera)}
-                                                >
+                                <ContextMenu key={camera.id}>
+                                    <ContextMenuTrigger asChild>
+                                        <tr
+                                            onClick={() => setFocused(camera.id)}
+                                            onContextMenu={() => setFocused(camera.id)}
+                                            onDoubleClick={() => canManage && setEditing(camera)}
+                                            className={cn(focused === camera.id && "bg-primary/10")}
+                                        >
+                                            <td className="w-full max-w-0 px-3 py-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="truncate text-foreground" title={camera.name}>{camera.name}</span>
+                                                    {!camera.enabled ? <Badge variant="neutral">Off</Badge> : null}
+                                                </div>
+                                                <p className="truncate text-[11px] text-foreground-subtle">
+                                                    {[camera.zone, cameraVendor(camera.vendor).label, camera.address]
+                                                        .filter(Boolean)
+                                                        .join(" - ")}
+                                                </p>
+                                            </td>
+                                            <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
+                                                {DETECTOR_META[camera.detector as Detector]?.label ?? camera.detector}
+                                            </td>
+                                            <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
+                                                {RECORDING_LABEL[camera.recording] ?? camera.recording}
+                                                {camera.recording !== "off" ? (
+                                                    <span className="text-foreground-subtle"> - {camera.retentionDays}d</span>
+                                                ) : null}
+                                            </td>
+                                            {canManage ? (
+                                                <td className="whitespace-nowrap px-3 py-2 text-right">
+                                                    <div className="flex justify-end gap-1">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            aria-label={`Change ${camera.name}`}
+                                                            title="Change"
+                                                            onClick={() => setEditing(camera)}
+                                                        >
+                                                            <Pencil className="size-4 shrink-0" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            aria-label={`Remove ${camera.name}`}
+                                                            title="Remove"
+                                                            onClick={() => setRemoving(camera)}
+                                                        >
+                                                            <Trash2 className="size-4 shrink-0" />
+                                                        </Button>
+                                                    </div>
+                                                </td>
+                                            ) : null}
+                                        </tr>
+                                    </ContextMenuTrigger>
+                                    <ContextMenuContent>
+                                        <ContextMenuLabel>{camera.name}</ContextMenuLabel>
+                                        {canManage ? (
+                                            <>
+                                                <ContextMenuItem onSelect={() => setEditing(camera)}>
                                                     <Pencil className="size-4 shrink-0" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    aria-label={`Remove ${camera.name}`}
-                                                    title="Remove"
-                                                    onClick={() => setRemoving(camera)}
+                                                    Rename and change
+                                                </ContextMenuItem>
+                                                <ContextMenuSeparator />
+                                                <ContextMenuItem
+                                                    variant="danger"
+                                                    onSelect={() => setRemoving(camera)}
                                                 >
                                                     <Trash2 className="size-4 shrink-0" />
-                                                </Button>
-                                            </div>
-                                        </td>
-                                    ) : null}
-                                </tr>
+                                                    Remove
+                                                </ContextMenuItem>
+                                            </>
+                                        ) : (
+                                            <ContextMenuItem disabled>Nothing to change here</ContextMenuItem>
+                                        )}
+                                    </ContextMenuContent>
+                                </ContextMenu>
                             ))}
                         </tbody>
                     </table>

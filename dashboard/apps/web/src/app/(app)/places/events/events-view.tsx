@@ -18,8 +18,8 @@ import * as actions from "../actions";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { EventView } from "@/lib/home/events";
-import { Bell, Check, Loader2, Trash2 } from "lucide-react";
 import type { CameraView } from "@/lib/home/cameras";
+import { Bell, Check, Loader2, Trash2 } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
 import {
     Badge,
@@ -58,7 +58,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
     const format = useDisplayFormat();
     const [events, setEvents] = useState<EventView[] | null>(null);
     const [cameras, setCameras] = useState<CameraView[]>([]);
-    const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
+    const [people, setPeople] = useState<{ id: string; name: string; subjectId: string }[]>([]);
     const [cameraId, setCameraId] = useState("");
     const [kind, setKind] = useState("");
     const [label, setLabel] = useState("");
@@ -77,7 +77,13 @@ export function EventsView({ canControl }: { canControl: boolean }) {
             const [list, known] = await Promise.all([actions.listCamerasAction(), actions.listPeopleAction()]);
             if (cancelled) return;
             setCameras(list.cameras ?? []);
-            setPeople((known.people ?? []).map((person) => ({ id: person.id, name: person.name })));
+            setPeople(
+                (known.people ?? []).map((person) => ({
+                    id: person.id,
+                    name: person.name,
+                    subjectId: person.subjectId
+                }))
+            );
         })();
         return () => {
             cancelled = true;
@@ -173,6 +179,19 @@ export function EventsView({ canControl }: { canControl: boolean }) {
         }
     };
 
+    /**
+     * What to call the person in an event.
+     *
+     * The event holds the subject the recognizer sent, which is fixed for life;
+     * the name beside it is whatever they are called today. Resolving it here
+     * rather than storing it twice is what makes correcting a name correct the
+     * whole log instead of only what happens next.
+     */
+    const nameFor = (subject: string | null): string | null => {
+        if (!subject) return null;
+        return people.find((person) => person.subjectId === subject)?.name ?? subject;
+    };
+
     const openMoment = async (event: EventView) => {
         setNoFootage(null);
         const result = await runAction(() => actions.momentAction(event.id), setError);
@@ -212,7 +231,11 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                         aria-label="Who"
                         options={[
                             { value: "", label: "Anybody" },
-                            ...people.map((person) => ({ value: person.name, label: person.name }))
+                            // Filtered on the subject the recognizer wrote into
+                            // the event, shown under whatever they are called
+                            // now: a name corrected here still finds everything
+                            // recorded before the correction.
+                            ...people.map((person) => ({ value: person.subjectId, label: person.name }))
                         ]}
                     />
                 ) : null}
@@ -303,7 +326,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                 <div className="flex items-start justify-between gap-2 border-t border-border px-3 py-2">
                                     <div className="min-w-0">
                                         <p className="truncate text-[13px] text-foreground">
-                                            {event.label ?? KIND_LABEL[event.kind] ?? event.kind}
+                                            {nameFor(event.label) ?? KIND_LABEL[event.kind] ?? event.kind}
                                         </p>
                                         <p className="truncate text-[11px] text-foreground-subtle">
                                             {event.cameraName} - {format.dateTime(event.at)}
