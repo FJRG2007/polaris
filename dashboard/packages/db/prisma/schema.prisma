@@ -6091,11 +6091,62 @@ model ChatReport {
     message  ChatMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
     reporter User        @relation("ChatReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
     handledBy User?      @relation("ChatReportsHandled", fields: [handledById], references: [id], onDelete: SetNull)
+    files    ChatReportFile[]
 
     // One report per person per message. A second press is the same report.
     @@unique([messageId, reporterId])
     @@index([status, createdAt])
     @@index([channelId])
+}
+
+// A file that was on the message when somebody reported it.
+//
+// Most reports are about a picture. The queue showed the text and nothing else,
+// so the one thing a moderator had to look at to decide anything was the one
+// thing that was not there - and a report of a photograph read "No text", which
+// is true and useless.
+//
+// This is the row, not the bytes. `path` points at the very same file the
+// message points at: nothing is copied, and a conversation full of pictures does
+// not cost twice as much because somebody objected to one of them. What that
+// buys is the problem this row also solves - the author can delete the message,
+// and with it the evidence. So when the message goes, the file is MOVED out from
+// under it into the report's own folder and `held` is set. Still one copy; it
+// simply belongs to the report now.
+//
+// Which is also why every field is duplicated here rather than read through
+// `attachmentId`: the attachment row is deleted with the message, and this has
+// to be able to draw and serve the file without it.
+model ChatReportFile {
+    id           String  @id @default(uuid(7)) @db.Uuid
+    reportId     String  @db.Uuid
+    // The attachment it was taken from, while that still exists. Null once the
+    // message has been deleted - it is what this is asked by, when the bytes
+    // have to be rescued before they go.
+    attachmentId String? @db.Uuid
+    name         String
+    // The same width the attachment carries it in, so nothing is rounded on the
+    // way across.
+    size         BigInt  @default(0)
+    contentType  String
+    // Where the bytes are, in the same two columns the attachment uses. Both
+    // change exactly once, if the message is ever deleted.
+    connectionId String? @db.Uuid
+    path         String
+    // What the browser measured about a recording, so the report can draw the
+    // same player the conversation does rather than a link.
+    durationMs   Int?
+    waveform     String?
+    // Whether the bytes now belong to the report. False means they are still the
+    // message's, and deleting the message is what changes it.
+    held         Boolean @default(false)
+    createdAt    DateTime @default(now())
+
+    report ChatReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+    @@index([reportId])
+    // The lookup that runs on every message deletion, so it must not be a scan.
+    @@index([attachmentId])
 }
 
 // An emoji somebody put on a message. One row per person per emoji per message,

@@ -26,7 +26,9 @@
 import { remove } from "./messages";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { knownPreviews, type KnownPreview } from "./link-preview";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
+import { copyOntoReport, reportFiles, type ChatReportFileView } from "./report-files";
 import { ChatAccessError, ChatRuleError, requireChannel, type ChatActor } from "./access";
 
 /** How much of a message is copied onto the report. Enough to triage without
@@ -46,6 +48,15 @@ export interface ChatReportView {
     /** Who wrote what was reported, when they still have an account. */
     readonly authorName: string | null;
     readonly excerpt: string;
+    /** What was attached to it. Kept whether or not the message still is - see
+     *  `report-files` - because the commonest report is about a picture, and a
+     *  queue that showed the words and not the picture was showing the one thing
+     *  nobody was objecting to. */
+    readonly files: readonly ChatReportFileView[];
+    /** The cards the message drew, for a report about a link. Resolved from what
+     *  has already been looked up rather than fetched: a moderation queue must
+     *  not make this server visit an address somebody chose. */
+    readonly links: readonly KnownPreview[];
     /** Null once the message is gone - deleted by its author, by a moderator, or
      *  by an instance that leaves no trace. */
     readonly messageId: string | null;
@@ -115,17 +126,25 @@ export async function reportMessage(
 
     if (existing) {
         await prisma.chatReport.update({ where: { id: existing.id }, data: shape });
+        // Again rather than only on the first press: the same report is updated,
+        // and the message may have been edited in between - a picture taken off,
+        // another put on.
+        await copyOntoReport(existing.id, message.id);
         return { already: true };
     }
 
-    await prisma.chatReport.create({
+    const made = await prisma.chatReport.create({
         data: {
             messageId: message.id,
             channelId: message.channelId,
             reporterId: actor.id,
             ...shape
-        }
+        },
+        select: { id: true }
     });
+    // Rows, not bytes. They point at the same stored files the message points
+    // at, and only become the report's own if the message is ever deleted.
+    await copyOntoReport(made.id, message.id);
     return { already: false };
 }
 
@@ -174,7 +193,26 @@ export async function listReports(status: core.ChatReportStatus | "all"): Promis
     const named = new Map(authors.map((user) => [user.id, user.name]));
     const where = new Map(channels.map((channel) => [channel.id, channel]));
 
+    // What was attached, and the card the message drew - the two halves the
+    // queue was missing, in one lookup each rather than one per row.
+    //
+    // The link is read out of the copy taken at report time, which is the only
+    // place it survives an author deleting the message. `firstLink` is the same
+    // function that decided which address the message itself unfurled, so a
+    // report shows the card the reader was looking at and not a second guess at
+    // one.
+    const [files, previews] = await Promise.all([
+        reportFiles(rows.map((row) => row.id)),
+        knownPreviews(
+            rows
+                .map((row) => core.firstLink(row.excerpt))
+                .filter((link): link is string => link !== null)
+        )
+    ]);
+
     return rows.map((row) => {
+        const link = core.firstLink(row.excerpt);
+        const card = link ? previews.get(link) : undefined;
         const channel = where.get(row.channelId);
         return {
             id: row.id,
@@ -187,6 +225,8 @@ export async function listReports(status: core.ChatReportStatus | "all"): Promis
             reporterName: row.reporter.name,
             authorName: row.authorId ? (named.get(row.authorId) ?? null) : null,
             excerpt: row.excerpt,
+            files: files.get(row.id) ?? [],
+            links: card?.ok && card.view ? [card] : [],
             messageId: row.messageId,
             channelId: row.channelId,
             // A direct message has no name of its own, and naming the people in

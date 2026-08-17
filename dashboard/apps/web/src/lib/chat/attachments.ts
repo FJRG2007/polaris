@@ -20,6 +20,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { keepChannelForReports, keepForReports } from "./report-files";
 import {
     AUTOMATIC_TARGET,
     LOCAL_TARGET,
@@ -40,6 +41,18 @@ const LOCAL_FOLDER = "chat";
 /** Inside whichever storage, so a NAS shared with everything else stays legible
  *  from a file browser. */
 const ATTACHMENT_ROOT = "polaris/chat";
+
+/**
+ * Where a file goes when a report is the only thing left holding it.
+ *
+ * Beside the conversations rather than inside one, and that placement is the
+ * whole design. Everything that deletes a conversation's files does it by
+ * deleting `polaris/chat/<channel>` whole, and the sweep below removes any
+ * folder under that root without a channel to answer for it - so evidence kept
+ * anywhere under there would be swept away by exactly the operations it has to
+ * survive. Out here, neither can reach it, and neither had to learn about it.
+ */
+const EVIDENCE_ROOT = "polaris/chat-reports";
 
 /**
  * The most one file may be, whatever the rules say.
@@ -343,6 +356,86 @@ export async function readStored(
 }
 
 /**
+ * Move a file out from under the message that is about to lose it.
+ *
+ * A moved file, not a copied one, and that is the point. A report holds the same
+ * bytes the message holds - one file, two things pointing at it - so a
+ * conversation full of pictures does not cost twice as much because somebody
+ * objected to one of them. The arrangement only breaks at one moment: the author
+ * deletes the message, and the file goes with it. This is that moment.
+ *
+ * Written to the storage this instance uses today rather than the one the file
+ * is on, because the old one may be a NAS that is being decommissioned - which
+ * is a thing that happens to a file nobody has touched in six months, which is
+ * what evidence is. The source copy is deleted last and its failure is not
+ * fatal: a byte range left behind on an unreachable share is worse than losing
+ * the evidence, but only just, and it is the sweep's problem.
+ *
+ * @returns where it now is, or null if it could not be moved - in which case the
+ *   caller leaves the row alone and the file is deleted with the message, which
+ *   is the honest outcome rather than a row pointing at nothing.
+ */
+export async function holdFile(
+    from: { connectionId: string | null; path: string },
+    folder: string,
+    name: string
+): Promise<{ connectionId: string | null; path: string } | null> {
+    const bytes = await readStored(from.connectionId, from.path, `a reported file at ${from.path}`);
+    if (!bytes) return null;
+
+    const into = `${EVIDENCE_ROOT}/${safe(folder)}`;
+    const path = `${into}/${safe(name)}`;
+    let placed: { targetId: string };
+    try {
+        placed = await placeFile({
+            target: await chatTarget(),
+            localFolder: LOCAL_FOLDER,
+            folder: into,
+            path,
+            bytes,
+            mime: "application/octet-stream",
+            what: "reported file"
+        });
+    } catch (error) {
+        console.error(`chat: a reported file at ${from.path} could not be kept:`, error);
+        return null;
+    }
+
+    // Only once the new copy exists. The order is what makes this a move that
+    // cannot lose the file rather than a delete that usually copies first.
+    const driver = await driverForTarget(from.connectionId ?? LOCAL_TARGET, LOCAL_FOLDER).catch(
+        () => null
+    );
+    if (driver) {
+        try {
+            await driver.delete(from.path).catch(() => undefined);
+        } finally {
+            await driver.dispose().catch(() => undefined);
+        }
+    }
+
+    return { connectionId: placed.targetId === LOCAL_TARGET ? null : placed.targetId, path };
+}
+
+/** Everything a report was keeping, gone with the report. */
+export async function discardEvidence(reportIds: readonly string[]): Promise<void> {
+    const folders = [...new Set(reportIds)];
+    if (folders.length === 0) return;
+
+    const driver = await driverForTarget((await chatTarget()).id, LOCAL_FOLDER).catch(() => null);
+    if (!driver) return;
+    try {
+        for (const folder of folders) {
+            await driver
+                .delete(`${EVIDENCE_ROOT}/${safe(folder)}`, { recursive: true })
+                .catch(() => undefined);
+        }
+    } finally {
+        await driver.dispose().catch(() => undefined);
+    }
+}
+
+/**
  * Delete the files on a message from wherever they were written.
  *
  * Every route out of a message goes through here - taken back without trace, or
@@ -364,9 +457,16 @@ export async function readStored(
 export async function discardAttachments(messageId: string): Promise<void> {
     const files = await prisma.chatAttachment.findMany({
         where: { messageId },
-        select: { connectionId: true, path: true }
+        select: { id: true, connectionId: true, path: true }
     });
     if (files.length === 0) return;
+
+    // Anything a report is holding is moved out from under this first, so that
+    // deleting a message somebody objected to does not also delete what they
+    // objected to. Nothing is refused and nothing is copied - see
+    // `report-files` - and for the overwhelming majority of messages this is one
+    // indexed lookup that finds nothing.
+    await keepForReports(files.map((file) => file.id));
 
     const byTarget = new Map<string, string[]>();
     for (const file of files) {
@@ -419,6 +519,11 @@ export async function discardAttachments(messageId: string): Promise<void> {
 export async function discardChannelFiles(channelIds: readonly string[]): Promise<void> {
     const channels = [...new Set(channelIds)];
     if (channels.length === 0) return;
+
+    // The whole folder goes below, recursively, so anything a report is holding
+    // has to be out of it before that runs. A report outlives the conversation
+    // it was made in - it is the instance's record, not the room's.
+    await keepChannelForReports(channels);
 
     const stored = await prisma.chatAttachment.findMany({
         where: { message: { channelId: { in: channels } } },

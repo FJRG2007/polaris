@@ -28,6 +28,11 @@ const createReport = vi.fn();
 const updateReport = vi.fn();
 const requireChannel = vi.fn();
 const remove = vi.fn();
+/** What was on the message, and what the report ends up holding a copy of. */
+const findAttachments = vi.fn();
+const findReportFiles = vi.fn();
+const createReportFiles = vi.fn();
+const deleteReportFiles = vi.fn();
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -39,10 +44,18 @@ vi.mock("@polaris/db", () => ({
             findMany: vi.fn(async () => []),
             count: vi.fn(async () => 0)
         },
+        chatAttachment: { findMany: findAttachments },
+        chatReportFile: {
+            findMany: findReportFiles,
+            createMany: createReportFiles,
+            deleteMany: deleteReportFiles,
+            update: vi.fn(async () => ({}))
+        },
         user: { findMany: vi.fn(async () => []) },
         chatChannel: { findMany: vi.fn(async () => []) }
     }
 }));
+vi.mock("@/lib/chat/link-preview", () => ({ knownPreviews: async () => new Map() }));
 class FakeAccessError extends Error {}
 vi.mock("@/lib/chat/access", () => ({
     requireChannel,
@@ -71,6 +84,10 @@ beforeEach(() => {
     }));
     findReport.mockImplementation(async () => null);
     createReport.mockImplementation(async () => ({ id: "r1" }));
+    findAttachments.mockImplementation(async () => []);
+    findReportFiles.mockImplementation(async () => []);
+    createReportFiles.mockImplementation(async () => ({ count: 0 }));
+    deleteReportFiles.mockImplementation(async () => ({ count: 0 }));
 });
 
 describe("reporting a message", () => {

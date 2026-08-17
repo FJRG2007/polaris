@@ -24,8 +24,11 @@ import { runAction } from "@/lib/run-action";
 import { settleReportAction } from "./actions";
 import { CHAT_REPORT_LABELS } from "@polaris/core";
 import type { ChatReportView } from "@/lib/chat/reports";
-import { Check, MessageSquare, Trash2 } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
+import { VoiceNote } from "@/app/(app)/chat/voice-note";
+import type { LinkPreviewView } from "@/lib/chat/link-preview";
+import type { ChatReportFileView } from "@/lib/chat/report-files";
+import { Check, Download, MessageSquare, Paperclip, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardBody, Select } from "@polaris/ui";
 
 const FILTERS = [
@@ -103,8 +106,27 @@ export function ReportsView({
                             surface, and a report is not a place to run somebody
                             else's formatting. */}
                         <blockquote className="whitespace-pre-wrap break-words border-l-2 border-border pl-3 text-sm">
-                            {report.excerpt || <span className="text-muted-foreground">No text</span>}
+                            {report.excerpt || (
+                                <span className="text-muted-foreground">
+                                    {report.files.length > 0 ? "No text - see below" : "No text"}
+                                </span>
+                            )}
                         </blockquote>
+
+                        {/* What was actually attached. Most reports are about a
+                            picture, and until this was here the queue showed the
+                            words and not the thing anybody was objecting to. */}
+                        <ReportFiles reportId={report.id} files={report.files} />
+
+                        {/* The card the message drew, for a report about a link.
+                            Drawn from what was already looked up: nothing here
+                            visits an address somebody else chose. */}
+                        {report.links.map((link) =>
+                            link.view ? (
+                                <ReportLink key={link.view.url} link={link.view} />
+                            ) : null
+                        )}
+
                         <p className="text-xs text-muted-foreground">
                             {report.authorName ? `Written by ${report.authorName}` : "Written by an account that is gone"}
                             {!report.live && " - the message is no longer there"}
@@ -157,5 +179,106 @@ export function ReportsView({
                 </Card>
             ))}
         </div>
+    );
+}
+
+/**
+ * What was attached to the message, as the moderator has to see it.
+ *
+ * Drawn rather than listed. A report of a picture where the picture is a
+ * filename is a report nobody can answer without opening the conversation, which
+ * for a direct message they cannot do at all - and being able to would be a
+ * worse feature than this one.
+ *
+ * Served from the report's own route, which is gated on administering the
+ * instance. That is the only reason these are readable here.
+ */
+function ReportFiles({
+    reportId,
+    files
+}: {
+    reportId: string;
+    files: readonly ChatReportFileView[];
+}) {
+    if (files.length === 0) return null;
+
+    const href = (file: ChatReportFileView) => `/api/chat/reports/${reportId}/files/${file.id}`;
+
+    return (
+        <div className="flex flex-col gap-2">
+            {files.map((file) => (
+                <div key={file.id} className="flex flex-col gap-1">
+                    {file.contentType.startsWith("image/") ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                            src={href(file)}
+                            alt={file.name}
+                            className="max-h-72 w-auto max-w-full rounded-md border border-border object-contain"
+                        />
+                    ) : file.contentType.startsWith("video/") ? (
+                        <video
+                            src={href(file)}
+                            controls
+                            preload="metadata"
+                            className="max-h-72 w-auto max-w-full rounded-md border border-border"
+                        />
+                    ) : file.contentType.startsWith("audio/") ? (
+                        <VoiceNote
+                            href={href(file)}
+                            name={file.name}
+                            recorded={false}
+                            durationMs={file.durationMs}
+                            waveform={file.waveform}
+                        />
+                    ) : (
+                        <a
+                            href={`${href(file)}?download=1`}
+                            className="flex w-fit items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-xs no-underline hover:bg-muted"
+                        >
+                            <Paperclip className="size-3.5 shrink-0" />
+                            <span className="min-w-0 truncate">{file.name}</span>
+                            <Download className="size-3.5 shrink-0 text-muted-foreground" />
+                        </a>
+                    )}
+                    <span className="text-[11px] text-foreground-subtle">
+                        {file.name}
+                        {/* Said out loud, because the two are different claims: a
+                            live file is the one still on the message, and a kept
+                            one is the copy that outlived it. */}
+                        {file.held ? " - kept after the message was deleted" : null}
+                    </span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+/** The card the message drew for a link, for a report about one. */
+function ReportLink({ link }: { link: LinkPreviewView }) {
+    return (
+        <a
+            href={link.url}
+            target="_blank"
+            rel="noreferrer noopener nofollow"
+            className="flex gap-3 rounded-md border border-border p-2.5 no-underline hover:bg-muted"
+        >
+            {link.hasImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                    src={`/api/chat/links/${link.id}/image`}
+                    alt=""
+                    className="size-16 shrink-0 rounded object-cover"
+                />
+            ) : null}
+            <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="text-[11px] text-foreground-subtle">
+                    {link.siteName || new URL(link.url).hostname}
+                </span>
+                <span className="truncate text-sm font-medium text-foreground">{link.title}</span>
+                <span className="line-clamp-2 text-[12px] text-muted-foreground">
+                    {link.description}
+                </span>
+            </span>
+        </a>
     );
 }
