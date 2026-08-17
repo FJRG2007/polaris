@@ -18,6 +18,7 @@ import { runAction } from "@/lib/run-action";
 import { PersonDialog } from "./person-dialog";
 import { useEffect, useRef, useState } from "react";
 import type { PersonView } from "@/lib/home/people";
+import { focusAfterMove } from "@/lib/list-selection";
 import { ImagePlus, Loader2, Pencil, ScanFace, Trash2, UserPlus } from "lucide-react";
 import {
     cn,
@@ -144,10 +145,12 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
             setRemoving(current);
         } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
-            const delta = event.key === "ArrowDown" ? 1 : -1;
-            const next = index < 0 ? (delta > 0 ? 0 : list.length - 1) : index + delta;
-            const landed = list[Math.max(0, Math.min(list.length - 1, next))];
-            if (landed) setFocused(landed.id);
+            const landed = focusAfterMove(
+                list.map((item) => item.id),
+                focused,
+                event.key === "ArrowDown" ? 1 : -1
+            );
+            if (landed) setFocused(landed);
         }
     };
 

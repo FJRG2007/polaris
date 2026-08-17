@@ -19,6 +19,7 @@ import type { CameraView } from "@/lib/home/cameras";
 import type { DiscoveredCamera } from "@/lib/home/discovery";
 import { Cctv, Pencil, Plus, Radar, Trash2 } from "lucide-react";
 import { DETECTOR_META, type Detector } from "@/lib/home/detection";
+import { focusAfterMove } from "@/lib/list-selection";
 import {
     cn,
     Badge,
@@ -124,10 +125,12 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
             setRemoving(current);
         } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
-            const delta = event.key === "ArrowDown" ? 1 : -1;
-            const next = index < 0 ? (delta > 0 ? 0 : list.length - 1) : index + delta;
-            const landed = list[Math.max(0, Math.min(list.length - 1, next))];
-            if (landed) setFocused(landed.id);
+            const landed = focusAfterMove(
+                list.map((item) => item.id),
+                focused,
+                event.key === "ArrowDown" ? 1 : -1
+            );
+            if (landed) setFocused(landed);
         }
     };
 

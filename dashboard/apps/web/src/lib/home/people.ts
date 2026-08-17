@@ -67,14 +67,38 @@ async function faceCounts(): Promise<Map<string, number>> {
     return counts;
 }
 
-/** Write somebody down. The subject is the name as typed: it is what the
- *  recognizer files photographs under and what turns up as the label on an
+/**
+ * A subject nobody in this house already answers to.
+ *
+ * Normally the name as typed, because it is what turns up as the label on an
+ * event and the two should read the same. Not always, though, and the exception
+ * is the whole reason this function exists: renaming somebody leaves their old
+ * name free while their subject keeps it, so writing down a second person under
+ * that freed name would file both of them under one subject - and then a
+ * photograph taught for one is a face the recognizer answers with the other.
+ * That is the exact harm the subject was split from the name to prevent.
+ *
+ * The loop terminates: there are finitely many people in a house, so some
+ * suffix is always free.
+ */
+async function freeSubject(installedAppId: string, name: string): Promise<string> {
+    const rows = await prisma.homePerson.findMany({ where: { installedAppId }, select: { subjectId: true } });
+    const taken = new Set(rows.map((row) => row.subjectId));
+    if (!taken.has(name)) return name;
+    for (let suffix = 2; ; suffix++) {
+        const candidate = `${name} ${suffix}`;
+        if (!taken.has(candidate)) return candidate;
+    }
+}
+
+/** Write somebody down. The subject is normally the name as typed: it is what
+ *  the recognizer files photographs under and what turns up as the label on an
  *  event, so the two should read the same. */
 export async function addPerson(installedAppId: string, name: string): Promise<PersonView> {
     const trimmed = name.trim();
     if (!trimmed) throw new Error("Give them a name");
     const row = await prisma.homePerson.create({
-        data: { installedAppId, name: trimmed, subjectId: trimmed }
+        data: { installedAppId, name: trimmed, subjectId: await freeSubject(installedAppId, trimmed) }
     });
     return { id: row.id, name: row.name, subjectId: row.subjectId, notify: row.notify, faces: 0 };
 }

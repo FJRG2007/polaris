@@ -6713,7 +6713,11 @@ model HomePerson {
     id             String  @id @default(uuid(7)) @db.Uuid
     installedAppId String  @db.Uuid
     name           String
-    /// The subject this person is filed under in the recognition service.
+    /// The subject this person is filed under in the recognition service. Set
+    /// from the name when they were written down and never moved afterwards, so
+    /// correcting a name does not cost somebody the photographs already taught
+    /// for them. Unique per house for the same reason the name is: two people
+    /// sharing a subject share a face.
     subjectId      String
     /// Whether seeing them is worth reporting. A household is recognized so that
     /// it stops raising alerts, not so that every arrival home becomes one.
@@ -6723,5 +6727,6 @@ model HomePerson {
     updatedAt DateTime @updatedAt
 
     @@unique([installedAppId, name])
+    @@unique([installedAppId, subjectId])
     @@index([installedAppId])
 }

@@ -20,6 +20,7 @@ import { runAction } from "@/lib/run-action";
 import { AlertDialog } from "./alert-dialog";
 import type { CameraView } from "@/lib/home/cameras";
 import type { AlertRuleView } from "@/lib/home/alerts";
+import { focusAfterMove } from "@/lib/list-selection";
 import { Bell, Pencil, Plus, Trash2 } from "lucide-react";
 import {
     cn,
@@ -124,10 +125,12 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
             setRemoving(current);
         } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
-            const delta = event.key === "ArrowDown" ? 1 : -1;
-            const next = index < 0 ? (delta > 0 ? 0 : list.length - 1) : index + delta;
-            const landed = list[Math.max(0, Math.min(list.length - 1, next))];
-            if (landed) setFocused(landed.id);
+            const landed = focusAfterMove(
+                list.map((item) => item.id),
+                focused,
+                event.key === "ArrowDown" ? 1 : -1
+            );
+            if (landed) setFocused(landed);
         }
     };
 

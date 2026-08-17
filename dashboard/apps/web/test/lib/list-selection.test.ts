@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { afterClick, afterMove, rangeBetween, toggled } from "@/lib/list-selection";
+import { afterClick, afterMove, focusAfterMove, rangeBetween, toggled } from "@/lib/list-selection";
 
 const KEYS = ["a", "b", "c", "d", "e"];
 
@@ -73,6 +73,27 @@ describe("an arrow key", () => {
 
     it("does nothing to an empty list", () => {
         expect([...afterMove(new Set(), [], null, null, 1, false).selected]).toEqual([]);
+    });
+});
+
+describe("a list that holds one row", () => {
+    it("starts at the near end whichever way the first press went", () => {
+        expect(focusAfterMove(KEYS, null, 1)).toBe("a");
+        expect(focusAfterMove(KEYS, null, -1)).toBe("e");
+    });
+
+    it("walks one at a time and stops at both ends", () => {
+        expect(focusAfterMove(KEYS, "b", 1)).toBe("c");
+        expect(focusAfterMove(KEYS, "e", 1)).toBe("e");
+        expect(focusAfterMove(KEYS, "a", -1)).toBe("a");
+    });
+
+    it("treats a row that is no longer there as nothing focused", () => {
+        expect(focusAfterMove(KEYS, "gone", 1)).toBe("a");
+    });
+
+    it("has nowhere to go in an empty list", () => {
+        expect(focusAfterMove([], null, 1)).toBeNull();
     });
 });
 

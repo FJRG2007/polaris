@@ -90,6 +90,22 @@ export function afterMove(
     return { selected: key ? new Set([key]) : new Set(), anchor: next, cursor: next };
 }
 
+/**
+ * The same walk for a list that holds one row rather than a selection.
+ *
+ * A camera, a person and an alert rule are each changed on their own - there is
+ * no action that takes several - so those screens track one focused row. They
+ * still have to walk it the same way, and three hand-written copies of "start at
+ * the near end, then clamp" is three chances to get the empty list or the first
+ * press wrong.
+ */
+export function focusAfterMove(keys: readonly string[], focused: string | null, delta: number): string | null {
+    if (keys.length === 0) return null;
+    const index = focused === null ? -1 : keys.indexOf(focused);
+    const next = index < 0 ? (delta > 0 ? 0 : keys.length - 1) : clamp(index + delta, keys.length);
+    return keys[next] ?? null;
+}
+
 function clamp(value: number, length: number): number {
     return Math.max(0, Math.min(length - 1, value));
 }
