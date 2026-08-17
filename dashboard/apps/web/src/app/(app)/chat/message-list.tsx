@@ -28,6 +28,7 @@ import { useEffect, useRef, useState } from "react";
 import { autoplaying, embedFor } from "@/lib/chat/embeds";
 import { EditHistoryDialog } from "./edit-history-dialog";
 import { RelativeTime } from "@/components/relative-time";
+import { MessageInfoDialog } from "./message-info-dialog";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
 import { isPlayable, isVoiceMessage } from "./voice-recorder";
@@ -38,7 +39,8 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuTrigger
+    DropdownMenuTrigger,
+    keepFocusOnClose
 } from "@polaris/ui";
 import {
     Check,
@@ -74,9 +76,17 @@ export interface MessageListProps {
     onOpenThread?: (message: ChatMessageView) => void;
     onReact: (messageId: string, emoji: string) => void;
     onStar: (message: ChatMessageView) => void;
-    onReply: (message: ChatMessageView) => void;
-    onForward: (message: ChatMessageView) => void;
-    onEdit: (message: ChatMessageView) => void;
+    /**
+     * Absent inside a thread, which is already the reply.
+     *
+     * Optional for the same reason `onOpenThread` is: a control that is drawn and
+     * does nothing is worse than one that is not there. These three used to be
+     * passed as empty functions by the thread panel, so it carried a Reply
+     * button, a Forward item and an Edit item that all quietly did nothing.
+     */
+    onReply?: (message: ChatMessageView) => void;
+    onForward?: (message: ChatMessageView) => void;
+    onEdit?: (message: ChatMessageView) => void;
     onDelete: (message: ChatMessageView) => void;
     /** A message to point at, after arriving from a search result. It fades on
      *  its own: a highlight that stays is a highlight somebody has to dismiss. */
@@ -97,26 +107,20 @@ export function MessageList({
     onEdit,
     onDelete
 }: MessageListProps) {
-    useMessageKeys({ messages, viewerId, canPost, canModerate, onEdit, onDelete });
+    useMessageKeys({ messages, viewerId, canPost, canModerate, onReply, onEdit, onDelete });
 
     // The picture being looked at, held here rather than in each message: one
     // viewer is open at a time, and it is drawn over the whole conversation.
     const [viewing, setViewing] = useState<ViewedImage | null>(null);
     const [reporting, setReporting] = useState<string | null>(null);
+    const [explaining, setExplaining] = useState<ChatMessageView | null>(null);
 
     return (
         <ol className="flex flex-col">
             {messages.map((message, index) => {
                 const previous = index > 0 ? messages[index - 1] : undefined;
                 const newDay = !previous || !sameDay(previous.createdAt, message.createdAt);
-                const grouped =
-                    !newDay &&
-                    previous !== undefined &&
-                    previous.authorId === message.authorId &&
-                    message.authorId !== null &&
-                    !previous.deleted &&
-                    !message.deleted &&
-                    withinWindow(previous.createdAt, message.createdAt);
+                const grouped = sharesBlock(previous, message);
 
                 return (
                     <li
@@ -132,9 +136,15 @@ export function MessageList({
                         <Message
                             message={message}
                             grouped={grouped}
+                            // The ticks go under the last message of a block and
+                            // nowhere else. Somebody who has read the newest of
+                            // five messages in a row has read the other four,
+                            // and five ticks say that five times.
+                            lastOfBlock={!sharesBlock(message, messages[index + 1])}
                             mine={message.authorId === viewerId}
                             onOpenImage={setViewing}
                             onReport={(target) => setReporting(target.id)}
+                            onExplain={setExplaining}
                             canPost={canPost}
                             canModerate={canModerate}
                             onOpenThread={onOpenThread}
@@ -152,12 +162,18 @@ export function MessageList({
             <ImageViewer
                 image={viewing}
                 onClose={() => setViewing(null)}
-                onForward={(messageId) => {
-                    const found = messages.find((entry) => entry.id === messageId);
-                    if (!found) return;
-                    setViewing(null);
-                    onForward(found);
-                }}
+                // Absent inside a thread, where forwarding is left to the
+                // channel: the viewer draws no Forward item rather than one
+                // that does nothing.
+                onForward={
+                    onForward &&
+                    ((messageId) => {
+                        const found = messages.find((entry) => entry.id === messageId);
+                        if (!found) return;
+                        setViewing(null);
+                        onForward(found);
+                    })
+                }
                 onReport={(messageId) => {
                     setViewing(null);
                     setReporting(messageId);
@@ -169,31 +185,58 @@ export function MessageList({
                 open={reporting !== null}
                 onOpenChange={(next) => !next && setReporting(null)}
             />
+            <MessageInfoDialog
+                message={explaining}
+                onOpenChange={(next) => !next && setExplaining(null)}
+            />
         </ol>
     );
 }
 
 /**
- * F2 rewrites the message under the pointer, and Delete takes it back.
+ * Whether the second of two messages joins the first's block.
  *
- * The row already lights up on hover and already carries a pencil and a bin, so
- * the thing being pointed at is unambiguous - these are shortcuts to controls
- * that are visibly there, not hidden gestures. Focus counts as well as hover, so
- * the same keys reach the same message for somebody using a keyboard.
+ * The same question in both directions: the header and the face are dropped from
+ * a message that joins the one above it, and the ticks are dropped from one the
+ * next message joins. Neither a tombstone nor a line Polaris wrote itself joins
+ * anything - a deleted message ends the block it was in.
+ */
+function sharesBlock(
+    previous: ChatMessageView | undefined,
+    next: ChatMessageView | undefined
+): boolean {
+    if (!previous || !next) return false;
+    if (previous.authorId === null || previous.authorId !== next.authorId) return false;
+    if (previous.deleted || next.deleted) return false;
+    return (
+        sameDay(previous.createdAt, next.createdAt) &&
+        withinWindow(previous.createdAt, next.createdAt)
+    );
+}
+
+/**
+ * The keys that act on the message being pointed at.
+ *
+ * F2 rewrites it, Delete takes it back, and R answers it - the three things the
+ * hover row already offers. The row lights up on hover and carries a pencil, a
+ * bin and an arrow, so what is being aimed at is never in doubt: these are
+ * shortcuts to controls that are visibly there, not hidden gestures. Focus counts
+ * as well as hover, so the same keys reach the same message from a keyboard.
  *
  * Delete opens the confirmation rather than doing it, exactly as the menu item
  * does. A key that removed a message on a single press would be the one gesture
  * in a conversation with no undo, reachable by leaning on a keyboard.
  *
- * Both are ignored while a field has focus. Neither key does anything useful in
- * a text box, but a shortcut that fired while somebody was typing would be one
- * that fired at the wrong message.
+ * All of them are ignored while a field has focus. R is a letter, and somebody
+ * typing "r" in the composer means the letter every time - which is also why
+ * this only ever fires with the pointer or the focus on a message.
  */
 function useMessageKeys({
     messages,
     viewerId,
     canPost,
     canModerate,
+    onReply,
     onEdit,
     onDelete
 }: {
@@ -201,17 +244,25 @@ function useMessageKeys({
     viewerId: string;
     canPost: boolean;
     canModerate: boolean;
-    onEdit: (message: ChatMessageView) => void;
+    onReply?: (message: ChatMessageView) => void;
+    onEdit?: (message: ChatMessageView) => void;
     onDelete: (message: ChatMessageView) => void;
 }) {
     // Held in a ref so the listener is bound once rather than rebuilt on every
     // message that arrives.
-    const latest = useRef({ messages, viewerId, canPost, canModerate, onEdit, onDelete });
-    latest.current = { messages, viewerId, canPost, canModerate, onEdit, onDelete };
+    const latest = useRef({ messages, viewerId, canPost, canModerate, onReply, onEdit, onDelete });
+    latest.current = { messages, viewerId, canPost, canModerate, onReply, onEdit, onDelete };
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
-            const wanted = event.key === "F2" ? "edit" : event.key === "Delete" ? "delete" : null;
+            const wanted =
+                event.key === "F2"
+                    ? "edit"
+                    : event.key === "Delete"
+                      ? "delete"
+                      : event.key === "r" || event.key === "R"
+                        ? "reply"
+                        : null;
             if (!wanted || event.metaKey || event.ctrlKey || event.altKey) return;
             const active = document.activeElement;
             if (
@@ -230,15 +281,21 @@ function useMessageKeys({
             const id = row?.id.replace(/^message-/, "");
             const message = shown.messages.find((entry) => entry.id === id);
             if (!message || message.deleted) return;
+            // A line Polaris wrote itself - somebody joined, a call started - is
+            // not a message to answer, rewrite or take down.
+            if (message.kind === "system") return;
 
             const mine = message.authorId === shown.viewerId;
-            // The same rules the pencil and the bin are drawn under, so a key can
-            // never do something the screen does not offer: your own to rewrite,
-            // and your own or anybody's here to take down.
-            if (wanted === "edit" && !mine) return;
+            // The same rules the pencil, the bin and the arrow are drawn under,
+            // so a key can never do something the screen does not offer: your own
+            // to rewrite, your own or anybody's here to take down, and anything
+            // at all to answer - wherever answering is offered.
+            if (wanted === "edit" && (!mine || !shown.onEdit)) return;
             if (wanted === "delete" && !mine && !shown.canModerate) return;
+            if (wanted === "reply" && !shown.onReply) return;
             event.preventDefault();
-            if (wanted === "edit") shown.onEdit(message);
+            if (wanted === "edit") shown.onEdit?.(message);
+            else if (wanted === "reply") shown.onReply?.(message);
             else shown.onDelete(message);
         };
         document.addEventListener("keydown", onKey);
@@ -249,6 +306,7 @@ function useMessageKeys({
 function Message({
     message,
     grouped,
+    lastOfBlock,
     mine,
     canPost,
     canModerate,
@@ -260,25 +318,30 @@ function Message({
     onEdit,
     onDelete,
     onOpenImage,
-    onReport
+    onReport,
+    onExplain
 }: {
     message: ChatMessageView;
     grouped: boolean;
+    /** Whether the next message starts a new block, which is where the ticks go. */
+    lastOfBlock: boolean;
     mine: boolean;
     canPost: boolean;
     canModerate: boolean;
     onOpenThread?: (message: ChatMessageView) => void;
     onReact: (messageId: string, emoji: string) => void;
     onStar: (message: ChatMessageView) => void;
-    onReply: (message: ChatMessageView) => void;
-    onForward: (message: ChatMessageView) => void;
-    onEdit: (message: ChatMessageView) => void;
+    onReply?: (message: ChatMessageView) => void;
+    onForward?: (message: ChatMessageView) => void;
+    onEdit?: (message: ChatMessageView) => void;
     onDelete: (message: ChatMessageView) => void;
     /** A picture on this message was pressed. Opened over the conversation
      *  rather than in a tab: a tab is the browser's viewer, with no way back and
      *  nothing to do with the picture but look at it. */
     onOpenImage: (image: ViewedImage) => void;
     onReport: (message: ChatMessageView) => void;
+    /** Open the three moments behind the ticks. */
+    onExplain: (message: ChatMessageView) => void;
 }) {
     const format = useDisplayFormat();
     const [showingHistory, setShowingHistory] = useState(false);
@@ -309,7 +372,8 @@ function Message({
                 onStar,
                 onEdit,
                 onDelete,
-                onReport
+                onReport,
+                onExplain
             }}
         >
         {/* `data-state` arrives from the right-click menu's trigger, which this
@@ -378,7 +442,15 @@ function Message({
                 ) : (
                     <div className="text-sm">
                         <RichText value={message.body} />
-                        {message.receipt && <Ticks receipt={message.receipt} />}
+                        {/* Under the last message of a block only. Five ticks
+                            down a run of five messages say the same thing five
+                            times, and seeing the newest is seeing the rest. */}
+                        {message.receipt && lastOfBlock && (
+                            <Ticks
+                                receipt={message.receipt}
+                                onOpen={() => onExplain(message)}
+                            />
+                        )}
                         {message.edited && (
                             // A button, not a label: "(edited)" that cannot be
                             // opened asks the room to take the change on trust.
@@ -510,15 +582,17 @@ function Message({
                     >
                         <Star className={cn("size-3.5", message.starred && "fill-current")} />
                     </button>
-                    <button
-                        type="button"
-                        aria-label="Reply"
-                        title="Reply"
-                        onClick={() => onReply(message)}
-                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    >
-                        <CornerUpLeft className="size-3.5" />
-                    </button>
+                    {onReply && (
+                        <button
+                            type="button"
+                            aria-label="Reply"
+                            title="Reply - or press R"
+                            onClick={() => onReply(message)}
+                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            <CornerUpLeft className="size-3.5" />
+                        </button>
+                    )}
                     {onOpenThread && (
                         <button
                             type="button"
@@ -541,8 +615,8 @@ function Message({
                                     <SmilePlus className="size-3.5 rotate-90" />
                                 </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                {mine && (
+                            <DropdownMenuContent align="end" onCloseAutoFocus={keepFocusOnClose}>
+                                {mine && onEdit && (
                                     <DropdownMenuItem onSelect={() => onEdit(message)}>
                                         <Pencil className="size-3.5" />
                                         Edit
@@ -653,8 +727,18 @@ function KeepableImage({
  * everybody already reads without being taught. It only ever appears on your own
  * messages in a one-to-one conversation, and only when both people allow it, so
  * its absence is not a state to be explained.
+ *
+ * Pressable, because "did they actually see this, and when" is a real question
+ * and the glyph is where somebody asks it. The same three moments are in the
+ * right-click menu, for anybody who does not think to press a tick.
  */
-function Ticks({ receipt }: { receipt: NonNullable<ChatMessageView["receipt"]> }) {
+function Ticks({
+    receipt,
+    onOpen
+}: {
+    receipt: NonNullable<ChatMessageView["receipt"]>;
+    onOpen: () => void;
+}) {
     const label = {
         sent: "Sent",
         delivered: "Delivered",
@@ -662,11 +746,13 @@ function Ticks({ receipt }: { receipt: NonNullable<ChatMessageView["receipt"]> }
     }[receipt];
 
     return (
-        <span
-            title={label}
-            aria-label={label}
+        <button
+            type="button"
+            title={`${label}. Press for when.`}
+            aria-label={`${label}. Open message information`}
+            onClick={onOpen}
             className={cn(
-                "ml-1 inline-flex align-middle",
+                "ml-1 inline-flex rounded align-middle transition-colors hover:text-foreground",
                 receipt === "read" ? "text-primary" : "text-foreground-subtle"
             )}
         >
@@ -675,7 +761,7 @@ function Ticks({ receipt }: { receipt: NonNullable<ChatMessageView["receipt"]> }
             ) : (
                 <CheckCheck className="size-3" />
             )}
-        </span>
+        </button>
     );
 }
 

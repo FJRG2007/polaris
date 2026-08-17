@@ -136,6 +136,22 @@ export async function GET(request: Request): Promise<Response> {
                     return;
                 }
 
+                // The one frame that is also for the person who caused it. Two
+                // screens act on somebody catching up and they are different
+                // screens: their own other devices, which have a count to take
+                // down, and the people in the conversation, whose ticks under
+                // their own messages have just moved. Never coalesced - it is
+                // two small marks, not a page to go and fetch.
+                if (change.kind === "read") {
+                    if (change.actorId !== actor.id && !reachable.has(change.channelId)) return;
+                    send({
+                        kind: "read",
+                        channelId: change.channelId,
+                        userId: change.actorId
+                    });
+                    return;
+                }
+
                 // Their own writing already settled in the tab that did it.
                 if (change.actorId === actor.id) return;
 

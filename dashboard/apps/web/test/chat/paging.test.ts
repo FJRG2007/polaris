@@ -70,7 +70,19 @@ vi.mock("@polaris/db", () => ({
 }));
 
 vi.mock("@/lib/chat/access", () => ({
-    requireChannel: async () => undefined,
+    // What the real one answers with, because the reader uses it: a page marks
+    // the conversation delivered, and only a one-to-one conversation stamps the
+    // moment on the messages themselves.
+    requireChannel: async (_actor: unknown, channelId: string) => ({
+        channelId,
+        spaceId: null,
+        kind: "text",
+        archived: false,
+        member: true,
+        mayPost: true,
+        mayAdminister: false,
+        mayModerate: false
+    }),
     requirePostable: async () => undefined,
     reachableChannelIds: async () => new Set<string>(),
     ChatAccessError: class extends Error {},

@@ -113,15 +113,12 @@ export function ThreadPanel({
                         canPost={canPost}
                         canModerate={canModerate}
                         highlightId={highlightId}
-                        onReply={() => {
-                            // A thread is already the reply. Quoting inside one
-                            // would be a reply to a reply with no room to draw
-                            // it, so the action is left to the channel.
-                        }}
-                        onForward={() => {
-                            // Same: forwarding out of a thread is done from the
-                            // channel, where the whole conversation is.
-                        }}
+                        // No onReply, onForward or onEdit: a thread is already the
+                        // reply, forwarding out of one is done from the channel,
+                        // and a message is rewritten in the channel's own
+                        // composer. Left off rather than passed as nothing, which
+                        // is what drew three controls in here that did nothing at
+                        // all when they were pressed.
                         onStar={async (message) => {
                             await runAction(() => actions.starAction(message.id), setError);
                             await load();
@@ -132,10 +129,6 @@ export function ThreadPanel({
                                 setError
                             );
                             await load();
-                        }}
-                        onEdit={() => {
-                            // Editing happens in the channel's own composer, which
-                            // is the one place a message is rewritten.
                         }}
                         onDelete={async (message) => {
                             await runAction(

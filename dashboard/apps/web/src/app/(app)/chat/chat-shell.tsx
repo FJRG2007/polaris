@@ -57,7 +57,7 @@ export function ChatShell({
 
 function ChatColumns({ children }: { children: ReactNode }) {
     const pathname = usePathname();
-    const { refresh } = useChat();
+    const { refresh, viewerId } = useChat();
     // Inside a conversation on a phone the list steps aside; on anything wider
     // both are shown, which is why this decides a class rather than a render.
     const inConversation = pathname.startsWith("/chat/c/");
@@ -71,8 +71,13 @@ function ChatColumns({ children }: { children: ReactNode }) {
                 // alternative is teaching the client to apply every kind of
                 // change to a shape the server already knows how to build.
                 if (frame.kind === "posted" || frame.kind === "channels") refresh();
+                // Read somewhere else - a phone, another tab - by this same
+                // person. Nothing arrived, but the counts in the rail are no
+                // longer true, and before this they stayed up until the page was
+                // reloaded. Somebody else catching up changes nothing here.
+                if (frame.kind === "read" && frame.userId === viewerId) refresh();
             },
-            [refresh]
+            [refresh, viewerId]
         )
     );
 

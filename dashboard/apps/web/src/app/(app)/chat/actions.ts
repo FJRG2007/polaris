@@ -33,8 +33,13 @@ import { messageToasts, type MessageToast } from "@/lib/chat/toasts";
 import { searchMessages, type ChatSearchHit } from "@/lib/chat/search";
 import { voicePresence, type VoicePresence } from "@/lib/chat/meetings";
 import type { ChatInviteOffer, ChatInviteView } from "@/lib/chat/invites";
-import type { ChatMessageView, ChatNewerPage, ChatPage } from "@/lib/chat/messages";
 import { fetchRemoteMedia, searchTenor, tenorConfigured, type TenorResult } from "@/lib/chat/tenor";
+import type {
+    ChatMessageView,
+    ChatNewerPage,
+    ChatPage,
+    MessageDelivery
+} from "@/lib/chat/messages";
 import type {
     ChatCategoryView,
     ChatChannelView,
@@ -360,6 +365,41 @@ export async function markReadAction(input: unknown): Promise<{ error?: string }
     // scrolling, and there is nowhere on the screen a failure would belong.
     if (!parsed.success) return {};
     return guard(() => messages.markRead(me, parsed.data));
+}
+
+/**
+ * The ticks under messages already on screen, asked for again.
+ *
+ * What a screen does when it is told the other person caught up: reloading the
+ * conversation for two ticks would replace every message on it and move the
+ * reader. An unreadable answer is an empty one - the marks are decoration on a
+ * conversation that is already drawn.
+ */
+export async function receiptsAction(
+    input: unknown
+): Promise<{ receipts: Record<string, core.MessageReceipt> }> {
+    const me = await actor();
+    const parsed = core.chatReceiptsSchema.safeParse(input);
+    if (!parsed.success) return { receipts: {} };
+    const result = await guard(() =>
+        messages.receiptsFor(me, parsed.data.channelId, parsed.data.messageIds)
+    );
+    return { receipts: result.error ? {} : (result.value ?? {}) };
+}
+
+/**
+ * When one of the reader's own messages arrived and was read.
+ *
+ * Only ever answered for a one-to-one conversation where the ticks are already
+ * shown - the panel is the same fact, spelled out.
+ */
+export async function messageDeliveryAction(
+    messageId: string
+): Promise<{ delivery?: MessageDelivery; error?: string }> {
+    const me = await actor();
+    const result = await guard(() => messages.deliveryOf(me, String(messageId ?? "")));
+    if (result.error) return { error: result.error };
+    return result.value ? { delivery: result.value } : {};
 }
 
 /**

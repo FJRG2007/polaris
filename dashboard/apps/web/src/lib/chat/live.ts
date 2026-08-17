@@ -32,8 +32,11 @@ export interface ChatChange {
     /** posted - a message arrived or changed, pull the channel again.
      *  channels - what this person can reach changed, redraw the rail.
      *  typing - somebody is composing right now.
-     *  call - a call in this conversation started, moved or ended. */
-    readonly kind: "posted" | "channels" | "typing" | "call";
+     *  call - a call in this conversation started, moved or ended.
+     *  read - somebody caught up here. Two screens act on it and nobody else:
+     *      their own other devices, which have an unread count to take down, and
+     *      the people they were reading, whose ticks have just moved. */
+    readonly kind: "posted" | "channels" | "typing" | "call" | "read";
     /** Who caused it. A tab does not need waking for its own write. */
     readonly actorId: string;
     /** Only on `typing` and `call`: what to draw beside the dots, or who is

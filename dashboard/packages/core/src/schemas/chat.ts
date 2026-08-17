@@ -131,6 +131,10 @@ export const MAX_CHAT_MESSAGE = 8000;
  *  so is more useful than growing a list nobody can read the header of. */
 export const MAX_GROUP_MEMBERS = 25;
 
+/** How many messages one request may ask the ticks for. A conversation holds a
+ *  window of a few pages on screen; this is comfortably past that. */
+export const MAX_CHAT_RECEIPTS = 200;
+
 /**
  * A channel name, as it is stored.
  *
@@ -296,6 +300,15 @@ export const chatMarkReadSchema = z.object({
 });
 
 export type ChatMarkReadInput = z.infer<typeof chatMarkReadSchema>;
+
+/** The ticks under messages a screen is already showing, asked for again after
+ *  the other person caught up. Bounded by what a conversation holds on screen. */
+export const chatReceiptsSchema = z.object({
+    channelId: z.string().uuid(),
+    messageIds: z.array(z.string().uuid()).max(MAX_CHAT_RECEIPTS)
+});
+
+export type ChatReceiptsInput = z.infer<typeof chatReceiptsSchema>;
 
 export const chatMembersSchema = z.object({
     /** A space or a channel, depending on which action is being called. */
