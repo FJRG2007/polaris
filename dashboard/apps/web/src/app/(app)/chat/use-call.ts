@@ -81,9 +81,30 @@ const signalSchema = z.discriminatedUnion("type", [
     z.object({
         type: z.literal("media"),
         camera: z.string().nullable(),
-        screen: z.string().nullable()
+        screen: z.string().nullable(),
+        /**
+         * Whether their microphone is off, and whether they have stopped
+         * listening altogether.
+         *
+         * Said out loud because it cannot be heard: a muted microphone sends
+         * silence, and silence is what somebody who is simply not talking sends
+         * too. Without this, the only way to find out that the person you are
+         * asking a question to has their microphone off is to ask twice.
+         *
+         * Optional, because a browser left open across a deploy is still sending
+         * the older shape of this message, and the whole message is worth more
+         * than these two fields.
+         */
+        muted: z.boolean().optional(),
+        deafened: z.boolean().optional()
     })
 ]);
+
+/** What somebody else's controls are set to, as far as they have said. */
+export interface PeerState {
+    readonly muted: boolean;
+    readonly deafened: boolean;
+}
 
 /** One track that arrived, and the slot it arrived on. */
 interface InboundTrack {
@@ -143,6 +164,10 @@ export interface CallState {
     /** The participant ids talking right now, this browser's own included.
      *  Measured here rather than announced by anybody - see `useSpeaking`. */
     readonly speaking: ReadonlySet<string>;
+    /** What everybody else's microphone and headphones are set to, as far as
+     *  they have said. Absent for somebody whose browser has not said yet, which
+     *  draws as nothing rather than as "on". */
+    readonly states: ReadonlyMap<string, PeerState>;
     readonly micOn: boolean;
     readonly cameraOn: boolean;
     /** Whether this browser has a camera to turn on at all. */
@@ -191,7 +216,12 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const [remote, setRemote] = useState<ReadonlyMap<string, MediaStream>>(new Map());
     const [screens, setScreens] = useState<ReadonlyMap<string, MediaStream>>(new Map());
+    const [states, setStates] = useState<ReadonlyMap<string, PeerState>>(new Map());
     const [micOn, setMicOn] = useState(true);
+    /** What this browser would say about itself right now. Held as a ref so the
+     *  announcement can read it without every callback that announces having to
+     *  be rebuilt when either changes. */
+    const mine = useRef<PeerState>({ muted: false, deafened: false });
     const [cameraOn, setCameraOn] = useState(withVideo);
     const [hasCamera, setHasCamera] = useState(false);
     const [sharing, setSharing] = useState(false);
@@ -381,13 +411,20 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
      *
      * The `mid` is null until the first negotiation assigns one, and a message
      * saying so is still worth sending: it says "not that one yet".
+     *
+     * It carries the microphone and the headphones too, because neither can be
+     * heard: a muted microphone sends silence, and so does somebody who is just
+     * not talking. Read from a ref rather than from the state it mirrors, so
+     * this is not rebuilt - and every peer told again - on each press of mute.
      */
     const announce = useCallback(
         (otherId: string, peer: Peer) => {
             void send(otherId, {
                 type: "media",
                 camera: peer.video?.mid ?? null,
-                screen: peer.screen?.mid ?? null
+                screen: peer.screen?.mid ?? null,
+                muted: mine.current.muted,
+                deafened: mine.current.deafened
             });
         },
         [send]
@@ -542,6 +579,11 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
                         return next;
                     });
                     setScreens((current) => {
+                        const next = new Map(current);
+                        next.delete(otherId);
+                        return next;
+                    });
+                    setStates((current) => {
                         const next = new Map(current);
                         next.delete(otherId);
                         return next;
@@ -767,6 +809,21 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
                     camera: signal.data.camera,
                     screen: signal.data.screen
                 });
+                // What their controls are set to, which nothing else can tell.
+                // A browser from before this said anything is left absent rather
+                // than recorded as "on": no icon is the honest drawing of "it
+                // has not said".
+                const said = { muted: signal.data.muted, deafened: signal.data.deafened };
+                if (said.muted !== undefined || said.deafened !== undefined) {
+                    setStates((current) => {
+                        const next = new Map(current);
+                        next.set(fromId, {
+                            muted: said.muted ?? false,
+                            deafened: said.deafened ?? false
+                        });
+                        return next;
+                    });
+                }
                 // Tracks may already be here, drawn as a camera because nothing
                 // had said otherwise. This is what moves them.
                 resort(fromId);
@@ -892,6 +949,11 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
                 next.delete(otherId);
                 return next;
             });
+            setStates((current) => {
+                const next = new Map(current);
+                next.delete(otherId);
+                return next;
+            });
         }
     }, [meeting, peerFor]);
 
@@ -992,6 +1054,19 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
             return next;
         });
     }, [setVoiceEnabled]);
+
+    /**
+     * Say what the microphone and the headphones are doing, whenever they change.
+     *
+     * Nobody can hear a muted microphone being muted, so the other side is told.
+     * The ref is what `announce` reads - it is updated first, so a peer that is
+     * being announced to for some other reason at the same moment carries the
+     * same answer.
+     */
+    useEffect(() => {
+        mine.current = { muted: !micOn || deafened, deafened };
+        for (const [otherId, peer] of peers.current) announce(otherId, peer);
+    }, [micOn, deafened, announce]);
 
     /** Swap one input for another, mid-call, without dropping the connections. */
     const chooseDevice = useCallback(
@@ -1109,6 +1184,7 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
         remote,
         screens,
         speaking,
+        states,
         cleanMic,
         setCleanMic,
         micFilter,

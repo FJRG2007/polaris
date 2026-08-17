@@ -12,7 +12,7 @@
  */
 
 import { ARK_MAPS, DEFAULT_ARK_MAP } from "@/lib/apps/ark/maps";
-import { Bot, Gamepad2, House, MessagesSquare, ScanFace, Video, type LucideIcon } from "lucide-react";
+import { Bot, Gamepad2, House, MessagesSquare, PhoneCall, ScanFace, Video, type LucideIcon } from "lucide-react";
 
 export type AppCategory = "Messaging" | "AI" | "Game servers" | "Home" | "Tools";
 
@@ -71,6 +71,16 @@ export interface TemplateEnvVar {
     /** Minted at install time as a random secret (an app's own admin password),
      *  never shown and never asked for. Implies `secret`. */
     generated?: boolean;
+    /**
+     * Written in front of a generated value.
+     *
+     * For a credential whose format is not "a random string": LiveKit's keys are
+     * a YAML map, so the variable it reads has to be `name: secret` rather than
+     * the secret alone. The prefix is part of the manifest because it is part of
+     * what that container accepts, and minting a value it refuses to start with
+     * is a failure nobody can see from here.
+     */
+    generatedPrefix?: string;
     /** Editable from the installed app's settings after the install. */
     tunable?: boolean;
     /** Groups tunables under a heading in the settings form. */
@@ -925,6 +935,67 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
             ],
             volumes: [{ name: "data", mountPath: "/data", label: "Known faces" }],
             ports: [{ container: 8000, protocol: "http", label: "Recognition API" }]
+        }
+    },
+    {
+        /**
+         * What carries a call, once there is more than one person in it or more
+         * than one network between them.
+         *
+         * Chat's own calls are browser-to-browser, which is the right shape for
+         * two people in one house and the wrong one for everybody else: with no
+         * server in the middle, each browser can only offer the addresses of its
+         * own network, so a call between two houses never connects at all. This
+         * is the server in the middle - every browser sends its camera and its
+         * microphone here once, and this sends them on.
+         *
+         * LiveKit rather than something written here. It is the thing this job
+         * has: an SFU, Apache-licensed, one container, and the same piece every
+         * other product that does this uses.
+         *
+         * Never offered on its own. Chat installs it from its own settings, on
+         * the machine the owner picked, and it does nothing without a call.
+         */
+        id: "call-server",
+        name: "Call server",
+        internal: true,
+        category: "Messaging",
+        icon: PhoneCall,
+        summary: "Carries the sound and the picture in a call, so browsers do not have to reach each other.",
+        description:
+            "The server a call runs through. Without one, two browsers have to find a route to each other directly - which works inside one house and fails between two. With one, each browser talks only to this, on the machine you chose. Nothing is recorded and nothing is kept: it forwards what it is given while the call is on and holds none of it.",
+        docsUrl: "https://docs.livekit.io",
+        installMethod: "compose-template",
+        capabilities: ["tool"],
+        dashboard: "generic",
+        template: {
+            image: "livekit/livekit-server:latest",
+            env: [
+                // The name and the secret, as one YAML pair, because that is the
+                // shape the server reads (`--keys`, `LIVEKIT_KEYS`). Minted here
+                // and never shown: Polaris signs every join token with it and
+                // nobody types it.
+                {
+                    key: "LIVEKIT_KEYS",
+                    label: "Signing key",
+                    generated: true,
+                    generatedPrefix: "polaris: "
+                },
+                // One UDP port rather than the ten thousand the defaults use.
+                // A range that size cannot be forwarded through a home router by
+                // anybody who is not already enjoying this.
+                { key: "UDP_PORT", label: "Media port", default: "7882" },
+                // What the server tells browsers to send media to. Left empty on
+                // a LAN, where the address it works out for itself is right; set
+                // to the public address of the machine when the call has to cross
+                // the internet.
+                { key: "NODE_IP", label: "Address browsers reach it on", tunable: true }
+            ],
+            ports: [
+                { container: 7880, protocol: "http", label: "Signalling" },
+                { container: 7881, protocol: "tcp", label: "Media over TCP" },
+                { container: 7882, protocol: "udp", host: 7882, label: "Media" }
+            ]
         }
     },
     {
