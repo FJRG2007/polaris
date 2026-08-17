@@ -24,6 +24,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ClipView } from "@/lib/home/recording";
 import type { CameraView } from "@/lib/home/cameras";
 import { afterClick, afterMove } from "@/lib/list-selection";
+import { MediaPlayer } from "@/components/media-player";
 import { useDisplayFormat } from "@/components/display-format";
 import { Download, Loader2, Pin, PinOff, Play, Square, Trash2, Video, X } from "lucide-react";
 import {
@@ -382,12 +383,11 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                                 </div>
                                             </div>
                                             {playing === clip.id ? (
-                                                <video
-                                                    src={`/api/home/clips/${clip.id}/video`}
-                                                    className="w-full rounded-md border border-border bg-background"
-                                                    controls
+                                                <MediaPlayer
+                                                    kind="video"
                                                     autoPlay
-                                                    playsInline
+                                                    src={`/api/home/clips/${clip.id}/video`}
+                                                    className="overflow-hidden rounded-md border border-border bg-background"
                                                     onClick={(event) => event.stopPropagation()}
                                                 />
                                             ) : null}
