@@ -21,7 +21,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { HLS_FILES, hlsAssetPath, hlsMasterPath, streamPath } from "@/lib/home/relay";
 
-const ENTRYPOINT = readFileSync(join(process.cwd(), "../../services/camera-relay/entrypoint.sh"), "utf8");
+const ENTRYPOINT = readFileSync(
+    join(process.cwd(), "../../services/camera-relay/entrypoint.sh"),
+    "utf8"
+);
 
 /** The allowlist as the relay will read it: the items under `allow_paths`, up to
  *  the blank line that ends the block. */
