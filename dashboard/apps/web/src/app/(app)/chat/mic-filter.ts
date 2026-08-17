@@ -30,15 +30,22 @@
  * because a paid model is somebody's decision to make and not this file's.
  */
 
-import {
-    GtcrnWorkletNode,
-    RnnoiseWorkletNode,
-    loadGtcrn,
-    loadRnnoise
-} from "@sapphi-red/web-noise-suppressor";
-
 /** Where the staged worklets and models are served from. */
 const ASSETS = "/audio";
+
+/**
+ * The models, fetched at the moment somebody turns the filter on.
+ *
+ * Imported here rather than at the top of the file because the package declares
+ * `class ... extends AudioWorkletNode` as it loads, and `AudioWorkletNode` is a
+ * browser global. A "use client" module is still executed on the server to render
+ * the first HTML, so a static import throws there - and it throws for every page
+ * that reaches this file through an import chain, whether or not anybody is in a
+ * call. That is a 500 on a screen with no microphone on it.
+ */
+function suppressors() {
+    return import("@sapphi-red/web-noise-suppressor");
+}
 
 /** The models want 48 kHz, which is what a call runs at anyway. Asked for
  *  explicitly so the graph is never built at a rate the model cannot use. */
@@ -152,6 +159,7 @@ async function gtcrnNode(
     context: AudioContext
 ): Promise<{ node: AudioNode; dispose: () => void; using: FilteredMic["using"] } | null> {
     try {
+        const { GtcrnWorkletNode, loadGtcrn } = await suppressors();
         const wasmBinary = await loadGtcrn({ url: `${ASSETS}/gtcrn.wasm` });
         await context.audioWorklet.addModule(`${ASSETS}/gtcrn-worklet.js`);
         const node = new GtcrnWorkletNode(context, { maxChannels: 1, wasmBinary });
@@ -165,6 +173,7 @@ async function rnnoiseNode(
     context: AudioContext
 ): Promise<{ node: AudioNode; dispose: () => void; using: FilteredMic["using"] } | null> {
     try {
+        const { RnnoiseWorkletNode, loadRnnoise } = await suppressors();
         const wasmBinary = await loadRnnoise({
             url: `${ASSETS}/rnnoise.wasm`,
             simdUrl: `${ASSETS}/rnnoise_simd.wasm`

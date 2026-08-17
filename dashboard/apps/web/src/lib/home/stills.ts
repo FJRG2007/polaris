@@ -108,20 +108,37 @@ export async function storeStill(
     return stillKey(placed.targetId, path);
 }
 
-/** Read a still back, or null when the storage it was on is gone. Never throws:
- *  a missing picture is a tile with no picture, not a screen that fails. */
+/**
+ * Read a still back, or null when the storage it was on is gone.
+ *
+ * Never throws: a missing picture is a tile with no picture, not a screen that
+ * fails. It does say why, though, in the server's log and never to the reader -
+ * this used to swallow the reason, and a wall of events with no pictures whose
+ * files are sitting on the disk, readable, is a morning of guessing. The row
+ * points at a file somebody expected to be there, so a read that fails is worth
+ * a line whichever way it failed.
+ */
 export async function readStill(key: string): Promise<Buffer | null> {
     const parsed = parseStillKey(key);
-    if (!parsed) return null;
+    if (!parsed) {
+        console.error(`stills: ${key} is not an address this Polaris wrote`);
+        return null;
+    }
+    let driver: Awaited<ReturnType<typeof driverForTarget>> | null = null;
     try {
-        const driver = await driverForTarget(parsed.targetId, LOCAL_FOLDER);
+        driver = await driverForTarget(parsed.targetId, LOCAL_FOLDER);
         const stream = await driver.readStream(parsed.path);
         const chunks: Buffer[] = [];
         for await (const chunk of stream as unknown as AsyncIterable<Uint8Array>) chunks.push(Buffer.from(chunk));
-        await driver.dispose?.();
         return Buffer.concat(chunks);
-    } catch {
+    } catch (error) {
+        console.error(`stills: could not read ${parsed.path} from ${parsed.targetId}:`, error);
         return null;
+    } finally {
+        // Released on the way out however this ended. A storage session left open
+        // per failed read is the leak that turns one unreachable share into a
+        // NAS that stops answering the reads that would have worked.
+        await driver?.dispose?.().catch(() => undefined);
     }
 }
 
