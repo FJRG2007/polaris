@@ -247,15 +247,27 @@ Chat (talking to the people here):
 - [x] Threads one level deep, reactions, editing your own, and deleting with a
       tombstone so replies under a removed message still make sense
 - [x] Unread counts from a read mark rather than a stored counter, own messages
-      excluded, and a mark that never moves backwards between two open tabs
-- [x] Live: messages, membership changes and typing over one connection per
-      device, filtered server-side to the conversations the reader is in. Frames
-      carry ids, never message text - the tab pulls through the same access check
-      that drew the screen
+      excluded, and a mark that never moves backwards between two open tabs.
+      Catching up on one device is announced live to every other screen open on
+      the same account, so a count taken down on mobile does not sit stale on
+      Polaris until the next reload
+- [x] Live: messages, membership changes, typing and read marks over one
+      connection per device, filtered server-side to the conversations the
+      reader is in. Frames carry ids, never message text - the tab pulls
+      through the same access check that drew the screen
+- [x] Message information: the ticks under your own message in a one-to-one
+      conversation open onto when it was sent, delivered and read, each moment
+      answered for by a separate stamp rather than read back out of the ticks.
+      Only offered where the ticks already are, and only what the other
+      person's privacy setting allows
 - [x] Reached by being in it. No administrator override, no instance-wide read
 - [x] Calls: audio and video started from a conversation, browser to browser
       with no media ever passing through Polaris. Mute, camera, and a roster of
       who is in the room. Capped at 8, which is what a mesh carries
+- [x] The microphone is one choice remembered per browser, not per feature - the
+      one picked for a call is also the one a voice message records with, so
+      picking the good headset for a call and being recorded through a laptop
+      lid for a voice message is not a thing that happens
 - [x] Somebody with no Polaris account can be brought into a call, on a
       per-meeting link an account holder opens. They wait in a lobby until
       somebody inside lets them in, the link dies with the call, and the cookie
@@ -265,13 +277,25 @@ Chat (talking to the people here):
       addresses, and not otherwise - a hosted TURN default is not something
       Polaris should decide for an operator
 - [x] Files on a message: staged in the composer, dropped onto the conversation,
-      or picked. Images shown inline, everything else a download, and the
-      download authorized by the conversation before a byte is read. An
-      administrator picks where they go under Uploads, defaulting to wherever
-      profile photos already go rather than asking the same question twice
+      pasted from the clipboard, or picked - a pasted screenshot gets the same
+      preview and limits as a picked file rather than being eaten silently.
+      Images shown inline, everything else a download, and the download
+      authorized by the conversation before a byte is read. An administrator
+      picks where they go under Uploads, defaulting to wherever profile photos
+      already go rather than asking the same question twice
+- [x] A deleted conversation's files go with it: the folder they were written
+      under is removed with the channel or space, and the last file leaving a
+      message empties its folder too, so storage does not grow bytes nothing
+      can reach any more. What an older build already left behind is cleared by
+      a Tidy up on the chat card under Uploads, deliberately narrow to folders
+      no conversation or message answers for
 - [x] Keeping a message: private to whoever kept it, with a Saved screen that
       links back to the room it came from. Starring is a bookmark, not a signal -
       reactions are the public version
+- [x] Emoji, GIFs and stickers in one picker with tabs, searched through a
+      service an administrator connects. A GIF or sticker found by search can be
+      kept to a personal library for reuse the same way an emoji is favorited,
+      independent of the picture ever being sent
 - [x] Somebody whose chat has been switched off cannot be messaged: they are not
       offered in a picker, and a direct message or channel add naming them is
       refused. They have no screen a message could arrive on
