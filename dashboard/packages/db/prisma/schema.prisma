@@ -5982,6 +5982,17 @@ model ChatMessage {
     lastReplyAt DateTime?
     editedAt    DateTime?
     deletedAt   DateTime?
+    // When the other person's device first picked this up, and when they first
+    // saw it. Only ever written in a one-to-one conversation, and only on
+    // somebody else's message: "read by three of the seven people here" is a
+    // different feature, and this is what the message information panel reads.
+    //
+    // Stamped once and never moved. The marks on the membership row are
+    // monotonic and say how far somebody has got now, which cannot answer when
+    // they got to a particular message - that is what these are for. Null means
+    // it did not happen, or happened before Polaris recorded it.
+    deliveredAt DateTime?
+    readAt      DateTime?
     createdAt   DateTime  @default(now())
 
     channel     ChatChannel      @relation(fields: [channelId], references: [id], onDelete: Cascade)

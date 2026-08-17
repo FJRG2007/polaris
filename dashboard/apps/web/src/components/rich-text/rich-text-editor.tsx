@@ -60,6 +60,25 @@ export interface RichTextEditorProps {
      */
     focusAt?: number;
     /**
+     * Where the caret lands when `focusAt` fires.
+     *
+     * "end" for a surface whose text has just been replaced - starting an edit -
+     * where the end of the sentence is the only place to carry on from. "keep"
+     * for one that already has something half-written in it: answering a message
+     * must put the caret back where the writer left it, not at the end of a line
+     * they were in the middle of.
+     */
+    focusWhere?: "end" | "keep";
+    /**
+     * Files arrived on the clipboard, usually a screenshot.
+     *
+     * Answered by the caller because the files are not the document's business:
+     * a composer stages them as attachments, and a surface with nowhere to put
+     * one says so by not passing this. True means it took them, and the paste
+     * goes no further.
+     */
+    onPasteFiles?: (files: readonly File[]) => boolean;
+    /**
      * The conversation this editor is writing into, when it is writing into one.
      *
      * What @ offers then is the people in that room rather than the ones this
@@ -100,14 +119,20 @@ export function RichTextEditor({
     disabled = false,
     autoFocus = false,
     focusAt = 0,
+    focusWhere = "end",
+    onPasteFiles,
     mentionsIn = null,
     bordered = false,
     className
 }: RichTextEditorProps) {
     // Held in a ref rather than in the dependency list: the editor is built once
     // and these change with every render of the parent.
-    const handlers = useRef({ onChange, onBlur, onSubmit, onTyping });
-    handlers.current = { onChange, onBlur, onSubmit, onTyping };
+    const handlers = useRef({ onChange, onBlur, onSubmit, onTyping, onPasteFiles });
+    handlers.current = { onChange, onBlur, onSubmit, onTyping, onPasteFiles };
+    // The same, for where the caret goes: it changes with the reason the caller
+    // is asking, and it must not be a reason to focus on its own.
+    const caret = useRef(focusWhere);
+    caret.current = focusWhere;
 
     const search = useCallback(
         async (kinds: readonly refs.ReferenceKind[], query: string) => {
@@ -129,7 +154,11 @@ export function RichTextEditor({
         // The room mentions only where there is a room: `mentionsIn` is a
         // conversation, and offering "@everyone" in a task description would name
         // a set of people nobody can point at.
-        () => [...baseExtensions(placeholder), BlockMenu, mentionExtension(search, mentionsIn !== null)],
+        () => [
+            ...baseExtensions(placeholder),
+            BlockMenu,
+            mentionExtension(search, mentionsIn !== null)
+        ],
         [placeholder, search, mentionsIn]
     );
 
@@ -199,10 +228,20 @@ export function RichTextEditor({
 
                 return send();
             },
-            handlePaste: (view, event) => handleMarkdownPaste(editorRef.current, view, event)
+            handlePaste: (view, event) => {
+                // A screenshot, or anything else on the clipboard that is a file
+                // rather than text. It belongs to whatever is around the editor -
+                // a composer stages it as an attachment - and nothing about it
+                // goes into the document.
+                const files = [...(event.clipboardData?.files ?? [])];
+                if (files.length > 0 && handlers.current.onPasteFiles?.(files)) return true;
+                return handleMarkdownPaste(editorRef.current, view, event);
+            }
         },
-        onUpdate: ({ editor: current }) => handlers.current.onChange?.(md.docToMarkdown(current.getJSON())),
-        onBlur: ({ editor: current }) => handlers.current.onBlur?.(md.docToMarkdown(current.getJSON()))
+        onUpdate: ({ editor: current }) =>
+            handlers.current.onChange?.(md.docToMarkdown(current.getJSON())),
+        onBlur: ({ editor: current }) =>
+            handlers.current.onBlur?.(md.docToMarkdown(current.getJSON()))
     });
 
     const editorRef = useRef<Editor | null>(null);
@@ -222,12 +261,25 @@ export function RichTextEditor({
         editor?.setEditable(!disabled);
     }, [editor, disabled]);
 
-    // At the end of whatever is already written: somebody answering a message
-    // wants to type, and somebody editing one wants to carry on from where the
-    // sentence stopped rather than from in front of it.
+    /**
+     * Somebody asked for the caret.
+     *
+     * On a timer of zero rather than straight away. Most of the things that ask
+     * for it are menu items - Reply, Edit - and a Radix menu hands focus back to
+     * whatever opened it a tick after it unmounts, which is a tick after this. So
+     * focusing now was focusing and then being blurred, which is exactly what
+     * "pressing reply does not put me back in the box" looked like.
+     */
     useEffect(() => {
         if (!focusAt || !editor || disabled) return;
-        editor.commands.focus("end");
+        const timer = window.setTimeout(() => {
+            if (editor.isDestroyed) return;
+            // "keep" restores the selection the editor still holds from before it
+            // was blurred, which is where the writer left off.
+            if (caret.current === "keep") editor.commands.focus();
+            else editor.commands.focus("end");
+        }, 0);
+        return () => window.clearTimeout(timer);
     }, [focusAt, editor, disabled]);
 
     if (!editor) {
@@ -249,12 +301,12 @@ function surfaceClass(bordered: boolean, disabled: boolean): string {
         "w-full",
         bordered
             ? "rounded-md border border-border bg-field px-3 py-2 focus-within:border-border-strong"
-            // Camouflaged until you point at it, and plain again once the caret
-            // is in: the tint says "this is editable", and once you are editing
-            // it is only a box around what you are writing. Written as one
-            // selector rather than hover plus focus-within, which are the same
-            // specificity and would resolve by stylesheet order.
-            : "-mx-2 rounded-md px-2 py-1 transition-colors [&:not(:focus-within):hover]:bg-muted/40",
+            : // Camouflaged until you point at it, and plain again once the caret
+              // is in: the tint says "this is editable", and once you are editing
+              // it is only a box around what you are writing. Written as one
+              // selector rather than hover plus focus-within, which are the same
+              // specificity and would resolve by stylesheet order.
+              "-mx-2 rounded-md px-2 py-1 transition-colors [&:not(:focus-within):hover]:bg-muted/40",
         disabled && "cursor-default opacity-70 [&:not(:focus-within):hover]:bg-transparent"
     );
 }
@@ -288,7 +340,11 @@ function handleMarkdownPaste(editor: Editor | null, view: unknown, event: Clipbo
     // inserted anyway, and letting it through keeps the link-on-paste behavior.
     if (pending.length === 0 && !looksLikeMarkdown(text)) return false;
 
-    editor.chain().focus().insertContent(doc.content ?? []).run();
+    editor
+        .chain()
+        .focus()
+        .insertContent(doc.content ?? [])
+        .run();
     if (pending.length > 0) void nameReferences(editor, pending);
     return true;
 }
@@ -296,7 +352,9 @@ function handleMarkdownPaste(editor: Editor | null, view: unknown, event: Clipbo
 /** Cheap enough to run on every paste, and wrong only in the harmless direction:
  *  a false positive re-inserts the same text it was given. */
 function looksLikeMarkdown(text: string): boolean {
-    return /(^|\n)\s*(#{1,3} |[-*+] |\d+\. |> |```)/.test(text) || /\*\*|__|~~|\[[^\]]+\]\(/.test(text);
+    return (
+        /(^|\n)\s*(#{1,3} |[-*+] |\d+\. |> |```)/.test(text) || /\*\*|__|~~|\[[^\]]+\]\(/.test(text)
+    );
 }
 
 interface PendingReference {
@@ -309,14 +367,23 @@ function collectReferences(doc: { content?: unknown }): PendingReference[] {
     const found: PendingReference[] = [];
     const walk = (node: Record<string, unknown>) => {
         if (node.type === md.REFERENCE) {
-            const attrs = (node.attrs ?? {}) as { kind?: refs.ReferenceKind; id?: string; label?: string };
+            const attrs = (node.attrs ?? {}) as {
+                kind?: refs.ReferenceKind;
+                id?: string;
+                label?: string;
+            };
             // Picked from the @ list, the label is already the name. Pasted, it
             // is whatever was between the brackets - usually the URL itself.
-            if (attrs.kind && attrs.id && (!attrs.label || attrs.label.includes("://") || attrs.label.startsWith("/"))) {
+            if (
+                attrs.kind &&
+                attrs.id &&
+                (!attrs.label || attrs.label.includes("://") || attrs.label.startsWith("/"))
+            ) {
                 found.push({ kind: attrs.kind, id: attrs.id });
             }
         }
-        for (const child of (node.content as Record<string, unknown>[] | undefined) ?? []) walk(child);
+        for (const child of (node.content as Record<string, unknown>[] | undefined) ?? [])
+            walk(child);
     };
     walk(doc as Record<string, unknown>);
     return found;
@@ -327,13 +394,21 @@ async function nameReferences(editor: Editor, pending: readonly PendingReference
     editor.commands.command(({ tr, state }) => {
         state.doc.descendants((node, pos) => {
             if (node.type.name !== md.REFERENCE) return;
-            if (!pending.some((target) => target.kind === node.attrs.kind && target.id === node.attrs.id)) return;
+            if (
+                !pending.some(
+                    (target) => target.kind === node.attrs.kind && target.id === node.attrs.id
+                )
+            )
+                return;
             tr.setNodeMarkup(pos, undefined, { ...node.attrs, label: PENDING_LABEL });
         });
         return true;
     });
 
-    const result = await runAction(() => resolveReferencesAction([...pending]), () => undefined);
+    const result = await runAction(
+        () => resolveReferencesAction([...pending]),
+        () => undefined
+    );
     const labels = result?.labels ?? {};
     if (editor.isDestroyed) return;
 

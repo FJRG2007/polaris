@@ -24,6 +24,7 @@
  * track through `applyConstraints`, so changing the setting never renegotiates.
  */
 
+import { micDevice } from "./mic-device";
 import type { MicFilter } from "./mic-filter";
 import { useCallback, useEffect, useState } from "react";
 
@@ -67,11 +68,29 @@ function browserProcessing(level: MicFilter): boolean {
     return level !== "off";
 }
 
-/** What to ask the browser for when opening a microphone. */
+/**
+ * What to ask the browser for when opening a microphone.
+ *
+ * With no device named it asks for the one this browser has been told to use -
+ * so a microphone picked in a call is the one a voice message is recorded
+ * through, and the other way round. Naming one explicitly is how that choice is
+ * made in the first place.
+ *
+ * The two are asked for differently on purpose. A device somebody has just picked
+ * is `exact`, because quietly opening a different microphone than the one they
+ * chose is worse than telling them it could not be opened. The remembered one is
+ * `ideal`: it names a headset that may have been unplugged three days ago, and
+ * that must never be the reason a recording cannot start.
+ */
 export function micConstraints(deviceId?: string): MediaTrackConstraints {
     const on = browserProcessing(micCleanup());
+    const remembered = micDevice();
     return {
-        ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+        ...(deviceId
+            ? { deviceId: { exact: deviceId } }
+            : remembered
+              ? { deviceId: { ideal: remembered } }
+              : {}),
         echoCancellation: on,
         noiseSuppression: on,
         autoGainControl: on

@@ -13,18 +13,19 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
+import type { FootageSettings } from "@/lib/home/stills";
 import type { AvatarSettings } from "@/lib/avatar-service";
 import { ResolvedTarget, TargetPicker } from "./target-picker";
-import type { UploadSettings } from "@/lib/tasks/attachment-service";
-import { Button, Card, CardBody, Input, Switch, cn } from "@polaris/ui";
 import type { ChatStorageSettings } from "@/lib/chat/attachments";
-import type { FootageSettings } from "@/lib/home/stills";
+import type { UploadSettings } from "@/lib/tasks/attachment-service";
+import { Button, Card, CardBody, ConfirmDeleteDialog, Input, Switch, cn } from "@polaris/ui";
 import {
     checkStorageAction,
     setAvatarSettingsAction,
     setChatStorageTargetAction,
     setFootageTargetAction,
     setUploadSettingsAction,
+    tidyChatStorageAction,
     type StorageCheck
 } from "./actions";
 
@@ -55,9 +56,18 @@ function CheckButton({ which }: { which: StorageCheck }) {
                     onClick={async () => {
                         setBusy(true);
                         setSaid(null);
-                        const result = await runAction(() => checkStorageAction(which), () => undefined);
+                        const result = await runAction(
+                            () => checkStorageAction(which),
+                            () => undefined
+                        );
                         setBusy(false);
-                        setSaid(result ?? { ok: false, detail: "That check could not be run.", where: "" });
+                        setSaid(
+                            result ?? {
+                                ok: false,
+                                detail: "That check could not be run.",
+                                where: ""
+                            }
+                        );
                     }}
                 >
                     {busy && <Loader2 className="size-4 animate-spin" />}
@@ -70,6 +80,103 @@ function CheckButton({ which }: { which: StorageCheck }) {
                     {said.detail}
                 </p>
             )}
+        </div>
+    );
+}
+
+/**
+ * Take out the folders no conversation answers for.
+ *
+ * Only on the chat card, because that is the storage that grew them: a
+ * conversation deleted by an older build left its whole folder behind, and a
+ * message deleted one at a time left an empty one named after a uuid. Nothing
+ * else will ever remove either, and neither is reachable from anywhere in
+ * Polaris.
+ *
+ * Asked first, because what it does is a recursive delete on somebody's disk and
+ * a press is not a decision. It runs against every storage the instance has ever
+ * written chat files to - a NAS share other people may also be using among them -
+ * and nothing puts back what it takes.
+ *
+ * What could not be removed is said as plainly as what was. A run where half the
+ * folders refused and the line only counted the other half reads as a clean
+ * sweep, which is how a full disk stays full.
+ */
+function TidyButton() {
+    const [asking, setAsking] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [said, setSaid] = useState<{ detail: string; failed: boolean } | null>(null);
+
+    const tidy = async () => {
+        setBusy(true);
+        setSaid(null);
+        const result = await runAction(
+            () => tidyChatStorageAction(),
+            () => undefined
+        );
+        setBusy(false);
+        setAsking(false);
+        if (!result || result.error) {
+            setSaid({ detail: result?.error ?? "That could not be run.", failed: true });
+            return;
+        }
+        const removed = result.removed ?? 0;
+        const failed = result.failed ?? 0;
+        const took =
+            removed === 0
+                ? "Nothing to take out."
+                : `Took out ${removed} folder${removed === 1 ? "" : "s"}.`;
+        setSaid({
+            detail:
+                failed === 0
+                    ? took
+                    : `${took} ${failed} could not be removed - the storage refused, or it is not answering.`,
+            failed: failed > 0
+        });
+    };
+
+    return (
+        <div className="flex flex-col gap-1.5">
+            <div>
+                <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy}
+                    title="Removes folders for conversations that no longer exist, and empty ones."
+                    onClick={() => {
+                        setSaid(null);
+                        setAsking(true);
+                    }}
+                >
+                    {busy && <Loader2 className="size-4 animate-spin" />}
+                    Tidy up
+                </Button>
+            </div>
+            {said && (
+                <p className={cn("text-xs", said.failed ? "text-danger" : "text-muted-foreground")}>
+                    {said.detail}
+                </p>
+            )}
+
+            <ConfirmDeleteDialog
+                open={asking}
+                onOpenChange={(open) => !busy && setAsking(open)}
+                requireTyping={false}
+                name="chat storage"
+                kind="folders"
+                title="Tidy the chat storage"
+                confirmLabel="Tidy up"
+                pending={busy}
+                description={
+                    <>
+                        Deletes every folder under the chat root whose conversation no longer
+                        exists, with everything inside it, and any folder left empty. The files do
+                        not come back.
+                    </>
+                }
+                question="Tidy every storage this instance has written chat files to?"
+                onConfirm={() => void tidy()}
+            />
         </div>
     );
 }
@@ -175,7 +282,9 @@ function AttachmentsCard({ settings }: { settings: UploadSettings }) {
                         />
                         <span className="text-sm text-muted-foreground">MB</span>
                     </div>
-                    {!limitValid && <span className="text-xs text-danger">Between 1 and 10240 MB.</span>}
+                    {!limitValid && (
+                        <span className="text-xs text-danger">Between 1 and 10240 MB.</span>
+                    )}
                 </label>
 
                 <CheckButton which="tasks" />
@@ -205,7 +314,10 @@ function PhotosCard({ settings }: { settings: AvatarSettings }) {
         if (saving) return;
         setSaving(true);
         setError("");
-        const result = await runAction(() => setAvatarSettingsAction({ target, gravatar }), setError);
+        const result = await runAction(
+            () => setAvatarSettingsAction({ target, gravatar }),
+            setError
+        );
         setSaving(false);
         if (result?.error) {
             setError(result.error);
@@ -220,8 +332,8 @@ function PhotosCard({ settings }: { settings: AvatarSettings }) {
                 <div>
                     <h2 className="text-sm font-medium">Profile photos</h2>
                     <p className="text-xs text-muted-foreground">
-                        The picture on somebody&rsquo;s account. Capped at 2 MB and squared by the browser before it is
-                        sent, so these stay small wherever they go.
+                        The picture on somebody&rsquo;s account. Capped at 2 MB and squared by the
+                        browser before it is sent, so these stay small wherever they go.
                     </p>
                 </div>
 
@@ -246,9 +358,10 @@ function PhotosCard({ settings }: { settings: AvatarSettings }) {
                     <span className="flex flex-col gap-0.5">
                         <span className="text-sm font-medium">Use Gravatar</span>
                         <span className="text-xs text-muted-foreground">
-                            For accounts with no photo of their own, show the one their email address has on Gravatar.
-                            Polaris asks for it, not the browser, so no address leaves this server and nobody is told
-                            who is looking. Off means initials until somebody uploads a photo.
+                            For accounts with no photo of their own, show the one their email
+                            address has on Gravatar. Polaris asks for it, not the browser, so no
+                            address leaves this server and nobody is told who is looking. Off means
+                            initials until somebody uploads a photo.
                         </span>
                     </span>
                     <Switch
@@ -325,7 +438,10 @@ function ChatCard({ settings }: { settings: ChatStorageSettings }) {
                     }}
                 />
 
-                <CheckButton which="chat" />
+                <div className="flex flex-wrap items-start gap-2">
+                    <CheckButton which="chat" />
+                    <TidyButton />
+                </div>
                 <SaveRow
                     dirty={dirty}
                     valid
@@ -376,8 +492,9 @@ function FootageCard({ settings }: { settings: FootageSettings }) {
                 <div>
                     <h2 className="text-sm font-medium">Camera footage</h2>
                     <p className="text-xs text-muted-foreground">
-                        Recordings and the pictures that go with what the cameras notice. A NAS is the right answer if
-                        you have one: this is the only thing here that grows whether or not anybody uses it.
+                        Recordings and the pictures that go with what the cameras notice. A NAS is
+                        the right answer if you have one: this is the only thing here that grows
+                        whether or not anybody uses it.
                     </p>
                 </div>
 

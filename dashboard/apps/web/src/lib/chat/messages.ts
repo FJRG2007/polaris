@@ -29,6 +29,7 @@ import {
     reachableChannelIds,
     requireChannel,
     requirePostable,
+    type ChannelAccess,
     type ChatActor
 } from "./access";
 
@@ -163,8 +164,7 @@ export async function readChannel(
     channelId: string,
     before?: string
 ): Promise<ChatPage> {
-    await requireChannel(actor, channelId);
-    await markDelivered(actor, channelId);
+    await markDelivered(actor, await requireChannel(actor, channelId));
 
     const cursor = before
         ? await prisma.chatMessage.findFirst({
@@ -235,8 +235,7 @@ export async function readSince(
     channelId: string,
     afterId: string | null
 ): Promise<ChatNewerPage> {
-    await requireChannel(actor, channelId);
-    await markDelivered(actor, channelId);
+    await markDelivered(actor, await requireChannel(actor, channelId));
     const cursor = afterId
         ? await prisma.chatMessage.findFirst({
               where: { id: afterId, channelId },
@@ -351,7 +350,11 @@ export async function send(
                 replyToId: quoted,
                 forwarded: quoted !== null && (quote?.forwarded ?? false),
                 ...(attachments.length
-                    ? { attachments: { createMany: { data: attachments.map((file) => ({ ...file })) } } }
+                    ? {
+                          attachments: {
+                              createMany: { data: attachments.map((file) => ({ ...file })) }
+                          }
+                      }
                     : {})
             },
             select: { id: true, createdAt: true }
@@ -547,10 +550,7 @@ export interface ChatEditHistory {
  * it is that "(edited)" without it asks the room to take the change on trust,
  * and a history only the author could open would not answer that.
  */
-export async function editHistory(
-    actor: ChatActor,
-    messageId: string
-): Promise<ChatEditHistory> {
+export async function editHistory(actor: ChatActor, messageId: string): Promise<ChatEditHistory> {
     const message = await prisma.chatMessage.findUnique({
         where: { id: messageId },
         select: { channelId: true, deletedAt: true }
@@ -642,9 +642,18 @@ export async function remove(
     const wouldTakeOthers = message.replyCount > 0;
 
     if (rules.deleteLeavesTrace || wouldTakeOthers) {
-        await prisma.chatMessage.update({
-            where: { id: messageId },
-            data: { deletedAt: new Date(), body: "" }
+        // The line stays and says so; nothing else does. A tombstone carries no
+        // text, no files and no reactions - which is how it is already drawn - so
+        // leaving the bytes on the NAS would be keeping a photograph nothing can
+        // reach and nobody can find, on somebody else's disk, forever.
+        await discardAttachments(messageId);
+        await prisma.$transaction(async (tx) => {
+            await tx.chatAttachment.deleteMany({ where: { messageId } });
+            await tx.chatReaction.deleteMany({ where: { messageId } });
+            await tx.chatMessage.update({
+                where: { id: messageId },
+                data: { deletedAt: new Date(), body: "" }
+            });
         });
     } else {
         // Bytes first: the rows cascade with the message, and an attachment row
@@ -705,10 +714,37 @@ export async function react(actor: ChatActor, input: core.ChatReactInput): Promi
  * Only where there is somebody to tell. A membership row is what carries the
  * mark, and somebody reading a public channel through the space has none.
  */
-async function markDelivered(actor: ChatActor, channelId: string): Promise<void> {
+async function markDelivered(actor: ChatActor, channel: ChannelAccess): Promise<void> {
+    const now = new Date();
+    const channelId = channel.channelId;
+
+    // The moment itself, on the messages themselves, and only in a one-to-one
+    // conversation - which is the only place there is a "the other person" to
+    // draw an information panel about. The mark below says how far this reader
+    // has got now; it can never say when they got to a particular message.
+    if (channel.kind === "dm" && channel.member) {
+        const mark = await prisma.chatChannelMember.findUnique({
+            where: { channelId_userId: { channelId, userId: actor.id } },
+            select: { lastDeliveredAt: true }
+        });
+        await prisma.chatMessage.updateMany({
+            where: {
+                channelId,
+                authorId: { not: actor.id },
+                deliveredAt: null,
+                // From where the last pick-up left off. Everything older than
+                // that arrived long ago - possibly before Polaris recorded the
+                // moment at all - and stamping it now would put today's time on
+                // a message from March.
+                ...(mark?.lastDeliveredAt ? { createdAt: { gte: mark.lastDeliveredAt } } : {})
+            },
+            data: { deliveredAt: now }
+        });
+    }
+
     await prisma.chatChannelMember.updateMany({
         where: { channelId, userId: actor.id },
-        data: { lastDeliveredAt: new Date() }
+        data: { lastDeliveredAt: now }
     });
 }
 
@@ -718,9 +754,15 @@ async function markDelivered(actor: ChatActor, channelId: string): Promise<void>
  * Never moves the mark backwards. Two tabs open on the same channel disagree
  * about what has been seen, and the one scrolled further up must not un-read
  * what the other already read.
+ *
+ * Announced, because nothing else says somebody caught up: the count on the
+ * desktop they left open stayed until the page was reloaded, and the second tick
+ * under the other person's message stayed grey for the same reason. Only
+ * announced when the mark actually moved - every early return above this is a
+ * read that changed nothing - and only to the screens `readAudience` names.
  */
 export async function markRead(actor: ChatActor, input: core.ChatMarkReadInput): Promise<void> {
-    await requireChannel(actor, input.channelId);
+    const channel = await requireChannel(actor, input.channelId);
     const message = await prisma.chatMessage.findFirst({
         where: { id: input.messageId, channelId: input.channelId },
         select: { createdAt: true }
@@ -743,6 +785,145 @@ export async function markRead(actor: ChatActor, input: core.ChatMarkReadInput):
             lastReadAt: message.createdAt
         }
     });
+
+    // The moment, on everything this crossed. Bounded by the mark it replaces,
+    // so a conversation opened for the tenth time stamps whatever arrived since
+    // the ninth and nothing else.
+    if (channel.kind === "dm") {
+        await prisma.chatMessage.updateMany({
+            where: {
+                channelId: input.channelId,
+                authorId: { not: actor.id },
+                readAt: null,
+                createdAt: {
+                    lte: message.createdAt,
+                    ...(current?.lastReadAt ? { gt: current.lastReadAt } : {})
+                }
+            },
+            data: { readAt: new Date() }
+        });
+    }
+
+    publishChatChange({
+        channelId: input.channelId,
+        kind: "read",
+        actorId: actor.id,
+        audience: await readAudience(actor, channel)
+    });
+}
+
+/**
+ * Whose screens a read is for.
+ *
+ * Always the reader's own, which is the count coming down on the desktop they
+ * left open. The other person as well, but only in a one-to-one conversation
+ * where the ticks are theirs to see: the frame arrives at the instant somebody
+ * opened the message, which is the fact the setting withholds - a receipt
+ * nothing draws is still a receipt if it is on the wire.
+ *
+ * One person everywhere else. No screen consumes somebody else's read outside a
+ * one-to-one - "read by four of the seven here" is a different feature - and
+ * telling fifty members about each other's reading is a frame per pair per
+ * message for nothing.
+ */
+async function readAudience(actor: ChatActor, channel: ChannelAccess): Promise<string[]> {
+    if (channel.kind !== "dm") return [actor.id];
+
+    const other = await prisma.chatChannelMember.findFirst({
+        where: { channelId: channel.channelId, userId: { not: actor.id } },
+        select: { userId: true }
+    });
+    if (!other) return [actor.id];
+
+    // Not resolved as an administrator, for the same reason `receiptStateIn` is
+    // not: these are the ticks under somebody's own messages, and the admin
+    // exception is about reading somebody else's.
+    const allowed = await receiptsBetween({ id: actor.id, isAdmin: false }, other.userId);
+    return allowed ? [actor.id, other.userId] : [actor.id];
+}
+
+/**
+ * The ticks for messages that are already on screen.
+ *
+ * Sending is not the only thing that moves them: the other person reading is,
+ * and that happens to a message nothing is going to fetch again. So a screen
+ * that has been told somebody caught up asks for the marks by themselves rather
+ * than reloading the conversation - which would replace every message on it and
+ * take the reader back to the bottom.
+ *
+ * Computed by the same path the page uses, privacy included, so a reader cannot
+ * be shown a receipt the other person's settings withhold.
+ */
+export async function receiptsFor(
+    actor: ChatActor,
+    channelId: string,
+    messageIds: readonly string[]
+): Promise<Record<string, core.MessageReceipt>> {
+    await requireChannel(actor, channelId);
+    const wanted = [...new Set(messageIds)].slice(0, core.MAX_CHAT_RECEIPTS);
+    if (wanted.length === 0) return {};
+
+    const state = await receiptStateIn(actor, channelId);
+    if (!state) return {};
+
+    const rows = await prisma.chatMessage.findMany({
+        where: { id: { in: wanted }, channelId, authorId: actor.id, deletedAt: null },
+        select: { id: true, createdAt: true }
+    });
+    return Object.fromEntries(rows.map((row) => [row.id, receiptAt(state, row.createdAt)]));
+}
+
+/** When one message got where it was going. */
+export interface MessageDelivery {
+    readonly sentAt: string;
+    /**
+     * When the other person's device picked it up, and when they saw it.
+     *
+     * Null for a step that has not happened - and also for one that happened
+     * before Polaris recorded the moment, which is why `state` is here too: it
+     * is worked out from the marks that have always existed, so an old message
+     * can say it was read without inventing an hour for it.
+     */
+    readonly deliveredAt: string | null;
+    readonly readAt: string | null;
+    readonly state: core.MessageReceipt;
+}
+
+/**
+ * When a message was sent, arrived and was read.
+ *
+ * Only for the reader's own message in a one-to-one conversation where both
+ * settings allow the ticks - the same rule that decides whether they are drawn.
+ * Null when there is nothing to say, which is the panel's cue not to be offered.
+ */
+export async function deliveryOf(
+    actor: ChatActor,
+    messageId: string
+): Promise<MessageDelivery | null> {
+    const row = await prisma.chatMessage.findUnique({
+        where: { id: messageId },
+        select: {
+            channelId: true,
+            authorId: true,
+            createdAt: true,
+            deletedAt: true,
+            deliveredAt: true,
+            readAt: true
+        }
+    });
+    if (!row) return null;
+    await requireChannel(actor, row.channelId);
+    if (row.authorId !== actor.id || row.deletedAt) return null;
+
+    const state = await receiptStateIn(actor, row.channelId);
+    if (!state) return null;
+
+    return {
+        sentAt: row.createdAt.toISOString(),
+        deliveredAt: row.deliveredAt?.toISOString() ?? null,
+        readAt: row.readAt?.toISOString() ?? null,
+        state: receiptAt(state, row.createdAt)
+    };
 }
 
 /**
@@ -776,12 +957,10 @@ export async function forward(actor: ChatActor, input: core.ChatForwardInput): P
 
     // The note as written, empty included: a space was here to get past the
     // blank-body rule, and it left a message whose text was one space.
-    return send(
-        actor,
-        { channelId: input.channelId, body: input.note, parentId: null },
-        [],
-        { messageId: input.messageId, forwarded: true }
-    );
+    return send(actor, { channelId: input.channelId, body: input.note, parentId: null }, [], {
+        messageId: input.messageId,
+        forwarded: true
+    });
 }
 
 /**
@@ -898,7 +1077,10 @@ interface Row {
  * their account, which is the opposite of what a record of a conversation is
  * for.
  */
-export async function decorateMessages(actor: ChatActor, rows: readonly Row[]): Promise<ChatMessageView[]> {
+export async function decorateMessages(
+    actor: ChatActor,
+    rows: readonly Row[]
+): Promise<ChatMessageView[]> {
     if (rows.length === 0) return [];
 
     const authorIds = [
@@ -1082,8 +1264,12 @@ async function receiptStateFor(
 ): Promise<ReceiptState | null> {
     const mine = rows.filter((row) => row.authorId === actor.id && !row.deletedAt);
     if (mine.length === 0) return null;
+    return receiptStateIn(actor, mine[0]!.channelId);
+}
 
-    const channelId = mine[0]!.channelId;
+/** The same question asked of a conversation rather than of a page of it, for the
+ *  screen that only wants the marks. */
+async function receiptStateIn(actor: ChatActor, channelId: string): Promise<ReceiptState | null> {
     const channel = await prisma.chatChannel.findUnique({
         where: { id: channelId },
         select: { kind: true }
@@ -1112,8 +1298,14 @@ function receiptFor(
     state: ReceiptState | null
 ): core.MessageReceipt | null {
     if (!state || row.authorId !== actor.id || row.deletedAt) return null;
-    if (state.readAt && state.readAt >= row.createdAt) return "read";
-    if (state.deliveredAt && state.deliveredAt >= row.createdAt) return "delivered";
+    return receiptAt(state, row.createdAt);
+}
+
+/** Which tick one of the reader's own messages has earned, given how far the
+ *  other side has got. */
+function receiptAt(state: ReceiptState, createdAt: Date): core.MessageReceipt {
+    if (state.readAt && state.readAt >= createdAt) return "read";
+    if (state.deliveredAt && state.deliveredAt >= createdAt) return "delivered";
     return "sent";
 }
 

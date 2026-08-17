@@ -23,7 +23,8 @@ import {
     ContextMenuContent,
     ContextMenuItem,
     ContextMenuSeparator,
-    ContextMenuTrigger
+    ContextMenuTrigger,
+    keepFocusOnClose
 } from "@polaris/ui";
 import {
     Copy,
@@ -31,6 +32,7 @@ import {
     Flag,
     CornerUpLeft,
     Forward,
+    Info,
     Link2,
     MessageSquare,
     Pencil,
@@ -43,15 +45,20 @@ export interface MessageActions {
     readonly mine: boolean;
     readonly canPost: boolean;
     readonly canModerate: boolean;
-    readonly onReply: (message: ChatMessageView) => void;
-    readonly onForward: (message: ChatMessageView) => void;
+    /** The three a thread does not have: answering, forwarding and rewriting all
+     *  happen in the channel, and an item that does nothing is worse than one
+     *  that is not there. */
+    readonly onReply?: (message: ChatMessageView) => void;
+    readonly onForward?: (message: ChatMessageView) => void;
+    readonly onEdit?: (message: ChatMessageView) => void;
     readonly onOpenThread?: (message: ChatMessageView) => void;
     readonly onStar: (message: ChatMessageView) => void;
-    readonly onEdit: (message: ChatMessageView) => void;
     readonly onDelete: (message: ChatMessageView) => void;
     /** Say something is wrong with it. Not offered on your own message: the
      *  thing to do about your own words is take them back, which is Delete. */
     readonly onReport: (message: ChatMessageView) => void;
+    /** When it was sent, when it arrived, when it was read. */
+    readonly onExplain: (message: ChatMessageView) => void;
 }
 
 export function MessageMenu({
@@ -71,18 +78,26 @@ export function MessageMenu({
     return (
         <ContextMenu>
             <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-            <ContextMenuContent className="w-52">
+            {/* Focus is not handed back to the message row on the way out: Reply
+                and Edit put the caret in the composer, and the hand-back landed
+                a beat later and took it straight out again. */}
+            <ContextMenuContent className="w-52" onCloseAutoFocus={keepFocusOnClose}>
                 {canPost && !message.deleted && (
                     <>
-                        <ContextMenuItem onSelect={() => actions.onReply(message)}>
-                            <CornerUpLeft className="size-3.5" />
-                            Reply
-                        </ContextMenuItem>
+                        {actions.onReply && (
+                            <ContextMenuItem onSelect={() => actions.onReply?.(message)}>
+                                <CornerUpLeft className="size-3.5" />
+                                Reply
+                                <span className="ml-auto pl-6 text-[11px] text-foreground-subtle">
+                                    R
+                                </span>
+                            </ContextMenuItem>
+                        )}
                         {/* Absent rather than refused when whoever wrote it does
                             not allow it. A menu that offers something and then
                             says no is worse than one that offers less. */}
-                        {message.forwardable && (
-                            <ContextMenuItem onSelect={() => actions.onForward(message)}>
+                        {message.forwardable && actions.onForward && (
+                            <ContextMenuItem onSelect={() => actions.onForward?.(message)}>
                                 <Forward className="size-3.5" />
                                 Forward
                             </ContextMenuItem>
@@ -138,6 +153,17 @@ export function MessageMenu({
                         </ContextMenuItem>
                     ))}
 
+                {/* Only where there are ticks to explain, which is exactly a
+                    one-to-one conversation, your own message, and both people
+                    allowing them - the same rule that decides whether the ticks
+                    are drawn, asked once on the server and carried here. */}
+                {message.receipt && !message.deleted && (
+                    <ContextMenuItem onSelect={() => actions.onExplain(message)}>
+                        <Info className="size-3.5" />
+                        Information
+                    </ContextMenuItem>
+                )}
+
                 {!mine && !message.deleted && (
                     <>
                         <ContextMenuSeparator />
@@ -154,8 +180,8 @@ export function MessageMenu({
                         {/* The keys said out loud, because a shortcut nobody is
                             told about is a shortcut nobody uses. Both act on the
                             message under the pointer, which is this one. */}
-                        {mine && (
-                            <ContextMenuItem onSelect={() => actions.onEdit(message)}>
+                        {mine && actions.onEdit && (
+                            <ContextMenuItem onSelect={() => actions.onEdit?.(message)}>
                                 <Pencil className="size-3.5" />
                                 Edit
                                 <span className="ml-auto pl-6 text-[11px] text-foreground-subtle">

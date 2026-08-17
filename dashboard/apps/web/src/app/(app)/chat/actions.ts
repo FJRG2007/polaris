@@ -33,8 +33,13 @@ import { messageToasts, type MessageToast } from "@/lib/chat/toasts";
 import { searchMessages, type ChatSearchHit } from "@/lib/chat/search";
 import { voicePresence, type VoicePresence } from "@/lib/chat/meetings";
 import type { ChatInviteOffer, ChatInviteView } from "@/lib/chat/invites";
-import type { ChatMessageView, ChatNewerPage, ChatPage } from "@/lib/chat/messages";
 import { fetchRemoteMedia, searchTenor, tenorConfigured, type TenorResult } from "@/lib/chat/tenor";
+import type {
+    ChatMessageView,
+    ChatNewerPage,
+    ChatPage,
+    MessageDelivery
+} from "@/lib/chat/messages";
 import type {
     ChatCategoryView,
     ChatChannelView,
@@ -305,7 +310,9 @@ export async function searchTenorAction(
     kind: "gif" | "sticker"
 ): Promise<{ results: TenorResult[] }> {
     await actor();
-    return { results: await searchTenor(String(query ?? ""), kind === "sticker" ? "sticker" : "gif") };
+    return {
+        results: await searchTenor(String(query ?? ""), kind === "sticker" ? "sticker" : "gif")
+    };
 }
 
 /**
@@ -363,6 +370,43 @@ export async function markReadAction(input: unknown): Promise<{ error?: string }
 }
 
 /**
+ * The ticks under messages already on screen, asked for again.
+ *
+ * What a screen does when it is told the other person caught up: reloading the
+ * conversation for two ticks would replace every message on it and move the
+ * reader. An unreadable answer is an empty one - the marks are decoration on a
+ * conversation that is already drawn.
+ */
+export async function receiptsAction(
+    input: unknown
+): Promise<{ receipts: Record<string, core.MessageReceipt> }> {
+    const me = await actor();
+    const parsed = core.chatReceiptsSchema.safeParse(input);
+    if (!parsed.success) return { receipts: {} };
+    const result = await guard(() =>
+        messages.receiptsFor(me, parsed.data.channelId, parsed.data.messageIds)
+    );
+    return { receipts: result.error ? {} : (result.value ?? {}) };
+}
+
+/**
+ * When one of the reader's own messages arrived and was read.
+ *
+ * Only ever answered for a one-to-one conversation where the ticks are already
+ * shown - the panel is the same fact, spelled out.
+ */
+export async function messageDeliveryAction(
+    messageId: string
+): Promise<{ delivery?: MessageDelivery; error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(messageId);
+    if (!parsed.success) return { error: "There is no such message" };
+    const result = await guard(() => messages.deliveryOf(me, parsed.data));
+    if (result.error) return { error: result.error };
+    return result.value ? { delivery: result.value } : {};
+}
+
+/**
  * Report a message.
  *
  * No permission of its own: being able to see something is being able to say
@@ -370,7 +414,9 @@ export async function markReadAction(input: unknown): Promise<{ error?: string }
  * nobody makes. The service proves the conversation, which is the same check
  * that let them read it.
  */
-export async function reportMessageAction(input: unknown): Promise<{ already?: boolean; error?: string }> {
+export async function reportMessageAction(
+    input: unknown
+): Promise<{ already?: boolean; error?: string }> {
     const me = await actor();
     const parsed = core.chatReportSchema.safeParse(input);
     if (!parsed.success) return { error: "Say what is wrong with it" };
@@ -500,7 +546,9 @@ export async function updateChannelAction(input: unknown): Promise<{ error?: str
     return result;
 }
 
-export async function createCategoryAction(input: unknown): Promise<{ id?: string; error?: string }> {
+export async function createCategoryAction(
+    input: unknown
+): Promise<{ id?: string; error?: string }> {
     const me = await actor();
     const parsed = core.chatCategoryCreateSchema.safeParse(input);
     if (!parsed.success)
@@ -541,7 +589,9 @@ export async function openDirectAction(input: unknown): Promise<{ id?: string; e
     const parsed = core.chatDirectOpenSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Pick somebody first" };
 
-    const result = await guard(() => chat.openDirect(me, parsed.data.userIds, parsed.data.name ?? ""));
+    const result = await guard(() =>
+        chat.openDirect(me, parsed.data.userIds, parsed.data.name ?? "")
+    );
     if (!result.error) revalidatePath(CHAT_PATH);
     return result.error ? { error: result.error } : { id: result.value };
 }
@@ -816,9 +866,7 @@ export async function sendSavedMediaAction(
     savedId: string
 ): Promise<{ id?: string; error?: string }> {
     const me = await actor();
-    const result = await guard(() =>
-        saved.sendSavedMedia(me, String(channelId), String(savedId))
-    );
+    const result = await guard(() => saved.sendSavedMedia(me, String(channelId), String(savedId)));
     if (result.error || !result.value) return { error: result.error ?? "That could not be sent" };
     if ("messageId" in result.value) return { id: result.value.messageId };
     return sendMediaAction(channelId, result.value.remote);

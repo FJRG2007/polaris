@@ -8,14 +8,14 @@
 import { z } from "zod";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
-import { setAvatarSettings } from "@/lib/avatar-service";
-import { setChatStorageTarget } from "@/lib/chat/attachments";
-import { footageSettings, setFootageTarget } from "@/lib/home/stills";
-import { setUploadSettings } from "@/lib/tasks/attachment-service";
-import { checkStorageTarget } from "@/lib/storage-target";
 import { chatTarget } from "@/lib/chat/attachments";
 import { avatarSettings } from "@/lib/avatar-service";
+import { setAvatarSettings } from "@/lib/avatar-service";
+import { checkStorageTarget } from "@/lib/storage-target";
 import { uploadSettings } from "@/lib/tasks/attachment-service";
+import { setUploadSettings } from "@/lib/tasks/attachment-service";
+import { footageSettings, setFootageTarget } from "@/lib/home/stills";
+import { setChatStorageTarget, tidyChatStorage } from "@/lib/chat/attachments";
 
 /** A storage connection id, `local`, or `auto`. */
 const target = z.string().trim().min(1).max(128);
@@ -122,6 +122,35 @@ export async function setChatStorageTargetAction(input: unknown): Promise<{ erro
     } catch (caught) {
         console.error(caught);
         return { error: "Could not save that" };
+    }
+}
+
+/**
+ * Take out what no conversation answers for.
+ *
+ * A conversation deleted by an older build left its whole folder on the storage,
+ * and a message deleted one at a time left an empty one. Nothing in Polaris can
+ * reach either, so nothing but this will ever remove them.
+ */
+export async function tidyChatStorageAction(): Promise<{
+    removed?: number;
+    failed?: number;
+    error?: string;
+}> {
+    const admin = await requireAdmin();
+    try {
+        const result = await tidyChatStorage();
+        await recordAudit({
+            actorId: admin.id,
+            action: "settings.chat.uploads.tidy",
+            targetType: "setting",
+            targetId: "chat.attachments",
+            metadata: { removed: result.removed, failed: result.failed }
+        });
+        return result;
+    } catch (caught) {
+        console.error(caught);
+        return { error: "That storage could not be tidied" };
     }
 }
 

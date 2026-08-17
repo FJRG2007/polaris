@@ -22,9 +22,9 @@
  */
 
 import * as core from "@polaris/core";
-import { Button, cn } from "@polaris/ui";
 import { typingAction } from "./actions";
 import { EmojiPicker } from "./emoji-picker";
+import { useMicrophones } from "./mic-device";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
@@ -39,6 +39,8 @@ import {
 } from "./voice-recorder";
 import {
     Camera,
+    Check,
+    ChevronDown,
     CornerUpLeft,
     Image as ImageIcon,
     Mic,
@@ -48,6 +50,16 @@ import {
     Trash2,
     X
 } from "lucide-react";
+import {
+    Button,
+    cn,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger
+} from "@polaris/ui";
 
 /** How often, at most, the server is told somebody is typing. */
 const TYPING_EVERY_MS = 2500;
@@ -125,9 +137,7 @@ export function Composer({
     // other picker, so the button would be a second paperclip wearing a camera.
     const [handheld, setHandheld] = useState(false);
     useEffect(() => {
-        setHandheld(
-            typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches
-        );
+        setHandheld(typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches);
     }, []);
     // Bumped to rebuild the editor, which is how it is cleared: the editor owns
     // its document, and setting the value prop back to "" does not empty it.
@@ -158,14 +168,22 @@ export function Composer({
      * nobody means to take - the press was the decision to write. The same for
      * an edit, where the text is already there and the cursor was not.
      *
+     * Where it lands is the difference between the two. An edit has just replaced
+     * what is in the box, so the end of it is the only sensible place. A reply
+     * happens to a box somebody may be halfway through a sentence in - the way
+     * everybody uses it is to type, decide it should answer something, and press
+     * reply - so the caret goes back exactly where they left it.
+     *
      * On the ids and nothing else. The objects are replaced whenever the
      * conversation reloads, and focusing on that would put the caret back at the
      * end of the line every time somebody else said something.
      */
     const replyingToId = replyingTo?.id ?? null;
     const [focusAt, setFocusAt] = useState(0);
+    const [focusWhere, setFocusWhere] = useState<"end" | "keep">("end");
     useEffect(() => {
         if (!editingId && !replyingToId) return;
+        setFocusWhere(editingId ? "end" : "keep");
         setFocusAt((current) => current + 1);
     }, [editingId, replyingToId]);
 
@@ -183,6 +201,7 @@ export function Composer({
     useEffect(() => {
         if (disabled || editingId) return;
         if (typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches) return;
+        setFocusWhere("end");
         setFocusAt((current) => current + 1);
     }, [channelId, disabled, editingId]);
 
@@ -198,7 +217,11 @@ export function Composer({
         if (!editing && !replyingTo) return;
         const onKey = (event: KeyboardEvent) => {
             if (event.key !== "Escape") return;
-            if (document.querySelector("[data-state='open'][role='dialog'], [data-state='open'][role='menu']")) {
+            if (
+                document.querySelector(
+                    "[data-state='open'][role='dialog'], [data-state='open'][role='menu']"
+                )
+            ) {
                 return;
             }
             event.preventDefault();
@@ -258,14 +281,19 @@ export function Composer({
      *
      * Silently dropping the eleventh file is how somebody sends ten of the
      * twelve screenshots they meant to and finds out later.
+     *
+     * Answers how many it took, which is what a paste needs: a clipboard that
+     * carries a picture and text at once has to keep the text when the picture is
+     * refused - no permission to send files, or a message already holding as many
+     * as it may - or the paste is eaten and nothing at all appears.
      */
-    const stage = (picked: FileList | null): void => {
-        if (!picked || picked.length === 0) return;
+    const stage = (picked: ArrayLike<File> | null): number => {
+        if (!picked || picked.length === 0) return 0;
         // Said rather than ignored: a file dropped onto a box that quietly does
         // nothing with it reads as a broken composer.
         if (!attachable) {
             setRefused("You are not allowed to send files here.");
-            return;
+            return 0;
         }
         const chosen = Array.from(picked);
         const room = Math.max(0, rules.maxAttachments - files.length);
@@ -285,6 +313,7 @@ export function Composer({
         }
         setRefused(notes.join(" "));
         if (accepted.length > 0) setFiles((current) => [...current, ...accepted]);
+        return accepted.length;
     };
 
     /** What every picker does with what came back. Cleared afterwards so
@@ -391,28 +420,15 @@ export function Composer({
             )}
 
             {files.length > 0 && (
-                <ul className="mb-2 flex flex-wrap gap-1">
+                <ul className="mb-2 flex flex-wrap items-end gap-2">
                     {files.map((file, index) => (
-                        <li
-                            key={`${file.name}:${index}`}
-                            className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs"
-                        >
-                            <Paperclip className="size-3 shrink-0 text-muted-foreground" />
-                            <span className="max-w-[12rem] truncate" title={file.name}>
-                                {file.name}
-                            </span>
-                            <span className="text-muted-foreground">{readableSize(file.size)}</span>
-                            <button
-                                type="button"
-                                aria-label={`Remove ${file.name}`}
-                                onClick={() =>
-                                    setFiles((current) => current.filter((_, at) => at !== index))
-                                }
-                                className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
-                            >
-                                <X className="size-3" />
-                            </button>
-                        </li>
+                        <StagedFile
+                            key={`${file.name}:${file.lastModified}:${index}`}
+                            file={file}
+                            onRemove={() =>
+                                setFiles((current) => current.filter((_, at) => at !== index))
+                            }
+                        />
                     ))}
                 </ul>
             )}
@@ -447,7 +463,13 @@ export function Composer({
                             {voice.levels.map((level, at) => (
                                 <span
                                     key={at}
-                                    style={{ height: `${Math.max(8, Math.min(100, level * 260))}%` }}
+                                    // A fraction of the loudest moment so far, so
+                                    // this reads like the waveform the message
+                                    // arrives with rather than like a microphone
+                                    // that is barely picking anything up.
+                                    style={{
+                                        height: `${Math.max(8, Math.min(100, level * 100))}%`
+                                    }}
                                     className={cn(
                                         "w-1 shrink-0 rounded-full",
                                         voice.silent ? "bg-border" : "bg-primary"
@@ -495,6 +517,20 @@ export function Composer({
                         // this account shares a Tasks space with, which is what
                         // it used to offer and is a different question entirely.
                         mentionsIn={channelId}
+                        focusWhere={focusWhere}
+                        // A screenshot on the clipboard is a screenshot somebody
+                        // is sending: it is staged like a picked file, with the
+                        // same limits and the same preview, and nothing about it
+                        // goes into the text.
+                        //
+                        // Only claimed when something was actually staged. A
+                        // clipboard filled by copying out of a page carries the
+                        // picture and the words together, so a refused file that
+                        // said it took the paste threw the words away too.
+                        onPasteFiles={(pasted) => {
+                            if (disabled) return false;
+                            return stage(pasted) > 0;
+                        }}
                         onChange={setBody}
                         // From the keys and not from the document changing. A
                         // document changes for reasons that are not a person
@@ -564,16 +600,10 @@ export function Composer({
                                 record, rather than as a button that apologises
                                 when it is pressed. */}
                             {mayAttach && recordable && (
-                                <button
-                                    type="button"
+                                <MicButton
                                     disabled={disabled || files.length >= rules.maxAttachments}
-                                    onClick={voice.start}
-                                    aria-label="Record a voice message"
-                                    title="Record a voice message"
-                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-                                >
-                                    <Mic className="size-4" />
-                                </button>
+                                    onStart={voice.start}
+                                />
                             )}
                             <EmojiPicker
                                 disabled={disabled}
@@ -656,6 +686,151 @@ export function Composer({
         </div>
     );
 }
+
+/**
+ * Record, and pick what to record with.
+ *
+ * The button starts the recording and the chevron beside it chooses the
+ * microphone - the same shape the call controls use, and for the same reason:
+ * which device to use is decided once, and it must not slow down the thing that
+ * is decided every time.
+ *
+ * The chevron is only there where there is a choice to make. It also only appears
+ * once a microphone permission has been granted, because a browser will not name
+ * devices before that - a menu of "Microphone 1, Microphone 2" is not a choice
+ * anybody can make.
+ *
+ * The choice is this browser's, shared with calls: see `mic-device`.
+ */
+function MicButton({ disabled, onStart }: { disabled: boolean; onStart: () => void }) {
+    const { devices, chosenId, choose } = useMicrophones();
+    const many = devices.length > 1;
+
+    return (
+        <span className="flex items-center">
+            <button
+                type="button"
+                disabled={disabled}
+                onClick={onStart}
+                aria-label="Record a voice message"
+                title="Record a voice message"
+                className={cn(
+                    "rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50",
+                    many && "rounded-r-none pr-1"
+                )}
+            >
+                <Mic className="size-4" />
+            </button>
+            {many && (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <button
+                            type="button"
+                            disabled={disabled}
+                            aria-label="Choose a microphone"
+                            title="Choose a microphone"
+                            className="rounded rounded-l-none py-1.5 pl-0.5 pr-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                        >
+                            <ChevronDown className="size-3" />
+                        </button>
+                    </DropdownMenuTrigger>
+                    {/* Upward: the composer is at the bottom of the screen. */}
+                    <DropdownMenuContent align="start" side="top" className="max-w-72">
+                        <DropdownMenuLabel>Microphone</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {devices.map((device) => (
+                            <DropdownMenuItem key={device.id} onSelect={() => choose(device.id)}>
+                                <Check
+                                    className={cn(
+                                        "size-3.5 shrink-0",
+                                        device.id === chosenId ? "opacity-100" : "opacity-0"
+                                    )}
+                                />
+                                <span className="truncate" title={device.label}>
+                                    {device.label}
+                                </span>
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            )}
+        </span>
+    );
+}
+
+/**
+ * One file waiting to be sent.
+ *
+ * A picture is shown as the picture. "screenshot-2026-08-17-at-13-42-08.png" is
+ * not a description of anything, and pasting three screenshots in a row is three
+ * lines of that - which is how somebody sends the wrong one. Everything else is
+ * a chip with its name and size, because that is all there is to say about a
+ * spreadsheet.
+ *
+ * The preview is a blob address made here and given back when the file goes.
+ * Leaking one holds the whole file in memory for as long as the tab is open.
+ */
+function StagedFile({ file, onRemove }: { file: File; onRemove: () => void }) {
+    const [preview, setPreview] = useState<string | null>(null);
+
+    useEffect(() => {
+        // Only what the browser will actually draw. An SVG is an image and is
+        // deliberately not on this list - the same rule the conversation itself
+        // applies to a picture somebody uploaded.
+        if (!PREVIEWABLE.has(file.type.split(";")[0]?.trim().toLowerCase() ?? "")) return;
+        const address = URL.createObjectURL(file);
+        setPreview(address);
+        return () => {
+            URL.revokeObjectURL(address);
+            setPreview(null);
+        };
+    }, [file]);
+
+    const remove = (
+        <button
+            type="button"
+            aria-label={`Remove ${file.name}`}
+            title="Remove"
+            onClick={onRemove}
+            className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+        >
+            <X className="size-3" />
+        </button>
+    );
+
+    if (!preview) {
+        return (
+            <li className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs">
+                <Paperclip className="size-3 shrink-0 text-muted-foreground" />
+                <span className="max-w-[12rem] truncate" title={file.name}>
+                    {file.name}
+                </span>
+                <span className="text-muted-foreground">{readableSize(file.size)}</span>
+                {remove}
+            </li>
+        );
+    }
+
+    return (
+        <li className="relative">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a local blob, no loader wanted */}
+            <img
+                src={preview}
+                alt={file.name}
+                title={`${file.name} - ${readableSize(file.size)}`}
+                className="size-20 rounded-md border border-border object-cover"
+            />
+            <span className="absolute -right-1.5 -top-1.5 rounded-full border border-border bg-elevated shadow-sm">
+                {remove}
+            </span>
+        </li>
+    );
+}
+
+/** What a staged file is shown as itself, rather than as its name. The same list
+ *  the conversation draws inline, for the same reason: these are the formats that
+ *  are pictures and cannot carry script. */
+const PREVIEWABLE = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"]);
 
 /** A size somebody can read at a glance. Not the display-format helper: that one
  *  writes dates and money, and a file size is neither. */

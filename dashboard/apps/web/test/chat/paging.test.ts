@@ -70,7 +70,19 @@ vi.mock("@polaris/db", () => ({
 }));
 
 vi.mock("@/lib/chat/access", () => ({
-    requireChannel: async () => undefined,
+    // What the real one answers with, because the reader uses it: a page marks
+    // the conversation delivered, and only a one-to-one conversation stamps the
+    // moment on the messages themselves.
+    requireChannel: async (_actor: unknown, channelId: string) => ({
+        channelId,
+        spaceId: null,
+        kind: "text",
+        archived: false,
+        member: true,
+        mayPost: true,
+        mayAdminister: false,
+        mayModerate: false
+    }),
     requirePostable: async () => undefined,
     reachableChannelIds: async () => new Set<string>(),
     ChatAccessError: class extends Error {},
@@ -87,7 +99,10 @@ vi.mock("@/lib/privacy-service", () => ({
 vi.mock("@/lib/chat/live", () => ({ publishChatChange: () => undefined }));
 vi.mock("@/lib/chat/rules", () => ({ rulesForChannel: async () => ({ keepEditHistory: false }) }));
 vi.mock("@/lib/chat/room-mentions", () => ({ announceRoomMention: async () => undefined }));
-vi.mock("@/lib/chat/link-preview", () => ({ knownPreviews: async () => new Map(), unfurl: async () => undefined }));
+vi.mock("@/lib/chat/link-preview", () => ({
+    knownPreviews: async () => new Map(),
+    unfurl: async () => undefined
+}));
 
 const { readChannel, readSince } = await import("@/lib/chat/messages");
 

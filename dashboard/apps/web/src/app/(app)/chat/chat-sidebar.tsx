@@ -124,8 +124,9 @@ export function ChatSidebar() {
         if (!channel) return;
         setActiveSpaceId(channel.spaceId);
         // And remembered, so choosing this space again on this browser comes back
-        // here rather than to whatever is at the top of the list.
-        if (channel.spaceId) rememberChannel(channel.spaceId, channel.id);
+        // here rather than to whatever is at the top of the list. Direct messages
+        // are remembered the same way, under a key of their own.
+        rememberChannel(channel.spaceId, channel.id);
     }, [open, channels, setActiveSpaceId]);
 
     // Pinned first, then whatever happened most recently. Pinning is why the
@@ -328,7 +329,13 @@ export function ChatSidebar() {
                                     label={channel.name}
                                     icon={
                                         channel.others.length === 1 && channel.others[0] ? (
-                                            <Avatar person={channel.others[0]} size={18} />
+                                            // Twenty rather than eighteen, which
+                                            // is the size below which a face goes
+                                            // without its presence dot - so this
+                                            // list was the one place in Polaris
+                                            // where somebody's face did not say
+                                            // whether they were there.
+                                            <Avatar person={channel.others[0]} size={20} />
                                         ) : (
                                             // A group is its picture, or the
                                             // faces of the people in it. An
@@ -617,7 +624,9 @@ function ChannelRows({
                                                 name: person.name
                                             }}
                                         />
-                                        <span className="truncate" title={person.name}>{person.name}</span>
+                                        <span className="truncate" title={person.name}>
+                                            {person.name}
+                                        </span>
                                     </li>
                                 ))}
                             </ul>
@@ -790,9 +799,7 @@ function RowMenu({
                     )}
                     {channel.pinned ? "Unpin" : "Pin to the top"}
                 </ContextMenuItem>
-                <ContextMenuItem
-                    onSelect={() => void copyText(channelLink(baseUrl, channel.id))}
-                >
+                <ContextMenuItem onSelect={() => void copyText(channelLink(baseUrl, channel.id))}>
                     <Link2 className="size-3.5" />
                     Copy link
                 </ContextMenuItem>

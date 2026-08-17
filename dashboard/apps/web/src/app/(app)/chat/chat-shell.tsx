@@ -57,7 +57,7 @@ export function ChatShell({
 
 function ChatColumns({ children }: { children: ReactNode }) {
     const pathname = usePathname();
-    const { refresh } = useChat();
+    const { refresh, viewerId } = useChat();
     // Inside a conversation on a phone the list steps aside; on anything wider
     // both are shown, which is why this decides a class rather than a render.
     const inConversation = pathname.startsWith("/chat/c/");
@@ -71,8 +71,18 @@ function ChatColumns({ children }: { children: ReactNode }) {
                 // alternative is teaching the client to apply every kind of
                 // change to a shape the server already knows how to build.
                 if (frame.kind === "posted" || frame.kind === "channels") refresh();
+                // Caught up by this same person, wherever they did it - a phone,
+                // another tab, or the conversation open beside this rail.
+                // Nothing arrived, but the counts here are no longer true, and
+                // before this they stayed up until the page was reloaded. The one
+                // trigger on purpose: the screen that performed the read is told
+                // by this frame like every other, so it does not ask for the list
+                // again on its own. Somebody else catching up changes nothing
+                // here, and is only ever announced to them and the one person
+                // whose ticks it moves.
+                if (frame.kind === "read" && frame.userId === viewerId) refresh();
             },
-            [refresh]
+            [refresh, viewerId]
         )
     );
 

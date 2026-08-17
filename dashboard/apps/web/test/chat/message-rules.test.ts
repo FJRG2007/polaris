@@ -13,8 +13,8 @@
  *   than trusted to a comment.
  */
 
-import { ChatAccessError, ChatRuleError } from "@/lib/chat/access";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ChatAccessError, ChatRuleError } from "@/lib/chat/access";
 import { DEFAULT_CHAT_RULES, type ChatRules } from "@polaris/core";
 
 const SENT = new Date("2026-08-15T12:00:00Z");
@@ -39,6 +39,11 @@ let written: {
     deletes: string[];
     edits: { messageId: string; body: string }[];
     discarded: string[];
+    /** Attachment rows dropped, which a tombstone does as well as a hard delete:
+     *  the line stays, the files do not. */
+    unattached: string[];
+    /** Reactions dropped, for the same reason. */
+    cleared: string[];
 };
 
 /**
@@ -101,7 +106,13 @@ vi.mock("@polaris/db", () => {
             findMany: async () => [],
             count: async () => recent,
             create: async () => ({ id: "new", createdAt: SENT }),
-            update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+            update: async ({
+                where,
+                data
+            }: {
+                where: { id: string };
+                data: Record<string, unknown>;
+            }) => {
                 written.updates.push({ id: where.id, data });
                 return message;
             },
@@ -117,8 +128,20 @@ vi.mock("@polaris/db", () => {
             },
             findMany: async () => []
         },
-        chatReaction: { findMany: async () => [] },
-        chatAttachment: { findMany: async () => [] },
+        chatReaction: {
+            findMany: async () => [],
+            deleteMany: async ({ where }: { where: { messageId: string } }) => {
+                written.cleared.push(where.messageId);
+                return { count: 0 };
+            }
+        },
+        chatAttachment: {
+            findMany: async () => [],
+            deleteMany: async ({ where }: { where: { messageId: string } }) => {
+                written.unattached.push(where.messageId);
+                return { count: 0 };
+            }
+        },
         chatStar: { findMany: async () => [] },
         user: { findMany: async () => [] },
         $transaction: async (run: (tx: unknown) => Promise<unknown>) => run(client)
@@ -133,7 +156,7 @@ beforeEach(() => {
     moderator = false;
     groupOwner = false;
     recent = 0;
-    written = { updates: [], deletes: [], edits: [], discarded: [] };
+    written = { updates: [], deletes: [], edits: [], discarded: [], unattached: [], cleared: [] };
     message = {
         id: "message-1",
         channelId: "channel-1",
@@ -213,6 +236,17 @@ describe("deleting", () => {
         expect(written.deletes).toHaveLength(0);
         expect(written.updates.at(-1)?.data).toMatchObject({ body: "" });
         expect(written.updates.at(-1)?.data.deletedAt).toBeInstanceOf(Date);
+    });
+
+    it("takes the files with it even when the line stays", async () => {
+        const { remove } = await import("@/lib/chat/messages");
+        await remove(actor, "message-1");
+        // The tombstone carries no text, no files and no reactions - which is
+        // how it is drawn. Keeping the bytes would leave a photograph nothing
+        // can reach on somebody's NAS for the life of the instance.
+        expect(written.discarded).toEqual(["message-1"]);
+        expect(written.unattached).toEqual(["message-1"]);
+        expect(written.cleared).toEqual(["message-1"]);
     });
 
     it("takes the row and the files when the instance wants no trace", async () => {

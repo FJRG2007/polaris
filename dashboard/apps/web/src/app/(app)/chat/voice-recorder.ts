@@ -134,13 +134,30 @@ export interface RecordedSound {
     readonly waveform: string;
 }
 
+/**
+ * The quietest recording that still fills the meter.
+ *
+ * The live bars are scaled against the loudest moment so far, the same way the
+ * stored shape is scaled against the loudest moment of the whole recording -
+ * which is why the two used to disagree so badly: the meter drew raw loudness,
+ * where ordinary speech is a tenth of the way up, and then the message came back
+ * with a full waveform on it.
+ *
+ * Without a floor the scaling would make a silent room look like shouting: the
+ * loudest hiss so far becomes the top of the meter. This is roughly the level of
+ * quiet speech, so anything below it stays visibly small.
+ */
+const QUIET_PEAK = 0.05;
+
 export interface VoiceRecording {
     /** True from the moment the microphone opens. */
     readonly recording: boolean;
     /** How long it has been running, in whole seconds. */
     readonly seconds: number;
-    /** The last couple of seconds of level, newest last, for the meter that
-     *  moves while somebody talks. */
+    /** The last couple of seconds of level, newest last, for the meter that moves
+     *  while somebody talks. Already scaled against the loudest moment so far, so
+     *  a bar is a fraction between nothing and full - the same scale the waveform
+     *  on the sent message uses. */
     readonly levels: readonly number[];
     /** True when nothing has been heard for a while - a muted microphone, the
      *  wrong device, a headset that is not the one selected. Said out loud
@@ -178,6 +195,8 @@ export function useVoiceRecording(
     const ticker = useRef<ReturnType<typeof setInterval> | null>(null);
     const began = useRef(0);
     const measured = useRef<number[]>([]);
+    /** The loudest moment so far, which is what the meter is drawn against. */
+    const loudest = useRef(0);
     const listener = useRef<AudioContext | null>(null);
     const done = useRef(onRecorded);
     done.current = onRecorded;
@@ -254,6 +273,7 @@ export function useVoiceRecording(
                 setLevels([]);
                 setSilent(false);
                 measured.current = [];
+                loudest.current = 0;
                 began.current = Date.now();
                 let lastHeard = Date.now();
 
@@ -265,8 +285,14 @@ export function useVoiceRecording(
                         square += value * value;
                     }
                     const level = Math.sqrt(square / frame.length);
+                    // The measurement is what is stored; the meter shows it
+                    // against the loudest moment so far. Speech is a tenth of the
+                    // way up in absolute terms, so drawing it raw made a
+                    // perfectly good recording look like it was hearing nothing.
                     measured.current.push(level);
-                    setLevels((current) => [...current, level].slice(-WAVEFORM_BARS));
+                    loudest.current = Math.max(loudest.current, level);
+                    const shown = Math.min(1, level / Math.max(loudest.current, QUIET_PEAK));
+                    setLevels((current) => [...current, shown].slice(-WAVEFORM_BARS));
 
                     const now = Date.now();
                     if (level > SILENCE) lastHeard = now;

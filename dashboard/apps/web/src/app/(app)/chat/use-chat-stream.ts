@@ -24,6 +24,9 @@ const STREAM_PATH = "/api/chat/stream";
 const frameSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("posted"), seq: z.number(), channels: z.array(z.string()) }),
     z.object({ kind: z.literal("channels") }),
+    // Somebody caught up. Theirs to take an unread count down with, and the
+    // other side's to move the ticks under their own messages.
+    z.object({ kind: z.literal("read"), channelId: z.string(), userId: z.string() }),
     z.object({
         kind: z.literal("typing"),
         channelId: z.string(),

@@ -11,9 +11,10 @@
 import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
 import { publishChatChange } from "./live";
-import { prisma, type Prisma } from "@polaris/db";
 import { groupOwnerId } from "./ownership";
+import { prisma, type Prisma } from "@polaris/db";
 import { nicknamesFor } from "@/lib/contact-names";
+import { discardChannelFiles } from "./attachments";
 import { postNotice, postSpaceNotice } from "./notices";
 import {
     ChatAccessError,
@@ -226,6 +227,13 @@ export async function deleteSpace(actor: ChatActor, spaceId: string): Promise<vo
     if (!space || space.ownerId !== actor.id) {
         throw new ChatAccessError("Only the owner can delete a space");
     }
+    // Every channel's files, before the rows that say where they are cascade
+    // away with the space.
+    const channels = await prisma.chatChannel.findMany({
+        where: { spaceId },
+        select: { id: true }
+    });
+    await discardChannelFiles(channels.map((channel) => channel.id));
     await prisma.chatSpace.delete({ where: { id: spaceId } });
 }
 
@@ -513,7 +521,10 @@ export async function renameCategory(
     if (!category) throw new ChatAccessError("That category is gone");
     await requireSpace(actor, category.spaceId, "admin");
 
-    await prisma.chatCategory.update({ where: { id: input.categoryId }, data: { name: input.name } });
+    await prisma.chatCategory.update({
+        where: { id: input.categoryId },
+        data: { name: input.name }
+    });
     publishChatChange({ channelId: input.categoryId, kind: "channels", actorId: actor.id });
 }
 
@@ -772,6 +783,11 @@ async function requireGroupOwner(actor: ChatActor, channelId: string): Promise<v
 export async function deleteChannel(actor: ChatActor, channelId: string): Promise<void> {
     const access = await requireChannel(actor, channelId);
     if (!access.mayAdminister) throw new ChatAccessError("You cannot delete that channel");
+    // Bytes first: the attachment rows cascade with the channel, and they are
+    // the only record of where the files were written. Deleted after them, the
+    // files would be unreachable and unfindable, and would sit on the NAS for
+    // the life of the instance.
+    await discardChannelFiles([channelId]);
     await prisma.chatChannel.delete({ where: { id: channelId } });
     publishChatChange({ channelId, kind: "channels", actorId: actor.id });
 }

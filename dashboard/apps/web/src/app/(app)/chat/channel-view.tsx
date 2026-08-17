@@ -41,7 +41,7 @@ import type { ChatMessageView } from "@/lib/chat/messages";
 import { useRouter, useSearchParams } from "next/navigation";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { ChannelMembers, useMembersPanel } from "./members-panel";
-import { MessageCircle, Mic, Video, Volume2 } from "lucide-react";
+import { ArrowDown, MessageCircle, Mic, Video, Volume2 } from "lucide-react";
 import { Button, ConfirmDeleteDialog, EmptyState, Skeleton } from "@polaris/ui";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
@@ -141,6 +141,10 @@ export function ChannelView({
     const [replyingTo, setReplyingTo] = useState<ChatMessageView | null>(null);
     const [forwarding, setForwarding] = useState<ChatMessageView | null>(null);
     const [typists, setTypists] = useState<readonly Typist[]>([]);
+    // How much arrived below somebody who is reading further up. They are not
+    // dragged to it - that is the one thing a chat must not do to somebody
+    // mid-sentence - but they are told, and one press takes them there.
+    const [unseen, setUnseen] = useState(0);
     const [live, setLive] = useState<{ meetingId: string; count: number } | null>(null);
     // The call this browser is sitting in, held above every screen so that
     // walking out of the conversation shrinks it into a bar rather than hanging
@@ -297,6 +301,7 @@ export function ChannelView({
         const page = result.page?.messages ?? [];
         following.current = true;
         settling.current = Date.now() + SETTLE_MS;
+        setUnseen(0);
         show(page);
         olderThanRef.current = result.page?.olderThan ?? null;
         newerThanRef.current = null;
@@ -422,6 +427,10 @@ export function ChannelView({
         const arrived = result.page?.messages ?? [];
         if (arrived.length === 0) return;
 
+        // Below the fold for somebody reading further up. Counted rather than
+        // scrolled to, and shown as a press at the bottom of the list.
+        if (!following.current) setUnseen((current) => current + arrived.length);
+
         const window = [...held.current, ...arrived];
         if (window.length > MAX_WINDOW && following.current) {
             // Following along, so the top is what gives: the reader is at the
@@ -446,6 +455,13 @@ export function ChannelView({
         const element = document.getElementById(`message-${messageId}`);
         if (!element) return false;
         following.current = false;
+        // The conversation has stopped settling, whatever the clock says. This
+        // is what a link to a message was fighting: the first second after a
+        // conversation opens, the list insists on the bottom every frame, so
+        // landing on an older message inside that second was undone before
+        // anybody saw it - the message was pointed at and the screen was at the
+        // newest line.
+        settling.current = 0;
         element.scrollIntoView({ block: "center" });
         setHighlight(messageId);
         setTimeout(() => setHighlight(null), HIGHLIGHT_MS);
@@ -552,12 +568,60 @@ export function ChannelView({
         void jumpTo(messageId);
     }, [channel, messageId, messages, jumpTo]);
 
+    /**
+     * The ticks, asked for again.
+     *
+     * The other person read the conversation. Nothing about the messages
+     * changed, so reloading is the wrong tool: it replaces every message on
+     * screen and takes a reader who had walked up into the history back down to
+     * the newest line. Only this reader's own messages that are not already
+     * read are asked about, so a group channel - where there are no ticks at
+     * all - asks nothing.
+     *
+     * Capped at what one request may carry, newest first. The window is only
+     * trimmed while the reader is at the live end, so somebody reading further up
+     * while a conversation runs holds more than that - and a list one over the
+     * limit is refused whole, which stopped the ticks moving at all with nothing
+     * on screen to say why.
+     */
+    const freshenReceipts = useCallback(async () => {
+        const waiting = held.current
+            .filter(
+                (entry) =>
+                    entry.authorId === viewerId &&
+                    entry.receipt !== null &&
+                    entry.receipt !== "read"
+            )
+            .map((entry) => entry.id)
+            .slice(-core.MAX_CHAT_RECEIPTS);
+        if (waiting.length === 0) return;
+
+        const { receipts } = await actions.receiptsAction({ channelId, messageIds: waiting });
+        if (Object.keys(receipts).length === 0) return;
+        setMessages(
+            (current) =>
+                current?.map((entry) =>
+                    receipts[entry.id] ? { ...entry, receipt: receipts[entry.id]! } : entry
+                ) ?? current
+        );
+    }, [channelId, viewerId]);
+
     useChatStream(
         useCallback(
             (frame) => {
                 if (frame.kind === "posted" && frame.channels.includes(channelId)) {
                     void catchUp();
                     checkCall();
+                }
+                // Somebody caught up in here. Their own screens take a count
+                // down; this one moves the ticks under its own messages, which
+                // used to sit on "sent" until the conversation was reopened.
+                if (
+                    frame.kind === "read" &&
+                    frame.channelId === channelId &&
+                    frame.userId !== viewerId
+                ) {
+                    void freshenReceipts();
                 }
                 // The count beside the call button, kept honest. Nothing is
                 // posted when somebody joins or leaves a call, so before this
@@ -680,14 +744,29 @@ export function ChannelView({
         return () => cancelAnimationFrame(frame);
     }, [messages, stick]);
 
-    // Catching up on what is actually on screen.
-    useEffect(() => {
+    /**
+     * Catching up on what is actually on screen.
+     *
+     * Called rather than only watched, because being at the live end is a ref and
+     * a ref changes without a render. Pressing "3 new messages" on a whole window
+     * scrolls and nothing else - the list it marks is the list it already had - so
+     * an effect on the messages alone left the reader looking straight at the
+     * newest line with the channel still bold in the rail. Scrolling back down by
+     * hand is the same moment.
+     *
+     * The rail is not refreshed here. The read is announced, and this tab is in
+     * that frame's audience like every other screen this person has open, so
+     * asking for the list again as well is the same three queries twice.
+     */
+    const catchUpMark = useCallback(() => {
         if (!following.current) return;
-        const newest = messages?.[messages.length - 1];
+        const newest = held.current[held.current.length - 1];
         if (!newest || marked.current === newest.id) return;
         marked.current = newest.id;
-        void actions.markReadAction({ channelId, messageId: newest.id }).then(refresh);
-    }, [messages, channelId, refresh]);
+        void actions.markReadAction({ channelId, messageId: newest.id });
+    }, [channelId]);
+
+    useEffect(catchUpMark, [messages, catchUpMark]);
 
     /**
      * Keep a message, or stop keeping it.
@@ -822,7 +901,8 @@ export function ChannelView({
         const apply = (entry: ChatMessageView): ChatMessageView => {
             const existing = entry.reactions.find((entry) => entry.emoji === emoji);
             if ((existing?.mine ?? false) === mine) return entry;
-            if (!existing) return { ...entry, reactions: [...entry.reactions, { emoji, count: 1, mine }] };
+            if (!existing)
+                return { ...entry, reactions: [...entry.reactions, { emoji, count: 1, mine }] };
             const count = existing.count + (mine ? 1 : -1);
             return {
                 ...entry,
@@ -831,7 +911,10 @@ export function ChannelView({
                     .filter((entry) => entry.count > 0)
             };
         };
-        setMessages((current) => current?.map((entry) => (entry.id === messageId ? apply(entry) : entry)) ?? current);
+        setMessages(
+            (current) =>
+                current?.map((entry) => (entry.id === messageId ? apply(entry) : entry)) ?? current
+        );
     };
 
     const react = async (messageId: string, emoji: string) => {
@@ -851,7 +934,9 @@ export function ChannelView({
     const patchMessage = (messageId: string, patch: Partial<ChatMessageView>) => {
         setMessages(
             (current) =>
-                current?.map((entry) => (entry.id === messageId ? { ...entry, ...patch } : entry)) ?? current
+                current?.map((entry) =>
+                    entry.id === messageId ? { ...entry, ...patch } : entry
+                ) ?? current
         );
     };
 
@@ -935,19 +1020,22 @@ export function ChannelView({
                         name={channel.name}
                         count={live?.count ?? 0}
                         onJoin={(video) => {
-                            void runAction(
-                                () => calls.startCallAction(channelId),
-                                setError
-                            ).then((result) => {
-                                if (!result || result.error) return;
-                                if (result.meetingId) {
-                                    enter(
-                                        { meetingId: result.meetingId, channelId, title: callTitle },
-                                        video
-                                    );
-                                } else setError("That call could not be joined. Try again.");
-                                checkCall();
-                            });
+                            void runAction(() => calls.startCallAction(channelId), setError).then(
+                                (result) => {
+                                    if (!result || result.error) return;
+                                    if (result.meetingId) {
+                                        enter(
+                                            {
+                                                meetingId: result.meetingId,
+                                                channelId,
+                                                title: callTitle
+                                            },
+                                            video
+                                        );
+                                    } else setError("That call could not be joined. Try again.");
+                                    checkCall();
+                                }
+                            );
                         }}
                     />
                 )}
@@ -985,13 +1073,19 @@ export function ChannelView({
                     ref={scroller}
                     onScroll={(event) => {
                         const element = event.currentTarget;
-                        const below = element.scrollHeight - element.scrollTop - element.clientHeight;
+                        const below =
+                            element.scrollHeight - element.scrollTop - element.clientHeight;
                         // At the bottom is always "following along". Away from
                         // it only counts once the list has settled: until then
                         // the movement is the page growing under itself, not
                         // somebody deciding to read further up.
-                        if (below < AT_BOTTOM_SLACK) following.current = true;
-                        else if (Date.now() > settling.current) following.current = false;
+                        if (below < AT_BOTTOM_SLACK) {
+                            following.current = true;
+                            // Back at the live end, so nothing is waiting below
+                            // and everything on screen has now been seen.
+                            setUnseen(0);
+                            catchUpMark();
+                        } else if (Date.now() > settling.current) following.current = false;
                         // Both edges, because the window moves in both
                         // directions: up into the history, and back down out of
                         // it. Each is a no-op when there is no page that way.
@@ -1042,19 +1136,43 @@ export function ChannelView({
 
                     {/* The way back, for somebody who has read a long way up.
                         Scrolling down would work and would take a page at a
-                        time; this is one press. */}
-                    {newerThan && (
+                        time; this is one press.
+
+                        Also what a message arriving below the fold gets. A reader
+                        mid-way up the history is not dragged to the newest line -
+                        that is the one thing a conversation must not do to
+                        somebody reading - but before this they were not told
+                        either, so a message that had arrived was a message they
+                        found later by accident. */}
+                    {(newerThan || unseen > 0) && (
                         <div className="sticky bottom-2 flex justify-center">
                             <button
                                 type="button"
                                 onClick={() => {
                                     following.current = true;
                                     anchor.current = null;
-                                    void load();
+                                    setUnseen(0);
+                                    // A window that has been trimmed has to fetch
+                                    // its way back; one that is whole only has to
+                                    // scroll, and reloading it would throw away
+                                    // the history above. Either way the reader is
+                                    // now at the newest message, which is a read
+                                    // nothing else would report - scrolling does
+                                    // not change the list a fetch would.
+                                    if (newerThan) void load();
+                                    else {
+                                        stick();
+                                        catchUpMark();
+                                    }
                                 }}
-                                className="rounded-full border border-border bg-elevated px-3 py-1 text-xs shadow-md transition-colors hover:bg-card-hover"
+                                className="flex items-center gap-1.5 rounded-full border border-border bg-elevated px-3 py-1 text-xs shadow-md transition-colors hover:bg-card-hover"
                             >
-                                Jump to the newest
+                                <ArrowDown className="size-3" />
+                                {unseen === 0
+                                    ? "Jump to the newest"
+                                    : unseen === 1
+                                      ? "1 new message"
+                                      : `${unseen} new messages`}
                             </button>
                         </div>
                     )}
