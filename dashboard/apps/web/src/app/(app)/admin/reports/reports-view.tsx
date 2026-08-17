@@ -23,13 +23,13 @@ import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { settleReportAction } from "./actions";
 import { CHAT_REPORT_LABELS } from "@polaris/core";
+import { VoiceNote } from "@/app/(app)/chat/voice-note";
 import type { ChatReportView } from "@/lib/chat/reports";
 import { useDisplayFormat } from "@/components/display-format";
-import { VoiceNote } from "@/app/(app)/chat/voice-note";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
 import type { ChatReportFileView } from "@/lib/chat/report-files";
-import { Check, Download, MessageSquare, Paperclip, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardBody, Select } from "@polaris/ui";
+import { Check, Download, MessageSquare, Paperclip, Trash2 } from "lucide-react";
 
 const FILTERS = [
     { value: "open", label: "Waiting" },
@@ -236,6 +236,10 @@ function ReportFiles({
                             className="flex w-fit items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-xs no-underline hover:bg-muted"
                         >
                             <Paperclip className="size-3.5 shrink-0" />
+                            {/* enigma:allow-clipped-value - the same name is
+                                written out underneath every file, wrapping, and
+                                a moderator reading a report needs it there
+                                rather than on a hover. */}
                             <span className="min-w-0 truncate">{file.name}</span>
                             <Download className="size-3.5 shrink-0 text-muted-foreground" />
                         </a>
@@ -274,7 +278,16 @@ function ReportLink({ link }: { link: LinkPreviewView }) {
                 <span className="text-[11px] text-foreground-subtle">
                     {link.siteName || new URL(link.url).hostname}
                 </span>
-                <span className="truncate text-sm font-medium text-foreground">{link.title}</span>
+                <span
+                    // The headline is often the whole of what a link report is
+                    // about, and a card is narrow. Carried in full here so it is
+                    // recoverable without following the address, which is the
+                    // one thing a moderator should not have to do.
+                    title={link.title}
+                    className="truncate text-sm font-medium text-foreground"
+                >
+                    {link.title}
+                </span>
                 <span className="line-clamp-2 text-[12px] text-muted-foreground">
                     {link.description}
                 </span>
