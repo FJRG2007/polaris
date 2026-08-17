@@ -16,14 +16,14 @@ import * as actions from "../actions";
 import { runAction } from "@/lib/run-action";
 import { useEffect, useRef, useState } from "react";
 import type { PersonView } from "@/lib/home/people";
-import { ImagePlus, Loader2, ScanFace, Trash2 } from "lucide-react";
-import { Badge, Button, ConfirmDeleteDialog, EmptyState, Input, Skeleton, Switch } from "@polaris/ui";
+import { PersonDialog } from "./person-dialog";
+import { ImagePlus, Loader2, ScanFace, Trash2, UserPlus } from "lucide-react";
+import { Badge, Button, ConfirmDeleteDialog, EmptyState, Skeleton, Switch } from "@polaris/ui";
 
 export function PeopleView({ canManage }: { canManage: boolean }) {
     const [people, setPeople] = useState<PersonView[] | null>(null);
     const [ready, setReady] = useState(true);
-    const [name, setName] = useState("");
-    const [busy, setBusy] = useState(false);
+    const [adding, setAdding] = useState(false);
     const [uploading, setUploading] = useState<string | null>(null);
     const [removing, setRemoving] = useState<PersonView | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -44,17 +44,9 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
         };
     }, []);
 
-    const add = async () => {
-        if (!name.trim()) return;
-        setBusy(true);
-        const result = await runAction(() => actions.addPersonAction(name), setError);
-        setBusy(false);
-        if (!result || result.error || !result.person) {
-            if (result?.error) setError(result.error);
-            return;
-        }
-        setPeople((current) => [...(current ?? []), result.person!].sort((a, b) => a.name.localeCompare(b.name)));
-        setName("");
+    const added = (person: PersonView) => {
+        setAdding(false);
+        setPeople((current) => [...(current ?? []), person].sort((a, b) => a.name.localeCompare(b.name)));
     };
 
     const pickPhoto = (person: PersonView) => {
@@ -102,18 +94,8 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
 
             {canManage ? (
                 <div className="flex flex-wrap gap-2">
-                    <Input
-                        value={name}
-                        onChange={(event) => setName(event.target.value)}
-                        placeholder="Their name"
-                        className="w-56"
-                        aria-label="Their name"
-                        onKeyDown={(event) => {
-                            if (event.key === "Enter") void add();
-                        }}
-                    />
-                    <Button onClick={add} disabled={busy || !name.trim()}>
-                        {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
+                    <Button onClick={() => setAdding(true)}>
+                        <UserPlus className="size-4 shrink-0" />
                         Add somebody
                     </Button>
                 </div>
@@ -125,7 +107,15 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                 <EmptyState
                     icon={<ScanFace />}
                     title="Nobody yet"
-                    description="Add the people who live here, give each of them a few photographs, and the cameras stop reporting them as strangers."
+                    description="Add the people who live here with a few photographs each, and the cameras stop reporting them as strangers."
+                    action={
+                        canManage ? (
+                            <Button size="sm" onClick={() => setAdding(true)}>
+                                <UserPlus className="size-4 shrink-0" />
+                                Add somebody
+                            </Button>
+                        ) : undefined
+                    }
                 />
             ) : (
                 <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
@@ -192,6 +182,10 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                     ))}
                 </ul>
             )}
+
+            {adding ? (
+                <PersonDialog recognizerReady={ready} onClose={() => setAdding(false)} onSaved={added} />
+            ) : null}
 
             <input
                 ref={fileInput}

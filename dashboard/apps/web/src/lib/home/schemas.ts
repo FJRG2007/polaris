@@ -61,6 +61,10 @@ export const detectionSettingsSchema = z.object({
     // setting anybody wants once they have it, and zero would let one camera
     // saturate whatever it runs on.
     minGapSeconds: z.coerce.number().int().min(1).max(3600),
+    // Zero is allowed and means "report the instant anything moves", which is
+    // what somebody watching a doorway for a courier wants and what a camera
+    // pointed at a hedge must never be set to.
+    settleSeconds: z.coerce.number().int().min(0).max(60),
     classes: z.array(z.enum(OBJECT_CLASSES)).max(OBJECT_CLASSES.length),
     faceThreshold: z.coerce.number().int().min(1).max(100),
     hours: z
@@ -98,7 +102,7 @@ export const cameraInputSchema = z.object({
     /** The server detection runs on, when the chosen rung runs anywhere at all. */
     detectorTargetId: z.string().trim().max(64).nullable().default(null),
     detection: detectionSettingsSchema,
-    recording: z.enum(["off", "motion", "continuous"]).default("off"),
+    recording: z.enum(["off", "motion", "continuous"]).default("motion"),
     /** A storage connection id, "local", or empty for the instance default. The
      *  value is checked against what this instance actually has before it is
      *  stored - an id in a form is a request, not a destination. */

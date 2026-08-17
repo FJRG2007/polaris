@@ -6656,6 +6656,52 @@ model CameraClip {
     @@index([startedAt])
 }
 
+// When to tell somebody, and who.
+//
+// The bell is a record: a list you come back to and clear, and the right home
+// for "an update is available". Somebody walking up to the door at three in the
+// morning is not that - it is worth interrupting for, once, and then it is over.
+// So an alert is delivered as a message in a conversation: it appears where a
+// message appears, it can be muted the way a conversation is muted, and it
+// leaves a thread somebody can scroll rather than a badge they clear.
+//
+// A rule is deliberately small. What was seen, optionally who, optionally where,
+// optionally between which hours - and who hears about it. Anything more
+// expressive is a rules engine, and a rules engine is a thing people configure
+// once and then cannot read six months later.
+model AlertRule {
+    id             String  @id @default(uuid(7)) @db.Uuid
+    installedAppId String  @db.Uuid
+    /// The place this watches. Null means everywhere.
+    placeId        String? @db.Uuid
+    /// One camera, or every camera in that place.
+    cameraId       String? @db.Uuid
+    name           String
+    /// Which detections it fires on, as a JSON array of event kinds. Read whole
+    /// and never queried by element, so it is one column rather than a table.
+    kinds          String  @default("[\"person\"]")
+    /// Only this person, by the name the recognizer puts to them. Null is
+    /// anybody - including, deliberately, a stranger.
+    label          String?
+    /// The hours it applies, as a JSON {from,to} in local time, or null for all
+    /// day. The same shape a camera's detection window uses.
+    hours          String?
+    /// Who hears about it, as a JSON array of user ids.
+    recipients     String  @default("[]")
+    /// The conversation it posts into, made the first time it fires so a rule
+    /// nobody triggers never creates a room.
+    channelId      String? @db.Uuid
+    enabled        Boolean @default(true)
+    createdById    String? @db.Uuid
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([installedAppId])
+    @@index([placeId])
+    @@index([cameraId])
+}
+
 // Somebody the house knows by sight.
 //
 // Deliberately holds no face data. The template that recognizes a person lives in

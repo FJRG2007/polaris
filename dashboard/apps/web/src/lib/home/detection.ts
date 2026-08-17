@@ -118,6 +118,16 @@ export interface DetectionSettings {
      * a minute at worst however busy the view is.
      */
     readonly minGapSeconds: number;
+    /**
+     * How long movement has to keep going before it counts, in seconds.
+     *
+     * This is the knob that separates a person from a moth. Nearly every false
+     * positive a camera produces is momentary - an insect crossing the lens at
+     * night, a gust in a hedge, a lorry shaking the wall - and every one of them
+     * is over before this elapses. Something that is still happening two seconds
+     * later is something that happened.
+     */
+    readonly settleSeconds: number;
     /** Which of the classes above are worth reporting, for the object rung. */
     readonly classes: readonly ObjectClass[];
     /** 0-100. How sure the face rung has to be before it puts a name to somebody.
@@ -135,6 +145,10 @@ export const DEFAULT_DETECTION: DetectionSettings = {
     // Half a minute. Chosen so the first thing anybody sets up does not fill the
     // events list with one afternoon of the same cat.
     minGapSeconds: 30,
+    // Two seconds. Long enough that a moth, a gust and a passing vibration are
+    // all gone before it, short enough that somebody walking past a doorway is
+    // still there.
+    settleSeconds: 2,
     classes: ["person", "vehicle"],
     // CompreFace's own similarity scale. High enough that a cousin is not
     // greeted by their sibling's name.

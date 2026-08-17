@@ -43,6 +43,9 @@ export interface VisionAssignment {
     /** The shortest gap between two detections on this camera, in seconds. This
      *  is what bounds the cost of the whole thing. */
     readonly minGapSeconds: number;
+    /** How long movement has to last before it counts, which is what keeps a
+     *  moth and a gust out of the log. */
+    readonly settleSeconds: number;
     /** Whether to go past movement, and how far. */
     readonly detector: Detector;
     readonly classes: readonly ObjectClass[];
@@ -258,6 +261,7 @@ export async function assignmentsFor(installedAppId: string): Promise<VisionAssi
             authorization: `Basic ${Buffer.from(`${endpoint.username}:${endpoint.password}`).toString("base64")}`,
             sensitivity: detection.sensitivity,
             minGapSeconds: detection.minGapSeconds,
+            settleSeconds: detection.settleSeconds,
             detector,
             classes: detection.classes,
             hours: detection.hours,

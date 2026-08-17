@@ -52,6 +52,7 @@ interface Assignment {
     authorization: string;
     sensitivity: number;
     minGapSeconds: number;
+    settleSeconds: number;
     detector: "motion" | "objects" | "faces";
     classes: string[];
     hours: { from: number; to: number } | null;
@@ -259,6 +260,16 @@ function watch(assignment: Assignment): Watch {
     let previous: Buffer | null = null;
     let lastFired = 0;
     let busy = false;
+    /**
+     * How many frames in a row have been moving.
+     *
+     * One frame over the threshold is a moth crossing the lens, a gust in a
+     * hedge, or the wall shaking as a lorry goes past - all of them over before
+     * the next frame. Something that is still moving a second later is something
+     * that happened. This is the same idea as the settle window the camera's own
+     * alerts get, measured in frames because that is what this rung has.
+     */
+    let movingFrames = 0;
 
     child.stdout.on("data", (chunk: Buffer) => {
         pending = pending.length === 0 ? chunk : Buffer.concat([pending, chunk]);
@@ -280,12 +291,21 @@ function watch(assignment: Assignment): Watch {
             }
             const percent = (changed / FRAME_BYTES) * 100;
             const needed = Math.max(0.2, (101 - assignment.sensitivity) / 10);
-            if (percent < needed) continue;
+            if (percent < needed) {
+                movingFrames = 0;
+                continue;
+            }
+            movingFrames += 1;
+            // Zero settle means "the instant anything moves", which is what a
+            // doorway waiting for a courier wants; anything else waits for the
+            // movement to still be there.
+            if (movingFrames < Math.max(1, Math.ceil(assignment.settleSeconds * FPS))) continue;
 
             const now = Date.now();
             if (now - lastFired < assignment.minGapSeconds * 1000) continue;
             if (!withinHours(assignment, new Date().getHours())) continue;
             lastFired = now;
+            movingFrames = 0;
 
             busy = true;
             void escalate(assignment)

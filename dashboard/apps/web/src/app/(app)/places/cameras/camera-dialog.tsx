@@ -70,6 +70,7 @@ interface FormState {
     detectorTargetId: string;
     sensitivity: number;
     minGapSeconds: string;
+    settleSeconds: string;
     classes: ObjectClass[];
     faceThreshold: string;
     hoursOn: boolean;
@@ -81,8 +82,14 @@ interface FormState {
     enabled: boolean;
 }
 
-function initial(camera: CameraView | null, prefill: { address: string; vendor: string | null } | null): FormState {
-    const detection = camera?.detection ?? DEFAULT_DETECTION;
+function initial(
+    camera: CameraView | null,
+    prefill: { address: string; vendor: string | null } | null,
+    defaults: { sensitivity: number; settleSeconds: number; minGapSeconds: number } | null
+): FormState {
+    // An existing camera keeps what it was set to; a new one starts from
+    // whatever this instance decided works here.
+    const detection = camera?.detection ?? { ...DEFAULT_DETECTION, ...(defaults ?? {}) };
     return {
         name: camera?.name ?? "",
         zone: camera?.zone ?? "",
@@ -99,12 +106,16 @@ function initial(camera: CameraView | null, prefill: { address: string; vendor: 
         detectorTargetId: camera?.detectorTargetId ?? "local",
         sensitivity: detection.sensitivity,
         minGapSeconds: String(detection.minGapSeconds),
+        settleSeconds: String(detection.settleSeconds),
         classes: [...detection.classes],
         faceThreshold: String(detection.faceThreshold),
         hoursOn: detection.hours !== null,
         hoursFrom: String(detection.hours?.from ?? 22),
         hoursTo: String(detection.hours?.to ?? 6),
-        recording: (camera?.recording as FormState["recording"]) ?? "off",
+        // A new camera keeps what it sees. Somebody adding a camera to a
+        // house means "watch this", and a camera that notices things and keeps
+        // none of them answers no question anybody had afterwards.
+        recording: (camera?.recording as FormState["recording"]) ?? "motion",
         storageTarget: camera?.storageTarget ?? "",
         retentionDays: String(camera?.retentionDays ?? 7),
         enabled: camera?.enabled ?? true
@@ -116,6 +127,7 @@ export function CameraDialog({
     prefill = null,
     servers,
     storage,
+    defaults,
     onClose,
     onSaved
 }: {
@@ -126,10 +138,12 @@ export function CameraDialog({
     servers: Server[];
     /** The disks footage can be pointed at, the instance default first. */
     storage: { id: string; label: string }[];
+    /** What a new camera starts out believing about movement. */
+    defaults: { sensitivity: number; settleSeconds: number; minGapSeconds: number } | null;
     onClose: () => void;
     onSaved: (saved: CameraView) => void;
 }) {
-    const [form, setForm] = useState<FormState>(() => initial(camera, prefill));
+    const [form, setForm] = useState<FormState>(() => initial(camera, prefill, defaults));
     const [busy, setBusy] = useState(false);
     const [testing, setTesting] = useState(false);
     const [tested, setTested] = useState<string | null>(null);
@@ -170,6 +184,9 @@ export function CameraDialog({
         detection: {
             sensitivity: form.sensitivity,
             minGapSeconds: Number(form.minGapSeconds) || DEFAULT_DETECTION.minGapSeconds,
+            settleSeconds: Number.isFinite(Number(form.settleSeconds))
+                ? Number(form.settleSeconds)
+                : DEFAULT_DETECTION.settleSeconds,
             classes: form.classes,
             faceThreshold: Number(form.faceThreshold) || DEFAULT_DETECTION.faceThreshold,
             hours: form.hoursOn ? { from: Number(form.hoursFrom) || 0, to: Number(form.hoursTo) || 0 } : null
@@ -425,6 +442,17 @@ export function CameraDialog({
                                         />
                                     </Field>
                                 ) : null}
+                                <Field
+                                    label="Ignore anything shorter than"
+                                    hint="Seconds. The knob that keeps moths, gusts and passing lorries out of the log - nearly every false alarm is over within one or two. Zero reports the instant anything moves."
+                                >
+                                    <Input
+                                        value={form.settleSeconds}
+                                        onChange={(event) => set("settleSeconds", event.target.value)}
+                                        className="w-24"
+                                        inputMode="numeric"
+                                    />
+                                </Field>
                                 <Field
                                     label="Wait between detections"
                                     hint="The knob that decides what this camera costs. Seconds."

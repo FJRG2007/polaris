@@ -91,11 +91,19 @@ async function watchCamera(cameraId: string, endpoint: OnvifEndpoint, cancelled:
             }
             const messages = await pullMessages(endpoint, subscription);
             if (cancelled()) return;
-            // The camera reports both the start and the end of what it saw. Only
-            // the start is an event; the end is the same thing finishing.
-            for (const message of messages.filter((item) => item.active)) {
-                await report(cameraId, kindForTopic(message.topic));
+            // The camera reports both the start and the end of what it saw, and
+            // both matter here: how long it lasted is the difference between a
+            // person and a moth.
+            for (const message of messages) {
+                const kind = kindForTopic(message.topic);
+                if (message.active) began(cameraId, kind);
+                else await ended(cameraId, kind);
             }
+            // A camera that reports a start and never a stop - some do, and some
+            // simply stop being asked - must not leave something pending
+            // forever. Anything that has outlasted its own settle window has
+            // earned its event.
+            await settleOverdue(cameraId);
         } catch (error) {
             subscription = null;
             // A camera that has forgotten the subscription says so as a fault, and
@@ -104,6 +112,58 @@ async function watchCamera(cameraId: string, endpoint: OnvifEndpoint, cancelled:
             else await sleep(2000);
         }
     }
+}
+
+/**
+ * What a camera says is happening right now, and since when.
+ *
+ * Nearly every false positive a camera reports is momentary: an insect crossing
+ * the lens at night, a gust in a hedge, a lorry shaking the wall. All of them
+ * start and stop within a second or two, so nothing is written down until the
+ * camera has been saying it for as long as that camera's settle window - and
+ * then it is written once.
+ */
+const pending = new Map<string, number>();
+
+function pendingKey(cameraId: string, kind: string): string {
+    return `${cameraId}:${kind}`;
+}
+
+function began(cameraId: string, kind: Detection["kind"]): void {
+    const key = pendingKey(cameraId, kind);
+    if (!pending.has(key)) pending.set(key, Date.now());
+}
+
+/** The camera says it stopped. Report it only if it lasted. */
+async function ended(cameraId: string, kind: Detection["kind"]): Promise<void> {
+    const key = pendingKey(cameraId, kind);
+    const startedAt = pending.get(key);
+    pending.delete(key);
+    if (startedAt === undefined) return;
+    const settle = (await settleWindow(cameraId)) * 1000;
+    if (Date.now() - startedAt >= settle) await report(cameraId, kind);
+}
+
+/** Anything still going that has already outlasted its window. Reported now
+ *  rather than when it stops, because somebody standing at a door for a minute
+ *  should not be told about in a minute. */
+async function settleOverdue(cameraId: string): Promise<void> {
+    const settle = (await settleWindow(cameraId)) * 1000;
+    for (const [key, startedAt] of pending) {
+        if (!key.startsWith(`${cameraId}:`)) continue;
+        if (Date.now() - startedAt < settle) continue;
+        pending.delete(key);
+        await report(cameraId, key.slice(cameraId.length + 1) as Detection["kind"]);
+    }
+}
+
+/** How long this camera's movement has to last. */
+async function settleWindow(cameraId: string): Promise<number> {
+    const camera = await prisma.camera.findFirst({
+        where: { id: cameraId },
+        select: { detectionConfig: true }
+    });
+    return camera ? parseDetection(camera.detectionConfig).settleSeconds : 0;
 }
 
 /** Write a detection, if the camera's own window says it should be looking. */

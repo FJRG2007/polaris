@@ -46,7 +46,16 @@ export function CameraTile({
 }) {
     const [visible, setVisible] = useState(false);
     const [stamp, setStamp] = useState(0);
-    const [failed, setFailed] = useState(false);
+    /**
+     * What to try next when the picture does not arrive.
+     *
+     * The small stream first, because a wall of them is the whole point. Some
+     * cameras publish only one, and some publish a second that the relay cannot
+     * open - so rather than showing "not answering" over a camera that is
+     * perfectly fine, it falls back to the good stream, then to a still, and
+     * only then admits defeat.
+     */
+    const [attempt, setAttempt] = useState<"sub" | "main" | "still" | "none">("sub");
     const [ready, setReady] = useState(false);
     const frame = useRef<HTMLDivElement | null>(null);
     const video = useRef<HTMLVideoElement | null>(null);
@@ -63,13 +72,22 @@ export function CameraTile({
         return () => observer.disconnect();
     }, []);
 
-    const playing = visible && live && camera.enabled && !failed;
+    const playing = visible && live && camera.enabled && (attempt === "sub" || attempt === "main");
+    const showStill = !playing && camera.enabled && live && attempt !== "none";
 
     useEffect(() => {
         if (playing || !camera.enabled) return;
         const timer = setInterval(() => setStamp((value) => value + 1), STILL_INTERVAL_MS);
         return () => clearInterval(timer);
     }, [playing, camera.enabled]);
+
+    // Give up for a minute, not forever: a camera that was rebooting when the
+    // page loaded is otherwise dead until somebody reloads.
+    useEffect(() => {
+        if (attempt !== "none") return;
+        const timer = setTimeout(() => setAttempt("sub"), 60_000);
+        return () => clearTimeout(timer);
+    }, [attempt]);
 
     // Stopping has to end the request rather than hide it: a stream nobody is
     // watching still holds a slot on the relay.
@@ -88,15 +106,19 @@ export function CameraTile({
                 {playing ? (
                     <video
                         ref={video}
-                        src={`/api/home/cameras/${camera.id}/stream?q=sub`}
+                        // Keyed so switching quality really re-creates the
+                        // element: a <video> handed a new src after an error
+                        // keeps the error and never tries again.
+                        key={attempt}
+                        src={`/api/home/cameras/${camera.id}/stream?q=${attempt}`}
                         className="size-full object-cover"
                         autoPlay
                         muted
                         playsInline
                         onCanPlay={() => setReady(true)}
-                        onError={() => setFailed(true)}
+                        onError={() => setAttempt(attempt === "sub" ? "main" : "still")}
                     />
-                ) : camera.enabled && live ? (
+                ) : showStill ? (
                     // eslint-disable-next-line @next/next/no-img-element -- a live
                     // frame is never the same twice, so there is nothing for the
                     // image optimizer to cache and it would only add a hop.
@@ -104,7 +126,7 @@ export function CameraTile({
                         src={`/api/home/cameras/${camera.id}/snapshot?v=${stamp}`}
                         alt={camera.name}
                         className="size-full object-cover"
-                        onError={() => setFailed(true)}
+                        onError={() => setAttempt("none")}
                     />
                 ) : (
                     <Unavailable camera={camera} live={live} />

@@ -12,6 +12,8 @@
 
 import { prisma } from "@polaris/db";
 import { parseDetection } from "@/lib/home/cameras";
+import { raiseAlerts } from "@/lib/home/alerts";
+import { deleteStill, storeStill } from "@/lib/home/stills";
 import { createNotification } from "@/lib/notification-service";
 import type { ObjectClass } from "@/lib/home/detection";
 import { MOTION_SECONDS, recordClip } from "@/lib/home/recording";
@@ -68,7 +70,14 @@ export interface EventView {
 export async function recordDetection(detection: Detection): Promise<EventView | null> {
     const camera = await prisma.camera.findFirst({
         where: { id: detection.cameraId },
-        select: { id: true, name: true, detectionConfig: true, recording: true, installedAppId: true }
+        select: {
+            id: true,
+            name: true,
+            placeId: true,
+            detectionConfig: true,
+            recording: true,
+            installedAppId: true
+        }
     });
     if (!camera) return null;
 
@@ -99,9 +108,24 @@ export async function recordDetection(detection: Detection): Promise<EventView |
             stillKey: detection.stillKey ?? null
         }
     });
+    // Every event gets a picture. A camera reporting its own movement sends
+    // nothing but the fact of it, and a log of lines saying "movement" with no
+    // pictures is a log nobody can judge without opening the footage - which for
+    // a camera that keeps none is not there either. The relay already holds the
+    // connection, so this is one small frame and no second connection.
+    if (!detection.stillKey) void attachStill(camera.installedAppId, camera.id, row.id);
+
     void announce(camera.installedAppId, camera.name, row.id, detection).catch((error) =>
         console.error("polaris: could not report what a camera saw:", error)
     );
+    // And anybody who asked to be told about exactly this, in the conversation
+    // they will actually see it in. Never awaited and never able to fail the
+    // event: the log entry stands whether or not a message could be written.
+    void raiseAlerts(camera.installedAppId, detection, row.id, {
+        id: camera.id,
+        name: camera.name,
+        placeId: camera.placeId
+    });
 
     // A camera set to keep footage when something happens keeps it now. Not
     // awaited: the clip is half a minute long, and whoever reported this - a
@@ -127,6 +151,30 @@ export async function recordDetection(detection: Detection): Promise<EventView |
         clipId: row.clipId,
         acked: false
     };
+}
+
+/**
+ * Take a picture of what just happened and put it on the event.
+ *
+ * Best effort and never awaited: the event is already recorded, and a camera
+ * that was too slow to produce a frame is not a reason to have no log entry. A
+ * failure leaves the row exactly as it was - with no picture, which is what it
+ * had anyway.
+ */
+async function attachStill(installedAppId: string, cameraId: string, eventId: string): Promise<void> {
+    try {
+        const { cameraStill } = await import("@/lib/home/live");
+        const image = await cameraStill(installedAppId, cameraId);
+        const camera = await prisma.camera.findFirst({
+            where: { id: cameraId },
+            select: { id: true, storageTarget: true }
+        });
+        if (!camera) return;
+        const stillKey = await storeStill(camera, image);
+        await prisma.cameraEvent.update({ where: { id: eventId }, data: { stillKey } });
+    } catch {
+        // A camera that would not send a frame just now. The line stands.
+    }
 }
 
 /**
@@ -271,6 +319,41 @@ export async function acknowledgeEvent(installedAppId: string, id: string, userI
     });
     if (!event) throw new Error("Event not found");
     await prisma.cameraEvent.update({ where: { id }, data: { ackedAt: new Date(), ackedById: userId } });
+}
+
+/**
+ * Remove one detection.
+ *
+ * A false positive is not something to acknowledge, it is something that should
+ * not be in the log: a list where every third line is a moth is a list nobody
+ * reads. The picture goes with it - keeping a photograph of somebody's doorstep
+ * for a row that has been deleted is the wrong half to keep.
+ */
+export async function deleteEvent(installedAppId: string, id: string): Promise<void> {
+    const event = await prisma.cameraEvent.findFirst({
+        where: { id, camera: { installedAppId } },
+        select: { id: true, stillKey: true }
+    });
+    if (!event) throw new Error("Event not found");
+    if (event.stillKey) await deleteStill(event.stillKey);
+    await prisma.cameraEvent.delete({ where: { id } });
+}
+
+/**
+ * Remove everything a filter matched.
+ *
+ * The one that matters after a windy night: forty rows of the same hedge, and
+ * removing them one at a time is why they get left there instead. Bounded, and
+ * it only ever removes what the screen was showing.
+ */
+export async function deleteEvents(installedAppId: string, query: EventQuery): Promise<number> {
+    const doomed = await listEvents(installedAppId, { ...query, limit: 200 });
+    for (const event of doomed) {
+        if (event.stillKey) await deleteStill(event.stillKey);
+    }
+    if (doomed.length === 0) return 0;
+    await prisma.cameraEvent.deleteMany({ where: { id: { in: doomed.map((event) => event.id) } } });
+    return doomed.length;
 }
 
 /** How many are still waiting, for the badge. Counted rather than listed: the

@@ -21,6 +21,7 @@ import * as cameras from "@/lib/home/cameras";
 import * as events from "@/lib/home/events";
 import * as ptz from "@/lib/home/ptz";
 import * as places from "@/lib/home/places";
+import * as defaults from "@/lib/home/detection-defaults";
 import * as people from "@/lib/home/people";
 import * as recording from "@/lib/home/recording";
 import { listHosts } from "@/lib/host-service";
@@ -105,6 +106,26 @@ export async function deletePlaceAction(id: string): Promise<{ error?: string }>
     if (result.error) return { error: result.error };
     revalidatePath(PATH);
     return {};
+}
+
+/** What a new camera starts out believing about movement, and setting it. */
+export async function detectionDefaultsAction(): Promise<{
+    defaults?: defaults.DetectionDefaults;
+    error?: string;
+}> {
+    await requireHome("home.read");
+    const result = await guard(() => defaults.detectionDefaults());
+    return result.error ? { error: result.error } : { defaults: result.value };
+}
+
+export async function setDetectionDefaultsAction(input: {
+    sensitivity: number;
+    settleSeconds: number;
+    minGapSeconds: number;
+}): Promise<{ error?: string }> {
+    await requireHome("home.manage");
+    const result = await guard(() => defaults.setDetectionDefaults(input));
+    return result.error ? { error: result.error } : {};
 }
 
 /** The disks a camera's footage can be pointed at: whatever Polaris is set to by
@@ -321,6 +342,50 @@ export async function listEventsAction(input: {
         })
     );
     return result.error ? { error: result.error } : { events: result.value };
+}
+
+/**
+ * Remove a detection, or everything the current filter matched.
+ *
+ * `home.control` rather than `home.manage`: clearing false positives is the
+ * everyday work of whoever watches the cameras, and a log they cannot tidy is
+ * one they stop reading. What it removes is a record of what a camera thought it
+ * saw, never footage - a clip is removed from Clips, deliberately separately.
+ */
+export async function deleteEventAction(id: string): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.control");
+    const result = await guard(() => events.deleteEvent(install.id, id));
+    if (result.error) return { error: result.error };
+    revalidatePath(`${PATH}/events`);
+    return {};
+}
+
+export async function clearEventsAction(input: {
+    cameraId?: string | null;
+    kind?: string | null;
+    label?: string | null;
+    from?: string | null;
+    to?: string | null;
+}): Promise<{ removed?: number; error?: string }> {
+    const { install } = await requireHome("home.control");
+    const when = (value: string | null | undefined): Date | null => {
+        if (!value) return null;
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+    const result = await guard(async () =>
+        events.deleteEvents(install.id, {
+            placeId: (await currentPlace(install.id)).current.id,
+            cameraId: input.cameraId ?? null,
+            kind: input.kind ?? null,
+            label: input.label ?? null,
+            from: when(input.from),
+            to: when(input.to)
+        })
+    );
+    if (result.error) return { error: result.error };
+    revalidatePath(`${PATH}/events`);
+    return { removed: result.value ?? 0 };
 }
 
 /** The footage of one moment, and how far into it to start. Null when nothing

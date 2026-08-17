@@ -18,12 +18,13 @@ import * as actions from "../actions";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { EventView } from "@/lib/home/events";
-import { Bell, Check, Loader2 } from "lucide-react";
+import { Bell, Check, Loader2, Trash2 } from "lucide-react";
 import type { CameraView } from "@/lib/home/cameras";
 import { useDisplayFormat } from "@/components/display-format";
 import {
     Badge,
     Button,
+    ConfirmDeleteDialog,
     Dialog,
     DialogContent,
     DialogHeader,
@@ -65,6 +66,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
     const [to, setTo] = useState("");
     const [moment, setMoment] = useState<{ event: EventView; clipId: string; offsetSeconds: number } | null>(null);
     const [noFootage, setNoFootage] = useState<string | null>(null);
+    const [clearing, setClearing] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
     const [done, setDone] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -122,6 +124,38 @@ export function EventsView({ canControl }: { canControl: boolean }) {
         if (!result?.events) return;
         if (result.events.length === 0) setDone(true);
         setEvents((current) => [...(current ?? []), ...(result.events ?? [])]);
+    };
+
+    const remove = async (event: EventView) => {
+        // Gone from the screen at once: a false positive is something somebody is
+        // clearing off a list, and a list that pauses on each one is a list they
+        // stop clearing. Put back if the server refuses.
+        setEvents((current) => (current ?? []).filter((item) => item.id !== event.id));
+        const result = await runAction(() => actions.deleteEventAction(event.id), setError);
+        if (result?.error) {
+            setError(result.error);
+            setEvents((current) => [event, ...(current ?? [])].sort((a, b) => b.at.localeCompare(a.at)));
+        }
+    };
+
+    const clearShown = async () => {
+        setClearing(false);
+        const result = await runAction(
+            () =>
+                actions.clearEventsAction({
+                    cameraId: cameraId || null,
+                    kind: kind || null,
+                    label: label || null,
+                    from: from || null,
+                    to: to || null
+                }),
+            setError
+        );
+        if (result?.error) {
+            setError(result.error);
+            return;
+        }
+        setEvents([]);
     };
 
     const acknowledge = async (event: EventView) => {
@@ -208,7 +242,13 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                             setTo("");
                         }}
                     >
-                        Clear
+                        Clear filters
+                    </Button>
+                ) : null}
+                {canControl && (events?.length ?? 0) > 0 ? (
+                    <Button variant="ghost" size="sm" onClick={() => setClearing(true)}>
+                        <Trash2 className="size-4 shrink-0" />
+                        Delete these
                     </Button>
                 ) : null}
             </div>
@@ -286,6 +326,17 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                                 <Check className="size-4 shrink-0" />
                                             </Button>
                                         ) : null}
+                                        {canControl ? (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                aria-label="Delete this detection"
+                                                title="Delete - it was nothing"
+                                                onClick={() => void remove(event)}
+                                            >
+                                                <Trash2 className="size-4 shrink-0" />
+                                            </Button>
+                                        ) : null}
                                     </div>
                                 </div>
                             </li>
@@ -301,6 +352,20 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                     ) : null}
                 </>
             )}
+            {clearing ? (
+                <ConfirmDeleteDialog
+                    open
+                    onOpenChange={(open) => !open && setClearing(false)}
+                    name="these detections"
+                    kind="detections"
+                    requireTyping={false}
+                    title="Delete the detections on screen?"
+                    question="Everything the current filters match is removed, along with its pictures. Footage is not touched."
+                    confirmLabel="Delete them"
+                    onConfirm={() => void clearShown()}
+                />
+            ) : null}
+
             {moment ? (
                 <MomentDialog
                     title={`${moment.event.label ?? KIND_LABEL[moment.event.kind] ?? moment.event.kind} - ${moment.event.cameraName}, ${format.dateTime(moment.event.at)}`}

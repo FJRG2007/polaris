@@ -31,6 +31,11 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
     const [cameras, setCameras] = useState<CameraView[] | null>(null);
     const [servers, setServers] = useState<{ id: string; label: string }[]>([]);
     const [storage, setStorage] = useState<{ id: string; label: string }[]>([]);
+    const [defaults, setDefaults] = useState<{
+        sensitivity: number;
+        settleSeconds: number;
+        minGapSeconds: number;
+    } | null>(null);
     const [editing, setEditing] = useState<CameraView | null>(null);
     const [adding, setAdding] = useState<{ address: string; vendor: string | null } | null>(null);
     const [discovering, setDiscovering] = useState(false);
@@ -40,16 +45,18 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
     useEffect(() => {
         let cancelled = false;
         void (async () => {
-            const [list, machines, disks] = await Promise.all([
+            const [list, machines, disks, tuning] = await Promise.all([
                 actions.listCamerasAction(),
                 actions.listServersAction(),
-                actions.listStorageOptionsAction()
+                actions.listStorageOptionsAction(),
+                actions.detectionDefaultsAction()
             ]);
             if (cancelled) return;
             if (list.error) setError(list.error);
             setCameras(list.cameras ?? []);
             setServers(machines.servers ?? []);
             setStorage(disks.options ?? []);
+            setDefaults(tuning.defaults ?? null);
             // A link from the wall names the camera to open, so pressing a name
             // there lands on its settings rather than on a list to find it in.
             if (openId) {
@@ -182,6 +189,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                     prefill={adding}
                     servers={servers}
                     storage={storage}
+                    defaults={defaults}
                     onClose={() => {
                         setEditing(null);
                         setAdding(null);

@@ -27,6 +27,12 @@ interface Settings {
     recognizerReady: boolean;
 }
 
+interface Defaults {
+    sensitivity: number;
+    settleSeconds: number;
+    minGapSeconds: number;
+}
+
 export function HomeSettingsView({
     storage,
     canAdmin
@@ -36,6 +42,9 @@ export function HomeSettingsView({
     canAdmin: boolean;
 }) {
     const [settings, setSettings] = useState<Settings | null>(null);
+    const [defaults, setDefaults] = useState<Defaults | null>(null);
+    const [savingDefaults, setSavingDefaults] = useState(false);
+    const [savedDefaults, setSavedDefaults] = useState(false);
     const [url, setUrl] = useState("");
     const [key, setKey] = useState("");
     const [saving, setSaving] = useState(false);
@@ -45,17 +54,35 @@ export function HomeSettingsView({
     useEffect(() => {
         let cancelled = false;
         void (async () => {
-            const result = await actions.homeSettingsAction();
+            const [result, tuning] = await Promise.all([
+                actions.homeSettingsAction(),
+                actions.detectionDefaultsAction()
+            ]);
             if (cancelled) return;
             if (result.error) setError(result.error);
             const value = result.settings ?? { faceApiUrl: "", hasFaceKey: false, recognizerReady: false };
             setSettings(value);
             setUrl(value.faceApiUrl);
+            setDefaults(tuning.defaults ?? null);
         })();
         return () => {
             cancelled = true;
         };
     }, []);
+
+    const saveDefaults = async () => {
+        if (!defaults) return;
+        setSavingDefaults(true);
+        setSavedDefaults(false);
+        setError(null);
+        const result = await runAction(() => actions.setDetectionDefaultsAction(defaults), setError);
+        setSavingDefaults(false);
+        if (result?.error) {
+            setError(result.error);
+            return;
+        }
+        setSavedDefaults(true);
+    };
 
     const saveRecognizer = async () => {
         setSaving(true);
@@ -97,6 +124,96 @@ export function HomeSettingsView({
                         <Link href="/admin/uploads">Change it under Uploads</Link>
                     </Button>
                 ) : null}
+            </section>
+
+            <section className="flex flex-col gap-3">
+                <div>
+                    <h2 className="text-[13px] font-semibold text-foreground">How sensitive a new camera is</h2>
+                    <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+                        Nobody guesses these right the first time, and they are not the same for a hallway and a garden
+                        facing a hedge. Set them once here, from the camera you have already tuned, and every camera
+                        added afterwards starts there. Each camera can still disagree.
+                    </p>
+                </div>
+
+                {defaults === null ? (
+                    <Skeleton className="h-9 w-72" />
+                ) : (
+                    <>
+                        <label className="flex flex-col gap-1.5">
+                            <span className="text-[12px] font-medium text-muted-foreground">
+                                Sensitivity - {defaults.sensitivity}
+                            </span>
+                            <input
+                                type="range"
+                                min={1}
+                                max={100}
+                                value={defaults.sensitivity}
+                                onChange={(event) => {
+                                    setDefaults({ ...defaults, sensitivity: Number(event.target.value) });
+                                    setSavedDefaults(false);
+                                }}
+                                className="w-64 accent-primary"
+                                aria-label="Sensitivity"
+                            />
+                            <span className="text-[11px] text-foreground-subtle">
+                                Higher notices smaller changes. Too high and every shadow is an event.
+                            </span>
+                        </label>
+
+                        <label className="flex flex-col gap-1.5">
+                            <span className="text-[12px] font-medium text-muted-foreground">
+                                Ignore anything shorter than
+                            </span>
+                            <Input
+                                value={String(defaults.settleSeconds)}
+                                onChange={(event) => {
+                                    setDefaults({ ...defaults, settleSeconds: Number(event.target.value) || 0 });
+                                    setSavedDefaults(false);
+                                }}
+                                className="w-24"
+                                inputMode="numeric"
+                                aria-label="Settle seconds"
+                            />
+                            <span className="text-[11px] text-foreground-subtle">
+                                Seconds. This is the one that stops moths, gusts and passing lorries: nearly every
+                                false alarm is over within a second or two, and a person is not.
+                            </span>
+                        </label>
+
+                        <label className="flex flex-col gap-1.5">
+                            <span className="text-[12px] font-medium text-muted-foreground">
+                                Wait between detections
+                            </span>
+                            <Input
+                                value={String(defaults.minGapSeconds)}
+                                onChange={(event) => {
+                                    setDefaults({ ...defaults, minGapSeconds: Number(event.target.value) || 1 });
+                                    setSavedDefaults(false);
+                                }}
+                                className="w-24"
+                                inputMode="numeric"
+                                aria-label="Wait between detections"
+                            />
+                            <span className="text-[11px] text-foreground-subtle">
+                                Seconds. Somebody standing at a door is one thing that happened, not sixty.
+                            </span>
+                        </label>
+
+                        <div className="flex items-center gap-2">
+                            <Button variant="secondary" onClick={saveDefaults} disabled={savingDefaults}>
+                                {savingDefaults ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
+                                Save
+                            </Button>
+                            {savedDefaults ? (
+                                <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                                    <CircleCheck className="size-3.5 shrink-0 text-success" />
+                                    Saved
+                                </span>
+                            ) : null}
+                        </div>
+                    </>
+                )}
             </section>
 
             <section className="flex flex-col gap-3">
