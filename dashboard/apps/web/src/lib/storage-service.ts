@@ -197,9 +197,20 @@ function credentialsOf(row: ConnectionRow): StorageCredentials {
  * memory is dropped and the daemon is asked properly.
  */
 async function hostMountedDriver(row: ConnectionRow): Promise<StorageDriver | null> {
-    if (!getCapabilities().nativeMounts) return null;
+    // Both of these used to return without a word, and between them they are the
+    // whole difference between reading a share through the kernel and reading it
+    // through a userspace client that falls over when two requests overlap. A
+    // wall of thumbnails is exactly that overlap, so the fallback has to say it
+    // happened.
+    if (!getCapabilities().nativeMounts) {
+        console.error(`storage: no host mounts available, reading ${row.id} over its own protocol`);
+        return null;
+    }
     const spec = mountSpecFor(row);
-    if (!spec) return null;
+    if (!spec) {
+        console.error(`storage: ${row.id} (${row.kind}) has nothing to mount, reading it over its own protocol`);
+        return null;
+    }
     const seenAt = mountsSeenLive.get(row.id);
     if (seenAt !== undefined && Date.now() - seenAt < MOUNT_TRUSTED_MS) {
         const driver = await mountedLocalDriver(row.id);

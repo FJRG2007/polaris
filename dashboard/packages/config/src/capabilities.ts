@@ -89,14 +89,30 @@ export function deriveCapabilities(
  * refreshes it on an interval; server code reads the current snapshot and the
  * client receives it through a context provider. Never trust the client copy for
  * authorization - always re-check server-side.
+ *
+ * Held on the process rather than in this module, and that is not a detail. The
+ * bundler gives this file to whoever imports it, and the built server ends up
+ * with four separate copies of it: the probe that runs at startup fills in the
+ * one in the instrumentation bundle, while a route handler reads a different one
+ * that still says there is no daemon and never will. Everything gated on the
+ * snapshot then quietly takes the limited path on a machine where the daemon is
+ * running perfectly - which is how camera stills spent a day being read over a
+ * userspace SMB client instead of the kernel mount sitting right there.
+ *
+ * A symbol from the global registry is shared by every copy, so there is one
+ * answer per process however many times this module is instantiated.
  */
-let current: Capabilities = LIMITED_CAPABILITIES;
+const HOLDER = Symbol.for("polaris.capabilities.current");
+
+interface Holder {
+    [HOLDER]?: Capabilities;
+}
 
 export function getCapabilities(): Capabilities {
-    return current;
+    return (globalThis as Holder)[HOLDER] ?? LIMITED_CAPABILITIES;
 }
 
 export function setCapabilities(next: Capabilities): Capabilities {
-    current = next;
-    return current;
+    (globalThis as Holder)[HOLDER] = next;
+    return next;
 }
