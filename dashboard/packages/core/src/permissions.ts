@@ -106,7 +106,11 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "agents.manage",
         "home.read",
         "home.control",
-        "home.manage",
+        // Deliberately not "home.manage". Adding a camera makes Polaris open a
+        // connection to an address and a port somebody typed, from inside the
+        // network - the same reason registering a server was raised to an
+        // administrative grant. Watching the house and pointing a camera are
+        // everyday things; deciding what Polaris connects to is not.
         "tasks.read",
         "tasks.manage",
         "inbox.read",
