@@ -169,8 +169,8 @@ export function PersonDialog({
                         </Button>
                         <span className="text-[11px] text-foreground-subtle">
                             {recognizerReady
-                                ? "Four or five, in different light. One photograph recognizes that photograph; several recognize a person."
-                                : "No recognizer is connected yet, so there is nowhere to send them. The name can be written down now and starts working when one is."}
+                                ? "Four or five, in different light, one face per photograph. One photograph recognizes that photograph; several recognize a person."
+                                : "Nothing is recognizing faces yet, so there is nowhere to send them. Set one up under Settings - the name can be written down now and starts working then."}
                         </span>
                         <input
                             ref={fileInput}

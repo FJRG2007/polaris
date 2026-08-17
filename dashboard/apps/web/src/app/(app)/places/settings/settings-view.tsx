@@ -8,23 +8,27 @@
  * be told about it twice - and it is re-read on every write, so connecting one
  * later moves new footage onto it with no migration.
  *
- * The recognizer is connected rather than installed, and the screen says so
- * plainly along with the command that starts one. Polaris installs single
- * containers; a recognizer is a stack with its own database, so pretending to
- * install it would be a button that fails for reasons nobody could act on.
+ * Recognition is installed from here, on a machine chosen here, because it is
+ * part of Home rather than something to go and find. The address and key fields
+ * are still underneath for a house that already runs its own - they speak the
+ * same dialect - but nobody has to touch them to get a name on an event.
  */
 
+import Link from "next/link";
 import * as actions from "../actions";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { CircleCheck, Loader2 } from "lucide-react";
-import Link from "next/link";
-import { Button, Input, Skeleton } from "@polaris/ui";
+import { CircleCheck, Loader2, ScanFace } from "lucide-react";
+import { Button, Input, Select, Skeleton } from "@polaris/ui";
 
 interface Settings {
     faceApiUrl: string;
     hasFaceKey: boolean;
     recognizerReady: boolean;
+    /** Where Home put one of its own, in words. Null when it has not. */
+    installedOn: string | null;
+    /** Whether it is answering yet. A fresh one spends a minute starting. */
+    answering: boolean;
 }
 
 interface Defaults {
@@ -49,26 +53,55 @@ export function HomeSettingsView({
     const [key, setKey] = useState("");
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [servers, setServers] = useState<{ id: string; label: string }[]>([]);
+    const [server, setServer] = useState("local");
+    const [installing, setInstalling] = useState(false);
+    const [manual, setManual] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
         void (async () => {
-            const [result, tuning] = await Promise.all([
+            const [result, tuning, machines] = await Promise.all([
                 actions.homeSettingsAction(),
-                actions.detectionDefaultsAction()
+                actions.detectionDefaultsAction(),
+                actions.listServersAction()
             ]);
             if (cancelled) return;
             if (result.error) setError(result.error);
-            const value = result.settings ?? { faceApiUrl: "", hasFaceKey: false, recognizerReady: false };
+            const value = result.settings ?? {
+                faceApiUrl: "",
+                hasFaceKey: false,
+                recognizerReady: false,
+                installedOn: null,
+                answering: false
+            };
             setSettings(value);
             setUrl(value.faceApiUrl);
+            // Only opened by hand. A house that already typed an address keeps
+            // seeing it; everybody else is offered the button and nothing else.
+            setManual(Boolean(value.faceApiUrl));
             setDefaults(tuning.defaults ?? null);
+            setServers(machines.servers ?? []);
         })();
         return () => {
             cancelled = true;
         };
     }, []);
+
+    const install = async () => {
+        setInstalling(true);
+        setError(null);
+        const result = await runAction(() => actions.installRecognizerAction(server), setError);
+        if (result?.error) {
+            setInstalling(false);
+            setError(result.error);
+            return;
+        }
+        const fresh = await actions.homeSettingsAction();
+        setInstalling(false);
+        if (fresh.settings) setSettings(fresh.settings);
+    };
 
     const saveDefaults = async () => {
         if (!defaults) return;
@@ -96,15 +129,17 @@ export function HomeSettingsView({
         }
         setKey("");
         setSaved(true);
-        setSettings((current) =>
-            current
-                ? {
-                      faceApiUrl: url.trim(),
-                      hasFaceKey: Boolean(url.trim()) && (Boolean(key.trim()) || current.hasFaceKey),
-                      recognizerReady: Boolean(url.trim()) && (Boolean(key.trim()) || current.hasFaceKey)
-                  }
-                : current
-        );
+        setSettings((current) => {
+            if (!current) return current;
+            const paired = Boolean(url.trim()) && (Boolean(key.trim()) || current.hasFaceKey);
+            return {
+                ...current,
+                faceApiUrl: url.trim(),
+                hasFaceKey: paired,
+                // One Home installed itself wins, so it stays ready either way.
+                recognizerReady: paired || Boolean(current.installedOn)
+            };
+        });
     };
 
     return (
@@ -220,9 +255,9 @@ export function HomeSettingsView({
                 <div>
                     <h2 className="text-[13px] font-semibold text-foreground">Face recognition</h2>
                     <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
-                        Optional, and only needed for cameras set to work out who somebody is. Run a recognizer on any
-                        machine you like and give Home its address and key. Faces are sent to it only after a camera has
-                        already seen a person, and they never leave the machine it runs on.
+                        Optional, and only needed for cameras set to work out who somebody is. Install it on whichever
+                        machine you like - the pictures and what is learned from them stay on that machine, and a face
+                        is only looked at after a camera has already seen a person.
                     </p>
                 </div>
 
@@ -230,6 +265,57 @@ export function HomeSettingsView({
                     <Skeleton className="h-9 w-72" />
                 ) : (
                     <>
+                        {settings.installedOn ? (
+                            <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface px-3 py-2">
+                                <p className="flex items-center gap-1.5 text-[12px] text-foreground">
+                                    {settings.answering ? (
+                                        <CircleCheck className="size-3.5 shrink-0 text-success" />
+                                    ) : (
+                                        <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+                                    )}
+                                    {settings.answering
+                                        ? `Running on ${settings.installedOn}.`
+                                        : `Starting on ${settings.installedOn}.`}
+                                </p>
+                                <p className="text-[11px] text-foreground-subtle">
+                                    {settings.answering
+                                        ? "Teach it who lives here under People, and cameras set to recognize faces will start using their names."
+                                        : "It loads its models the first time it starts, which takes a minute or two. Nothing is lost in the meantime - cameras still report that somebody is there."}
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="flex flex-wrap items-end gap-2">
+                                <label className="flex flex-col gap-1.5">
+                                    <span className="text-[12px] font-medium text-muted-foreground">
+                                        Run it on
+                                    </span>
+                                    <Select
+                                        value={server}
+                                        onValueChange={setServer}
+                                        options={servers.map((machine) => ({
+                                            value: machine.id,
+                                            label: machine.label
+                                        }))}
+                                    />
+                                </label>
+                                <Button onClick={install} disabled={installing}>
+                                    {installing ? (
+                                        <Loader2 className="size-4 shrink-0 animate-spin" />
+                                    ) : (
+                                        <ScanFace className="size-4 shrink-0" />
+                                    )}
+                                    {installing ? "Installing" : "Install it"}
+                                </Button>
+                                <span className="pb-2 text-[11px] text-foreground-subtle">
+                                    A few hundred megabytes, once. It runs on the processor - no graphics card needed.
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Hidden once Home runs one of its own, because its own
+                            wins: an address typed underneath a running install
+                            would look saved and do nothing. */}
+                        {settings.installedOn ? null : manual ? (
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                             <label className="flex flex-col gap-1.5">
                                 <span className="text-[12px] font-medium text-muted-foreground">Address</span>
@@ -270,27 +356,23 @@ export function HomeSettingsView({
                                 </span>
                             ) : null}
                         </div>
-
-                        {settings.recognizerReady ? (
-                            <p className="text-[12px] text-muted-foreground">
-                                Connected. Teach it who lives here under People.
-                            </p>
                         ) : (
-                            <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface px-3 py-2">
-                                <p className="text-[12px] text-muted-foreground">
-                                    Nothing connected yet. CompreFace is the one Home is written against - it runs on
-                                    its own with Docker, then mints a key under Face Recognition Services:
-                                </p>
-                                <code className="overflow-x-auto text-[11px] text-foreground-subtle">
-                                    git clone https://github.com/exadel-inc/CompreFace &amp;&amp; cd CompreFace &amp;&amp;
-                                    docker compose up -d
-                                </code>
-                                <p className="text-[11px] text-foreground-subtle">
-                                    Until then, cameras set to recognize faces still report that somebody is there -
-                                    just not who.
-                                </p>
-                            </div>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="self-start"
+                                onClick={() => setManual(true)}
+                            >
+                                I already run my own
+                            </Button>
                         )}
+
+                        {!settings.recognizerReady ? (
+                            <p className="text-[11px] text-foreground-subtle">
+                                Until there is one, cameras set to recognize faces still report that somebody is there -
+                                just not who.
+                            </p>
+                        ) : null}
                     </>
                 )}
             </section>

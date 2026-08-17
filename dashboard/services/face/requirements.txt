@@ -1,0 +1,7 @@
+# Pinned rather than floated: this container is rebuilt rarely and installed on
+# somebody's home server, where a surprise major version is a face database that
+# stops answering at three in the morning.
+uniface[cpu]==4.0.0
+fastapi==0.115.6
+uvicorn==0.34.0
+python-multipart==0.0.20

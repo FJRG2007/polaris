@@ -16,15 +16,13 @@
  */
 
 import { prisma } from "@polaris/db";
-import { loadEnv } from "@polaris/config";
-import { listHosts } from "@/lib/host-service";
-import { homeInstall } from "@/lib/home/access";
 import { appBaseUrl } from "@/lib/domain-service";
+import { recognizerFor } from "@/lib/home/recognizer";
 import { parseDetection } from "@/lib/home/cameras";
 import { installApp } from "@/lib/apps/install-service";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { installEnvSecret } from "@/lib/apps/install-secret";
-import { decryptSecret, encryptSecret } from "@polaris/storage";
+import { assertServer, findService } from "@/lib/home/side-service";
 import { relayEndpoint, relayServerFor, streamName } from "@/lib/home/relay";
 import { detectorReaches, type Detector, type ObjectClass } from "@/lib/home/detection";
 
@@ -55,121 +53,9 @@ export interface VisionAssignment {
     readonly faces: { readonly baseUrl: string; readonly apiKey: string; readonly threshold: number } | null;
 }
 
-/**
- * What the house keeps for itself, on the install row.
- *
- * The recognizer is connected rather than installed. Polaris deploys single
- * containers, and CompreFace is five of them with a database - so it is run the
- * way its own project says to run it, and Home is told where it ended up. The
- * key it mints in its own interface is a credential to a service that holds
- * faces, so it lives encrypted here rather than in a settings table in the clear.
- */
-interface HomeSecrets {
-    faceApiUrl?: string;
-    faceApiKey?: string;
-}
-
-async function readSecrets(installedAppId: string): Promise<HomeSecrets> {
-    const row = await prisma.installedApp.findFirst({
-        where: { id: installedAppId },
-        select: { encryptedSecret: true, secretNonce: true, secretKeyId: true }
-    });
-    if (!row?.encryptedSecret || !row.secretNonce || !row.secretKeyId) return {};
-    try {
-        return JSON.parse(
-            decryptSecret(
-                {
-                    ciphertext: Buffer.from(row.encryptedSecret),
-                    nonce: Buffer.from(row.secretNonce),
-                    keyId: row.secretKeyId
-                },
-                loadEnv().POLARIS_MASTER_KEY
-            )
-        ) as HomeSecrets;
-    } catch {
-        return {};
-    }
-}
-
-/**
- * Point the house at a recognizer, or unpoint it.
- *
- * A blank address or a blank key clears the pairing, which is how face
- * recognition is switched off without touching anything else - the cameras on
- * that rung fall back to reporting a person and stop asking who.
- *
- * The address is only kept if it parses as an http(s) URL with a host. It is
- * dialled by this server and by every vision worker, so a malformed one is a
- * failure repeated on several machines with no obvious cause.
- */
-export async function setFaceRecognition(installedAppId: string, baseUrl: string, apiKey: string): Promise<void> {
-    const trimmedUrl = baseUrl.trim().replace(/\/+$/, "");
-    if (trimmedUrl) {
-        let parsed: URL;
-        try {
-            parsed = new URL(trimmedUrl);
-        } catch {
-            throw new Error("Write the address as http://192.168.1.20:8000");
-        }
-        if (!/^https?:$/.test(parsed.protocol) || !parsed.hostname) {
-            throw new Error("Write the address as http://192.168.1.20:8000");
-        }
-    }
-    const current = await readSecrets(installedAppId);
-    const secrets: HomeSecrets = {
-        ...current,
-        faceApiUrl: trimmedUrl || undefined,
-        // An empty key on a save that only changed the address leaves the stored
-        // one alone; clearing the address clears the pairing outright.
-        faceApiKey: trimmedUrl ? apiKey.trim() || current.faceApiKey : undefined
-    };
-    const blob = encryptSecret(JSON.stringify(secrets), loadEnv().POLARIS_MASTER_KEY);
-    await prisma.installedApp.update({
-        where: { id: installedAppId },
-        data: { encryptedSecret: blob.ciphertext, secretNonce: blob.nonce, secretKeyId: blob.keyId }
-    });
-}
-
-/** What the settings screen shows: the address, and that there is a key. The key
- *  itself never goes back to a browser. */
-export async function faceRecognitionSettings(
-    installedAppId: string
-): Promise<{ baseUrl: string; hasKey: boolean }> {
-    const secrets = await readSecrets(installedAppId);
-    return { baseUrl: secrets.faceApiUrl ?? "", hasKey: Boolean(secrets.faceApiKey) };
-}
-
-/** Where the recognizer answers, and the key for it. Null when either half is
- *  missing, which is what makes the face rung unavailable rather than broken. */
-async function faceRecognition(installedAppId: string): Promise<{ baseUrl: string; apiKey: string } | null> {
-    const { faceApiUrl, faceApiKey } = await readSecrets(installedAppId);
-    return faceApiUrl && faceApiKey ? { baseUrl: faceApiUrl, apiKey: faceApiKey } : null;
-}
-
-/** Where the recognizer is, for the house that has one. The people screen and
- *  the assignment builder both need it, and neither should have to know which
- *  install the house is. */
-export async function faceEndpoint(): Promise<{ baseUrl: string; apiKey: string } | null> {
-    const install = await homeInstall();
-    return install ? faceRecognition(install.id) : null;
-}
-
 /** The vision worker running on one server, or null when there is not one. */
-async function findWorker(serverId: string): Promise<{ applicationId: string; ownerId: string } | null> {
-    const targetId =
-        serverId === "local"
-            ? (await prisma.deployTarget.findFirst({ where: { kind: "local" }, select: { id: true } }))?.id
-            : (await prisma.deployTarget.findFirst({ where: { hostId: serverId }, select: { id: true } }))?.id;
-    const row = await prisma.installedApp.findFirst({
-        where: {
-            catalogId: VISION_APP,
-            status: { not: "removed" },
-            applicationId: { not: null },
-            ...(targetId ? { targetId } : {})
-        },
-        select: { applicationId: true, ownerId: true }
-    });
-    return row?.applicationId ? { applicationId: row.applicationId, ownerId: row.ownerId } : null;
+async function findWorker(serverId: string) {
+    return findService(VISION_APP, serverId);
 }
 
 /**
@@ -181,10 +67,7 @@ async function findWorker(serverId: string): Promise<{ applicationId: string; ow
  */
 export async function ensureVisionWorker(ownerId: string, actorId: string, serverId: string): Promise<void> {
     if (await findWorker(serverId)) return;
-    if (serverId !== "local") {
-        const hosts = await listHosts(ownerId);
-        if (!hosts.some((host) => host.id === serverId)) throw new Error("That server is not connected");
-    }
+    await assertServer(ownerId, serverId);
     await installApp(ownerId, actorId, {
         catalogId: VISION_APP,
         name: "Vision worker",
@@ -242,7 +125,7 @@ export async function assignmentsFor(installedAppId: string): Promise<VisionAssi
     });
     if (cameras.length === 0) return [];
 
-    const faces = await faceRecognition(installedAppId);
+    const faces = await recognizerFor(installedAppId);
     const assignments: VisionAssignment[] = [];
     for (const camera of cameras) {
         const endpoint = await relayEndpoint(relayServerFor(camera.reachVia));
@@ -267,7 +150,11 @@ export async function assignmentsFor(installedAppId: string): Promise<VisionAssi
             hours: detection.hours,
             faces:
                 faces && detectorReaches(detector, "faces")
-                    ? { ...faces, threshold: detection.faceThreshold }
+                    ? // The worker runs beside the recognizer as often as not, so
+                      // it gets the address that machine can dial rather than the
+                      // one Polaris uses - which may be a tunnel that exists only
+                      // inside this process.
+                      { baseUrl: faces.directUrl, apiKey: faces.apiKey, threshold: detection.faceThreshold }
                     : null
         });
     }

@@ -896,6 +896,38 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         }
     },
     {
+        // Who somebody is, rather than that somebody is there. Never offered on
+        // its own: Home installs it from its own settings, on the machine the
+        // owner picked, and it is useless without a camera pointed at it.
+        id: "face-recognizer",
+        name: "Face recognition",
+        internal: true,
+        category: "Home",
+        icon: ScanFace,
+        summary: "Puts names to the faces you have taught it, on your own hardware.",
+        description:
+            "The recognizer behind Home's People screen. It finds faces in a frame and compares them with the ones you have taught it, on the machine you chose - photographs and the templates taken from them stay in this container and are never sent anywhere, including to Polaris.",
+        installMethod: "compose-template",
+        capabilities: ["tool"],
+        dashboard: "generic",
+        template: {
+            // Published by CI (.github/workflows/dashboard-publish.yml, `face`
+            // job) from dashboard/services/face: SCRFD and ArcFace, the small
+            // variants, with the weights baked in so it works with no way out.
+            image: "ghcr.io/fjrg2007/polaris-face:latest",
+            build: "dashboard/services/face",
+            env: [
+                // Minted at install and never shown. Nobody types it, Polaris and
+                // the vision workers are the only things that call this, and it
+                // refuses to start without one rather than coming up open on
+                // somebody's home network with a face database behind it.
+                { key: "FACE_API_KEY", label: "API key", generated: true }
+            ],
+            volumes: [{ name: "data", mountPath: "/data", label: "Known faces" }],
+            ports: [{ container: 8000, protocol: "http", label: "Recognition API" }]
+        }
+    },
+    {
         // The machine that does the looking. Never offered on its own: Home puts
         // one on whichever server a camera's detection was pointed at, and it is
         // useless without a camera to watch.

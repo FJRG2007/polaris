@@ -15,28 +15,29 @@
  * password or the relay's address.
  */
 
+import * as ptz from "@/lib/home/ptz";
+import { cookies } from "next/headers";
 import * as relay from "@/lib/home/relay";
 import { revalidatePath } from "next/cache";
-import * as cameras from "@/lib/home/cameras";
 import * as events from "@/lib/home/events";
-import * as ptz from "@/lib/home/ptz";
 import * as alerts from "@/lib/home/alerts";
 import * as places from "@/lib/home/places";
-import * as defaults from "@/lib/home/detection-defaults";
 import * as people from "@/lib/home/people";
-import * as recording from "@/lib/home/recording";
+import * as cameras from "@/lib/home/cameras";
 import { listHosts } from "@/lib/host-service";
-import { footageTarget } from "@/lib/home/stills";
-import { LOCAL_TARGET, storageTargetOptions } from "@/lib/storage-target";
 import { probeCamera } from "@/lib/home/onvif";
-import { cookies } from "next/headers";
 import { requireHome } from "@/lib/home/access";
-import { currentPlace, PLACE_COOKIE, PLACE_COOKIE_MAX_AGE } from "@/lib/home/current-place";
+import * as recording from "@/lib/home/recording";
+import { footageTarget } from "@/lib/home/stills";
 import { cameraVendor } from "@/lib/home/vendors";
 import { discoverCameras } from "@/lib/home/discovery";
-import { ensureVisionWorker, faceEndpoint, faceRecognitionSettings, setFaceRecognition } from "@/lib/home/vision";
+import { ensureVisionWorker } from "@/lib/home/vision";
+import * as defaults from "@/lib/home/detection-defaults";
+import { LOCAL_TARGET, storageTargetOptions } from "@/lib/storage-target";
 import { needsSomewhereToRun, type Detector } from "@/lib/home/detection";
+import { currentPlace, PLACE_COOKIE, PLACE_COOKIE_MAX_AGE } from "@/lib/home/current-place";
 import { cameraInputSchema, discoveryInputSchema, normalizeCameraInput } from "@/lib/home/schemas";
+import { faceEndpoint, faceRecognitionSettings, installRecognizer, setFaceRecognition } from "@/lib/home/recognizer";
 
 const PATH = "/places";
 
@@ -511,10 +512,16 @@ export async function removePersonAction(id: string): Promise<{ error?: string }
     return {};
 }
 
-/** Where the recognizer is and whether it has a key, for the settings screen.
- *  The key itself never comes back. */
+/** What the settings screen shows about recognition: whether Home runs one, where
+ *  it put it, and whether it is answering yet. The key itself never comes back. */
 export async function homeSettingsAction(): Promise<{
-    settings?: { faceApiUrl: string; hasFaceKey: boolean; recognizerReady: boolean };
+    settings?: {
+        faceApiUrl: string;
+        hasFaceKey: boolean;
+        recognizerReady: boolean;
+        installedOn: string | null;
+        answering: boolean;
+    };
     error?: string;
 }> {
     const { install } = await requireHome("home.manage");
@@ -523,19 +530,38 @@ export async function homeSettingsAction(): Promise<{
         return {
             faceApiUrl: face.baseUrl,
             hasFaceKey: face.hasKey,
-            recognizerReady: (await faceEndpoint()) !== null
+            recognizerReady: (await faceEndpoint()) !== null,
+            installedOn: face.installedOn,
+            answering: face.answering
         };
     });
     return result.error ? { error: result.error } : { settings: result.value };
 }
 
 /**
- * Point the house at the recognizer somebody is running.
+ * Put a recognizer up, on a machine somebody chose.
  *
- * Connected rather than installed: CompreFace is five containers and a database,
- * and Polaris deploys single containers - so it is run the way its own project
- * says to, and this is where Home is told the address and the key it minted.
- * Clearing the address switches face recognition off.
+ * This is the whole reason the container in `dashboard/services/face` exists.
+ * Recognition used to mean going away and running somebody else's five-container
+ * stack by hand; it is part of Home now, and this is the button.
+ *
+ * Slow the first time - it is a deploy, and the image carries its models - and
+ * instant afterwards.
+ */
+export async function installRecognizerAction(serverId: string): Promise<{ error?: string }> {
+    const { user, install } = await requireHome("home.manage");
+    const result = await guard(() => installRecognizer(install.ownerId, user.id, String(serverId)));
+    if (result.error) return { error: result.error };
+    revalidatePath(`${PATH}/settings`);
+    return {};
+}
+
+/**
+ * Point the house at a recognizer somebody runs themselves.
+ *
+ * Still here after the button above, and on purpose: a house that already runs
+ * one should not have to install a second, and this speaks the same dialect.
+ * Clearing the address switches that pairing off.
  */
 export async function setFaceRecognitionAction(baseUrl: string, apiKey: string): Promise<{ error?: string }> {
     const { install } = await requireHome("home.manage");

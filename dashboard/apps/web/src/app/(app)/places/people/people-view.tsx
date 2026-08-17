@@ -12,11 +12,12 @@
  * than kept here, so what this screen says is what it actually holds.
  */
 
+import Link from "next/link";
 import * as actions from "../actions";
 import { runAction } from "@/lib/run-action";
+import { PersonDialog } from "./person-dialog";
 import { useEffect, useRef, useState } from "react";
 import type { PersonView } from "@/lib/home/people";
-import { PersonDialog } from "./person-dialog";
 import { ImagePlus, Loader2, ScanFace, Trash2, UserPlus } from "lucide-react";
 import { Badge, Button, ConfirmDeleteDialog, EmptyState, Skeleton, Switch } from "@polaris/ui";
 
@@ -86,9 +87,11 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
     return (
         <div className="flex flex-col gap-4">
             {!ready ? (
-                <p className="rounded-lg border border-border bg-surface px-3 py-2 text-[12px] text-muted-foreground">
-                    No recognizer is connected yet. Run one and give Home its address under Settings; the names
-                    written here start working the moment you do.
+                <p className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-[12px] text-muted-foreground">
+                    Nothing is recognizing faces yet. Names written here start working the moment something is.
+                    <Button asChild variant="secondary" size="sm">
+                        <Link href="/places/settings">Set it up</Link>
+                    </Button>
                 </p>
             ) : null}
 

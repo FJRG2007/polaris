@@ -41,6 +41,7 @@ on:
       - "dashboard/services/edge-guard/**"
       - "dashboard/services/camera-relay/**"
       - "dashboard/services/vision/**"
+      - "dashboard/services/face/**"
       - "dashboard/package.json"
       - "dashboard/package-lock.json"
       - "crates/polaris-hostd/**"
@@ -76,6 +77,7 @@ jobs:
       guard: ${{ steps.filter.outputs.guard }}
       relay: ${{ steps.filter.outputs.relay }}
       vision: ${{ steps.filter.outputs.vision }}
+      face: ${{ steps.filter.outputs.face }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -88,7 +90,7 @@ jobs:
         run: |
           set -euo pipefail
           out() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
-          all() { out web true; out mdns true; out hostd true; out updater true; out bridge true; out guard true; out relay true; out vision true; }
+          all() { out web true; out mdns true; out hostd true; out updater true; out bridge true; out guard true; out relay true; out vision true; out face true; }
           if [ "$EVENT" = "workflow_dispatch" ] || [ -z "${BEFORE:-}" ] \
              || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
              || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
@@ -117,6 +119,9 @@ jobs:
           has '^dashboard/services/camera-relay/' && out relay true || out relay false
           # The worker bundles nothing but its own source.
           has '^dashboard/services/vision/' && out vision true || out vision false
+          # The recognizer is one Python file, its pins, and the weights the
+          # Dockerfile bakes in.
+          has '^dashboard/services/face/' && out face true || out face false
 
   # The gates. Skipped when nothing they cover is being rebuilt, which also skips
   # the image jobs that need them - they would have been skipped by their own
@@ -402,7 +407,37 @@ jobs:
           platforms: linux/amd64,linux/arm64
           outputs: type=image,name=ghcr.io/fjrg2007/polaris-vision,push-by-digest=true,name-canonical=true,push=true
 
-  # The gate. The three images above are already in the registry by the time this
+  # The recognizer. Its own image because the alternative was telling people to go
+  # and run a five-container stack by hand, which is not something Home can install
+  # from a button. Heavier than the rest - it carries onnxruntime and the model
+  # weights - and rebuilt only when its own directory changes.
+  face:
+    needs: changes
+    if: ${{ needs.changes.outputs.face == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: dashboard
+          file: dashboard/services/face/Dockerfile
+          # Same reach as the worker: this is the other half of the same job, and
+          # a house that runs detection on a small board will want to run
+          # recognition beside it rather than send frames across the network.
+          platforms: linux/amd64,linux/arm64
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-face,push-by-digest=true,name-canonical=true,push=true
+
+  # The gate. The images above are already in the registry by the time this
   # runs; what it does is give them the name every deployment pulls, and only if the
   # suites passed. Each image is tagged on its own result, so a bridge that failed to
   # build does not hold back a web that did.
@@ -411,7 +446,7 @@ jobs:
   # it is, and a skipped dashboard-ci (nothing here was rebuilt) skips this too,
   # since its result is then not 'success'.
   tag:
-    needs: [dashboard-ci, web, bridge, guard, relay, vision]
+    needs: [dashboard-ci, web, bridge, guard, relay, vision, face]
     if: ${{ !cancelled() && needs.dashboard-ci.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
@@ -445,3 +480,7 @@ jobs:
         if: ${{ needs.vision.result == 'success' }}
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-vision:latest             ghcr.io/fjrg2007/polaris-vision@${{ needs.vision.outputs.digest }}
+      - name: Tag the face recognizer
+        if: ${{ needs.face.result == 'success' }}
+        run: |
+          docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-face:latest             ghcr.io/fjrg2007/polaris-face@${{ needs.face.outputs.digest }}

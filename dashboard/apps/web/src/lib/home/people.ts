@@ -13,7 +13,7 @@
  */
 
 import { prisma } from "@polaris/db";
-import { faceEndpoint } from "@/lib/home/vision";
+import { faceEndpoint } from "@/lib/home/recognizer";
 
 export interface PersonView {
     readonly id: string;
