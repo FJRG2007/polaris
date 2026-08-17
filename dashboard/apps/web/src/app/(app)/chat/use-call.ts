@@ -34,6 +34,7 @@
  */
 
 import { z } from "zod";
+import { setMicDevice } from "./mic-device";
 import { useSpeaking } from "./use-speaking";
 import * as actions from "./meeting-actions";
 import { playCallSound } from "@/lib/call-sounds";
@@ -962,6 +963,10 @@ function refused(error: unknown, what: string): string {
                         track.enabled = !deafened && micOn;
                         mic.current = track;
                         setMicrophoneId(deviceId);
+                        // Remembered for this browser, so the next call and the
+                        // next voice message use the microphone somebody went to
+                        // the trouble of picking.
+                        setMicDevice(deviceId);
                         // Rebuilt against the new device: the old graph was
                         // reading from the track just stopped.
                         await startFilter();

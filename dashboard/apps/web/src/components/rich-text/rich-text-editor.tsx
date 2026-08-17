@@ -60,6 +60,25 @@ export interface RichTextEditorProps {
      */
     focusAt?: number;
     /**
+     * Where the caret lands when `focusAt` fires.
+     *
+     * "end" for a surface whose text has just been replaced - starting an edit -
+     * where the end of the sentence is the only place to carry on from. "keep"
+     * for one that already has something half-written in it: answering a message
+     * must put the caret back where the writer left it, not at the end of a line
+     * they were in the middle of.
+     */
+    focusWhere?: "end" | "keep";
+    /**
+     * Files arrived on the clipboard, usually a screenshot.
+     *
+     * Answered by the caller because the files are not the document's business:
+     * a composer stages them as attachments, and a surface with nowhere to put
+     * one says so by not passing this. True means it took them, and the paste
+     * goes no further.
+     */
+    onPasteFiles?: (files: readonly File[]) => boolean;
+    /**
      * The conversation this editor is writing into, when it is writing into one.
      *
      * What @ offers then is the people in that room rather than the ones this
@@ -100,14 +119,20 @@ export function RichTextEditor({
     disabled = false,
     autoFocus = false,
     focusAt = 0,
+    focusWhere = "end",
+    onPasteFiles,
     mentionsIn = null,
     bordered = false,
     className
 }: RichTextEditorProps) {
     // Held in a ref rather than in the dependency list: the editor is built once
     // and these change with every render of the parent.
-    const handlers = useRef({ onChange, onBlur, onSubmit, onTyping });
-    handlers.current = { onChange, onBlur, onSubmit, onTyping };
+    const handlers = useRef({ onChange, onBlur, onSubmit, onTyping, onPasteFiles });
+    handlers.current = { onChange, onBlur, onSubmit, onTyping, onPasteFiles };
+    // The same, for where the caret goes: it changes with the reason the caller
+    // is asking, and it must not be a reason to focus on its own.
+    const caret = useRef(focusWhere);
+    caret.current = focusWhere;
 
     const search = useCallback(
         async (kinds: readonly refs.ReferenceKind[], query: string) => {
@@ -199,7 +224,15 @@ export function RichTextEditor({
 
                 return send();
             },
-            handlePaste: (view, event) => handleMarkdownPaste(editorRef.current, view, event)
+            handlePaste: (view, event) => {
+                // A screenshot, or anything else on the clipboard that is a file
+                // rather than text. It belongs to whatever is around the editor -
+                // a composer stages it as an attachment - and nothing about it
+                // goes into the document.
+                const files = [...(event.clipboardData?.files ?? [])];
+                if (files.length > 0 && handlers.current.onPasteFiles?.(files)) return true;
+                return handleMarkdownPaste(editorRef.current, view, event);
+            }
         },
         onUpdate: ({ editor: current }) => handlers.current.onChange?.(md.docToMarkdown(current.getJSON())),
         onBlur: ({ editor: current }) => handlers.current.onBlur?.(md.docToMarkdown(current.getJSON()))
@@ -222,12 +255,25 @@ export function RichTextEditor({
         editor?.setEditable(!disabled);
     }, [editor, disabled]);
 
-    // At the end of whatever is already written: somebody answering a message
-    // wants to type, and somebody editing one wants to carry on from where the
-    // sentence stopped rather than from in front of it.
+    /**
+     * Somebody asked for the caret.
+     *
+     * On a timer of zero rather than straight away. Most of the things that ask
+     * for it are menu items - Reply, Edit - and a Radix menu hands focus back to
+     * whatever opened it a tick after it unmounts, which is a tick after this. So
+     * focusing now was focusing and then being blurred, which is exactly what
+     * "pressing reply does not put me back in the box" looked like.
+     */
     useEffect(() => {
         if (!focusAt || !editor || disabled) return;
-        editor.commands.focus("end");
+        const timer = window.setTimeout(() => {
+            if (editor.isDestroyed) return;
+            // "keep" restores the selection the editor still holds from before it
+            // was blurred, which is where the writer left off.
+            if (caret.current === "keep") editor.commands.focus();
+            else editor.commands.focus("end");
+        }, 0);
+        return () => window.clearTimeout(timer);
     }, [focusAt, editor, disabled]);
 
     if (!editor) {
