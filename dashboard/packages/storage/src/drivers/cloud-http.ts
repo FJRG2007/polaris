@@ -15,6 +15,29 @@ import { StorageError, type StorageErrorCode } from "../driver.js";
 /** Supplies a currently-valid access token for the linked account. */
 export type TokenSource = () => Promise<string>;
 
+/**
+ * Prove a folder is empty before deleting it, for the providers that cannot be
+ * asked to.
+ *
+ * Dropbox, Drive and OneDrive all remove a folder with everything inside it and
+ * have no other mode, so `recursive: false` cannot be passed on - it has to be
+ * held here. Ignoring the flag is what this exists to stop: a caller that asks
+ * for "only if it is empty" is tidying up, and has no business taking somebody's
+ * files with it because the provider's delete has one meaning.
+ *
+ * A path with no listing - a file, or something already gone - is not a folder
+ * to refuse, so the delete goes ahead and the provider answers for it.
+ */
+export async function refuseIfFilled(
+    listing: () => Promise<{ entries: readonly unknown[] }>,
+    path: string
+): Promise<void> {
+    const held = await listing().catch(() => null);
+    if (held && held.entries.length > 0) {
+        throw new StorageError("io_error", `${path} is not empty`);
+    }
+}
+
 /** What these drivers ever send as a body. Narrower than the platform's BodyInit,
  *  which is not a global under this package's lib settings. */
 export type CloudBody = Uint8Array | string | ReadableStream<Uint8Array> | null;

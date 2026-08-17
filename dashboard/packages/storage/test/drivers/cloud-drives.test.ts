@@ -207,3 +207,52 @@ describe("Dropbox", () => {
         expect(arg.commit.path).toBe("/Polaris/big.tar");
     });
 });
+
+/**
+ * "Only if it is empty" on a provider whose delete has no such mode.
+ *
+ * All three take a folder's contents with it and offer nothing else, so the flag
+ * used to be ignored outright: a caller tidying up an empty directory could take
+ * a file that had landed in it a second earlier. It is proved before the delete
+ * is asked for now, and a folder with anything in it is a refusal.
+ */
+describe("deleting a folder only if it is empty", () => {
+    it("refuses when Dropbox says there is something in it", async () => {
+        const calls = stubFetch((call) => {
+            if (call.url.endsWith("/files/list_folder")) {
+                return new Response(
+                    JSON.stringify({ entries: [{ ".tag": "file", name: "kept.png" }] })
+                );
+            }
+            return new Response(JSON.stringify({}));
+        });
+
+        const driver = new DropboxDriver({ id: "c4", token });
+        await expect(driver.delete("polaris/chat/room", { recursive: false })).rejects.toThrow(
+            /not empty/i
+        );
+        expect(calls.some((call) => call.url.endsWith("/files/delete_v2"))).toBe(false);
+    });
+
+    it("goes ahead when it is empty", async () => {
+        const calls = stubFetch((call) => {
+            if (call.url.endsWith("/files/list_folder")) {
+                return new Response(JSON.stringify({ entries: [] }));
+            }
+            return new Response(JSON.stringify({}));
+        });
+
+        const driver = new DropboxDriver({ id: "c5", token });
+        await driver.delete("polaris/chat/room", { recursive: false });
+        expect(calls.some((call) => call.url.endsWith("/files/delete_v2"))).toBe(true);
+    });
+
+    it("still takes everything when nobody asked it not to", async () => {
+        const calls = stubFetch(() => new Response(JSON.stringify({})));
+        const driver = new DropboxDriver({ id: "c6", token });
+        await driver.delete("polaris/chat/room");
+        // Nothing is listed: the provider's own recursive delete is the point.
+        expect(calls.some((call) => call.url.endsWith("/files/list_folder"))).toBe(false);
+        expect(calls.some((call) => call.url.endsWith("/files/delete_v2"))).toBe(true);
+    });
+});
