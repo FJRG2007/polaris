@@ -1,10 +1,12 @@
 #!/bin/bash
 # Write the relay's configuration from the environment, then hand over to go2rtc.
 #
-# Only the parts Polaris decides are written here. Everything else - which
-# cameras exist, what they are reached at - is set through the API afterwards and
-# persisted by go2rtc into this same file, so a restart comes back with the
-# cameras it had.
+# One file, two owners. Everything above `streams:` is what Polaris decides, and
+# it is rewritten on every boot so a change made here reaches a relay that was
+# installed months ago - the file lives in a volume that outlives the image, and
+# writing it only once means shipping a fix nobody receives. Everything from
+# `streams:` down belongs to go2rtc: it rewrites that section every time a camera
+# is added, and it is what brings the cameras back after a restart.
 set -euo pipefail
 
 CONFIG=/config/go2rtc.yaml
@@ -14,11 +16,8 @@ if [ -z "${RELAY_PASSWORD:-}" ]; then
     exit 1
 fi
 
-# Written once. After the first boot go2rtc owns this file: it rewrites it every
-# time a camera is added, and re-templating it here would drop every camera the
-# house has on the next restart.
-if [ ! -f "$CONFIG" ]; then
-    cat > "$CONFIG" <<YAML
+settings() {
+    cat <<YAML
 api:
   listen: ":1984"
   username: "${RELAY_USERNAME:-polaris}"
@@ -26,11 +25,20 @@ api:
   # Nothing here is meant to be opened in a browser: Polaris is the only client,
   # and it asks for streams and stills. Without this the relay serves its own web
   # interface to anybody on the network who finds the port.
+  #
+  # Whole paths, not prefixes: go2rtc compares these against the request path
+  # entire, so a folder like /api/hls allows nothing and every file a player
+  # fetches has to be named. Miss them and the stream plays everywhere except on
+  # Apple devices, which take no other format.
   allow_paths:
     - /api/streams
     - /api/frame.jpeg
     - /api/stream.mp4
     - /api/stream.m3u8
+    - /api/hls/playlist.m3u8
+    - /api/hls/init.mp4
+    - /api/hls/segment.m4s
+    - /api/hls/segment.ts
     - /api/webrtc
     - /api/ws
 
@@ -45,9 +53,26 @@ rtsp:
 webrtc:
   listen: ":8555"
 
-streams: {}
 YAML
-    chmod 600 "$CONFIG"
-fi
+}
+
+# The cameras the relay already holds, exactly as go2rtc wrote them. The key
+# itself is always re-emitted bare: an inline `streams: {}` is a mapping go2rtc's
+# config writer cannot add a line to, and it fails the entire write - which
+# reaches somebody as a camera that was accepted and then has no stream.
+cameras() {
+    if [ -f "$CONFIG" ] && grep -q '^streams:' "$CONFIG"; then
+        sed -n '/^streams:/,$p' "$CONFIG" | tail -n +2
+    fi
+}
+
+kept=$(cameras)
+{
+    settings
+    echo "streams:"
+    if [ -n "$kept" ]; then printf "%s\n" "$kept"; fi
+} > "$CONFIG.new"
+chmod 600 "$CONFIG.new"
+mv "$CONFIG.new" "$CONFIG"
 
 exec "$@"
