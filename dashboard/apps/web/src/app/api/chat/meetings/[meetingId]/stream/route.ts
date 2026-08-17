@@ -100,7 +100,11 @@ export async function GET(
 
             offEvents = subscribeMeetingEvents((event) => {
                 if (closed || event.meetingId !== meetingId) return;
-                send({ kind: event.kind });
+                // The claim carries which browser made it, and nothing else
+                // does: every browser in the call is told, and each compares it
+                // with its own to find out whether it is still the one on the
+                // line.
+                send({ kind: event.kind, ...(event.deviceId ? { deviceId: event.deviceId } : {}) });
                 // The roster moving is the only thing that can admit somebody,
                 // and only a stream that is still waiting has to ask.
                 if (event.kind === "roster" && !admitted) void recheckAdmission();

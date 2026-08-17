@@ -41,6 +41,7 @@
 
 import { z } from "zod";
 import { setMicDevice } from "./mic-device";
+import { callDeviceId } from "./call-device";
 import * as actions from "./meeting-actions";
 import { playCallSound } from "@/lib/call-sounds";
 import type { MeetingView } from "@/lib/chat/meetings";
@@ -109,7 +110,9 @@ const frameSchema = z.discriminatedUnion("kind", [
     }),
     z.object({ kind: z.literal("signal"), fromId: z.string(), payload: z.string() }),
     z.object({ kind: z.literal("roster") }),
-    z.object({ kind: z.literal("ended") })
+    z.object({ kind: z.literal("ended") }),
+    /** Another browser of this same account took the call. */
+    z.object({ kind: z.literal("claimed"), deviceId: z.string().optional() })
 ]);
 
 /**
@@ -349,6 +352,25 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         setMicFilter(built.using);
     }, []);
 
+    /**
+     * Everything that was true of the last call and is not true of this one.
+     *
+     * A hook outlives the calls it carries - the provider holding it is above
+     * every screen in Polaris - so state left behind is state the next call
+     * starts with. What is deliberately not reset is the microphone and camera:
+     * they are set from what opens, a moment later, and blanking them here would
+     * flicker the controls on the way in.
+     */
+    const forget = useCallback(() => {
+        setMeeting(null);
+        setEnded(false);
+        setError("");
+        setRemote(new Map());
+        setScreens(new Map());
+        setStates(new Map());
+        setSpeaking(new Set());
+    }, []);
+
     /** Open the devices, connect, publish, and take it all down again. */
     useEffect(() => {
         if (!meetingId) return;
@@ -365,6 +387,12 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
          * is what keeps it from being repeated afterwards as well.
          */
         let connecting = false;
+
+        // This is a different call, so nothing about the last one is true of it.
+        // `ended` in particular: it is only ever set, never cleared, so a second
+        // call in the same tab opened straight onto "the call has ended" - the
+        // answer to a question about a room nobody is in any more.
+        forget();
 
         /**
          * Ask for the ticket and join, if there is one to be had.
@@ -549,6 +577,13 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     setParticipantId(frame.data.participantId);
                     refresh();
                     if (frame.data.admission === "admitted") void connect();
+                    // This browser is on the call now, so say so. Any other
+                    // browser of the same account that thought it was hangs up
+                    // on hearing it - one seat, one device, and the newest press
+                    // is the one that meant it.
+                    if (frame.data.admission === "admitted") {
+                        void actions.claimCallAction(inCall, callDeviceId());
+                    }
                     return;
                 }
                 if (frame.data.kind === "roster") {
@@ -556,6 +591,16 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     // Somebody may have just been let out of the waiting room,
                     // and it may have been us.
                     void connect();
+                    return;
+                }
+                // Another browser of this account took the seat. An account has
+                // one place in a call, so this browser no longer has it - and
+                // being told is the whole point: without it two devices sat on
+                // one seat, both holding a microphone, neither aware.
+                if (frame.data.kind === "claimed") {
+                    if (frame.data.deviceId && frame.data.deviceId !== callDeviceId()) {
+                        setEnded(true);
+                    }
                     return;
                 }
                 if (frame.data.kind === "ended") setEnded(true);
@@ -586,6 +631,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             void actions.leaveCallAction(inCall);
         };
     }, [
+        forget,
         listDevices,
         meetingId,
         outgoingMic,

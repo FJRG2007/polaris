@@ -26,6 +26,7 @@ import { usePathname } from "next/navigation";
 import { Phone, PhoneOff } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
+import { useHeldCall } from "@/app/(app)/chat/call-session";
 import { notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
 import { RING_FOR_MS, playCallSound, startRinging } from "@/lib/call-sounds";
 
@@ -46,15 +47,21 @@ interface Ringing {
     readonly at: number;
 }
 
-export function IncomingCalls() {
+export function IncomingCalls({ viewerId }: { viewerId: string }) {
     const pathname = usePathname();
+    const held = useHeldCall();
     const [ringing, setRinging] = useState<readonly Ringing[]>([]);
+    const inCall = held?.session?.meetingId ?? null;
 
     useChatStream(
         useCallback(
             (frame, context) => {
                 if (frame.kind !== "call") return;
                 if (frame.state === "ringing") {
+                    // Your own call. The frame is addressed to the conversation,
+                    // and the person who pressed the button is in it - so without
+                    // this, starting a call rang at the person starting it.
+                    if (frame.userId === viewerId) return;
                     setRinging((current) =>
                         current.some((entry) => entry.meetingId === frame.meetingId)
                             ? current
@@ -81,19 +88,37 @@ export function IncomingCalls() {
                     );
                 }
             },
-            []
+            [viewerId]
         )
     );
 
-    // Already standing in the conversation it is in: the call is on that screen,
-    // with its own button. Ringing at somebody about a room they are looking at
-    // is how a notification becomes noise.
-    const showing = ringing.filter((entry) => !pathname.startsWith(`/chat/c/${entry.channelId}`));
+    /**
+     * Everything still worth being told about.
+     *
+     * A call this browser is already sitting in is not an incoming call - it is
+     * the call - and one that has been answered somewhere goes quiet everywhere.
+     */
+    const waiting = ringing.filter((entry) => entry.meetingId !== inCall);
 
-    // One ring for however many are waiting, and silence once none are. Only the
-    // tab holding the connection: the others are showing the same card, and a
-    // telephone that rings once per open tab is a telephone people mute.
-    const sounding = showing.some((entry) => entry.owner);
+    // The card is not drawn for the conversation on screen: the room is right
+    // there with its own way in, and a card over the top of it is a second
+    // button for the same thing.
+    const showing = waiting.filter((entry) => !pathname.startsWith(`/chat/c/${entry.channelId}`));
+
+    /**
+     * The sound, on the other hand, is for every call waiting - including one in
+     * the conversation on screen.
+     *
+     * Suppressing it there was wrong in the case it matters most. Somebody
+     * reading a conversation is not watching the header: the only thing that
+     * changed was a small button growing a number, above the messages they are
+     * looking at, and a call arriving is exactly the moment a chat has to
+     * interrupt. So the card is what the pathname decides; being told is not.
+     *
+     * Only the tab holding the connection: the others are the same browser, and
+     * a telephone that rings once per open tab is a telephone people mute.
+     */
+    const sounding = waiting.some((entry) => entry.owner);
     useEffect(() => {
         if (!sounding) return;
         return startRinging("ring");
@@ -113,7 +138,7 @@ export function IncomingCalls() {
      */
     const notices = useRef(new Map<string, { close: () => void }>());
     useEffect(() => {
-        for (const entry of showing) {
+        for (const entry of waiting) {
             if (!entry.owner || notices.current.has(entry.meetingId) || tabIsWatched()) continue;
             // Marked before the permission prompt resolves, so a second frame
             // does not raise a second notice for the same call.
@@ -129,13 +154,13 @@ export function IncomingCalls() {
             });
         }
 
-        const live = new Set(showing.map((entry) => entry.meetingId));
+        const live = new Set(waiting.map((entry) => entry.meetingId));
         for (const [meetingId, notice] of notices.current) {
             if (live.has(meetingId)) continue;
             notice.close();
             notices.current.delete(meetingId);
         }
-    }, [showing]);
+    }, [waiting]);
 
     // Nothing outlives the screen: a notice left behind by a page that has gone
     // is one nobody can dismiss from inside Polaris.

@@ -12,20 +12,13 @@
  * all open the same menu, which is what everybody expects from a chat client.
  */
 
-import type { ReactNode } from "react";
 import { isPlayable } from "./voice-recorder";
+import { copyText, messageLink } from "./links";
 import { useAppUrl } from "@/components/app-url";
+import { useState, type ReactNode } from "react";
 import { plainText } from "@/components/rich-text/excerpt";
-import type { ChatMessageView } from "@/lib/chat/messages";
-import { copyText, downloadFile, messageLink } from "./links";
-import {
-    ContextMenu,
-    ContextMenuContent,
-    ContextMenuItem,
-    ContextMenuSeparator,
-    ContextMenuTrigger,
-    keepFocusOnClose
-} from "@polaris/ui";
+import type { ChatAttachmentView, ChatMessageView } from "@/lib/chat/messages";
+import { AUDIO_FORMATS, extensionOf, saveRecording, type AudioFormat } from "./audio-download";
 import {
     Copy,
     Download,
@@ -39,6 +32,18 @@ import {
     Star,
     Trash2
 } from "lucide-react";
+import {
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuSeparator,
+    ContextMenuSub,
+    ContextMenuSubContent,
+    ContextMenuSubTrigger,
+    ContextMenuTrigger,
+    keepFocusOnClose,
+    useToast
+} from "@polaris/ui";
 
 export interface MessageActions {
     readonly message: ChatMessageView;
@@ -70,10 +75,39 @@ export function MessageMenu({
 }) {
     const { message, mine, canPost, canModerate } = actions;
     const baseUrl = useAppUrl();
+    const toast = useToast();
+    /** Which recording is being converted, so its menu cannot be pressed twice
+     *  while a few seconds of encoding are going on. */
+    const [saving, setSaving] = useState<string | null>(null);
     // A recording is the one attachment with no way to save it from the message
     // itself: a picture opens into a viewer that offers it and a document is a
     // link, but a player is a player. So the menu is where it lives.
     const recordings = message.attachments.filter((file) => isPlayable(file.contentType));
+
+    /**
+     * Save one, in the format that was asked for.
+     *
+     * Announced on the way in and only on the way out if it went wrong: the
+     * original is instant and needs no note, and everything else takes long
+     * enough that silence reads as a menu item that did nothing.
+     */
+    const save = async (file: ChatAttachmentView, format: AudioFormat) => {
+        const note = `audio-${file.id}`;
+        if (format !== "original") {
+            setSaving(file.id);
+            toast.show({
+                key: note,
+                title: "Preparing the file",
+                body: "Converted here, in this tab. It stays stored as it was.",
+                // Until it is done, however long that is.
+                life: 0
+            });
+        }
+        const failure = await saveRecording(`/api/chat/attachments/${file.id}`, file.name, format);
+        setSaving(null);
+        toast.dismiss(note);
+        if (failure) toast.show({ title: failure });
+    };
 
     return (
         <ContextMenu>
@@ -138,19 +172,36 @@ export function MessageMenu({
                 )}
                 {!message.deleted &&
                     recordings.map((file) => (
-                        <ContextMenuItem
-                            key={file.id}
-                            onSelect={() =>
-                                downloadFile(`/api/chat/attachments/${file.id}`, file.name)
-                            }
-                        >
-                            <Download className="size-3.5" />
-                            {/* Named only when there is more than one, since a
-                                voice message has no name worth reading. */}
-                            <span className="min-w-0 truncate">
-                                {recordings.length === 1 ? "Download the audio" : file.name}
-                            </span>
-                        </ContextMenuItem>
+                        <ContextMenuSub key={file.id}>
+                            <ContextMenuSubTrigger>
+                                <Download className="size-3.5" />
+                                {/* Named only when there is more than one, since
+                                    a voice message has no name worth reading. */}
+                                <span className="min-w-0 truncate">
+                                    {recordings.length === 1 ? "Download the audio" : file.name}
+                                </span>
+                            </ContextMenuSubTrigger>
+                            {/* A format rather than a file, because what was
+                                recorded is a container most desktop players will
+                                not open. The first one is what nearly everybody
+                                wants; the last is the untouched original. */}
+                            <ContextMenuSubContent>
+                                {AUDIO_FORMATS.map((choice) => (
+                                    <ContextMenuItem
+                                        key={choice.format}
+                                        disabled={saving === file.id}
+                                        onSelect={() => void save(file, choice.format)}
+                                    >
+                                        {choice.label}
+                                        {choice.format === "original" && (
+                                            <span className="ml-auto pl-4 text-[11px] uppercase text-foreground-subtle">
+                                                {extensionOf(file.name)}
+                                            </span>
+                                        )}
+                                    </ContextMenuItem>
+                                ))}
+                            </ContextMenuSubContent>
+                        </ContextMenuSub>
                     ))}
 
                 {/* Only where there are ticks to explain, which is exactly a

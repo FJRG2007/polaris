@@ -28,6 +28,7 @@
 
 import type { CallState } from "./use-call";
 import * as actions from "./meeting-actions";
+import { useHeldCall } from "./call-session";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { searchPeopleAction } from "./actions";
@@ -167,11 +168,16 @@ export function CallRoom({
     // The call ending under somebody - the host closing it, or the last other
     // person leaving a one-to-one - is the case that most needs a sound: the
     // screen they are looking at is not this one.
+    //
+    // Which is exactly why the dashboard sounds it from the provider instead,
+    // where it is heard wherever the reader is standing. This is left for the
+    // guest page, which has no provider and no other screen to be on.
+    const held = useHeldCall();
     const wasEnded = useRef(false);
     useEffect(() => {
-        if (call.ended && !wasEnded.current) playCallSound("hangUp");
+        if (!held && call.ended && !wasEnded.current) playCallSound("hangUp");
         wasEnded.current = call.ended;
-    }, [call.ended]);
+    }, [call.ended, held]);
 
     if (call.ended) {
         return (

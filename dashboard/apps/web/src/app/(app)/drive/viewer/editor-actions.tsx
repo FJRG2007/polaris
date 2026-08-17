@@ -10,9 +10,9 @@
 import { useEffect, useState } from "react";
 import { Copy, Download, Save } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import { downloadBytes } from "@/lib/download";
 import {
     copyNameFor,
-    downloadBytes,
     fileNameSchema,
     saveFileBytes,
     siblingNames,
