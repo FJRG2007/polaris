@@ -340,14 +340,33 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
         });
     }, [meetingId]);
 
+    /**
+     * One thing said to one other browser on the way to talking directly.
+     *
+     * A refusal here is not a detail: an offer that never lands is a call where
+     * both people sit looking at each other's names hearing nothing, and until
+     * this checked the answer the only trace of it was a red line in a console
+     * nobody had open. So it is said on screen once, in the words of what
+     * actually happened, and the connection is left to keep trying.
+     */
     const send = useCallback(
         async (toId: string, payload: unknown) => {
             if (!meetingId) return;
-            await fetch(`/api/chat/meetings/${meetingId}/signal`, {
+            const response = await fetch(`/api/chat/meetings/${meetingId}/signal`, {
                 method: "POST",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({ toId, payload: JSON.stringify(payload) })
-            }).catch(() => undefined);
+            }).catch(() => null);
+
+            // A network that dropped one request is not worth a banner: the next
+            // candidate or the next negotiation carries the same information.
+            if (!response || response.ok) return;
+            const answer = (await response.json().catch(() => null)) as { error?: string } | null;
+            setError(
+                answer?.error
+                    ? `This call could not be set up: ${answer.error.toLowerCase()}.`
+                    : "This call could not be set up. Nothing this browser sends is reaching the other side."
+            );
         },
         [meetingId]
     );
@@ -495,6 +514,25 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
             };
 
             connection.onconnectionstatechange = () => {
+                /**
+                 * A connection that failed rather than closed is worth saying.
+                 *
+                 * Both browsers are in the call, both drew each other's names,
+                 * and no media ever arrives in either direction - which is what
+                 * "I cannot hear him and he cannot hear me" is, every time. The
+                 * usual reason is that this instance has no STUN or TURN server,
+                 * so each browser only ever offered the addresses of its own
+                 * network: two people in the same house connect and two people
+                 * in different ones never can. That is one line of configuration
+                 * and it was impossible to guess from a silent call.
+                 */
+                if (connection.connectionState === "failed") {
+                    setError(
+                        ice.current.length === 0
+                            ? "This call could not connect. With no STUN or TURN server set up, calls only work between browsers on the same network - an administrator sets POLARIS_STUN_URLS."
+                            : "This call could not connect. The two browsers could not find a route to each other."
+                    );
+                }
                 if (["failed", "closed"].includes(connection.connectionState)) {
                     inbound.current.delete(otherId);
                     layout.current.delete(otherId);

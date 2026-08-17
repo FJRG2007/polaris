@@ -23,6 +23,11 @@ const bodySchema = z.object({
     payload: z.string().min(1).max(MAX_SIGNAL_BYTES)
 });
 
+/** The same, minus the size, so the two refusals can be told apart: a payload
+ *  that is merely too big is a different thing from a body this cannot read, and
+ *  answering both with 400 is what made a dead call impossible to diagnose. */
+const shapeSchema = z.object({ toId: z.string().uuid(), payload: z.string().min(1) });
+
 export async function POST(
     request: Request,
     { params }: { params: Promise<{ meetingId: string }> }
@@ -41,7 +46,22 @@ export async function POST(
         return Response.json({ error: "That could not be read" }, { status: 400 });
     }
     const parsed = bodySchema.safeParse(raw);
-    if (!parsed.success) return Response.json({ error: "That could not be read" }, { status: 400 });
+    if (!parsed.success) {
+        // Said out loud, both to the caller and to the log. A signal that is
+        // refused is a call that will never connect, and the browser has no way
+        // of knowing which of the two happened.
+        const shape = shapeSchema.safeParse(raw);
+        if (shape.success) {
+            console.warn(
+                `chat: a call signal of ${shape.data.payload.length} characters was refused in meeting ${meetingId} (the limit is ${MAX_SIGNAL_BYTES})`
+            );
+            return Response.json(
+                { error: "That is too large to relay" },
+                { status: 413 }
+            );
+        }
+        return Response.json({ error: "That could not be read" }, { status: 400 });
+    }
 
     // The recipient has to be in this same call and admitted to it. Resolved
     // here rather than trusted from the sender, which is the point of the route.
