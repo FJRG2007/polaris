@@ -33,6 +33,9 @@ export const PERMISSIONS = [
     "games.manage",
     "agents.read",
     "agents.manage",
+    "home.read",
+    "home.control",
+    "home.manage",
     "tasks.read",
     "tasks.manage",
     "inbox.read",
@@ -101,6 +104,9 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "games.manage",
         "agents.read",
         "agents.manage",
+        "home.read",
+        "home.control",
+        "home.manage",
         "tasks.read",
         "tasks.manage",
         "inbox.read",
@@ -124,6 +130,10 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "deploy.read",
         "games.read",
         "agents.read",
+        // Deliberately no home grant. Every other read here widens what somebody
+        // can look at inside Polaris; this one points a camera at the people who
+        // live in the house, and a role nobody chose to give it to should not
+        // arrive holding it. An operator who wants it ticks one box.
         "tasks.read",
         "inbox.read"
     ],
@@ -180,6 +190,11 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     "games.manage": { area: "Game servers", label: "Create servers, change settings and rebuild" },
     "agents.read": { area: "Apps", label: "See coding-agent repositories and runs" },
     "agents.manage": { area: "Apps", label: "Enable repositories and start agent runs" },
+    "home.read": { area: "Home", label: "Watch the cameras and read what they saw" },
+    // Pointing a camera somewhere is not the same decision as being allowed to
+    // look at where it already points, and neither is silencing an alert.
+    "home.control": { area: "Home", label: "Move cameras and act on alerts" },
+    "home.manage": { area: "Home", label: "Add cameras, and set how they detect and record" },
     "tasks.read": { area: "Tasks", label: "See spaces, lists and tasks" },
     "tasks.manage": { area: "Tasks", label: "Create and change tasks" },
     "inbox.read": { area: "Inbox", label: "Read conversations" },
@@ -222,6 +237,8 @@ export const IMPLIED_PERMISSIONS: Readonly<Partial<Record<Permission, readonly P
     // works today and nobody loses a screen they had.
     "games.manage": ["games.read", "games.moderate", "games.console"],
     "agents.manage": ["agents.read"],
+    "home.control": ["home.read"],
+    "home.manage": ["home.read", "home.control"],
     "tasks.manage": ["tasks.read"],
     "inbox.manage": ["inbox.read"]
 };

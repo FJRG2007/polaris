@@ -14,10 +14,11 @@
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { homePathFor } from "@/lib/app-access";
 import { guardSession } from "@/lib/session-guard";
 import { canAny, userHasPermission } from "@polaris/auth";
+import { isAppInstalled } from "@/lib/apps/install-presence";
 import { hasPermission, type Permission } from "@polaris/core";
+import { homePathFor, type AppAccessInput } from "@/lib/app-access";
 import { resolveViewAs, type ViewAsIdentity } from "@/lib/view-as-service";
 
 export interface SessionUser {
@@ -129,9 +130,15 @@ export async function sessionCanAny(user: SessionUser, permission: Permission): 
 
 /** This user's own capability check, in the shape the app registry asks for. Built
  *  on the "anywhere at all" answer, because that is what deciding whether to draw
- *  a link means. */
-export function accessFor(user: SessionUser): { isAdmin: boolean; can: (permission: Permission) => Promise<boolean> } {
-    return { isAdmin: user.isAdmin, can: (permission) => sessionCanAny(user, permission) };
+ *  a link means. Carries the install probe too, so an app that only exists once
+ *  somebody adds it is answered for here rather than at each screen that lists
+ *  apps. */
+export function accessFor(user: SessionUser): AppAccessInput {
+    return {
+        isAdmin: user.isAdmin,
+        can: (permission) => sessionCanAny(user, permission),
+        isInstalled: isAppInstalled
+    };
 }
 
 /** Where this user belongs: the first app they can open, or their own account. */

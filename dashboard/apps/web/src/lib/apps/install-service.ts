@@ -17,6 +17,7 @@ import { createVolume } from "@/lib/deploy-volume-service";
 import { availableHostPort } from "@/lib/apps/port-registry";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import type { AppInstallInput } from "@/lib/apps/install-schema";
+import { invalidateInstallPresence } from "@/lib/apps/install-presence";
 import { invalidateBridgeCache } from "@/lib/messaging/bridge-endpoint";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { createApplication, createProject, deleteApplication, deployApplication } from "@/lib/deploy-service";
@@ -124,6 +125,9 @@ export async function installApp(
                 installedById: actorId
             }
         });
+        // An app the switcher only draws once it exists has to appear on the next
+        // screen, not at the end of a cache window.
+        invalidateInstallPresence(app.id);
         return { installedAppId: record.id, applicationId: null };
     }
 
@@ -252,6 +256,8 @@ export async function installApp(
                 : {})
         }
     });
+
+    invalidateInstallPresence(app.id);
 
     // Kick off the first deploy; a failure is surfaced on the app's own page and
     // recorded on the install, but installation itself still succeeds.
@@ -425,6 +431,7 @@ export async function uninstallApp(ownerId: string, id: string): Promise<void> {
         }
     }
     await prisma.installedApp.update({ where: { id: row.id }, data: { status: "removed" } });
+    invalidateInstallPresence(row.catalogId);
     // Forget any cached bridge endpoint so the inbox reflects the removal at once.
     if (row.catalogId === "messaging-bridge") invalidateBridgeCache();
 }

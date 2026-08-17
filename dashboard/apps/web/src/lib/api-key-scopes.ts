@@ -37,6 +37,9 @@ export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
     "games.manage": "Manage game servers",
     "agents.read": "Read agent runs",
     "agents.manage": "Manage agent repositories",
+    "home.read": "Watch cameras",
+    "home.control": "Move cameras",
+    "home.manage": "Manage cameras",
     "tasks.read": "Read tasks",
     "tasks.manage": "Manage tasks",
     "inbox.read": "Read conversations",
@@ -76,6 +79,9 @@ export const SCOPE_HINTS: Readonly<Record<Permission, string>> = {
     "games.manage": "Create servers, run console commands, and change settings.",
     "agents.read": "List enabled repositories and read run history.",
     "agents.manage": "Enable repositories, change how they run, and start runs.",
+    "home.read": "Open a live view, take a snapshot, and read detections and clips.",
+    "home.control": "Pan, tilt and zoom a camera, and dismiss what it reported.",
+    "home.manage": "Add and remove cameras, and change how they detect and record.",
     "tasks.read": "Read spaces, lists, and tasks.",
     "tasks.manage": "Create and change tasks, lists, and spaces.",
     "inbox.read": "Read conversations, contacts, and channel activity.",
@@ -110,6 +116,7 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
         title: "Game servers",
         scopes: ["games.read", "games.moderate", "games.console", "games.manage"]
     },
+    { title: "Home", scopes: ["home.read", "home.control", "home.manage"] },
     { title: "Tasks", scopes: ["tasks.read", "tasks.manage"] },
     { title: "Inbox", scopes: ["inbox.read", "inbox.manage"] },
     { title: "Administration", scopes: ["users.manage", "settings.manage", "system.manage"] }

@@ -15,6 +15,8 @@ import {
     BookOpen,
     Building2,
     CalendarRange,
+    Camera,
+    Cctv,
     ChartColumn,
     Clock,
     Code2,
@@ -30,6 +32,7 @@ import {
     Globe,
     HardDrive,
     History,
+    House,
     IdCard,
     Inbox,
     KeyRound,
@@ -47,6 +50,7 @@ import {
     NotebookPen,
     Radio,
     Rocket,
+    ScanFace,
     ScanLine,
     Scale,
     ScrollText,
@@ -66,6 +70,7 @@ import {
     UserCog,
     Users,
     UsersRound,
+    Video,
     Webhook,
     Workflow,
     type LucideIcon
@@ -100,6 +105,16 @@ export interface AppEntry {
     /** Kept out of the switcher list: a personal section reached from the account
      *  menu, which still owns its paths so the rail and the header follow it. */
     hidden?: boolean;
+    /**
+     * The marketplace app whose install turns this one on, for an app that is a
+     * feature somebody opts into rather than part of every Polaris.
+     *
+     * Holding the permission is not enough on its own: until the app is installed
+     * there is nothing behind the entry, and a switcher full of doors onto empty
+     * rooms is how a dashboard stops meaning anything. Resolved by the caller
+     * (see reachableApps) - an entry with none is always offered.
+     */
+    requiresApp?: string;
     /** Extra path prefixes this app owns beyond `href`, so routes that live
      *  outside the app's own subtree (e.g. legacy top-level admin pages) still
      *  resolve to it for the switcher highlight and the sidebar. */
@@ -155,6 +170,22 @@ export const POLARIS_APPS: AppEntry[] = [
         // and the built-in Deploy / Servers / Containers / Backups rails.
         match: ["/apps"],
         permission: "deploy.read"
+    },
+    {
+        // The house: cameras, what they saw, and what to do about it. Its own app
+        // rather than a screen inside Apps, because the people who watch a camera
+        // are rarely the people who deploy anything - and it is only here at all
+        // once somebody installs Home.
+        id: "home",
+        label: "Home",
+        description: "Cameras, what they saw, and what to do about it",
+        icon: House,
+        // Not "/home": that path belongs to Overview and spent a release
+        // redirecting permanently to Drive, so browsers that followed it once
+        // still do.
+        href: "/house",
+        permission: "home.read",
+        requiresApp: "home"
     },
     {
         id: "tasks",
@@ -498,6 +529,61 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/watch/webhooks",
             icon: Webhook,
             keywords: ["discord", "slack", "endpoints"]
+        }
+    ],
+    home: [
+        {
+            label: "Live",
+            href: "/house",
+            icon: Cctv,
+            keywords: ["cameras", "wall", "watch", "stream", "view", "rtsp"]
+        },
+        {
+            label: "Events",
+            href: "/house/events",
+            icon: Bell,
+            keywords: [
+                "detections",
+                "motion",
+                "person",
+                "faces",
+                "alerts",
+                "what happened",
+                "history"
+            ]
+        },
+        {
+            label: "Clips",
+            href: "/house/clips",
+            icon: Video,
+            keywords: ["recordings", "footage", "playback", "saved", "download"]
+        },
+        {
+            label: "Cameras",
+            href: "/house/cameras",
+            icon: Camera,
+            keywords: [
+                "add camera",
+                "tapo",
+                "tp-link",
+                "onvif",
+                "discover",
+                "credentials",
+                "detection",
+                "recording"
+            ]
+        },
+        {
+            label: "People",
+            href: "/house/people",
+            icon: ScanFace,
+            keywords: ["faces", "known", "recognition", "family", "strangers"]
+        },
+        {
+            label: "Settings",
+            href: "/house/settings",
+            icon: SlidersHorizontal,
+            keywords: ["relay", "storage", "retention", "where it runs", "uninstall"]
         }
     ],
     tasks: [

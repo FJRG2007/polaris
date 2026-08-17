@@ -26,6 +26,16 @@ export const OVERVIEW_APP = "overview";
 export interface AppAccessInput {
     isAdmin: boolean;
     can: (permission: Permission) => Promise<boolean>;
+    /**
+     * Whether a marketplace app is installed, for the entries that only exist
+     * once somebody adds them (AppEntry.requiresApp).
+     *
+     * Optional because this is also asked on behalf of a role rather than a
+     * person - the role editor previews what a role would reach - and there the
+     * question is what the grants allow, not what this Polaris happens to have
+     * installed today. Absent, every entry is treated as present.
+     */
+    isInstalled?: (catalogId: string) => Promise<boolean>;
 }
 
 /** The apps this person may open, in registry order. Hidden apps (the account
@@ -40,10 +50,13 @@ export interface AppAccessInput {
  *  is a view onto the other apps, so for an account that reaches none of them it
  *  is an empty grid offered as somewhere to be. Those accounts belong on their
  *  own account page, which is what dropping it here arranges. */
-export async function reachableApps({ isAdmin, can }: AppAccessInput): Promise<AppEntry[]> {
+export async function reachableApps({ isAdmin, can, isInstalled }: AppAccessInput): Promise<AppEntry[]> {
     const decided = await Promise.all(
         POLARIS_APPS.map(async (app) => {
             if (app.hidden) return null;
+            // Asked before the permission, because an app nobody installed is not
+            // a thing anybody is being refused: there is nothing there yet.
+            if (app.requiresApp && isInstalled && !(await isInstalled(app.requiresApp))) return null;
             if (app.adminOnly && !isAdmin) {
                 if (!app.guest || !(await can(app.guest.permission))) return null;
                 return { ...app, label: app.guest.label, description: app.guest.description, href: app.guest.href };

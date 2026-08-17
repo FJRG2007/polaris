@@ -12,9 +12,9 @@
  */
 
 import { ARK_MAPS, DEFAULT_ARK_MAP } from "@/lib/apps/ark/maps";
-import { Bot, Gamepad2, MessagesSquare, type LucideIcon } from "lucide-react";
+import { Bot, Gamepad2, House, MessagesSquare, ScanFace, Video, type LucideIcon } from "lucide-react";
 
-export type AppCategory = "Messaging" | "AI" | "Game servers" | "Tools";
+export type AppCategory = "Messaging" | "AI" | "Game servers" | "Home" | "Tools";
 
 /** What an installed app provides, driving derived nav and which adapted
  *  dashboard is mounted. An app may declare several. */
@@ -24,6 +24,9 @@ export type AppCapability =
     | "ai-assistant"
     | "game-manager"
     | "game-server"
+    | "camera-hub"
+    | "face-recognition"
+    | "home-hub"
     | "tool";
 
 /** How an app is provisioned. `compose-template` runs a compose stack via Deploy;
@@ -831,6 +834,72 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         }
     },
     {
+        // The house, installed once for the whole Polaris rather than per person:
+        // there is one of it, and everybody who lives there is looking at the same
+        // cameras. Installing runs nothing - the media relay arrives with the first
+        // camera, and only on the machine that was picked for it.
+        id: "home",
+        name: "Home",
+        category: "Home",
+        icon: House,
+        summary: "Cameras, and what they see, on your own machines.",
+        description:
+            "Watch your cameras live, keep what matters, and get told when something happens. Polaris pulls each camera once and shows it to everybody watching, so the camera never runs out of connections. Detection is yours to choose per camera - the camera's own alerts, movement, people, or faces - along with where it runs and how often, so a house full of cameras does not have to cost a machine.",
+        installMethod: "builtin",
+        capabilities: ["home-hub"],
+        dashboard: "builtin",
+        singleton: true
+    },
+    {
+        // The relay every camera is watched through. Never offered on its own: it is
+        // installed by Home the first time a camera is added, on the machine that
+        // camera was told to use, and it is useless without one.
+        id: "camera-hub",
+        name: "Camera relay",
+        internal: true,
+        category: "Home",
+        icon: Video,
+        summary: "Pulls each camera once and streams it to everybody watching.",
+        description:
+            "The media relay behind Home. It holds one connection per camera and re-serves it to every viewer without re-encoding, so a camera that allows a single stream can still be watched by several people at once, and the machine it runs on barely notices.",
+        docsUrl: "https://github.com/AlexxIT/go2rtc",
+        installMethod: "compose-template",
+        capabilities: ["camera-hub"],
+        dashboard: "generic",
+        template: {
+            image: "alexxit/go2rtc:latest",
+            env: [
+                // The relay's own API is not a public surface: it can add a source
+                // that reads a file off the machine, so it answers on the loopback
+                // interface and Polaris reaches it through the container network.
+                { key: "GO2RTC_API_LISTEN", label: "API address", default: ":1984" }
+            ],
+            volumes: [{ name: "config", mountPath: "/config", label: "Relay configuration" }],
+            ports: [{ container: 1984, protocol: "http", label: "Relay API" }]
+        }
+    },
+    {
+        // Faces are the one detector that has to hold a picture of a person to work,
+        // so it is never installed quietly: somebody chooses it, and chooses the
+        // machine it runs on.
+        id: "compreface",
+        name: "Face recognition",
+        category: "Home",
+        icon: ScanFace,
+        summary: "Recognizes the faces you have taught it, on your own hardware.",
+        description:
+            "Runs CompreFace so Home can tell a familiar face from a stranger. Nothing leaves the machine you install it on, and Polaris only sends it a frame when a camera has already seen a person - so it sits idle the rest of the time.",
+        docsUrl: "https://github.com/exadel-inc/CompreFace",
+        installMethod: "compose-template",
+        capabilities: ["face-recognition"],
+        dashboard: "generic",
+        template: {
+            image: "exadel/compreface:latest",
+            volumes: [{ name: "data", mountPath: "/var/lib/postgresql/data", label: "Known faces" }],
+            ports: [{ container: 8000, protocol: "http", label: "Recognition API" }]
+        }
+    },
+    {
         id: "openclaw",
         name: "OpenClaw assistant",
         category: "AI",
@@ -946,7 +1015,7 @@ function isConsentField(app: AppManifest, field: TemplateEnvVar): boolean {
     return Boolean(app.consent) && field.key === "EULA";
 }
 
-const CATEGORY_ORDER: readonly AppCategory[] = ["Messaging", "AI", "Game servers", "Tools"];
+const CATEGORY_ORDER: readonly AppCategory[] = ["Messaging", "AI", "Game servers", "Home", "Tools"];
 
 /** Marketplace grouping, in a stable display order. */
 export function appsByCategory(): ReadonlyArray<{ category: AppCategory; apps: AppManifest[] }> {

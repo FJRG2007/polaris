@@ -53,6 +53,9 @@ const CAPABILITY_LABEL: Record<AppCapability, string> = {
     "ai-assistant": "AI assistant",
     "game-manager": "Game servers",
     "game-server": "Game server",
+    "camera-hub": "Cameras",
+    "face-recognition": "Face recognition",
+    "home-hub": "Home",
     tool: "Tool"
 };
 
