@@ -68,13 +68,13 @@ const {
 /** A token reaching one account and one zone: the "everything" case. */
 function full() {
     accounts = [{ id: "acc-1", name: "Personal" }];
-    zones = [{ id: "zone-1", name: "fjrg2007.com" }];
+    zones = [{ id: "zone-1", name: "example.com" }];
 }
 
 /** A zone-scoped token: reaches a domain, no account. */
 function dnsOnly() {
     accounts = [];
-    zones = [{ id: "zone-1", name: "fjrg2007.com" }];
+    zones = [{ id: "zone-1", name: "example.com" }];
 }
 
 beforeEach(() => {

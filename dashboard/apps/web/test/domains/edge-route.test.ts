@@ -37,9 +37,9 @@ beforeEach(() => {
 
 describe("which names count as public", () => {
     it("takes what the operator typed, however they typed it", () => {
-        expect(publicHostname("https://Polaris.FJRG2007.com/")).toBe("polaris.fjrg2007.com");
-        expect(publicHostname("  polaris.fjrg2007.com.  ")).toBe("polaris.fjrg2007.com");
-        expect(publicHostname("polaris.fjrg2007.com:8443")).toBe("polaris.fjrg2007.com");
+        expect(publicHostname("https://Polaris.EXAMPLE.com/")).toBe("polaris.example.com");
+        expect(publicHostname("  polaris.example.com.  ")).toBe("polaris.example.com");
+        expect(publicHostname("polaris.example.com:8443")).toBe("polaris.example.com");
     });
 
     it("leaves the names the compose labels already serve", () => {
@@ -59,16 +59,16 @@ describe("which names count as public", () => {
 
 describe("what the edge is told to serve", () => {
     it("routes the hostnames over https, with a certificate", () => {
-        const config = renderDashboardConfig(["polaris.fjrg2007.com", "share.polaris.fjrg2007.com"]);
+        const config = renderDashboardConfig(["polaris.example.com", "share.polaris.example.com"]);
 
-        expect(config).toContain('rule: "Host(`polaris.fjrg2007.com`) || Host(`share.polaris.fjrg2007.com`)"');
+        expect(config).toContain('rule: "Host(`polaris.example.com`) || Host(`share.polaris.example.com`)"');
         expect(config).toContain("entryPoints: [websecure]");
         expect(config).toContain("certResolver: letsencrypt");
         expect(config).toContain('- url: "http://web:3000"');
     });
 
     it("sends :80 to https instead of serving it", () => {
-        const config = renderDashboardConfig(["polaris.fjrg2007.com"]);
+        const config = renderDashboardConfig(["polaris.example.com"]);
 
         expect(config).toContain("entryPoints: [web]");
         expect(config).toContain("middlewares: [polaris-dashboard-redirect-https]");
@@ -104,7 +104,7 @@ describe("guarding the dashboard itself", () => {
     };
 
     it("adds no middleware when nothing is configured", () => {
-        const config = renderDashboardConfig(["polaris.fjrg2007.com"], { allow: [], deny: [], rules: [] });
+        const config = renderDashboardConfig(["polaris.example.com"], { allow: [], deny: [], rules: [] });
 
         expect(config).not.toContain("ipAllowList");
         expect(config).not.toContain("X-Polaris-Waf");
@@ -115,7 +115,7 @@ describe("guarding the dashboard itself", () => {
         // configured one, and it is the only thing putting the guard in front of it.
         // Either check alone is enough, since either can be the one left on.
         for (const waf of [{ sqlInjectionProtection: true }, { xssProtection: true }]) {
-            const config = renderDashboardConfig(["polaris.fjrg2007.com"], waf);
+            const config = renderDashboardConfig(["polaris.example.com"], waf);
 
             expect(config).toContain("X-Polaris-Waf");
             expect(config).toContain("polaris-dashboard-waf-guard");
@@ -124,7 +124,7 @@ describe("guarding the dashboard itself", () => {
 
     it("narrows the route to an allowlist natively", () => {
         // Traefik enforces this one itself, so it keeps working with the guard down.
-        const config = renderDashboardConfig(["polaris.fjrg2007.com"], { allow: ["192.168.1.0/24"] });
+        const config = renderDashboardConfig(["polaris.example.com"], { allow: ["192.168.1.0/24"] });
 
         expect(config).toContain("      ipAllowList:\n        sourceRange: [\"192.168.1.0/24\"]");
         expect(config).toContain("middlewares: [polaris-dashboard-allow]");
@@ -133,13 +133,13 @@ describe("guarding the dashboard itself", () => {
     it("keeps the allowlist on the :80 redirect router as well", () => {
         // Otherwise a blocked address still reaches the redirect and learns the name
         // is served here.
-        const config = renderDashboardConfig(["polaris.fjrg2007.com"], { allow: ["192.168.1.0/24"] });
+        const config = renderDashboardConfig(["polaris.example.com"], { allow: ["192.168.1.0/24"] });
 
         expect(config).toContain("middlewares: [polaris-dashboard-allow, polaris-dashboard-redirect-https]");
     });
 
     it("carries a denylist and the custom rules to the guard", () => {
-        const config = renderDashboardConfig(["polaris.fjrg2007.com"], { deny: ["203.0.113.9"], rules: [RULE] });
+        const config = renderDashboardConfig(["polaris.example.com"], { deny: ["203.0.113.9"], rules: [RULE] });
 
         expect(config).toContain("X-Polaris-Waf:");
         expect(config).toContain("polaris-dashboard-waf-guard");
@@ -149,7 +149,7 @@ describe("guarding the dashboard itself", () => {
     it("names its guard middlewares apart from the app routes' shared ones", () => {
         // Every file in the directory merges into one config, so a repeated name is a
         // duplicate definition and one of the two is dropped.
-        const config = renderDashboardConfig(["polaris.fjrg2007.com"], { deny: ["203.0.113.9"] });
+        const config = renderDashboardConfig(["polaris.example.com"], { deny: ["203.0.113.9"] });
 
         expect(config).not.toContain("    polaris-waf-guard:");
         expect(config).not.toContain("    polaris-app-");
@@ -157,7 +157,7 @@ describe("guarding the dashboard itself", () => {
 
     it("never asks the guard to require a login for the dashboard", () => {
         // Polaris has a login of its own; the guard's handoff in front of it is a loop.
-        const config = renderDashboardConfig(["polaris.fjrg2007.com"], { deny: ["203.0.113.9"] });
+        const config = renderDashboardConfig(["polaris.example.com"], { deny: ["203.0.113.9"] });
         const header = /X-Polaris-Waf: "([^"]+)"/.exec(config)?.[1] ?? "";
 
         expect(JSON.parse(Buffer.from(header, "base64").toString("utf8"))).toMatchObject({ l: false });
@@ -167,52 +167,52 @@ describe("guarding the dashboard itself", () => {
 describe("which hostnames are collected", () => {
     it("serves the app domain, the sharing domain and the configured zone", async () => {
         stored({
-            "domain.app": "polaris.fjrg2007.com",
-            "domain.sharing": "share.polaris.fjrg2007.com",
-            "domain.zones": zones("fjrg2007.com", "plr")
+            "domain.app": "polaris.example.com",
+            "domain.sharing": "share.polaris.example.com",
+            "domain.zones": zones("example.com", "plr")
         });
 
         // The sharing domain matters on its own: share links and drop points are served
         // by the dashboard, so a hostname it lacks is a handed-out link that 404s.
         expect(await dashboardHosts()).toEqual([
-            "polaris.fjrg2007.com",
-            "share.polaris.fjrg2007.com",
-            "plr.fjrg2007.com"
+            "polaris.example.com",
+            "share.polaris.example.com",
+            "plr.example.com"
         ]);
     });
 
     it("serves the zone before the setup has moved the dashboard onto it", async () => {
         // The move waits for the zone to be seen answering here, which it cannot do
         // until the edge serves it - so the zone cannot wait for the move.
-        stored({ "domain.zones": zones("fjrg2007.com", "polaris") });
+        stored({ "domain.zones": zones("example.com", "polaris") });
 
-        expect(await dashboardHosts()).toEqual(["polaris.fjrg2007.com"]);
+        expect(await dashboardHosts()).toEqual(["polaris.example.com"]);
     });
 
     it("names one hostname once, however many settings point at it", async () => {
         stored({
-            "domain.app": "https://polaris.fjrg2007.com",
-            "domain.sharing": "polaris.fjrg2007.com",
-            "domain.zones": zones("fjrg2007.com", "polaris")
+            "domain.app": "https://polaris.example.com",
+            "domain.sharing": "polaris.example.com",
+            "domain.zones": zones("example.com", "polaris")
         });
 
-        expect(await dashboardHosts()).toEqual(["polaris.fjrg2007.com"]);
+        expect(await dashboardHosts()).toEqual(["polaris.example.com"]);
     });
 
     it("serves the extra domains an operator added", async () => {
         stored({
-            "domain.app": "polaris.fjrg2007.com",
+            "domain.app": "polaris.example.com",
             "domain.extra": JSON.stringify(["old.example.com", "www.example.com"])
         });
 
-        expect(await dashboardHosts()).toEqual(["polaris.fjrg2007.com", "old.example.com", "www.example.com"]);
+        expect(await dashboardHosts()).toEqual(["polaris.example.com", "old.example.com", "www.example.com"]);
     });
 
     it("keeps serving the app domain when the extra list is unreadable", async () => {
         // One malformed value must not take the dashboard's own route with it.
-        stored({ "domain.app": "polaris.fjrg2007.com", "domain.extra": "{not json" });
+        stored({ "domain.app": "polaris.example.com", "domain.extra": "{not json" });
 
-        expect(await dashboardHosts()).toEqual(["polaris.fjrg2007.com"]);
+        expect(await dashboardHosts()).toEqual(["polaris.example.com"]);
     });
 
     it("collects nothing on a LAN-only install", async () => {

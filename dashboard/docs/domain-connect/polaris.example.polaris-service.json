@@ -1,11 +1,11 @@
 {
-  "providerId": "fjrg2007.com",
+  "providerId": "polaris.example",
   "providerName": "Polaris",
   "serviceId": "polaris-service",
   "serviceName": "Polaris service",
   "version": 1,
   "description": "Points one hostname at your server, for a service that answers on a domain of its own instead of a zone subdomain. Applied at the hostname for app.example.com, or at the domain itself for example.com.",
-  "syncPubKeyDomain": "dc.fjrg2007.com",
+  "syncPubKeyDomain": "dc.polaris.example",
   "syncBlock": false,
   "records": [
     {

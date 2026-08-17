@@ -41,18 +41,18 @@ describe("provisionHostnameDns", () => {
         vi.clearAllMocks();
         resolve4.mockRejectedValue(new Error("NXDOMAIN"));
         loadCloudflareToken.mockResolvedValue("cf-token");
-        resolveZoneForHostname.mockResolvedValue({ id: "zone-1", name: "fjrg2007.com" });
+        resolveZoneForHostname.mockResolvedValue({ id: "zone-1", name: "example.com" });
         findDnsRecords.mockResolvedValue([]);
         upsertARecord.mockResolvedValue("record-1");
         pruneDnsRecords.mockResolvedValue(undefined);
     });
 
     it("creates the record for a name on the operator's own domain", async () => {
-        expect(await provisionHostnameDns("orphion.fjrg2007.com")).toEqual({
+        expect(await provisionHostnameDns("orphion.example.com")).toEqual({
             status: "created",
             ip: "51.15.20.30"
         });
-        expect(upsertARecord).toHaveBeenCalledWith("cf-token", "zone-1", "orphion.fjrg2007.com", "51.15.20.30");
+        expect(upsertARecord).toHaveBeenCalledWith("cf-token", "zone-1", "orphion.example.com", "51.15.20.30");
     });
 
     it("creates it just the same on a different domain the token reaches", async () => {
@@ -62,15 +62,15 @@ describe("provisionHostnameDns", () => {
     });
 
     it("takes the hostname as typed, however it was capitalized or spaced", async () => {
-        await provisionHostnameDns("  Orphion.FJRG2007.com  ");
-        expect(upsertARecord).toHaveBeenCalledWith("cf-token", "zone-1", "orphion.fjrg2007.com", "51.15.20.30");
+        await provisionHostnameDns("  Orphion.EXAMPLE.com  ");
+        expect(upsertARecord).toHaveBeenCalledWith("cf-token", "zone-1", "orphion.example.com", "51.15.20.30");
     });
 
     it("asks Cloudflare nothing about a name that already answers here", async () => {
         // A wildcard the operator already created covers it, so there is no record to
         // write and nothing to tell them about.
         resolve4.mockResolvedValue(["51.15.20.30"]);
-        expect(await provisionHostnameDns("orphion.fjrg2007.com")).toEqual({
+        expect(await provisionHostnameDns("orphion.example.com")).toEqual({
             status: "unchanged",
             ip: "51.15.20.30"
         });
@@ -79,13 +79,13 @@ describe("provisionHostnameDns", () => {
 
     it("leaves an existing record that already points here alone", async () => {
         findDnsRecords.mockResolvedValue([{ id: "record-1", content: "51.15.20.30" }]);
-        expect((await provisionHostnameDns("orphion.fjrg2007.com")).status).toBe("unchanged");
+        expect((await provisionHostnameDns("orphion.example.com")).status).toBe("unchanged");
         expect(upsertARecord).not.toHaveBeenCalled();
     });
 
     it("never repoints a name that answers somewhere else, and says where", async () => {
         findDnsRecords.mockResolvedValue([{ id: "record-9", content: "203.0.113.7" }]);
-        expect(await provisionHostnameDns("orphion.fjrg2007.com")).toEqual({
+        expect(await provisionHostnameDns("orphion.example.com")).toEqual({
             status: "conflict",
             ip: "51.15.20.30",
             content: "203.0.113.7"
@@ -96,7 +96,7 @@ describe("provisionHostnameDns", () => {
 
     it("hands the record back to the operator when no token is connected", async () => {
         loadCloudflareToken.mockResolvedValue(null);
-        const result = await provisionHostnameDns("orphion.fjrg2007.com");
+        const result = await provisionHostnameDns("orphion.example.com");
         expect(result.status).toBe("manual");
         expect(result.ip).toBe("51.15.20.30");
         expect(result.detail).toContain("Cloudflare");
