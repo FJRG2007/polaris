@@ -19,7 +19,15 @@
  */
 
 import { baseName, normalizeRelPath, parentPath } from "@polaris/core";
-import { chunked, cloudFetch, cloudJson, collect, rangeHeader, type TokenSource } from "./cloud-http.js";
+import {
+    chunked,
+    cloudFetch,
+    cloudJson,
+    collect,
+    rangeHeader,
+    refuseIfFilled,
+    type TokenSource
+} from "./cloud-http.js";
 import {
     StorageError,
     type ListOptions,
@@ -382,8 +390,11 @@ export class GDriveDriver implements StorageDriver {
         this.ids.set(target, fileId);
     }
 
-    public async delete(path: string, _options?: { recursive?: boolean }): Promise<void> {
+    public async delete(path: string, options?: { recursive?: boolean }): Promise<void> {
         const rel = normalizeRelPath(path);
+        // Drive has no non-recursive delete, so "only if it is empty" is proved
+        // before it is asked rather than passed to it.
+        if (options?.recursive === false) await refuseIfFilled(() => this.list(rel), rel);
         const fileId = await this.idFor(rel);
         // Deleting a folder takes its contents with it, so recursion is Drive's
         // problem rather than a walk from here.

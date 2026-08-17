@@ -20,6 +20,7 @@ import { runAction } from "@/lib/run-action";
 import type { EventView } from "@/lib/home/events";
 import type { CameraView } from "@/lib/home/cameras";
 import { Bell, Check, Loader2, Trash2 } from "lucide-react";
+import { MediaPlayer } from "@/components/media-player";
 import { useDisplayFormat } from "@/components/display-format";
 import {
     Badge,
@@ -425,12 +426,13 @@ function MomentDialog({
                 <DialogHeader>
                     <DialogTitle>{title}</DialogTitle>
                 </DialogHeader>
-                <video
-                    src={`/api/home/clips/${clipId}/video#t=${offsetSeconds}`}
-                    className="w-full rounded-md border border-border bg-black"
-                    controls
+                {/* The fragment is what opens it at the moment the event
+                    happened rather than at the start of the clip. */}
+                <MediaPlayer
+                    kind="video"
                     autoPlay
-                    playsInline
+                    src={`/api/home/clips/${clipId}/video#t=${offsetSeconds}`}
+                    className="overflow-hidden rounded-md border border-border bg-black"
                 />
             </DialogContent>
         </Dialog>

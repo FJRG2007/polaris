@@ -201,7 +201,12 @@ export async function installApp(
     // Generated vars are the app's own credentials (Minecraft's RCON password): minted
     // here so nobody is asked for them and no app ships a default one.
     for (const declared of template.env ?? []) {
-        if (declared.generated) envByKey.set(declared.key, { value: randomBytes(24).toString("hex"), isSecret: true });
+        if (declared.generated) {
+            envByKey.set(declared.key, {
+                value: `${declared.generatedPrefix ?? ""}${randomBytes(24).toString("hex")}`,
+                isSecret: true
+            });
+        }
     }
     // Hub wiring: the bridge reads these at startup (see services/messaging-bridge).
     // WEB_INGEST_URL defaults to the public app URL; a locally-installed hub has it

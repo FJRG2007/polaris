@@ -904,7 +904,11 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "attachments",
                 "rate limit",
                 "direct messages",
-                "group chats"
+                "group chats",
+                "calls",
+                "call server",
+                "video calls",
+                "meetings"
             ],
             group: ADMIN_COMMUNICATION_GROUP
         },

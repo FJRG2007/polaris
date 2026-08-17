@@ -19,6 +19,7 @@ import { PersonDialog } from "./person-dialog";
 import { useEffect, useRef, useState } from "react";
 import type { PersonView } from "@/lib/home/people";
 import { focusAfterMove } from "@/lib/list-selection";
+import { FACE_IMAGE_TYPES } from "@/lib/home/face-image";
 import { ImagePlus, Loader2, Pencil, ScanFace, Trash2, UserPlus } from "lucide-react";
 import {
     cn,
@@ -85,7 +86,7 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
         setUploading(id);
         setError(null);
         const bytes = new Uint8Array(await file.arrayBuffer());
-        const result = await runAction(() => actions.addFaceAction(id, bytes), setError);
+        const result = await runAction(() => actions.addFaceAction(id, bytes, file.type), setError);
         setUploading(null);
         if (result?.error) {
             setError(result.error);
@@ -324,7 +325,7 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
             <input
                 ref={fileInput}
                 type="file"
-                accept="image/jpeg,image/png"
+                accept={FACE_IMAGE_TYPES.join(",")}
                 className="hidden"
                 onChange={(event) => {
                     const file = event.target.files?.[0];

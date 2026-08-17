@@ -1,11 +1,12 @@
 /**
- * What is allowed in a conversation (/admin/chat).
+ * What is allowed in a conversation, and where its calls run (/admin/chat).
  */
 
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { allChatRules } from "@/lib/chat/rules";
 import { ChatRulesView } from "./chat-rules-view";
+import { CallServerView } from "./call-server-view";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,12 @@ export default async function ChatRulesPage() {
                 description="How long a message may be, what it may carry, how long it stays editable, and what a deleted one leaves behind. Answered separately for spaces, group chats and direct messages."
             />
             <ChatRulesView initial={rules} />
+            {/* Under the rules rather than above them: the rules are what an
+                administrator comes here to change, and this is set once and then
+                never again. */}
+            <div className="mt-8">
+                <CallServerView />
+            </div>
         </div>
     );
 }

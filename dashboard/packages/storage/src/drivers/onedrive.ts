@@ -21,7 +21,15 @@
  */
 
 import { baseName, normalizeRelPath, parentPath } from "@polaris/core";
-import { chunked, cloudFetch, cloudJson, collect, rangeHeader, type TokenSource } from "./cloud-http.js";
+import {
+    chunked,
+    cloudFetch,
+    cloudJson,
+    collect,
+    rangeHeader,
+    refuseIfFilled,
+    type TokenSource
+} from "./cloud-http.js";
 import {
     StorageError,
     type ListOptions,
@@ -268,8 +276,12 @@ export class OneDriveDriver implements StorageDriver {
         });
     }
 
-    public async delete(path: string, _options?: { recursive?: boolean }): Promise<void> {
-        await cloudFetch(this.token, "OneDrive", this.item(normalizeRelPath(path)), {
+    public async delete(path: string, options?: { recursive?: boolean }): Promise<void> {
+        const rel = normalizeRelPath(path);
+        // OneDrive removes a folder with everything in it and offers no other
+        // mode, so "only if it is empty" is held here.
+        if (options?.recursive === false) await refuseIfFilled(() => this.list(rel), rel);
+        await cloudFetch(this.token, "OneDrive", this.item(rel), {
             method: "DELETE",
             expect: [200, 204]
         });

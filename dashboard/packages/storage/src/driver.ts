@@ -98,6 +98,15 @@ export interface StorageDriver {
     ): Promise<StatEntry>;
     mkdir(path: string): Promise<void>;
     move(from: string, to: string): Promise<void>;
+    /**
+     * Remove a file, or a folder.
+     *
+     * Recursive by default, which is the trap worth stating: a folder is deleted
+     * with everything inside it unless `recursive: false` is asked for, and a
+     * caller that means "only if it is empty" has to say so. `recursive: false`
+     * on a folder that is not empty is a refusal, including on the providers
+     * whose own delete has no such mode - they prove it before asking.
+     */
     delete(path: string, options?: { recursive?: boolean }): Promise<void>;
     usage(): Promise<StorageUsage>;
 }

@@ -98,11 +98,18 @@ describe("meeting signalling", () => {
         expect(signals).not.toHaveBeenCalled();
     });
 
-    it("caps a payload at one offer's worth, so this is not a message channel", () => {
+    it("caps a payload, and leaves room for a session description a real call sends", () => {
         // Asserted as a constant rather than through the route, because the route
         // is where it is applied and this is the number it applies.
+        //
+        // The floor is the part that bit: candidates are trickled separately, so
+        // the cap was set for an offer that carried them and was well under what
+        // a session actually sends. One video m-line is two or three kilobytes of
+        // codecs and header extensions, and a call that has renegotiated - a
+        // screen shared and stopped, a camera turned on - carries several. Under
+        // this, the offer is refused and nobody hears anybody.
+        expect(MAX_SIGNAL_BYTES).toBeGreaterThanOrEqual(32 * 1024);
         expect(MAX_SIGNAL_BYTES).toBeLessThanOrEqual(64 * 1024);
-        expect(MAX_SIGNAL_BYTES).toBeGreaterThan(4096);
     });
 });
 

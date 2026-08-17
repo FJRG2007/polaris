@@ -373,7 +373,11 @@ export async function discardAttachments(messageId: string): Promise<void> {
                     if (!folder) continue;
                     const listed = await driver.list(folder).catch(() => null);
                     if (listed && listed.entries.length === 0) {
-                        await driver.delete(folder).catch(() => undefined);
+                        // Never recursive. A delete without this takes the folder
+                        // and everything in it - which, between the listing above
+                        // and this line, could be a picture somebody has just
+                        // sent. The refusal is the outcome to want.
+                        await driver.delete(folder, { recursive: false }).catch(() => undefined);
                     }
                 }
             } finally {
@@ -497,11 +501,12 @@ export async function tidyChatStorage(): Promise<{ removed: number; failed: numb
                     }
                     const inside = await driver.list(entry.path).catch(() => null);
                     if (!inside || inside.entries.length > 0) continue;
-                    // Empty, and not recursive: a file that landed between the
-                    // listing and this makes the delete fail, which is the
-                    // outcome to want.
+                    // Empty, and asked for as not recursive - which the default
+                    // is not. Without it a file that landed between the listing
+                    // and this line would be taken with the folder; with it the
+                    // delete refuses, which is what was meant all along.
                     await driver
-                        .delete(entry.path)
+                        .delete(entry.path, { recursive: false })
                         .then(() => {
                             removed += 1;
                         })

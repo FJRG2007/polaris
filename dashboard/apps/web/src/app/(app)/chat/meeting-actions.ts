@@ -19,6 +19,7 @@ import * as core from "@polaris/core";
 import { cookies } from "next/headers";
 import * as chat from "@/lib/chat/chat-service";
 import * as meetings from "@/lib/chat/meetings";
+import * as calls from "@/lib/chat/call-server";
 import { requirePermission } from "@/lib/session";
 import type { MeetingView } from "@/lib/chat/meetings";
 import { ChatAccessError, requireChannel } from "@/lib/chat/access";
@@ -142,6 +143,48 @@ export async function readCallAction(
     return result.error
         ? { error: result.error }
         : { meeting: result.value, participantId: seat.participantId };
+}
+
+/**
+ * Which way this call will be carried.
+ *
+ * Asked before anything is opened, because the two ways of carrying a call are
+ * two different pieces of code in the browser and starting the wrong one costs a
+ * second permission prompt. It answers about the instance rather than about the
+ * caller - so a seat is the only gate, and somebody still in the waiting room
+ * gets a truthful answer, which is what lets their browser be ready the moment
+ * they are let in.
+ */
+export async function callTransportAction(meetingId: string): Promise<"sfu" | "mesh"> {
+    const seat = await resolveSeat(meetingId);
+    if (!seat) return "mesh";
+    return (await calls.callServer()) ? "sfu" : "mesh";
+}
+
+/**
+ * The ticket for the server a call runs through.
+ *
+ * Answered with nothing at all when this instance has no call server, which is
+ * not an error: the browser then talks to the other browsers directly, which is
+ * what Chat did before there was one and still works inside a single network.
+ *
+ * The signing key never leaves the server. What comes back is good for one room,
+ * for a few minutes, under the identity of the seat this request already holds -
+ * so a browser cannot ask for a ticket to a call it was not admitted to, and the
+ * waiting room is enforced exactly once, here.
+ */
+export async function callTokenAction(
+    meetingId: string
+): Promise<{ url?: string; token?: string; error?: string }> {
+    const seat = await resolveSeat(meetingId);
+    if (!seat) return { error: "You are not in that call" };
+    if (seat.admission !== "admitted") return { error: "Still waiting to be let in" };
+
+    const endpoint = await calls.callServer();
+    if (!endpoint) return {};
+
+    const token = await calls.joinToken(endpoint, meetingId, seat.participantId);
+    return { url: endpoint.url, token };
 }
 
 /** Still here. */

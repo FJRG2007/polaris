@@ -17,7 +17,7 @@
  */
 
 import { baseName, normalizeRelPath, parentPath } from "@polaris/core";
-import { chunked, cloudFetch, cloudJson, collect, type TokenSource } from "./cloud-http.js";
+import { chunked, cloudFetch, cloudJson, collect, refuseIfFilled, type TokenSource } from "./cloud-http.js";
 import {
     StorageError,
     type ListOptions,
@@ -247,9 +247,12 @@ export class DropboxDriver implements StorageDriver {
         });
     }
 
-    public async delete(path: string, _options?: { recursive?: boolean }): Promise<void> {
-        // Deleting a folder takes its contents with it.
-        await this.rpc<unknown>("/files/delete_v2", { path: this.at(normalizeRelPath(path)) });
+    public async delete(path: string, options?: { recursive?: boolean }): Promise<void> {
+        const rel = normalizeRelPath(path);
+        // Deleting a folder takes its contents with it, and Dropbox has no other
+        // mode - so a caller asking for "only if it is empty" is answered here.
+        if (options?.recursive === false) await refuseIfFilled(() => this.list(rel), rel);
+        await this.rpc<unknown>("/files/delete_v2", { path: this.at(rel) });
     }
 
     public async usage(): Promise<StorageUsage> {

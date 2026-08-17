@@ -18,8 +18,18 @@ import Link from "next/link";
 import * as actions from "../actions";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { CircleCheck, Loader2, ScanFace } from "lucide-react";
+import { CircleAlert, CircleCheck, Loader2, ScanFace } from "lucide-react";
 import { Button, Input, Select, Skeleton } from "@polaris/ui";
+
+/** How often a recognizer that has not answered yet is asked again. Short: it is
+ *  the difference between watching it come up and reloading the page to find
+ *  out, and it only runs while somebody has this screen open and it is starting. */
+const STARTING_EVERY_MS = 5000;
+
+/** How many of those before it stops asking. Five minutes: comfortably past the
+ *  minute or two a first start takes, and short of watching a machine that is
+ *  never going to answer. */
+const STARTING_TRIES = 60;
 
 interface Settings {
     faceApiUrl: string;
@@ -56,6 +66,8 @@ export function HomeSettingsView({
     const [servers, setServers] = useState<{ id: string; label: string }[]>([]);
     const [server, setServer] = useState("local");
     const [installing, setInstalling] = useState(false);
+    /** True once it has been given long enough to start and has not. */
+    const [waited, setWaited] = useState(false);
     const [manual, setManual] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -88,6 +100,42 @@ export function HomeSettingsView({
             cancelled = true;
         };
     }, []);
+
+    /**
+     * A recognizer that has just been installed is not answering yet.
+     *
+     * It pulls a few hundred megabytes and then loads its models, which is the
+     * minute or two the card says it is - and nothing tells this screen when that
+     * finishes. So the card sat on "Starting" until somebody reloaded the page
+     * and found it had been running the whole time.
+     *
+     * Only while it is starting, and not forever. Once it answers there is
+     * nothing left to watch, and every ask is a request to the machine it runs
+     * on - so a screen left open on an install that never came up stops asking
+     * and says so rather than spinning at it all afternoon.
+     */
+    useEffect(() => {
+        if (!settings?.installedOn || settings.answering || waited) return;
+        let left = STARTING_TRIES;
+        const timer = setInterval(() => {
+            if (left <= 0) {
+                clearInterval(timer);
+                setWaited(true);
+                return;
+            }
+            left -= 1;
+            void actions
+                .homeSettingsAction()
+                .then((fresh) => {
+                    if (fresh.settings) setSettings(fresh.settings);
+                })
+                .catch(() => {
+                    // A refused answer is the machine still coming up, which is
+                    // what this is waiting for. The next tick asks again.
+                });
+        }, STARTING_EVERY_MS);
+        return () => clearInterval(timer);
+    }, [settings?.installedOn, settings?.answering, waited]);
 
     const install = async () => {
         setInstalling(true);
@@ -270,18 +318,34 @@ export function HomeSettingsView({
                                 <p className="flex items-center gap-1.5 text-[12px] text-foreground">
                                     {settings.answering ? (
                                         <CircleCheck className="size-3.5 shrink-0 text-success" />
+                                    ) : waited ? (
+                                        <CircleAlert className="size-3.5 shrink-0 text-warning" />
                                     ) : (
                                         <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
                                     )}
                                     {settings.answering
                                         ? `Running on ${settings.installedOn}.`
-                                        : `Starting on ${settings.installedOn}.`}
+                                        : waited
+                                          ? `Not answering on ${settings.installedOn}.`
+                                          : `Starting on ${settings.installedOn}.`}
                                 </p>
                                 <p className="text-[11px] text-foreground-subtle">
                                     {settings.answering
                                         ? "Teach it who lives here under People, and cameras set to recognize faces will start using their names."
-                                        : "It loads its models the first time it starts, which takes a minute or two. Nothing is lost in the meantime - cameras still report that somebody is there."}
+                                        : waited
+                                          ? "It has had several minutes and has not come up. The machine may be busy pulling it down, or the container may have stopped - it is under Apps, by the name it was installed with."
+                                          : "It loads its models the first time it starts, which takes a minute or two. Nothing is lost in the meantime - cameras still report that somebody is there."}
                                 </p>
+                                {waited ? (
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        className="self-start"
+                                        onClick={() => setWaited(false)}
+                                    >
+                                        Check again
+                                    </Button>
+                                ) : null}
                             </div>
                         ) : (
                             <div className="flex flex-wrap items-end gap-2">

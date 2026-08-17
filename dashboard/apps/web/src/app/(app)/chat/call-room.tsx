@@ -39,15 +39,19 @@ import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
     Check,
     ChevronUp,
+    Expand,
     Headphones,
     HeadphoneOff,
     Link2,
     Loader2,
+    Maximize2,
     Mic,
     MicOff,
+    Minimize2,
     MonitorUp,
     MonitorX,
     PhoneOff,
+    Shrink,
     UserPlus,
     Video,
     VideoOff,
@@ -140,6 +144,21 @@ export function CallRoom({
     const waiting = call.meeting?.participants.filter((person) => person.admission === "waiting");
     const columns = gridColumns((admitted?.length ?? 1) || 1);
 
+    /**
+     * The one picture filling the room, when somebody has asked for one.
+     *
+     * A key rather than a participant, because a person can be two pictures at
+     * once - their face and the screen they are sharing - and "make that bigger"
+     * has to mean the one that was pressed. Dropped when whatever it names is no
+     * longer there, so a sharer stopping does not leave the room staring at an
+     * empty rectangle.
+     */
+    const [focused, setFocused] = useState<string | null>(null);
+    const focus = (key: string) => setFocused((current) => (current === key ? null : key));
+    const screenKeys = [...call.screens.keys()].map((personId) => `screen:${personId}`);
+    const cameraKeys = (admitted ?? []).map((person) => `camera:${person.id}`);
+    const live = focused && [...screenKeys, ...cameraKeys].includes(focused) ? focused : null;
+
     useEffect(() => {
         if (!call.meeting?.guestToken) return;
         setGuestLink(`${window.location.origin}/m/${call.meeting.guestToken}`);
@@ -219,16 +238,61 @@ export function CallRoom({
                 rather than in a tile the size of a head: a shared screen is
                 usually text, and text in a ninth of a window is not readable.
                 One per sharer, because a mesh has no reason to allow only one. */}
-            {[...call.screens].map(([personId, stream]) => (
+            {(live?.startsWith("camera:")
+                ? []
+                : [...call.screens].filter(
+                      ([personId]) => !live || live === `screen:${personId}`
+                  )
+            ).map(([personId, stream]) => (
                 <div key={personId} className="min-h-0 flex-[2]">
                     <Tile
                         stream={stream}
                         name={`${nameOf(admitted, personId)} - screen`}
                         personId={null}
+                        focused={live === `screen:${personId}`}
+                        onFocus={() => focus(`screen:${personId}`)}
                         volumeKey={undefined}
                     />
                 </div>
             ))}
+
+            {/* A face somebody asked to see bigger takes the same place a screen
+                would. One at a time: two big pictures is the grid again. */}
+            {live?.startsWith("camera:") && (
+                <div className="min-h-0 flex-[2]">
+                    {live === `camera:${call.participantId}` ? (
+                        <Tile
+                            stream={call.localStream}
+                            name="You"
+                            personId={mine?.userId ?? viewerId ?? null}
+                            own
+                            focused
+                            onFocus={() => focus(live)}
+                            cameraOff={!call.cameraOn && !call.sharing}
+                            sharing={call.sharing}
+                        />
+                    ) : (
+                        (() => {
+                            const personId = live.slice("camera:".length);
+                            const person = admitted?.find((entry) => entry.id === personId);
+                            return (
+                                <Tile
+                                    stream={call.remote.get(personId) ?? null}
+                                    name={person?.name ?? "Somebody"}
+                                    personId={person?.userId ?? null}
+                                    guest={person?.guest}
+                                    focused
+                                    onFocus={() => focus(live)}
+                                    muted={call.states.get(personId)?.muted}
+                                    deafened={call.states.get(personId)?.deafened}
+                                    speaking={call.speaking.has(personId)}
+                                    volumeKey={person?.userId ?? personId}
+                                />
+                            );
+                        })()
+                    )}
+                </div>
+            )}
 
             <div className={cn("grid min-h-0 flex-1 gap-2", columns)}>
                 <Tile
@@ -243,6 +307,10 @@ export function CallRoom({
                     }
                     cameraOff={!call.cameraOn && !call.sharing}
                     sharing={call.sharing}
+                    focused={live === `camera:${call.participantId}`}
+                    onFocus={
+                        call.participantId ? () => focus(`camera:${call.participantId}`) : undefined
+                    }
                 />
                 {(admitted ?? [])
                     .filter((person) => person.id !== call.participantId)
@@ -254,6 +322,10 @@ export function CallRoom({
                             personId={person.userId ?? null}
                             guest={person.guest}
                             speaking={call.speaking.has(person.id)}
+                            muted={call.states.get(person.id)?.muted}
+                            deafened={call.states.get(person.id)?.deafened}
+                            focused={live === `camera:${person.id}`}
+                            onFocus={() => focus(`camera:${person.id}`)}
                             // Their account where they have one, so turning
                             // somebody down holds across calls; their seat where
                             // they do not, which lasts as long as the seat.
@@ -580,6 +652,10 @@ function Tile({
     cameraOff = false,
     sharing = false,
     speaking = false,
+    muted = false,
+    deafened = false,
+    focused = false,
+    onFocus,
     volumeKey
 }: {
     stream: MediaStream | null;
@@ -596,12 +672,45 @@ function Tile({
     /** Whether YOUR picture is a screen rather than a camera. */
     sharing?: boolean;
     speaking?: boolean;
+    /** Their microphone is off, or they have stopped listening altogether.
+     *  Neither can be heard, so both are drawn. */
+    muted?: boolean;
+    deafened?: boolean;
+    /** Whether this tile is the one filling the room right now. */
+    focused?: boolean;
+    /** Make this the big one, or put it back. Absent where there is nothing to
+     *  enlarge - a tile with no picture in it. */
+    onFocus?: () => void;
     /** Who this tile's volume is remembered against. Absent on your own tile,
      *  which has no volume to set - it is never played back. */
     volumeKey?: string;
 }) {
     const video = useRef<HTMLVideoElement>(null);
+    const frame = useRef<HTMLDivElement>(null);
     const [volume, setVolume] = useCallVolume(volumeKey ?? "");
+
+    /**
+     * Full screen, on the tile rather than on the video inside it.
+     *
+     * A `<video>` taken full screen by the browser draws nothing but the video:
+     * the name, the ring that says somebody is talking and the buttons all go
+     * with it. Taking the frame instead keeps them, which is also how the camera
+     * viewer does it.
+     *
+     * Tracked rather than assumed, because Escape leaves full screen without
+     * pressing anything here.
+     */
+    const [full, setFull] = useState(false);
+    useEffect(() => {
+        const onChange = () => setFull(document.fullscreenElement === frame.current);
+        document.addEventListener("fullscreenchange", onChange);
+        return () => document.removeEventListener("fullscreenchange", onChange);
+    }, []);
+
+    const toggleFull = () => {
+        if (document.fullscreenElement === frame.current) void document.exitFullscreen().catch(() => undefined);
+        else void frame.current?.requestFullscreen().catch(() => undefined);
+    };
 
     /**
      * Attach the stream and start the picture.
@@ -696,8 +805,9 @@ function Tile({
 
     const tile = (
         <div
+            ref={frame}
             className={cn(
-                "relative min-h-0 overflow-hidden rounded-lg bg-elevated ring-1 transition-shadow duration-fast",
+                "group/tile relative min-h-0 overflow-hidden rounded-lg bg-elevated ring-1 transition-shadow duration-fast",
                 // Two rings rather than a thicker one: a border that appears and
                 // disappears would move everything inside the tile by two pixels
                 // every time somebody drew breath.
@@ -742,10 +852,49 @@ function Tile({
                 {name}
                 {guest && <span className="text-muted-foreground">guest</span>}
                 {sharing && <span className="text-primary">sharing</span>}
+                {/* Their controls, drawn because they cannot be heard. Deafened
+                    wins the space: somebody who is not listening is not reached
+                    by talking louder, and their microphone being off follows
+                    from it anyway. */}
+                {deafened ? (
+                    <HeadphoneOff className="size-3 text-danger" aria-label="Not listening" />
+                ) : muted ? (
+                    <MicOff className="size-3 text-danger" aria-label="Microphone off" />
+                ) : null}
                 {volumeKey && volume === 0 && (
                     <VolumeX className="size-3 text-danger" aria-label="Silenced for you" />
                 )}
             </span>
+
+            {/* Two different things, which is why they are two buttons. Bigger
+                keeps the call around it - the other faces, the controls, the
+                conversation - and is what somebody wants while a screen is being
+                explained to them. Full screen is the whole display and nothing
+                else, which is what they want when it is a film. */}
+            {!blank && (
+                <span className="absolute right-1 top-1 flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/tile:opacity-100">
+                    {onFocus && (
+                        <button
+                            type="button"
+                            onClick={onFocus}
+                            aria-label={focused ? "Back to the grid" : "Make this bigger"}
+                            title={focused ? "Back to the grid" : "Make this bigger"}
+                            className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                            {focused ? <Shrink className="size-3.5" /> : <Expand className="size-3.5" />}
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={toggleFull}
+                        aria-label={full ? "Leave full screen" : "Full screen"}
+                        title={full ? "Leave full screen" : "Full screen"}
+                        className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                        {full ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+                    </button>
+                </span>
+            )}
         </div>
     );
 

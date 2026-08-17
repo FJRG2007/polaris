@@ -18,6 +18,7 @@ import { useRef, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { PersonView } from "@/lib/home/people";
 import { ImagePlus, Loader2, X } from "lucide-react";
+import { FACE_IMAGE_TYPES } from "@/lib/home/face-image";
 import {
     Button,
     Dialog,
@@ -90,7 +91,7 @@ export function PersonDialog({
             setProgress(`Sending ${index + 1} of ${chosen.length}`);
             const bytes = new Uint8Array(await item.file.arrayBuffer());
             const result = await runAction(
-                () => actions.addFaceAction(created.person!.id, bytes),
+                () => actions.addFaceAction(created.person!.id, bytes, item.file.type),
                 (message) => refused.push(message)
             );
             if (result?.error) refused.push(`${item.file.name}: ${result.error}`);
@@ -175,7 +176,7 @@ export function PersonDialog({
                         <input
                             ref={fileInput}
                             type="file"
-                            accept="image/jpeg,image/png"
+                            accept={FACE_IMAGE_TYPES.join(",")}
                             multiple
                             className="hidden"
                             onChange={(event) => {
