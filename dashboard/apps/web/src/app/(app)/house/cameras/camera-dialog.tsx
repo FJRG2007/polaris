@@ -134,6 +134,8 @@ export function CameraDialog({
         setForm((current) => ({ ...current, [key]: value }));
 
     const vendor = cameraVendor(form.vendor);
+    /** The server this camera is reached through, when it is not Polaris itself. */
+    const reachedVia = form.reachVia.startsWith("server:") ? form.reachVia.slice("server:".length) : null;
     // A make with its own protocol has no paths and no account to fill in: the
     // password is the whole credential. Showing the fields anyway is how somebody
     // ends up typing a camera account into a form that ignores it.
@@ -339,7 +341,7 @@ export function CameraDialog({
 
                     <Section
                         title="Reached from"
-                        hint="A camera on another network - behind a repeater, or at another address - is reached by a server that can see it."
+                        hint="A camera on another network - behind a repeater, or at another address - is reached by a server that lives there and is connected to Polaris under Servers. The stream comes back over that connection, so no extra port has to be opened."
                     >
                         <Select
                             value={form.reachVia}
@@ -370,13 +372,30 @@ export function CameraDialog({
                         ) : null}
 
                         {needsSomewhereToRun(form.detector) ? (
-                            <Field label="Runs on">
-                                <Select
-                                    value={form.detectorTargetId}
-                                    onValueChange={(value) => set("detectorTargetId", value)}
-                                    options={servers.map((server) => ({ value: server.id, label: server.label }))}
-                                />
-                            </Field>
+                            reachedVia ? (
+                                // Not a choice: the stream is over there, and
+                                // dragging it back across the link Polaris could
+                                // not reach the camera over, to look at it here,
+                                // would be the slowest possible way to do it.
+                                <Field
+                                    label="Runs on"
+                                    hint="The machine that reaches this camera also analyzes it - the stream is already there."
+                                >
+                                    <Input
+                                        value={servers.find((server) => server.id === reachedVia)?.label ?? reachedVia}
+                                        readOnly
+                                        className="w-64"
+                                    />
+                                </Field>
+                            ) : (
+                                <Field label="Runs on">
+                                    <Select
+                                        value={form.detectorTargetId}
+                                        onValueChange={(value) => set("detectorTargetId", value)}
+                                        options={servers.map((server) => ({ value: server.id, label: server.label }))}
+                                    />
+                                </Field>
+                            )
                         ) : null}
 
                         {form.detector !== "none" ? (

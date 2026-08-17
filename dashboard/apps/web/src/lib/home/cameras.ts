@@ -119,6 +119,20 @@ export async function getCamera(installedAppId: string, id: string): Promise<Cam
     return row ? toView(row) : null;
 }
 
+/**
+ * Where this camera's detection runs.
+ *
+ * A camera reached through a server is analyzed on that server, whatever the
+ * form said. The alternative is hauling its stream across the link Polaris could
+ * not reach the camera over in the first place, to look at it somewhere else -
+ * which is slower, costs the tunnel, and fails outright when the worker is on a
+ * machine that cannot see the relay at all.
+ */
+function detectionRunsOn(input: CameraInput): string | null {
+    if (input.reachVia.startsWith("server:")) return input.reachVia.slice("server:".length);
+    return input.detectorTargetId;
+}
+
 /** The paths a camera ends up with: what was typed, else what its make uses. */
 function resolvePaths(input: CameraInput): { mainPath: string; subPath: string } {
     const vendor = cameraVendor(input.vendor);
@@ -154,7 +168,7 @@ export async function createCamera(installedAppId: string, input: CameraInput): 
             username: input.username || null,
             reachVia: input.reachVia,
             detector: input.detector,
-            detectorTargetId: input.detectorTargetId,
+            detectorTargetId: detectionRunsOn(input),
             detectionConfig: JSON.stringify(input.detection),
             recording: input.recording,
             retentionDays: input.retentionDays,
@@ -188,7 +202,7 @@ export async function updateCamera(
             username: input.username || null,
             reachVia: input.reachVia,
             detector: input.detector,
-            detectorTargetId: input.detectorTargetId,
+            detectorTargetId: detectionRunsOn(input),
             detectionConfig: JSON.stringify(input.detection),
             recording: input.recording,
             retentionDays: input.retentionDays,

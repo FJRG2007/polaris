@@ -17,7 +17,9 @@
  * Server-only.
  */
 
+import { Socket } from "node:net";
 import { prisma } from "@polaris/db";
+import { tunnelledUrl } from "@/lib/home/tunnel";
 import { listHosts } from "@/lib/host-service";
 import { relaySource } from "@/lib/home/vendors";
 import { getPublicIp } from "@/lib/domain-service";
@@ -32,7 +34,18 @@ const RELAY_APP = "camera-hub";
 /** Where a relay is, and how to prove to it that this is Polaris asking. */
 export interface RelayEndpoint {
     readonly installedAppId: string;
+    /**
+     * How Polaris dials it. Usually the server's own address; for a relay on a
+     * machine whose high ports nobody forwards, a loopback address that tunnels
+     * through the SSH connection Polaris already has to it.
+     */
     readonly baseUrl: string;
+    /**
+     * How something ON that machine dials it. The vision worker runs beside the
+     * relay, so it must be given the real address rather than a tunnel that only
+     * exists inside the Polaris process.
+     */
+    readonly directUrl: string;
     readonly username: string;
     readonly password: string;
 }
@@ -79,18 +92,70 @@ async function targetIdFor(serverId: string): Promise<string | null> {
     return target?.id ?? null;
 }
 
-/** The address the relay answers on, dialled the way everything else dials a
- *  deployed app: the server's own address and the app's stable host port. */
-async function baseUrlFor(applicationId: string): Promise<string | null> {
+/**
+ * The two addresses a relay answers on: the one Polaris uses and the one its own
+ * machine uses.
+ *
+ * The direct address is how every other deployed app is dialled - the server's
+ * address and the app's stable host port. It works whenever Polaris and the
+ * server are on speaking terms, which is the ordinary case and the fast one.
+ *
+ * When it does not answer, the relay is on a machine Polaris can only reach
+ * through SSH: a second router, a guest network, another building. Rather than
+ * asking somebody to forward another port, the stream comes back down that SSH
+ * connection. Which of the two is in use is decided by knocking once and
+ * remembering the answer, so it costs nothing per request.
+ */
+async function urlsFor(
+    applicationId: string,
+    ownerId: string
+): Promise<{ baseUrl: string; directUrl: string } | null> {
     const application = await prisma.application.findFirst({
         where: { id: applicationId },
-        select: { target: { select: { kind: true, host: { select: { address: true } } } } }
+        select: { target: { select: { kind: true, hostId: true, host: { select: { address: true } } } } }
     });
     if (!application) return null;
-    const dialHost =
-        application.target.kind === "local" ? await getPublicIp() : (application.target.host?.address?.trim() ?? null);
+    const local = application.target.kind === "local";
+    const dialHost = local ? await getPublicIp() : (application.target.host?.address?.trim() ?? null);
     if (!dialHost) return null;
-    return `http://${dialHost}:${hostPortForApp(applicationId)}`;
+
+    const port = hostPortForApp(applicationId);
+    const directUrl = `http://${dialHost}:${port}`;
+    const hostId = application.target.hostId;
+    if (local || !hostId) return { baseUrl: directUrl, directUrl };
+
+    if (await reachable(dialHost, port)) return { baseUrl: directUrl, directUrl };
+    // A tunnel that cannot be opened is not a reason to answer nothing: the
+    // direct address is still the best guess, and the caller's own failure says
+    // more than a silent null would.
+    const tunnelled = await tunnelledUrl(hostId, ownerId, "127.0.0.1", port).catch(() => null);
+    return { baseUrl: tunnelled ?? directUrl, directUrl };
+}
+
+/** Whether a port answers, remembered for a while.
+ *
+ *  Asked once per relay rather than per request: the answer is a fact about the
+ *  network between two machines, and it does not change between two clicks. */
+const reachability = new Map<string, { open: boolean; at: number }>();
+const REACHABILITY_TTL_MS = 5 * 60_000;
+
+function reachable(host: string, port: number): Promise<boolean> {
+    const key = `${host}:${port}`;
+    const known = reachability.get(key);
+    if (known && Date.now() - known.at < REACHABILITY_TTL_MS) return Promise.resolve(known.open);
+    return new Promise((resolve) => {
+        const socket = new Socket();
+        const answer = (open: boolean) => {
+            socket.destroy();
+            reachability.set(key, { open, at: Date.now() });
+            resolve(open);
+        };
+        socket.setTimeout(1500);
+        socket.once("connect", () => answer(true));
+        socket.once("timeout", () => answer(false));
+        socket.once("error", () => answer(false));
+        socket.connect(port, host);
+    });
 }
 
 /** The account the relay was installed with, read back from the app's own
@@ -107,12 +172,12 @@ async function relayCredentials(applicationId: string, ownerId: string): Promise
 export async function relayEndpoint(serverId: string): Promise<RelayEndpoint | null> {
     const relay = await findRelay(serverId);
     if (!relay) return null;
-    const [baseUrl, auth] = await Promise.all([
-        baseUrlFor(relay.applicationId),
+    const [urls, auth] = await Promise.all([
+        urlsFor(relay.applicationId, relay.ownerId),
         relayCredentials(relay.applicationId, relay.ownerId)
     ]);
-    if (!baseUrl || !auth) return null;
-    return { installedAppId: relay.installedAppId, baseUrl, ...auth };
+    if (!urls || !auth) return null;
+    return { installedAppId: relay.installedAppId, ...urls, ...auth };
 }
 
 /**

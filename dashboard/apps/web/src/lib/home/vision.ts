@@ -251,7 +251,10 @@ export async function assignmentsFor(installedAppId: string): Promise<VisionAssi
         assignments.push({
             cameraId: camera.id,
             cameraName: camera.name,
-            streamUrl: `${endpoint.baseUrl}/api/stream.mp4?src=${encodeURIComponent(streamName(camera.id, "sub"))}`,
+            // The worker runs beside the relay, so it is given the relay's real
+            // address rather than the one Polaris dials it on - a tunnel that
+            // only exists inside the Polaris process reaches nothing from there.
+            streamUrl: `${endpoint.directUrl}/api/stream.mp4?src=${encodeURIComponent(streamName(camera.id, "sub"))}`,
             authorization: `Basic ${Buffer.from(`${endpoint.username}:${endpoint.password}`).toString("base64")}`,
             sensitivity: detection.sensitivity,
             minGapSeconds: detection.minGapSeconds,
