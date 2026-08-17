@@ -27,9 +27,18 @@ import { Badge, Button } from "@polaris/ui";
 import { useEffect, useRef, useState } from "react";
 import type { CameraView } from "@/lib/home/cameras";
 import { Camera, Loader2, Maximize2, VideoOff } from "lucide-react";
+import { otherTransport, preferredTransport, stillSrc, streamSrc, type Transport } from "@/lib/home/player";
 
-/** How often a tile that is not playing refreshes its picture. */
-const STILL_INTERVAL_MS = 15_000;
+/**
+ * How often the fallback picture is replaced.
+ *
+ * Faster when it is what somebody is actually looking at, because a picture that
+ * does not change reads as a broken camera - the clock in the corner stops, and
+ * that is the first thing anybody notices. Slower when the tile is off screen or
+ * the camera is off, where it is only there to be current when scrolled back to.
+ */
+const STILL_INTERVAL_MS = 4_000;
+const IDLE_STILL_INTERVAL_MS = 30_000;
 
 export function CameraTile({
     camera,
@@ -56,9 +65,41 @@ export function CameraTile({
      * only then admits defeat.
      */
     const [attempt, setAttempt] = useState<"sub" | "main" | "still" | "none">("sub");
+    /** Which live format this browser gets. Guessed once, then corrected by
+     *  whether it actually played - see lib/home/player. */
+    const [transport, setTransport] = useState<Transport>("mp4");
+    const [swapped, setSwapped] = useState(false);
     const [ready, setReady] = useState(false);
     const frame = useRef<HTMLDivElement | null>(null);
     const video = useRef<HTMLVideoElement | null>(null);
+
+    // Asked after mounting rather than during render: the server has no browser
+    // to ask, and a first paint that disagrees with the second is a hydration
+    // mismatch over a camera.
+    useEffect(() => setTransport(preferredTransport()), []);
+
+    /**
+     * What to try when the picture does not arrive.
+     *
+     * The good stream next, because some cameras publish only one and some
+     * publish a second the relay cannot open. Then the other format: a browser
+     * that will not take one usually takes the other, and finding out by trying
+     * is more reliable than deciding from what the browser calls itself.
+     */
+    const failed = () => {
+        setReady(false);
+        if (attempt === "sub") {
+            setAttempt("main");
+            return;
+        }
+        if (!swapped) {
+            setSwapped(true);
+            setTransport(otherTransport(transport));
+            setAttempt("sub");
+            return;
+        }
+        setAttempt("still");
+    };
 
     // Only what somebody can actually see is worth a connection.
     useEffect(() => {
@@ -77,15 +118,25 @@ export function CameraTile({
 
     useEffect(() => {
         if (playing || !camera.enabled) return;
-        const timer = setInterval(() => setStamp((value) => value + 1), STILL_INTERVAL_MS);
+        const watched = visible && attempt === "still";
+        const timer = setInterval(
+            () => setStamp((value) => value + 1),
+            watched ? STILL_INTERVAL_MS : IDLE_STILL_INTERVAL_MS
+        );
         return () => clearInterval(timer);
-    }, [playing, camera.enabled]);
+    }, [playing, camera.enabled, visible, attempt]);
 
     // Give up for a minute, not forever: a camera that was rebooting when the
     // page loaded is otherwise dead until somebody reloads.
     useEffect(() => {
         if (attempt !== "none") return;
-        const timer = setTimeout(() => setAttempt("sub"), 60_000);
+        const timer = setTimeout(() => {
+            // From the top, including which format to try: the last round may
+            // have ended on the wrong one for a reason that has since gone away.
+            setTransport(preferredTransport());
+            setSwapped(false);
+            setAttempt("sub");
+        }, 60_000);
         return () => clearTimeout(timer);
     }, [attempt]);
 
@@ -106,24 +157,29 @@ export function CameraTile({
                 {playing ? (
                     <video
                         ref={video}
-                        // Keyed so switching quality really re-creates the
-                        // element: a <video> handed a new src after an error
+                        // Keyed so switching quality or format really re-creates
+                        // the element: a <video> handed a new src after an error
                         // keeps the error and never tries again.
-                        key={attempt}
-                        src={`/api/home/cameras/${camera.id}/stream?q=${attempt}`}
+                        key={`${transport}-${attempt}`}
+                        src={streamSrc(camera.id, attempt, transport)}
+                        // A live picture the moment the tile appears. HLS in
+                        // particular waits for a keyframe and a first segment,
+                        // and a camera with a long keyframe interval can leave a
+                        // black rectangle up for several seconds.
+                        poster={stillSrc(camera.id)}
                         className="size-full object-cover"
                         autoPlay
                         muted
                         playsInline
                         onCanPlay={() => setReady(true)}
-                        onError={() => setAttempt(attempt === "sub" ? "main" : "still")}
+                        onError={failed}
                     />
                 ) : showStill ? (
                     // eslint-disable-next-line @next/next/no-img-element -- a live
                     // frame is never the same twice, so there is nothing for the
                     // image optimizer to cache and it would only add a hop.
                     <img
-                        src={`/api/home/cameras/${camera.id}/snapshot?v=${stamp}`}
+                        src={stillSrc(camera.id, stamp)}
                         alt={camera.name}
                         className="size-full object-cover"
                         onError={() => setAttempt("none")}

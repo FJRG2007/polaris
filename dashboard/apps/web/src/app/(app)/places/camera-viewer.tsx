@@ -18,6 +18,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CameraView } from "@/lib/home/cameras";
 import { Camera, Loader2, Maximize2, Minimize2 } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogTitle, cn } from "@polaris/ui";
+import { otherTransport, preferredTransport, stillSrc, streamSrc, type Transport } from "@/lib/home/player";
 
 export function CameraViewer({
     camera,
@@ -33,6 +34,23 @@ export function CameraViewer({
     const [full, setFull] = useState(false);
     const [failed, setFailed] = useState(false);
     const [ready, setReady] = useState(false);
+    /** Which live format this browser gets - see lib/home/player. Guessed after
+     *  mounting, since the server has no browser to ask. */
+    const [transport, setTransport] = useState<Transport>("mp4");
+    const [swapped, setSwapped] = useState(false);
+
+    useEffect(() => setTransport(preferredTransport()), []);
+
+    /** A browser that will not take one format usually takes the other, and
+     *  trying is more reliable than deciding from what it calls itself. */
+    const stalled = () => {
+        if (swapped) {
+            setFailed(true);
+            return;
+        }
+        setSwapped(true);
+        setTransport(otherTransport(transport));
+    };
 
     // The browser is the authority on whether it is fullscreen: it leaves on
     // Escape without telling anybody who asked for it.
@@ -45,8 +63,10 @@ export function CameraViewer({
     // Closing has to end the request rather than hide it: a stream left running
     // holds a slot on the relay for a camera nobody is watching.
     useEffect(() => {
-        const element = video.current;
+        // Read at teardown rather than at mount: swapping format replaces the
+        // element, and the one to stop is whichever is playing when this closes.
         return () => {
+            const element = video.current;
             if (!element) return;
             element.pause();
             element.removeAttribute("src");
@@ -66,14 +86,23 @@ export function CameraViewer({
                 <div ref={frame} className="group/frame relative bg-black">
                     <video
                         ref={video}
-                        src={`/api/home/cameras/${camera.id}/stream?q=main`}
+                        // Keyed on the format so swapping really re-creates the
+                        // element: a <video> handed a new src after an error
+                        // keeps the error and never tries again.
+                        key={transport}
+                        src={streamSrc(camera.id, "main", transport)}
+                        // The last frame, immediately, under a stream that is
+                        // still starting - a camera with a long keyframe interval
+                        // can take several seconds to produce a first picture,
+                        // and a black rectangle is indistinguishable from broken.
+                        poster={stillSrc(camera.id)}
                         className={cn("w-full bg-black", full ? "h-screen object-contain" : "aspect-video object-contain")}
                         autoPlay
                         muted
                         playsInline
                         controls={false}
                         onCanPlay={() => setReady(true)}
-                        onError={() => setFailed(true)}
+                        onError={stalled}
                     />
 
                     {!ready && !failed ? (

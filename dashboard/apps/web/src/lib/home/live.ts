@@ -7,18 +7,33 @@
  * Polaris URL, this resolves it, and the bytes are passed through. A viewer never
  * learns the camera's address, its password, or where the relay is.
  *
- * The transport is a progressive fragmented MP4 rather than WebRTC. WebRTC would
- * shave a second off the delay, and it cannot work here: its media goes direct
- * from the relay to the browser over UDP, which means opening the relay to
- * viewers - exactly what the paragraph above refuses. An MP4 over HTTP plays in
- * every browser with no player library, arrives about a second behind, and
- * travels the one path that is already authenticated.
+ * Not WebRTC. It would shave a second off the delay and it cannot work here: its
+ * media goes direct from the relay to the browser over UDP, which means opening
+ * the relay to viewers - exactly what the paragraph above refuses.
+ *
+ * So there are two transports, and which one a browser gets is not a preference.
+ * A progressive fragmented MP4 is the good one: one request, no player library,
+ * about a second behind. No Apple device can play it - not Safari on a Mac, not
+ * an iPhone, not an iPad, and not Chrome on either of them, because they are all
+ * the same engine. Those get HLS, which is a playlist of small segments, several
+ * seconds behind, and the only thing they will play. Both come down the same
+ * authenticated path, so both work from outside the house.
  *
  * Server-only.
  */
 
 import { getCamera } from "@/lib/home/cameras";
-import { relayEndpoint, relayServerFor, snapshot, streamPath, relayStream, type RelayEndpoint } from "@/lib/home/relay";
+import {
+    relayEndpoint,
+    relayServerFor,
+    snapshot,
+    streamPath,
+    relayStream,
+    hlsMasterPath,
+    hlsAssetPath,
+    type HlsFile,
+    type RelayEndpoint
+} from "@/lib/home/relay";
 
 export class CameraOfflineError extends Error {}
 
@@ -66,6 +81,76 @@ export async function cameraStream(
             // The stream is generated as it is watched, so there is no length and
             // no seeking. Saying so stops a browser asking for ranges of it.
             "accept-ranges": "none"
+        }
+    });
+}
+
+/**
+ * Point the master playlist at this route instead of at the relay.
+ *
+ * go2rtc writes one relative link, `hls/playlist.m3u8?id=...`, which is right
+ * when the playlist is served from `api/stream.m3u8` and one directory too deep
+ * from ours. Dropping the prefix makes it a sibling, and every link below it -
+ * the init segment and the media segments - is then already relative to the
+ * right place and needs no touching.
+ *
+ * Exported for its own test: this is one substitution standing between a viewer
+ * and a black rectangle, and it is worth pinning.
+ */
+export function rewriteMasterPlaylist(playlist: string): string {
+    return playlist.replace(/(^|\n)hls\/playlist\.m3u8\?/g, "$1playlist.m3u8?");
+}
+
+/** A session id as go2rtc mints them, and the sequence number a player asks for.
+ *  Anything else is not a request this proxy makes on somebody's behalf. */
+const SESSION = /^[A-Za-z0-9]{1,32}$/;
+const SEQUENCE = /^[0-9]{1,12}$/;
+
+/**
+ * The same live stream, as HLS, for the browsers that will not take the MP4.
+ *
+ * Every file a player asks for comes back through here, so the relay stays
+ * unreachable and a viewer outside the house needs nothing open but Polaris.
+ */
+export async function cameraHls(
+    installedAppId: string,
+    cameraId: string,
+    file: HlsFile,
+    query: { quality: "main" | "sub"; session: string | null; sequence: string | null }
+): Promise<Response> {
+    const { endpoint } = await relayForCamera(installedAppId, cameraId);
+
+    if (file === "stream.m3u8") {
+        const upstream = await relayStream(endpoint, hlsMasterPath(cameraId, query.quality));
+        if (!upstream.ok) throw new CameraOfflineError("The camera is not answering");
+        return playlist(rewriteMasterPlaylist(await upstream.text()));
+    }
+
+    // A player only ever asks for these with a session the relay gave it a moment
+    // ago. One that does not look like one is not worth dialling out for.
+    if (!query.session || !SESSION.test(query.session)) throw new CameraOfflineError("That stream has ended");
+    if (query.sequence && !SEQUENCE.test(query.sequence)) throw new CameraOfflineError("That stream has ended");
+
+    const upstream = await relayStream(endpoint, hlsAssetPath(file, query.session, query.sequence));
+    // A segment the relay no longer holds is an ordinary part of live HLS: the
+    // player asks again. Passing the status through is what lets it.
+    if (!upstream.ok) return new Response(null, { status: upstream.status === 404 ? 404 : 503 });
+    if (file === "playlist.m3u8") return playlist(await upstream.text());
+    return new Response(upstream.body, {
+        headers: {
+            "content-type": upstream.headers.get("content-type") ?? "video/iso.segment",
+            "cache-control": "no-store"
+        }
+    });
+}
+
+function playlist(body: string): Response {
+    return new Response(body, {
+        headers: {
+            "content-type": "application/vnd.apple.mpegurl",
+            // A playlist that is a few seconds old points at segments the relay
+            // has already dropped, which a player reports as a stall.
+            "cache-control": "no-store"
         }
     });
 }

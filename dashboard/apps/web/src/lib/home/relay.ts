@@ -17,35 +17,18 @@
  * Server-only.
  */
 
-import { Socket } from "node:net";
-import { prisma } from "@polaris/db";
-import { tunnelledUrl } from "@/lib/home/tunnel";
-import { listHosts } from "@/lib/host-service";
 import { relaySource } from "@/lib/home/vendors";
-import { getPublicIp } from "@/lib/domain-service";
-import { hostPortForApp } from "@/lib/deploy-service";
 import type { CameraTarget } from "@/lib/home/cameras";
 import { installApp } from "@/lib/apps/install-service";
 import { installEnvSecret, installEnvValue } from "@/lib/apps/install-secret";
+import { assertServer, findService, serviceUrls, type ServiceUrls } from "@/lib/home/side-service";
 
 /** The catalog app this module installs and talks to. */
 const RELAY_APP = "camera-hub";
 
 /** Where a relay is, and how to prove to it that this is Polaris asking. */
-export interface RelayEndpoint {
+export interface RelayEndpoint extends ServiceUrls {
     readonly installedAppId: string;
-    /**
-     * How Polaris dials it. Usually the server's own address; for a relay on a
-     * machine whose high ports nobody forwards, a loopback address that tunnels
-     * through the SSH connection Polaris already has to it.
-     */
-    readonly baseUrl: string;
-    /**
-     * How something ON that machine dials it. The vision worker runs beside the
-     * relay, so it must be given the real address rather than a tunnel that only
-     * exists inside the Polaris process.
-     */
-    readonly directUrl: string;
     readonly username: string;
     readonly password: string;
 }
@@ -62,102 +45,6 @@ export function streamName(cameraId: string, quality: "main" | "sub"): string {
     return `${cameraId}-${quality}`;
 }
 
-/** The relay installed on one server, or null when that server has none. */
-async function findRelay(serverId: string): Promise<{ installedAppId: string; applicationId: string; ownerId: string } | null> {
-    const targetId = await targetIdFor(serverId);
-    const row = await prisma.installedApp.findFirst({
-        where: {
-            catalogId: RELAY_APP,
-            status: { not: "removed" },
-            applicationId: { not: null },
-            ...(targetId ? { targetId } : {})
-        },
-        orderBy: { createdAt: "asc" },
-        select: { id: true, applicationId: true, ownerId: true }
-    });
-    return row?.applicationId
-        ? { installedAppId: row.id, applicationId: row.applicationId, ownerId: row.ownerId }
-        : null;
-}
-
-/** The deploy target a server id resolves to, when one already exists. Null for
- *  a server that has never had anything deployed on it, which is also the case
- *  where no relay can be found. */
-async function targetIdFor(serverId: string): Promise<string | null> {
-    if (serverId === "local") {
-        const local = await prisma.deployTarget.findFirst({ where: { kind: "local" }, select: { id: true } });
-        return local?.id ?? null;
-    }
-    const target = await prisma.deployTarget.findFirst({ where: { hostId: serverId }, select: { id: true } });
-    return target?.id ?? null;
-}
-
-/**
- * The two addresses a relay answers on: the one Polaris uses and the one its own
- * machine uses.
- *
- * The direct address is how every other deployed app is dialled - the server's
- * address and the app's stable host port. It works whenever Polaris and the
- * server are on speaking terms, which is the ordinary case and the fast one.
- *
- * When it does not answer, the relay is on a machine Polaris can only reach
- * through SSH: a second router, a guest network, another building. Rather than
- * asking somebody to forward another port, the stream comes back down that SSH
- * connection. Which of the two is in use is decided by knocking once and
- * remembering the answer, so it costs nothing per request.
- */
-async function urlsFor(
-    applicationId: string,
-    ownerId: string
-): Promise<{ baseUrl: string; directUrl: string } | null> {
-    const application = await prisma.application.findFirst({
-        where: { id: applicationId },
-        select: { target: { select: { kind: true, hostId: true, host: { select: { address: true } } } } }
-    });
-    if (!application) return null;
-    const local = application.target.kind === "local";
-    const dialHost = local ? await getPublicIp() : (application.target.host?.address?.trim() ?? null);
-    if (!dialHost) return null;
-
-    const port = hostPortForApp(applicationId);
-    const directUrl = `http://${dialHost}:${port}`;
-    const hostId = application.target.hostId;
-    if (local || !hostId) return { baseUrl: directUrl, directUrl };
-
-    if (await reachable(dialHost, port)) return { baseUrl: directUrl, directUrl };
-    // A tunnel that cannot be opened is not a reason to answer nothing: the
-    // direct address is still the best guess, and the caller's own failure says
-    // more than a silent null would.
-    const tunnelled = await tunnelledUrl(hostId, ownerId, "127.0.0.1", port).catch(() => null);
-    return { baseUrl: tunnelled ?? directUrl, directUrl };
-}
-
-/** Whether a port answers, remembered for a while.
- *
- *  Asked once per relay rather than per request: the answer is a fact about the
- *  network between two machines, and it does not change between two clicks. */
-const reachability = new Map<string, { open: boolean; at: number }>();
-const REACHABILITY_TTL_MS = 5 * 60_000;
-
-function reachable(host: string, port: number): Promise<boolean> {
-    const key = `${host}:${port}`;
-    const known = reachability.get(key);
-    if (known && Date.now() - known.at < REACHABILITY_TTL_MS) return Promise.resolve(known.open);
-    return new Promise((resolve) => {
-        const socket = new Socket();
-        const answer = (open: boolean) => {
-            socket.destroy();
-            reachability.set(key, { open, at: Date.now() });
-            resolve(open);
-        };
-        socket.setTimeout(1500);
-        socket.once("connect", () => answer(true));
-        socket.once("timeout", () => answer(false));
-        socket.once("error", () => answer(false));
-        socket.connect(port, host);
-    });
-}
-
 /** The account the relay was installed with, read back from the app's own
  *  environment - see install-secret for why it is not kept twice. */
 async function relayCredentials(applicationId: string, ownerId: string): Promise<{ username: string; password: string } | null> {
@@ -170,10 +57,10 @@ async function relayCredentials(applicationId: string, ownerId: string): Promise
 
 /** The relay serving one server, or null when there is not one yet. */
 export async function relayEndpoint(serverId: string): Promise<RelayEndpoint | null> {
-    const relay = await findRelay(serverId);
+    const relay = await findService(RELAY_APP, serverId);
     if (!relay) return null;
     const [urls, auth] = await Promise.all([
-        urlsFor(relay.applicationId, relay.ownerId),
+        serviceUrls(relay.applicationId, relay.ownerId),
         relayCredentials(relay.applicationId, relay.ownerId)
     ]);
     if (!urls || !auth) return null;
@@ -192,11 +79,7 @@ export async function ensureRelay(ownerId: string, actorId: string, serverId: st
     const existing = await relayEndpoint(serverId);
     if (existing) return existing;
 
-    // A server id that names nothing is not something to install onto.
-    if (serverId !== "local") {
-        const hosts = await listHosts(ownerId);
-        if (!hosts.some((host) => host.id === serverId)) throw new Error("That server is not connected");
-    }
+    await assertServer(ownerId, serverId);
     await installApp(ownerId, actorId, {
         catalogId: RELAY_APP,
         name: "Camera relay",
@@ -303,12 +186,44 @@ export async function snapshot(endpoint: RelayEndpoint, cameraId: string, qualit
 
 /** Where a viewer's player connects, as a path on the relay. The browser never
  *  sees this - it is what the authenticated proxy route dials. */
-export function streamPath(cameraId: string, kind: "mp4" | "hls" | "webrtc" | "ws", quality: "main" | "sub" = "main"): string {
+export function streamPath(cameraId: string, kind: "mp4" | "webrtc" | "ws", quality: "main" | "sub" = "main"): string {
     const src = encodeURIComponent(streamName(cameraId, quality));
     if (kind === "mp4") return `/api/stream.mp4?src=${src}`;
-    if (kind === "hls") return `/api/stream.m3u8?src=${src}`;
     if (kind === "webrtc") return `/api/webrtc?src=${src}`;
     return `/api/ws?src=${src}`;
+}
+
+/**
+ * The files an HLS player asks for, in the order it asks for them.
+ *
+ * An allowlist rather than a path: these arrive from a URL, and a proxy that
+ * pastes whatever it was given onto a relay's address is a proxy that can be
+ * pointed at the rest of that relay's API.
+ */
+export const HLS_FILES = ["stream.m3u8", "playlist.m3u8", "init.mp4", "segment.m4s", "segment.ts"] as const;
+export type HlsFile = (typeof HLS_FILES)[number];
+
+export function isHlsFile(value: string): value is HlsFile {
+    return (HLS_FILES as readonly string[]).includes(value);
+}
+
+/**
+ * The first playlist a player fetches, which is also what opens the session.
+ *
+ * `mp4` asks for fragmented-MP4 segments instead of the legacy transport stream.
+ * That is the flavour that carries H265 and audio, and Safari - the only reason
+ * any of this is HLS rather than a plain MP4 - plays it.
+ */
+export function hlsMasterPath(cameraId: string, quality: "main" | "sub"): string {
+    return `/api/stream.m3u8?src=${encodeURIComponent(streamName(cameraId, quality))}&mp4`;
+}
+
+/** Everything the player fetches afterwards. The relay finds the stream from its
+ *  own session id, so these carry no camera and no quality. */
+export function hlsAssetPath(file: Exclude<HlsFile, "stream.m3u8">, session: string, sequence: string | null): string {
+    const query = new URLSearchParams({ id: session });
+    if (sequence) query.set("n", sequence);
+    return `/api/hls/${file}?${query.toString()}`;
 }
 
 /** Dial a relay path and hand back the raw response, for the proxy route that
