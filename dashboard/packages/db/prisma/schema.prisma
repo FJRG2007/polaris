@@ -6449,3 +6449,187 @@ model UserPermission {
     @@unique([userId, permission])
     @@index([userId])
 }
+// A camera Polaris watches.
+//
+// One row per physical camera, whatever it is reached through. Most of what makes
+// a camera awkward is that the same box answers on several addresses at once - a
+// high-quality stream, a low-quality one, an ONVIF service on another port - and
+// that it will usually allow only one connection to the good stream. So the paths
+// are resolved once, when the camera is added, and Polaris holds exactly one pull
+// open per camera and re-serves it to everybody watching. Nothing in the
+// dashboard ever opens a second connection to a camera.
+//
+// The password is envelope-encrypted, like a Host's: it is the credential to a
+// live view of somebody's home, and a database dump must not be a way in.
+model Camera {
+    id             String  @id @default(uuid(7)) @db.Uuid
+    // The Home install this belongs to. Bare uuid, per the InstalledApp precedent
+    // of not linking installs by foreign key.
+    installedAppId String  @db.Uuid
+    name           String
+    /// Where in the house it points ("Front door"). Free text, and the only
+    /// grouping the wall has - a table of zones would be a second thing to
+    /// maintain for a list that is read once per screen.
+    zone           String?
+    /// tapo | reolink | hikvision | dahua | onvif | generic - what it is, which
+    /// decides the stream paths and how it is controlled when it was not probed.
+    vendor         String  @default("generic")
+    /// What the camera calls itself, as reported over ONVIF. Kept for the row,
+    /// not for logic.
+    model          String?
+
+    // How Polaris reaches it.
+    address   String
+    rtspPort  Int     @default(554)
+    /// The ONVIF service port when it speaks ONVIF: 80 on most, 2020 on Tapo.
+    /// Null when it does not, which is what makes the movement controls absent
+    /// rather than broken.
+    onvifPort Int?
+    /// Stream paths below the host, resolved when the camera was added and then
+    /// left alone. `mainPath` is the quality that gets recorded and watched;
+    /// `subPath` is the small one detection reads, because running detection on
+    /// the main stream is how a house of cameras eats a machine.
+    mainPath  String?
+    subPath   String?
+    username  String?
+    // Envelope-encrypted camera password.
+    encryptedSecret Bytes?
+    secretNonce     Bytes?
+    secretKeyId     String?
+
+    /// direct, or `server:<hostId>` for a camera on a network Polaris cannot
+    /// reach: that machine holds the RTSP connection on its own LAN and the
+    /// stream comes back over the channel Polaris already has to it.
+    reachVia      String  @default("direct")
+    /// The DeployTarget running the relay that holds this camera's connection.
+    /// Null until the first viewer, which is what keeps an added-but-never-opened
+    /// camera from costing anything.
+    relayTargetId String? @db.Uuid
+
+    /// none | camera | motion | objects | faces - the most expensive stage this
+    /// camera is allowed to reach. Each stage gates the next, so `faces` still
+    /// means "only when movement was seen, and only if it looked like a person".
+    detector         String  @default("camera")
+    /// Where that detection runs, when it is not the camera doing it itself.
+    detectorTargetId String? @db.Uuid
+    /// Tuning for the chosen detector as a JSON object: sensitivity, the hours it
+    /// is on, the shortest gap between two looks. Read whole with the camera and
+    /// never queried by field, so it is one column rather than a table per knob.
+    detectionConfig  String  @default("{}")
+
+    /// off | motion | continuous.
+    recording     String  @default("off")
+    /// Days a clip from this camera is kept. Storage is the one resource a camera
+    /// spends whether or not anybody watches, so every camera has a limit and it
+    /// is per camera - a doorbell and a garage do not deserve the same month.
+    retentionDays Int     @default(7)
+    /// Off means Polaris does not connect to it at all: no relay, no detection,
+    /// no recording. The row stays, so its clips and its settings survive.
+    enabled       Boolean @default(true)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    events CameraEvent[]
+    clips  CameraClip[]
+
+    @@index([installedAppId])
+    @@index([installedAppId, zone])
+}
+
+// Something a camera saw.
+//
+// The row is the record; the picture and the footage are not in it. A still is a
+// key into the storage the house writes to, and a clip is its own row, so an
+// event costs a few hundred bytes however many of them a windy afternoon
+// produces.
+model CameraEvent {
+    id        String    @id @default(uuid(7)) @db.Uuid
+    cameraId  String    @db.Uuid
+    at        DateTime  @default(now())
+    /// motion | person | vehicle | animal | face | offline | tamper - what was
+    /// seen, at the most specific stage that ran.
+    kind      String
+    /// Who or what, when the stage that ran can say: the name of a known face,
+    /// the object class. Null for bare movement.
+    label     String?
+    /// 0-100, as the detector reported it, so a threshold can be moved later
+    /// without the events already recorded becoming unreadable.
+    score     Int?
+    /// Where the still is, as a key in the house's storage. Null when the stage
+    /// that fired keeps no picture (a camera reporting its own motion).
+    stillKey  String?
+    /// The recording this event sits inside, when one was kept.
+    clipId    String?   @db.Uuid
+    /// Somebody has seen this and it needs no further attention.
+    ackedAt   DateTime?
+    ackedById String?   @db.Uuid
+
+    camera Camera      @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+    clip   CameraClip? @relation(fields: [clipId], references: [id], onDelete: SetNull)
+
+    // The three questions asked of this table: what happened on this camera, what
+    // happened anywhere (the house's feed), and what of one kind happened here.
+    @@index([cameraId, at])
+    @@index([at])
+    @@index([cameraId, kind, at])
+}
+
+// Footage kept on disk.
+//
+// Written in segments rather than as one file per event, so a camera that records
+// all day does not become one unbounded recording, and an event that spans two
+// segments still resolves to both.
+model CameraClip {
+    id        String    @id @default(uuid(7)) @db.Uuid
+    cameraId  String    @db.Uuid
+    startedAt DateTime
+    endedAt   DateTime?
+    /// motion | continuous | manual - why this segment exists, which is also what
+    /// decides whether retention may drop it.
+    reason    String    @default("motion")
+    /// Where the file is: the storage connection it was written to, and the path
+    /// inside it. A null connection means the house's default destination, so a
+    /// clip does not go missing when that default is changed later.
+    connectionId String? @db.Uuid
+    path         String
+    bytes        BigInt  @default(0)
+    durationMs   Int     @default(0)
+    /// Kept until somebody removes it, whatever the retention says. This is how
+    /// the clip of the one night that mattered survives a seven-day house.
+    pinned       Boolean @default(false)
+
+    createdAt DateTime @default(now())
+
+    camera Camera        @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+    events CameraEvent[]
+
+    // Listing a camera's footage newest first, and the retention sweep, which
+    // asks for everything older than a date and not pinned.
+    @@index([cameraId, startedAt])
+    @@index([startedAt])
+}
+
+// Somebody the house knows by sight.
+//
+// Deliberately holds no face data. The template that recognizes a person lives in
+// whichever recognition service the operator chose to install and stays on that
+// machine; this is the name they are known by here and the id they answer to
+// there, so removing a person from Polaris is a delete in both and never leaves a
+// biometric record behind in the one nobody thinks to look at.
+model HomePerson {
+    id             String  @id @default(uuid(7)) @db.Uuid
+    installedAppId String  @db.Uuid
+    name           String
+    /// The subject this person is filed under in the recognition service.
+    subjectId      String
+    /// Whether seeing them is worth reporting. A household is recognized so that
+    /// it stops raising alerts, not so that every arrival home becomes one.
+    notify         Boolean @default(false)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([installedAppId, name])
+    @@index([installedAppId])
+}

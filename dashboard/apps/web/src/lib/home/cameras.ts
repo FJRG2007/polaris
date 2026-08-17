@@ -1,0 +1,283 @@
+/**
+ * The cameras in the house: reading them, adding one, changing one, removing one.
+ *
+ * Two shapes come out of here and the difference is the point. `CameraView` is
+ * what a screen gets - everything except the password. `CameraTarget` is what the
+ * relay and the detectors get, and it carries the decrypted credential, so it is
+ * built only where a connection is about to be made and never returned to a
+ * caller that renders.
+ *
+ * Server-only.
+ */
+
+import { prisma } from "@polaris/db";
+import { loadEnv } from "@polaris/config";
+import { cameraVendor, rtspUrl } from "@/lib/home/vendors";
+import { decryptSecret, encryptSecret } from "@polaris/storage";
+import { detectionSettingsSchema, type CameraInput } from "@/lib/home/schemas";
+import { DEFAULT_DETECTION, type DetectionSettings } from "@/lib/home/detection";
+
+/** A camera as a screen sees it. No credential, ever. */
+export interface CameraView {
+    readonly id: string;
+    readonly name: string;
+    readonly zone: string;
+    readonly vendor: string;
+    readonly model: string | null;
+    readonly address: string;
+    readonly rtspPort: number;
+    readonly onvifPort: number | null;
+    readonly mainPath: string;
+    readonly subPath: string;
+    readonly username: string;
+    /** Whether a password is stored, so the form can say "unchanged" instead of
+     *  arriving blank and looking like there is none. */
+    readonly hasPassword: boolean;
+    readonly reachVia: string;
+    readonly detector: string;
+    readonly detectorTargetId: string | null;
+    readonly detection: DetectionSettings;
+    readonly recording: string;
+    readonly retentionDays: number;
+    readonly enabled: boolean;
+    /** Whether the camera can be pointed somewhere, which is only true when it
+     *  answered ONVIF. */
+    readonly ptz: boolean;
+}
+
+/** A camera as something that is about to connect to it sees it. */
+export interface CameraTarget {
+    readonly id: string;
+    readonly name: string;
+    readonly address: string;
+    readonly rtspPort: number;
+    readonly onvifPort: number | null;
+    readonly username: string | null;
+    readonly password: string | null;
+    readonly reachVia: string;
+    /** Full URL of the stream that gets watched and recorded. */
+    readonly mainUrl: string;
+    /** The small one detection reads. Falls back to the main stream when the
+     *  camera publishes only one - detection still has to work there, it just
+     *  costs more, and the settings screen says so. */
+    readonly subUrl: string;
+}
+
+type CameraRow = Awaited<ReturnType<typeof prisma.camera.findFirst>>;
+
+/** The stored detection tuning, or the defaults for a row written before a knob
+ *  existed. A malformed blob is not an error a screen should die on: it means
+ *  this camera falls back to the defaults, which is what it was doing anyway. */
+export function parseDetection(raw: string): DetectionSettings {
+    try {
+        const parsed = detectionSettingsSchema.safeParse(JSON.parse(raw));
+        return parsed.success ? { ...DEFAULT_DETECTION, ...parsed.data } : DEFAULT_DETECTION;
+    } catch {
+        return DEFAULT_DETECTION;
+    }
+}
+
+function toView(row: NonNullable<CameraRow>): CameraView {
+    return {
+        id: row.id,
+        name: row.name,
+        zone: row.zone ?? "",
+        vendor: row.vendor,
+        model: row.model,
+        address: row.address,
+        rtspPort: row.rtspPort,
+        onvifPort: row.onvifPort,
+        mainPath: row.mainPath ?? "",
+        subPath: row.subPath ?? "",
+        username: row.username ?? "",
+        hasPassword: row.encryptedSecret !== null,
+        reachVia: row.reachVia,
+        detector: row.detector,
+        detectorTargetId: row.detectorTargetId,
+        detection: parseDetection(row.detectionConfig),
+        recording: row.recording,
+        retentionDays: row.retentionDays,
+        enabled: row.enabled,
+        ptz: row.onvifPort !== null
+    };
+}
+
+/** Every camera in the house, grouped the way the wall reads: by zone, then by
+ *  name. One query - a house has tens of cameras, not thousands. */
+export async function listCameras(installedAppId: string): Promise<CameraView[]> {
+    const rows = await prisma.camera.findMany({
+        where: { installedAppId },
+        orderBy: [{ zone: "asc" }, { name: "asc" }]
+    });
+    return rows.map(toView);
+}
+
+/** One camera of this house, or null. Scoped by the install on purpose: an id
+ *  from somewhere else must not resolve. */
+export async function getCamera(installedAppId: string, id: string): Promise<CameraView | null> {
+    const row = await prisma.camera.findFirst({ where: { id, installedAppId } });
+    return row ? toView(row) : null;
+}
+
+/** The paths a camera ends up with: what was typed, else what its make uses. */
+function resolvePaths(input: CameraInput): { mainPath: string; subPath: string } {
+    const vendor = cameraVendor(input.vendor);
+    return {
+        mainPath: input.mainPath || vendor.mainPath,
+        subPath: input.subPath || vendor.subPath || ""
+    };
+}
+
+/** Encrypt a camera password for storage, or null to leave the stored one be. */
+function secretColumns(password: string | undefined) {
+    if (password === undefined || password === "") return null;
+    const blob = encryptSecret(password, loadEnv().POLARIS_MASTER_KEY);
+    return { encryptedSecret: blob.ciphertext, secretNonce: blob.nonce, secretKeyId: blob.keyId };
+}
+
+export async function createCamera(installedAppId: string, input: CameraInput): Promise<CameraView> {
+    const vendor = cameraVendor(input.vendor);
+    const paths = resolvePaths(input);
+    const row = await prisma.camera.create({
+        data: {
+            installedAppId,
+            name: input.name,
+            zone: input.zone || null,
+            vendor: input.vendor,
+            address: input.address,
+            rtspPort: input.rtspPort,
+            // What the make listens on, unless the form was told otherwise. This
+            // is the one that makes Tapo work without anybody knowing about 2020.
+            onvifPort: input.onvifPort ?? vendor.onvifPort ?? null,
+            mainPath: paths.mainPath || null,
+            subPath: paths.subPath || null,
+            username: input.username || null,
+            reachVia: input.reachVia,
+            detector: input.detector,
+            detectorTargetId: input.detectorTargetId,
+            detectionConfig: JSON.stringify(input.detection),
+            recording: input.recording,
+            retentionDays: input.retentionDays,
+            enabled: input.enabled,
+            ...(secretColumns(input.password) ?? {})
+        }
+    });
+    return toView(row);
+}
+
+export async function updateCamera(
+    installedAppId: string,
+    id: string,
+    input: CameraInput
+): Promise<CameraView> {
+    const existing = await prisma.camera.findFirst({ where: { id, installedAppId }, select: { id: true } });
+    if (!existing) throw new Error("Camera not found");
+    const vendor = cameraVendor(input.vendor);
+    const paths = resolvePaths(input);
+    const row = await prisma.camera.update({
+        where: { id },
+        data: {
+            name: input.name,
+            zone: input.zone || null,
+            vendor: input.vendor,
+            address: input.address,
+            rtspPort: input.rtspPort,
+            onvifPort: input.onvifPort ?? vendor.onvifPort ?? null,
+            mainPath: paths.mainPath || null,
+            subPath: paths.subPath || null,
+            username: input.username || null,
+            reachVia: input.reachVia,
+            detector: input.detector,
+            detectorTargetId: input.detectorTargetId,
+            detectionConfig: JSON.stringify(input.detection),
+            recording: input.recording,
+            retentionDays: input.retentionDays,
+            enabled: input.enabled,
+            // An empty password field on an edit means "leave it": the stored one
+            // is never sent to the browser, so blank cannot mean "clear it"
+            // without silently locking Polaris out of the camera.
+            ...(secretColumns(input.password) ?? {})
+        }
+    });
+    return toView(row);
+}
+
+/** Remove a camera and everything it recorded. The rows cascade; the files it
+ *  wrote are dropped by the retention sweep, which is the one thing that knows
+ *  how to reach the storage they went to. */
+export async function deleteCamera(installedAppId: string, id: string): Promise<void> {
+    const existing = await prisma.camera.findFirst({ where: { id, installedAppId }, select: { id: true } });
+    if (!existing) throw new Error("Camera not found");
+    await prisma.camera.delete({ where: { id } });
+}
+
+/** The stored password, or null when the camera needs none. Throws only when the
+ *  master key has changed under a stored credential, which is a real failure and
+ *  has to be said rather than swallowed into "camera offline". */
+async function cameraPassword(row: NonNullable<CameraRow>): Promise<string | null> {
+    if (!row.encryptedSecret || !row.secretNonce || !row.secretKeyId) return null;
+    return decryptSecret(
+        {
+            // Prisma hands bytes back as a Uint8Array; the envelope is written in
+            // Buffers.
+            ciphertext: Buffer.from(row.encryptedSecret),
+            nonce: Buffer.from(row.secretNonce),
+            keyId: row.secretKeyId
+        },
+        loadEnv().POLARIS_MASTER_KEY
+    );
+}
+
+/**
+ * A camera in the form something that connects to it needs, credential included.
+ *
+ * Never hand the result to a component. It is built for the relay's configuration
+ * and for the ONVIF client, both of which run on the server and both of which
+ * need the password to say anything to the camera at all.
+ */
+export async function cameraTarget(installedAppId: string, id: string): Promise<CameraTarget | null> {
+    const row = await prisma.camera.findFirst({ where: { id, installedAppId } });
+    if (!row) return null;
+    const password = await cameraPassword(row);
+    const auth = { username: row.username, password };
+    const endpoint = { address: row.address, rtspPort: row.rtspPort };
+    const mainUrl = rtspUrl(endpoint, row.mainPath ?? "", auth);
+    return {
+        id: row.id,
+        name: row.name,
+        address: row.address,
+        rtspPort: row.rtspPort,
+        onvifPort: row.onvifPort,
+        username: row.username,
+        password,
+        reachVia: row.reachVia,
+        mainUrl,
+        subUrl: row.subPath ? rtspUrl(endpoint, row.subPath, auth) : mainUrl
+    };
+}
+
+/** Every enabled camera as a connection target, for the relay's configuration.
+ *  One pass rather than a query per camera - the relay is written whole. */
+export async function cameraTargets(installedAppId: string): Promise<CameraTarget[]> {
+    const rows = await prisma.camera.findMany({ where: { installedAppId, enabled: true } });
+    return Promise.all(
+        rows.map(async (row) => {
+            const password = await cameraPassword(row);
+            const auth = { username: row.username, password };
+            const endpoint = { address: row.address, rtspPort: row.rtspPort };
+            const mainUrl = rtspUrl(endpoint, row.mainPath ?? "", auth);
+            return {
+                id: row.id,
+                name: row.name,
+                address: row.address,
+                rtspPort: row.rtspPort,
+                onvifPort: row.onvifPort,
+                username: row.username,
+                password,
+                reachVia: row.reachVia,
+                mainUrl,
+                subUrl: row.subPath ? rtspUrl(endpoint, row.subPath, auth) : mainUrl
+            };
+        })
+    );
+}
