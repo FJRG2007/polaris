@@ -1,0 +1,120 @@
+"use client";
+
+/**
+ * Getting hold of a microphone and a camera, and saying what happened when it
+ * did not work.
+ *
+ * Shared by both ways a call is carried, because opening the devices is the one
+ * part that is the same either way - and because the sentences below are the
+ * only thing standing between somebody and a call where nobody can hear them
+ * with nothing on screen saying why.
+ */
+
+import type { CallDevice } from "./call-state";
+import { micConstraints } from "./mic-cleanup";
+
+/**
+ * Open what this browser can, and say what it could not.
+ *
+ * Asked in three goes rather than one, because one is how a busy camera takes
+ * the microphone with it: a single `getUserMedia` for both fails as a whole, so
+ * somebody with Discord or OBS holding the camera joined a call able to hear and
+ * unable to speak, with nothing on screen saying why. So both, then sound alone,
+ * then picture alone.
+ */
+export async function openMedia(
+    withVideo: boolean
+): Promise<{ stream: MediaStream | null; note: string }> {
+    const ask = (audio: boolean, video: boolean) =>
+        navigator.mediaDevices.getUserMedia({
+            // Echo, background noise and a level that keeps somebody audible
+            // from across the room, all handled by the browser before anything
+            // is sent - see `mic-cleanup`.
+            audio: audio ? micConstraints() : false,
+            video
+        });
+
+    try {
+        return { stream: await ask(true, withVideo), note: "" };
+    } catch (first) {
+        if (!withVideo) return { stream: null, note: refused(first, "microphone") };
+
+        // The camera is the likelier of the two to be busy, and the one nobody
+        // needs. Try again without it before giving up on being heard.
+        try {
+            return { stream: await ask(true, false), note: refused(first, "camera") };
+        } catch (second) {
+            try {
+                return { stream: await ask(false, true), note: refused(second, "microphone") };
+            } catch {
+                return { stream: null, note: refused(second, "microphone or camera") };
+            }
+        }
+    }
+}
+
+/**
+ * What the browser refused, in words somebody can do something about.
+ *
+ * `NotReadable` is the one worth naming precisely: on Windows a device is held
+ * exclusively, and "another application is using it" is a sentence somebody can
+ * act on in a way that "could not reach your microphone" is not.
+ */
+export function refused(error: unknown, what: string): string {
+    const name = error instanceof Error ? error.name : "";
+    if (name === "NotAllowedError" || name === "SecurityError") {
+        return `Polaris was not allowed to use your ${what}. Allow it in the address bar and rejoin.`;
+    }
+    if (name === "NotReadableError" || name === "AbortError") {
+        return `Your ${what} is busy - another application is holding it. Close it, or pick a different device, and rejoin.`;
+    }
+    if (name === "NotFoundError" || name === "OverconstrainedError") {
+        return `No ${what} was found on this device.`;
+    }
+    return `Polaris could not reach your ${what}.`;
+}
+
+/** What this browser has to offer, named. Labels are only filled in once a
+ *  permission has been granted, which is why this is asked after the stream. */
+export async function callDevices(): Promise<{
+    microphones: CallDevice[];
+    cameras: CallDevice[];
+}> {
+    const found = await navigator.mediaDevices.enumerateDevices().catch(() => []);
+    const named = (kind: MediaDeviceKind, fallback: string): CallDevice[] =>
+        found
+            .filter((device) => device.kind === kind && device.deviceId)
+            .map((device, index) => ({
+                id: device.deviceId,
+                label: device.label || `${fallback} ${index + 1}`
+            }));
+    return { microphones: named("audioinput", "Microphone"), cameras: named("videoinput", "Camera") };
+}
+
+/**
+ * The new picture of the room, keeping every stream that has not changed.
+ *
+ * A `MediaStream` is what a tile's video element is pointed at, and pointing one
+ * at a different object restarts it - a black frame, a re-attach, and on a wall
+ * of faces all of them at once. Since the whole room is worked out on every
+ * track event, that would be the ordinary case rather than a rare one, so a
+ * participant whose set of tracks is unchanged keeps the exact object they had.
+ *
+ * Compared by track identity rather than by count: a camera swapped for another
+ * camera is the same number of tracks and a completely different picture.
+ */
+export function settle(
+    held: ReadonlyMap<string, MediaStream>,
+    found: ReadonlyMap<string, MediaStreamTrack[]>
+): ReadonlyMap<string, MediaStream> {
+    const next = new Map<string, MediaStream>();
+    for (const [id, tracks] of found) {
+        const before = held.get(id);
+        const same =
+            before !== undefined &&
+            before.getTracks().length === tracks.length &&
+            tracks.every((track) => before.getTrackById(track.id) !== null);
+        next.set(id, same ? before : new MediaStream(tracks));
+    }
+    return next;
+}

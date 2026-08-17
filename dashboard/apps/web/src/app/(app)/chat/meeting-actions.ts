@@ -19,10 +19,10 @@ import * as core from "@polaris/core";
 import { cookies } from "next/headers";
 import * as chat from "@/lib/chat/chat-service";
 import * as meetings from "@/lib/chat/meetings";
+import * as calls from "@/lib/chat/call-server";
 import { requirePermission } from "@/lib/session";
 import type { MeetingView } from "@/lib/chat/meetings";
 import { ChatAccessError, requireChannel } from "@/lib/chat/access";
-import * as calls from "@/lib/chat/call-server";
 import { GUEST_COOKIE, GUEST_COOKIE_MAX_AGE, resolveSeat } from "@/lib/chat/meeting-seat";
 
 /**
@@ -143,6 +143,22 @@ export async function readCallAction(
     return result.error
         ? { error: result.error }
         : { meeting: result.value, participantId: seat.participantId };
+}
+
+/**
+ * Which way this call will be carried.
+ *
+ * Asked before anything is opened, because the two ways of carrying a call are
+ * two different pieces of code in the browser and starting the wrong one costs a
+ * second permission prompt. It answers about the instance rather than about the
+ * caller - so a seat is the only gate, and somebody still in the waiting room
+ * gets a truthful answer, which is what lets their browser be ready the moment
+ * they are let in.
+ */
+export async function callTransportAction(meetingId: string): Promise<"sfu" | "mesh"> {
+    const seat = await resolveSeat(meetingId);
+    if (!seat) return "mesh";
+    return (await calls.callServer()) ? "sfu" : "mesh";
 }
 
 /**

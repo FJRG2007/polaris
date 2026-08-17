@@ -981,15 +981,32 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     generated: true,
                     generatedPrefix: "polaris: "
                 },
-                // One UDP port rather than the ten thousand the defaults use.
-                // A range that size cannot be forwarded through a home router by
-                // anybody who is not already enjoying this.
-                { key: "UDP_PORT", label: "Media port", default: "7882" },
-                // What the server tells browsers to send media to. Left empty on
-                // a LAN, where the address it works out for itself is right; set
-                // to the public address of the machine when the call has to cross
-                // the internet.
-                { key: "NODE_IP", label: "Address browsers reach it on", tunable: true }
+                /**
+                 * Everything else, as the one variable the server actually
+                 * reads.
+                 *
+                 * The upstream example passes `UDP_PORT` and `NODE_IP`, and it
+                 * does it by substituting them into a config file with a shell -
+                 * the binary itself has never heard of either, so setting them
+                 * here would have looked configured and done nothing. This is the
+                 * config, in flow style so it stays one line.
+                 *
+                 * What it says: one media port rather than the ten thousand the
+                 * defaults use, because a range that size cannot be forwarded
+                 * through a home router by anybody who is not already enjoying
+                 * this. And `use_external_ip`, which is how the server finds out
+                 * what address to tell browsers to send to - without it a call
+                 * between two houses is advertised at an address on the wrong
+                 * side of the router.
+                 */
+                {
+                    key: "LIVEKIT_CONFIG",
+                    label: "Server settings",
+                    help: "One line of YAML. Change `udp_port` if 7882 is taken, and add `node_ip: <address>` inside `rtc` if the machine cannot work out its own public address.",
+                    default:
+                        "{port: 7880, rtc: {tcp_port: 7881, udp_port: 7882, use_external_ip: true}}",
+                    tunable: true
+                }
             ],
             ports: [
                 { container: 7880, protocol: "http", label: "Signalling" },

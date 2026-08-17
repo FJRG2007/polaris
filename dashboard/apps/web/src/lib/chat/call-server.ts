@@ -217,7 +217,13 @@ export async function joinToken(
         canSubscribe: true,
         // The data channel carries nothing here: everything Polaris has to say
         // about a call goes through Polaris, where it can be checked.
-        canPublishData: false
+        canPublishData: false,
+        // One thing a browser is allowed to say about itself, and only about
+        // itself: whether its headphones are off. Nothing else can tell - a
+        // person who has stopped listening publishes exactly what an attentive
+        // one does - and it is a courtesy rather than a claim, so it does not
+        // need to be believed to be worth carrying.
+        canUpdateOwnMetadata: true
     });
     return token.toJwt();
 }
@@ -231,6 +237,9 @@ export interface CallServerSettings {
     readonly installedOn: string | null;
     /** Whether calls have somewhere to run at all. */
     readonly ready: boolean;
+    /** Whether it answers yet - a fresh install spends a minute or two starting,
+     *  and "installed but silent" is the state people ask about. */
+    readonly answering: boolean;
 }
 
 export async function callServerSettings(): Promise<CallServerSettings> {
@@ -240,8 +249,26 @@ export async function callServerSettings(): Promise<CallServerSettings> {
         url: stored.url ?? "",
         hasKey: Boolean(stored.apiKey),
         installedOn: stored.installId ? await serverNameFor(stored.installId) : null,
-        ready: endpoint !== null
+        ready: endpoint !== null,
+        answering: endpoint ? await answering(endpoint) : false
     };
+}
+
+/**
+ * Whether it answers at all.
+ *
+ * Asked over HTTP rather than over the address a browser dials, which is the
+ * same server on the same port speaking the other half of its protocol: a
+ * WebSocket handshake would need a signed token to get anywhere, and this
+ * question is "is the container up", not "may I join a call".
+ *
+ * Short timeout: this runs while a settings page is rendering, and a server
+ * still starting is a fact to report rather than a reason to hold the page.
+ */
+async function answering(endpoint: CallServerEndpoint): Promise<boolean> {
+    const address = endpoint.url.replace(/^ws:/, "http:").replace(/^wss:/, "https:");
+    const response = await fetch(address, { signal: AbortSignal.timeout(2500) }).catch(() => null);
+    return response?.ok === true;
 }
 
 /** Which machine the installed server sits on, in words. Null when the install
