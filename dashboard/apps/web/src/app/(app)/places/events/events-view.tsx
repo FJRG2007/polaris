@@ -21,7 +21,18 @@ import type { EventView } from "@/lib/home/events";
 import { Bell, Check, Loader2 } from "lucide-react";
 import type { CameraView } from "@/lib/home/cameras";
 import { useDisplayFormat } from "@/components/display-format";
-import { Badge, Button, EmptyState, Select, Skeleton, cn } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    EmptyState,
+    Select,
+    Skeleton,
+    cn
+} from "@polaris/ui";
 
 const KINDS = [
     { value: "", label: "Everything" },
@@ -46,8 +57,14 @@ export function EventsView({ canControl }: { canControl: boolean }) {
     const format = useDisplayFormat();
     const [events, setEvents] = useState<EventView[] | null>(null);
     const [cameras, setCameras] = useState<CameraView[]>([]);
+    const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
     const [cameraId, setCameraId] = useState("");
     const [kind, setKind] = useState("");
+    const [label, setLabel] = useState("");
+    const [from, setFrom] = useState("");
+    const [to, setTo] = useState("");
+    const [moment, setMoment] = useState<{ event: EventView; clipId: string; offsetSeconds: number } | null>(null);
+    const [noFootage, setNoFootage] = useState<string | null>(null);
     const [loadingMore, setLoadingMore] = useState(false);
     const [done, setDone] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -55,8 +72,10 @@ export function EventsView({ canControl }: { canControl: boolean }) {
     useEffect(() => {
         let cancelled = false;
         void (async () => {
-            const list = await actions.listCamerasAction();
-            if (!cancelled) setCameras(list.cameras ?? []);
+            const [list, known] = await Promise.all([actions.listCamerasAction(), actions.listPeopleAction()]);
+            if (cancelled) return;
+            setCameras(list.cameras ?? []);
+            setPeople((known.people ?? []).map((person) => ({ id: person.id, name: person.name })));
         })();
         return () => {
             cancelled = true;
@@ -68,7 +87,13 @@ export function EventsView({ canControl }: { canControl: boolean }) {
         setEvents(null);
         setDone(false);
         void (async () => {
-            const result = await actions.listEventsAction({ cameraId: cameraId || null, kind: kind || null });
+            const result = await actions.listEventsAction({
+                cameraId: cameraId || null,
+                kind: kind || null,
+                label: label || null,
+                from: from || null,
+                to: to || null
+            });
             if (cancelled) return;
             if (result.error) setError(result.error);
             setEvents(result.events ?? []);
@@ -76,7 +101,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
         return () => {
             cancelled = true;
         };
-    }, [cameraId, kind]);
+    }, [cameraId, kind, label, from, to]);
 
     const loadMore = async () => {
         if (!events?.length) return;
@@ -86,6 +111,9 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                 actions.listEventsAction({
                     cameraId: cameraId || null,
                     kind: kind || null,
+                    label: label || null,
+                    from: from || null,
+                    to: to || null,
                     before: events[events.length - 1]?.at ?? null
                 }),
             setError
@@ -111,6 +139,23 @@ export function EventsView({ canControl }: { canControl: boolean }) {
         }
     };
 
+    const openMoment = async (event: EventView) => {
+        setNoFootage(null);
+        const result = await runAction(() => actions.momentAction(event.id), setError);
+        if (!result) return;
+        if (result.error) {
+            setError(result.error);
+            return;
+        }
+        if (!result.moment) {
+            // Said rather than opening an empty player: "nothing was kept" is an
+            // answer, and it points at the setting that would have kept it.
+            setNoFootage(event.id);
+            return;
+        }
+        setMoment({ event, ...result.moment });
+    };
+
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap gap-2">
@@ -125,6 +170,47 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                     ]}
                 />
                 <Select value={kind} onValueChange={setKind} className="w-44" aria-label="What happened" options={KINDS} />
+                {people.length > 0 ? (
+                    <Select
+                        value={label}
+                        onValueChange={setLabel}
+                        className="w-44"
+                        aria-label="Who"
+                        options={[
+                            { value: "", label: "Anybody" },
+                            ...people.map((person) => ({ value: person.name, label: person.name }))
+                        ]}
+                    />
+                ) : null}
+                <input
+                    type="datetime-local"
+                    value={from}
+                    onChange={(event) => setFrom(event.target.value)}
+                    aria-label="From"
+                    className="h-9 rounded-md border border-border bg-field px-2 text-[13px] text-foreground"
+                />
+                <input
+                    type="datetime-local"
+                    value={to}
+                    onChange={(event) => setTo(event.target.value)}
+                    aria-label="To"
+                    className="h-9 rounded-md border border-border bg-field px-2 text-[13px] text-foreground"
+                />
+                {cameraId || kind || label || from || to ? (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                            setCameraId("");
+                            setKind("");
+                            setLabel("");
+                            setFrom("");
+                            setTo("");
+                        }}
+                    >
+                        Clear
+                    </Button>
+                ) : null}
             </div>
 
             {error ? <p className="text-[12px] text-danger">{error}</p> : null}
@@ -148,7 +234,12 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                     event.acked && "opacity-60"
                                 )}
                             >
-                                <div className="relative aspect-video bg-background">
+                                <button
+                                    type="button"
+                                    className="relative block aspect-video w-full cursor-zoom-in bg-background"
+                                    onClick={() => void openMoment(event)}
+                                    aria-label={`See ${event.cameraName} at ${format.dateTime(event.at)}`}
+                                >
                                     {event.stillKey ? (
                                         <Image
                                             src={`/api/home/events/${event.id}/still`}
@@ -163,7 +254,12 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                             No picture kept
                                         </span>
                                     )}
-                                </div>
+                                    {noFootage === event.id ? (
+                                        <span className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 text-[11px] text-white">
+                                            No footage of this moment was kept
+                                        </span>
+                                    ) : null}
+                                </button>
                                 <div className="flex items-start justify-between gap-2 border-t border-border px-3 py-2">
                                     <div className="min-w-0">
                                         <p className="truncate text-[13px] text-foreground">
@@ -205,7 +301,51 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                     ) : null}
                 </>
             )}
+            {moment ? (
+                <MomentDialog
+                    title={`${moment.event.label ?? KIND_LABEL[moment.event.kind] ?? moment.event.kind} - ${moment.event.cameraName}, ${format.dateTime(moment.event.at)}`}
+                    clipId={moment.clipId}
+                    offsetSeconds={moment.offsetSeconds}
+                    onClose={() => setMoment(null)}
+                />
+            ) : null}
         </div>
+    );
+}
+
+/**
+ * The footage of one moment.
+ *
+ * Seeked with a media fragment on the URL rather than by setting currentTime
+ * after load: the range request that produces is what makes a jump into the
+ * middle of a segment instant instead of a download of everything before it.
+ */
+function MomentDialog({
+    title,
+    clipId,
+    offsetSeconds,
+    onClose
+}: {
+    title: string;
+    clipId: string;
+    offsetSeconds: number;
+    onClose: () => void;
+}) {
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-4xl">
+                <DialogHeader>
+                    <DialogTitle>{title}</DialogTitle>
+                </DialogHeader>
+                <video
+                    src={`/api/home/clips/${clipId}/video#t=${offsetSeconds}`}
+                    className="w-full rounded-md border border-border bg-black"
+                    controls
+                    autoPlay
+                    playsInline
+                />
+            </DialogContent>
+        </Dialog>
     );
 }
 

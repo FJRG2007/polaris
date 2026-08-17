@@ -190,6 +190,14 @@ export interface EventQuery {
     /** One camera, or every camera in scope. */
     readonly cameraId?: string | null;
     readonly kind?: string | null;
+    /** One person, by the name the recognizer put to them. The question this
+     *  answers - "when was Ana here" - is the one a log is opened for. */
+    readonly label?: string | null;
+    /** A window to look inside. The other question a log is opened for is
+     *  "what happened on Tuesday night", and paging back to it through a month
+     *  of movement is not an answer. */
+    readonly from?: Date | null;
+    readonly to?: Date | null;
     /** Newest first, from this point back. Keyset rather than an offset: this
      *  table is the one that grows without limit. */
     readonly before?: Date | null;
@@ -212,11 +220,20 @@ export async function listEvents(installedAppId: string, query: EventQuery = {})
     if (cameras.length === 0) return [];
     const names = new Map(cameras.map((camera) => [camera.id, camera.name]));
 
+    // One `at` clause, because Prisma takes one per field and the window and the
+    // page cursor are both about `at` - written separately, the later one wins
+    // silently and the filter above it is simply ignored.
+    const at: { lt?: Date; gte?: Date; lte?: Date } = {};
+    if (query.before) at.lt = query.before;
+    if (query.from) at.gte = query.from;
+    if (query.to) at.lte = query.to;
+
     const rows = await prisma.cameraEvent.findMany({
         where: {
             cameraId: { in: [...names.keys()] },
             ...(query.kind ? { kind: query.kind } : {}),
-            ...(query.before ? { at: { lt: query.before } } : {})
+            ...(query.label ? { label: query.label } : {}),
+            ...(Object.keys(at).length > 0 ? { at } : {})
         },
         orderBy: { at: "desc" },
         take: limit,

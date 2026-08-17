@@ -20,7 +20,10 @@ export default async function EventsPage() {
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
             <div className="flex flex-wrap items-start justify-between gap-2">
-                <PageHeader title="Events" description="Everything the cameras noticed, newest first." />
+                <PageHeader
+                    title="Events"
+                    description="Everything the cameras noticed. Narrow it to one camera, one person or one night, and open any of it to see the footage of that moment."
+                />
                 <PlaceSwitcher places={place.places} current={place.current} canManage={canManage} />
             </div>
             <EventsView canControl={canControl} />

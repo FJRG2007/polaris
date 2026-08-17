@@ -182,6 +182,52 @@ export async function listClips(
     return rows.map((row) => toView(row, names.get(row.cameraId) ?? ""));
 }
 
+/**
+ * The footage of one moment, and how far into it that moment is.
+ *
+ * What a log entry is for: "somebody was at the door at 03:12" is worth reading
+ * and worth nothing without the ten seconds either side of it. The clip an event
+ * points at when one was kept for it, else whichever segment covers that instant
+ * - a camera recording all day has no event-shaped clips, and the answer is
+ * still there, three minutes into a segment.
+ *
+ * Null when nothing covers it, which is the ordinary case for a camera that
+ * keeps nothing.
+ */
+export async function momentOf(
+    installedAppId: string,
+    eventId: string
+): Promise<{ clipId: string; offsetSeconds: number } | null> {
+    const event = await prisma.cameraEvent.findFirst({
+        where: { id: eventId, camera: { installedAppId } },
+        select: { at: true, cameraId: true, clipId: true }
+    });
+    if (!event) return null;
+
+    const clip = event.clipId
+        ? await prisma.cameraClip.findFirst({
+              where: { id: event.clipId },
+              select: { id: true, startedAt: true }
+          })
+        : await prisma.cameraClip.findFirst({
+              where: {
+                  cameraId: event.cameraId,
+                  startedAt: { lte: event.at },
+                  // A segment still being written has no end yet, and is exactly
+                  // the one covering anything that just happened.
+                  OR: [{ endedAt: null }, { endedAt: { gte: event.at } }]
+              },
+              orderBy: { startedAt: "desc" },
+              select: { id: true, startedAt: true }
+          });
+    if (!clip) return null;
+
+    // A second or two before it, because the useful part of "somebody appeared"
+    // is the moment before they were there.
+    const offset = Math.max(0, Math.floor((event.at.getTime() - clip.startedAt.getTime()) / 1000) - 2);
+    return { clipId: clip.id, offsetSeconds: offset };
+}
+
 /** Keep this one whatever the retention says, or stop keeping it. */
 export async function pinClip(installedAppId: string, id: string, pinned: boolean): Promise<void> {
     const clip = await prisma.cameraClip.findFirst({

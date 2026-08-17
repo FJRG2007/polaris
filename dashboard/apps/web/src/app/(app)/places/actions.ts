@@ -293,20 +293,44 @@ export async function deleteCameraAction(id: string): Promise<{ error?: string }
 export async function listEventsAction(input: {
     cameraId?: string | null;
     kind?: string | null;
+    /** One person, by the name the recognizer put to them. */
+    label?: string | null;
+    /** The window to look inside, as whatever a datetime field produced. */
+    from?: string | null;
+    to?: string | null;
     /** The timestamp of the oldest row already on screen, for the next page. */
     before?: string | null;
 }): Promise<{ events?: events.EventView[]; error?: string }> {
     const { install } = await requireHome("home.read");
-    const before = input.before ? new Date(input.before) : null;
+    /** A date that a browser may have sent as an empty string or as nonsense. */
+    const when = (value: string | null | undefined): Date | null => {
+        if (!value) return null;
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+    const before = when(input.before);
     const result = await guard(async () =>
         events.listEvents(install.id, {
             placeId: (await currentPlace(install.id)).current.id,
             cameraId: input.cameraId ?? null,
             kind: input.kind ?? null,
-            before: before && !Number.isNaN(before.getTime()) ? before : null
+            label: input.label ?? null,
+            from: when(input.from),
+            to: when(input.to),
+            before
         })
     );
     return result.error ? { error: result.error } : { events: result.value };
+}
+
+/** The footage of one moment, and how far into it to start. Null when nothing
+ *  was kept - which the screen says rather than opening an empty player. */
+export async function momentAction(
+    eventId: string
+): Promise<{ moment?: { clipId: string; offsetSeconds: number } | null; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(() => recording.momentOf(install.id, eventId));
+    return result.error ? { error: result.error } : { moment: result.value ?? null };
 }
 
 /** Say that somebody has seen this one. Control rather than read: it changes
