@@ -43,8 +43,8 @@ import { z } from "zod";
 import { setMicDevice } from "./mic-device";
 import * as actions from "./meeting-actions";
 import { playCallSound } from "@/lib/call-sounds";
-import { callDevices, openMedia, settle } from "./call-media";
 import type { MeetingView } from "@/lib/chat/meetings";
+import { callDevices, openMedia, settle } from "./call-media";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CallDevice, CallState, PeerState } from "./call-state";
 import { filterMic, type FilteredMic, type MicFilter } from "./mic-filter";
@@ -417,8 +417,19 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             room.current = joined;
 
             joined
-                .on(RoomEvent.TrackSubscribed, () => resort())
-                .on(RoomEvent.TrackUnsubscribed, () => resort())
+                // Both, because a track arriving is also the first thing that
+                // says whether the microphone behind it is muted: somebody who
+                // joined muted publishes a muted track and never fires a mute
+                // event, so their icon would only appear if they happened to
+                // unmute and mute again.
+                .on(RoomEvent.TrackSubscribed, () => {
+                    resort();
+                    resortStates();
+                })
+                .on(RoomEvent.TrackUnsubscribed, () => {
+                    resort();
+                    resortStates();
+                })
                 .on(RoomEvent.LocalTrackPublished, () => publishLocalPreview())
                 .on(RoomEvent.TrackMuted, onMuteChanged)
                 .on(RoomEvent.TrackUnmuted, onMuteChanged)
