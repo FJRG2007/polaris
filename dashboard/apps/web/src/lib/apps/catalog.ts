@@ -867,12 +867,17 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         capabilities: ["camera-hub"],
         dashboard: "generic",
         template: {
-            image: "alexxit/go2rtc:latest",
+            // Published by CI (.github/workflows/dashboard-publish.yml, `relay`
+            // job) from dashboard/services/camera-relay: go2rtc with credentials
+            // on its API, which the stock image has no way to arrive with.
+            image: "ghcr.io/fjrg2007/polaris-camera-relay:latest",
+            build: "dashboard/services/camera-relay",
             env: [
-                // The relay's own API is not a public surface: it can add a source
-                // that reads a file off the machine, so it answers on the loopback
-                // interface and Polaris reaches it through the container network.
-                { key: "GO2RTC_API_LISTEN", label: "API address", default: ":1984" }
+                { key: "RELAY_USERNAME", label: "API account", default: "polaris" },
+                // Minted at install and never shown: nobody types it, Polaris is
+                // the only thing that ever calls this API, and the relay refuses
+                // to start without it rather than coming up open.
+                { key: "RELAY_PASSWORD", label: "API password", generated: true }
             ],
             volumes: [{ name: "config", mountPath: "/config", label: "Relay configuration" }],
             ports: [{ container: 1984, protocol: "http", label: "Relay API" }]

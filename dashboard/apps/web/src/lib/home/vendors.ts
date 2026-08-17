@@ -36,12 +36,40 @@ export interface CameraVendor {
      *  because every one of these is a support question that would otherwise be
      *  asked as "it says wrong password". */
     readonly note?: string;
+    /**
+     * The maker's own protocol, when using it beats RTSP.
+     *
+     * TP-Link is the case this exists for. Their cameras do speak RTSP, but only
+     * after somebody digs a "camera account" out of a submenu of the phone app,
+     * and that account is the single most common reason a Tapo camera will not
+     * connect. The maker's own protocol takes the password they already know -
+     * the one they log into the app with - and carries two-way audio besides.
+     */
+    readonly nativeScheme?: string;
+    /** Whether the maker's protocol wants the account name as well, or just the
+     *  password. TP-Link's wants only the password. */
+    readonly nativePasswordOnly?: boolean;
 }
 
 export const CAMERA_VENDORS: readonly CameraVendor[] = [
     {
+        // First in the list on purpose: it is the one that works with what
+        // somebody already has, and the one that avoids the camera-account
+        // detour every other Tapo setup starts with.
+        id: "tapo-cloud",
+        label: "TP-Link Tapo (Tapo password)",
+        // Reached over TP-Link's own protocol rather than RTSP, so there are no
+        // paths to resolve - the subtype does that job.
+        mainPath: "",
+        onvifPort: 2020,
+        ptz: true,
+        nativeScheme: "tapo",
+        nativePasswordOnly: true,
+        note: "The password you sign into the Tapo app with. No camera account, and the microphone works both ways."
+    },
+    {
         id: "tapo",
-        label: "TP-Link Tapo",
+        label: "TP-Link Tapo (camera account)",
         mainPath: "/stream1",
         subPath: "/stream2",
         // Tapo does not answer ONVIF on 80. It listens on 2020, and only once a
@@ -139,5 +167,30 @@ export function rtspUrl(
 /** The same address with the password taken out, for anything a person reads:
  *  a log line, an error, the row on the settings screen. */
 export function redactRtspUrl(url: string): string {
-    return url.replace(/^(rtsp:\/\/[^:/@]+):[^@]*@/, "$1:***@");
+    return url.replace(/^([a-z]+:\/\/[^:/@]+):[^@]*@/i, "$1:***@");
+}
+
+/**
+ * The address the relay is given for a camera, which is not always an RTSP one.
+ *
+ * A make with its own protocol gets that, because it is both easier for the
+ * owner (the password they already have) and better (two-way audio). Everything
+ * else gets RTSP. `quality` picks the stream: the good one to watch and record,
+ * the small one to analyze.
+ */
+export function relaySource(
+    camera: { vendor: string; address: string; rtspPort: number; mainPath?: string | null; subPath?: string | null },
+    quality: "main" | "sub",
+    auth: CameraAuth = {}
+): string {
+    const vendor = cameraVendor(camera.vendor);
+    if (vendor.nativeScheme) {
+        const credentials = vendor.nativePasswordOnly
+            ? encodeURIComponent(auth.password ?? "")
+            : `${encodeURIComponent(auth.username ?? "")}:${encodeURIComponent(auth.password ?? "")}`;
+        // subtype=1 is the small stream, 0 the full one.
+        return `${vendor.nativeScheme}://${credentials}@${camera.address}?subtype=${quality === "sub" ? 1 : 0}`;
+    }
+    const path = quality === "sub" ? camera.subPath || camera.mainPath || vendor.mainPath : camera.mainPath || vendor.mainPath;
+    return rtspUrl(camera, path ?? "", auth);
 }
