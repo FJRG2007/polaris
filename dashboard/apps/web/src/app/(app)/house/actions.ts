@@ -125,10 +125,20 @@ export async function discoverCamerasAction(input: unknown): Promise<{
     found?: Awaited<ReturnType<typeof discoverCameras>>;
     error?: string;
 }> {
-    await requireHome("home.manage");
+    const { install } = await requireHome("home.manage");
     const parsed = discoveryInputSchema.safeParse(input ?? {});
     if (!parsed.success) return { error: "Write the network as 192.168.1.0/24." };
-    const result = await guard(() => discoverCameras(parsed.data.subnet));
+    // Looking from another server is only meaningful with a range to look at:
+    // the multicast probe is a thing Polaris does on its own segment.
+    if (parsed.data.fromServerId && !parsed.data.subnet) {
+        return { error: "Give the address range on that network, like 192.168.1.0/24." };
+    }
+    const result = await guard(() =>
+        discoverCameras(
+            parsed.data.subnet,
+            parsed.data.fromServerId ? { hostId: parsed.data.fromServerId, ownerId: install.ownerId } : null
+        )
+    );
     return result.error ? { error: result.error } : { found: result.value };
 }
 

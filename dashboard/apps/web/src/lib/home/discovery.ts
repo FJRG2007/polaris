@@ -235,13 +235,72 @@ export async function sweepSubnet(cidr: string): Promise<DiscoveredCamera[]> {
 }
 
 /**
+ * Sweep a network Polaris cannot see, from a server that can.
+ *
+ * This is the case the whole `reachVia` idea exists for: a camera on a repeater,
+ * a guest network, or another building. Polaris cannot knock on those doors, and
+ * the machine that lives there can - so the knocking is done there, over the
+ * connection Polaris already has to it, and only the list of addresses comes
+ * back.
+ *
+ * Written as one bash line rather than a script pushed to the host: it is a loop
+ * with a timeout in it, every server has bash, and nothing is left behind on the
+ * machine afterwards.
+ */
+export async function sweepFromServer(hostId: string, ownerId: string, cidr: string): Promise<DiscoveredCamera[]> {
+    const hosts = hostsInCidr(cidr);
+    if (hosts.length === 0) return [];
+    const { getHostConnection } = await import("@/lib/host-service");
+    const { execCommand, openSshClient } = await import("@polaris/ssh");
+    const connection = await getHostConnection(hostId, ownerId);
+
+    // `/dev/tcp` is bash's own way of opening a socket, so this needs nothing
+    // installed. The subshells run in parallel and each one gives up after a
+    // second, which keeps a /24 to a few seconds rather than four minutes.
+    const base = hosts[0]!.split(".").slice(0, 3).join(".");
+    const command = `for i in $(seq 1 254); do (timeout 1 bash -c "echo > /dev/tcp/${base}.$i/554" 2>/dev/null && echo ${base}.$i) & done; wait`;
+
+    const client = await openSshClient({
+        host: connection.address,
+        port: connection.port,
+        username: connection.username,
+        auth: connection.auth,
+        ...(connection.hostKey ? { pinnedHostKey: connection.hostKey } : {})
+    });
+    try {
+        let output = "";
+        await execCommand(client, command, { onStdout: (chunk) => (output += chunk.toString("utf8")) });
+        return output
+            .split(/\s+/)
+            .map((line) => line.trim())
+            .filter((line) => /^(\d{1,3}\.){3}\d{1,3}$/.test(line))
+            .map((address) => ({
+                address,
+                onvifPort: null,
+                name: null,
+                vendor: null,
+                via: "sweep" as const,
+                ports: [554] as readonly number[]
+            }));
+    } finally {
+        client.end();
+    }
+}
+
+/**
  * Both ways of looking, merged.
  *
  * What the multicast found wins over what the sweep found for the same address:
  * one of them knows the camera's name and its ONVIF port, the other only knows
  * that something is listening.
  */
-export async function discoverCameras(subnet: string): Promise<DiscoveredCamera[]> {
+export async function discoverCameras(
+    subnet: string,
+    from?: { hostId: string; ownerId: string } | null
+): Promise<DiscoveredCamera[]> {
+    // Asked to look from another machine, that is the only place worth looking:
+    // this one has already been established not to see that network.
+    if (from && subnet) return sweepFromServer(from.hostId, from.ownerId, subnet);
     const [probed, swept] = await Promise.all([
         probeNetwork(),
         subnet ? sweepSubnet(subnet) : Promise.resolve([] as DiscoveredCamera[])

@@ -186,6 +186,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
             {discovering ? (
                 <DiscoverDialog
                     known={new Set(cameras.map((camera) => camera.address))}
+                    servers={servers.filter((server) => server.id !== "local")}
                     onClose={() => setDiscovering(false)}
                     onPick={(found: DiscoveredCamera) => {
                         setDiscovering(false);

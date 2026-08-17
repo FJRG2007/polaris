@@ -17,19 +17,35 @@ import * as actions from "../actions";
 import { runAction } from "@/lib/run-action";
 import { Loader2, Radar } from "lucide-react";
 import type { DiscoveredCamera } from "@/lib/home/discovery";
-import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select
+} from "@polaris/ui";
 
 export function DiscoverDialog({
     known,
+    servers,
     onClose,
     onPick
 }: {
     /** Addresses the house already has, so the list can say so. */
     known: Set<string>;
+    /** The machines that can be asked to look, for a network Polaris cannot see
+     *  itself. */
+    servers: { id: string; label: string }[];
     onClose: () => void;
     onPick: (found: DiscoveredCamera) => void;
 }) {
     const [subnet, setSubnet] = useState("");
+    const [from, setFrom] = useState("");
     const [busy, setBusy] = useState(false);
     const [found, setFound] = useState<DiscoveredCamera[] | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -37,7 +53,10 @@ export function DiscoverDialog({
     const scan = async () => {
         setBusy(true);
         setError(null);
-        const result = await runAction(() => actions.discoverCamerasAction({ subnet }), setError);
+        const result = await runAction(
+            () => actions.discoverCamerasAction({ subnet, fromServerId: from || null }),
+            setError
+        );
         setBusy(false);
         if (!result) return;
         if (result.error) {
@@ -58,19 +77,42 @@ export function DiscoverDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex items-end gap-2">
-                    <label className="flex flex-1 flex-col gap-1.5">
-                        <span className="text-[12px] font-medium text-muted-foreground">Address range</span>
-                        <Input
-                            value={subnet}
-                            onChange={(event) => setSubnet(event.target.value)}
-                            placeholder="192.168.1.0/24"
-                        />
-                    </label>
-                    <Button onClick={scan} disabled={busy}>
-                        {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : <Radar className="size-4 shrink-0" />}
-                        Look
-                    </Button>
+                <div className="flex flex-col gap-3">
+                    <div className="flex items-end gap-2">
+                        <label className="flex flex-1 flex-col gap-1.5">
+                            <span className="text-[12px] font-medium text-muted-foreground">Address range</span>
+                            <Input
+                                value={subnet}
+                                onChange={(event) => setSubnet(event.target.value)}
+                                placeholder="192.168.1.0/24"
+                            />
+                        </label>
+                        <Button onClick={scan} disabled={busy || (Boolean(from) && !subnet.trim())}>
+                            {busy ? (
+                                <Loader2 className="size-4 shrink-0 animate-spin" />
+                            ) : (
+                                <Radar className="size-4 shrink-0" />
+                            )}
+                            Look
+                        </Button>
+                    </div>
+                    {servers.length > 0 ? (
+                        <label className="flex flex-col gap-1.5">
+                            <span className="text-[12px] font-medium text-muted-foreground">Look from</span>
+                            <Select
+                                value={from}
+                                onValueChange={setFrom}
+                                options={[
+                                    { value: "", label: "Polaris itself" },
+                                    ...servers.map((server) => ({ value: server.id, label: server.label }))
+                                ]}
+                            />
+                            <span className="text-[11px] text-foreground-subtle">
+                                For a camera on a network Polaris cannot reach - another building, a guest network, the
+                                far side of a repeater. That machine does the looking.
+                            </span>
+                        </label>
+                    ) : null}
                 </div>
 
                 {error ? <p className="mt-3 text-[12px] text-danger">{error}</p> : null}
