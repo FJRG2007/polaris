@@ -13,18 +13,19 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
+import type { FootageSettings } from "@/lib/home/stills";
 import type { AvatarSettings } from "@/lib/avatar-service";
 import { ResolvedTarget, TargetPicker } from "./target-picker";
+import type { ChatStorageSettings } from "@/lib/chat/attachments";
 import type { UploadSettings } from "@/lib/tasks/attachment-service";
 import { Button, Card, CardBody, Input, Switch, cn } from "@polaris/ui";
-import type { ChatStorageSettings } from "@/lib/chat/attachments";
-import type { FootageSettings } from "@/lib/home/stills";
 import {
     checkStorageAction,
     setAvatarSettingsAction,
     setChatStorageTargetAction,
     setFootageTargetAction,
     setUploadSettingsAction,
+    tidyChatStorageAction,
     type StorageCheck
 } from "./actions";
 
@@ -70,6 +71,56 @@ function CheckButton({ which }: { which: StorageCheck }) {
                     {said.detail}
                 </p>
             )}
+        </div>
+    );
+}
+
+/**
+ * Take out the folders no conversation answers for.
+ *
+ * Only on the chat card, because that is the storage that grew them: a
+ * conversation deleted by an older build left its whole folder behind, and a
+ * message deleted one at a time left an empty one named after a uuid. Nothing
+ * else will ever remove either, and neither is reachable from anywhere in
+ * Polaris.
+ */
+function TidyButton() {
+    const [busy, setBusy] = useState(false);
+    const [said, setSaid] = useState("");
+
+    return (
+        <div className="flex flex-col gap-1.5">
+            <div>
+                <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy}
+                    title="Removes folders for conversations that no longer exist, and empty ones."
+                    onClick={async () => {
+                        setBusy(true);
+                        setSaid("");
+                        const result = await runAction(
+                            () => tidyChatStorageAction(),
+                            () => undefined
+                        );
+                        setBusy(false);
+                        if (!result || result.error) {
+                            setSaid(result?.error ?? "That could not be run.");
+                            return;
+                        }
+                        const removed = result.removed ?? 0;
+                        setSaid(
+                            removed === 0
+                                ? "Nothing to take out."
+                                : `Took out ${removed} folder${removed === 1 ? "" : "s"}.`
+                        );
+                    }}
+                >
+                    {busy && <Loader2 className="size-4 animate-spin" />}
+                    Tidy up
+                </Button>
+            </div>
+            {said && <p className="text-xs text-muted-foreground">{said}</p>}
         </div>
     );
 }
@@ -325,7 +376,10 @@ function ChatCard({ settings }: { settings: ChatStorageSettings }) {
                     }}
                 />
 
-                <CheckButton which="chat" />
+                <div className="flex flex-wrap items-start gap-2">
+                    <CheckButton which="chat" />
+                    <TidyButton />
+                </div>
                 <SaveRow
                     dirty={dirty}
                     valid

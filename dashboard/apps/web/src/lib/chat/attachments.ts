@@ -334,15 +334,21 @@ export async function readAttachment(attachmentId: string): Promise<{
 /**
  * Delete the files on a message from wherever they were written.
  *
- * For the delete that leaves no trace. The rows go with the message by cascade;
- * this is the part the database cannot do, and without it "no trace" would mean
- * the message is gone and the photo is still on the NAS.
+ * Every route out of a message goes through here - taken back without trace, or
+ * left as a tombstone, which carries no files either. The rows cascade with the
+ * message; this is the part the database cannot do, and without it deleting a
+ * message would mean the words are gone and the photograph is still on the NAS.
  *
  * One driver per storage rather than one per file, because opening a NAS session
  * for each of ten attachments is ten handshakes for one delete. A file that
  * cannot be removed - a target that has moved, a share that is not answering -
  * does not stop the deletion: the caller is taking a message back, and refusing
  * that because a byte range is unreachable helps nobody.
+ *
+ * The folder goes too when it is the last file in it. A conversation's files live
+ * in one folder named after the channel, and without this every conversation that
+ * ever carried a picture leaves an empty directory named after a uuid behind it,
+ * forever, in somebody's file browser.
  */
 export async function discardAttachments(messageId: string): Promise<void> {
     const files = await prisma.chatAttachment.findMany({
@@ -363,11 +369,154 @@ export async function discardAttachments(messageId: string): Promise<void> {
             if (!driver) return;
             try {
                 for (const path of paths) await driver.delete(path).catch(() => undefined);
+                for (const folder of new Set(paths.map(folderOf))) {
+                    if (!folder) continue;
+                    const listed = await driver.list(folder).catch(() => null);
+                    if (listed && listed.entries.length === 0) {
+                        await driver.delete(folder).catch(() => undefined);
+                    }
+                }
             } finally {
                 await driver.dispose().catch(() => undefined);
             }
         })
     );
+}
+
+/**
+ * Everything a conversation ever stored, gone with the conversation.
+ *
+ * Deleting a channel used to take the rows and leave the bytes: the rows cascade
+ * away, and with them the only record of where the files were, so nothing could
+ * ever find them again. On an instance with a NAS behind it that is a disk that
+ * only fills up.
+ *
+ * One recursive delete per storage rather than a walk of the rows. A channel's
+ * files are all in one folder named after it, so this is one call whether the
+ * channel carried two files or two thousand - which is the difference between a
+ * delete and a job.
+ *
+ * Which storages to ask is read from the rows while they still exist. A file
+ * written when the instance pointed at a NAS is on that NAS whatever the setting
+ * says today, and the current target is asked as well so a folder left behind by
+ * a write that failed goes with it.
+ */
+export async function discardChannelFiles(channelIds: readonly string[]): Promise<void> {
+    const channels = [...new Set(channelIds)];
+    if (channels.length === 0) return;
+
+    const stored = await prisma.chatAttachment.findMany({
+        where: { message: { channelId: { in: channels } } },
+        select: { connectionId: true },
+        distinct: ["connectionId"]
+    });
+    const targets = new Set(stored.map((row) => row.connectionId ?? LOCAL_TARGET));
+    targets.add((await chatTarget()).id);
+
+    await Promise.all(
+        [...targets].map(async (target) => {
+            const driver = await driverForTarget(target, LOCAL_FOLDER).catch(() => null);
+            if (!driver) return;
+            try {
+                for (const channelId of channels) {
+                    await driver
+                        .delete(`${ATTACHMENT_ROOT}/${safe(channelId)}`, { recursive: true })
+                        .catch(() => undefined);
+                }
+            } finally {
+                await driver.dispose().catch(() => undefined);
+            }
+        })
+    );
+}
+
+/**
+ * Folders under the chat's root that no conversation answers for.
+ *
+ * Housekeeping for what earlier builds left behind: a conversation deleted
+ * before Polaris knew to take its files with it left the whole folder, and a
+ * message deleted one at a time left an empty directory named after a uuid.
+ * Neither is reachable from anywhere in Polaris, and neither will ever be looked
+ * at again.
+ *
+ * Deliberately narrow about what it removes. A folder goes when the conversation
+ * it is named after no longer exists, or when it is empty - never because
+ * nothing points at the files inside it, which would turn a bug in the rows into
+ * a way of deleting somebody's pictures.
+ *
+ * Every storage the instance has ever written chat files to, as far as the rows
+ * still say, plus the one it writes to now.
+ */
+export async function tidyChatStorage(): Promise<{ removed: number; failed: number }> {
+    const [stored, channels, current] = await Promise.all([
+        prisma.chatAttachment.findMany({ select: { connectionId: true }, distinct: ["connectionId"] }),
+        prisma.chatChannel.findMany({ select: { id: true } }),
+        chatTarget()
+    ]);
+    const live = new Set(channels.map((channel) => safe(channel.id)));
+    const targets = new Set(stored.map((row) => row.connectionId ?? LOCAL_TARGET));
+    targets.add(current.id);
+
+    let removed = 0;
+    let failed = 0;
+
+    for (const target of targets) {
+        const driver = await driverForTarget(target, LOCAL_FOLDER).catch(() => null);
+        if (!driver) {
+            failed += 1;
+            continue;
+        }
+        try {
+            // Paged, because the root holds one folder per conversation and an
+            // instance with thousands of them would otherwise be tidied down to
+            // whatever the first page happened to hold.
+            let cursor: string | undefined;
+            do {
+                const page = await driver
+                    .list(ATTACHMENT_ROOT, cursor ? { cursor } : undefined)
+                    .catch(() => null);
+                if (!page) break;
+                cursor = page.nextCursor;
+
+                for (const entry of page.entries) {
+                    if (entry.kind !== "dir") continue;
+                    if (!live.has(entry.name)) {
+                        // The conversation is gone: so is everything in it.
+                        await driver
+                            .delete(entry.path, { recursive: true })
+                            .then(() => {
+                                removed += 1;
+                            })
+                            .catch(() => {
+                                failed += 1;
+                            });
+                        continue;
+                    }
+                    const inside = await driver.list(entry.path).catch(() => null);
+                    if (!inside || inside.entries.length > 0) continue;
+                    // Empty, and not recursive: a file that landed between the
+                    // listing and this makes the delete fail, which is the
+                    // outcome to want.
+                    await driver
+                        .delete(entry.path)
+                        .then(() => {
+                            removed += 1;
+                        })
+                        .catch(() => undefined);
+                }
+            } while (cursor);
+        } finally {
+            await driver.dispose().catch(() => undefined);
+        }
+    }
+
+    return { removed, failed };
+}
+
+/** The folder a stored path sits in, or empty for one that has none. */
+function folderOf(path: string): string {
+    const cut = path.lastIndexOf("/");
+    return cut > 0 ? path.slice(0, cut) : "";
 }
 
 /** Which channel an attachment belongs to, so the download can be authorized
@@ -460,6 +609,5 @@ function reason(error: unknown): string {
 function safe(value: string): string {
     return value.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 64) || "unnamed";
 }
-
 
 export { AUTOMATIC_TARGET, LOCAL_TARGET };
