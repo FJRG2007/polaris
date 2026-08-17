@@ -14,7 +14,8 @@
  * server that was never theirs.
  */
 
-import { notFound } from "next/navigation";
+import { findApp } from "@/lib/apps/catalog";
+import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/session";
 import { gameContextFor } from "../game-context";
 import { canOpenGameTab, isGameTab } from "../tabs";
@@ -42,6 +43,13 @@ export default async function InstalledAppPage({
     if (!access) notFound();
     const app = await getInstalledApp(access.ownerId, id);
     if (!app) notFound();
+
+    // An app that runs nothing has nothing to manage here: this page would be
+    // Start, Redeploy and Uninstall over a status that can only ever read "not
+    // running", and the app itself is a screen somewhere else. Home and Game
+    // servers are both that, and both say where they live.
+    const opensAt = findApp(app.catalogId)?.opensAt;
+    if (opensAt) redirect(opensAt);
 
     const held = await gamePermissionsFor(user, id);
     // Starting, stopping and redeploying are the manage grant on this server, or the

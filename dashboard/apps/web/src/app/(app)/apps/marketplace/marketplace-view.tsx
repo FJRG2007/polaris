@@ -11,7 +11,6 @@
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { isGameServersApp } from "@/lib/apps/games-catalog";
 import { appInstallInputSchema } from "@/lib/apps/install-schema";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import type { InstalledAppView } from "@/lib/apps/install-service";
@@ -54,7 +53,6 @@ const CAPABILITY_LABEL: Record<AppCapability, string> = {
     "game-manager": "Game servers",
     "game-server": "Game server",
     "camera-hub": "Cameras",
-    "face-recognition": "Face recognition",
     "home-hub": "Home",
     tool: "Tool"
 };
@@ -89,7 +87,7 @@ export function MarketplaceView({ installed }: { installed: InstalledAppView[] }
                     setInstallingId(null);
                     return;
                 }
-                router.push(`/apps/installed/${result.installedAppId}`);
+                router.push(app.opensAt ?? `/apps/installed/${result.installedAppId}`);
             })
             .catch(() => {
                 setError("Could not install the app");
@@ -147,14 +145,14 @@ export function MarketplaceView({ installed }: { installed: InstalledAppView[] }
 /**
  * Where Open goes for an app that is already installed.
  *
- * Usually the app's own page. Game servers is the exception: its page is a door
- * to the Game servers screen and nothing else, so Open going there first is a
- * click that exists only to be clicked through.
+ * Usually the app's own page. An app that runs nothing says where it really
+ * lives (`opensAt`), because its install page would be a row of lifecycle
+ * buttons over a status that can only ever read "not running" - a click that
+ * exists to be clicked through.
  */
 function openHrefFor(app: AppManifest, singletonInstall: Map<string, string>): string | null {
     if (!app.singleton || !singletonInstall.has(app.id)) return null;
-    if (isGameServersApp(app.id)) return "/apps/games";
-    return `/apps/installed/${singletonInstall.get(app.id)}`;
+    return app.opensAt ?? `/apps/installed/${singletonInstall.get(app.id)}`;
 }
 
 function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
@@ -166,12 +164,7 @@ function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
                     const manifest = findApp(item.catalogId);
                     const Icon = manifest?.icon;
                     return (
-                        <Link
-                            key={item.id}
-                            href={
-                                isGameServersApp(item.catalogId) ? "/apps/games" : `/apps/installed/${item.id}`
-                            }
-                        >
+                        <Link key={item.id} href={manifest?.opensAt ?? `/apps/installed/${item.id}`}>
                             <Card className="transition-colors hover:border-border">
                                 <CardBody className="flex items-center gap-3 py-3">
                                     <div className="grid size-9 shrink-0 place-items-center rounded-md border border-border bg-surface">

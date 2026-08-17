@@ -33,8 +33,10 @@ export interface DetectorMeta {
     /** Whether the work happens on the camera itself. The two that do are free,
      *  and are why "camera" is the default rather than "motion". */
     readonly onCamera: boolean;
-    /** A marketplace app this rung needs before it can be chosen. */
-    readonly requiresApp?: string;
+    /** Something that has to be set up before this rung can do its job, said in
+     *  the words of the screen that sets it up. A camera can still be put on the
+     *  rung without it - it simply stops one step short. */
+    readonly requires?: string;
 }
 
 export const DETECTOR_META: Readonly<Record<Detector, DetectorMeta>> = {
@@ -72,7 +74,7 @@ export const DETECTOR_META: Readonly<Record<Detector, DetectorMeta>> = {
         summary: "When a person is seen, compare their face against the people you have taught it. Everybody else is reported as a stranger.",
         cost: "Highest, and rarest: it only runs on frames that already had a person in them.",
         onCamera: false,
-        requiresApp: "compreface"
+        requires: "A recognizer connected under Settings. Without one, these cameras still report that somebody is there - just not who."
     }
 };
 

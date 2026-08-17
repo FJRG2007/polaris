@@ -30,7 +30,7 @@ import { probeCamera } from "@/lib/home/onvif";
 import { requireHome } from "@/lib/home/access";
 import { cameraVendor } from "@/lib/home/vendors";
 import { discoverCameras } from "@/lib/home/discovery";
-import { ensureVisionWorker, faceEndpoint, hasFaceApiKey, setFaceApiKey } from "@/lib/home/vision";
+import { ensureVisionWorker, faceEndpoint, faceRecognitionSettings, setFaceRecognition } from "@/lib/home/vision";
 import { needsSomewhereToRun, type Detector } from "@/lib/home/detection";
 import { cameraInputSchema, discoveryInputSchema, normalizeCameraInput } from "@/lib/home/schemas";
 
@@ -284,17 +284,21 @@ export async function removePersonAction(id: string): Promise<{ error?: string }
     return {};
 }
 
-/** Whether the house holds a recognition key, and where footage is written. The
- *  key itself never comes back. */
+/** Where the recognizer is and whether it has a key, for the settings screen.
+ *  The key itself never comes back. */
 export async function homeSettingsAction(): Promise<{
-    settings?: { hasFaceKey: boolean; recognizerInstalled: boolean };
+    settings?: { faceApiUrl: string; hasFaceKey: boolean; recognizerReady: boolean };
     error?: string;
 }> {
     const { install } = await requireHome("home.manage");
-    const result = await guard(async () => ({
-        hasFaceKey: await hasFaceApiKey(install.id),
-        recognizerInstalled: (await faceEndpoint()) !== null
-    }));
+    const result = await guard(async () => {
+        const face = await faceRecognitionSettings(install.id);
+        return {
+            faceApiUrl: face.baseUrl,
+            hasFaceKey: face.hasKey,
+            recognizerReady: (await faceEndpoint()) !== null
+        };
+    });
     return result.error ? { error: result.error } : { settings: result.value };
 }
 
@@ -315,12 +319,17 @@ export async function setHomeStorageAction(target: string): Promise<{ error?: st
     return result.error ? { error: result.error } : {};
 }
 
-/** Keep the recognition key CompreFace minted in its own interface. Empty clears
- *  it, which is how face recognition is switched off without uninstalling
- *  anything. */
-export async function setFaceKeyAction(apiKey: string): Promise<{ error?: string }> {
+/**
+ * Point the house at the recognizer somebody is running.
+ *
+ * Connected rather than installed: CompreFace is five containers and a database,
+ * and Polaris deploys single containers - so it is run the way its own project
+ * says to, and this is where Home is told the address and the key it minted.
+ * Clearing the address switches face recognition off.
+ */
+export async function setFaceRecognitionAction(baseUrl: string, apiKey: string): Promise<{ error?: string }> {
     const { install } = await requireHome("home.manage");
-    const result = await guard(() => setFaceApiKey(install.id, String(apiKey)));
+    const result = await guard(() => setFaceRecognition(install.id, String(baseUrl), String(apiKey)));
     return result.error ? { error: result.error } : {};
 }
 

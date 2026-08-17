@@ -95,8 +95,8 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
         <div className="flex flex-col gap-4">
             {!ready ? (
                 <p className="rounded-lg border border-border bg-surface px-3 py-2 text-[12px] text-muted-foreground">
-                    Face recognition is not set up yet. Install it from the marketplace and paste its key under
-                    Settings; names written here will start working the moment you do.
+                    No recognizer is connected yet. Run one and give Home its address under Settings; the names
+                    written here start working the moment you do.
                 </p>
             ) : null}
 

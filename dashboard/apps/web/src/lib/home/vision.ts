@@ -19,8 +19,7 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { listHosts } from "@/lib/host-service";
 import { homeInstall } from "@/lib/home/access";
-import { hostPortForApp } from "@/lib/deploy-service";
-import { appBaseUrl, getPublicIp } from "@/lib/domain-service";
+import { appBaseUrl } from "@/lib/domain-service";
 import { parseDetection } from "@/lib/home/cameras";
 import { installApp } from "@/lib/apps/install-service";
 import { createHash, timingSafeEqual } from "node:crypto";
@@ -30,7 +29,6 @@ import { relayEndpoint, relayServerFor, streamName } from "@/lib/home/relay";
 import { detectorReaches, type Detector, type ObjectClass } from "@/lib/home/detection";
 
 const VISION_APP = "vision-worker";
-const FACE_APP = "compreface";
 
 /** What one camera's worker is told to do. */
 export interface VisionAssignment {
@@ -54,11 +52,17 @@ export interface VisionAssignment {
     readonly faces: { readonly baseUrl: string; readonly apiKey: string; readonly threshold: number } | null;
 }
 
-/** The secret the house keeps for itself, on the install row. Today it is only
- *  the recognition key - a key CompreFace mints in its own interface, so it is
- *  pasted rather than generated, and it is not going in a settings table in the
- *  clear. */
+/**
+ * What the house keeps for itself, on the install row.
+ *
+ * The recognizer is connected rather than installed. Polaris deploys single
+ * containers, and CompreFace is five of them with a database - so it is run the
+ * way its own project says to run it, and Home is told where it ended up. The
+ * key it mints in its own interface is a credential to a service that holds
+ * faces, so it lives encrypted here rather than in a settings table in the clear.
+ */
 interface HomeSecrets {
+    faceApiUrl?: string;
     faceApiKey?: string;
 }
 
@@ -84,10 +88,38 @@ async function readSecrets(installedAppId: string): Promise<HomeSecrets> {
     }
 }
 
-/** Keep the recognition key. Empty clears it, which is how somebody turns face
- *  recognition off without uninstalling anything. */
-export async function setFaceApiKey(installedAppId: string, apiKey: string): Promise<void> {
-    const secrets = { ...(await readSecrets(installedAppId)), faceApiKey: apiKey.trim() || undefined };
+/**
+ * Point the house at a recognizer, or unpoint it.
+ *
+ * A blank address or a blank key clears the pairing, which is how face
+ * recognition is switched off without touching anything else - the cameras on
+ * that rung fall back to reporting a person and stop asking who.
+ *
+ * The address is only kept if it parses as an http(s) URL with a host. It is
+ * dialled by this server and by every vision worker, so a malformed one is a
+ * failure repeated on several machines with no obvious cause.
+ */
+export async function setFaceRecognition(installedAppId: string, baseUrl: string, apiKey: string): Promise<void> {
+    const trimmedUrl = baseUrl.trim().replace(/\/+$/, "");
+    if (trimmedUrl) {
+        let parsed: URL;
+        try {
+            parsed = new URL(trimmedUrl);
+        } catch {
+            throw new Error("Write the address as http://192.168.1.20:8000");
+        }
+        if (!/^https?:$/.test(parsed.protocol) || !parsed.hostname) {
+            throw new Error("Write the address as http://192.168.1.20:8000");
+        }
+    }
+    const current = await readSecrets(installedAppId);
+    const secrets: HomeSecrets = {
+        ...current,
+        faceApiUrl: trimmedUrl || undefined,
+        // An empty key on a save that only changed the address leaves the stored
+        // one alone; clearing the address clears the pairing outright.
+        faceApiKey: trimmedUrl ? apiKey.trim() || current.faceApiKey : undefined
+    };
     const blob = encryptSecret(JSON.stringify(secrets), loadEnv().POLARIS_MASTER_KEY);
     await prisma.installedApp.update({
         where: { id: installedAppId },
@@ -95,31 +127,20 @@ export async function setFaceApiKey(installedAppId: string, apiKey: string): Pro
     });
 }
 
-/** Whether the house has been given a recognition key at all, for the screen
- *  that asks for one. The key itself never goes back to a browser. */
-export async function hasFaceApiKey(installedAppId: string): Promise<boolean> {
-    return Boolean((await readSecrets(installedAppId)).faceApiKey);
+/** What the settings screen shows: the address, and that there is a key. The key
+ *  itself never goes back to a browser. */
+export async function faceRecognitionSettings(
+    installedAppId: string
+): Promise<{ baseUrl: string; hasKey: boolean }> {
+    const secrets = await readSecrets(installedAppId);
+    return { baseUrl: secrets.faceApiUrl ?? "", hasKey: Boolean(secrets.faceApiKey) };
 }
 
 /** Where the recognizer answers, and the key for it. Null when either half is
  *  missing, which is what makes the face rung unavailable rather than broken. */
 async function faceRecognition(installedAppId: string): Promise<{ baseUrl: string; apiKey: string } | null> {
-    const { faceApiKey } = await readSecrets(installedAppId);
-    if (!faceApiKey) return null;
-    const install = await prisma.installedApp.findFirst({
-        where: { catalogId: FACE_APP, status: { not: "removed" }, applicationId: { not: null } },
-        select: { applicationId: true }
-    });
-    if (!install?.applicationId) return null;
-    const application = await prisma.application.findFirst({
-        where: { id: install.applicationId },
-        select: { target: { select: { kind: true, host: { select: { address: true } } } } }
-    });
-    if (!application) return null;
-    const host =
-        application.target.kind === "local" ? await getPublicIp() : (application.target.host?.address?.trim() ?? null);
-    if (!host) return null;
-    return { baseUrl: `http://${host}:${hostPortForApp(install.applicationId)}`, apiKey: faceApiKey };
+    const { faceApiUrl, faceApiKey } = await readSecrets(installedAppId);
+    return faceApiUrl && faceApiKey ? { baseUrl: faceApiUrl, apiKey: faceApiKey } : null;
 }
 
 /** Where the recognizer is, for the house that has one. The people screen and

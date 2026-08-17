@@ -25,7 +25,6 @@ export type AppCapability =
     | "game-manager"
     | "game-server"
     | "camera-hub"
-    | "face-recognition"
     | "home-hub"
     | "tool";
 
@@ -137,6 +136,16 @@ export interface AppManifest {
     /** Only one instance per Polaris (e.g. the messaging hub); the wizard then
      *  installs or opens the existing one instead of allowing duplicates. */
     singleton?: boolean;
+    /**
+     * The screen this app IS, for one whose install has nothing to manage.
+     *
+     * Most installs are a container, and their page is the right place to land:
+     * it starts, stops, redeploys and removes the thing. An app that runs nothing
+     * has none of that, and its install page is a row of buttons that do not
+     * apply over a status that will always read "not running" - so opening it
+     * lands here instead, and so does every link that names the install.
+     */
+    opensAt?: string;
     /** Declared but not yet installable - shown locked in the marketplace. */
     comingSoon?: boolean;
     /** Not offered in the marketplace: it is created from inside another app that
@@ -188,6 +197,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         name: "Game servers",
         category: "Game servers",
         icon: Gamepad2,
+        opensAt: "/apps/games",
         summary: "Create and run Minecraft and ARK servers on your own machines.",
         description:
             "Install it once and create as many servers as you want, of any game Polaris knows: Minecraft for PC, phones and consoles, or ARK: Survival Evolved. Each server gets an address on your domain, a console, player moderation, its own schedule, and the memory it needs for the players you expect. Nothing is downloaded until you create a server, and only for the game that server plays.",
@@ -203,6 +213,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         id: "minecraft-manager",
         name: "Minecraft",
         legacy: true,
+        opensAt: "/apps/games",
         category: "Game servers",
         icon: Gamepad2,
         summary: "Create and run as many Minecraft servers as you want.",
@@ -842,6 +853,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         name: "Home",
         category: "Home",
         icon: House,
+        opensAt: "/house",
         summary: "Cameras, and what they see, on your own machines.",
         description:
             "Watch your cameras live, keep what matters, and get told when something happens. Polaris pulls each camera once and shows it to everybody watching, so the camera never runs out of connections. Detection is yours to choose per camera - the camera's own alerts, movement, people, or faces - along with where it runs and how often, so a house full of cameras does not have to cost a machine.",
@@ -907,27 +919,6 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                 // and to report what it saw; nobody types it.
                 { key: "WORKER_KEY", label: "Worker key", generated: true }
             ]
-        }
-    },
-    {
-        // Faces are the one detector that has to hold a picture of a person to work,
-        // so it is never installed quietly: somebody chooses it, and chooses the
-        // machine it runs on.
-        id: "compreface",
-        name: "Face recognition",
-        category: "Home",
-        icon: ScanFace,
-        summary: "Recognizes the faces you have taught it, on your own hardware.",
-        description:
-            "Runs CompreFace so Home can tell a familiar face from a stranger. Nothing leaves the machine you install it on, and Polaris only sends it a frame when a camera has already seen a person - so it sits idle the rest of the time.",
-        docsUrl: "https://github.com/exadel-inc/CompreFace",
-        installMethod: "compose-template",
-        capabilities: ["face-recognition"],
-        dashboard: "generic",
-        template: {
-            image: "exadel/compreface:latest",
-            volumes: [{ name: "data", mountPath: "/var/lib/postgresql/data", label: "Known faces" }],
-            ports: [{ container: 8000, protocol: "http", label: "Recognition API" }]
         }
     },
     {

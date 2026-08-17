@@ -363,6 +363,11 @@ export function CameraDialog({
                             {DETECTOR_META[form.detector].summary}{" "}
                             <span className="text-foreground-subtle">{DETECTOR_META[form.detector].cost}</span>
                         </p>
+                        {DETECTOR_META[form.detector].requires ? (
+                            <p className="text-[12px] leading-relaxed text-warning">
+                                {DETECTOR_META[form.detector].requires}
+                            </p>
+                        ) : null}
 
                         {needsSomewhereToRun(form.detector) ? (
                             <Field label="Runs on">
