@@ -89,7 +89,11 @@ export function UserProfileDialog({
                 ) : profile ? (
                     <div className="flex flex-col gap-4">
                         <div className="flex items-center gap-3">
-                            <Avatar person={{ id: userId ?? "", name: profile.name }} size={44} />
+                            <Avatar
+                                openable
+                                person={{ id: userId ?? "", name: profile.name }}
+                                size={44}
+                            />
                             <div className="min-w-0">
                                 <p className="flex items-center gap-1.5 font-medium">
                                     <span className="truncate">{profile.name}</span>

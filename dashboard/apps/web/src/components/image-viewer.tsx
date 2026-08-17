@@ -9,6 +9,12 @@
  * conversation is look closer at it, save it, or send it on, and all three are
  * here.
  *
+ * One viewer for every picture in Polaris rather than one per screen. It was the
+ * conversation's, and a profile photo opened from a face is the same gesture
+ * wanting the same thing - so what belongs to a message (forwarding it, reporting
+ * it) is what the caller passes in, and a picture with no message behind it
+ * simply gets neither.
+ *
  * Zoom is the pointer's, which is the only kind that feels right: the wheel
  * zooms around where the pointer is, and a drag moves the picture rather than
  * the page. Double-press toggles between fit and life size, which is the gesture
@@ -21,8 +27,8 @@
  * can open, which is what somebody quoting it in a ticket means.
  */
 
-import { copyText, downloadFile } from "./links";
 import { useAppUrl } from "@/components/app-url";
+import { copyText, downloadFile } from "@/app/(app)/chat/links";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
     Copy,
@@ -65,11 +71,13 @@ const DRAG_SLOP = 4;
 export interface ViewedImage {
     readonly url: string;
     readonly name: string;
-    /** The message it is on, for forwarding and reporting. */
-    readonly messageId: string;
+    /** The message it is on, for forwarding and reporting. Absent for a picture
+     *  that is not in a conversation - a profile photo, which there is nowhere
+     *  to forward and nothing to report. */
+    readonly messageId?: string;
     /** Whether whoever sent it lets it be passed on. The viewer offers the
      *  action or does not; it never offers one that would be refused. */
-    readonly forwardable: boolean;
+    readonly forwardable?: boolean;
 }
 
 export function ImageViewer({
@@ -126,6 +134,10 @@ export function ImageViewer({
      *  than whatever hostname this tab happens to be on. */
     const shareable = `${baseUrl}${image.url}`;
 
+    /** The message this picture is on, when it is on one. Read out here so the
+     *  two actions that need it are drawn only when there is one to act on. */
+    const messageId = image.messageId;
+
     /**
      * The bytes on the clipboard.
      *
@@ -174,16 +186,16 @@ export function ImageViewer({
                 <ExternalLink className="size-3.5" />
                 Open in the browser
             </Item>
-            {onForward && image.forwardable && (
-                <Item onSelect={() => onForward(image.messageId)}>
+            {onForward && image.forwardable && messageId && (
+                <Item onSelect={() => onForward(messageId)}>
                     <Forward className="size-3.5" />
                     Forward
                 </Item>
             )}
-            {onReport && (
+            {onReport && messageId && (
                 <>
                     <Separator />
-                    <Item variant="danger" onSelect={() => onReport(image.messageId)}>
+                    <Item variant="danger" onSelect={() => onReport(messageId)}>
                         <Flag className="size-3.5" />
                         Report
                     </Item>

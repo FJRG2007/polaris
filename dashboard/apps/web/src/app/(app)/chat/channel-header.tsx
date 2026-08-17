@@ -164,7 +164,7 @@ export function ChannelHeader({
                 {named ? (
                     <Icon className="size-4 shrink-0 text-muted-foreground" />
                 ) : channel.others.length === 1 && channel.others[0] ? (
-                    <Avatar person={channel.others[0]} size={20} />
+                    <Avatar openable person={channel.others[0]} size={20} />
                 ) : (
                     <ChatAvatar
                         kind="channel"

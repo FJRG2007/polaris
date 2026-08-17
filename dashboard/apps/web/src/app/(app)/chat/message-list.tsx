@@ -31,8 +31,8 @@ import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
 import { isPlayable, isVoiceMessage } from "./voice-recorder";
-import { ImageViewer, type ViewedImage } from "./image-viewer";
 import { useDisplayFormat } from "@/components/display-format";
+import { ImageViewer, type ViewedImage } from "@/components/image-viewer";
 import {
     cn,
     DropdownMenu,
@@ -333,7 +333,7 @@ function Message({
                         {format.time(message.createdAt)}
                     </span>
                 ) : message.authorId ? (
-                    <Avatar person={{ id: message.authorId, name: author }} size={28} />
+                    <Avatar openable person={{ id: message.authorId, name: author }} size={28} />
                 ) : (
                     <span className="inline-flex size-7 items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground">
                         ?

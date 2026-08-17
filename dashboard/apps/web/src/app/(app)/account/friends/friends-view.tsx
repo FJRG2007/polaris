@@ -77,7 +77,7 @@ function FriendsCard({
                                 key={request.id}
                                 className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
                             >
-                                <Avatar person={request.person} size={24} />
+                                <Avatar openable person={request.person} size={24} />
                                 <span className="min-w-0 flex-1">
                                     <span className="block truncate text-sm">
                                         {request.person.name}
@@ -126,7 +126,7 @@ function FriendsCard({
                                 key={friend.id}
                                 className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
                             >
-                                <Avatar person={friend} size={24} />
+                                <Avatar openable person={friend} size={24} />
                                 <span className="min-w-0 flex-1">
                                     <span className="block truncate text-sm" title={friend.name}>
                                         {friend.name}

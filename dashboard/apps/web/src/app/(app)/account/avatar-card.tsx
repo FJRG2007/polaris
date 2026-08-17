@@ -159,7 +159,7 @@ export function AvatarCard({ userId, name, hasPhoto }: { userId: string; name: s
         <PhotoCard
             title="Photo"
             hint="Shown wherever your name appears. Without one, Polaris uses the picture your email address has on Gravatar, and your initials if it has none."
-            preview={<Avatar person={{ id: userId, name }} size={64} />}
+            preview={<Avatar openable person={{ id: userId, name }} size={64} />}
             endpoint="/api/avatar"
             pictureUrl={avatarUrl(userId)}
             hasPhoto={hasPhoto}

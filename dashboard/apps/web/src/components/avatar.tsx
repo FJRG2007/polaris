@@ -18,9 +18,12 @@
 import { cn } from "@polaris/ui";
 import { useState } from "react";
 import { Volume2 } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ImageViewer } from "@/components/image-viewer";
 import { usePresence } from "@/components/presence-store";
-import { PRESENCE_WORDS, type Presence } from "@polaris/core";
 import { avatarUrl, orgAvatarUrl } from "@/lib/avatar-url";
+import { usePhotoOpenable } from "@/components/photo-access";
+import { PRESENCE_WORDS, type Presence } from "@polaris/core";
 
 export interface AvatarPerson {
     /**
@@ -61,6 +64,26 @@ function tintFor(id: string): string {
         hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
     }
     return `hsl(${hash % 360} 36% 42%)`;
+}
+
+/**
+ * Whether a face offers to open the photo behind it.
+ *
+ * Three things have to hold, and each of them is a different way of being wrong:
+ * the screen has to have asked for it, there has to be a picture rather than
+ * initials, and the person has to allow this reader to open it. Written out here
+ * so the rule can be read and tested on its own - it is the one part of a face
+ * that answers to somebody's privacy setting, and "the button was there but did
+ * nothing" and "the button was there and should not have been" are both bugs
+ * nobody would report.
+ */
+export function photoOpens(input: {
+    readonly openable: boolean;
+    readonly hasPhoto: boolean;
+    readonly allowed: boolean;
+    readonly source: string | null;
+}): boolean {
+    return input.openable && input.hasPhoto && input.allowed && input.source !== null;
 }
 
 /** Initials from a display name. Two words give two letters, one word gives two
@@ -104,11 +127,25 @@ export function Avatar({
     size = 24,
     className,
     square = false,
-    status = true
+    status = true,
+    openable = false
 }: {
     person: AvatarPerson;
     size?: number;
     className?: string;
+    /**
+     * Whether pressing the face opens the photo full size.
+     *
+     * Off by default, and on where the face stands for the person rather than
+     * decorating a row: a conversation, a member list, somebody's profile. A face
+     * inside something else that is already pressable stays a picture, because
+     * two things under one press is one of them nobody finds.
+     *
+     * On its own it only offers: the press appears when there is a photo to open
+     * - the blank pixel served for an account without one is not one - and when
+     * that person's privacy setting lets this reader open it.
+     */
+    openable?: boolean;
     /** A rounded square instead of a circle. What an organization gets: a group
      *  and a person appear side by side in the same lists, and the shape is what
      *  tells them apart before either name is read. */
@@ -130,6 +167,14 @@ export function Avatar({
     // A 404 is the ordinary answer for somebody with no picture anywhere, so it
     // is not an error state - it just means the initials underneath stay.
     const [failed, setFailed] = useState(false);
+    // Whether there is a picture here at all. An account without one is answered
+    // with a transparent pixel rather than a refusal, so the picture that arrived
+    // is the one thing that says which happened - and a face showing initials
+    // must not offer to open them.
+    const [real, setReal] = useState(false);
+    const [opened, setOpened] = useState(false);
+    const mayOpen = usePhotoOpenable(openable ? person.id : null);
+    const opens = photoOpens({ openable, hasPhoto: real, allowed: mayOpen, source });
     const shape = square ? "rounded-md" : "rounded-full";
 
     // The dot sits outside the picture, so it is not clipped by the circle the
@@ -157,21 +202,73 @@ export function Avatar({
                     src={source}
                     alt=""
                     onError={() => setFailed(true)}
+                    // The blank pixel is one pixel across, so this is the whole
+                    // test for "is there a photo behind this face" and it costs
+                    // no request of its own.
+                    onLoad={(event) => setReal(event.currentTarget.naturalWidth > 1)}
                     className={cn("absolute inset-0 size-full object-cover", shape)}
                 />
             )}
         </span>
     );
 
+    // Pressable only where there is something to open. The button wraps the face
+    // rather than replacing it, so the circle, the ring and the tint are the same
+    // ones every other face has - a photo somebody can open must not be a
+    // different-looking face.
+    const shown = opens ? (
+        <button
+            type="button"
+            aria-label={`Open ${person.name}'s photo`}
+            className={cn("inline-flex shrink-0 cursor-zoom-in", shape)}
+            onClick={(event) => {
+                // The face often sits inside a row that opens something of its
+                // own. Opening the photo is the whole gesture, not the first half
+                // of two.
+                event.preventDefault();
+                event.stopPropagation();
+                setOpened(true);
+            }}
+        >
+            {face}
+        </button>
+    ) : (
+        face
+    );
+
+    // Put on the body rather than beside the face: the viewer covers the window,
+    // and a face sits inside scrolling panels and transformed rows that a fixed
+    // child would be positioned and clipped by.
+    const viewer =
+        opened && source && typeof document !== "undefined"
+            ? createPortal(
+                  <ImageViewer
+                      image={{ url: source, name: person.name }}
+                      onClose={() => setOpened(false)}
+                  />,
+                  document.body
+              )
+            : null;
+
     // Nothing until it is known: a grey dot that turns green a moment later
     // reads as somebody's status changing rather than as an answer arriving.
     // And nothing on a face too small to carry one - below this the dot is
     // larger than the initials it covers.
-    if (!where || size < PRESENCE_FLOOR) return face;
+    if (!where || size < PRESENCE_FLOOR) {
+        return viewer ? (
+            <>
+                {shown}
+                {viewer}
+            </>
+        ) : (
+            shown
+        );
+    }
 
     return (
         <span className="relative inline-flex shrink-0 align-middle">
-            {face}
+            {shown}
+            {viewer}
             {where.inCall ? (
                 // A call they are in and this reader could walk into. It takes
                 // the dot's place rather than sitting beside it: somebody on a
@@ -217,8 +314,6 @@ const PRESENCE_COLOURS: Record<Presence, string> = {
     // must not look the same.
     offline: "bg-border-strong"
 };
-
-
 
 /** An organization's face, wherever one is drawn. The same component underneath,
  *  pointed at the organization's own picture and drawn as a square. */

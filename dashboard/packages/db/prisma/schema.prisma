@@ -6231,6 +6231,11 @@ model UserPrivacy {
     lastSeen     String   @default("everyone")
     readReceipts String   @default("everyone")
     avatar       String   @default("everyone")
+    // Whether the photo can be opened and looked at full size, which is a
+    // separate question from whether it is shown at all: being recognisable in a
+    // list is what a photo is for, and it is not the same as offering it to be
+    // studied. Open by default like the rest.
+    photoFullSize String  @default("everyone")
     // The two that are shut until somebody opens them, and the only ones. An
     // address and a number are not details of a presence: they are what spam,
     // password resets and impersonation start from, and nothing in Polaris needs

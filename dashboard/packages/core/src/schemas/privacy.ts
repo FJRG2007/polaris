@@ -72,6 +72,7 @@ export const PRIVACY_FIELD_LABELS = {
     lastSeen: "When you were last here",
     readReceipts: "That you have read a message",
     avatar: "Your photo",
+    photoFullSize: "Opening your photo",
     email: "Your email address",
     phone: "Your phone number",
     forwarding: "Passing your messages on"
@@ -84,6 +85,8 @@ export const PRIVACY_FIELD_NOTES = {
     readReceipts:
         'The ticks under a message in a direct conversation. Turning this down also stops you seeing anybody else\'s, and "only" is how you leave them on for one person.',
     avatar: "Who sees your photo. Anybody who cannot gets your initials instead.",
+    photoFullSize:
+        "Who can open your photo and look at it full size. Anybody who cannot still sees it beside your name - this is a rule about the press, not a second copy of the picture.",
     email: "Who sees the address you sign in with. Anybody who cannot sees your name and username, which is enough to write to you here.",
     phone: "The number kept for sign-in codes. Nobody is shown it unless you say so.",
     forwarding:
@@ -94,6 +97,7 @@ export const PRIVACY_FIELD_NOTES = {
 export const PRIVACY_FIELDS = [
     "discoverable",
     "avatar",
+    "photoFullSize",
     "email",
     "phone",
     "lastSeen",
@@ -120,7 +124,7 @@ export const PRIVACY_SECTIONS = [
     {
         id: "details",
         label: "Your details",
-        fields: ["avatar", "email", "phone"]
+        fields: ["avatar", "photoFullSize", "email", "phone"]
     },
     {
         id: "presence",
@@ -204,6 +208,25 @@ export const privacySettingsSchema = z.object({
     lastSeen: open,
     readReceipts: open,
     avatar: open,
+    /**
+     * Whether somebody may open the photo and look at it full size.
+     *
+     * Separate from the photo itself because they are two different questions.
+     * Being recognisable in a list of names is what a photo is for, and most
+     * people who are happy with that are still not offering their face as
+     * something to be studied - which is the whole appeal of tapping a picture
+     * in a messenger and what makes it worth being able to say no to.
+     *
+     * Open by default, like everything except the address and the number:
+     * somebody who put a photo up put it up, and a default that quietly removed
+     * the press would read as a bug.
+     *
+     * What it is honestly worth is said in the note beside it. The picture behind
+     * a face and the picture in the viewer are the same bytes at the same
+     * address - there is no second, larger copy being withheld - so this takes
+     * away the one-press way to look closer and nothing else.
+     */
+    photoFullSize: open,
     /**
      * Who is shown the address the account signs in with.
      *

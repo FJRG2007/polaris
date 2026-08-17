@@ -43,6 +43,18 @@ describe("an account nobody has configured", () => {
         expect(DEFAULT_PRIVACY.avatar.audience).toBe("everyone");
     });
 
+    it("lets the photo be opened, as its own question", () => {
+        // Two decisions, not one: being recognisable in a list of names is what
+        // a photo is for, and it is not the same as offering your face to be
+        // studied. Both start open, and shutting the second must leave the first
+        // alone - otherwise saying "do not open it" would take the face off
+        // every screen.
+        expect(DEFAULT_PRIVACY.photoFullSize.audience).toBe("everyone");
+        const shut = privacySettingsSchema.parse({ photoFullSize: { audience: "nobody" } });
+        expect(shut.photoFullSize.audience).toBe("nobody");
+        expect(shut.avatar.audience).toBe("everyone");
+    });
+
     it("keeps the address and the number to itself", () => {
         // The two exceptions, and the reason they are exceptions: an address and
         // a number are not details of a presence, they are what spam, password

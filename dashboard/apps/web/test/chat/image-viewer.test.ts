@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { closesOnRelease } from "@/app/(app)/chat/image-viewer";
+import { closesOnRelease } from "@/components/image-viewer";
 
 const dark = { x: 100, y: 100, outside: true };
 const picture = { x: 100, y: 100, outside: false };

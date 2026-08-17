@@ -34,6 +34,7 @@ export class PrivacyError extends Error {
 /** The columns holding one row's audiences, which is every field there is. */
 const AUDIENCE_COLUMNS = {
     avatar: true,
+    photoFullSize: true,
     email: true,
     phone: true,
     lastSeen: true,
