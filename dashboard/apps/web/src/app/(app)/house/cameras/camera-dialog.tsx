@@ -376,6 +376,25 @@ export function CameraDialog({
 
                         {form.detector !== "none" ? (
                             <>
+                                {/* Only the rungs Polaris runs itself have a
+                                    sensitivity to set: a camera doing its own
+                                    looking has that setting in its own app. */}
+                                {needsSomewhereToRun(form.detector) ? (
+                                    <Field
+                                        label={`Sensitivity - ${form.sensitivity}`}
+                                        hint="Higher notices smaller changes. Too high and every shadow is an event."
+                                    >
+                                        <input
+                                            type="range"
+                                            min={1}
+                                            max={100}
+                                            value={form.sensitivity}
+                                            onChange={(event) => set("sensitivity", Number(event.target.value))}
+                                            className="w-64 accent-primary"
+                                            aria-label="Sensitivity"
+                                        />
+                                    </Field>
+                                ) : null}
                                 <Field
                                     label="Wait between detections"
                                     hint="The knob that decides what this camera costs. Seconds."

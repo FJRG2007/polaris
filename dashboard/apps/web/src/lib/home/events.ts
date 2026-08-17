@@ -12,6 +12,8 @@
 
 import { prisma } from "@polaris/db";
 import { parseDetection } from "@/lib/home/cameras";
+import { createNotification } from "@/lib/notification-service";
+import type { ObjectClass } from "@/lib/home/detection";
 import { MOTION_SECONDS, recordClip } from "@/lib/home/recording";
 
 /** What a detector reports. The kinds are the ladder's own vocabulary. */
@@ -26,6 +28,16 @@ export interface Detection {
     readonly stillKey?: string | null;
     readonly at?: Date;
 }
+
+/** Which detections are one of the object classes a camera can be told to care
+ *  about. A recognized face is a person, so it is filtered as one - somebody who
+ *  turned people off did not mean "except the ones you know". */
+const OBJECT_CLASS_OF: Readonly<Partial<Record<Detection["kind"], ObjectClass>>> = {
+    person: "person",
+    face: "person",
+    vehicle: "vehicle",
+    animal: "animal"
+};
 
 export interface EventView {
     readonly id: string;
@@ -60,7 +72,16 @@ export async function recordDetection(detection: Detection): Promise<EventView |
     });
     if (!camera) return null;
 
-    const gapMs = parseDetection(camera.detectionConfig).minGapSeconds * 1000;
+    const settings = parseDetection(camera.detectionConfig);
+    // A camera told to care about people and not about cars should not fill its
+    // list with cars, whichever stage saw them - the camera's own alerts included.
+    // Movement and the two warnings are never filtered: they are not object
+    // classes, and "the camera stopped answering" is not something anybody opted
+    // out of.
+    const asClass = OBJECT_CLASS_OF[detection.kind];
+    if (asClass && !settings.classes.includes(asClass)) return null;
+
+    const gapMs = settings.minGapSeconds * 1000;
     const at = detection.at ?? new Date();
     const recent = await prisma.cameraEvent.findFirst({
         where: { cameraId: camera.id, kind: detection.kind, at: { gt: new Date(at.getTime() - gapMs) } },
@@ -78,6 +99,10 @@ export async function recordDetection(detection: Detection): Promise<EventView |
             stillKey: detection.stillKey ?? null
         }
     });
+    void announce(camera.installedAppId, camera.name, row.id, detection).catch((error) =>
+        console.error("polaris: could not report what a camera saw:", error)
+    );
+
     // A camera set to keep footage when something happens keeps it now. Not
     // awaited: the clip is half a minute long, and whoever reported this - a
     // camera's own alert, a worker - is not waiting around for it. The event is
@@ -102,6 +127,61 @@ export async function recordDetection(detection: Detection): Promise<EventView |
         clipId: row.clipId,
         acked: false
     };
+}
+
+/**
+ * Tell somebody, when it is worth telling them.
+ *
+ * The bar is deliberately high, because an alert that fires on everything is one
+ * nobody reads and then does not read on the night it mattered. Movement never
+ * qualifies - that is what the list is for. A stranger does, tampering does, and
+ * a face only when that person was marked as worth reporting: a household is
+ * taught to the recognizer so it STOPS raising alerts, not so every arrival home
+ * becomes one.
+ *
+ * Sent to whoever the house belongs to. Never throws - it is the last thing that
+ * happens to an event, and an event that was recorded must not be reported as a
+ * failure because a notification could not be written.
+ */
+async function announce(
+    installedAppId: string,
+    cameraName: string,
+    eventId: string,
+    detection: Detection
+): Promise<void> {
+    if (detection.kind === "motion") return;
+
+    if (detection.kind === "face" && detection.label) {
+        const person = await prisma.homePerson.findFirst({
+            where: { installedAppId, name: detection.label },
+            select: { notify: true }
+        });
+        if (!person?.notify) return;
+    }
+
+    const install = await prisma.installedApp.findFirst({
+        where: { id: installedAppId },
+        select: { ownerId: true }
+    });
+    if (!install) return;
+
+    const what =
+        detection.kind === "face" && detection.label
+            ? `${detection.label} is at the ${cameraName}`
+            : detection.kind === "tamper"
+              ? `The ${cameraName} camera may have been tampered with`
+              : detection.kind === "person"
+                ? `Somebody is at the ${cameraName}`
+                : `A ${detection.kind} at the ${cameraName}`;
+
+    await createNotification({
+        userId: install.ownerId,
+        type: "home.event",
+        title: what,
+        href: "/house/events",
+        level: detection.kind === "tamper" ? "warning" : "info",
+        metadata: { eventId }
+    });
 }
 
 export interface EventQuery {
