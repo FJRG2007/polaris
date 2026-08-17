@@ -12,6 +12,7 @@
 
 import { prisma } from "@polaris/db";
 import { parseDetection } from "@/lib/home/cameras";
+import { MOTION_SECONDS, recordClip } from "@/lib/home/recording";
 
 /** What a detector reports. The kinds are the ladder's own vocabulary. */
 export interface Detection {
@@ -55,7 +56,7 @@ export interface EventView {
 export async function recordDetection(detection: Detection): Promise<EventView | null> {
     const camera = await prisma.camera.findFirst({
         where: { id: detection.cameraId },
-        select: { id: true, name: true, detectionConfig: true }
+        select: { id: true, name: true, detectionConfig: true, recording: true, installedAppId: true }
     });
     if (!camera) return null;
 
@@ -77,6 +78,18 @@ export async function recordDetection(detection: Detection): Promise<EventView |
             stillKey: detection.stillKey ?? null
         }
     });
+    // A camera set to keep footage when something happens keeps it now. Not
+    // awaited: the clip is half a minute long, and whoever reported this - a
+    // camera's own alert, a worker - is not waiting around for it. The event is
+    // pointed at the clip once there is one.
+    if (camera.recording === "motion") {
+        void recordClip(camera.installedAppId, camera.id, "motion", MOTION_SECONDS)
+            .then(async (clip) => {
+                if (clip) await prisma.cameraEvent.update({ where: { id: row.id }, data: { clipId: clip.id } });
+            })
+            .catch((error) => console.error("polaris: could not keep footage of an event:", error));
+    }
+
     return {
         id: row.id,
         cameraId: camera.id,

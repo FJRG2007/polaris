@@ -18,6 +18,8 @@
 import * as relay from "@/lib/home/relay";
 import { revalidatePath } from "next/cache";
 import * as cameras from "@/lib/home/cameras";
+import * as events from "@/lib/home/events";
+import * as recording from "@/lib/home/recording";
 import { listHosts } from "@/lib/host-service";
 import { probeCamera } from "@/lib/home/onvif";
 import { requireHome } from "@/lib/home/access";
@@ -188,6 +190,62 @@ export async function deleteCameraAction(id: string): Promise<{ error?: string }
     if (result.error) return { error: result.error };
     revalidatePath(PATH);
     return {};
+}
+
+export async function listEventsAction(input: {
+    cameraId?: string | null;
+    kind?: string | null;
+    /** The timestamp of the oldest row already on screen, for the next page. */
+    before?: string | null;
+}): Promise<{ events?: events.EventView[]; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const before = input.before ? new Date(input.before) : null;
+    const result = await guard(() =>
+        events.listEvents(install.id, {
+            cameraId: input.cameraId ?? null,
+            kind: input.kind ?? null,
+            before: before && !Number.isNaN(before.getTime()) ? before : null
+        })
+    );
+    return result.error ? { error: result.error } : { events: result.value };
+}
+
+/** Say that somebody has seen this one. Control rather than read: it changes
+ *  what everybody else in the house sees waiting for them. */
+export async function acknowledgeEventAction(id: string): Promise<{ error?: string }> {
+    const { user, install } = await requireHome("home.control");
+    const result = await guard(() => events.acknowledgeEvent(install.id, id, user.id));
+    return result.error ? { error: result.error } : {};
+}
+
+export async function listClipsAction(input: {
+    cameraId?: string | null;
+    before?: string | null;
+}): Promise<{ clips?: recording.ClipView[]; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const before = input.before ? new Date(input.before) : null;
+    const result = await guard(() =>
+        recording.listClips(install.id, {
+            cameraId: input.cameraId ?? null,
+            before: before && !Number.isNaN(before.getTime()) ? before : null
+        })
+    );
+    return result.error ? { error: result.error } : { clips: result.value };
+}
+
+/** Hold on to one clip past its retention, or stop. Control rather than manage:
+ *  it keeps something rather than removing it, and everybody who watches the
+ *  house should be able to say "not that one". */
+export async function pinClipAction(id: string, pinned: boolean): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.control");
+    const result = await guard(() => recording.pinClip(install.id, id, pinned));
+    return result.error ? { error: result.error } : {};
+}
+
+export async function deleteClipAction(id: string): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const result = await guard(() => recording.deleteClip(install.id, id));
+    return result.error ? { error: result.error } : {};
 }
 
 /** Which cameras the relay is actually serving, so a tile can tell "not started

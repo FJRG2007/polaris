@@ -17,6 +17,7 @@
 import { withLease } from "./lease";
 import { prisma } from "@polaris/db";
 import { sweepDueBackups } from "@/lib/backups/service";
+import { sweepContinuousRecording, sweepHomeRetention } from "@/lib/home/sweeps";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
@@ -248,6 +249,26 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // only when somebody opens the link would mean a Send nobody opened
         // sitting there forever, which is the case it was set for.
         run: () => sweepExpiredSends()
+    },
+    {
+        key: "home-recording",
+        // A minute, and each pass only tops up: a camera already writing a
+        // segment is left alone, and one that has just finished starts the next.
+        everyMs: Number(process.env.POLARIS_HOME_RECORDING_MS) || MINUTE,
+        // Leased, because two runners would each start a segment on the same
+        // camera and write the same footage to the disk twice.
+        leaseMs: 20 * MINUTE,
+        run: sweepContinuousRecording
+    },
+    {
+        key: "home-retention",
+        // Footage is the only part of the house that grows whether or not anybody
+        // uses it, so this is the job that decides whether a disk fills.
+        everyMs: Number(process.env.POLARIS_HOME_RETENTION_MS) || 15 * MINUTE,
+        // Leased: it removes files, and two runners racing on the same clip means
+        // one of them fails on a file the other already dropped.
+        leaseMs: 10 * MINUTE,
+        run: sweepHomeRetention
     },
     {
         key: "suspensions",
