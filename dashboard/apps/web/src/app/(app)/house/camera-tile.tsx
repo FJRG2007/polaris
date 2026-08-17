@@ -1,52 +1,69 @@
 "use client";
 
 /**
- * One camera on the wall.
+ * One camera on the wall, live.
  *
- * A tile is a still until somebody looks at it, and video while they do. That is
- * not a nicety - a wall of twelve live streams is twelve connections held open
- * for a page nobody is reading closely, and the whole point of Home is that a
- * camera costs nothing until it is watched. So the still refreshes slowly, and
- * pressing the tile is what asks for video.
+ * Every tile plays, because that is what a wall of cameras is for. It costs the
+ * cameras nothing: the relay holds one connection to each and re-serves it, so a
+ * tile, a second person watching and a detector are all the same single
+ * connection as far as the camera is concerned.
  *
- * A camera that will not answer says which of the three things is wrong -
- * starting up, switched off, or not reachable - because "no signal" sends people
- * to the wrong place every time.
+ * Two things are still bounded. The tiles watch the SMALL stream - a wall is
+ * glanced at, and twelve full-resolution streams is bandwidth spent on pictures
+ * the size of a postcard - and a tile scrolled out of view stops playing and
+ * falls back to its still. The second is not tidiness: a browser allows about
+ * six connections to one host over HTTP/1.1, so a house with ten cameras on a
+ * plain-HTTP LAN would otherwise have four tiles that never load and nothing on
+ * screen explaining why.
+ *
+ * Nothing here nests a button inside a button. It used to - the whole tile was
+ * one, with the movement arrows inside it - which is invalid HTML, and the
+ * browser resolves it by dropping the inner button's events. The arrows silently
+ * did nothing.
  */
 
 import Link from "next/link";
-import { PtzPad } from "./ptz-pad";
-import { Badge, cn } from "@polaris/ui";
+import { Badge, Button } from "@polaris/ui";
 import { useEffect, useRef, useState } from "react";
 import type { CameraView } from "@/lib/home/cameras";
-import { Camera, Loader2, Play, VideoOff } from "lucide-react";
+import { Camera, Loader2, Maximize2, VideoOff } from "lucide-react";
 
-/** How often an idle tile asks for a new still. Slow on purpose: it is a wall,
- *  not a stream, and twelve tiles at this rate is one request every five
- *  seconds. */
+/** How often a tile that is not playing refreshes its picture. */
 const STILL_INTERVAL_MS = 15_000;
 
 export function CameraTile({
     camera,
     live,
-    playing,
     canControl,
-    onPlay
+    onOpen
 }: {
     camera: CameraView;
     /** Whether the relay is serving this camera at all. */
     live: boolean;
-    /** Whether this is the tile currently showing video. One at a time: two
-     *  streams on one screen is two connections for one pair of eyes. */
-    playing: boolean;
-    /** Whether this viewer may point the camera. Drawn only for somebody who
-     *  can: an arrow the server will refuse is a worse answer than no arrow. */
     canControl: boolean;
-    onPlay: (id: string | null) => void;
+    /** Open it big. */
+    onOpen: () => void;
 }) {
-    const [stamp, setStamp] = useState(() => 0);
+    const [visible, setVisible] = useState(false);
+    const [stamp, setStamp] = useState(0);
     const [failed, setFailed] = useState(false);
+    const [ready, setReady] = useState(false);
+    const frame = useRef<HTMLDivElement | null>(null);
     const video = useRef<HTMLVideoElement | null>(null);
+
+    // Only what somebody can actually see is worth a connection.
+    useEffect(() => {
+        const element = frame.current;
+        if (!element) return;
+        const observer = new IntersectionObserver(
+            (entries) => setVisible(entries.some((entry) => entry.isIntersecting)),
+            { rootMargin: "200px" }
+        );
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, []);
+
+    const playing = visible && live && camera.enabled && !failed;
 
     useEffect(() => {
         if (playing || !camera.enabled) return;
@@ -54,45 +71,37 @@ export function CameraTile({
         return () => clearInterval(timer);
     }, [playing, camera.enabled]);
 
-    // Leaving the tile has to end the request, not just hide it: a <video> that is
-    // unmounted while streaming can keep its connection until the browser gets
-    // round to it, and that connection is the camera's only one.
+    // Stopping has to end the request rather than hide it: a stream nobody is
+    // watching still holds a slot on the relay.
     useEffect(() => {
+        if (playing) return;
         const element = video.current;
-        return () => {
-            if (!element) return;
-            element.pause();
-            element.removeAttribute("src");
-            element.load();
-        };
+        if (!element) return;
+        element.pause();
+        element.removeAttribute("src");
+        element.load();
     }, [playing]);
 
-    const still = `/api/home/cameras/${camera.id}/snapshot?v=${stamp}`;
-
     return (
-        <div className="group relative overflow-hidden rounded-lg border border-border bg-card">
-            <button
-                type="button"
-                onClick={() => onPlay(playing ? null : camera.id)}
-                className="block aspect-video w-full bg-background"
-                aria-label={playing ? `Stop watching ${camera.name}` : `Watch ${camera.name}`}
-            >
+        <div ref={frame} className="group relative overflow-hidden rounded-lg border border-border bg-card">
+            <div className="relative aspect-video bg-background">
                 {playing ? (
                     <video
                         ref={video}
-                        src={`/api/home/cameras/${camera.id}/stream?q=main`}
+                        src={`/api/home/cameras/${camera.id}/stream?q=sub`}
                         className="size-full object-cover"
                         autoPlay
                         muted
                         playsInline
+                        onCanPlay={() => setReady(true)}
                         onError={() => setFailed(true)}
                     />
-                ) : camera.enabled && live && !failed ? (
+                ) : camera.enabled && live ? (
                     // eslint-disable-next-line @next/next/no-img-element -- a live
                     // frame is never the same twice, so there is nothing for the
                     // image optimizer to cache and it would only add a hop.
                     <img
-                        src={still}
+                        src={`/api/home/cameras/${camera.id}/snapshot?v=${stamp}`}
                         alt={camera.name}
                         className="size-full object-cover"
                         onError={() => setFailed(true)}
@@ -100,19 +109,39 @@ export function CameraTile({
                 ) : (
                     <Unavailable camera={camera} live={live} />
                 )}
-                {/* Over the picture, and only while it is playing: pointing a
-                    camera at a still is aiming at where it was a minute ago. */}
-                {playing && camera.ptz && canControl ? <PtzPad cameraId={camera.id} /> : null}
-            </button>
+
+                {playing && !ready ? (
+                    <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-white/70">
+                        <Loader2 className="size-5 shrink-0 animate-spin" />
+                    </span>
+                ) : null}
+
+                {/* The whole picture opens it: a transparent button OVER the
+                    frame rather than one wrapping it, so anything drawn on top
+                    stays a sibling and keeps its own clicks. */}
+                <button
+                    type="button"
+                    onClick={onOpen}
+                    aria-label={`Open ${camera.name}`}
+                    className="absolute inset-0 cursor-zoom-in"
+                />
+                <span
+                    className="pointer-events-none absolute right-2 top-2 flex size-7 items-center justify-center rounded-md bg-black/45 text-white/80 opacity-0 transition-opacity group-hover:opacity-100"
+                    aria-hidden
+                >
+                    <Maximize2 className="size-3.5 shrink-0" />
+                </span>
+            </div>
 
             <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2">
                 <div className="min-w-0">
-                    <Link
-                        href={`/house/cameras?open=${camera.id}`}
-                        className="block truncate text-[13px] font-medium text-foreground hover:underline"
+                    <button
+                        type="button"
+                        onClick={onOpen}
+                        className="block max-w-full truncate text-left text-[13px] font-medium text-foreground hover:underline"
                     >
                         {camera.name}
-                    </Link>
+                    </button>
                     {camera.zone ? (
                         <p className="truncate text-[11px] text-foreground-subtle" title={camera.zone}>{camera.zone}</p>
                     ) : null}
@@ -123,15 +152,19 @@ export function CameraTile({
                             REC
                         </Badge>
                     ) : null}
-                    <span
-                        className={cn(
-                            "flex size-6 items-center justify-center rounded-md text-foreground-subtle transition-colors",
-                            "group-hover:bg-surface group-hover:text-foreground"
-                        )}
-                        aria-hidden
-                    >
-                        <Play className="size-3.5 shrink-0" />
-                    </span>
+                    {canControl ? (
+                        <Button
+                            asChild
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Settings for ${camera.name}`}
+                            title="Settings"
+                        >
+                            <Link href={`/house/cameras?open=${camera.id}`}>
+                                <Camera className="size-4 shrink-0" />
+                            </Link>
+                        </Button>
+                    ) : null}
                 </div>
             </div>
         </div>
@@ -140,14 +173,8 @@ export function CameraTile({
 
 /** Why there is no picture, said specifically enough to act on. */
 function Unavailable({ camera, live }: { camera: CameraView; live: boolean }) {
-    if (!camera.enabled) {
-        return (
-            <Placeholder icon={<VideoOff className="size-5 shrink-0" />} label="Switched off" />
-        );
-    }
-    if (!live) {
-        return <Placeholder icon={<Loader2 className="size-5 shrink-0 animate-spin" />} label="Starting" />;
-    }
+    if (!camera.enabled) return <Placeholder icon={<VideoOff className="size-5 shrink-0" />} label="Switched off" />;
+    if (!live) return <Placeholder icon={<Loader2 className="size-5 shrink-0 animate-spin" />} label="Starting" />;
     return <Placeholder icon={<Camera className="size-5 shrink-0" />} label="Not answering" />;
 }
 

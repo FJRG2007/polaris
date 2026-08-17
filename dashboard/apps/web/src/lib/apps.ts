@@ -178,7 +178,7 @@ export const POLARIS_APPS: AppEntry[] = [
         // once somebody installs Home.
         id: "home",
         label: "Home",
-        description: "Cameras, what they saw, and what to do about it",
+        description: "Your house: the cameras, what they saw, and what to do about it",
         icon: House,
         // Not "/home": that path belongs to Overview and spent a release
         // redirecting permanently to Drive, so browsers that followed it once
@@ -285,6 +285,16 @@ export interface AppSection {
  * machines they run on, three are how you watch and protect them. The rail groups
  * them so the eye lands on the third of the list it wants.
  */
+/**
+ * The heading the camera screens sit under in the Home rail.
+ *
+ * Home is the house, and cameras are the first thing in it rather than the whole
+ * of it - so they are named as a subject from the start. A flat rail of six
+ * camera screens would have to be rearranged the day anything else arrives, and
+ * rearranging a rail people have learned is a worse cost than one heading now.
+ */
+const CAMERAS_GROUP = "Cameras";
+
 const MACHINES_GROUP = "Machines";
 const OPERATIONS_GROUP = "Operations";
 
@@ -536,10 +546,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Live",
             href: "/house",
             icon: Cctv,
+            group: CAMERAS_GROUP,
             keywords: ["cameras", "wall", "watch", "stream", "view", "rtsp"]
         },
         {
             label: "Events",
+            group: CAMERAS_GROUP,
             href: "/house/events",
             icon: Bell,
             keywords: [
@@ -554,12 +566,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         },
         {
             label: "Clips",
+            group: CAMERAS_GROUP,
             href: "/house/clips",
             icon: Video,
             keywords: ["recordings", "footage", "playback", "saved", "download"]
         },
         {
             label: "Cameras",
+            group: CAMERAS_GROUP,
             href: "/house/cameras",
             icon: Camera,
             keywords: [
@@ -575,6 +589,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         },
         {
             label: "People",
+            group: CAMERAS_GROUP,
             href: "/house/people",
             icon: ScanFace,
             keywords: ["faces", "known", "recognition", "family", "strangers"]

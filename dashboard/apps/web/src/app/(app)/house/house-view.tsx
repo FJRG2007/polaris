@@ -13,6 +13,7 @@ import Link from "next/link";
 import * as actions from "./actions";
 import { Cctv, Plus } from "lucide-react";
 import { CameraTile } from "./camera-tile";
+import { CameraViewer } from "./camera-viewer";
 import { useEffect, useState } from "react";
 import type { CameraView } from "@/lib/home/cameras";
 import { Button, EmptyState, Skeleton } from "@polaris/ui";
@@ -21,7 +22,7 @@ export function HouseView({ canManage, canControl }: { canManage: boolean; canCo
     const [cameras, setCameras] = useState<CameraView[] | null>(null);
     const [live, setLive] = useState<Set<string>>(() => new Set());
     const [error, setError] = useState<string | null>(null);
-    const [playing, setPlaying] = useState<string | null>(null);
+    const [opened, setOpened] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -91,14 +92,21 @@ export function HouseView({ canManage, canControl }: { canManage: boolean; canCo
                                     key={camera.id}
                                     camera={camera}
                                     live={live.has(camera.id)}
-                                    playing={playing === camera.id}
                                     canControl={canControl}
-                                    onPlay={setPlaying}
+                                    onOpen={() => setOpened(camera.id)}
                                 />
                             ))}
                     </div>
                 </section>
             ))}
+
+            {opened ? (
+                <CameraViewer
+                    camera={cameras.find((camera) => camera.id === opened) as CameraView}
+                    canControl={canControl}
+                    onClose={() => setOpened(null)}
+                />
+            ) : null}
         </div>
     );
 }

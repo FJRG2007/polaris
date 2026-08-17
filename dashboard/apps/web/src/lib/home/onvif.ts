@@ -155,6 +155,107 @@ export async function getDeviceInformation(endpoint: OnvifEndpoint): Promise<Dev
     };
 }
 
+/**
+ * Where this camera's services actually live.
+ *
+ * The one path fixed by the standard is the device service; everything else is
+ * wherever the maker put it, and they disagree - `/onvif/media_service`,
+ * `/onvif/Media`, `/onvif/ptz`, sometimes on another port entirely. Hardcoding
+ * one spelling is why a camera answers "what are you" perfectly and then ignores
+ * every arrow: the request went to a path that is not there.
+ *
+ * So the camera is asked. `GetCapabilities` is the Profile S call every camera
+ * supporting any of this implements, and it names an address per service. Only
+ * the path is kept - the address a camera reports is the one it believes it has,
+ * which behind a repeater is frequently not the one that reaches it.
+ *
+ * Cached per camera: it is a fact about the firmware, not about the moment, and
+ * asking before every arrow press would put a round trip in front of something
+ * that has to feel immediate.
+ */
+export interface OnvifServices {
+    readonly media: string;
+    readonly ptz: string;
+    readonly events: string;
+}
+
+/** What each service is called in a capabilities document, and what Polaris
+ *  falls back to when the camera does not name one. */
+const SERVICE_FALLBACK: OnvifServices = {
+    media: "/onvif/media_service",
+    ptz: "/onvif/ptz_service",
+    events: "/onvif/event_service"
+};
+
+const services = new Map<string, { value: OnvifServices; at: number }>();
+const SERVICES_TTL_MS = 10 * 60_000;
+
+/** The path part of an address a camera reported, or null when it reported
+ *  nothing usable. */
+function pathOfXAddr(value: string | null): string | null {
+    if (!value) return null;
+    try {
+        const url = new URL(value);
+        return `${url.pathname}${url.search}` || null;
+    } catch {
+        return value.startsWith("/") ? value : null;
+    }
+}
+
+/** The block of a capabilities document describing one service, whatever prefix
+ *  it carries. */
+function sectionOf(xml: string, name: string): string | null {
+    const match = new RegExp(
+        `<(?:[A-Za-z0-9._-]+:)?${name}\\b[^>]*>([\\s\\S]*?)</(?:[A-Za-z0-9._-]+:)?${name}>`
+    ).exec(xml);
+    return match?.[1] ?? null;
+}
+
+/**
+ * The three service paths out of a capabilities document.
+ *
+ * Pure, so the one thing that decides whether an arrow works can be pinned by a
+ * test rather than discovered against a camera. Each service is read out of its
+ * OWN section: they all carry an element called XAddr, so reading the document
+ * as a whole would give whichever came first for all three - and the arrows
+ * would post PTZ commands at the media service.
+ */
+export function parseServices(xml: string): OnvifServices {
+    const read = (name: string, fallback: string): string => {
+        const section = sectionOf(xml, name);
+        return (section ? pathOfXAddr(tagValue(section, "XAddr")) : null) ?? fallback;
+    };
+    return {
+        media: read("Media", SERVICE_FALLBACK.media),
+        ptz: read("PTZ", SERVICE_FALLBACK.ptz),
+        events: read("Events", SERVICE_FALLBACK.events)
+    };
+}
+
+export async function getServices(endpoint: OnvifEndpoint): Promise<OnvifServices> {
+    const key = `${endpoint.address}:${endpoint.port}`;
+    const known = services.get(key);
+    if (known && Date.now() - known.at < SERVICES_TTL_MS) return known.value;
+
+    // A camera that will not answer this still gets the usual paths tried: the
+    // call failing is not proof that nothing is there.
+    const xml = await call(
+        endpoint,
+        DEVICE_SERVICE,
+        "<GetCapabilities xmlns=\"http://www.onvif.org/ver10/device/wsdl\"><Category>All</Category></GetCapabilities>"
+    ).catch(() => "");
+
+    const value = parseServices(xml);
+    services.set(key, { value, at: Date.now() });
+    return value;
+}
+
+/** Forget what a camera said about itself - after its address or its account
+ *  changes, when the old answer describes a different device. */
+export function forgetServices(address: string, port: number): void {
+    services.delete(`${address}:${port}`);
+}
+
 export interface MediaProfile {
     readonly token: string;
     readonly name: string;
@@ -166,7 +267,11 @@ export interface MediaProfile {
 /** The streams this camera publishes, widest first, so the first is the main one
  *  and the last is the small one detection should read. */
 export async function getProfiles(endpoint: OnvifEndpoint): Promise<MediaProfile[]> {
-    const xml = await call(endpoint, "/onvif/media_service", "<GetProfiles xmlns=\"http://www.onvif.org/ver10/media/wsdl\"/>");
+    const xml = await call(
+        endpoint,
+        (await getServices(endpoint)).media,
+        "<GetProfiles xmlns=\"http://www.onvif.org/ver10/media/wsdl\"/>"
+    );
     const tokens = attrValues(xml, "Profiles", "token");
     const names = tagValues(xml, "Name");
     const widths = tagValues(xml, "Width").map((value) => Number.parseInt(value, 10));
@@ -190,7 +295,7 @@ export async function getProfiles(endpoint: OnvifEndpoint): Promise<MediaProfile
 export async function getStreamUri(endpoint: OnvifEndpoint, profileToken: string): Promise<string | null> {
     const xml = await call(
         endpoint,
-        "/onvif/media_service",
+        (await getServices(endpoint)).media,
         `<GetStreamUri xmlns="http://www.onvif.org/ver10/media/wsdl"><StreamSetup xmlns="http://www.onvif.org/ver10/schema"><Stream>RTP-Unicast</Stream><Transport><Protocol>RTSP</Protocol></Transport></StreamSetup><ProfileToken>${escapeXml(profileToken)}</ProfileToken></GetStreamUri>`
     );
     const uri = tagValue(xml, "Uri");
@@ -217,7 +322,7 @@ export async function ptzMove(endpoint: OnvifEndpoint, profileToken: string, vec
     const clamp = (value: number) => Math.max(-1, Math.min(1, value)).toFixed(2);
     await call(
         endpoint,
-        "/onvif/ptz_service",
+        (await getServices(endpoint)).ptz,
         `<ContinuousMove xmlns="http://www.onvif.org/ver20/ptz/wsdl"><ProfileToken>${escapeXml(profileToken)}</ProfileToken><Velocity xmlns="http://www.onvif.org/ver10/schema"><PanTilt x="${clamp(vector.pan)}" y="${clamp(vector.tilt)}"/><Zoom x="${clamp(vector.zoom)}"/></Velocity></ContinuousMove>`
     );
 }
@@ -225,7 +330,7 @@ export async function ptzMove(endpoint: OnvifEndpoint, profileToken: string, vec
 export async function ptzStop(endpoint: OnvifEndpoint, profileToken: string): Promise<void> {
     await call(
         endpoint,
-        "/onvif/ptz_service",
+        (await getServices(endpoint)).ptz,
         `<Stop xmlns="http://www.onvif.org/ver20/ptz/wsdl"><ProfileToken>${escapeXml(profileToken)}</ProfileToken><PanTilt>true</PanTilt><Zoom>true</Zoom></Stop>`
     );
 }
@@ -239,7 +344,7 @@ export interface PtzPreset {
 export async function getPresets(endpoint: OnvifEndpoint, profileToken: string): Promise<PtzPreset[]> {
     const xml = await call(
         endpoint,
-        "/onvif/ptz_service",
+        (await getServices(endpoint)).ptz,
         `<GetPresets xmlns="http://www.onvif.org/ver20/ptz/wsdl"><ProfileToken>${escapeXml(profileToken)}</ProfileToken></GetPresets>`
     );
     const tokens = attrValues(xml, "Preset", "token");
@@ -250,7 +355,7 @@ export async function getPresets(endpoint: OnvifEndpoint, profileToken: string):
 export async function gotoPreset(endpoint: OnvifEndpoint, profileToken: string, preset: string): Promise<void> {
     await call(
         endpoint,
-        "/onvif/ptz_service",
+        (await getServices(endpoint)).ptz,
         `<GotoPreset xmlns="http://www.onvif.org/ver20/ptz/wsdl"><ProfileToken>${escapeXml(profileToken)}</ProfileToken><PresetToken>${escapeXml(preset)}</PresetToken></GotoPreset>`
     );
 }
@@ -267,7 +372,7 @@ export async function gotoPreset(endpoint: OnvifEndpoint, profileToken: string, 
 export async function createPullPoint(endpoint: OnvifEndpoint): Promise<string | null> {
     const xml = await call(
         endpoint,
-        "/onvif/event_service",
+        (await getServices(endpoint)).events,
         "<CreatePullPointSubscription xmlns=\"http://www.onvif.org/ver10/events/wsdl\"><InitialTerminationTime>PT60S</InitialTerminationTime></CreatePullPointSubscription>"
     );
     // The camera answers with the address its mailbox lives at, which is usually

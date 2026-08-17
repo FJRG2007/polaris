@@ -7,6 +7,7 @@
  * the difference somebody chose the expensive setting for.
  */
 
+import { parseServices } from "@/lib/home/onvif";
 import { relaySource } from "@/lib/home/vendors";
 import { describe, expect, it, vi } from "vitest";
 
@@ -69,5 +70,36 @@ describe("what a camera's own alert means", () => {
     it("treats anything it does not know as movement, which is what it is underneath", () => {
         expect(kindForTopic("tns1:RuleEngine/CellMotionDetector/Motion")).toBe("motion");
         expect(kindForTopic("tns1:RuleEngine/SomethingNobodyHasSeenBefore")).toBe("motion");
+    });
+});
+
+describe("where a camera keeps its services", () => {
+    // Trimmed from a real GetCapabilities: the paths are per-vendor, which is the
+    // whole reason this is asked rather than assumed. A hardcoded
+    // "/onvif/ptz_service" is why the arrows did nothing on a camera that
+    // answered everything else perfectly.
+    const capabilities =
+        "<tds:GetCapabilitiesResponse><tds:Capabilities><tt:Events><tt:XAddr>http://192.168.1.50:2020/onvif/event</tt:XAddr></tt:Events><tt:Media><tt:XAddr>http://192.168.1.50:2020/onvif/Media</tt:XAddr></tt:Media><tt:PTZ><tt:XAddr>http://192.168.1.50:2020/onvif/PTZ</tt:XAddr></tt:PTZ></tds:Capabilities></tds:GetCapabilitiesResponse>";
+
+    it("reads each service out of its own section, not the first XAddr it sees", () => {
+        expect(parseServices(capabilities)).toEqual({
+            media: "/onvif/Media",
+            ptz: "/onvif/PTZ",
+            events: "/onvif/event"
+        });
+    });
+
+    it("keeps only the path, because the address a camera reports is its own idea", () => {
+        // Behind a repeater the host a camera names is frequently not one that
+        // reaches it; the address that works is the one already being used.
+        expect(parseServices(capabilities).ptz.startsWith("/")).toBe(true);
+    });
+
+    it("falls back to the usual paths when a camera says nothing", () => {
+        expect(parseServices("")).toEqual({
+            media: "/onvif/media_service",
+            ptz: "/onvif/ptz_service",
+            events: "/onvif/event_service"
+        });
     });
 });
