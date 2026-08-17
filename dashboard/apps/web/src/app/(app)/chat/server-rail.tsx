@@ -28,10 +28,10 @@
 
 import { useChat } from "./chat-context";
 import { useMemo, useState } from "react";
+import { lastChannelIn } from "./recents";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { LeaveDialog } from "./leave-dialog";
-import { lastChannelIn } from "./recents";
 import { leaveSpaceAction } from "./actions";
 import { InviteDialog } from "./invite-dialog";
 import { chatAvatarUrl } from "@/lib/avatar-url";
@@ -71,25 +71,38 @@ export function ServerRail() {
     const [error, setError] = useState("");
 
     /**
-     * Open a space, and a conversation inside it.
+     * Open a space, and a conversation inside it. Null is direct messages, which
+     * behave like a space here and are reached the same way.
      *
-     * Choosing a space used to move the list on the left and leave the reader
-     * looking at whatever direct message was already open - a click that appears
-     * to do nothing. So it lands somewhere: where this browser was last in that
-     * space, and failing that its first channel, which is the one at the top of
-     * the list and the nearest thing a space has to a front door.
+     * Choosing one used to move the list on the left and leave the reader looking
+     * at whatever was already open - a click that appears to do nothing, and
+     * worse in the direction nobody expects: pressing Direct messages while
+     * standing in a server listed the conversations and went on showing the
+     * server's channel beside them.
      *
-     * A voice room is not it. Landing in one would put somebody in a call by
+     * So it always lands somewhere: where this browser was last in that place,
+     * then the newest conversation in it, then Chat with nothing open - which is
+     * the honest answer for somebody who has never sent a direct message.
+     *
+     * A voice room is never it. Landing in one would put somebody in a call by
      * navigating, which is not what picking a server means.
      */
-    const openSpace = (spaceId: string): void => {
+    const openSpace = (spaceId: string | null): void => {
         setActiveSpaceId(spaceId);
         const inSpace = channels.filter(
             (channel) => channel.spaceId === spaceId && !channel.archived && channel.kind !== "voice"
         );
         const remembered = lastChannelIn(spaceId);
-        const target = inSpace.find((channel) => channel.id === remembered) ?? inSpace[0];
-        if (target) router.push(`/chat/c/${target.id}`);
+        const target =
+            inSpace.find((channel) => channel.id === remembered) ??
+            // A space has an order somebody arranged; the people you talk to have
+            // none but "who spoke last", which is what the list beside this shows.
+            (spaceId === null
+                ? [...inSpace].sort((left, right) =>
+                      (right.lastMessageAt ?? "").localeCompare(left.lastMessageAt ?? "")
+                  )[0]
+                : inSpace[0]);
+        router.push(target ? `/chat/c/${target.id}` : "/chat");
     };
 
     /** Unread, summed per space, so a space with something waiting says so
@@ -110,7 +123,7 @@ export function ServerRail() {
                 label="Direct messages"
                 active={activeSpaceId === null}
                 unread={waiting.get(null) ?? 0}
-                onClick={() => setActiveSpaceId(null)}
+                onClick={() => openSpace(null)}
             >
                 <MessageSquare className="size-4" />
             </Pill>

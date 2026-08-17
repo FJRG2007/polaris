@@ -68,6 +68,11 @@ export function rememberMedia(media: RecentMedia): void {
 /** Where each space's last-opened channel is kept, one entry per space. */
 const LAST_CHANNEL_KEY = "polaris.chat.lastChannel";
 
+/** What direct messages are filed under. They belong to no space, and they are
+ *  still a place somebody comes back to. Ids are uuids, so this cannot collide
+ *  with a real one. */
+const DIRECTS = "dm";
+
 /**
  * The channel this browser last had open in a space, and the note that records
  * it.
@@ -77,31 +82,35 @@ const LAST_CHANNEL_KEY = "polaris.chat.lastChannel";
  * been reading - which reads as a click that did nothing. A space opens on a
  * channel now, and the one it opens on is the one this person was last in.
  *
+ * Null is direct messages, which are a place you go like any other: pressing that
+ * button used to move the list on the left and leave the reader looking at the
+ * channel of whichever server they had come from.
+ *
  * On the device rather than on the account, like everything else here: where
  * somebody left off is a habit of that browser, and following them across
  * machines would be a surprise rather than a service.
  */
-export function lastChannelIn(spaceId: string): string | null {
+export function lastChannelIn(spaceId: string | null): string | null {
     if (typeof window === "undefined") return null;
     try {
         const raw = window.localStorage.getItem(LAST_CHANNEL_KEY);
         if (!raw) return null;
         const parsed: unknown = JSON.parse(raw);
         if (typeof parsed !== "object" || parsed === null) return null;
-        const found = (parsed as Record<string, unknown>)[spaceId];
+        const found = (parsed as Record<string, unknown>)[spaceId ?? DIRECTS];
         return typeof found === "string" ? found : null;
     } catch {
         return null;
     }
 }
 
-export function rememberChannel(spaceId: string, channelId: string): void {
+export function rememberChannel(spaceId: string | null, channelId: string): void {
     if (typeof window === "undefined") return;
     try {
         const raw = window.localStorage.getItem(LAST_CHANNEL_KEY);
         const parsed: unknown = raw ? JSON.parse(raw) : {};
         const map = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, string>) : {};
-        map[spaceId] = channelId;
+        map[spaceId ?? DIRECTS] = channelId;
         window.localStorage.setItem(LAST_CHANNEL_KEY, JSON.stringify(map));
     } catch {
         // Storage disabled or full. The space still opens - on its first
