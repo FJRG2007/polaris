@@ -21,6 +21,11 @@ import { runAction } from "@/lib/run-action";
 import { CircleCheck, Loader2, ScanFace } from "lucide-react";
 import { Button, Input, Select, Skeleton } from "@polaris/ui";
 
+/** How often a recognizer that has not answered yet is asked again. Short: it is
+ *  the difference between watching it come up and reloading the page to find
+ *  out, and it only runs while somebody has this screen open and it is starting. */
+const STARTING_EVERY_MS = 5000;
+
 interface Settings {
     faceApiUrl: string;
     hasFaceKey: boolean;
@@ -88,6 +93,35 @@ export function HomeSettingsView({
             cancelled = true;
         };
     }, []);
+
+    /**
+     * A recognizer that has just been installed is not answering yet.
+     *
+     * It pulls a few hundred megabytes and then loads its models, which is the
+     * minute or two the card says it is - and nothing tells this screen when that
+     * finishes. So the card sat on "Starting" until somebody reloaded the page
+     * and found it had been running the whole time.
+     *
+     * Only while it is starting: once it answers there is nothing left to watch,
+     * and the question costs a request to the machine it runs on every time it is
+     * asked.
+     */
+    useEffect(() => {
+        if (!settings?.installedOn || settings.answering) return;
+        const ask = () => {
+            void actions
+                .homeSettingsAction()
+                .then((fresh) => {
+                    if (fresh.settings) setSettings(fresh.settings);
+                })
+                .catch(() => {
+                    // A refused answer is the machine still coming up, which is
+                    // what this is waiting for. The next tick asks again.
+                });
+        };
+        const timer = setInterval(ask, STARTING_EVERY_MS);
+        return () => clearInterval(timer);
+    }, [settings?.installedOn, settings?.answering]);
 
     const install = async () => {
         setInstalling(true);
