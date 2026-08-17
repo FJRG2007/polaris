@@ -20,20 +20,23 @@ import { revalidatePath } from "next/cache";
 import * as cameras from "@/lib/home/cameras";
 import * as events from "@/lib/home/events";
 import * as ptz from "@/lib/home/ptz";
+import * as places from "@/lib/home/places";
 import * as people from "@/lib/home/people";
 import * as recording from "@/lib/home/recording";
 import { listHosts } from "@/lib/host-service";
 import { footageTarget } from "@/lib/home/stills";
 import { LOCAL_TARGET, storageTargetOptions } from "@/lib/storage-target";
 import { probeCamera } from "@/lib/home/onvif";
+import { cookies } from "next/headers";
 import { requireHome } from "@/lib/home/access";
+import { currentPlace, PLACE_COOKIE, PLACE_COOKIE_MAX_AGE } from "@/lib/home/current-place";
 import { cameraVendor } from "@/lib/home/vendors";
 import { discoverCameras } from "@/lib/home/discovery";
 import { ensureVisionWorker, faceEndpoint, faceRecognitionSettings, setFaceRecognition } from "@/lib/home/vision";
 import { needsSomewhereToRun, type Detector } from "@/lib/home/detection";
 import { cameraInputSchema, discoveryInputSchema, normalizeCameraInput } from "@/lib/home/schemas";
 
-const PATH = "/house";
+const PATH = "/places";
 
 /** Turn a refusal into a sentence. Anything else is a real fault and throws. */
 async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: string }> {
@@ -47,8 +50,61 @@ async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: str
 
 export async function listCamerasAction(): Promise<{ cameras?: cameras.CameraView[]; error?: string }> {
     const { install } = await requireHome("home.read");
-    const result = await guard(() => cameras.listCameras(install.id));
+    const result = await guard(async () => {
+        const { current } = await currentPlace(install.id);
+        return cameras.listCameras(install.id, current.id);
+    });
     return result.error ? { error: result.error } : { cameras: result.value };
+}
+
+/** Remember which place this person is looking at. Not authorization: it narrows
+ *  what is listed, and every screen still resolves what they may do. */
+export async function choosePlaceAction(placeId: string): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(async () => {
+        const place = await places.getPlace(install.id, String(placeId));
+        if (!place) throw new Error("No such place");
+        (await cookies()).set(PLACE_COOKIE, place.id, {
+            path: "/",
+            maxAge: PLACE_COOKIE_MAX_AGE,
+            sameSite: "lax"
+        });
+    });
+    if (result.error) return { error: result.error };
+    revalidatePath(PATH);
+    return {};
+}
+
+export async function listPlacesAction(): Promise<{ places?: places.PlaceView[]; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(() => places.listPlaces(install.id));
+    return result.error ? { error: result.error } : { places: result.value };
+}
+
+export async function savePlaceAction(
+    id: string | null,
+    input: { name: string; kind: string; address: string }
+): Promise<{ place?: places.PlaceView; error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const shape = {
+        name: String(input?.name ?? ""),
+        kind: String(input?.kind ?? "other"),
+        address: String(input?.address ?? "")
+    };
+    const result = await guard(() =>
+        id ? places.updatePlace(install.id, id, shape) : places.createPlace(install.id, shape)
+    );
+    if (result.error || !result.value) return { error: result.error ?? "That place could not be saved." };
+    revalidatePath(PATH);
+    return { place: result.value };
+}
+
+export async function deletePlaceAction(id: string): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const result = await guard(() => places.deletePlace(install.id, id));
+    if (result.error) return { error: result.error };
+    revalidatePath(PATH);
+    return {};
 }
 
 /** The disks a camera's footage can be pointed at: whatever Polaris is set to by
@@ -169,6 +225,10 @@ export async function saveCameraAction(
         return { error: parsed.error.issues[0]?.message ?? "Some of that is not right." };
     }
     const result = await guard(async () => {
+        const { current } = await currentPlace(install.id);
+        const placeId = parsed.data.placeId || current.id;
+        if (!(await places.getPlace(install.id, placeId))) throw new Error("That place is not one of yours");
+        parsed.data.placeId = placeId;
         if (parsed.data.storageTarget) {
             const allowed = new Set([LOCAL_TARGET, ...(await storageTargetOptions()).map((option) => option.id)]);
             if (!allowed.has(parsed.data.storageTarget)) throw new Error("That storage is not one of yours");
@@ -238,8 +298,9 @@ export async function listEventsAction(input: {
 }): Promise<{ events?: events.EventView[]; error?: string }> {
     const { install } = await requireHome("home.read");
     const before = input.before ? new Date(input.before) : null;
-    const result = await guard(() =>
+    const result = await guard(async () =>
         events.listEvents(install.id, {
+            placeId: (await currentPlace(install.id)).current.id,
             cameraId: input.cameraId ?? null,
             kind: input.kind ?? null,
             before: before && !Number.isNaN(before.getTime()) ? before : null
@@ -380,8 +441,9 @@ export async function listClipsAction(input: {
 }): Promise<{ clips?: recording.ClipView[]; error?: string }> {
     const { install } = await requireHome("home.read");
     const before = input.before ? new Date(input.before) : null;
-    const result = await guard(() =>
+    const result = await guard(async () =>
         recording.listClips(install.id, {
+            placeId: (await currentPlace(install.id)).current.id,
             cameraId: input.cameraId ?? null,
             before: before && !Number.isNaN(before.getTime()) ? before : null
         })

@@ -172,18 +172,25 @@ export const POLARIS_APPS: AppEntry[] = [
         permission: "deploy.read"
     },
     {
-        // The house: cameras, what they saw, and what to do about it. Its own app
-        // rather than a screen inside Apps, because the people who watch a camera
-        // are rarely the people who deploy anything - and it is only here at all
-        // once somebody installs Home.
+        /**
+         * The places you own and what watches them.
+         *
+         * Its own app rather than a screen inside Apps, because the people who
+         * watch a camera are rarely the people who deploy anything - and it is
+         * only here at all once somebody installs it.
+         *
+         * The id stays `home` however it is labelled: it is the catalog app
+         * people have already installed, and renaming it would orphan every one
+         * of those installs to rename a word on screen.
+         */
         id: "home",
-        label: "Home",
-        description: "Your house: the cameras, what they saw, and what to do about it",
+        label: "Places",
+        description: "Your places and the cameras in them, what they saw, and what to do about it",
         icon: House,
-        // Not "/home": that path belongs to Overview and spent a release
+        // Never "/home": that path belongs to Overview and spent a release
         // redirecting permanently to Drive, so browsers that followed it once
         // still do.
-        href: "/house",
+        href: "/places",
         permission: "home.read",
         requiresApp: "home"
     },
@@ -544,7 +551,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
     home: [
         {
             label: "Live",
-            href: "/house",
+            href: "/places",
             icon: Cctv,
             group: CAMERAS_GROUP,
             keywords: ["cameras", "wall", "watch", "stream", "view", "rtsp"]
@@ -552,7 +559,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Events",
             group: CAMERAS_GROUP,
-            href: "/house/events",
+            href: "/places/events",
             icon: Bell,
             keywords: [
                 "detections",
@@ -567,14 +574,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Clips",
             group: CAMERAS_GROUP,
-            href: "/house/clips",
+            href: "/places/clips",
             icon: Video,
             keywords: ["recordings", "footage", "playback", "saved", "download"]
         },
         {
             label: "Cameras",
             group: CAMERAS_GROUP,
-            href: "/house/cameras",
+            href: "/places/cameras",
             icon: Camera,
             keywords: [
                 "add camera",
@@ -590,13 +597,13 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "People",
             group: CAMERAS_GROUP,
-            href: "/house/people",
+            href: "/places/people",
             icon: ScanFace,
             keywords: ["faces", "known", "recognition", "family", "strangers"]
         },
         {
             label: "Settings",
-            href: "/house/settings",
+            href: "/places/settings",
             icon: SlidersHorizontal,
             keywords: ["relay", "storage", "retention", "where it runs", "uninstall"]
         }

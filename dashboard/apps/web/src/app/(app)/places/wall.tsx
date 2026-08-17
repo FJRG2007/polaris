@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The wall: every camera in the house, grouped by where it points.
+ * The wall: every camera in this place, grouped by where it points.
  *
  * The shell is on screen before anything has been asked for, and the cameras
  * arrive after - so the page never waits on a relay or a camera that is asleep.
@@ -18,7 +18,7 @@ import { useEffect, useState } from "react";
 import type { CameraView } from "@/lib/home/cameras";
 import { Button, EmptyState, Skeleton } from "@polaris/ui";
 
-export function HouseView({ canManage, canControl }: { canManage: boolean; canControl: boolean }) {
+export function Wall({ canManage, canControl }: { canManage: boolean; canControl: boolean }) {
     const [cameras, setCameras] = useState<CameraView[] | null>(null);
     const [live, setLive] = useState<Set<string>>(() => new Set());
     const [error, setError] = useState<string | null>(null);
@@ -60,7 +60,7 @@ export function HouseView({ canManage, canControl }: { canManage: boolean; canCo
                 action={
                     canManage ? (
                         <Button asChild size="sm">
-                            <Link href="/house/cameras">
+                            <Link href="/places/cameras">
                                 <Plus className="size-4 shrink-0" />
                                 Add a camera
                             </Link>

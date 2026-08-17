@@ -178,14 +178,16 @@ async function announce(
         userId: install.ownerId,
         type: "home.event",
         title: what,
-        href: "/house/events",
+        href: "/places/events",
         level: detection.kind === "tamper" ? "warning" : "info",
         metadata: { eventId }
     });
 }
 
 export interface EventQuery {
-    /** One camera, or the whole house. */
+    /** One place, or every camera the house has. */
+    readonly placeId?: string | null;
+    /** One camera, or every camera in scope. */
     readonly cameraId?: string | null;
     readonly kind?: string | null;
     /** Newest first, from this point back. Keyset rather than an offset: this
@@ -200,7 +202,11 @@ export async function listEvents(installedAppId: string, query: EventQuery = {})
     // Scoped through the cameras of this house rather than trusting the id in the
     // request: an event id from anywhere else must not resolve.
     const cameras = await prisma.camera.findMany({
-        where: { installedAppId, ...(query.cameraId ? { id: query.cameraId } : {}) },
+        where: {
+            installedAppId,
+            ...(query.placeId ? { placeId: query.placeId } : {}),
+            ...(query.cameraId ? { id: query.cameraId } : {})
+        },
         select: { id: true, name: true }
     });
     if (cameras.length === 0) return [];

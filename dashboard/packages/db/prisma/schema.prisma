@@ -6449,6 +6449,40 @@ model UserPermission {
     @@unique([userId, permission])
     @@index([userId])
 }
+// A place the cameras are in: a house, an office, a workshop, a site.
+//
+// Home began as one house because that is what one person has, and it is not
+// what anybody has for long: a flat and a parents' house, an office and the
+// warehouse behind it. The alternative to this table is a "location" field on a
+// camera, which reads the same on the first screen and cannot carry what a place
+// actually owns - who may see it, what it alerts on, what the cameras there are
+// keeping.
+//
+// Not an organization and not a scope: those say whose work this is. A place says
+// where a camera physically points, which is a different question and one that
+// somebody with a single account still has more than one answer to.
+model Place {
+    id             String @id @default(uuid(7)) @db.Uuid
+    // The Home install this belongs to. Bare uuid, per the InstalledApp precedent.
+    installedAppId String @db.Uuid
+    name           String
+    /// house | office | site | other - what it is, which is only ever a label and
+    /// an icon. Nothing behaves differently; it is there because "Warehouse" and
+    /// "Mum's" read better with the right symbol beside them.
+    kind           String @default("house")
+    /// Where it is, in the words somebody would use. Never geocoded - a house is
+    /// not a map pin here, and a stored coordinate for somebody's home is a
+    /// liability with no use.
+    address        String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    cameras Camera[]
+
+    @@index([installedAppId])
+}
+
 // A camera Polaris watches.
 //
 // One row per physical camera, whatever it is reached through. Most of what makes
@@ -6466,8 +6500,12 @@ model Camera {
     // The Home install this belongs to. Bare uuid, per the InstalledApp precedent
     // of not linking installs by foreign key.
     installedAppId String  @db.Uuid
+    /// The place it is in. Null on a camera added before places existed, which
+    /// the app reads as "the first one" and repairs on sight - a camera somebody
+    /// already set up must not disappear because a table was added under it.
+    placeId        String? @db.Uuid
     name           String
-    /// Where in the house it points ("Front door"). Free text, and the only
+    /// Where in that place it points ("Front door"). Free text, and the only
     /// grouping the wall has - a table of zones would be a second thing to
     /// maintain for a list that is read once per screen.
     zone           String?
@@ -6536,10 +6574,12 @@ model Camera {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
+    place  Place?        @relation(fields: [placeId], references: [id], onDelete: SetNull)
     events CameraEvent[]
     clips  CameraClip[]
 
     @@index([installedAppId])
+    @@index([placeId])
     @@index([installedAppId, zone])
 }
 

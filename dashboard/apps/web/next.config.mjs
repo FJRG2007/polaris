@@ -49,7 +49,13 @@ const nextConfig = {
     // at /home for the same reason - a path nobody's browser has a stale answer for.
     redirects: async () => [
         { source: "/notifications", destination: "/account/notifications", permanent: false },
-        { source: "/overview", destination: "/home", permanent: false }
+        { source: "/overview", destination: "/home", permanent: false },
+        // Home's screens were at /house for one release. Temporary on purpose: a
+        // permanent redirect is a 308 with no expiry, cached by every browser
+        // that ever followed it, and this project has already lost one path that
+        // way.
+        { source: "/house", destination: "/places", permanent: false },
+        { source: "/house/:path*", destination: "/places/:path*", permanent: false }
     ],
     /**
      * The vault's Bitwarden-compatible surface.

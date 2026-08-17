@@ -158,11 +158,15 @@ function toView(row: ClipRow, cameraName: string): ClipView {
 /** The house's footage, newest first, bounded and keyset-paged like the events. */
 export async function listClips(
     installedAppId: string,
-    query: { cameraId?: string | null; before?: Date | null; limit?: number } = {}
+    query: { placeId?: string | null; cameraId?: string | null; before?: Date | null; limit?: number } = {}
 ): Promise<ClipView[]> {
     const limit = Math.min(Math.max(query.limit ?? 40, 1), 200);
     const cameras = await prisma.camera.findMany({
-        where: { installedAppId, ...(query.cameraId ? { id: query.cameraId } : {}) },
+        where: {
+            installedAppId,
+            ...(query.placeId ? { placeId: query.placeId } : {}),
+            ...(query.cameraId ? { id: query.cameraId } : {})
+        },
         select: { id: true, name: true }
     });
     if (cameras.length === 0) return [];

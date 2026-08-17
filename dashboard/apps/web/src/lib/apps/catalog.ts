@@ -850,13 +850,13 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         // cameras. Installing runs nothing - the media relay arrives with the first
         // camera, and only on the machine that was picked for it.
         id: "home",
-        name: "Home",
+        name: "Places",
         category: "Home",
         icon: House,
-        opensAt: "/house",
-        summary: "Cameras, and what they see, on your own machines.",
+        opensAt: "/places",
+        summary: "Your places, and the cameras watching them, on your own machines.",
         description:
-            "Watch your cameras live, keep what matters, and get told when something happens. Polaris pulls each camera once and shows it to everybody watching, so the camera never runs out of connections. Detection is yours to choose per camera - the camera's own alerts, movement, people, or faces - along with where it runs and how often, so a house full of cameras does not have to cost a machine.",
+            "A house, an office, a workshop - each with its own cameras. Watch them live, keep what matters, and get told when something happens. Polaris pulls each camera once and shows it to everybody watching, so the camera never runs out of connections. Detection is yours to choose per camera - the camera's own alerts, movement, people, or faces - along with where it runs and how often, so a house full of cameras does not have to cost a machine.",
         installMethod: "builtin",
         capabilities: ["home-hub"],
         dashboard: "builtin",

@@ -9,6 +9,8 @@
 import { PageHeader } from "@polaris/ui";
 import { CamerasView } from "./cameras-view";
 import { requireHomeUser } from "@/lib/home/access";
+import { currentPlace } from "@/lib/home/current-place";
+import { PlaceSwitcher } from "../place-switcher";
 
 export const dynamic = "force-dynamic";
 
@@ -17,15 +19,19 @@ export default async function CamerasPage({
 }: {
     searchParams: Promise<{ open?: string }>;
 }) {
-    const { canManage } = await requireHomeUser("home.read");
+    const { install, canManage } = await requireHomeUser("home.read");
+    const place = await currentPlace(install.id);
     const { open } = await searchParams;
 
     return (
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-            <PageHeader
-                title="Cameras"
-                description="What each camera is, how Polaris reaches it, and what it is allowed to notice."
-            />
+            <div className="flex flex-wrap items-start justify-between gap-2">
+                <PageHeader
+                    title="Cameras"
+                    description="What each camera is, how Polaris reaches it, and what it is allowed to notice."
+                />
+                <PlaceSwitcher places={place.places} current={place.current} canManage={canManage} />
+            </div>
             <CamerasView canManage={canManage} openId={open ?? null} />
         </div>
     );

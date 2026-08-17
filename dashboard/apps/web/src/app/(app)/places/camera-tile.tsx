@@ -160,7 +160,7 @@ export function CameraTile({
                             aria-label={`Settings for ${camera.name}`}
                             title="Settings"
                         >
-                            <Link href={`/house/cameras?open=${camera.id}`}>
+                            <Link href={`/places/cameras?open=${camera.id}`}>
                                 <Camera className="size-4 shrink-0" />
                             </Link>
                         </Button>

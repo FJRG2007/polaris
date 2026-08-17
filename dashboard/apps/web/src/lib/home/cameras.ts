@@ -21,6 +21,7 @@ import { DEFAULT_DETECTION, type DetectionSettings } from "@/lib/home/detection"
 export interface CameraView {
     readonly id: string;
     readonly name: string;
+    readonly placeId: string;
     readonly zone: string;
     readonly vendor: string;
     readonly model: string | null;
@@ -84,6 +85,7 @@ function toView(row: NonNullable<CameraRow>): CameraView {
     return {
         id: row.id,
         name: row.name,
+        placeId: row.placeId ?? "",
         zone: row.zone ?? "",
         vendor: row.vendor,
         model: row.model,
@@ -106,11 +108,17 @@ function toView(row: NonNullable<CameraRow>): CameraView {
     };
 }
 
-/** Every camera in the house, grouped the way the wall reads: by zone, then by
- *  name. One query - a house has tens of cameras, not thousands. */
-export async function listCameras(installedAppId: string): Promise<CameraView[]> {
+/**
+ * Every camera in one place, grouped the way the wall reads: by zone, then by
+ * name. One query - a place has tens of cameras, not thousands.
+ *
+ * Scoped to a place rather than to the whole install, because every screen in
+ * this app is about one building. Passing no place answers for all of them,
+ * which is what the sweeps and the workers want.
+ */
+export async function listCameras(installedAppId: string, placeId?: string | null): Promise<CameraView[]> {
     const rows = await prisma.camera.findMany({
-        where: { installedAppId },
+        where: { installedAppId, ...(placeId ? { placeId } : {}) },
         orderBy: [{ zone: "asc" }, { name: "asc" }]
     });
     return rows.map(toView);
@@ -159,6 +167,7 @@ export async function createCamera(installedAppId: string, input: CameraInput): 
     const row = await prisma.camera.create({
         data: {
             installedAppId,
+            placeId: input.placeId || null,
             name: input.name,
             zone: input.zone || null,
             vendor: input.vendor,
@@ -196,6 +205,7 @@ export async function updateCamera(
     const row = await prisma.camera.update({
         where: { id },
         data: {
+            placeId: input.placeId || null,
             name: input.name,
             zone: input.zone || null,
             vendor: input.vendor,

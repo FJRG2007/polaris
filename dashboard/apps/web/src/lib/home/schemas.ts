@@ -77,6 +77,9 @@ const reachViaSchema = z
 
 export const cameraInputSchema = z.object({
     name: z.string().trim().min(1, "Give it a name").max(64),
+    /** The place it is in. Checked against this install's places before it is
+     *  stored - an id in a form is a request, not a fact. */
+    placeId: z.string().trim().max(64).default(""),
     zone: z.string().trim().max(64).default(""),
     vendor: z.string().trim().min(1).max(32),
     address: addressSchema,
