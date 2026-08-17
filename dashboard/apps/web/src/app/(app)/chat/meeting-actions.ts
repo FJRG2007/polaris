@@ -133,12 +133,24 @@ export async function joinAsGuestAction(
     return { meetingId: seat.meetingId, admission: seat.admission };
 }
 
-/** The call as the screen draws it, for whoever holds a seat in it. */
-export async function readCallAction(
-    meetingId: string
-): Promise<{ meeting?: MeetingView | null; participantId?: string; error?: string }> {
+/**
+ * The call as the screen draws it, for whoever holds a seat in it.
+ *
+ * `gone` is the answer that matters and it is separate from `error` on purpose.
+ * Not holding a seat is not a failure to read the call - it is this browser not
+ * being in it, which is what happens when the call ended, when the seat was
+ * swept, or when another device took it over. Reported as an error it drew a
+ * sentence on a screen that went on showing the call bar for a room nobody was
+ * in; reported as itself, the screen lets go.
+ */
+export async function readCallAction(meetingId: string): Promise<{
+    meeting?: MeetingView | null;
+    participantId?: string;
+    gone?: boolean;
+    error?: string;
+}> {
     const seat = await resolveSeat(meetingId);
-    if (!seat) return { error: "You are not in that call" };
+    if (!seat) return { gone: true };
     const result = await guard(() => meetings.readMeeting(seat));
     return result.error
         ? { error: result.error }

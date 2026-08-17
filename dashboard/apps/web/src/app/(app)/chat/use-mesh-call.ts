@@ -297,6 +297,14 @@ export function useMeshCall(meetingId: string | null, options?: { video?: boolea
     const refresh = useCallback(() => {
         if (!meetingId) return;
         void actions.readCallAction(meetingId).then((result) => {
+            // No seat. This browser is not in that call - it ended, the seat was
+            // swept, or another device took it over - and the honest thing is to
+            // let go rather than draw a sentence under a bar for a room nobody
+            // is in.
+            if (result.gone) {
+                setEnded(true);
+                return;
+            }
             if (result.error) {
                 setError(result.error);
                 return;
