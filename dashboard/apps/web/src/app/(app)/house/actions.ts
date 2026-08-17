@@ -23,9 +23,8 @@ import * as ptz from "@/lib/home/ptz";
 import * as people from "@/lib/home/people";
 import * as recording from "@/lib/home/recording";
 import { listHosts } from "@/lib/host-service";
-import { setSetting } from "@/lib/setting-store";
-import { HOME_TARGET_KEY } from "@/lib/home/stills";
-import { AUTOMATIC_TARGET, LOCAL_TARGET, storageTargetOptions } from "@/lib/storage-target";
+import { footageTarget } from "@/lib/home/stills";
+import { LOCAL_TARGET, storageTargetOptions } from "@/lib/storage-target";
 import { probeCamera } from "@/lib/home/onvif";
 import { requireHome } from "@/lib/home/access";
 import { cameraVendor } from "@/lib/home/vendors";
@@ -50,6 +49,24 @@ export async function listCamerasAction(): Promise<{ cameras?: cameras.CameraVie
     const { install } = await requireHome("home.read");
     const result = await guard(() => cameras.listCameras(install.id));
     return result.error ? { error: result.error } : { cameras: result.value };
+}
+
+/** The disks a camera's footage can be pointed at: whatever Polaris is set to by
+ *  default, this server, or any storage connection it has. */
+export async function listStorageOptionsAction(): Promise<{
+    options?: { id: string; label: string }[];
+    error?: string;
+}> {
+    await requireHome("home.read");
+    const result = await guard(async () => {
+        const [fallback, connections] = await Promise.all([footageTarget(null), storageTargetOptions()]);
+        return [
+            { id: "", label: `Wherever this Polaris keeps footage (${fallback.name})` },
+            { id: LOCAL_TARGET, label: "This server" },
+            ...connections.map((connection) => ({ id: connection.id, label: connection.name }))
+        ];
+    });
+    return result.error ? { error: result.error } : { options: result.value };
 }
 
 /** The machines a camera can be reached from, or have its detection run on. */
@@ -151,9 +168,15 @@ export async function saveCameraAction(
     if (!parsed.success) {
         return { error: parsed.error.issues[0]?.message ?? "Some of that is not right." };
     }
-    const result = await guard(() =>
-        id ? cameras.updateCamera(install.id, id, parsed.data) : cameras.createCamera(install.id, parsed.data)
-    );
+    const result = await guard(async () => {
+        if (parsed.data.storageTarget) {
+            const allowed = new Set([LOCAL_TARGET, ...(await storageTargetOptions()).map((option) => option.id)]);
+            if (!allowed.has(parsed.data.storageTarget)) throw new Error("That storage is not one of yours");
+        }
+        return id
+            ? cameras.updateCamera(install.id, id, parsed.data)
+            : cameras.createCamera(install.id, parsed.data);
+    });
     if (result.error || !result.value) return { error: result.error ?? "That camera could not be saved." };
     revalidatePath(PATH);
     return { camera: result.value };
@@ -300,23 +323,6 @@ export async function homeSettingsAction(): Promise<{
         };
     });
     return result.error ? { error: result.error } : { settings: result.value };
-}
-
-/** Where the house writes footage. One of the storage connections Polaris
- *  already has, "this server", or the automatic rule. */
-export async function setHomeStorageAction(target: string): Promise<{ error?: string }> {
-    await requireHome("home.manage");
-    const chosen = String(target);
-    const result = await guard(async () => {
-        const allowed = new Set([
-            AUTOMATIC_TARGET,
-            LOCAL_TARGET,
-            ...(await storageTargetOptions()).map((option) => option.id)
-        ]);
-        if (!allowed.has(chosen)) throw new Error("That storage is not one of yours");
-        await setSetting(HOME_TARGET_KEY, chosen);
-    });
-    return result.error ? { error: result.error } : {};
 }
 
 /**

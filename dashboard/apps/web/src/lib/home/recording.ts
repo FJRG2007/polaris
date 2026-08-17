@@ -23,9 +23,9 @@
 import { prisma } from "@polaris/db";
 import { randomUUID } from "node:crypto";
 import { getCamera } from "@/lib/home/cameras";
-import { HOME_TARGET_KEY } from "@/lib/home/stills";
+import { footageTarget } from "@/lib/home/stills";
 import { relayEndpoint, relayServerFor, relayStream, streamPath } from "@/lib/home/relay";
-import { LOCAL_TARGET, driverForTarget, resolveStorageTarget, safeName } from "@/lib/storage-target";
+import { LOCAL_TARGET, driverForTarget, safeName } from "@/lib/storage-target";
 
 /** Where clips sit on whichever storage they land on. */
 const CLIP_ROOT = "polaris/home/clips";
@@ -80,7 +80,8 @@ export async function recordClip(
     const folder = `${CLIP_ROOT}/${safeName(cameraId)}`;
     const path = `${folder}/${startedAt.toISOString().slice(0, 10)}-${randomUUID()}.mp4`;
 
-    const target = await resolveStorageTarget(HOME_TARGET_KEY);
+    // The camera's own disk when it names one, the instance's otherwise.
+    const target = await footageTarget(camera.storageTarget || null);
     const driver = await driverForTarget(target.id, LOCAL_FOLDER);
     try {
         const upstream = await relayStream(endpoint, streamPath(cameraId, "mp4", "main"));

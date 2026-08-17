@@ -54,7 +54,18 @@ export interface TargetOption {
  * write from then on, the setting falls through to the automatic rule.
  */
 export async function resolveStorageTarget(settingKey: string): Promise<UploadTarget> {
-    const choice = (await getSetting(settingKey)) ?? AUTOMATIC_TARGET;
+    return resolveTargetChoice(await getSetting(settingKey));
+}
+
+/**
+ * The same, for a choice that is stored somewhere other than a setting.
+ *
+ * A camera carries its own, so its footage can go on the disk that suits it -
+ * a doorbell on the NAS, the garage on whatever is nearest - and null means "the
+ * one this instance is set to", which is what nearly every camera keeps.
+ */
+export async function resolveTargetChoice(value: string | null): Promise<UploadTarget> {
+    const choice = value ?? AUTOMATIC_TARGET;
     if (choice === LOCAL_TARGET) return { id: LOCAL_TARGET, name: "This server", automatic: false };
     if (choice !== AUTOMATIC_TARGET) {
         const chosen = await prisma.storageConnection.findUnique({

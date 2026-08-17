@@ -96,6 +96,10 @@ export const cameraInputSchema = z.object({
     detectorTargetId: z.string().trim().max(64).nullable().default(null),
     detection: detectionSettingsSchema,
     recording: z.enum(["off", "motion", "continuous"]).default("off"),
+    /** A storage connection id, "local", or empty for the instance default. The
+     *  value is checked against what this instance actually has before it is
+     *  stored - an id in a form is a request, not a destination. */
+    storageTarget: z.string().trim().max(64).default(""),
     // A month at the top. Longer than that is a storage decision that should be
     // made deliberately with a bigger disk, not typed into a box.
     retentionDays: z.coerce.number().int().min(1).max(365).default(7),

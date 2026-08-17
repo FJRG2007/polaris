@@ -30,6 +30,7 @@ const RECORDING_LABEL: Record<string, string> = {
 export function CamerasView({ canManage, openId }: { canManage: boolean; openId: string | null }) {
     const [cameras, setCameras] = useState<CameraView[] | null>(null);
     const [servers, setServers] = useState<{ id: string; label: string }[]>([]);
+    const [storage, setStorage] = useState<{ id: string; label: string }[]>([]);
     const [editing, setEditing] = useState<CameraView | null>(null);
     const [adding, setAdding] = useState<{ address: string; vendor: string | null } | null>(null);
     const [discovering, setDiscovering] = useState(false);
@@ -39,11 +40,16 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
     useEffect(() => {
         let cancelled = false;
         void (async () => {
-            const [list, machines] = await Promise.all([actions.listCamerasAction(), actions.listServersAction()]);
+            const [list, machines, disks] = await Promise.all([
+                actions.listCamerasAction(),
+                actions.listServersAction(),
+                actions.listStorageOptionsAction()
+            ]);
             if (cancelled) return;
             if (list.error) setError(list.error);
             setCameras(list.cameras ?? []);
             setServers(machines.servers ?? []);
+            setStorage(disks.options ?? []);
             // A link from the wall names the camera to open, so pressing a name
             // there lands on its settings rather than on a list to find it in.
             if (openId) {
@@ -175,6 +181,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                     camera={editing}
                     prefill={adding}
                     servers={servers}
+                    storage={storage}
                     onClose={() => {
                         setEditing(null);
                         setAdding(null);

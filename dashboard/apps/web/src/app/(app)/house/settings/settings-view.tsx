@@ -18,7 +18,8 @@ import * as actions from "../actions";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { CircleCheck, Loader2 } from "lucide-react";
-import { Button, Input, Select, Skeleton } from "@polaris/ui";
+import Link from "next/link";
+import { Button, Input, Skeleton } from "@polaris/ui";
 
 interface Settings {
     faceApiUrl: string;
@@ -28,14 +29,13 @@ interface Settings {
 
 export function HomeSettingsView({
     storage,
-    targets
+    canAdmin
 }: {
-    /** What footage is written to today. */
+    /** Where footage lands today, resolved - a fact rather than a control. */
     storage: string;
-    targets: { id: string; label: string }[];
+    canAdmin: boolean;
 }) {
     const [settings, setSettings] = useState<Settings | null>(null);
-    const [target, setTarget] = useState(storage);
     const [url, setUrl] = useState("");
     const [key, setKey] = useState("");
     const [saving, setSaving] = useState(false);
@@ -56,16 +56,6 @@ export function HomeSettingsView({
             cancelled = true;
         };
     }, []);
-
-    const saveTarget = async (next: string) => {
-        const previous = target;
-        setTarget(next);
-        const result = await runAction(() => actions.setHomeStorageAction(next), setError);
-        if (result?.error) {
-            setError(result.error);
-            setTarget(previous);
-        }
-    };
 
     const saveRecognizer = async () => {
         setSaving(true);
@@ -96,18 +86,17 @@ export function HomeSettingsView({
                 <div>
                     <h2 className="text-[13px] font-semibold text-foreground">Where footage goes</h2>
                     <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
-                        Clips and the pictures that go with events. A NAS is the right answer if you have one - it is
-                        the disk with the room and the backups. Changing this moves new footage only; what is already
-                        stored stays readable where it is.
+                        Recordings and the pictures that go with events are written to{" "}
+                        <span className="text-foreground">{storage}</span>. That is set for the whole instance under
+                        Uploads, beside where photos and attachments go - one place for one decision. A camera that
+                        wants its own disk says so on its own settings.
                     </p>
                 </div>
-                <Select
-                    value={target}
-                    onValueChange={saveTarget}
-                    className="w-72"
-                    aria-label="Where footage goes"
-                    options={targets.map((option) => ({ value: option.id, label: option.label }))}
-                />
+                {canAdmin ? (
+                    <Button asChild variant="secondary" size="sm" className="self-start">
+                        <Link href="/admin/uploads">Change it under Uploads</Link>
+                    </Button>
+                ) : null}
             </section>
 
             <section className="flex flex-col gap-3">

@@ -10,6 +10,7 @@ import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { setAvatarSettings } from "@/lib/avatar-service";
 import { setChatStorageTarget } from "@/lib/chat/attachments";
+import { footageSettings, setFootageTarget } from "@/lib/home/stills";
 import { setUploadSettings } from "@/lib/tasks/attachment-service";
 import { checkStorageTarget } from "@/lib/storage-target";
 import { chatTarget } from "@/lib/chat/attachments";
@@ -77,6 +78,33 @@ export async function setAvatarSettingsAction(input: unknown): Promise<{ error?:
  *  "same as profile photos" made this screen describe itself by pointing at
  *  another one, and moved every file in every conversation whenever the photos
  *  moved. */
+/**
+ * Where camera footage is kept by default.
+ *
+ * Here rather than inside Home, so an operator sets every kind of upload in one
+ * place - and so there is exactly one instance-wide answer. A camera may still
+ * name its own disk; that is a decision about one camera, and it lives on the
+ * camera.
+ */
+export async function setFootageTargetAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = z.object({ target }).safeParse(input);
+    if (!parsed.success) return { error: "Check the settings and try again" };
+    try {
+        await setFootageTarget(parsed.data.target);
+        await recordAudit({
+            actorId: admin.id,
+            action: "settings.home.footage.update",
+            targetType: "setting",
+            targetId: "home.footage",
+            metadata: { target: parsed.data.target }
+        });
+        return {};
+    } catch {
+        return { error: "That could not be saved" };
+    }
+}
+
 export async function setChatStorageTargetAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ target }).safeParse(input);
@@ -101,7 +129,8 @@ export async function setChatStorageTargetAction(input: unknown): Promise<{ erro
 const CHECKS = {
     tasks: "uploads",
     avatars: "avatars",
-    chat: "chat"
+    chat: "chat",
+    footage: "home"
 } as const;
 
 export type StorageCheck = keyof typeof CHECKS;
@@ -126,7 +155,9 @@ export async function checkStorageAction(
             ? await chatTarget()
             : which === "avatars"
               ? (await avatarSettings()).resolved
-              : (await uploadSettings()).resolved;
+              : which === "footage"
+                ? (await footageSettings()).resolved
+                : (await uploadSettings()).resolved;
 
     const result = await checkStorageTarget(target.id, folder);
     return {

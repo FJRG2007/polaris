@@ -45,7 +45,7 @@ export async function POST(request: Request): Promise<Response> {
 
     const camera = await prisma.camera.findFirst({
         where: { id: parsed.data.cameraId, installedAppId: install.id },
-        select: { id: true }
+        select: { id: true, storageTarget: true }
     });
     if (!camera) return Response.json({ error: "No such camera." }, { status: 404 });
 
@@ -55,7 +55,7 @@ export async function POST(request: Request): Promise<Response> {
         if (bytes.byteLength > MAX_STILL_BYTES) {
             return Response.json({ error: "That picture is too large." }, { status: 413 });
         }
-        stillKey = await storeStill(camera.id, bytes).catch(() => null);
+        stillKey = await storeStill(camera, bytes).catch(() => null);
     }
 
     const event = await recordDetection({

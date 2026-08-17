@@ -38,6 +38,9 @@ export interface CameraView {
     readonly detectorTargetId: string | null;
     readonly detection: DetectionSettings;
     readonly recording: string;
+    /** Where its footage is written: a connection id, "local", or "" for
+     *  whatever the instance is set to. */
+    readonly storageTarget: string;
     readonly retentionDays: number;
     readonly enabled: boolean;
     /** Whether the camera can be pointed somewhere, which is only true when it
@@ -96,6 +99,7 @@ function toView(row: NonNullable<CameraRow>): CameraView {
         detectorTargetId: row.detectorTargetId,
         detection: parseDetection(row.detectionConfig),
         recording: row.recording,
+        storageTarget: row.storageTarget ?? "",
         retentionDays: row.retentionDays,
         enabled: row.enabled,
         ptz: row.onvifPort !== null
@@ -171,6 +175,7 @@ export async function createCamera(installedAppId: string, input: CameraInput): 
             detectorTargetId: detectionRunsOn(input),
             detectionConfig: JSON.stringify(input.detection),
             recording: input.recording,
+            storageTarget: input.storageTarget || null,
             retentionDays: input.retentionDays,
             enabled: input.enabled,
             ...(secretColumns(input.password) ?? {})
@@ -205,6 +210,7 @@ export async function updateCamera(
             detectorTargetId: detectionRunsOn(input),
             detectionConfig: JSON.stringify(input.detection),
             recording: input.recording,
+            storageTarget: input.storageTarget || null,
             retentionDays: input.retentionDays,
             enabled: input.enabled,
             // An empty password field on an edit means "leave it": the stored one

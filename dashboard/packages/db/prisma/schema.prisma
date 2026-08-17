@@ -6519,6 +6519,12 @@ model Camera {
 
     /// off | motion | continuous.
     recording     String  @default("off")
+    /// Which storage this camera's footage is written to: a storage connection
+    /// id, `local` for this server, or null for whatever the instance is set to
+    /// under Uploads. Per camera because the disks are not interchangeable - a
+    /// doorbell recording all day and a garage that fires twice a week do not
+    /// belong on the same one just because they were added on the same evening.
+    storageTarget String?
     /// Days a clip from this camera is kept. Storage is the one resource a camera
     /// spends whether or not anybody watches, so every camera has a limit and it
     /// is per camera - a doorbell and a garage do not deserve the same month.

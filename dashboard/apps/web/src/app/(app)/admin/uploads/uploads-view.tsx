@@ -18,10 +18,12 @@ import { ResolvedTarget, TargetPicker } from "./target-picker";
 import type { UploadSettings } from "@/lib/tasks/attachment-service";
 import { Button, Card, CardBody, Input, Switch, cn } from "@polaris/ui";
 import type { ChatStorageSettings } from "@/lib/chat/attachments";
+import type { FootageSettings } from "@/lib/home/stills";
 import {
     checkStorageAction,
     setAvatarSettingsAction,
     setChatStorageTargetAction,
+    setFootageTargetAction,
     setUploadSettingsAction,
     type StorageCheck
 } from "./actions";
@@ -337,20 +339,99 @@ function ChatCard({ settings }: { settings: ChatStorageSettings }) {
     );
 }
 
+/**
+ * Camera footage.
+ *
+ * Its own card because it is not like the others: it is written by machines
+ * rather than by people, it arrives all day, and it is the only kind here that
+ * can fill a disk without anybody doing anything. A camera may still be pointed
+ * at a disk of its own - that decision lives on the camera - and this is what
+ * every camera that has not been is written to.
+ */
+function FootageCard({ settings }: { settings: FootageSettings }) {
+    const initial = settings.choice;
+    const [target, setTarget] = useState(initial);
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
+    const [error, setError] = useState("");
+
+    const dirty = target !== initial;
+
+    const save = async () => {
+        if (saving) return;
+        setSaving(true);
+        setError("");
+        const result = await runAction(() => setFootageTargetAction({ target }), setError);
+        setSaving(false);
+        if (result?.error) {
+            setError(result.error);
+            return;
+        }
+        setSaved(true);
+    };
+
+    return (
+        <Card>
+            <CardBody className="flex flex-col gap-4 p-4">
+                <div>
+                    <h2 className="text-sm font-medium">Camera footage</h2>
+                    <p className="text-xs text-muted-foreground">
+                        Recordings and the pictures that go with what the cameras notice. A NAS is the right answer if
+                        you have one: this is the only thing here that grows whether or not anybody uses it.
+                    </p>
+                </div>
+
+                <ResolvedTarget
+                    resolved={settings.resolved}
+                    automatic="Worked out from what this instance has connected. Connect a NAS and new footage follows it."
+                />
+
+                <TargetPicker
+                    label="Where to keep it"
+                    hint="Footage already recorded stays where it was written. A camera can override this on its own settings."
+                    value={target}
+                    options={settings.options}
+                    resolvedName={settings.resolved.name}
+                    onChange={(value) => {
+                        setTarget(value);
+                        setSaved(false);
+                    }}
+                />
+
+                <CheckButton which="footage" />
+                <SaveRow
+                    dirty={dirty}
+                    valid
+                    saving={saving}
+                    saved={saved}
+                    error={error}
+                    onSave={() => void save()}
+                />
+            </CardBody>
+        </Card>
+    );
+}
+
 export function UploadsView({
     uploads,
     avatars,
-    chat
+    chat,
+    footage
 }: {
     uploads: UploadSettings;
     avatars: AvatarSettings;
     chat: ChatStorageSettings;
+    /** Absent on an instance with no Home installed - there is nothing recording,
+     *  so a card about where recordings go would be a setting for a feature that
+     *  is not there. */
+    footage: FootageSettings | null;
 }) {
     return (
         <div className="flex max-w-2xl flex-col gap-4">
             <AttachmentsCard settings={uploads} />
             <PhotosCard settings={avatars} />
             <ChatCard settings={chat} />
+            {footage ? <FootageCard settings={footage} /> : null}
         </div>
     );
 }

@@ -76,6 +76,7 @@ interface FormState {
     hoursFrom: string;
     hoursTo: string;
     recording: "off" | "motion" | "continuous";
+    storageTarget: string;
     retentionDays: string;
     enabled: boolean;
 }
@@ -104,6 +105,7 @@ function initial(camera: CameraView | null, prefill: { address: string; vendor: 
         hoursFrom: String(detection.hours?.from ?? 22),
         hoursTo: String(detection.hours?.to ?? 6),
         recording: (camera?.recording as FormState["recording"]) ?? "off",
+        storageTarget: camera?.storageTarget ?? "",
         retentionDays: String(camera?.retentionDays ?? 7),
         enabled: camera?.enabled ?? true
     };
@@ -113,6 +115,7 @@ export function CameraDialog({
     camera,
     prefill = null,
     servers,
+    storage,
     onClose,
     onSaved
 }: {
@@ -121,6 +124,8 @@ export function CameraDialog({
      *  is a guess worth starting from. */
     prefill?: { address: string; vendor: string | null } | null;
     servers: Server[];
+    /** The disks footage can be pointed at, the instance default first. */
+    storage: { id: string; label: string }[];
     onClose: () => void;
     onSaved: (saved: CameraView) => void;
 }) {
@@ -170,6 +175,7 @@ export function CameraDialog({
             hours: form.hoursOn ? { from: Number(form.hoursFrom) || 0, to: Number(form.hoursTo) || 0 } : null
         },
         recording: form.recording,
+        storageTarget: form.storageTarget,
         retentionDays: Number(form.retentionDays) || 7,
         enabled: form.enabled
     });
@@ -507,6 +513,18 @@ export function CameraDialog({
                                 { value: "continuous", label: "Everything" }
                             ]}
                         />
+                        {form.recording !== "off" ? (
+                            <Field
+                                label="Store on"
+                                hint="Footage already written stays where it is; this decides where the next of it goes."
+                            >
+                                <Select
+                                    value={form.storageTarget}
+                                    onValueChange={(value) => set("storageTarget", value)}
+                                    options={storage.map((option) => ({ value: option.id, label: option.label }))}
+                                />
+                            </Field>
+                        ) : null}
                         {form.recording !== "off" ? (
                             <Field label="Keep for" hint="Days. Anything you pin survives this.">
                                 <Input
