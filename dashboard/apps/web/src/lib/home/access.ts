@@ -13,8 +13,9 @@
  */
 
 import { prisma } from "@polaris/db";
+import { redirect } from "next/navigation";
 import type { Permission } from "@polaris/core";
-import { requirePermission, type SessionUser } from "@/lib/session";
+import { homePathForUser, requirePermission, sessionCanAny, type SessionUser } from "@/lib/session";
 
 export interface HomeInstall {
     readonly id: string;
@@ -58,4 +59,32 @@ export async function requireHome(
 ): Promise<{ user: SessionUser; install: HomeInstall }> {
     const user = await requirePermission(permission);
     return { user, install: await requireHomeInstall() };
+}
+
+/**
+ * The same, for a screen, plus what to draw.
+ *
+ * A screen needs more than "may they be here": it decides whether to draw a
+ * button at all, and drawing one that the action behind it will refuse is worse
+ * than leaving it out. So the two wider grants come back with the session.
+ *
+ * Somebody who reaches /house before anybody has installed Home is not shown an
+ * empty room - they are sent to the marketplace, where installing it is the
+ * thing to do. Sent to their own landing page instead if they could not install
+ * it anyway, since the marketplace would only refuse them next.
+ */
+export async function requireHomeUser(permission: Permission): Promise<{
+    user: SessionUser;
+    install: HomeInstall;
+    canControl: boolean;
+    canManage: boolean;
+}> {
+    const user = await requirePermission(permission);
+    const install = await homeInstall();
+    if (!install) redirect(user.isAdmin ? "/apps/marketplace?app=home" : await homePathForUser(user));
+    const [canControl, canManage] = await Promise.all([
+        sessionCanAny(user, "home.control"),
+        sessionCanAny(user, "home.manage")
+    ]);
+    return { user, install, canControl, canManage };
 }
