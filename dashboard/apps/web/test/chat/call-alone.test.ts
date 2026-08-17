@@ -6,7 +6,9 @@
  * away from a call they started actually creates.
  *
  * Three things are asserted, and the last two are why this has a test rather
- * than a comment. It waits the full three minutes. It does not touch a call in a
+ * than a comment. It waits out the whole window - read from the module rather
+ * than written down here, so shortening it is one change. It does not touch a
+ * call in a
  * channel, where the first person to arrive is early rather than abandoned. And
  * it never fires while two people are in the room, however long ago the second
  * one arrived.
@@ -132,13 +134,13 @@ beforeEach(() => {
 
 describe("a call somebody is sitting in on their own", () => {
     it("ends once they have been alone long enough", async () => {
-        alone(4 * MINUTE);
+        alone(meetings.ALONE_TTL_MS + MINUTE);
         await meetings.keepSeat(seat);
         expect(endedAt).not.toBeNull();
     });
 
     it("is left alone before then", async () => {
-        alone(2 * MINUTE);
+        alone(meetings.ALONE_TTL_MS - 10_000);
         await meetings.keepSeat(seat);
         expect(endedAt).toBeNull();
     });

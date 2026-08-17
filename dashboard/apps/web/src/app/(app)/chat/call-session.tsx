@@ -21,11 +21,20 @@
 
 import Link from "next/link";
 import { CallAudio } from "./call-audio";
-import { useChatStream } from "./use-chat-stream";
 import { Button, cn } from "@polaris/ui";
+import { useChatStream } from "./use-chat-stream";
+import { playCallSound } from "@/lib/call-sounds";
 import { useCall, type CallState } from "./use-call";
 import { Headphones, HeadphoneOff, Mic, MicOff, PhoneOff } from "lucide-react";
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useState,
+    type ReactNode
+} from "react";
 
 /** The call this browser is sitting in. */
 export interface CallSession {
@@ -57,6 +66,19 @@ export function useCallHold(): CallHold {
     return hold;
 }
 
+/**
+ * The same thing, for a screen that may not be inside a provider.
+ *
+ * There is exactly one such screen - the guest page, which holds its own call
+ * because there is no dashboard around it - and the difference matters for one
+ * thing: who is responsible for noticing that the call ended. Inside the
+ * dashboard that is this provider, wherever the reader happens to be standing;
+ * on the guest page it is the room itself, because that is all there is.
+ */
+export function useHeldCall(): CallHold | null {
+    return useContext(Context);
+}
+
 export function CallProvider({ viewerId, children }: { viewerId: string; children: ReactNode }) {
     const [session, setSession] = useState<CallSession | null>(null);
     const [withVideo, setWithVideo] = useState(false);
@@ -68,6 +90,26 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
     }, []);
 
     const leave = useCallback(() => setSession(null), []);
+
+    /**
+     * The call ended, so this browser is no longer in one.
+     *
+     * The host closed it, the last other person left a one-to-one, or it was
+     * swept for being abandoned. Whatever the reason, nothing was letting go of
+     * the session: the bar went on floating over every screen in Polaris,
+     * offering to mute and hang up a call that had been over for an hour, and it
+     * only went away on a reload. Somebody standing in the conversation at least
+     * got a panel to press; everybody else got a lie.
+     *
+     * Sounded here rather than by the room, and that is the point of doing it
+     * here: the reader is usually looking at something else, which is the whole
+     * reason a call survives navigation in the first place.
+     */
+    useEffect(() => {
+        if (!session || !call.ended) return;
+        playCallSound("hangUp");
+        setSession(null);
+    }, [call.ended, session]);
 
     /**
      * The call moved, so this browser moves with it.

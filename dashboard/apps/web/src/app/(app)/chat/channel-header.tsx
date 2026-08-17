@@ -218,14 +218,22 @@ export function ChannelHeader({
                     {!mayCall ? null : call ? (
                         // One button once a call is running: joining is joining,
                         // and the camera is a switch inside the room.
+                        //
+                        // Without a camera, which is the whole of the difference
+                        // between this and the two buttons below. Starting a
+                        // video call is a decision somebody makes; walking into
+                        // one that is already happening is not, and it used to
+                        // open the camera anyway - so joining a conversation to
+                        // hear what was being said put your face on everybody's
+                        // screen without a single press that said so.
                         <button
                             type="button"
-                            onClick={() => onStartCall(true)}
+                            onClick={() => onStartCall(false)}
                             aria-label="Join the call"
                             title="Join the call"
                             className="flex items-center gap-1.5 rounded-md bg-primary/15 px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-primary/25"
                         >
-                            <Video className="size-4" />
+                            <Phone className="size-4" />
                             <span>{call.count}</span>
                         </button>
                     ) : (

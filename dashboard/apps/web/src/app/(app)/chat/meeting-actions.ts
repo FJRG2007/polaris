@@ -187,6 +187,37 @@ export async function callTokenAction(
     return { url: endpoint.url, token };
 }
 
+/**
+ * A call this account is already in, on some other device.
+ *
+ * Asked by a browser that is not in one, so it can offer to take it over rather
+ * than leave somebody looking at a phone that says nothing while their computer
+ * holds a live microphone in another room.
+ *
+ * It answers about the account rather than about a conversation, which is what
+ * makes it safe to ask from anywhere: the only thing it can tell you is where
+ * your own seat is.
+ */
+export async function callElsewhereAction(): Promise<meetings.CallElsewhere | null> {
+    const user = await requirePermission("chat.use");
+    if (!(await can(user.id, "chat.call"))) return null;
+    return meetings.callElsewhere(user.id);
+}
+
+/**
+ * Take the call over on this device.
+ *
+ * The seat is already this account's - joining reuses it - so this says nothing
+ * about who may be in the room. What it does is tell the browser that had it
+ * that it no longer does, which is the half that was missing: two devices held
+ * one seat and neither knew.
+ */
+export async function claimCallAction(meetingId: string, deviceId: string): Promise<void> {
+    const seat = await resolveSeat(meetingId);
+    if (!seat || seat.admission !== "admitted") return;
+    meetings.claimCall(meetingId, String(deviceId).slice(0, 100));
+}
+
 /** Still here. */
 export async function keepSeatAction(meetingId: string): Promise<void> {
     const seat = await resolveSeat(meetingId);

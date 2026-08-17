@@ -262,24 +262,40 @@ export async function readAttachment(attachmentId: string): Promise<{
     });
     if (!row) return null;
 
-    // Twice, with a fresh session the second time.
-    //
-    // A read can fail for a reason that has nothing to do with the file: a
-    // handle another request left open a second ago, a session the server has
-    // just reaped, a share reconnecting. One retry turns most of those into a
-    // pause nobody notices, and the ones it does not are answered honestly
-    // rather than papered over - two attempts, then the truth.
+    const bytes = await readStored(row.connectionId, row.path, `attachment ${attachmentId}`);
+    return bytes ? { name: row.name, contentType: row.contentType, bytes } : null;
+}
+
+/**
+ * The bytes at one path, from whichever storage holds them.
+ *
+ * Twice, with a fresh session the second time.
+ *
+ * A read can fail for a reason that has nothing to do with the file: a handle
+ * another request left open a second ago, a session the server has just reaped,
+ * a share reconnecting. One retry turns most of those into a pause nobody
+ * notices, and the ones it does not are answered honestly rather than papered
+ * over - two attempts, then the truth.
+ *
+ * Addressed by where the file is rather than by what points at it, because two
+ * things point at the same file: the message it was sent on, and a report
+ * somebody made about that message.
+ *
+ * @param what - How to name it in a log line, for the two attempts that fail.
+ */
+export async function readStored(
+    connectionId: string | null,
+    path: string,
+    what: string
+): Promise<Uint8Array | null> {
     for (let attempt = 0; attempt < 2; attempt += 1) {
-        const driver = await driverForTarget(row.connectionId ?? LOCAL_TARGET, LOCAL_FOLDER).catch(
+        const driver = await driverForTarget(connectionId ?? LOCAL_TARGET, LOCAL_FOLDER).catch(
             (error: unknown) => {
                 // The storage did not answer, which is a different thing from
                 // the file being gone and the only one of the two anybody can
                 // do something about.
                 if (attempt === 1) {
-                    console.error(
-                        `chat: the storage holding attachment ${attachmentId} could not be opened:`,
-                        error
-                    );
+                    console.error(`chat: the storage holding ${what} could not be opened:`, error);
                 }
                 return null;
             }
@@ -291,7 +307,7 @@ export async function readAttachment(attachmentId: string): Promise<{
             // the request until the platform gives up on it, which is a player
             // that spins forever with nothing anywhere saying why.
             const stream = await core.withTimeout(
-                driver.readStream(row.path),
+                driver.readStream(path),
                 READ_TIMEOUT_MS,
                 "the storage did not open the file"
             );
@@ -309,7 +325,7 @@ export async function readAttachment(attachmentId: string): Promise<{
                 if (done) break;
                 if (value) chunks.push(Buffer.from(value));
             }
-            return { name: row.name, contentType: row.contentType, bytes: Buffer.concat(chunks) };
+            return Buffer.concat(chunks);
         } catch (error) {
             // A swept file, a storage target that moved, a NAS that is not
             // answering. The caller turns this into a 410 rather than a 500:
@@ -318,12 +334,7 @@ export async function readAttachment(attachmentId: string): Promise<{
             // Said out loud on the last attempt. Silently, this is a message
             // with a file on it that nobody can open and nothing anywhere
             // saying why.
-            if (attempt === 1) {
-                console.error(
-                    `chat: could not read attachment ${attachmentId} at ${row.path}:`,
-                    error
-                );
-            }
+            if (attempt === 1) console.error(`chat: could not read ${what} at ${path}:`, error);
         } finally {
             await driver.dispose().catch(() => undefined);
         }

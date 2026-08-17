@@ -14,6 +14,7 @@ import { ViewAsBanner } from "@/components/view-as-banner";
 import { AppNavDrawer } from "@/components/app-nav-drawer";
 import { ScopeSwitcher } from "@/components/scope-switcher";
 import { IncomingCalls } from "@/components/incoming-calls";
+import { CallElsewhere } from "@/app/(app)/chat/call-elsewhere";
 import { MessageToasts } from "@/components/message-toasts";
 import { CommandPalette } from "@/components/command-palette";
 import { PresenceProvider } from "@/components/presence-store";
@@ -81,7 +82,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                                     is in is a notice, not a call. Only for somebody
                                     who has Chat at all - the stream it listens on
                                     refuses anybody else. */}
-                                {apps.ids.includes("chat") ? <IncomingCalls /> : null}
+                                {apps.ids.includes("chat") ? <IncomingCalls viewerId={user.id} /> : null}
+                                {/* Beside the ringing card and never at the same
+                                    time as one: a call you are already in
+                                    somewhere is not a call coming in. */}
+                                {apps.ids.includes("chat") ? <CallElsewhere /> : null}
                                 {/* Messages announce themselves in the corner and
                                     are then gone. Never through the bell: that is a
                                     record of things to come back to, and a chat

@@ -40,6 +40,7 @@
 
 import { z } from "zod";
 import { setMicDevice } from "./mic-device";
+import { callDeviceId } from "./call-device";
 import { useSpeaking } from "./use-speaking";
 import * as actions from "./meeting-actions";
 import { playCallSound } from "@/lib/call-sounds";
@@ -62,7 +63,9 @@ const frameSchema = z.discriminatedUnion("kind", [
     }),
     z.object({ kind: z.literal("signal"), fromId: z.string(), payload: z.string() }),
     z.object({ kind: z.literal("roster") }),
-    z.object({ kind: z.literal("ended") })
+    z.object({ kind: z.literal("ended") }),
+    /** Another browser of this same account took the call. */
+    z.object({ kind: z.literal("claimed"), deviceId: z.string().optional() })
 ]);
 
 const signalSchema = z.discriminatedUnion("type", [
@@ -494,17 +497,21 @@ export function useMeshCall(meetingId: string | null, options?: { video?: boolea
                  * Both browsers are in the call, both drew each other's names,
                  * and no media ever arrives in either direction - which is what
                  * "I cannot hear him and he cannot hear me" is, every time. The
-                 * usual reason is that this instance has no STUN or TURN server,
-                 * so each browser only ever offered the addresses of its own
-                 * network: two people in the same house connect and two people
-                 * in different ones never can. That is one line of configuration
-                 * and it was impossible to guess from a silent call.
+                 * reason is that this call is being carried directly between the
+                 * two browsers, and they are not on the same network: with
+                 * nothing in the middle neither of them can work out an address
+                 * the other can reach.
+                 *
+                 * What it says is what the reader should do about it, and no
+                 * more. It used to name the environment variable an operator
+                 * would set - which put a piece of this instance's configuration
+                 * on the screen of whoever happened to be on the call, told them
+                 * nothing they could act on, and is the sort of detail that
+                 * belongs in a setting's own help text rather than in an error.
                  */
                 if (connection.connectionState === "failed") {
                     setError(
-                        ice.current.length === 0
-                            ? "This call could not connect. With no STUN or TURN server set up, calls only work between browsers on the same network - an administrator sets POLARIS_STUN_URLS."
-                            : "This call could not connect. The two browsers could not find a route to each other."
+                        "This call could not connect. Calls only reach between networks once this Polaris has a call server - an administrator sets one up under Chat in the admin settings."
                     );
                 }
                 if (["failed", "closed"].includes(connection.connectionState)) {
@@ -583,6 +590,24 @@ export function useMeshCall(meetingId: string | null, options?: { video?: boolea
         setMicFilter(built.using);
     }, []);
 
+    /**
+     * Everything that was true of the last call and is not true of this one.
+     *
+     * A hook outlives the calls it carries - the provider holding it is above
+     * every screen in Polaris - so state left behind is state the next call
+     * starts with. What is deliberately not reset is the microphone and camera:
+     * they are set from what opens, a moment later, and blanking them here would
+     * flicker the controls on the way in.
+     */
+    const forget = useCallback(() => {
+        setMeeting(null);
+        setEnded(false);
+        setError("");
+        setRemote(new Map());
+        setScreens(new Map());
+        setStates(new Map());
+    }, []);
+
     /** Open the microphone and camera, then the stream, then the connections. */
     useEffect(() => {
         // Not in a call: nothing is opened, nothing connects, nothing beats.
@@ -591,6 +616,12 @@ export function useMeshCall(meetingId: string | null, options?: { video?: boolea
         let stopped = false;
         let source: EventSource | null = null;
         let beat: ReturnType<typeof setInterval> | null = null;
+
+        // This is a different call, so nothing about the last one is true of it.
+        // `ended` in particular: it is only ever set, never cleared, so a second
+        // call in the same tab opened straight onto "the call has ended" - the
+        // answer to a question about a room nobody is in any more.
+        forget();
 
         async function start(): Promise<void> {
             ice.current = await actions.iceServersAction(inCall).catch(() => []);
@@ -641,10 +672,27 @@ export function useMeshCall(meetingId: string | null, options?: { video?: boolea
                     me.current = frame.data.participantId;
                     setParticipantId(frame.data.participantId);
                     refresh();
+                    // This browser is on the call now, so say so. Any other
+                    // browser of the same account that thought it was hangs up
+                    // on hearing it - one seat, one device, and the newest press
+                    // is the one that meant it.
+                    if (frame.data.admission === "admitted") {
+                        void actions.claimCallAction(inCall, callDeviceId());
+                    }
                     return;
                 }
                 if (frame.data.kind === "roster") {
                     refresh();
+                    return;
+                }
+                // Another browser of this account took the seat. An account has
+                // one place in a call, so this browser no longer has it - and
+                // being told is the whole point: without it two devices sat on
+                // one seat, both holding a microphone, neither aware.
+                if (frame.data.kind === "claimed") {
+                    if (frame.data.deviceId && frame.data.deviceId !== callDeviceId()) {
+                        setEnded(true);
+                    }
                     return;
                 }
                 if (frame.data.kind === "ended") {
@@ -774,6 +822,7 @@ export function useMeshCall(meetingId: string | null, options?: { video?: boolea
             void actions.leaveCallAction(inCall);
         };
     }, [
+        forget,
         listDevices,
         meetingId,
         peerFor,

@@ -79,16 +79,6 @@ export async function saveFileBytes(
     }
 }
 
-/** Hand bytes to the browser as a download, leaving the stored file untouched. */
-export function downloadBytes(blob: Blob, name: string): void {
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = name;
-    anchor.click();
-    URL.revokeObjectURL(url);
-}
-
 /**
  * Names already present in the target's folder, lowercased. Used to warn before
  * a copy silently replaces an existing file; an unreachable listing yields an

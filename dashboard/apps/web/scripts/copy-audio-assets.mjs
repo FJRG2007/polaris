@@ -1,12 +1,18 @@
 /**
- * Stage the noise-suppression runtime under public/audio.
+ * Stage the audio runtime under public/audio.
  *
- * The worklet is loaded by URL (`audioWorklet.addModule`) and the model is
- * fetched as a wasm binary, so neither can be bundled - they have to exist as
- * files the browser can ask this origin for. Nothing here comes from a CDN, and
- * the files must match the installed package exactly, so they are copied at
- * build time rather than committed. Runs from the web app's predev/prebuild
- * hooks, beside the pdf.js and Minecraft icon staging.
+ * Two things live here and neither can be bundled. The noise-suppression worklet
+ * is loaded by URL (`audioWorklet.addModule`) and its model is fetched as a wasm
+ * binary, so both have to exist as files the browser can ask this origin for.
+ * The MP3 encoder is a file for a second reason as well: every MP3 encoder there
+ * is descends from LAME and carries its licence, which asks that somebody be
+ * able to replace it with a build of their own - true of a file served from
+ * here, not true of something compiled into the application. Its licence is
+ * copied beside it so the terms travel with the code.
+ *
+ * Nothing here comes from a CDN, and the files must match the installed packages
+ * exactly, so they are copied at build time rather than committed. Runs from the
+ * web app's predev/prebuild hooks, beside the pdf.js and Minecraft icon staging.
  */
 
 import { fileURLToPath } from "node:url";
@@ -37,4 +43,11 @@ for (const [from, to] of files) {
     copyFileSync(join(root, from), join(target, to));
 }
 
-console.log(`Copied audio filter assets to ${target}`);
+// The encoder's own build, resolved the same way. The self-contained one rather
+// than the module: it is loaded with a script tag, by a page that has already
+// decided it needs it.
+const lame = dirname(require.resolve("@breezystack/lamejs"));
+copyFileSync(join(lame, "lamejs.iife.js"), join(target, "mp3-encoder.js"));
+copyFileSync(join(dirname(lame), "LICENSE"), join(target, "mp3-encoder.LICENSE.txt"));
+
+console.log(`Copied audio assets to ${target}`);

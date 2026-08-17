@@ -48,13 +48,14 @@ export const PARTICIPANT_TTL_MS = 30_000;
  *
  * A call nobody answered, or one the other person walked out of, otherwise runs
  * until the tab is closed - holding a camera light on, a connection open and a
- * guest link live. Three minutes is long enough to step away and come back and
- * short enough that a forgotten call is not an afternoon of it.
+ * guest link live. Two minutes: long enough that stepping away to answer the
+ * door does not end it, and short enough that being left alone on a line reads
+ * as the call being over rather than as a room to keep sitting in.
  *
  * Only in a direct message. A channel call is a room people drop into, and the
  * first person to arrive being thrown out for being early is exactly wrong.
  */
-export const ALONE_TTL_MS = 3 * 60_000;
+export const ALONE_TTL_MS = 2 * 60_000;
 
 export interface MeetingParticipantView {
     readonly id: string;
@@ -361,6 +362,105 @@ export async function keepSeat(seat: { meetingId: string; participantId: string 
         data: { lastSeenAt: new Date() }
     });
     await endIfAlone(seat.meetingId);
+}
+
+/**
+ * A call this account is in, somewhere that is not here.
+ *
+ * An account holds one seat in a call - a second device reuses the same
+ * participant row, because a person is one person in a room - so signing in on a
+ * phone while a call is running on a desk does not put anybody in two rooms. It
+ * put two browsers on one seat, silently, both holding a microphone open, and
+ * neither with any way to find out about the other. What the reader saw was a
+ * phone that said nothing and a call on the computer that behaved strangely.
+ *
+ * So the phone asks this on the way in, and offers to take the call over.
+ *
+ * Freshness is the whole of the test. A seat is left behind by any browser that
+ * was closed rather than hung up, and offering to move a call that ended
+ * yesterday is worse than offering nothing - so a seat that has not checked in
+ * within the sweep window is not a call anybody is in.
+ */
+export interface CallElsewhere {
+    readonly meetingId: string;
+    readonly channelId: string;
+    readonly participantId: string;
+    /** What to call it on the card and, once it is moved, in the bar. Named
+     *  here because the browser asking has no conversation on screen to read it
+     *  off - it may be anywhere in Polaris, or freshly signed in. */
+    readonly title: string;
+}
+
+export async function callElsewhere(userId: string): Promise<CallElsewhere | null> {
+    const seat = await prisma.meetingParticipant.findFirst({
+        where: {
+            userId,
+            admission: "admitted",
+            leftAt: null,
+            lastSeenAt: { gte: new Date(Date.now() - PARTICIPANT_TTL_MS) },
+            meeting: { endedAt: null }
+        },
+        orderBy: { lastSeenAt: "desc" },
+        select: {
+            id: true,
+            meetingId: true,
+            meeting: {
+                select: {
+                    channelId: true,
+                    channel: {
+                        select: {
+                            kind: true,
+                            name: true,
+                            spaceId: true,
+                            // Everybody but the person asking, which is what a
+                            // one-to-one is called: it has no name of its own.
+                            members: {
+                                where: { userId: { not: userId } },
+                                select: { user: { select: { name: true } } },
+                                take: MAX_TITLE_NAMES
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+    const channel = seat?.meeting.channel;
+    if (!seat?.meeting.channelId || !channel) return null;
+
+    const named = channel.spaceId
+        ? channel.kind === "text"
+            ? `#${channel.name}`
+            : channel.name
+        : channel.name ||
+          channel.members.map((member) => member.user.name).join(", ") ||
+          "Just you";
+
+    return {
+        meetingId: seat.meetingId,
+        channelId: seat.meeting.channelId,
+        participantId: seat.id,
+        title: named || "Call"
+    };
+}
+
+/** How many people to name in a group's title. Past this it is a list nobody
+ *  reads on a card the width of a phone. */
+const MAX_TITLE_NAMES = 4;
+
+/**
+ * Say which browser is on the call now.
+ *
+ * Sent to everybody in the room, and meant for exactly one of them: whichever
+ * other browser of the same account thought it was still on the line. It reads a
+ * device it does not recognise and hangs up.
+ *
+ * Nothing is stored. The claim is only true until the next one, which is the
+ * whole of what it has to be - and a column recording "the current device" would
+ * be a fact about a browser session living in the call's row, outliving both.
+ */
+export function claimCall(meetingId: string, deviceId: string): void {
+    publishMeetingEvent({ meetingId, kind: "claimed", deviceId });
 }
 
 /** Leave. The last one out ends the call, so a room is never left running with
