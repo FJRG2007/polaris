@@ -350,7 +350,11 @@ export async function send(
                 replyToId: quoted,
                 forwarded: quoted !== null && (quote?.forwarded ?? false),
                 ...(attachments.length
-                    ? { attachments: { createMany: { data: attachments.map((file) => ({ ...file })) } } }
+                    ? {
+                          attachments: {
+                              createMany: { data: attachments.map((file) => ({ ...file })) }
+                          }
+                      }
                     : {})
             },
             select: { id: true, createdAt: true }
@@ -546,10 +550,7 @@ export interface ChatEditHistory {
  * it is that "(edited)" without it asks the room to take the change on trust,
  * and a history only the author could open would not answer that.
  */
-export async function editHistory(
-    actor: ChatActor,
-    messageId: string
-): Promise<ChatEditHistory> {
+export async function editHistory(actor: ChatActor, messageId: string): Promise<ChatEditHistory> {
     const message = await prisma.chatMessage.findUnique({
         where: { id: messageId },
         select: { channelId: true, deletedAt: true }
@@ -956,12 +957,10 @@ export async function forward(actor: ChatActor, input: core.ChatForwardInput): P
 
     // The note as written, empty included: a space was here to get past the
     // blank-body rule, and it left a message whose text was one space.
-    return send(
-        actor,
-        { channelId: input.channelId, body: input.note, parentId: null },
-        [],
-        { messageId: input.messageId, forwarded: true }
-    );
+    return send(actor, { channelId: input.channelId, body: input.note, parentId: null }, [], {
+        messageId: input.messageId,
+        forwarded: true
+    });
 }
 
 /**
@@ -1078,7 +1077,10 @@ interface Row {
  * their account, which is the opposite of what a record of a conversation is
  * for.
  */
-export async function decorateMessages(actor: ChatActor, rows: readonly Row[]): Promise<ChatMessageView[]> {
+export async function decorateMessages(
+    actor: ChatActor,
+    rows: readonly Row[]
+): Promise<ChatMessageView[]> {
     if (rows.length === 0) return [];
 
     const authorIds = [
@@ -1267,10 +1269,7 @@ async function receiptStateFor(
 
 /** The same question asked of a conversation rather than of a page of it, for the
  *  screen that only wants the marks. */
-async function receiptStateIn(
-    actor: ChatActor,
-    channelId: string
-): Promise<ReceiptState | null> {
+async function receiptStateIn(actor: ChatActor, channelId: string): Promise<ReceiptState | null> {
     const channel = await prisma.chatChannel.findUnique({
         where: { id: channelId },
         select: { kind: true }

@@ -449,7 +449,10 @@ export async function discardChannelFiles(channelIds: readonly string[]): Promis
  */
 export async function tidyChatStorage(): Promise<{ removed: number; failed: number }> {
     const [stored, channels, current] = await Promise.all([
-        prisma.chatAttachment.findMany({ select: { connectionId: true }, distinct: ["connectionId"] }),
+        prisma.chatAttachment.findMany({
+            select: { connectionId: true },
+            distinct: ["connectionId"]
+        }),
         prisma.chatChannel.findMany({ select: { id: true } }),
         chatTarget()
     ]);

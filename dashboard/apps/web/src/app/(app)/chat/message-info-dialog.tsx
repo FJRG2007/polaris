@@ -22,13 +22,7 @@ import { messageDeliveryAction } from "./actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { Check, CheckCheck, Loader2, SendHorizontal } from "lucide-react";
 import type { ChatMessageView, MessageDelivery } from "@/lib/chat/messages";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle
-} from "@polaris/ui";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
 
 export function MessageInfoDialog({
     message,
@@ -153,9 +147,7 @@ function Step({
             <span className="flex min-w-0 flex-col">
                 <span className="text-sm font-medium">{label}</span>
                 {iso ? (
-                    <span className="text-xs text-muted-foreground">
-                        {format.dateTime(iso)}
-                    </span>
+                    <span className="text-xs text-muted-foreground">{format.dateTime(iso)}</span>
                 ) : (
                     <span className="text-xs text-muted-foreground">
                         {reached ? "The time was not recorded." : (waiting ?? "Not yet.")}

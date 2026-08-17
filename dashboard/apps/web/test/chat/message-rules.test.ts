@@ -106,7 +106,13 @@ vi.mock("@polaris/db", () => {
             findMany: async () => [],
             count: async () => recent,
             create: async () => ({ id: "new", createdAt: SENT }),
-            update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+            update: async ({
+                where,
+                data
+            }: {
+                where: { id: string };
+                data: Record<string, unknown>;
+            }) => {
                 written.updates.push({ id: where.id, data });
                 return message;
             },

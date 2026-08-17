@@ -56,7 +56,8 @@ function hex(color: string | undefined): string | null {
     if (!color) return null;
     const trimmed = color.trim();
     const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(trimmed);
-    if (short) return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`.toLowerCase();
+    if (short)
+        return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`.toLowerCase();
     return /^#[0-9a-f]{6}$/i.test(trimmed) ? trimmed.toLowerCase() : null;
 }
 
@@ -90,7 +91,8 @@ export function ServerRail() {
     const openSpace = (spaceId: string | null): void => {
         setActiveSpaceId(spaceId);
         const inSpace = channels.filter(
-            (channel) => channel.spaceId === spaceId && !channel.archived && channel.kind !== "voice"
+            (channel) =>
+                channel.spaceId === spaceId && !channel.archived && channel.kind !== "voice"
         );
         const remembered = lastChannelIn(spaceId);
         const target =

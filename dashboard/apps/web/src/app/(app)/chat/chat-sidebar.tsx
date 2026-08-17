@@ -624,7 +624,9 @@ function ChannelRows({
                                                 name: person.name
                                             }}
                                         />
-                                        <span className="truncate" title={person.name}>{person.name}</span>
+                                        <span className="truncate" title={person.name}>
+                                            {person.name}
+                                        </span>
                                     </li>
                                 ))}
                             </ul>
@@ -797,9 +799,7 @@ function RowMenu({
                     )}
                     {channel.pinned ? "Unpin" : "Pin to the top"}
                 </ContextMenuItem>
-                <ContextMenuItem
-                    onSelect={() => void copyText(channelLink(baseUrl, channel.id))}
-                >
+                <ContextMenuItem onSelect={() => void copyText(channelLink(baseUrl, channel.id))}>
                     <Link2 className="size-3.5" />
                     Copy link
                 </ContextMenuItem>

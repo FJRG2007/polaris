@@ -137,9 +137,7 @@ export function Composer({
     // other picker, so the button would be a second paperclip wearing a camera.
     const [handheld, setHandheld] = useState(false);
     useEffect(() => {
-        setHandheld(
-            typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches
-        );
+        setHandheld(typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches);
     }, []);
     // Bumped to rebuild the editor, which is how it is cleared: the editor owns
     // its document, and setting the value prop back to "" does not empty it.
@@ -219,7 +217,11 @@ export function Composer({
         if (!editing && !replyingTo) return;
         const onKey = (event: KeyboardEvent) => {
             if (event.key !== "Escape") return;
-            if (document.querySelector("[data-state='open'][role='dialog'], [data-state='open'][role='menu']")) {
+            if (
+                document.querySelector(
+                    "[data-state='open'][role='dialog'], [data-state='open'][role='menu']"
+                )
+            ) {
                 return;
             }
             event.preventDefault();
@@ -465,7 +467,9 @@ export function Composer({
                                     // this reads like the waveform the message
                                     // arrives with rather than like a microphone
                                     // that is barely picking anything up.
-                                    style={{ height: `${Math.max(8, Math.min(100, level * 100))}%` }}
+                                    style={{
+                                        height: `${Math.max(8, Math.min(100, level * 100))}%`
+                                    }}
                                     className={cn(
                                         "w-1 shrink-0 rounded-full",
                                         voice.silent ? "bg-border" : "bg-primary"
@@ -826,13 +830,7 @@ function StagedFile({ file, onRemove }: { file: File; onRemove: () => void }) {
 /** What a staged file is shown as itself, rather than as its name. The same list
  *  the conversation draws inline, for the same reason: these are the formats that
  *  are pictures and cannot carry script. */
-const PREVIEWABLE = new Set([
-    "image/png",
-    "image/jpeg",
-    "image/gif",
-    "image/webp",
-    "image/avif"
-]);
+const PREVIEWABLE = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"]);
 
 /** A size somebody can read at a glance. Not the display-format helper: that one
  *  writes dates and money, and a file size is neither. */

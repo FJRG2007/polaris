@@ -521,7 +521,10 @@ export async function renameCategory(
     if (!category) throw new ChatAccessError("That category is gone");
     await requireSpace(actor, category.spaceId, "admin");
 
-    await prisma.chatCategory.update({ where: { id: input.categoryId }, data: { name: input.name } });
+    await prisma.chatCategory.update({
+        where: { id: input.categoryId },
+        data: { name: input.name }
+    });
     publishChatChange({ channelId: input.categoryId, kind: "channels", actorId: actor.id });
 }
 

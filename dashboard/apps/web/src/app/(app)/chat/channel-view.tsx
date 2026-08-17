@@ -901,7 +901,8 @@ export function ChannelView({
         const apply = (entry: ChatMessageView): ChatMessageView => {
             const existing = entry.reactions.find((entry) => entry.emoji === emoji);
             if ((existing?.mine ?? false) === mine) return entry;
-            if (!existing) return { ...entry, reactions: [...entry.reactions, { emoji, count: 1, mine }] };
+            if (!existing)
+                return { ...entry, reactions: [...entry.reactions, { emoji, count: 1, mine }] };
             const count = existing.count + (mine ? 1 : -1);
             return {
                 ...entry,
@@ -910,7 +911,10 @@ export function ChannelView({
                     .filter((entry) => entry.count > 0)
             };
         };
-        setMessages((current) => current?.map((entry) => (entry.id === messageId ? apply(entry) : entry)) ?? current);
+        setMessages(
+            (current) =>
+                current?.map((entry) => (entry.id === messageId ? apply(entry) : entry)) ?? current
+        );
     };
 
     const react = async (messageId: string, emoji: string) => {
@@ -930,7 +934,9 @@ export function ChannelView({
     const patchMessage = (messageId: string, patch: Partial<ChatMessageView>) => {
         setMessages(
             (current) =>
-                current?.map((entry) => (entry.id === messageId ? { ...entry, ...patch } : entry)) ?? current
+                current?.map((entry) =>
+                    entry.id === messageId ? { ...entry, ...patch } : entry
+                ) ?? current
         );
     };
 
@@ -1014,19 +1020,22 @@ export function ChannelView({
                         name={channel.name}
                         count={live?.count ?? 0}
                         onJoin={(video) => {
-                            void runAction(
-                                () => calls.startCallAction(channelId),
-                                setError
-                            ).then((result) => {
-                                if (!result || result.error) return;
-                                if (result.meetingId) {
-                                    enter(
-                                        { meetingId: result.meetingId, channelId, title: callTitle },
-                                        video
-                                    );
-                                } else setError("That call could not be joined. Try again.");
-                                checkCall();
-                            });
+                            void runAction(() => calls.startCallAction(channelId), setError).then(
+                                (result) => {
+                                    if (!result || result.error) return;
+                                    if (result.meetingId) {
+                                        enter(
+                                            {
+                                                meetingId: result.meetingId,
+                                                channelId,
+                                                title: callTitle
+                                            },
+                                            video
+                                        );
+                                    } else setError("That call could not be joined. Try again.");
+                                    checkCall();
+                                }
+                            );
                         }}
                     />
                 )}
@@ -1064,7 +1073,8 @@ export function ChannelView({
                     ref={scroller}
                     onScroll={(event) => {
                         const element = event.currentTarget;
-                        const below = element.scrollHeight - element.scrollTop - element.clientHeight;
+                        const below =
+                            element.scrollHeight - element.scrollTop - element.clientHeight;
                         // At the bottom is always "following along". Away from
                         // it only counts once the list has settled: until then
                         // the movement is the page growing under itself, not

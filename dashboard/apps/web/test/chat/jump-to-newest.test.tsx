@@ -59,7 +59,9 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/app/(app)/chat/actions", () => ({
-    readChannelAction: async () => ({ page: { messages: opened, olderThan: null, newerThan: null } }),
+    readChannelAction: async () => ({
+        page: { messages: opened, olderThan: null, newerThan: null }
+    }),
     readSinceAction: async () => ({ page: { messages: arrived } }),
     markReadAction: async (input: { channelId: string; messageId: string }) => {
         marked.push(input);

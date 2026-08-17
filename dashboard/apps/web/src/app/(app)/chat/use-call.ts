@@ -384,24 +384,24 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
      */
     const publishTrack = useCallback(
         (kind: "audio" | "camera" | "screen", track: MediaStreamTrack | null) => {
-        for (const [otherId, peer] of peers.current) {
-            if (peer.connection.connectionState === "closed") continue;
-            const transceiver =
-                kind === "audio" ? peer.audio : kind === "camera" ? peer.video : peer.screen;
-            if (!transceiver) continue;
-            void transceiver.sender.replaceTrack(track).catch(() => undefined);
-            // The direction is what actually opens the tap. `replaceTrack` on a
-            // slot that is only receiving succeeds and sends nothing, which is
-            // the shape of "I turned my camera on and nobody saw it"; changing
-            // the direction is also what asks for the renegotiation that tells
-            // the other side to expect it.
-            const wanted = track ? "sendrecv" : "recvonly";
-            if (transceiver.direction !== wanted) transceiver.direction = wanted;
-            // Said out loud, every time: the other side cannot tell a screen
-            // from a camera by looking at the media, and the answer changes
-            // whenever one of them is turned on or off.
-            announce(otherId, peer);
-        }
+            for (const [otherId, peer] of peers.current) {
+                if (peer.connection.connectionState === "closed") continue;
+                const transceiver =
+                    kind === "audio" ? peer.audio : kind === "camera" ? peer.video : peer.screen;
+                if (!transceiver) continue;
+                void transceiver.sender.replaceTrack(track).catch(() => undefined);
+                // The direction is what actually opens the tap. `replaceTrack` on a
+                // slot that is only receiving succeeds and sends nothing, which is
+                // the shape of "I turned my camera on and nobody saw it"; changing
+                // the direction is also what asks for the renegotiation that tells
+                // the other side to expect it.
+                const wanted = track ? "sendrecv" : "recvonly";
+                if (transceiver.direction !== wanted) transceiver.direction = wanted;
+                // Said out loud, every time: the other side cannot tell a screen
+                // from a camera by looking at the media, and the answer changes
+                // whenever one of them is turned on or off.
+                announce(otherId, peer);
+            }
         },
         [announce]
     );
@@ -567,67 +567,69 @@ export function useCall(meetingId: string | null, options?: { video?: boolean })
     }, []);
 
     /**
- * Open what this browser can, and say what it could not.
- *
- * Asked in three goes rather than one, because one is how a busy camera takes
- * the microphone with it: a single `getUserMedia` for both fails as a whole, so
- * somebody with Discord or OBS holding the camera joined a call able to hear and
- * unable to speak, with nothing on screen saying why. So both, then sound alone,
- * then picture alone.
- *
- * The reasons are the browser's own names for them, translated. `NotReadable` is
- * the one worth naming precisely: on Windows a device is held exclusively, and
- * "another application is using it" is a sentence somebody can act on in a way
- * that "could not reach your microphone" is not.
- */
-async function openMedia(withVideo: boolean): Promise<{ stream: MediaStream | null; note: string }> {
-    const ask = (audio: boolean, video: boolean) =>
-        navigator.mediaDevices.getUserMedia({
-            // Echo, background noise and a level that keeps somebody audible
-            // from across the room, all handled by the browser before anything
-            // is sent - see `mic-cleanup`.
-            audio: audio ? micConstraints() : false,
-            video
-        });
+     * Open what this browser can, and say what it could not.
+     *
+     * Asked in three goes rather than one, because one is how a busy camera takes
+     * the microphone with it: a single `getUserMedia` for both fails as a whole, so
+     * somebody with Discord or OBS holding the camera joined a call able to hear and
+     * unable to speak, with nothing on screen saying why. So both, then sound alone,
+     * then picture alone.
+     *
+     * The reasons are the browser's own names for them, translated. `NotReadable` is
+     * the one worth naming precisely: on Windows a device is held exclusively, and
+     * "another application is using it" is a sentence somebody can act on in a way
+     * that "could not reach your microphone" is not.
+     */
+    async function openMedia(
+        withVideo: boolean
+    ): Promise<{ stream: MediaStream | null; note: string }> {
+        const ask = (audio: boolean, video: boolean) =>
+            navigator.mediaDevices.getUserMedia({
+                // Echo, background noise and a level that keeps somebody audible
+                // from across the room, all handled by the browser before anything
+                // is sent - see `mic-cleanup`.
+                audio: audio ? micConstraints() : false,
+                video
+            });
 
-    try {
-        return { stream: await ask(true, withVideo), note: "" };
-    } catch (first) {
-        if (!withVideo) return { stream: null, note: refused(first, "microphone") };
-
-        // The camera is the likelier of the two to be busy, and the one nobody
-        // needs. Try again without it before giving up on being heard.
         try {
-            return {
-                stream: await ask(true, false),
-                note: refused(first, "camera")
-            };
-        } catch (second) {
+            return { stream: await ask(true, withVideo), note: "" };
+        } catch (first) {
+            if (!withVideo) return { stream: null, note: refused(first, "microphone") };
+
+            // The camera is the likelier of the two to be busy, and the one nobody
+            // needs. Try again without it before giving up on being heard.
             try {
-                return { stream: await ask(false, true), note: refused(second, "microphone") };
-            } catch {
-                return { stream: null, note: refused(second, "microphone or camera") };
+                return {
+                    stream: await ask(true, false),
+                    note: refused(first, "camera")
+                };
+            } catch (second) {
+                try {
+                    return { stream: await ask(false, true), note: refused(second, "microphone") };
+                } catch {
+                    return { stream: null, note: refused(second, "microphone or camera") };
+                }
             }
         }
     }
-}
 
-/** What the browser refused, in words somebody can do something about. */
-function refused(error: unknown, what: string): string {
-    const name = error instanceof Error ? error.name : "";
-    if (name === "NotAllowedError" || name === "SecurityError") {
-        return `Polaris was not allowed to use your ${what}. Allow it in the address bar and rejoin.`;
+    /** What the browser refused, in words somebody can do something about. */
+    function refused(error: unknown, what: string): string {
+        const name = error instanceof Error ? error.name : "";
+        if (name === "NotAllowedError" || name === "SecurityError") {
+            return `Polaris was not allowed to use your ${what}. Allow it in the address bar and rejoin.`;
+        }
+        if (name === "NotReadableError" || name === "AbortError") {
+            return `Your ${what} is busy - another application is holding it. Close it, or pick a different device, and rejoin.`;
+        }
+        if (name === "NotFoundError" || name === "OverconstrainedError") {
+            return `No ${what} was found on this device.`;
+        }
+        return `Polaris could not reach your ${what}.`;
     }
-    if (name === "NotReadableError" || name === "AbortError") {
-        return `Your ${what} is busy - another application is holding it. Close it, or pick a different device, and rejoin.`;
-    }
-    if (name === "NotFoundError" || name === "OverconstrainedError") {
-        return `No ${what} was found on this device.`;
-    }
-    return `Polaris could not reach your ${what}.`;
-}
 
-/** Open the microphone and camera, then the stream, then the connections. */
+    /** Open the microphone and camera, then the stream, then the connections. */
     useEffect(() => {
         // Not in a call: nothing is opened, nothing connects, nothing beats.
         if (!meetingId) return;
@@ -802,7 +804,16 @@ function refused(error: unknown, what: string): string {
             screen.current = null;
             void actions.leaveCallAction(inCall);
         };
-    }, [listDevices, meetingId, peerFor, publishLocalPreview, refresh, send, startFilter, withVideo]);
+    }, [
+        listDevices,
+        meetingId,
+        peerFor,
+        publishLocalPreview,
+        refresh,
+        send,
+        startFilter,
+        withVideo
+    ]);
 
     /**
      * Open a connection to everybody new whose id is bigger than ours.

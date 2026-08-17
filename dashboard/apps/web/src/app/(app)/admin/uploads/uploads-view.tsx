@@ -56,9 +56,18 @@ function CheckButton({ which }: { which: StorageCheck }) {
                     onClick={async () => {
                         setBusy(true);
                         setSaid(null);
-                        const result = await runAction(() => checkStorageAction(which), () => undefined);
+                        const result = await runAction(
+                            () => checkStorageAction(which),
+                            () => undefined
+                        );
                         setBusy(false);
-                        setSaid(result ?? { ok: false, detail: "That check could not be run.", where: "" });
+                        setSaid(
+                            result ?? {
+                                ok: false,
+                                detail: "That check could not be run.",
+                                where: ""
+                            }
+                        );
                     }}
                 >
                     {busy && <Loader2 className="size-4 animate-spin" />}
@@ -101,7 +110,10 @@ function TidyButton() {
     const tidy = async () => {
         setBusy(true);
         setSaid(null);
-        const result = await runAction(() => tidyChatStorageAction(), () => undefined);
+        const result = await runAction(
+            () => tidyChatStorageAction(),
+            () => undefined
+        );
         setBusy(false);
         setAsking(false);
         if (!result || result.error) {
@@ -270,7 +282,9 @@ function AttachmentsCard({ settings }: { settings: UploadSettings }) {
                         />
                         <span className="text-sm text-muted-foreground">MB</span>
                     </div>
-                    {!limitValid && <span className="text-xs text-danger">Between 1 and 10240 MB.</span>}
+                    {!limitValid && (
+                        <span className="text-xs text-danger">Between 1 and 10240 MB.</span>
+                    )}
                 </label>
 
                 <CheckButton which="tasks" />
@@ -300,7 +314,10 @@ function PhotosCard({ settings }: { settings: AvatarSettings }) {
         if (saving) return;
         setSaving(true);
         setError("");
-        const result = await runAction(() => setAvatarSettingsAction({ target, gravatar }), setError);
+        const result = await runAction(
+            () => setAvatarSettingsAction({ target, gravatar }),
+            setError
+        );
         setSaving(false);
         if (result?.error) {
             setError(result.error);
@@ -315,8 +332,8 @@ function PhotosCard({ settings }: { settings: AvatarSettings }) {
                 <div>
                     <h2 className="text-sm font-medium">Profile photos</h2>
                     <p className="text-xs text-muted-foreground">
-                        The picture on somebody&rsquo;s account. Capped at 2 MB and squared by the browser before it is
-                        sent, so these stay small wherever they go.
+                        The picture on somebody&rsquo;s account. Capped at 2 MB and squared by the
+                        browser before it is sent, so these stay small wherever they go.
                     </p>
                 </div>
 
@@ -341,9 +358,10 @@ function PhotosCard({ settings }: { settings: AvatarSettings }) {
                     <span className="flex flex-col gap-0.5">
                         <span className="text-sm font-medium">Use Gravatar</span>
                         <span className="text-xs text-muted-foreground">
-                            For accounts with no photo of their own, show the one their email address has on Gravatar.
-                            Polaris asks for it, not the browser, so no address leaves this server and nobody is told
-                            who is looking. Off means initials until somebody uploads a photo.
+                            For accounts with no photo of their own, show the one their email
+                            address has on Gravatar. Polaris asks for it, not the browser, so no
+                            address leaves this server and nobody is told who is looking. Off means
+                            initials until somebody uploads a photo.
                         </span>
                     </span>
                     <Switch
@@ -474,8 +492,9 @@ function FootageCard({ settings }: { settings: FootageSettings }) {
                 <div>
                     <h2 className="text-sm font-medium">Camera footage</h2>
                     <p className="text-xs text-muted-foreground">
-                        Recordings and the pictures that go with what the cameras notice. A NAS is the right answer if
-                        you have one: this is the only thing here that grows whether or not anybody uses it.
+                        Recordings and the pictures that go with what the cameras notice. A NAS is
+                        the right answer if you have one: this is the only thing here that grows
+                        whether or not anybody uses it.
                     </p>
                 </div>
 

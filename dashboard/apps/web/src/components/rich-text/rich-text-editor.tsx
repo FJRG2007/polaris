@@ -154,7 +154,11 @@ export function RichTextEditor({
         // The room mentions only where there is a room: `mentionsIn` is a
         // conversation, and offering "@everyone" in a task description would name
         // a set of people nobody can point at.
-        () => [...baseExtensions(placeholder), BlockMenu, mentionExtension(search, mentionsIn !== null)],
+        () => [
+            ...baseExtensions(placeholder),
+            BlockMenu,
+            mentionExtension(search, mentionsIn !== null)
+        ],
         [placeholder, search, mentionsIn]
     );
 
@@ -234,8 +238,10 @@ export function RichTextEditor({
                 return handleMarkdownPaste(editorRef.current, view, event);
             }
         },
-        onUpdate: ({ editor: current }) => handlers.current.onChange?.(md.docToMarkdown(current.getJSON())),
-        onBlur: ({ editor: current }) => handlers.current.onBlur?.(md.docToMarkdown(current.getJSON()))
+        onUpdate: ({ editor: current }) =>
+            handlers.current.onChange?.(md.docToMarkdown(current.getJSON())),
+        onBlur: ({ editor: current }) =>
+            handlers.current.onBlur?.(md.docToMarkdown(current.getJSON()))
     });
 
     const editorRef = useRef<Editor | null>(null);
@@ -295,12 +301,12 @@ function surfaceClass(bordered: boolean, disabled: boolean): string {
         "w-full",
         bordered
             ? "rounded-md border border-border bg-field px-3 py-2 focus-within:border-border-strong"
-            // Camouflaged until you point at it, and plain again once the caret
-            // is in: the tint says "this is editable", and once you are editing
-            // it is only a box around what you are writing. Written as one
-            // selector rather than hover plus focus-within, which are the same
-            // specificity and would resolve by stylesheet order.
-            : "-mx-2 rounded-md px-2 py-1 transition-colors [&:not(:focus-within):hover]:bg-muted/40",
+            : // Camouflaged until you point at it, and plain again once the caret
+              // is in: the tint says "this is editable", and once you are editing
+              // it is only a box around what you are writing. Written as one
+              // selector rather than hover plus focus-within, which are the same
+              // specificity and would resolve by stylesheet order.
+              "-mx-2 rounded-md px-2 py-1 transition-colors [&:not(:focus-within):hover]:bg-muted/40",
         disabled && "cursor-default opacity-70 [&:not(:focus-within):hover]:bg-transparent"
     );
 }
@@ -334,7 +340,11 @@ function handleMarkdownPaste(editor: Editor | null, view: unknown, event: Clipbo
     // inserted anyway, and letting it through keeps the link-on-paste behavior.
     if (pending.length === 0 && !looksLikeMarkdown(text)) return false;
 
-    editor.chain().focus().insertContent(doc.content ?? []).run();
+    editor
+        .chain()
+        .focus()
+        .insertContent(doc.content ?? [])
+        .run();
     if (pending.length > 0) void nameReferences(editor, pending);
     return true;
 }
@@ -342,7 +352,9 @@ function handleMarkdownPaste(editor: Editor | null, view: unknown, event: Clipbo
 /** Cheap enough to run on every paste, and wrong only in the harmless direction:
  *  a false positive re-inserts the same text it was given. */
 function looksLikeMarkdown(text: string): boolean {
-    return /(^|\n)\s*(#{1,3} |[-*+] |\d+\. |> |```)/.test(text) || /\*\*|__|~~|\[[^\]]+\]\(/.test(text);
+    return (
+        /(^|\n)\s*(#{1,3} |[-*+] |\d+\. |> |```)/.test(text) || /\*\*|__|~~|\[[^\]]+\]\(/.test(text)
+    );
 }
 
 interface PendingReference {
@@ -355,14 +367,23 @@ function collectReferences(doc: { content?: unknown }): PendingReference[] {
     const found: PendingReference[] = [];
     const walk = (node: Record<string, unknown>) => {
         if (node.type === md.REFERENCE) {
-            const attrs = (node.attrs ?? {}) as { kind?: refs.ReferenceKind; id?: string; label?: string };
+            const attrs = (node.attrs ?? {}) as {
+                kind?: refs.ReferenceKind;
+                id?: string;
+                label?: string;
+            };
             // Picked from the @ list, the label is already the name. Pasted, it
             // is whatever was between the brackets - usually the URL itself.
-            if (attrs.kind && attrs.id && (!attrs.label || attrs.label.includes("://") || attrs.label.startsWith("/"))) {
+            if (
+                attrs.kind &&
+                attrs.id &&
+                (!attrs.label || attrs.label.includes("://") || attrs.label.startsWith("/"))
+            ) {
                 found.push({ kind: attrs.kind, id: attrs.id });
             }
         }
-        for (const child of (node.content as Record<string, unknown>[] | undefined) ?? []) walk(child);
+        for (const child of (node.content as Record<string, unknown>[] | undefined) ?? [])
+            walk(child);
     };
     walk(doc as Record<string, unknown>);
     return found;
@@ -373,13 +394,21 @@ async function nameReferences(editor: Editor, pending: readonly PendingReference
     editor.commands.command(({ tr, state }) => {
         state.doc.descendants((node, pos) => {
             if (node.type.name !== md.REFERENCE) return;
-            if (!pending.some((target) => target.kind === node.attrs.kind && target.id === node.attrs.id)) return;
+            if (
+                !pending.some(
+                    (target) => target.kind === node.attrs.kind && target.id === node.attrs.id
+                )
+            )
+                return;
             tr.setNodeMarkup(pos, undefined, { ...node.attrs, label: PENDING_LABEL });
         });
         return true;
     });
 
-    const result = await runAction(() => resolveReferencesAction([...pending]), () => undefined);
+    const result = await runAction(
+        () => resolveReferencesAction([...pending]),
+        () => undefined
+    );
     const labels = result?.labels ?? {};
     if (editor.isDestroyed) return;
 

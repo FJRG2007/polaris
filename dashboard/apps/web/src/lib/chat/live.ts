@@ -79,7 +79,11 @@ export interface ChatChange {
      * empty to occupied, so walking into a call already in progress does not
      * ring the people already sitting in it.
      */
-    readonly call?: { readonly meetingId: string; readonly state: CallState; readonly count: number };
+    readonly call?: {
+        readonly meetingId: string;
+        readonly state: CallState;
+        readonly count: number;
+    };
 }
 
 type Listener = (change: ChatChange) => void;

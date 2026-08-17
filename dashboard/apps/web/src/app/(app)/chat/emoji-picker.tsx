@@ -519,8 +519,8 @@ export function EmojiPicker({
                                 </p>
                             ) : saved.length === 0 ? (
                                 <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-                                    Nothing kept yet. The star in the corner of any picture puts
-                                    it here - in a message, or in the GIFs beside this.
+                                    Nothing kept yet. The star in the corner of any picture puts it
+                                    here - in a message, or in the GIFs beside this.
                                 </p>
                             ) : (
                                 <ul className="grid grid-cols-2 gap-1">

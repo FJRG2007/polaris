@@ -31,7 +31,8 @@ afterEach(cleanup);
 // jsdom. Polyfilled to a stub rather than skipped, because clicking into the
 // editor is otherwise how a person actually starts typing.
 if (!document.elementFromPoint) document.elementFromPoint = () => null;
-if (!Range.prototype.getClientRects) Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
+if (!Range.prototype.getClientRects)
+    Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
 if (!Range.prototype.getBoundingClientRect)
     Range.prototype.getBoundingClientRect = () =>
         ({ top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0 }) as DOMRect;

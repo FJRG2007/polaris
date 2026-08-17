@@ -44,10 +44,7 @@ export function recentEmoji(): string[] {
  *  make two entries: it is the same habit, recorded once. */
 export function rememberEmoji(char: string): void {
     if (!char) return;
-    write(
-        EMOJI_KEY,
-        [char, ...recentEmoji().filter((entry) => entry !== char)].slice(0, KEEP)
-    );
+    write(EMOJI_KEY, [char, ...recentEmoji().filter((entry) => entry !== char)].slice(0, KEEP));
 }
 
 export function recentMedia(): RecentMedia[] {
@@ -109,7 +106,8 @@ export function rememberChannel(spaceId: string | null, channelId: string): void
     try {
         const raw = window.localStorage.getItem(LAST_CHANNEL_KEY);
         const parsed: unknown = raw ? JSON.parse(raw) : {};
-        const map = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, string>) : {};
+        const map =
+            typeof parsed === "object" && parsed !== null ? (parsed as Record<string, string>) : {};
         map[spaceId ?? DIRECTS] = channelId;
         window.localStorage.setItem(LAST_CHANNEL_KEY, JSON.stringify(map));
     } catch {

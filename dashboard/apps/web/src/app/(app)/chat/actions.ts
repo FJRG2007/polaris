@@ -310,7 +310,9 @@ export async function searchTenorAction(
     kind: "gif" | "sticker"
 ): Promise<{ results: TenorResult[] }> {
     await actor();
-    return { results: await searchTenor(String(query ?? ""), kind === "sticker" ? "sticker" : "gif") };
+    return {
+        results: await searchTenor(String(query ?? ""), kind === "sticker" ? "sticker" : "gif")
+    };
 }
 
 /**
@@ -412,7 +414,9 @@ export async function messageDeliveryAction(
  * nobody makes. The service proves the conversation, which is the same check
  * that let them read it.
  */
-export async function reportMessageAction(input: unknown): Promise<{ already?: boolean; error?: string }> {
+export async function reportMessageAction(
+    input: unknown
+): Promise<{ already?: boolean; error?: string }> {
     const me = await actor();
     const parsed = core.chatReportSchema.safeParse(input);
     if (!parsed.success) return { error: "Say what is wrong with it" };
@@ -542,7 +546,9 @@ export async function updateChannelAction(input: unknown): Promise<{ error?: str
     return result;
 }
 
-export async function createCategoryAction(input: unknown): Promise<{ id?: string; error?: string }> {
+export async function createCategoryAction(
+    input: unknown
+): Promise<{ id?: string; error?: string }> {
     const me = await actor();
     const parsed = core.chatCategoryCreateSchema.safeParse(input);
     if (!parsed.success)
@@ -583,7 +589,9 @@ export async function openDirectAction(input: unknown): Promise<{ id?: string; e
     const parsed = core.chatDirectOpenSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Pick somebody first" };
 
-    const result = await guard(() => chat.openDirect(me, parsed.data.userIds, parsed.data.name ?? ""));
+    const result = await guard(() =>
+        chat.openDirect(me, parsed.data.userIds, parsed.data.name ?? "")
+    );
     if (!result.error) revalidatePath(CHAT_PATH);
     return result.error ? { error: result.error } : { id: result.value };
 }
@@ -858,9 +866,7 @@ export async function sendSavedMediaAction(
     savedId: string
 ): Promise<{ id?: string; error?: string }> {
     const me = await actor();
-    const result = await guard(() =>
-        saved.sendSavedMedia(me, String(channelId), String(savedId))
-    );
+    const result = await guard(() => saved.sendSavedMedia(me, String(channelId), String(savedId)));
     if (result.error || !result.value) return { error: result.error ?? "That could not be sent" };
     if ("messageId" in result.value) return { id: result.value.messageId };
     return sendMediaAction(channelId, result.value.remote);
