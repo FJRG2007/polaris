@@ -28,10 +28,9 @@
 import { cn } from "@polaris/ui";
 import { createPortal } from "react-dom";
 import type { TenorResult } from "@/lib/chat/tenor";
-import { Loader2, Search, Smile } from "lucide-react";
+import { Loader2, Search, Smile, Star } from "lucide-react";
 import { EMOJI_GROUPS, searchEmoji } from "@/lib/chat/emoji";
 import type { SavedMediaView } from "@/lib/chat/saved-media";
-import { listSavedMediaAction, searchTenorAction, tenorReadyAction } from "./actions";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
     recentEmoji,
@@ -40,6 +39,14 @@ import {
     rememberMedia,
     type RecentMedia
 } from "./recents";
+import {
+    listSavedMediaAction,
+    saveMediaAction,
+    savedSourcesAction,
+    searchTenorAction,
+    tenorReadyAction,
+    unsaveMediaAction
+} from "./actions";
 
 type Tab = "emoji" | "saved" | "gif" | "sticker";
 
@@ -180,8 +187,54 @@ export function EmojiPicker({
         emoji: [],
         media: []
     });
+    // Which of the pictures on screen this reader has kept, so every tile can
+    // draw its star without one question per tile.
+    const [kept, setKept] = useState<ReadonlySet<string>>(new Set());
     const trigger = useRef<HTMLButtonElement>(null);
     const panel = useRef<HTMLDivElement>(null);
+
+    /** Ask about a screenful at once, and answer for exactly what was asked -
+     *  anything that comes back unmentioned is not kept. */
+    const learnKept = useCallback(async (sources: readonly string[]) => {
+        const asked = [...new Set(sources.filter(Boolean))];
+        if (asked.length === 0) return;
+        const answer = await savedSourcesAction(asked).catch(() => null);
+        if (!answer) return;
+        setKept((current) => {
+            const next = new Set(current);
+            for (const source of asked) next.delete(source);
+            for (const source of answer.sources) next.add(source);
+            return next;
+        });
+    }, []);
+
+    /**
+     * Keep a picture, or stop keeping it.
+     *
+     * Optimistic, and put back if the server disagrees: the star is a bookmark,
+     * and a bookmark that waits for a round trip before it lights up reads as a
+     * press that did not land.
+     */
+    const toggleKeep = useCallback(async (source: string, name: string, keep: boolean) => {
+        const set = (on: boolean) =>
+            setKept((current) => {
+                const next = new Set(current);
+                if (on) next.add(source);
+                else next.delete(source);
+                return next;
+            });
+
+        set(keep);
+        const result = keep ? await saveMediaAction(source, name) : await unsaveMediaAction(source);
+        if (result.error) {
+            set(!keep);
+            return;
+        }
+        // The kept tab is now out of date whichever way this went. Dropped rather
+        // than patched, so it is asked for again the next time it is opened - and
+        // straight away if that is the tab somebody is standing in.
+        setSaved(null);
+    }, []);
 
     const reposition = useCallback(() => {
         const button = trigger.current?.getBoundingClientRect();
@@ -248,8 +301,23 @@ export function EmojiPicker({
     // nobody needed.
     useEffect(() => {
         if (!open || tab !== "saved" || saved !== null) return;
-        void listSavedMediaAction().then((answer) => setSaved(answer.saved));
+        void listSavedMediaAction().then((answer) => {
+            setSaved(answer.saved);
+            // Everything in here is kept by definition, so the stars are known
+            // without asking a second question about them.
+            setKept((current) => new Set([...current, ...answer.saved.map((one) => one.source)]));
+        });
     }, [open, tab, saved]);
+
+    // The stars for whatever is on screen. One question per screenful of
+    // pictures, asked when the pictures change rather than when a star is drawn.
+    useEffect(() => {
+        if (!open) return;
+        void learnKept([
+            ...results.map((result) => result.full),
+            ...recent.media.map((entry) => entry.full)
+        ]);
+    }, [open, results, recent.media, learnKept]);
 
     // The featured list, fetched while the emoji tab is still the one on screen.
     // Nothing is drawn from this directly - it fills the same store the tab
@@ -451,31 +519,25 @@ export function EmojiPicker({
                                 </p>
                             ) : saved.length === 0 ? (
                                 <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-                                    Nothing kept yet. The star in the corner of a picture in a
-                                    message puts it here.
+                                    Nothing kept yet. The star in the corner of any picture puts
+                                    it here - in a message, or in the GIFs beside this.
                                 </p>
                             ) : (
                                 <ul className="grid grid-cols-2 gap-1">
                                     {saved.map((entry) => (
-                                        <li key={entry.id}>
-                                            <button
-                                                type="button"
-                                                title={entry.name || "Send this"}
-                                                onClick={() => {
-                                                    onSaved(entry.id);
-                                                    setOpen(false);
-                                                }}
-                                                className="block w-full overflow-hidden rounded-md ring-border transition-shadow hover:ring-2"
-                                            >
-                                                {/* eslint-disable-next-line @next/next/no-img-element -- a preview grid, no loader wanted */}
-                                                <img
-                                                    src={entry.src}
-                                                    alt={entry.name}
-                                                    loading="lazy"
-                                                    className="h-24 w-full bg-muted object-cover"
-                                                />
-                                            </button>
-                                        </li>
+                                        <Tile
+                                            key={entry.id}
+                                            preview={entry.src}
+                                            description={entry.name}
+                                            kept={kept.has(entry.source)}
+                                            onPick={() => {
+                                                onSaved(entry.id);
+                                                setOpen(false);
+                                            }}
+                                            onKeep={(keep) =>
+                                                void toggleKeep(entry.source, entry.name, keep)
+                                            }
+                                        />
                                     ))}
                                 </ul>
                             )
@@ -507,6 +569,8 @@ export function EmojiPicker({
                                 </h3>
                                 <MediaGrid
                                     entries={recent.media}
+                                    kept={kept}
+                                    onKeep={toggleKeep}
                                     onPick={(media) => {
                                         rememberMedia(media);
                                         onMedia(media.full);
@@ -524,6 +588,8 @@ export function EmojiPicker({
                                         full: result.full,
                                         description: result.description
                                     }))}
+                                    kept={kept}
+                                    onKeep={toggleKeep}
                                     onPick={(media) => {
                                         rememberMedia(media);
                                         onMedia(media.full);
@@ -536,33 +602,20 @@ export function EmojiPicker({
                                 Nothing came back for that.
                             </p>
                         ) : (
-                            <ul className="grid grid-cols-2 gap-1 pb-1">
-                                {results.map((result) => (
-                                    <li key={result.id}>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                rememberMedia({
-                                                    preview: result.preview,
-                                                    full: result.full,
-                                                    description: result.description
-                                                });
-                                                onMedia(result.full);
-                                                setOpen(false);
-                                            }}
-                                            className="block w-full overflow-hidden rounded-md ring-border transition-shadow hover:ring-2"
-                                        >
-                                            {/* eslint-disable-next-line @next/next/no-img-element -- a remote preview grid, no loader wanted */}
-                                            <img
-                                                src={result.preview}
-                                                alt={result.description}
-                                                loading="lazy"
-                                                className="h-24 w-full bg-muted object-cover"
-                                            />
-                                        </button>
-                                    </li>
-                                ))}
-                            </ul>
+                            <MediaGrid
+                                entries={results.map((result) => ({
+                                    preview: result.preview,
+                                    full: result.full,
+                                    description: result.description
+                                }))}
+                                kept={kept}
+                                onKeep={toggleKeep}
+                                onPick={(media) => {
+                                    rememberMedia(media);
+                                    onMedia(media.full);
+                                    setOpen(false);
+                                }}
+                            />
                         )}
                     </div>
                 </div>,
@@ -617,41 +670,100 @@ function ByLink({ onSend }: { onSend: (address: string) => void }) {
 }
 
 /**
- * A grid of GIFs, drawn the same way whether they came back from a search or out
- * of what this browser sent last.
+ * A grid of GIFs, drawn the same way whether they came back from a search, out of
+ * what this browser sent last, or out of what somebody kept.
  *
- * Its own component because there are three of those places now, and three
- * copies of a grid is three places for the one that is wrong to hide.
+ * Its own component because there are four of those places now, and four copies
+ * of a grid is four places for the one that is wrong to hide.
  */
 function MediaGrid({
     entries,
-    onPick
+    kept,
+    onPick,
+    onKeep
 }: {
     entries: readonly RecentMedia[];
+    kept: ReadonlySet<string>;
     onPick: (media: RecentMedia) => void;
+    onKeep: (source: string, name: string, keep: boolean) => void;
 }) {
     if (entries.length === 0) return null;
     return (
         <ul className="grid grid-cols-2 gap-1 pb-1">
             {entries.map((entry) => (
-                <li key={entry.full}>
-                    <button
-                        type="button"
-                        title={entry.description || "Send this"}
-                        onClick={() => onPick(entry)}
-                        className="block w-full overflow-hidden rounded-md ring-border transition-shadow hover:ring-2"
-                    >
-                        {/* eslint-disable-next-line @next/next/no-img-element -- a remote preview grid, no loader wanted */}
-                        <img
-                            src={entry.preview}
-                            alt={entry.description}
-                            loading="lazy"
-                            className="h-24 w-full bg-muted object-cover"
-                        />
-                    </button>
-                </li>
+                <Tile
+                    key={entry.full}
+                    preview={entry.preview}
+                    description={entry.description}
+                    kept={kept.has(entry.full)}
+                    onPick={() => onPick(entry)}
+                    onKeep={(keep) => onKeep(entry.full, entry.description, keep)}
+                />
             ))}
         </ul>
+    );
+}
+
+/**
+ * One picture in a grid, with the star in its corner.
+ *
+ * The star is the same gesture as the one on a picture in a message and it does
+ * the same thing, which is the point: somebody who found a GIF in the search
+ * should not have to send it first and then keep it from the conversation. It
+ * appears on hover and on focus, and stays lit on the ones already kept.
+ *
+ * Pressing it is the whole gesture - the press does not also send the picture,
+ * which is what "keep this for later" has to mean.
+ */
+function Tile({
+    preview,
+    description,
+    kept,
+    onPick,
+    onKeep
+}: {
+    preview: string;
+    description: string;
+    kept: boolean;
+    onPick: () => void;
+    onKeep: (keep: boolean) => void;
+}) {
+    return (
+        <li className="group/pic relative">
+            <button
+                type="button"
+                title={description || "Send this"}
+                onClick={onPick}
+                className="block w-full overflow-hidden rounded-md ring-border transition-shadow hover:ring-2"
+            >
+                {/* eslint-disable-next-line @next/next/no-img-element -- a remote preview grid, no loader wanted */}
+                <img
+                    src={preview}
+                    alt={description}
+                    loading="lazy"
+                    className="h-24 w-full bg-muted object-cover"
+                />
+            </button>
+            <button
+                type="button"
+                aria-pressed={kept}
+                aria-label={kept ? "Stop keeping this picture" : "Keep this picture"}
+                title={kept ? "Kept. It is in your picker." : "Keep this"}
+                onClick={(event) => {
+                    // The tile under it sends. Keeping is not the first half of
+                    // sending.
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onKeep(!kept);
+                }}
+                className={cn(
+                    "absolute right-1 top-1 rounded-md border border-border bg-background/80 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/pic:opacity-100",
+                    kept && "text-primary opacity-100"
+                )}
+            >
+                <Star className={cn("size-3.5", kept && "fill-current")} />
+            </button>
+        </li>
     );
 }
 
