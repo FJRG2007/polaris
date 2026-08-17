@@ -27,9 +27,18 @@ import { Camera, Maximize2, Minimize2 } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogTitle, cn } from "@polaris/ui";
 import { otherTransport, preferredTransport, stillSrc, streamSrc, type Transport } from "@/lib/home/player";
 
-/** Paced by arrival rather than by a clock, so a slow link stretches the gap
- *  instead of queueing requests that overtake each other. */
-const FRAME_GAP_MS = 700;
+/**
+ * Paced by arrival rather than by a clock, so a slow link stretches the gap
+ * instead of queueing requests that overtake each other.
+ *
+ * Short, because this is one camera on its own and the pictures are what carries
+ * it until the stream starts - and, when the stream will not start at all, what
+ * carries it for good. At seven hundred milliseconds against a relay holding
+ * each frame for a second, better than half of these asks returned the picture
+ * already on screen: the reader was watching one frame a second and calling it,
+ * correctly, a slideshow.
+ */
+const FRAME_GAP_MS = 260;
 
 /** The same, once the stream has been given up on. The relay drops its
  *  connection to a camera when nothing is watching, so with no stream open every
@@ -45,6 +54,16 @@ const VIDEO_START_MS = 9_000;
 
 /** Opened deliberately, so the good size. */
 const FRAME_WIDTH = 1280;
+
+/**
+ * The size to ask for while the pictures are standing in for the video.
+ *
+ * Smaller on purpose, and it is a trade made the right way round: several
+ * smaller frames a second read as a moving picture, and one sharp frame a second
+ * reads as a fault. Sharpness comes back the moment the stream plays, and the
+ * stream is what this is waiting for.
+ */
+const MOVING_WIDTH = 640;
 
 export function CameraViewer({
     camera,
@@ -142,7 +161,14 @@ export function CameraViewer({
                         frame is never the same twice, so there is nothing for the
                         image optimizer to cache and it would only add a hop. */}
                     <img
-                        src={stillSrc(camera.id, stamp, FRAME_WIDTH)}
+                        src={stillSrc(
+                            camera.id,
+                            stamp,
+                            trying ? MOVING_WIDTH : FRAME_WIDTH,
+                            // Only while the pictures are the view. Once the
+                            // stream is playing nothing asks for one at all.
+                            trying
+                        )}
                         alt={camera.name}
                         className={cn("w-full bg-black", surface, playing && "invisible")}
                         onLoad={() => {
@@ -176,6 +202,30 @@ export function CameraViewer({
                         <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/70">
                             <Camera className="size-6 shrink-0" />
                             <span className="text-[12px]">This camera is not answering</span>
+                        </span>
+                    ) : null}
+
+                    {/* Said out loud, because otherwise it is not sayable. The
+                        stream failing looks exactly like a camera that is slow:
+                        pictures keep arriving, nothing goes red, and the reader
+                        is left deciding between "this is what live means here"
+                        and "something is broken". It took three reports to
+                        establish which. */}
+                    {!trying && drawn ? (
+                        <span className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-2 rounded-full bg-black/70 px-2.5 py-1 text-[11px] text-white/80">
+                            <Camera className="size-3.5 shrink-0" />
+                            Pictures only - the live stream would not start
+                            <button
+                                type="button"
+                                className="pointer-events-auto underline underline-offset-2"
+                                onClick={() => {
+                                    setTransport(preferredTransport());
+                                    setSwapped(false);
+                                    setTrying(true);
+                                }}
+                            >
+                                Try again
+                            </button>
                         </span>
                     ) : null}
 

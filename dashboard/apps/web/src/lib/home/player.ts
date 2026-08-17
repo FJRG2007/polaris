@@ -49,8 +49,17 @@ export function streamSrc(cameraId: string, quality: "main" | "sub", transport: 
  * answers from its own cache and the picture never changes, which is exactly what
  * a frozen camera looks like.
  */
-export function stillSrc(cameraId: string, stamp = 0, width?: number): string {
+export function stillSrc(
+    cameraId: string,
+    stamp = 0,
+    width?: number,
+    /** Ask the relay for a shorter cache window, so the pictures are actually
+     *  different from each other. Only for a screen showing one camera - see the
+     *  snapshot route. */
+    smooth = false
+): string {
     const query = new URLSearchParams({ v: String(stamp) });
     if (width) query.set("w", String(width));
+    if (smooth) query.set("smooth", "1");
     return `/api/home/cameras/${cameraId}/snapshot?${query.toString()}`;
 }

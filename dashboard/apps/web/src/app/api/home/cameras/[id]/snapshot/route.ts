@@ -23,11 +23,18 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     // The size it will actually be drawn at. A tile is a few hundred pixels wide
     // and a camera's own frame is several thousand: sending the full one is most
     // of a megabyte, several times a second, to fill a postcard.
-    const asked = Number(new URL(request.url).searchParams.get("w"));
+    const query = new URL(request.url).searchParams;
+    const asked = Number(query.get("w"));
     const width = Number.isFinite(asked) && asked >= 160 && asked <= 1920 ? Math.round(asked) : undefined;
+    // Asked for by a screen showing one camera, where a picture a second reads
+    // as a slideshow rather than as a view. A wall never asks for it: twelve
+    // tiles at four frames a second is the cost the shared cache exists to
+    // refuse.
+    const smooth = query.get("smooth") === "1";
     try {
         const image = await cameraStill(install.id, id, {
             ...(width ? { width } : {}),
+            smooth,
             // Somebody who closed the tab is not owed a decoded frame.
             signal: request.signal
         });
