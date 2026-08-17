@@ -577,6 +577,12 @@ export function ChannelView({
      * the newest line. Only this reader's own messages that are not already
      * read are asked about, so a group channel - where there are no ticks at
      * all - asks nothing.
+     *
+     * Capped at what one request may carry, newest first. The window is only
+     * trimmed while the reader is at the live end, so somebody reading further up
+     * while a conversation runs holds more than that - and a list one over the
+     * limit is refused whole, which stopped the ticks moving at all with nothing
+     * on screen to say why.
      */
     const freshenReceipts = useCallback(async () => {
         const waiting = held.current
@@ -586,7 +592,8 @@ export function ChannelView({
                     entry.receipt !== null &&
                     entry.receipt !== "read"
             )
-            .map((entry) => entry.id);
+            .map((entry) => entry.id)
+            .slice(-core.MAX_CHAT_RECEIPTS);
         if (waiting.length === 0) return;
 
         const { receipts } = await actions.receiptsAction({ channelId, messageIds: waiting });
@@ -737,14 +744,29 @@ export function ChannelView({
         return () => cancelAnimationFrame(frame);
     }, [messages, stick]);
 
-    // Catching up on what is actually on screen.
-    useEffect(() => {
+    /**
+     * Catching up on what is actually on screen.
+     *
+     * Called rather than only watched, because being at the live end is a ref and
+     * a ref changes without a render. Pressing "3 new messages" on a whole window
+     * scrolls and nothing else - the list it marks is the list it already had - so
+     * an effect on the messages alone left the reader looking straight at the
+     * newest line with the channel still bold in the rail. Scrolling back down by
+     * hand is the same moment.
+     *
+     * The rail is not refreshed here. The read is announced, and this tab is in
+     * that frame's audience like every other screen this person has open, so
+     * asking for the list again as well is the same three queries twice.
+     */
+    const catchUpMark = useCallback(() => {
         if (!following.current) return;
-        const newest = messages?.[messages.length - 1];
+        const newest = held.current[held.current.length - 1];
         if (!newest || marked.current === newest.id) return;
         marked.current = newest.id;
-        void actions.markReadAction({ channelId, messageId: newest.id }).then(refresh);
-    }, [messages, channelId, refresh]);
+        void actions.markReadAction({ channelId, messageId: newest.id });
+    }, [channelId]);
+
+    useEffect(catchUpMark, [messages, catchUpMark]);
 
     /**
      * Keep a message, or stop keeping it.
@@ -1049,8 +1071,10 @@ export function ChannelView({
                         // somebody deciding to read further up.
                         if (below < AT_BOTTOM_SLACK) {
                             following.current = true;
-                            // Back at the live end, so nothing is waiting below.
+                            // Back at the live end, so nothing is waiting below
+                            // and everything on screen has now been seen.
                             setUnseen(0);
+                            catchUpMark();
                         } else if (Date.now() > settling.current) following.current = false;
                         // Both edges, because the window moves in both
                         // directions: up into the history, and back down out of
@@ -1121,9 +1145,15 @@ export function ChannelView({
                                     // A window that has been trimmed has to fetch
                                     // its way back; one that is whole only has to
                                     // scroll, and reloading it would throw away
-                                    // the history above.
+                                    // the history above. Either way the reader is
+                                    // now at the newest message, which is a read
+                                    // nothing else would report - scrolling does
+                                    // not change the list a fetch would.
                                     if (newerThan) void load();
-                                    else stick();
+                                    else {
+                                        stick();
+                                        catchUpMark();
+                                    }
                                 }}
                                 className="flex items-center gap-1.5 rounded-full border border-border bg-elevated px-3 py-1 text-xs shadow-md transition-colors hover:bg-card-hover"
                             >

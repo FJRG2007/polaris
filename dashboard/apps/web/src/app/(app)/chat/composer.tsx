@@ -279,14 +279,19 @@ export function Composer({
      *
      * Silently dropping the eleventh file is how somebody sends ten of the
      * twelve screenshots they meant to and finds out later.
+     *
+     * Answers how many it took, which is what a paste needs: a clipboard that
+     * carries a picture and text at once has to keep the text when the picture is
+     * refused - no permission to send files, or a message already holding as many
+     * as it may - or the paste is eaten and nothing at all appears.
      */
-    const stage = (picked: ArrayLike<File> | null): void => {
-        if (!picked || picked.length === 0) return;
+    const stage = (picked: ArrayLike<File> | null): number => {
+        if (!picked || picked.length === 0) return 0;
         // Said rather than ignored: a file dropped onto a box that quietly does
         // nothing with it reads as a broken composer.
         if (!attachable) {
             setRefused("You are not allowed to send files here.");
-            return;
+            return 0;
         }
         const chosen = Array.from(picked);
         const room = Math.max(0, rules.maxAttachments - files.length);
@@ -306,6 +311,7 @@ export function Composer({
         }
         setRefused(notes.join(" "));
         if (accepted.length > 0) setFiles((current) => [...current, ...accepted]);
+        return accepted.length;
     };
 
     /** What every picker does with what came back. Cleared afterwards so
@@ -512,10 +518,14 @@ export function Composer({
                         // is sending: it is staged like a picked file, with the
                         // same limits and the same preview, and nothing about it
                         // goes into the text.
+                        //
+                        // Only claimed when something was actually staged. A
+                        // clipboard filled by copying out of a page carries the
+                        // picture and the words together, so a refused file that
+                        // said it took the paste threw the words away too.
                         onPasteFiles={(pasted) => {
                             if (disabled) return false;
-                            stage(pasted);
-                            return true;
+                            return stage(pasted) > 0;
                         }}
                         onChange={setBody}
                         // From the keys and not from the document changing. A

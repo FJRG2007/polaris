@@ -754,11 +754,11 @@ async function markDelivered(actor: ChatActor, channel: ChannelAccess): Promise<
  * about what has been seen, and the one scrolled further up must not un-read
  * what the other already read.
  *
- * Announced, because reading is not a private act on this wire. Nothing else
- * says somebody caught up: the count on the desktop they left open stayed until
- * the page was reloaded, and the second tick under the other person's message
- * stayed grey for the same reason. Only announced when the mark actually moved -
- * every early return above this is a read that changed nothing.
+ * Announced, because nothing else says somebody caught up: the count on the
+ * desktop they left open stayed until the page was reloaded, and the second tick
+ * under the other person's message stayed grey for the same reason. Only
+ * announced when the mark actually moved - every early return above this is a
+ * read that changed nothing - and only to the screens `readAudience` names.
  */
 export async function markRead(actor: ChatActor, input: core.ChatMarkReadInput): Promise<void> {
     const channel = await requireChannel(actor, input.channelId);
@@ -803,7 +803,42 @@ export async function markRead(actor: ChatActor, input: core.ChatMarkReadInput):
         });
     }
 
-    publishChatChange({ channelId: input.channelId, kind: "read", actorId: actor.id });
+    publishChatChange({
+        channelId: input.channelId,
+        kind: "read",
+        actorId: actor.id,
+        audience: await readAudience(actor, channel)
+    });
+}
+
+/**
+ * Whose screens a read is for.
+ *
+ * Always the reader's own, which is the count coming down on the desktop they
+ * left open. The other person as well, but only in a one-to-one conversation
+ * where the ticks are theirs to see: the frame arrives at the instant somebody
+ * opened the message, which is the fact the setting withholds - a receipt
+ * nothing draws is still a receipt if it is on the wire.
+ *
+ * One person everywhere else. No screen consumes somebody else's read outside a
+ * one-to-one - "read by four of the seven here" is a different feature - and
+ * telling fifty members about each other's reading is a frame per pair per
+ * message for nothing.
+ */
+async function readAudience(actor: ChatActor, channel: ChannelAccess): Promise<string[]> {
+    if (channel.kind !== "dm") return [actor.id];
+
+    const other = await prisma.chatChannelMember.findFirst({
+        where: { channelId: channel.channelId, userId: { not: actor.id } },
+        select: { userId: true }
+    });
+    if (!other) return [actor.id];
+
+    // Not resolved as an administrator, for the same reason `receiptStateIn` is
+    // not: these are the ticks under somebody's own messages, and the admin
+    // exception is about reading somebody else's.
+    const allowed = await receiptsBetween({ id: actor.id, isAdmin: false }, other.userId);
+    return allowed ? [actor.id, other.userId] : [actor.id];
 }
 
 /**

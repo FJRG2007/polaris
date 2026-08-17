@@ -35,7 +35,8 @@ export interface ChatChange {
      *  call - a call in this conversation started, moved or ended.
      *  read - somebody caught up here. Two screens act on it and nobody else:
      *      their own other devices, which have an unread count to take down, and
-     *      the people they were reading, whose ticks have just moved. */
+     *      the person they were reading, whose ticks have just moved. Addressed
+     *      through `audience`, because who may know is a setting. */
     readonly kind: "posted" | "channels" | "typing" | "call" | "read";
     /** Who caused it. A tab does not need waking for its own write. */
     readonly actorId: string;
@@ -52,7 +53,10 @@ export interface ChatChange {
      * joining or leaving rather than about the channel itself. On `call`: whose
      * telephone should ring - adding somebody to a group call rings them, and
      * would otherwise ring the nine people who were already in the group and had
-     * decided not to join.
+     * decided not to join. On `read`: the reader's own account, plus the one
+     * other person in a one-to-one conversation where the ticks are theirs to
+     * see - reaching a channel is not a reason to be told when somebody in it
+     * opened a message.
      */
     readonly audience?: readonly string[];
     /**

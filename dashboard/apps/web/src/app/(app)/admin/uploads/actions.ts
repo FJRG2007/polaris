@@ -145,7 +145,7 @@ export async function tidyChatStorageAction(): Promise<{
             action: "settings.chat.uploads.tidy",
             targetType: "setting",
             targetId: "chat.attachments",
-            metadata: { removed: result.removed }
+            metadata: { removed: result.removed, failed: result.failed }
         });
         return result;
     } catch (caught) {

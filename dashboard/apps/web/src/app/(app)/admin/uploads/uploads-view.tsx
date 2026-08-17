@@ -18,7 +18,7 @@ import type { AvatarSettings } from "@/lib/avatar-service";
 import { ResolvedTarget, TargetPicker } from "./target-picker";
 import type { ChatStorageSettings } from "@/lib/chat/attachments";
 import type { UploadSettings } from "@/lib/tasks/attachment-service";
-import { Button, Card, CardBody, Input, Switch, cn } from "@polaris/ui";
+import { Button, Card, CardBody, ConfirmDeleteDialog, Input, Switch, cn } from "@polaris/ui";
 import {
     checkStorageAction,
     setAvatarSettingsAction,
@@ -83,10 +83,45 @@ function CheckButton({ which }: { which: StorageCheck }) {
  * message deleted one at a time left an empty one named after a uuid. Nothing
  * else will ever remove either, and neither is reachable from anywhere in
  * Polaris.
+ *
+ * Asked first, because what it does is a recursive delete on somebody's disk and
+ * a press is not a decision. It runs against every storage the instance has ever
+ * written chat files to - a NAS share other people may also be using among them -
+ * and nothing puts back what it takes.
+ *
+ * What could not be removed is said as plainly as what was. A run where half the
+ * folders refused and the line only counted the other half reads as a clean
+ * sweep, which is how a full disk stays full.
  */
 function TidyButton() {
+    const [asking, setAsking] = useState(false);
     const [busy, setBusy] = useState(false);
-    const [said, setSaid] = useState("");
+    const [said, setSaid] = useState<{ detail: string; failed: boolean } | null>(null);
+
+    const tidy = async () => {
+        setBusy(true);
+        setSaid(null);
+        const result = await runAction(() => tidyChatStorageAction(), () => undefined);
+        setBusy(false);
+        setAsking(false);
+        if (!result || result.error) {
+            setSaid({ detail: result?.error ?? "That could not be run.", failed: true });
+            return;
+        }
+        const removed = result.removed ?? 0;
+        const failed = result.failed ?? 0;
+        const took =
+            removed === 0
+                ? "Nothing to take out."
+                : `Took out ${removed} folder${removed === 1 ? "" : "s"}.`;
+        setSaid({
+            detail:
+                failed === 0
+                    ? took
+                    : `${took} ${failed} could not be removed - the storage refused, or it is not answering.`,
+            failed: failed > 0
+        });
+    };
 
     return (
         <div className="flex flex-col gap-1.5">
@@ -96,31 +131,40 @@ function TidyButton() {
                     variant="secondary"
                     disabled={busy}
                     title="Removes folders for conversations that no longer exist, and empty ones."
-                    onClick={async () => {
-                        setBusy(true);
-                        setSaid("");
-                        const result = await runAction(
-                            () => tidyChatStorageAction(),
-                            () => undefined
-                        );
-                        setBusy(false);
-                        if (!result || result.error) {
-                            setSaid(result?.error ?? "That could not be run.");
-                            return;
-                        }
-                        const removed = result.removed ?? 0;
-                        setSaid(
-                            removed === 0
-                                ? "Nothing to take out."
-                                : `Took out ${removed} folder${removed === 1 ? "" : "s"}.`
-                        );
+                    onClick={() => {
+                        setSaid(null);
+                        setAsking(true);
                     }}
                 >
                     {busy && <Loader2 className="size-4 animate-spin" />}
                     Tidy up
                 </Button>
             </div>
-            {said && <p className="text-xs text-muted-foreground">{said}</p>}
+            {said && (
+                <p className={cn("text-xs", said.failed ? "text-danger" : "text-muted-foreground")}>
+                    {said.detail}
+                </p>
+            )}
+
+            <ConfirmDeleteDialog
+                open={asking}
+                onOpenChange={(open) => !busy && setAsking(open)}
+                requireTyping={false}
+                name="chat storage"
+                kind="folders"
+                title="Tidy the chat storage"
+                confirmLabel="Tidy up"
+                pending={busy}
+                description={
+                    <>
+                        Deletes every folder under the chat root whose conversation no longer
+                        exists, with everything inside it, and any folder left empty. The files do
+                        not come back.
+                    </>
+                }
+                question="Tidy every storage this instance has written chat files to?"
+                onConfirm={() => void tidy()}
+            />
         </div>
     );
 }

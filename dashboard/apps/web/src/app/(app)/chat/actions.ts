@@ -397,7 +397,9 @@ export async function messageDeliveryAction(
     messageId: string
 ): Promise<{ delivery?: MessageDelivery; error?: string }> {
     const me = await actor();
-    const result = await guard(() => messages.deliveryOf(me, String(messageId ?? "")));
+    const parsed = z.string().uuid().safeParse(messageId);
+    if (!parsed.success) return { error: "There is no such message" };
+    const result = await guard(() => messages.deliveryOf(me, parsed.data));
     if (result.error) return { error: result.error };
     return result.value ? { delivery: result.value } : {};
 }

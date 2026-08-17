@@ -41,20 +41,25 @@ export function MessageInfoDialog({
 }) {
     const [delivery, setDelivery] = useState<MessageDelivery | null>(null);
     const [error, setError] = useState("");
+    // Whether the answer has arrived, kept apart from the answer itself. There is
+    // a real answer that carries no moments - the other person turned the ticks
+    // off while this was open, or the message has since gone - and reading "no
+    // delivery" as "still asking" is a spinner nothing ever takes down.
+    const [asked, setAsked] = useState(false);
 
     // Asked when it opens. A channel of two hundred messages must not carry two
     // hundred of these around on the chance somebody opens one.
     useEffect(() => {
-        if (!message) {
-            setDelivery(null);
-            setError("");
-            return;
-        }
+        setDelivery(null);
+        setError("");
+        setAsked(false);
+        if (!message) return;
         let current = true;
         void messageDeliveryAction(message.id).then((result) => {
             if (!current) return;
             if (result.error) setError(result.error);
             else setDelivery(result.delivery ?? null);
+            setAsked(true);
         });
         return () => {
             current = false;
@@ -73,10 +78,17 @@ export function MessageInfoDialog({
                     <p role="alert" className="text-sm text-danger">
                         {error}
                     </p>
-                ) : !delivery ? (
+                ) : !asked ? (
                     <p className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
                         <Loader2 className="size-4 animate-spin" />
                         Looking
+                    </p>
+                ) : !delivery ? (
+                    // Answered, with nothing in it. The ticks stopped being this
+                    // reader's to see between opening the conversation and opening
+                    // this, or the message is no longer there.
+                    <p className="py-6 text-sm text-muted-foreground">
+                        There is nothing to show for this message any more.
                     </p>
                 ) : (
                     <ol className="flex flex-col gap-3">

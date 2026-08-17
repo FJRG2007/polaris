@@ -71,10 +71,15 @@ function ChatColumns({ children }: { children: ReactNode }) {
                 // alternative is teaching the client to apply every kind of
                 // change to a shape the server already knows how to build.
                 if (frame.kind === "posted" || frame.kind === "channels") refresh();
-                // Read somewhere else - a phone, another tab - by this same
-                // person. Nothing arrived, but the counts in the rail are no
-                // longer true, and before this they stayed up until the page was
-                // reloaded. Somebody else catching up changes nothing here.
+                // Caught up by this same person, wherever they did it - a phone,
+                // another tab, or the conversation open beside this rail.
+                // Nothing arrived, but the counts here are no longer true, and
+                // before this they stayed up until the page was reloaded. The one
+                // trigger on purpose: the screen that performed the read is told
+                // by this frame like every other, so it does not ask for the list
+                // again on its own. Somebody else catching up changes nothing
+                // here, and is only ever announced to them and the one person
+                // whose ticks it moves.
                 if (frame.kind === "read" && frame.userId === viewerId) refresh();
             },
             [refresh, viewerId]

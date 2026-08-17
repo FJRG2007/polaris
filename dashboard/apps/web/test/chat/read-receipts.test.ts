@@ -34,7 +34,12 @@ let mark: { lastReadAt: Date | null; lastDeliveredAt: Date | null } | null = nul
 let other: { userId: string; lastReadAt: Date | null; lastDeliveredAt: Date | null } | null = null;
 let receiptsAllowed = true;
 
-let announced: { kind: string; channelId: string; actorId: string }[] = [];
+let announced: {
+    kind: string;
+    channelId: string;
+    actorId: string;
+    audience?: readonly string[];
+}[] = [];
 let stamped: { where: Record<string, unknown>; data: Record<string, unknown> }[] = [];
 
 vi.mock("@/lib/chat/access", async () => {
@@ -55,7 +60,12 @@ vi.mock("@/lib/chat/access", async () => {
 });
 
 vi.mock("@/lib/chat/live", () => ({
-    publishChatChange: (change: { kind: string; channelId: string; actorId: string }) => {
+    publishChatChange: (change: {
+        kind: string;
+        channelId: string;
+        actorId: string;
+        audience?: readonly string[];
+    }) => {
         announced.push(change);
     }
 }));
@@ -125,9 +135,19 @@ beforeEach(() => {
 });
 
 describe("catching up", () => {
-    it("announces it, so the other screens of the same person can take the count down", async () => {
+    it("announces it to their own screens and to the person whose ticks it moves", async () => {
         await markRead(ada, { channelId: "c1", messageId: "m3" });
-        expect(announced).toEqual([{ kind: "read", channelId: "c1", actorId: "ada" }]);
+        expect(announced).toEqual([
+            { kind: "read", channelId: "c1", actorId: "ada", audience: ["ada", "grace"] }
+        ]);
+    });
+
+    it("does not tell them when the ticks are not theirs to see", async () => {
+        // The frame arrives at the instant the message was opened, so sending it
+        // to somebody the setting withholds the ticks from is the fact itself.
+        receiptsAllowed = false;
+        await markRead(ada, { channelId: "c1", messageId: "m3" });
+        expect(announced.at(-1)?.audience).toEqual(["ada"]);
     });
 
     it("says nothing when the mark would go backwards", async () => {
@@ -157,8 +177,11 @@ describe("catching up", () => {
         kind = "text";
         await markRead(ada, { channelId: "c1", messageId: "m3" });
         expect(stamped).toHaveLength(0);
-        // Still announced: the count in the rail is not a one-to-one feature.
+        // Still announced, and to nobody but the reader: the count in the rail is
+        // not a one-to-one feature, and nothing in a channel of fifty draws who
+        // has read what.
         expect(announced).toHaveLength(1);
+        expect(announced[0]?.audience).toEqual(["ada"]);
     });
 });
 
