@@ -72,3 +72,14 @@ describe("choosing a format", () => {
         expect(streamSrc("cam1", "sub", "hls")).toContain("q=sub");
     });
 });
+
+describe("the frame a tile draws", () => {
+    it("changes address every time, or the browser answers from its own cache and the picture freezes", () => {
+        expect(stillSrc("cam1", 1)).not.toBe(stillSrc("cam1", 2));
+    });
+
+    it("asks for the size it will be drawn at", () => {
+        expect(stillSrc("cam1", 0, 640)).toContain("w=640");
+        expect(stillSrc("cam1", 0)).not.toContain("w=");
+    });
+});

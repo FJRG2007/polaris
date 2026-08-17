@@ -102,10 +102,29 @@ function authHeader(endpoint: RelayEndpoint): string {
 async function relayFetch(
     endpoint: RelayEndpoint,
     path: string,
-    init: { method?: string; timeoutMs?: number; headers?: Record<string, string>; body?: string } = {}
+    init: {
+        method?: string;
+        timeoutMs?: number;
+        headers?: Record<string, string>;
+        body?: string;
+        /**
+         * The watcher's own request. A live stream ends when whoever was watching
+         * closes the tab, and without this it does not: the relay keeps sending,
+         * this process keeps reading, and go2rtc keeps a consumer for a viewer
+         * who left. They accumulate, and a relay carrying a dozen ghosts is the
+         * one that starts stuttering for the people still there.
+         */
+        signal?: AbortSignal;
+    } = {}
 ): Promise<Response> {
     const controller = new AbortController();
+    // The timeout is on getting a response started, not on the body: video reads
+    // for as long as somebody watches. Cleared as soon as the headers land.
     const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? 5000);
+    if (init.signal) {
+        if (init.signal.aborted) controller.abort();
+        else init.signal.addEventListener("abort", () => controller.abort(), { once: true });
+    }
     try {
         return await fetch(`${endpoint.baseUrl}${path}`, {
             method: init.method ?? "GET",
@@ -173,13 +192,26 @@ export async function publishedStreams(endpoint: RelayEndpoint): Promise<string[
  * usual reason: the camera has one connection to give and the relay already has
  * it.
  */
-export async function snapshot(endpoint: RelayEndpoint, cameraId: string, quality: "main" | "sub" = "sub"): Promise<Buffer | null> {
-    const response = await relayFetch(
-        endpoint,
-        `/api/frame.jpeg?src=${encodeURIComponent(streamName(cameraId, quality))}`,
+export async function snapshot(
+    endpoint: RelayEndpoint,
+    cameraId: string,
+    quality: "main" | "sub" = "sub",
+    options: { width?: number; cacheSeconds?: number; signal?: AbortSignal } = {}
+): Promise<Buffer | null> {
+    const query = new URLSearchParams({ src: streamName(cameraId, quality) });
+    // Asking for the size it will be drawn at rather than the camera's own. A
+    // tile is a few hundred pixels wide, and sending it a 2K frame is most of a
+    // megabyte to fill a postcard - over mobile data, several times a second.
+    if (options.width) query.set("w", String(options.width));
+    // The relay decodes a frame to answer this, so a wall of tiles asking at the
+    // same moment must not be a decode each. With a cache window they all get the
+    // one frame, and the cost is per camera per window rather than per viewer.
+    if (options.cacheSeconds) query.set("cache", `${options.cacheSeconds}s`);
+    const response = await relayFetch(endpoint, `/api/frame.jpeg?${query.toString()}`, {
         // A camera that is asleep takes a moment to produce its first frame.
-        { timeoutMs: 8000 }
-    ).catch(() => null);
+        timeoutMs: 8000,
+        ...(options.signal ? { signal: options.signal } : {})
+    }).catch(() => null);
     if (!response?.ok) return null;
     return Buffer.from(await response.arrayBuffer());
 }
@@ -228,14 +260,21 @@ export function hlsAssetPath(file: Exclude<HlsFile, "stream.m3u8">, session: str
 
 /** Dial a relay path and hand back the raw response, for the proxy route that
  *  streams it on to a viewer. */
-export async function relayStream(endpoint: RelayEndpoint, path: string, init?: { method?: string; body?: string; contentType?: string }): Promise<Response> {
+export async function relayStream(
+    endpoint: RelayEndpoint,
+    path: string,
+    init?: { method?: string; body?: string; contentType?: string; signal?: AbortSignal }
+): Promise<Response> {
     return relayFetch(endpoint, path, {
         method: init?.method ?? "GET",
         // Video is a long read; the timeout is on getting the response started,
-        // and the body streams for as long as somebody is watching.
-        timeoutMs: 10_000,
+        // and the body streams for as long as somebody is watching. That wait is
+        // real and it is the camera's: nothing can be sent until a keyframe
+        // arrives, and cameras space those seconds apart.
+        timeoutMs: 15_000,
         ...(init?.contentType ? { headers: { "content-type": init.contentType } } : {}),
-        ...(init?.body === undefined ? {} : { body: init.body })
+        ...(init?.body === undefined ? {} : { body: init.body }),
+        ...(init?.signal ? { signal: init.signal } : {})
     });
 }
 

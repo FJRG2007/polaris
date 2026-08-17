@@ -37,8 +37,20 @@ export function streamSrc(cameraId: string, quality: "main" | "sub", transport: 
         : `/api/home/cameras/${cameraId}/stream?q=${quality}`;
 }
 
-/** A single frame. Used as the poster under a stream that is still starting, and
- *  as the picture when there is no stream to be had. */
-export function stillSrc(cameraId: string, stamp = 0): string {
-    return `/api/home/cameras/${cameraId}/snapshot?v=${stamp}`;
+/**
+ * A single frame, at the size it will be drawn.
+ *
+ * This is what is actually on screen for the first few seconds of every camera,
+ * and for all of them on a device where the stream never starts - so it is asked
+ * for at the width it will occupy rather than the camera's own, which is several
+ * thousand pixels and most of a megabyte a time.
+ *
+ * `stamp` is what makes the next request a different one. Without it the browser
+ * answers from its own cache and the picture never changes, which is exactly what
+ * a frozen camera looks like.
+ */
+export function stillSrc(cameraId: string, stamp = 0, width?: number): string {
+    const query = new URLSearchParams({ v: String(stamp) });
+    if (width) query.set("w", String(width));
+    return `/api/home/cameras/${cameraId}/snapshot?${query.toString()}`;
 }

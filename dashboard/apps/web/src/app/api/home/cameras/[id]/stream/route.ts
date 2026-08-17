@@ -22,7 +22,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const { id } = await context.params;
     const quality = new URL(request.url).searchParams.get("q") === "sub" ? "sub" : "main";
     try {
-        return await cameraStream(install.id, id, quality);
+        return await cameraStream(install.id, id, quality, request.signal);
     } catch (caught) {
         if (caught instanceof CameraOfflineError) return new Response(caught.message, { status: 503 });
         throw caught;

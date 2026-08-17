@@ -17,8 +17,8 @@
 import { Socket } from "node:net";
 import { prisma } from "@polaris/db";
 import { listHosts } from "@/lib/host-service";
+import { localDialHost } from "@/lib/deploy/dial";
 import { tunnelledUrl } from "@/lib/home/tunnel";
-import { getPublicIp } from "@/lib/domain-service";
 import { hostPortForApp } from "@/lib/deploy-service";
 
 /** One of Home's own containers, as found on a server. */
@@ -92,7 +92,13 @@ export async function serviceUrls(applicationId: string, ownerId: string): Promi
     });
     if (!application) return null;
     const local = application.target.kind === "local";
-    const dialHost = local ? await getPublicIp() : (application.target.host?.address?.trim() ?? null);
+    // The same address the edge dials a locally deployed app on, and for the
+    // reason spelled out in lib/deploy/dial: the box's public address sends this
+    // traffic out to the router and back in. For a page that is one request that
+    // is merely wasteful; for video it is every byte of every stream taking a
+    // round trip through the router, which is exactly what a camera that "takes
+    // ages and then stutters" looks like.
+    const dialHost = local ? await localDialHost() : (application.target.host?.address?.trim() ?? null);
     if (!dialHost) return null;
 
     const port = hostPortForApp(applicationId);

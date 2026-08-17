@@ -34,7 +34,7 @@ export async function GET(
             quality: query.get("q") === "sub" ? "sub" : "main",
             session: query.get("id"),
             sequence: query.get("n")
-        });
+        }, request.signal);
     } catch (caught) {
         if (caught instanceof CameraOfflineError) return new Response(caught.message, { status: 503 });
         throw caught;

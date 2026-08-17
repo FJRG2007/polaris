@@ -51,9 +51,20 @@ async function relayForCamera(installedAppId: string, cameraId: string): Promise
 /** A still, for the wall and for an event's picture. The small stream on purpose:
  *  a wall of twelve full-resolution stills is several megabytes to draw a page
  *  nobody is looking closely at yet. */
-export async function cameraStill(installedAppId: string, cameraId: string): Promise<Buffer> {
+export async function cameraStill(
+    installedAppId: string,
+    cameraId: string,
+    options: { width?: number; signal?: AbortSignal } = {}
+): Promise<Buffer> {
     const { endpoint } = await relayForCamera(installedAppId, cameraId);
-    const image = await snapshot(endpoint, cameraId, "sub");
+    const image = await snapshot(endpoint, cameraId, "sub", {
+        ...(options.width ? { width: options.width } : {}),
+        // One second. It is what makes a wall of tiles refreshing together cost
+        // one decode per camera rather than one per tile, and a picture up to a
+        // second old is not a picture anybody can tell from the live one.
+        cacheSeconds: 1,
+        ...(options.signal ? { signal: options.signal } : {})
+    });
     if (!image) throw new CameraOfflineError("The camera did not send a picture");
     return image;
 }
@@ -67,10 +78,11 @@ export async function cameraStill(installedAppId: string, cameraId: string): Pro
 export async function cameraStream(
     installedAppId: string,
     cameraId: string,
-    quality: "main" | "sub"
+    quality: "main" | "sub",
+    signal?: AbortSignal
 ): Promise<Response> {
     const { endpoint } = await relayForCamera(installedAppId, cameraId);
-    const upstream = await relayStream(endpoint, streamPath(cameraId, "mp4", quality));
+    const upstream = await relayStream(endpoint, streamPath(cameraId, "mp4", quality), signal ? { signal } : undefined);
     if (!upstream.ok || !upstream.body) throw new CameraOfflineError("The camera is not answering");
     return new Response(upstream.body, {
         headers: {
@@ -116,12 +128,14 @@ export async function cameraHls(
     installedAppId: string,
     cameraId: string,
     file: HlsFile,
-    query: { quality: "main" | "sub"; session: string | null; sequence: string | null }
+    query: { quality: "main" | "sub"; session: string | null; sequence: string | null },
+    signal?: AbortSignal
 ): Promise<Response> {
     const { endpoint } = await relayForCamera(installedAppId, cameraId);
+    const passthrough = signal ? { signal } : undefined;
 
     if (file === "stream.m3u8") {
-        const upstream = await relayStream(endpoint, hlsMasterPath(cameraId, query.quality));
+        const upstream = await relayStream(endpoint, hlsMasterPath(cameraId, query.quality), passthrough);
         if (!upstream.ok) throw new CameraOfflineError("The camera is not answering");
         return playlist(rewriteMasterPlaylist(await upstream.text()));
     }
@@ -131,7 +145,7 @@ export async function cameraHls(
     if (!query.session || !SESSION.test(query.session)) throw new CameraOfflineError("That stream has ended");
     if (query.sequence && !SEQUENCE.test(query.sequence)) throw new CameraOfflineError("That stream has ended");
 
-    const upstream = await relayStream(endpoint, hlsAssetPath(file, query.session, query.sequence));
+    const upstream = await relayStream(endpoint, hlsAssetPath(file, query.session, query.sequence), passthrough);
     // A segment the relay no longer holds is an ordinary part of live HLS: the
     // player asks again. Passing the status through is what lets it.
     if (!upstream.ok) return new Response(null, { status: upstream.status === 404 ? 404 : 503 });
