@@ -24,7 +24,7 @@ import { getPublicIp } from "@/lib/domain-service";
 import { hostPortForApp } from "@/lib/deploy-service";
 import type { CameraTarget } from "@/lib/home/cameras";
 import { installApp } from "@/lib/apps/install-service";
-import { listEnvVars, revealEnvVar } from "@/lib/env-var-service";
+import { installEnvSecret, installEnvValue } from "@/lib/apps/install-secret";
 
 /** The catalog app this module installs and talks to. */
 const RELAY_APP = "camera-hub";
@@ -36,11 +36,6 @@ export interface RelayEndpoint {
     readonly username: string;
     readonly password: string;
 }
-
-/** Credentials are two queries and a decrypt; the wall asks for them once per
- *  camera per render, so they are held for a few seconds. */
-const CREDENTIAL_TTL_MS = 30_000;
-const credentials = new Map<string, { username: string; password: string; at: number }>();
 
 /** Where a camera's connection is made from: "local", or the id of the server
  *  that can see it. Read off the camera's own `reachVia`. */
@@ -98,21 +93,14 @@ async function baseUrlFor(applicationId: string): Promise<string | null> {
     return `http://${dialHost}:${hostPortForApp(applicationId)}`;
 }
 
-/** The account the relay was installed with. Read back from the app's own
- *  environment rather than kept twice: the install minted it there, and a second
- *  copy is a second thing to keep in step. */
+/** The account the relay was installed with, read back from the app's own
+ *  environment - see install-secret for why it is not kept twice. */
 async function relayCredentials(applicationId: string, ownerId: string): Promise<{ username: string; password: string } | null> {
-    const cached = credentials.get(applicationId);
-    if (cached && Date.now() - cached.at < CREDENTIAL_TTL_MS) return cached;
-    const vars = await listEnvVars("application", applicationId, ownerId).catch(() => []);
-    const username = vars.find((item) => item.key === "RELAY_USERNAME")?.value ?? "polaris";
-    const secret = vars.find((item) => item.key === "RELAY_PASSWORD");
-    if (!secret) return null;
-    const password = await revealEnvVar(secret.id, ownerId).catch(() => null);
-    if (!password) return null;
-    const resolved = { username, password };
-    credentials.set(applicationId, { ...resolved, at: Date.now() });
-    return resolved;
+    const [username, password] = await Promise.all([
+        installEnvValue(applicationId, ownerId, "RELAY_USERNAME", "polaris"),
+        installEnvSecret(applicationId, ownerId, "RELAY_PASSWORD")
+    ]);
+    return password ? { username, password } : null;
 }
 
 /** The relay serving one server, or null when there is not one yet. */

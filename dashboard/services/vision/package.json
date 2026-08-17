@@ -1,0 +1,14 @@
+{
+    "name": "@polaris/vision",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "The Polaris vision worker: watches camera streams for movement and asks the recognizer who is there.",
+    "main": "dist/index.js",
+    "scripts": {
+        "build": "tsup",
+        "typecheck": "tsc --noEmit",
+        "start": "node dist/index.js",
+        "test": "vitest run --passWithNoTests"
+    }
+}

@@ -884,6 +884,32 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         }
     },
     {
+        // The machine that does the looking. Never offered on its own: Home puts
+        // one on whichever server a camera's detection was pointed at, and it is
+        // useless without a camera to watch.
+        id: "vision-worker",
+        name: "Vision worker",
+        internal: true,
+        category: "Home",
+        icon: ScanFace,
+        summary: "Watches the small stream for movement, so nothing else has to.",
+        description:
+            "The part of Home that looks at pixels. It reads the small stream from the relay - never the camera - decides that something moved, and only then does anything more expensive. It sits idle the rest of the time, and it runs on the machine you chose rather than on the one Polaris is on.",
+        installMethod: "compose-template",
+        capabilities: ["tool"],
+        dashboard: "generic",
+        template: {
+            image: "ghcr.io/fjrg2007/polaris-vision:latest",
+            build: "dashboard/services/vision",
+            env: [
+                { key: "POLARIS_URL", label: "Where Polaris is", required: true },
+                // Minted at install. The worker presents it to ask what to watch
+                // and to report what it saw; nobody types it.
+                { key: "WORKER_KEY", label: "Worker key", generated: true }
+            ]
+        }
+    },
+    {
         // Faces are the one detector that has to hold a picture of a person to work,
         // so it is never installed quietly: somebody chooses it, and chooses the
         // machine it runs on.

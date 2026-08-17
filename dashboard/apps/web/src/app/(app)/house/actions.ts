@@ -23,6 +23,8 @@ import { probeCamera } from "@/lib/home/onvif";
 import { requireHome } from "@/lib/home/access";
 import { cameraVendor } from "@/lib/home/vendors";
 import { discoverCameras } from "@/lib/home/discovery";
+import { ensureVisionWorker } from "@/lib/home/vision";
+import { needsSomewhereToRun, type Detector } from "@/lib/home/detection";
 import { cameraInputSchema, discoveryInputSchema, normalizeCameraInput } from "@/lib/home/schemas";
 
 const PATH = "/house";
@@ -159,6 +161,13 @@ export async function startCameraAction(id: string): Promise<{ error?: string }>
         if (!target) throw new Error("Camera not found");
         const endpoint = await relay.ensureRelay(install.ownerId, user.id, relay.relayServerFor(camera.reachVia));
         await relay.publishCamera(endpoint, target, camera.vendor);
+        // A rung Polaris runs itself needs something to run it on, and that
+        // machine is the one the owner chose on the form. Installed here rather
+        // than when the camera was saved, for the same reason as the relay: it is
+        // a deploy, and a form should not wait on one.
+        if (needsSomewhereToRun(camera.detector as Detector)) {
+            await ensureVisionWorker(install.ownerId, user.id, camera.detectorTargetId ?? "local");
+        }
     });
     if (result.error) return { error: result.error };
     revalidatePath(PATH);

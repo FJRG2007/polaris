@@ -177,6 +177,13 @@ export async function register(): Promise<void> {
     const { startScheduledWork } = await import("./lib/cron/scheduler");
     startScheduledWork();
 
+    // Listen to the cameras that decide for themselves that something moved. It is
+    // the cheapest rung of the detection ladder by a wide margin - the camera is
+    // doing that work whether or not Polaris exists - and it is one long-poll per
+    // camera and no CPU. Does nothing at all on an instance with no cameras.
+    const { startCameraWatcher } = await import("./lib/home/watcher");
+    startCameraWatcher();
+
     // Re-establish messaging channels in the bridge after a bridge or web restart:
     // the bridge holds adapters in memory, so without this a channel stays
     // "connected" in the DB but dead at the bridge until manually reconnected.

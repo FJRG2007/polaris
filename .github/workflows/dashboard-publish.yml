@@ -40,6 +40,7 @@ on:
       - "dashboard/services/messaging-bridge/**"
       - "dashboard/services/edge-guard/**"
       - "dashboard/services/camera-relay/**"
+      - "dashboard/services/vision/**"
       - "dashboard/package.json"
       - "dashboard/package-lock.json"
       - "crates/polaris-hostd/**"
@@ -74,6 +75,7 @@ jobs:
       bridge: ${{ steps.filter.outputs.bridge }}
       guard: ${{ steps.filter.outputs.guard }}
       relay: ${{ steps.filter.outputs.relay }}
+      vision: ${{ steps.filter.outputs.vision }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -86,7 +88,7 @@ jobs:
         run: |
           set -euo pipefail
           out() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
-          all() { out web true; out mdns true; out hostd true; out updater true; out bridge true; out guard true; out relay true; }
+          all() { out web true; out mdns true; out hostd true; out updater true; out bridge true; out guard true; out relay true; out vision true; }
           if [ "$EVENT" = "workflow_dispatch" ] || [ -z "${BEFORE:-}" ] \
              || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
              || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
@@ -113,6 +115,8 @@ jobs:
           has '^dashboard/services/edge-guard/|^dashboard/packages/core/|^dashboard/package(-lock)?\.json$' && out guard true || out guard false
           # The relay is go2rtc plus an entrypoint; nothing else feeds it.
           has '^dashboard/services/camera-relay/' && out relay true || out relay false
+          # The worker bundles nothing but its own source.
+          has '^dashboard/services/vision/' && out vision true || out vision false
 
   # The gates. Skipped when nothing they cover is being rebuilt, which also skips
   # the image jobs that need them - they would have been skipped by their own
@@ -371,6 +375,33 @@ jobs:
           platforms: linux/amd64,linux/arm64
           outputs: type=image,name=ghcr.io/fjrg2007/polaris-camera-relay,push-by-digest=true,name-canonical=true,push=true
 
+  # The vision worker: ffmpeg and one bundled file. Published so a house does not
+  # build a video pipeline the first time somebody asks a camera to watch for
+  # people.
+  vision:
+    needs: changes
+    if: ${{ needs.changes.outputs.vision == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: dashboard
+          file: dashboard/services/vision/Dockerfile
+          # Detection is the work most likely to be sent to a small board in a
+          # cupboard, so it follows the servers people actually have.
+          platforms: linux/amd64,linux/arm64
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-vision,push-by-digest=true,name-canonical=true,push=true
+
   # The gate. The three images above are already in the registry by the time this
   # runs; what it does is give them the name every deployment pulls, and only if the
   # suites passed. Each image is tagged on its own result, so a bridge that failed to
@@ -380,7 +411,7 @@ jobs:
   # it is, and a skipped dashboard-ci (nothing here was rebuilt) skips this too,
   # since its result is then not 'success'.
   tag:
-    needs: [dashboard-ci, web, bridge, guard, relay]
+    needs: [dashboard-ci, web, bridge, guard, relay, vision]
     if: ${{ !cancelled() && needs.dashboard-ci.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
@@ -410,3 +441,7 @@ jobs:
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-camera-relay:latest \
             ghcr.io/fjrg2007/polaris-camera-relay@${{ needs.relay.outputs.digest }}
+      - name: Tag the vision worker
+        if: ${{ needs.vision.result == 'success' }}
+        run: |
+          docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-vision:latest             ghcr.io/fjrg2007/polaris-vision@${{ needs.vision.outputs.digest }}
