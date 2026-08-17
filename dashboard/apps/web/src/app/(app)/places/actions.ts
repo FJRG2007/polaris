@@ -20,6 +20,7 @@ import { revalidatePath } from "next/cache";
 import * as cameras from "@/lib/home/cameras";
 import * as events from "@/lib/home/events";
 import * as ptz from "@/lib/home/ptz";
+import * as alerts from "@/lib/home/alerts";
 import * as places from "@/lib/home/places";
 import * as defaults from "@/lib/home/detection-defaults";
 import * as people from "@/lib/home/people";
@@ -105,6 +106,59 @@ export async function deletePlaceAction(id: string): Promise<{ error?: string }>
     const result = await guard(() => places.deletePlace(install.id, id));
     if (result.error) return { error: result.error };
     revalidatePath(PATH);
+    return {};
+}
+
+/** Everybody who could be told about something, for the alert form. Names and
+ *  ids only - an alert names people, and that is all it needs of them. */
+export async function listRecipientsAction(): Promise<{
+    people?: { id: string; name: string }[];
+    error?: string;
+}> {
+    await requireHome("home.manage");
+    const result = await guard(async () => {
+        const { prisma } = await import("@polaris/db");
+        return prisma.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true }, take: 200 });
+    });
+    return result.error ? { error: result.error } : { people: result.value };
+}
+
+export async function listAlertsAction(): Promise<{ rules?: alerts.AlertRuleView[]; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(async () =>
+        alerts.listAlertRules(install.id, (await currentPlace(install.id)).current.id)
+    );
+    return result.error ? { error: result.error } : { rules: result.value };
+}
+
+/**
+ * Write or change an alert.
+ *
+ * `home.manage`, because an alert names other people and puts a conversation in
+ * their sidebar. Being told about your own house is everyday; deciding who else
+ * gets woken up at three in the morning is not.
+ */
+export async function saveAlertAction(
+    id: string | null,
+    input: alerts.AlertRuleInput
+): Promise<{ rule?: alerts.AlertRuleView; error?: string }> {
+    const { user, install } = await requireHome("home.manage");
+    const result = await guard(async () => {
+        // A rule with no place is one that watches everywhere, which is a
+        // deliberate choice rather than a side effect of the switcher.
+        const placeId = input.placeId ?? (await currentPlace(install.id)).current.id;
+        return alerts.saveAlertRule(install.id, id, user.id, { ...input, placeId });
+    });
+    if (result.error || !result.value) return { error: result.error ?? "That alert could not be saved." };
+    revalidatePath(`${PATH}/alerts`);
+    return { rule: result.value };
+}
+
+export async function deleteAlertAction(id: string): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const result = await guard(() => alerts.deleteAlertRule(install.id, id));
+    if (result.error) return { error: result.error };
+    revalidatePath(`${PATH}/alerts`);
     return {};
 }
 

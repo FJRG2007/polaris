@@ -572,6 +572,13 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
+            label: "Alerts",
+            group: CAMERAS_GROUP,
+            href: "/places/alerts",
+            icon: Bell,
+            keywords: ["notify", "tell me", "warn", "rules", "who gets told", "message"]
+        },
+        {
             label: "Clips",
             group: CAMERAS_GROUP,
             href: "/places/clips",
