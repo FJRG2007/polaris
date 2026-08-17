@@ -18,7 +18,9 @@
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { listHosts } from "@/lib/host-service";
-import { appBaseUrl } from "@/lib/domain-service";
+import { homeInstall } from "@/lib/home/access";
+import { hostPortForApp } from "@/lib/deploy-service";
+import { appBaseUrl, getPublicIp } from "@/lib/domain-service";
 import { parseDetection } from "@/lib/home/cameras";
 import { installApp } from "@/lib/apps/install-service";
 import { createHash, timingSafeEqual } from "node:crypto";
@@ -109,17 +111,23 @@ async function faceRecognition(installedAppId: string): Promise<{ baseUrl: strin
         select: { applicationId: true }
     });
     if (!install?.applicationId) return null;
-    const { hostPortForApp } = await import("@/lib/deploy-service");
     const application = await prisma.application.findFirst({
         where: { id: install.applicationId },
         select: { target: { select: { kind: true, host: { select: { address: true } } } } }
     });
     if (!application) return null;
-    const { getPublicIp } = await import("@/lib/domain-service");
     const host =
         application.target.kind === "local" ? await getPublicIp() : (application.target.host?.address?.trim() ?? null);
     if (!host) return null;
     return { baseUrl: `http://${host}:${hostPortForApp(install.applicationId)}`, apiKey: faceApiKey };
+}
+
+/** Where the recognizer is, for the house that has one. The people screen and
+ *  the assignment builder both need it, and neither should have to know which
+ *  install the house is. */
+export async function faceEndpoint(): Promise<{ baseUrl: string; apiKey: string } | null> {
+    const install = await homeInstall();
+    return install ? faceRecognition(install.id) : null;
 }
 
 /** The vision worker running on one server, or null when there is not one. */

@@ -17,7 +17,7 @@ import { requireHomeUser } from "@/lib/home/access";
 export const dynamic = "force-dynamic";
 
 export default async function HousePage() {
-    const { canManage } = await requireHomeUser("home.read");
+    const { canManage, canControl } = await requireHomeUser("home.read");
 
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -32,7 +32,7 @@ export default async function HousePage() {
                     </Button>
                 ) : null}
             </div>
-            <HouseView canManage={canManage} />
+            <HouseView canManage={canManage} canControl={canControl} />
         </div>
     );
 }

@@ -19,13 +19,18 @@ import * as relay from "@/lib/home/relay";
 import { revalidatePath } from "next/cache";
 import * as cameras from "@/lib/home/cameras";
 import * as events from "@/lib/home/events";
+import * as ptz from "@/lib/home/ptz";
+import * as people from "@/lib/home/people";
 import * as recording from "@/lib/home/recording";
 import { listHosts } from "@/lib/host-service";
+import { setSetting } from "@/lib/setting-store";
+import { HOME_TARGET_KEY } from "@/lib/home/stills";
+import { AUTOMATIC_TARGET, LOCAL_TARGET, storageTargetOptions } from "@/lib/storage-target";
 import { probeCamera } from "@/lib/home/onvif";
 import { requireHome } from "@/lib/home/access";
 import { cameraVendor } from "@/lib/home/vendors";
 import { discoverCameras } from "@/lib/home/discovery";
-import { ensureVisionWorker } from "@/lib/home/vision";
+import { ensureVisionWorker, faceEndpoint, hasFaceApiKey, setFaceApiKey } from "@/lib/home/vision";
 import { needsSomewhereToRun, type Detector } from "@/lib/home/detection";
 import { cameraInputSchema, discoveryInputSchema, normalizeCameraInput } from "@/lib/home/schemas";
 
@@ -215,6 +220,132 @@ export async function listEventsAction(input: {
 export async function acknowledgeEventAction(id: string): Promise<{ error?: string }> {
     const { user, install } = await requireHome("home.control");
     const result = await guard(() => events.acknowledgeEvent(install.id, id, user.id));
+    return result.error ? { error: result.error } : {};
+}
+
+/** Everybody the house knows by sight, and whether there is a recognizer for
+ *  those names to mean anything to yet. */
+export async function listPeopleAction(): Promise<{
+    people?: people.PersonView[];
+    recognizerReady?: boolean;
+    error?: string;
+}> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(async () => ({
+        people: await people.listPeople(install.id),
+        recognizerReady: (await faceEndpoint()) !== null
+    }));
+    return result.error ? { error: result.error } : { ...result.value };
+}
+
+export async function addPersonAction(name: string): Promise<{ person?: people.PersonView; error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const result = await guard(() => people.addPerson(install.id, String(name)));
+    if (result.error || !result.value) return { error: result.error ?? "They could not be added." };
+    revalidatePath(`${PATH}/people`);
+    return { person: result.value };
+}
+
+/**
+ * Teach the recognizer a face.
+ *
+ * The photograph is passed straight through and is never written down by
+ * Polaris. Capped here as well as at the recognizer: an action that accepts an
+ * arbitrarily large upload is a way to spend a server's memory.
+ */
+export async function addFaceAction(id: string, image: Uint8Array): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.manage");
+    if (image.byteLength > 8_000_000) return { error: "That photograph is too large." };
+    const result = await guard(() => people.addFace(install.id, id, image));
+    return result.error ? { error: result.error } : {};
+}
+
+export async function setPersonNotifyAction(id: string, notify: boolean): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.control");
+    const result = await guard(() => people.setNotify(install.id, id, Boolean(notify)));
+    return result.error ? { error: result.error } : {};
+}
+
+export async function removePersonAction(id: string): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const result = await guard(() => people.removePerson(install.id, id));
+    if (result.error) return { error: result.error };
+    revalidatePath(`${PATH}/people`);
+    return {};
+}
+
+/** Whether the house holds a recognition key, and where footage is written. The
+ *  key itself never comes back. */
+export async function homeSettingsAction(): Promise<{
+    settings?: { hasFaceKey: boolean; recognizerInstalled: boolean };
+    error?: string;
+}> {
+    const { install } = await requireHome("home.manage");
+    const result = await guard(async () => ({
+        hasFaceKey: await hasFaceApiKey(install.id),
+        recognizerInstalled: (await faceEndpoint()) !== null
+    }));
+    return result.error ? { error: result.error } : { settings: result.value };
+}
+
+/** Where the house writes footage. One of the storage connections Polaris
+ *  already has, "this server", or the automatic rule. */
+export async function setHomeStorageAction(target: string): Promise<{ error?: string }> {
+    await requireHome("home.manage");
+    const chosen = String(target);
+    const result = await guard(async () => {
+        const allowed = new Set([
+            AUTOMATIC_TARGET,
+            LOCAL_TARGET,
+            ...(await storageTargetOptions()).map((option) => option.id)
+        ]);
+        if (!allowed.has(chosen)) throw new Error("That storage is not one of yours");
+        await setSetting(HOME_TARGET_KEY, chosen);
+    });
+    return result.error ? { error: result.error } : {};
+}
+
+/** Keep the recognition key CompreFace minted in its own interface. Empty clears
+ *  it, which is how face recognition is switched off without uninstalling
+ *  anything. */
+export async function setFaceKeyAction(apiKey: string): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const result = await guard(() => setFaceApiKey(install.id, String(apiKey)));
+    return result.error ? { error: result.error } : {};
+}
+
+/**
+ * Point a camera somewhere else, and stop it again.
+ *
+ * `home.control` rather than `home.manage`: moving a camera is an everyday thing
+ * for whoever is watching, and it changes nothing about how the house is set up.
+ * The stop is its own call because movement is continuous - the camera keeps
+ * going until told otherwise.
+ */
+export async function ptzMoveAction(cameraId: string, direction: ptz.PtzDirection): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.control");
+    const result = await guard(() => ptz.move(install.id, cameraId, direction));
+    return result.error ? { error: result.error } : {};
+}
+
+export async function ptzStopAction(cameraId: string): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.control");
+    const result = await guard(() => ptz.stop(install.id, cameraId));
+    return result.error ? { error: result.error } : {};
+}
+
+export async function ptzPresetsAction(cameraId: string): Promise<{
+    presets?: { token: string; name: string }[];
+    error?: string;
+}> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(() => ptz.presets(install.id, cameraId));
+    return result.error ? { error: result.error } : { presets: result.value };
+}
+
+export async function ptzGoToAction(cameraId: string, preset: string): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.control");
+    const result = await guard(() => ptz.goTo(install.id, cameraId, preset));
     return result.error ? { error: result.error } : {};
 }
 

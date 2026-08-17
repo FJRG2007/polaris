@@ -15,6 +15,7 @@
  */
 
 import Link from "next/link";
+import { PtzPad } from "./ptz-pad";
 import { Badge, cn } from "@polaris/ui";
 import { useEffect, useRef, useState } from "react";
 import type { CameraView } from "@/lib/home/cameras";
@@ -29,6 +30,7 @@ export function CameraTile({
     camera,
     live,
     playing,
+    canControl,
     onPlay
 }: {
     camera: CameraView;
@@ -37,6 +39,9 @@ export function CameraTile({
     /** Whether this is the tile currently showing video. One at a time: two
      *  streams on one screen is two connections for one pair of eyes. */
     playing: boolean;
+    /** Whether this viewer may point the camera. Drawn only for somebody who
+     *  can: an arrow the server will refuse is a worse answer than no arrow. */
+    canControl: boolean;
     onPlay: (id: string | null) => void;
 }) {
     const [stamp, setStamp] = useState(() => 0);
@@ -95,6 +100,9 @@ export function CameraTile({
                 ) : (
                     <Unavailable camera={camera} live={live} />
                 )}
+                {/* Over the picture, and only while it is playing: pointing a
+                    camera at a still is aiming at where it was a minute ago. */}
+                {playing && camera.ptz && canControl ? <PtzPad cameraId={camera.id} /> : null}
             </button>
 
             <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2">

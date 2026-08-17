@@ -17,7 +17,7 @@ import { useEffect, useState } from "react";
 import type { CameraView } from "@/lib/home/cameras";
 import { Button, EmptyState, Skeleton } from "@polaris/ui";
 
-export function HouseView({ canManage }: { canManage: boolean }) {
+export function HouseView({ canManage, canControl }: { canManage: boolean; canControl: boolean }) {
     const [cameras, setCameras] = useState<CameraView[] | null>(null);
     const [live, setLive] = useState<Set<string>>(() => new Set());
     const [error, setError] = useState<string | null>(null);
@@ -92,6 +92,7 @@ export function HouseView({ canManage }: { canManage: boolean }) {
                                     camera={camera}
                                     live={live.has(camera.id)}
                                     playing={playing === camera.id}
+                                    canControl={canControl}
                                     onPlay={setPlaying}
                                 />
                             ))}
