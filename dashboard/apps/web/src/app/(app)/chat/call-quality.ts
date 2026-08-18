@@ -201,13 +201,18 @@ export interface AutoState {
     /** Consecutive healthy readings since the last change. */
     readonly healthy: number;
     /**
-     * The highest rung that has had to be abandoned in this call, if any.
+     * The lowest rung that has had to be abandoned in this call, if any.
      *
-     * Climbing back into it takes far longer than climbing anywhere else, and
-     * that is what stops the greedy default from turning into a metronome: a
-     * machine that cannot encode 1080p cannot encode it a minute later either,
-     * and without this the call would rediscover that every minute for as long
-     * as it lasted, changing resolution each time.
+     * Climbing back into it, or into anything above it, takes far longer than
+     * climbing anywhere else, and that is what stops the greedy default from
+     * turning into a metronome: a machine that cannot encode 1080p cannot encode
+     * it a minute later either, and without this the call would rediscover that
+     * every minute for as long as it lasted, changing resolution each time.
+     *
+     * The lowest rather than the highest, because a line that failed at 1080p
+     * and then failed at 720p has said something about 720p that remembering
+     * only 1080p throws away - and throwing it away is the same metronome one
+     * rung down, which is where it was actually found.
      */
     readonly blocked?: CallLevel;
 }
@@ -260,6 +265,24 @@ const STALLING_BELOW = 0.5;
  *  would never climb back. */
 export const DRIFT_EVERY_MS = 15_000;
 
+/**
+ * How often the picture is read while a call is still finding its level, and how
+ * many readings that lasts.
+ *
+ * Auto opens at the top rung on purpose, which means a line that cannot carry it
+ * has to be walked down - and at the ordinary cadence walking three rungs is
+ * three quarters of a minute of stuttering before the call settles, on exactly
+ * the connections least able to afford it. So the first few readings come
+ * quickly: long enough to cover the whole ladder, over before anybody has
+ * finished saying hello.
+ */
+export const DRIFT_SETTLING_MS = 5_000;
+
+/** Readings taken at the settling cadence before the ordinary one takes over.
+ *  One more than the rungs there are to come down, so the walk finishes inside
+ *  the window rather than on its edge. */
+export const DRIFT_SETTLING_READS = LEVELS.length;
+
 /** Whether something is actually going wrong, as opposed to merely not being
  *  perfect. Only these three things bring the picture down. */
 function struggling(health: CallHealth, ladder: QualityLadder, level: CallLevel): boolean {
@@ -279,10 +302,10 @@ function comfortable(health: CallHealth): boolean {
     return health.connection === "excellent" || health.connection === "good";
 }
 
-/** The higher of two rungs, either of which may be absent. */
-function higher(one: CallLevel | undefined, two: CallLevel): CallLevel {
+/** The lower of two rungs, either of which may be absent. */
+function lower(one: CallLevel | undefined, two: CallLevel): CallLevel {
     if (!one) return two;
-    return LEVELS.indexOf(one) >= LEVELS.indexOf(two) ? one : two;
+    return index(one) <= index(two) ? one : two;
 }
 
 /**
@@ -312,13 +335,18 @@ export function driftAuto(
             // Remembered only where there was somewhere to fall from. At the
             // floor the rung is not what is wrong, and blaming it would make
             // every climb out of a bad patch take three minutes.
-            blocked: down === state.level ? state.blocked : higher(state.blocked, state.level)
+            blocked: down === state.level ? state.blocked : lower(state.blocked, state.level)
         };
     }
     if (!comfortable(health)) return { ...state, healthy: 0 };
     const healthy = state.healthy + 1;
     const next = shift(ladder, state.level, 1);
-    const needed = next === state.blocked ? HEALTHY_TO_RETRY : HEALTHY_TO_CLIMB;
+    // At or above the rung that failed, not merely equal to it. Equality alone
+    // damped exactly one rung, and the one under it went back to the ordinary
+    // pace - so a call that had already given up on two of them climbed into the
+    // second every minute, failed, and came back down.
+    const slow = state.blocked !== undefined && index(next) >= index(state.blocked);
+    const needed = slow ? HEALTHY_TO_RETRY : HEALTHY_TO_CLIMB;
     if (healthy < needed) return { ...state, healthy };
     return { level: next, healthy: 0, blocked: state.blocked };
 }

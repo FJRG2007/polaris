@@ -1166,14 +1166,20 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                   }
                 | undefined;
             const stats = await sender?.getSenderStats?.().catch(() => undefined);
-            const top = stats?.reduce((best, entry) =>
+            // Empty rather than absent is the ordinary case, not a strange one:
+            // a track published a moment ago has no outbound report yet. It is
+            // the same "no evidence" as a browser that answers nothing, and it
+            // has to be checked for, because reducing an empty array with no
+            // initial value throws - inside a floating promise, which would take
+            // the screen's reading down with the camera's.
+            if (!stats || stats.length === 0) return { connection };
+            const top = stats.reduce((best, entry) =>
                 (entry.frameHeight ?? 0) > (best.frameHeight ?? 0) ? entry : best
             );
-            if (!top) return { connection };
             // Any layer naming a limit is the encoder being held back, so the
             // whole picture is. On the current codec there is one entry; the
             // fallback path has three, and a complaint from any of them counts.
-            const limited = stats?.find(
+            const limited = stats.find(
                 (entry) => entry.qualityLimitationReason && entry.qualityLimitationReason !== "none"
             );
             return {
@@ -1198,6 +1204,12 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * must not cost everybody in the room a black rectangle, and it does not
      * need to: the allowance is a ceiling, and a smaller picture spends less of
      * it without being told to.
+     *
+     * Rescheduled rather than a fixed interval, because the first readings of a
+     * call matter more than the rest: auto opens at the top rung, so a line that
+     * cannot carry it is stuttering until the walk down finishes. Those come
+     * quickly - see `DRIFT_SETTLING_MS` - and the ordinary cadence takes over
+     * once the call has had a chance to find its level.
      */
     useEffect(() => {
         if (!meetingId) return;
@@ -1205,10 +1217,27 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         // somebody chose should say so rather than showing the default for a
         // quarter of a minute.
         settleLevels();
-        const timer = setInterval(() => {
+        let timer: ReturnType<typeof setTimeout>;
+        // Readings actually taken, not ticks: a call still connecting must not
+        // spend the settling window on nothing.
+        let taken = 0;
+        function again() {
+            timer = setTimeout(
+                read,
+                taken < quality.DRIFT_SETTLING_READS
+                    ? quality.DRIFT_SETTLING_MS
+                    : quality.DRIFT_EVERY_MS
+            );
+        }
+        function read() {
             const current = room.current;
-            if (!current || current.state !== CONNECTED) return;
+            if (!current || current.state !== CONNECTED) {
+                again();
+                return;
+            }
             const connection = String(current.localParticipant.connectionQuality ?? "unknown");
+            taken += 1;
+            again();
 
             void (async () => {
                 let moved = false;
@@ -1249,8 +1278,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 }
                 if (moved) settleLevels();
             })();
-        }, quality.DRIFT_EVERY_MS);
-        return () => clearInterval(timer);
+        }
+        again();
+        return () => clearTimeout(timer);
     }, [meetingId, senderHealth, settleLevels]);
 
     /**
