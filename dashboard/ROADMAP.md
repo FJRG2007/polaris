@@ -261,9 +261,9 @@ Chat (talking to the people here):
       Only offered where the ticks already are, and only what the other
       person's privacy setting allows
 - [x] Reached by being in it. No administrator override, no instance-wide read
-- [x] Calls: audio and video started from a conversation, browser to browser
-      with no media ever passing through Polaris. Mute, camera, and a roster of
-      who is in the room. Capped at 8, which is what a mesh carries
+- [x] Calls: audio and video started from a conversation through the media
+      server the stack runs, browsers never exchanging media directly. Mute,
+      camera, and a roster of who is in the room. Capped at 8
 - [x] The microphone is one choice remembered per browser, not per feature - the
       one picked for a call is also the one a voice message records with, so
       picking the good headset for a call and being recorded through a laptop
