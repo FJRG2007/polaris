@@ -124,8 +124,9 @@ export function CallServerView() {
                 <h2 className="text-[13px] font-semibold text-foreground">Where calls run</h2>
                 <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
                     Every call goes through a media server, so each browser sends its camera once
-                    instead of once per person. Polaris starts one with the stack; until it answers,
-                    Chat says calls are unavailable rather than offering one that reaches nobody.
+                    instead of once per person. Polaris starts one with the stack and hands it its
+                    own key, so there is nothing to set up; until it answers, Chat says calls are
+                    unavailable rather than offering one that reaches nobody.
                 </p>
             </div>
 
@@ -143,7 +144,7 @@ export function CallServerView() {
                                 <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
                             )}
                             {!settings.ready
-                                ? "No call server is configured."
+                                ? "The call server could not be prepared."
                                 : settings.answering
                                   ? `Running ${where}.`
                                   : waited
@@ -152,7 +153,7 @@ export function CallServerView() {
                         </p>
                         <p className="text-[11px] text-foreground-subtle">
                             {!settings.ready
-                                ? "Calls are off until there is one. Re-run the installer, or point this at a server you already run."
+                                ? "This deployment has no volume for the key the dashboard and the call server share, which means it was brought up outside the Polaris stack. Update from Settings, or point this at a server you already run."
                                 : settings.answering ? (
                                       <>
                                           Calls between devices on this network work now. For calls

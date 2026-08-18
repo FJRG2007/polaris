@@ -20,6 +20,7 @@
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { AccessToken } from "livekit-server-sdk";
+import { ensureCallKey } from "@/lib/chat/call-keys";
 import { getIntegrationSecret, getIntegrationState, upsertIntegration } from "@/lib/integration-service";
 
 /** Where the pairing is kept. One per instance: a call server is infrastructure,
@@ -120,22 +121,57 @@ function websocket(address: string): string {
 }
 
 /**
- * Where calls run, or null when nothing is set up.
+ * The server this stack runs, which needs nothing configured anywhere.
  *
- * The deployment's own answer comes first. An operator who put a call server in
- * this process's environment has already decided, and asking them to go and
- * confirm it in a settings screen is how an instance ends up shipping with calls
- * that cannot cross a network and nobody realising.
+ * The address is a path, so the browser resolves it against whatever hostname it
+ * reached Polaris on, and the key comes off the volume the two containers share
+ * rather than out of `.env` - see `call-keys`. That is the whole point: `.env` is
+ * written by the installer and an installed Polaris is only ever updated from a
+ * button, so anything that has to appear there is a feature that is switched off
+ * on every deployment in the world.
+ *
+ * Null only when the key file could not be read or written, which means there is
+ * no shared volume, which means there is no media server beside this process
+ * either.
+ */
+async function shippedServer(): Promise<CallServerEndpoint | null> {
+    // The environment's secret, when an install predating the key file has one,
+    // so the file is seeded with the secret its media server is already using
+    // instead of a new one that would not match.
+    const seed = loadEnv().POLARIS_CALL_SERVER_API_SECRET?.trim();
+    const key = await ensureCallKey(seed);
+    return key ? { url: SHIPPED_PATH, apiKey: key.apiKey, apiSecret: key.apiSecret, shipped: true } : null;
+}
+
+/** Where the shipped server is served from, and the default the browser is told
+ *  to dial. It is a path rather than a hostname because only the browser knows
+ *  which hostname it used. */
+const SHIPPED_PATH = "/livekit";
+
+/**
+ * Where calls run, or null when there is nowhere at all.
+ *
+ * Three answers, in the order of how deliberately somebody chose them:
+ *
+ * 1. **A server named in this process's environment**, when it is somebody
+ *    else's. An operator who put an address in `.env` has decided. A `/livekit`
+ *    in there is not that decision - it is what every install written before the
+ *    key file existed carries, and it names the shipped server anyway, whose key
+ *    now lives on the volume rather than beside that line.
+ * 2. **A server typed into the settings screen.**
+ * 3. **The one this stack runs**, which is the answer on a deployment where
+ *    nobody has done either - and that is meant to be almost all of them.
  */
 export async function callServer(): Promise<CallServerEndpoint | null> {
     const fromEnv = environmentServer();
-    if (fromEnv) return fromEnv;
+    if (fromEnv && !fromEnv.shipped) return fromEnv;
 
     const stored = await config();
     const secret = stored.url ? await getIntegrationSecret(PROVIDER) : null;
-    return stored.url && stored.apiKey && secret
-        ? { url: stored.url, apiKey: stored.apiKey, apiSecret: secret, shipped: false }
-        : null;
+    if (stored.url && stored.apiKey && secret) {
+        return { url: stored.url, apiKey: stored.apiKey, apiSecret: secret, shipped: false };
+    }
+    return shippedServer();
 }
 
 /**

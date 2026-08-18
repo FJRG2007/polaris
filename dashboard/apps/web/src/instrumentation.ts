@@ -56,6 +56,17 @@ export async function register(): Promise<void> {
         console.error("polaris: could not close out interrupted deploys:", error)
     );
 
+    // The key the media server signs with, minted here rather than by the
+    // installer: .env is only ever written by a script and an installed Polaris
+    // is only ever updated from a button, so a key that had to appear there is a
+    // key no existing deployment has and no operator can give it one. The
+    // container refuses to start until this lands, and restarts until it does -
+    // which is why this is awaited rather than fired off with everything else.
+    const { ensureCallKey } = await import("./lib/chat/call-keys");
+    await ensureCallKey().catch((error) =>
+        console.error("polaris: could not prepare the call server key:", error)
+    );
+
     // Same for the dashboard's own public hostnames, which the compose labels cannot
     // carry: they are fixed at `up` time, so a domain configured afterwards would only
     // reach the edge again the next time it was saved.

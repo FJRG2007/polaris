@@ -13,6 +13,9 @@
  * room sees written under the picture.
  */
 
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { mkdtemp } from "node:fs/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const participants: Record<string, { name: string }> = {
@@ -47,6 +50,10 @@ vi.mock("@/lib/integration-service", () => ({
 let env: Record<string, string | undefined> = {};
 
 vi.mock("@polaris/config", () => ({ loadEnv: () => env }));
+
+// The key the shipped server signs with lives on a volume the two containers
+// share, so point it somewhere this suite may write.
+process.env.POLARIS_CALL_KEYS_DIR = await mkdtemp(join(tmpdir(), "polaris-call-keys-"));
 
 const calls = await import("@/lib/chat/call-server");
 
@@ -129,17 +136,14 @@ describe("the ticket for the media server", () => {
 });
 
 describe("where calls run", () => {
-    it("is nowhere until somebody sets it up", async () => {
-        expect(await calls.callServer()).toBeNull();
-    });
-
-    it("is nowhere when an address was typed without its key", async () => {
+    it("falls back to the shipped server when an address was typed without its key", async () => {
         stored = { enabled: true, config: { url: "wss://calls.example.com" } };
         secret = null;
 
         // Half a pairing signs nothing, and a call that tried would fail at the
-        // door of the media server rather than here.
-        expect(await calls.callServer()).toBeNull();
+        // door of that media server rather than here - so it is not used. What
+        // is left is the one this stack runs, which is always there.
+        expect((await calls.callServer())?.url).toBe("/livekit");
     });
 
     it("is the address somebody typed, once both halves are there", async () => {
@@ -198,6 +202,31 @@ describe("where calls run", () => {
         };
 
         expect((await calls.callServer())?.url).toBe("wss://deployed.example.com");
+    });
+
+    it("lets a typed server win over a `/livekit` left in the environment", async () => {
+        stored = { enabled: true, config: { url: "wss://typed.example.com", apiKey: "typed" } };
+        secret = "typed-secret";
+        // Every install written before the key file existed carries this line,
+        // and it is not a decision anybody made - it names the shipped server,
+        // whose key does not live beside it any more. Somebody typing an address
+        // into the settings screen is a decision.
+        env = {
+            POLARIS_CALL_SERVER_URL: "/livekit",
+            POLARIS_CALL_SERVER_API_KEY: "polaris",
+            POLARIS_CALL_SERVER_API_SECRET: "from-the-environment"
+        };
+
+        expect((await calls.callServer())?.url).toBe("wss://typed.example.com");
+    });
+
+    it("runs on the shipped server with nothing configured at all", async () => {
+        // The case almost every deployment is in, and the one that was broken:
+        // no environment, no stored pairing, and calls still work.
+        const endpoint = await calls.callServer();
+        expect(endpoint?.url).toBe("/livekit");
+        expect(endpoint?.shipped).toBe(true);
+        expect(endpoint?.apiSecret.length).toBeGreaterThanOrEqual(32);
     });
 
     it("ignores half a pairing in the environment rather than breaking a working one", async () => {
