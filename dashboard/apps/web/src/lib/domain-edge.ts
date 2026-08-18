@@ -248,6 +248,14 @@ export async function syncDashboardRoute(): Promise<void> {
             xssProtection: waf.xssProtection
         };
         await writeFile(join(dynamicDir(), FILE), renderDashboardConfig(hosts, rule), "utf8");
+        // The call server's path rides on these same hostnames and carries the same
+        // allowlist, so it is rewritten here rather than at each of the half-dozen
+        // places a domain or a firewall rule changes - one of which would eventually
+        // be added without the other and leave the path open on a locked-down
+        // instance. Imported here rather than at the top: that module reads this
+        // one's hostnames.
+        const { syncCallServerRoute } = await import("./chat/call-edge");
+        await syncCallServerRoute();
     } catch (error) {
         console.error("polaris: publishing the dashboard route failed:", error instanceof Error ? error.message : error);
     }

@@ -180,6 +180,19 @@ export function CallServerView() {
                         ) : null}
                     </div>
 
+                    {manual && settings.shipped ? (
+                        // The address in this deployment's own configuration wins
+                        // over anything stored here, so an address typed in while
+                        // that is set is saved and then never used. Said here
+                        // rather than left to be discovered on a call that keeps
+                        // going through the shipped server.
+                        <p className="text-[11px] text-warning">
+                            This deployment names a call server in its own configuration, so calls go
+                            there and the address below is not in use. Clear POLARIS_CALL_SERVER_URL
+                            in .env to use this one instead.
+                        </p>
+                    ) : null}
+
                     {manual ? (
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                             <label className="flex flex-col gap-1.5">

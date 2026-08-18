@@ -411,6 +411,32 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
          * is what keeps it from being repeated afterwards as well.
          */
         let connecting = false;
+        /**
+         * What a failed attempt put on screen, so the attempt that succeeds can
+         * take it back down.
+         *
+         * Only that message. A call that opens while the media server is
+         * restarting fails once and joins on the next roster change, and the
+         * banner it left said the call reached nobody while both people could
+         * hear each other. What the devices had to say - no microphone, no
+         * camera - is not this and stays where it is.
+         */
+        let reported = "";
+
+        /** Say why the call has not started. */
+        function report(message: string): void {
+            reported = message;
+            setError(message);
+        }
+
+        /** Take back what the last failed attempt said, if it is still what the
+         *  screen is showing. */
+        function connected(): void {
+            if (!reported) return;
+            const stale = reported;
+            reported = "";
+            setError((current) => (current === stale ? "" : current));
+        }
 
         // This is a different call, so nothing about the last one is true of it.
         // `ended` in particular: it is only ever set, never cleared, so a second
@@ -435,7 +461,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             if (stopped) return;
             if (ticket.waiting) return;
             if (ticket.error) {
-                setError(ticket.error);
+                report(ticket.error);
                 return;
             }
             if (!ticket.url || !ticket.token) return;
@@ -518,7 +544,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             } catch {
                 connecting = false;
                 room.current = null;
-                setError(
+                report(
                     "This call could not reach the call server. It may be starting up, or an administrator may need to look at it."
                 );
                 return;
@@ -529,6 +555,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 room.current = null;
                 return;
             }
+            connected();
 
             // Everything this browser already had open goes up now. Nothing was
             // published before the connection existed, so this is the one place

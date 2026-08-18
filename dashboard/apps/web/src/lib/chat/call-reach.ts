@@ -17,8 +17,8 @@
  */
 
 import { getHostLanIp } from "@/lib/host-address";
-import { callServer } from "@/lib/chat/call-server";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { answering, callServer } from "@/lib/chat/call-server";
 import { probeTcpPort, publicProbeHost } from "@/lib/net/port-probe";
 import { CALL_PORTS, CALL_TCP_PORT, type CallPortsReading } from "@/lib/chat/call-ports";
 
@@ -55,7 +55,12 @@ export async function readCallPorts(probe = false): Promise<CallPortsReading> {
 
     const base = {
         ports: CALL_PORTS,
-        running: endpoint !== null,
+        // Whether it answers, not whether it is configured. A stopped container
+        // is configured, and reading it as running is what turned "the media
+        // server is down" into a router this card sent somebody to go and fix.
+        // The answer is cached for a few seconds and every screen with a call on
+        // it asks the same question, so this costs a render nothing.
+        running: endpoint !== null && (await answering(endpoint)),
         shipped: endpoint?.shipped ?? false,
         lanIp,
         confirmedAt: reachedAt || null,

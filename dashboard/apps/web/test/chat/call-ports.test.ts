@@ -8,11 +8,17 @@
  * public address inward. Only an answer counts, and once one arrives it stands.
  */
 
-import { createServer, type Server } from "node:net";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createServer, type AddressInfo, type Server } from "node:net";
 
 let endpoint: { url: string; shipped: boolean } | null = null;
-vi.mock("@/lib/chat/call-server", () => ({ callServer: async () => endpoint }));
+/** Whether the media server answers. Configured and answering are two different
+ *  facts, and the whole point of this card is to tell them apart. */
+let up = true;
+vi.mock("@/lib/chat/call-server", () => ({
+    callServer: async () => endpoint,
+    answering: async () => up
+}));
 vi.mock("@/lib/host-address", () => ({ getHostLanIp: async () => "192.168.1.50" }));
 
 const settings: Record<string, string> = {};
@@ -30,7 +36,28 @@ vi.mock("@/lib/net/port-probe", async (importActual) => ({
     publicProbeHost: async () => probeHost
 }));
 
-const { CALL_TCP_PORT } = await import("@/lib/chat/call-ports");
+/**
+ * A port the kernel handed out, standing in for 7881.
+ *
+ * The real one belongs to the shipped media server, and a machine that is
+ * running Polaris while its own suite runs has it. Binding it here would fail
+ * two cases with EADDRINUSE rather than an assertion - a suite that passes only
+ * where the thing it tests is not installed.
+ */
+const probePort = await new Promise<number>((resolve, reject) => {
+    const socket = createServer();
+    socket.once("error", reject);
+    socket.listen(0, "127.0.0.1", () => {
+        const { port } = socket.address() as AddressInfo;
+        socket.close(() => resolve(port));
+    });
+});
+
+vi.mock("@/lib/chat/call-ports", async (importActual) => ({
+    ...(await importActual<typeof import("@/lib/chat/call-ports")>()),
+    CALL_TCP_PORT: probePort
+}));
+
 const { forgetProbe, readCallPorts } = await import("@/lib/chat/call-reach");
 
 /** Something answering on the port the probe will try. */
@@ -38,13 +65,14 @@ async function listenOnCallPort(): Promise<Server> {
     const server = createServer();
     await new Promise<void>((resolve, reject) => {
         server.once("error", reject);
-        server.listen(CALL_TCP_PORT, "127.0.0.1", resolve);
+        server.listen(probePort, "127.0.0.1", resolve);
     });
     return server;
 }
 
 beforeEach(() => {
     endpoint = { url: "/livekit", shipped: true };
+    up = true;
     probeHost = "127.0.0.1";
     for (const key of Object.keys(settings)) delete settings[key];
     // The knock is rate limited to one every thirty seconds per process, which
@@ -124,5 +152,23 @@ describe("the call ports", () => {
         const reading = await readCallPorts(true);
         expect(reading.running).toBe(false);
         expect(reading.confirmed).toBe(false);
+    });
+
+    it("knocks on nothing while the server is configured but silent", async () => {
+        up = false;
+        const server = await listenOnCallPort();
+        try {
+            const reading = await readCallPorts(true);
+            // Something is listening on the port, so a probe would tick it -
+            // and the fault is a stopped container, not a router. Sending
+            // somebody to their router for that is the whole failure.
+            expect(reading.running).toBe(false);
+            expect(reading.confirmed).toBe(false);
+            // Still the shipped server, which is what keeps the card on screen
+            // to say so instead of disappearing.
+            expect(reading.shipped).toBe(true);
+        } finally {
+            server.close();
+        }
     });
 });

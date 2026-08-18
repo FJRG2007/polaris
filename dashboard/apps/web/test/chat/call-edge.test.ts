@@ -14,6 +14,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/chat/call-server", () => ({ callServer: async () => null }));
+vi.mock("@/lib/domain-edge", () => ({ dashboardHosts: async () => [] }));
+vi.mock("@/lib/waf-service", () => ({ resolvePolarisWaf: async () => ({ allowLists: [] }) }));
 
 const { CALL_PATH, renderCallServerRoute } = await import("@/lib/chat/call-edge");
 
@@ -50,5 +52,42 @@ describe("the call server's route", () => {
         // An instance pointed at a call server somebody else operates has no use
         // for this path, and one left behind reaches nothing.
         expect(renderCallServerRoute(false)).toBe("http: {}\n");
+    });
+
+    it("carries the firewall's allowlist onto the hostnames it covers", () => {
+        const config = renderCallServerRoute(true, {
+            hosts: ["polaris.example.com"],
+            allow: ["203.0.113.0/24"]
+        });
+        // A path router matches every hostname and outranks the dashboard's own
+        // route, so without this an instance firewalled to one office still
+        // answered here from anywhere - stepping outside a restriction its
+        // operator set on purpose.
+        expect(config).toContain('rule: "(Host(`polaris.example.com`)) && PathPrefix(`/livekit`)"');
+        expect(config).toContain("middlewares: [polaris-livekit-allow, polaris-livekit-strip]");
+        expect(config).toContain('sourceRange: ["203.0.113.0/24"]');
+        // Above the open one, which it has to outrank on those names.
+        expect(config).toContain("priority: 110");
+    });
+
+    it("leaves the local names alone", () => {
+        // The allowlist is about the public hostnames: the local ones are served
+        // by the compose labels and have no rule of their own. A call between two
+        // devices in the house has to keep working while the internet is shut
+        // out, so the open router stays.
+        const config = renderCallServerRoute(true, {
+            hosts: ["polaris.example.com"],
+            allow: ["203.0.113.0/24"]
+        });
+        expect(config).toContain(`rule: "PathPrefix(\`${CALL_PATH}\`)"`);
+        expect(config).toContain("priority: 100");
+    });
+
+    it("adds nothing when no firewall rule was set", () => {
+        // An empty allowlist is not a restriction, and rendering an empty
+        // sourceRange would be one that refuses everybody.
+        const config = renderCallServerRoute(true, { hosts: ["polaris.example.com"], allow: [] });
+        expect(config).not.toContain("ipAllowList");
+        expect(config).toBe(renderCallServerRoute(true));
     });
 });
