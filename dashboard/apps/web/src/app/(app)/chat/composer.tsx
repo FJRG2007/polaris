@@ -77,6 +77,7 @@ export function Composer({
     editing,
     replyingTo,
     replyingFrom,
+    insert,
     onCancelReply,
     onSend,
     onMedia,
@@ -111,6 +112,16 @@ export function Composer({
      * hint of which of today's four channels it came out of.
      */
     replyingFrom?: { name: string; channel: boolean } | null;
+    /**
+     * Something to drop into the box, from outside it.
+     *
+     * A mention picked off the roster, which is how every client does it: press
+     * a name in the column and it lands in what you were writing rather than
+     * opening something. The token is what says "again" - the same text twice is
+     * two mentions, and comparing the text itself would silently swallow the
+     * second.
+     */
+    insert?: { token: number; text: string } | null;
     onCancelReply?: () => void;
     /** Files come back alongside the text. Empty for the ordinary case, which is
      *  why the caller can still take the fast optimistic path when it is.
@@ -196,6 +207,25 @@ export function Composer({
         setFocusWhere(editingId ? "end" : "keep");
         setFocusAt((current) => current + 1);
     }, [editingId, replyingToId]);
+
+    /**
+     * Drop something in at the end, and put the caret after it.
+     *
+     * The editor owns its document, so changing the value it was given does
+     * nothing on its own - the generation is what rebuilds it, the same lever
+     * clearing the box pulls. Appended rather than inserted at the caret: the
+     * caret is wherever the browser last left it, which after a press on a name
+     * in a column to the right is not where anybody is writing.
+     */
+    const insertToken = insert?.token ?? 0;
+    useEffect(() => {
+        if (!insert || insertToken === 0) return;
+        setBody((current) => (current.trimEnd() ? `${current.trimEnd()} ${insert.text} ` : `${insert.text} `));
+        setGeneration((current) => current + 1);
+        setFocusWhere("end");
+        setFocusAt((current) => current + 1);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately the token
+    }, [insertToken]);
 
     /**
      * Opening a conversation puts the caret in the box.

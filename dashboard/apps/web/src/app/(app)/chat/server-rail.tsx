@@ -33,13 +33,14 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { LeaveDialog } from "./leave-dialog";
 import { leaveSpaceAction } from "./actions";
+import { BansDialog } from "./bans-dialog";
 import { InviteDialog } from "./invite-dialog";
 import { chatAvatarUrl } from "@/lib/avatar-url";
 import { NewSpaceDialog } from "./new-space-dialog";
 import { ChatPictureDialog } from "./picture-dialog";
 import { NewChannelDialog } from "./new-channel-dialog";
 import type { ChatSpaceView } from "@/lib/chat/chat-service";
-import { Hash, Image as ImageIcon, LogOut, MessageSquare, Plus, UserPlus } from "lucide-react";
+import { Ban, Hash, Image as ImageIcon, LogOut, MessageSquare, Plus, UserPlus } from "lucide-react";
 import {
     cn,
     ContextMenu,
@@ -67,6 +68,7 @@ export function ServerRail() {
     const [newSpace, setNewSpace] = useState(false);
     const [newChannelIn, setNewChannelIn] = useState<ChatSpaceView | null>(null);
     const [inviting, setInviting] = useState<ChatSpaceView | null>(null);
+    const [showingBans, setShowingBans] = useState<ChatSpaceView | null>(null);
     const [picturing, setPicturing] = useState<ChatSpaceView | null>(null);
     const [leaving, setLeaving] = useState<ChatSpaceView | null>(null);
     const [error, setError] = useState("");
@@ -142,6 +144,7 @@ export function ServerRail() {
                             setNewChannelIn(space);
                         }}
                         onInvite={() => setInviting(space)}
+                        onBans={() => setShowingBans(space)}
                         onPicture={() => setPicturing(space)}
                         onLeave={() => setLeaving(space)}
                     >
@@ -180,6 +183,11 @@ export function ServerRail() {
                 space={newChannelIn}
                 onOpenChange={(next: boolean) => !next && setNewChannelIn(null)}
             />
+            <BansDialog
+                space={showingBans}
+                onOpenChange={(open) => !open && setShowingBans(null)}
+            />
+
             <InviteDialog
                 space={inviting}
                 onOpenChange={(next: boolean) => !next && setInviting(null)}
@@ -341,6 +349,7 @@ function SpaceMenu({
     onNewChannel,
     onInvite,
     onPicture,
+    onBans,
     onLeave,
     children
 }: {
@@ -348,6 +357,7 @@ function SpaceMenu({
     onNewChannel: () => void;
     onInvite: () => void;
     onPicture: () => void;
+    onBans: () => void;
     onLeave: () => void;
     children: React.ReactNode;
 }) {
@@ -382,6 +392,16 @@ function SpaceMenu({
                     <ContextMenuItem onSelect={onPicture}>
                         <ImageIcon className="size-3.5" />
                         Space picture
+                    </ContextMenuItem>
+                )}
+                {/* The one moderation decision that never ends on its own and
+                    reminds nobody it was made. Without a list, letting somebody
+                    back in means remembering a name nobody has seen for six
+                    months. */}
+                {administers && (
+                    <ContextMenuItem onSelect={onBans}>
+                        <Ban className="size-3.5" />
+                        Kept out
                     </ContextMenuItem>
                 )}
                 {mayLeave && (

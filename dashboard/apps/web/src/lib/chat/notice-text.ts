@@ -18,9 +18,11 @@
  * reader falls back to if the account is gone by then.
  */
 
-/** What happened. Four kinds, because "added" and "joined" differ by whether
- *  somebody else did it, and that is the whole content of the line. */
-export type ChatNoticeKind = "joined" | "added" | "left" | "removed";
+/** What happened. "added" and "joined" differ by whether somebody else did it,
+ *  and that is the whole content of the line; the two below it are moderation,
+ *  which is written down for the same reason it is announced - a room where
+ *  people quietly disappear is a room nobody trusts. */
+export type ChatNoticeKind = "joined" | "added" | "left" | "removed" | "banned" | "timedOut";
 
 /** Somebody a notice names. */
 export interface NoticePerson {
@@ -79,6 +81,10 @@ export function noticeBody(
             return `${who} left`;
         case "removed":
             return actor ? `${actor} removed ${who}` : `${who} was removed`;
+        case "banned":
+            return actor ? `${actor} banned ${who}` : `${who} was banned`;
+        case "timedOut":
+            return actor ? `${actor} timed ${who} out` : `${who} was timed out`;
     }
 }
 

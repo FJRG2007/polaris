@@ -20,6 +20,7 @@
  */
 
 import { can } from "@polaris/auth";
+import * as core from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { groupOwnerId } from "./ownership";
 import { memberOrgIds } from "@/lib/orgs/org-service";
@@ -112,6 +113,15 @@ export interface ChannelAccess {
     /** Whether they may post. False in an archived channel and in an archived
      *  space, which is what archiving means. */
     readonly mayPost: boolean;
+    /**
+     * When a timeout on this person ends, or null when there is none.
+     *
+     * Carried beside `mayPost` rather than folded into it, because the two are
+     * refused with different sentences and one of them has a moment in it.
+     * "This conversation is archived" said to somebody who has been timed out
+     * for ten minutes is a lie that makes them go and ask somebody about it.
+     */
+    readonly mutedUntil: Date | null;
     /** Whether they may rename it, set the topic, or add people. */
     readonly mayAdminister: boolean;
     /**
@@ -157,8 +167,23 @@ export async function channelAccess(
 
     const membership = await prisma.chatChannelMember.findUnique({
         where: { channelId_userId: { channelId, userId: actor.id } },
-        select: { role: true }
+        select: { role: true, timeoutUntil: true }
     });
+    // A timeout in a space is a timeout everywhere in it - that is what makes it
+    // a moderation tool rather than a per-room nuisance - so the space's row is
+    // read as well as this room's, and the later of the two is the one in force.
+    const spaceTimeout = channel.spaceId
+        ? (
+              await prisma.chatSpaceMember.findUnique({
+                  where: { spaceId_userId: { spaceId: channel.spaceId, userId: actor.id } },
+                  select: { timeoutUntil: true }
+              })
+          )?.timeoutUntil ?? null
+        : null;
+    const mutedUntil = latest(membership?.timeoutUntil ?? null, spaceTimeout);
+    // Expired is the same as never: it ends on its own, which is the whole
+    // reason it is a moment rather than a flag.
+    const quiet = mutedUntil !== null && mutedUntil.getTime() > Date.now();
 
     const spaceArchived = channel.space?.archived ?? false;
     const live = !channel.archived && !spaceArchived;
@@ -174,7 +199,8 @@ export async function channelAccess(
             kind: channel.kind,
             archived: channel.archived,
             member: true,
-            mayPost: live,
+            mayPost: live && !quiet,
+            mutedUntil: quiet ? mutedUntil : null,
             mayAdminister: false,
             mayModerate: channel.kind === "group" && groupOwnerId(channel) === actor.id
         };
@@ -191,10 +217,21 @@ export async function channelAccess(
         kind: channel.kind,
         archived: channel.archived,
         member: Boolean(membership),
-        mayPost: live,
+        // Nobody who may moderate the room is held by a timeout in it. One put on
+        // an administrator by another is a decision about a role, not a gag, and
+        // a moderator who cannot answer cannot moderate.
+        mayPost: live && (!quiet || admin),
+        mutedUntil: quiet && !admin ? mutedUntil : null,
         mayAdminister: admin,
         mayModerate: admin
     };
+}
+
+/** The later of two moments, either of which may be absent. */
+function latest(one: Date | null, two: Date | null): Date | null {
+    if (!one) return two;
+    if (!two) return one;
+    return one.getTime() >= two.getTime() ? one : two;
 }
 
 /** The same, refused loudly. */
@@ -208,6 +245,15 @@ export async function requireChannel(actor: ChatActor, channelId: string): Promi
  *  "you are not in it" and "it is archived" call for different next steps. */
 export async function requirePostable(actor: ChatActor, channelId: string): Promise<ChannelAccess> {
     const access = await requireChannel(actor, channelId);
+    if (access.mutedUntil) {
+        // Said as a wait rather than as a timestamp. Somebody who has just been
+        // stopped mid-sentence needs to know how long for, and a moment in ISO
+        // is a thing to be decoded rather than read.
+        const left = Math.max(1, Math.ceil((access.mutedUntil.getTime() - Date.now()) / 1000));
+        throw new ChatAccessError(
+            `You have been timed out here. It ends in ${core.slowmodeSpoken(left)}.`
+        );
+    }
     if (!access.mayPost) throw new ChatAccessError("That conversation is archived");
     return access;
 }

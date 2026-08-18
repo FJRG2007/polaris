@@ -621,6 +621,54 @@ export async function addSpaceMembersAction(input: unknown): Promise<{ error?: s
     return result;
 }
 
+/** Keep somebody out of a space: taken out, and written down so the next
+ *  invitation does not let them back in. */
+export async function banFromSpaceAction(
+    spaceId: string,
+    userId: string,
+    reason = ""
+): Promise<{ error?: string }> {
+    const me = await actor();
+    const result = await guard(() => chat.banFromSpace(me, spaceId, userId, reason));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result;
+}
+
+/** Let somebody back in. It does not put them in the space - being allowed in
+ *  and being in are different things, and only they decide the second. */
+export async function liftSpaceBanAction(
+    spaceId: string,
+    userId: string
+): Promise<{ error?: string }> {
+    const me = await actor();
+    const result = await guard(() => chat.liftSpaceBan(me, spaceId, userId));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result;
+}
+
+/** Who is kept out of a space, for the screen that lifts them. */
+export async function spaceBansAction(
+    spaceId: string
+): Promise<{ bans?: readonly chat.ChatBanView[]; error?: string }> {
+    const me = await actor();
+    const result = await guard(() => chat.listSpaceBans(me, spaceId));
+    return result.error ? { error: result.error } : { bans: result.value };
+}
+
+/** Stop somebody talking for a while. Zero minutes lifts it. */
+export async function timeOutMemberAction(
+    where: { spaceId?: string; channelId?: string },
+    userId: string,
+    minutes: number
+): Promise<{ error?: string }> {
+    const me = await actor();
+    const wanted = z.number().int().min(0).max(60 * 24 * 28).safeParse(minutes);
+    if (!wanted.success) return { error: "That is not a length of time" };
+    const result = await guard(() => chat.timeOutMember(me, where, userId, wanted.data));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result;
+}
+
 export async function removeSpaceMemberAction(
     spaceId: string,
     userId: string

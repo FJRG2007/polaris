@@ -152,6 +152,10 @@ export function ChannelView({
      * a reply bar with the room it came from named on it, rather than a dialog.
      */
     const [carried, setCarried] = useState<messagesLib.CarriedMessage | null>(null);
+    /** Something to drop into the box from outside it - a name pressed in the
+     *  roster. The token is what says "again", since the same name twice is two
+     *  mentions and the text alone cannot tell them apart. */
+    const [inserting, setInserting] = useState<{ token: number; text: string } | null>(null);
     const [typists, setTypists] = useState<readonly Typist[]>([]);
     // How much arrived below somebody who is reading further up. They are not
     // dragged to it - that is the one thing a chat must not do to somebody
@@ -1317,6 +1321,7 @@ export function ChannelView({
                 replyingFrom={
                     carried?.from ? { name: carried.from, channel: carried.channel } : null
                 }
+                insert={inserting}
                 onCancelReply={() => {
                     setReplyingTo(null);
                     setCarried(null);
@@ -1495,6 +1500,9 @@ export function ChannelView({
                     channel={channel}
                     open={members.open}
                     onOpenChange={members.setOpen}
+                    onMention={(text) =>
+                        setInserting((current) => ({ token: (current?.token ?? 0) + 1, text }))
+                    }
                 />
             )}
 

@@ -165,6 +165,8 @@ model User {
     notes               Note[]
     chatSpaces          ChatSpace[]
     chatSpaceMemberships ChatSpaceMember[]
+    chatSpaceBans       ChatSpaceBan[] @relation("ChatSpaceBanUser")
+    chatSpaceBansMade   ChatSpaceBan[] @relation("ChatSpaceBanBy")
     chatSpaceInvites     ChatSpaceInvite[]
     chatSavedMedia       ChatSavedMedia[]
     chatChannelMemberships ChatChannelMember[]
@@ -5707,6 +5709,7 @@ model ChatSpace {
     org      Organization?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
     avatar     ChatSpaceAvatar?
     members    ChatSpaceMember[]
+    bans       ChatSpaceBan[]
     channels   ChatChannel[]
     categories ChatCategory[]
     invites    ChatSpaceInvite[]
@@ -5781,6 +5784,10 @@ model ChatSpaceMember {
     userId    String   @db.Uuid
     // member | admin - an admin may add channels and people, a member may talk.
     role      String   @default("member")
+    // Until when they may read but not speak. Null is the ordinary case. A
+    // moment rather than a flag, so it ends on its own: a timeout somebody has
+    // to remember to lift is a timeout that becomes a ban by accident.
+    timeoutUntil DateTime?
     createdAt DateTime @default(now())
 
     space ChatSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
@@ -5788,6 +5795,35 @@ model ChatSpaceMember {
 
     @@unique([spaceId, userId])
     @@index([userId])
+}
+
+// Somebody kept out of a space, and who decided that.
+//
+// Only a space has these. A group is a handful of people who got there by
+// invitation from somebody already in it - there is no door to stand at, so
+// taking somebody out of one is all there is to do and putting them back is a
+// matter of inviting them again.
+//
+// The row is what refuses them: it is checked when anybody is added and when an
+// invitation is followed, so a ban survives being forgotten about. Lifting one
+// is deleting it, which is why there is nothing here for "lifted at" - a space
+// that wants that history has the activity log.
+model ChatSpaceBan {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    spaceId   String   @db.Uuid
+    userId    String   @db.Uuid
+    // Who decided, so the list of bans reads as decisions rather than as facts.
+    // Null once that account is gone: the ban outlives whoever made it.
+    byId      String?  @db.Uuid
+    reason    String   @default("")
+    createdAt DateTime @default(now())
+
+    space ChatSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    user  User      @relation("ChatSpaceBanUser", fields: [userId], references: [id], onDelete: Cascade)
+    by    User?     @relation("ChatSpaceBanBy", fields: [byId], references: [id], onDelete: SetNull)
+
+    @@unique([spaceId, userId])
+    @@index([spaceId])
 }
 
 // One conversation: a channel in a space, or a direct message that belongs to no
@@ -5917,6 +5953,9 @@ model ChatChannelMember {
     userId            String    @db.Uuid
     // member | admin
     role              String    @default("member")
+    // Until when they may read but not speak here. The same idea as a space
+    // member's, for a group - which has no roles to take away instead.
+    timeoutUntil      DateTime?
     // The last message this person has seen. Null before they have read any.
     lastReadMessageId String?   @db.Uuid
     lastReadAt        DateTime?

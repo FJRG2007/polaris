@@ -216,6 +216,16 @@ export async function acceptInvite(actor: ChatActor, code: string): Promise<{ sp
     // opening their own invite twice must not burn one of its uses.
     if (already) return { spaceId: invite.spaceId };
 
+    // A link is exactly how somebody who has been banned gets back in, and it is
+    // the door a ban exists to stand at. Refused before a use is spent: an
+    // invitation should not be consumed by somebody who was never going to be
+    // let through it.
+    const barred = await prisma.chatSpaceBan.findUnique({
+        where: { spaceId_userId: { spaceId: invite.spaceId, userId: actor.id } },
+        select: { id: true }
+    });
+    if (barred) throw new ChatAccessError("You cannot join that space");
+
     const claimed = await prisma.chatSpaceInvite.updateMany({
         where: {
             id: invite.id,

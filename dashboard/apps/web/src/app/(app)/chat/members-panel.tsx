@@ -28,6 +28,8 @@ import { useChat } from "./chat-context";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
+import { MemberMenu } from "./member-menu";
+import { NicknameDialog } from "./nickname-dialog";
 import { Crown, Users, X } from "lucide-react";
 import { useChatStream } from "./use-chat-stream";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -175,15 +177,27 @@ function useRoster(channelId: string, ownerId: string | null, showing: boolean):
 function MemberRows({
     members,
     loading,
-    viewerId
+    viewerId,
+    channel,
+    onMention,
+    onChanged
 }: {
     members: readonly ChatMemberView[];
     loading: boolean;
     viewerId: string;
+    /** The room being looked at, which is what decides who may do what to whom -
+     *  see `MemberMenu`. */
+    channel: ChatChannelView;
+    onMention: (text: string) => void;
+    onChanged: () => void;
 }) {
     const router = useRouter();
     const [busyId, setBusyId] = useState<string | null>(null);
     const [error, setError] = useState("");
+    /** Whose nickname is being changed. Held here rather than in the menu: the
+     *  menu is unmounted the moment an item is chosen, and a dialog opened by
+     *  something that is about to disappear never appears. */
+    const [naming, setNaming] = useState<ChatMemberView | null>(null);
 
     if (loading) {
         return (
@@ -211,6 +225,15 @@ function MemberRows({
                     const role = ROLE_WORDS[member.role];
                     return (
                         <li key={member.userId}>
+                            <MemberMenu
+                                member={member}
+                                channel={channel}
+                                viewerId={viewerId}
+                                onMention={onMention}
+                                onNickname={setNaming}
+                                onChanged={onChanged}
+                                onError={setError}
+                            >
                             <button
                                 type="button"
                                 disabled={you || busyId !== null}
@@ -257,10 +280,18 @@ function MemberRows({
                                     )}
                                 </span>
                             </button>
+                            </MemberMenu>
                         </li>
                     );
                 })}
             </ul>
+
+            <NicknameDialog
+                open={naming !== null}
+                person={naming ? { id: naming.userId, name: naming.name } : null}
+                onOpenChange={(open) => !open && setNaming(null)}
+                onSaved={onChanged}
+            />
         </>
     );
 }
@@ -276,13 +307,17 @@ function MemberRows({
 export function ChannelMembers({
     channel,
     open,
-    onOpenChange
+    onOpenChange,
+    onMention
 }: {
     channel: ChatChannelView;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    /** Put somebody into what is being written. The composer owns the box, so
+     *  this only says what to drop in it - see `MemberMenu`. */
+    onMention: (text: string) => void;
 }) {
-    const { viewerId } = useChat();
+    const { viewerId, refresh } = useChat();
     const wide = useWideScreen();
     const { members, loading } = useRoster(channel.id, channel.ownerId, open);
     const heading = `Members${loading ? "" : ` - ${members.length}`}`;
@@ -300,7 +335,14 @@ export function ChannelMembers({
                         </DialogTitle>
                     </DialogHeader>
                     <div className="max-h-[60vh] overflow-y-auto">
-                        <MemberRows members={members} loading={loading} viewerId={viewerId} />
+                        <MemberRows
+                            members={members}
+                            loading={loading}
+                            viewerId={viewerId}
+                            channel={channel}
+                            onMention={onMention}
+                            onChanged={refresh}
+                        />
                     </div>
                 </DialogContent>
             </Dialog>
@@ -321,7 +363,14 @@ export function ChannelMembers({
                 </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
-                <MemberRows members={members} loading={loading} viewerId={viewerId} />
+                <MemberRows
+                    members={members}
+                    loading={loading}
+                    viewerId={viewerId}
+                    channel={channel}
+                    onMention={onMention}
+                    onChanged={refresh}
+                />
             </div>
         </aside>
     );

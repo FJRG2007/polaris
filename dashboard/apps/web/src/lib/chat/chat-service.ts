@@ -18,6 +18,7 @@ import { discardChannelFiles } from "./attachments";
 import { postNotice, postSpaceNotice } from "./notices";
 import {
     ChatAccessError,
+    ChatRuleError,
     channelAccess,
     messageable,
     picturesAllowed,
@@ -276,7 +277,12 @@ export async function addSpaceMembers(
     });
     // The owner is never a member row, so adding them would create a second
     // answer to what they may do.
-    const wanted = [...new Set(userIds)].filter((id) => id !== space?.ownerId);
+    const asked = [...new Set(userIds)].filter((id) => id !== space?.ownerId);
+    // A ban is only a ban if it is checked where people are let in. Skipped
+    // rather than refused: adding five people of whom one is barred should add
+    // the four, not fail and leave whoever pressed it guessing which.
+    const barred = await bannedFrom(spaceId, asked);
+    const wanted = asked.filter((id) => !barred.has(id));
     if (wanted.length === 0) return;
 
     // Who is actually new, worked out before the write rather than counted
@@ -350,6 +356,174 @@ export async function removeSpaceMember(
         actorId: actor.id,
         audience: [userId]
     });
+}
+
+/** A ban, as the list that lifts them draws it. */
+export interface ChatBanView {
+    readonly userId: string;
+    readonly name: string;
+    readonly reason: string;
+    /** Who decided, or null once that account is gone. */
+    readonly byName: string | null;
+    readonly at: string;
+}
+
+/**
+ * Keep somebody out of a space.
+ *
+ * Removing them is only half of it - without the row they walk back in through
+ * the next invitation, and whoever removed them finds out by seeing them talking
+ * again. So this takes them out and writes down that they may not come back, in
+ * one transaction: a ban that half-applied would be either a removal nobody
+ * recorded or a record of somebody still in the room.
+ *
+ * Only a space. A group is people who got there by invitation from somebody
+ * already in it - there is no door to stand at, so taking somebody out of one is
+ * all there is to do.
+ *
+ * Announced in the space, like a removal is. A room where people quietly
+ * disappear is a room nobody trusts, and the alternative to saying so is
+ * everybody working it out from an absence.
+ */
+export async function banFromSpace(
+    actor: ChatActor,
+    spaceId: string,
+    userId: string,
+    reason = ""
+): Promise<void> {
+    await requireSpace(actor, spaceId, "admin");
+    if (userId === actor.id) throw new ChatRuleError("You cannot ban yourself");
+    const space = await prisma.chatSpace.findUnique({
+        where: { id: spaceId },
+        select: { ownerId: true }
+    });
+    // The owner is not somebody an administrator gets to decide about. Without
+    // this, any admin could take the space from whoever made it.
+    if (space?.ownerId === userId) throw new ChatRuleError("That is the owner of this space");
+
+    await prisma.$transaction(async (tx) => {
+        await tx.chatSpaceBan.upsert({
+            where: { spaceId_userId: { spaceId, userId } },
+            create: { spaceId, userId, byId: actor.id, reason: reason.trim().slice(0, 300) },
+            update: { byId: actor.id, reason: reason.trim().slice(0, 300) }
+        });
+        await tx.chatSpaceMember.deleteMany({ where: { spaceId, userId } });
+        const channels = await tx.chatChannel.findMany({
+            where: { spaceId },
+            select: { id: true }
+        });
+        await tx.chatChannelMember.deleteMany({
+            where: { userId, channelId: { in: channels.map((row) => row.id) } }
+        });
+    });
+
+    await postSpaceNotice(spaceId, "banned", { subjectId: userId, byId: actor.id });
+    publishChatChange({
+        channelId: spaceId,
+        kind: "channels",
+        actorId: actor.id,
+        audience: [userId]
+    });
+}
+
+/** Let somebody back in. Deleting the row is the whole of it - they are not put
+ *  back in the space, because being allowed in and being in are different things
+ *  and only they can decide the second. */
+export async function liftSpaceBan(
+    actor: ChatActor,
+    spaceId: string,
+    userId: string
+): Promise<void> {
+    await requireSpace(actor, spaceId, "admin");
+    await prisma.chatSpaceBan.deleteMany({ where: { spaceId, userId } });
+}
+
+/** Who is kept out of a space, for the screen that lifts them. */
+export async function listSpaceBans(actor: ChatActor, spaceId: string): Promise<ChatBanView[]> {
+    await requireSpace(actor, spaceId, "admin");
+    const rows = await prisma.chatSpaceBan.findMany({
+        where: { spaceId },
+        orderBy: { createdAt: "desc" },
+        select: {
+            userId: true,
+            reason: true,
+            createdAt: true,
+            user: { select: { name: true } },
+            by: { select: { name: true } }
+        }
+    });
+    return rows.map((row) => ({
+        userId: row.userId,
+        name: row.user.name,
+        reason: row.reason,
+        byName: row.by?.name ?? null,
+        at: row.createdAt.toISOString()
+    }));
+}
+
+/** Whether somebody is barred from a space. Asked wherever anybody is let in,
+ *  which is what makes a ban survive being forgotten about. */
+export async function bannedFrom(
+    spaceId: string,
+    userIds: readonly string[]
+): Promise<Set<string>> {
+    if (userIds.length === 0) return new Set();
+    const rows = await prisma.chatSpaceBan.findMany({
+        where: { spaceId, userId: { in: [...userIds] } },
+        select: { userId: true }
+    });
+    return new Set(rows.map((row) => row.userId));
+}
+
+/**
+ * Stop somebody talking for a while, without taking them out of the room.
+ *
+ * A moment rather than a flag, so it ends on its own. A timeout somebody has to
+ * remember to lift is a timeout that becomes a ban by accident, which is a thing
+ * everybody who has ever run a room has done at least once.
+ *
+ * In a space it holds everywhere in that space, which is what separates it from
+ * a per-room annoyance; in a group it holds in the group. Nobody who may
+ * moderate the room is held by one - see `channelAccess`.
+ *
+ * @param minutes - How long, or zero to lift it.
+ */
+export async function timeOutMember(
+    actor: ChatActor,
+    where: { spaceId?: string; channelId?: string },
+    userId: string,
+    minutes: number
+): Promise<void> {
+    if (userId === actor.id) throw new ChatRuleError("You cannot time yourself out");
+    const until = minutes > 0 ? new Date(Date.now() + minutes * 60_000) : null;
+
+    if (where.spaceId) {
+        await requireSpace(actor, where.spaceId, "admin");
+        const space = await prisma.chatSpace.findUnique({
+            where: { id: where.spaceId },
+            select: { ownerId: true }
+        });
+        if (space?.ownerId === userId) throw new ChatRuleError("That is the owner of this space");
+        await prisma.chatSpaceMember.updateMany({
+            where: { spaceId: where.spaceId, userId },
+            data: { timeoutUntil: until }
+        });
+        if (until) {
+            await postSpaceNotice(where.spaceId, "timedOut", { subjectId: userId, byId: actor.id });
+        }
+        publishChatChange({ channelId: where.spaceId, kind: "channels", actorId: actor.id });
+        return;
+    }
+
+    const channelId = where.channelId;
+    if (!channelId) throw new ChatRuleError("There is nowhere to do that");
+    const access = await requireChannel(actor, channelId);
+    if (!access.mayModerate) throw new ChatAccessError("You cannot do that here");
+    await prisma.chatChannelMember.updateMany({
+        where: { channelId, userId },
+        data: { timeoutUntil: until }
+    });
+    publishChatChange({ channelId, kind: "channels", actorId: actor.id });
 }
 
 // ---------------------------------------------------------------------------
