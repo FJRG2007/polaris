@@ -532,10 +532,17 @@ export function useMeshCall(meetingId: string | null, options?: { video?: boolea
                  * on the screen of whoever happened to be on the call, told them
                  * nothing they could act on, and is the sort of detail that
                  * belongs in a setting's own help text rather than in an error.
+                 *
+                 * It then spent a while telling people to go and have an
+                 * administrator set a call server up, which was already the
+                 * wrong instruction and became a false one: Polaris ships a call
+                 * server and starts it with the stack. Reaching this now means
+                 * that server is not running or cannot be reached, which is a
+                 * fault to report rather than a task to hand the reader.
                  */
                 if (connection.connectionState === "failed") {
                     setError(
-                        "This call could not connect. Calls only reach between networks once this Polaris has a call server - an administrator sets one up under Chat in the admin settings."
+                        "This call could not connect. It ran straight between the two browsers, which only reaches inside one network, because this Polaris is not using its call server."
                     );
                 }
                 if (["failed", "closed"].includes(connection.connectionState)) {
