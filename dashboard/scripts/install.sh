@@ -232,11 +232,6 @@ generate_env() {
     auth_secret=$(durable_secret POLARIS_AUTH_SECRET b64_48)
     pg_password=$(durable_secret POSTGRES_PASSWORD hex_24)
     setup_token=$(openssl rand -hex 24)
-    # Its own placeholder rather than sharing the auth secret's. sed substitutes
-    # per line, so a shared one hands the same string to both - and the call
-    # server's signing key would be the key that signs every session in the
-    # instance, held by a container whose whole job is to talk to the internet.
-    call_secret=$(durable_secret POLARIS_CALL_SERVER_API_SECRET b64_32)
     # And its own for the same reason: it is handed to whatever drives
     # /api/cron/*, while the master key it used to be written from is what
     # envelope-encrypts every credential this instance stores.
@@ -245,7 +240,6 @@ generate_env() {
     sed \
         -e "s#REPLACE_ME_openssl_rand_base64_32#${master_key}#" \
         -e "s#REPLACE_ME_long_random_string#${auth_secret}#" \
-        -e "s#REPLACE_ME_call_server_secret#${call_secret}#" \
         -e "s#REPLACE_ME_cron_secret#${cron_secret}#" \
         -e "s#REPLACE_ME_setup_token#${setup_token}#" \
         -e "s#REPLACE_ME_strong_password#${pg_password}#g" \
@@ -264,7 +258,6 @@ materialize() {
     case "$2" in
         REPLACE_ME_openssl_rand_base64_32) durable_secret "$key" b64_32 ;;
         REPLACE_ME_long_random_string) durable_secret "$key" b64_48 ;;
-        REPLACE_ME_call_server_secret) durable_secret "$key" b64_32 ;;
         REPLACE_ME_cron_secret) durable_secret "$key" b64_32 ;;
         REPLACE_ME_strong_password) durable_secret "$key" hex_24 ;;
         REPLACE_ME_setup_token) openssl rand -hex 24 ;;
@@ -424,7 +417,7 @@ separate_shared_secrets() {
     target="$1"
     separate_secret "$target" POLARIS_CALL_SERVER_API_SECRET POLARIS_AUTH_SECRET
     separate_secret "$target" POLARIS_CRON_SECRET POLARIS_MASTER_KEY \
-        "POLARIS_CRON_SECRET changed: an outside scheduler calling /api/cron/* needs the new value from .env"
+        "POLARIS_CRON_SECRET changed: give the new value to whatever calls /api/cron/*. The value it held until now WAS this instance's POLARIS_MASTER_KEY, which encrypts every stored credential - rotating the cron secret does not retire that. Treat it as exposed wherever it was configured, and rotate the master key if it ever left this machine."
 }
 
 # Whether the web container is serving. Prefers the container healthcheck; on an

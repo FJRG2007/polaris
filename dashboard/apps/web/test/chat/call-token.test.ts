@@ -13,6 +13,9 @@
  * room sees written under the picture.
  */
 
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { mkdtemp } from "node:fs/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const participants: Record<string, { name: string }> = {
@@ -47,6 +50,14 @@ vi.mock("@/lib/integration-service", () => ({
 let env: Record<string, string | undefined> = {};
 
 vi.mock("@polaris/config", () => ({ loadEnv: () => env }));
+
+// The key the shipped server signs with lives on a volume the two containers
+// share, so point it somewhere this suite may write.
+process.env.POLARIS_CALL_KEYS_DIR = await mkdtemp(join(tmpdir(), "polaris-call-keys-"));
+
+/** Whether a server answers is a different question, asked over the network and
+ *  answered in its own suite. */
+vi.stubGlobal("fetch", async () => ({ ok: true }) as Response);
 
 const calls = await import("@/lib/chat/call-server");
 
@@ -129,17 +140,14 @@ describe("the ticket for the media server", () => {
 });
 
 describe("where calls run", () => {
-    it("is nowhere until somebody sets it up", async () => {
-        expect(await calls.callServer()).toBeNull();
-    });
-
-    it("is nowhere when an address was typed without its key", async () => {
+    it("falls back to the shipped server when an address was typed without its key", async () => {
         stored = { enabled: true, config: { url: "wss://calls.example.com" } };
         secret = null;
 
         // Half a pairing signs nothing, and a call that tried would fail at the
-        // door of the media server rather than here.
-        expect(await calls.callServer()).toBeNull();
+        // door of that media server rather than here - so it is not used. What
+        // is left is the one this stack runs, which is always there.
+        expect((await calls.callServer())?.url).toBe("/livekit");
     });
 
     it("is the address somebody typed, once both halves are there", async () => {
@@ -200,6 +208,31 @@ describe("where calls run", () => {
         expect((await calls.callServer())?.url).toBe("wss://deployed.example.com");
     });
 
+    it("lets a typed server win over a `/livekit` left in the environment", async () => {
+        stored = { enabled: true, config: { url: "wss://typed.example.com", apiKey: "typed" } };
+        secret = "typed-secret";
+        // Every install written before the key file existed carries this line,
+        // and it is not a decision anybody made - it names the shipped server,
+        // whose key does not live beside it any more. Somebody typing an address
+        // into the settings screen is a decision.
+        env = {
+            POLARIS_CALL_SERVER_URL: "/livekit",
+            POLARIS_CALL_SERVER_API_KEY: "polaris",
+            POLARIS_CALL_SERVER_API_SECRET: "from-the-environment"
+        };
+
+        expect((await calls.callServer())?.url).toBe("wss://typed.example.com");
+    });
+
+    it("runs on the shipped server with nothing configured at all", async () => {
+        // The case almost every deployment is in, and the one that was broken:
+        // no environment, no stored pairing, and calls still work.
+        const endpoint = await calls.callServer();
+        expect(endpoint?.url).toBe("/livekit");
+        expect(endpoint?.shipped).toBe(true);
+        expect(endpoint?.apiSecret.length).toBeGreaterThanOrEqual(32);
+    });
+
     it("ignores half a pairing in the environment rather than breaking a working one", async () => {
         stored = { enabled: true, config: { url: "wss://typed.example.com", apiKey: "typed" } };
         secret = "typed-secret";
@@ -234,12 +267,66 @@ describe("where calls run", () => {
 
     it("leaves the stored key alone when only the address was changed", async () => {
         stored = { enabled: true, config: { url: "wss://old.example.com", apiKey: "polaris" } };
-        await calls.setCallServer("wss://calls.example.com/", "polaris", "");
+        await calls.setCallServer("wss://calls.example.com/", "", "");
 
-        const written = saved[0] as {
-            input: { config: Record<string, unknown>; secret?: unknown };
-        };
+        const written = saved[0] as { input: { config: Record<string, unknown>; secret?: unknown } };
         expect(written.input.config.url).toBe("wss://calls.example.com");
+        // Both halves. Written through, an empty key left an address that signs
+        // nothing, and calls moved to the shipped server without a word - which
+        // looks like nothing at all, because they keep working.
+        expect(written.input.config.apiKey).toBe("polaris");
         expect("secret" in written.input).toBe(false);
+    });
+});
+
+/**
+ * A stored address that is saved and then not used is the state nobody can
+ * diagnose from a screen that only draws it, so the screen is told why rather
+ * than left to guess from where calls ended up.
+ */
+describe("what the settings screen is told", () => {
+    beforeEach(() => calls.forgetAnswer());
+
+    it("names the deployment's own configuration when that is what wins", async () => {
+        stored = { enabled: true, config: { url: "wss://typed.example.com", apiKey: "typed" } };
+        secret = "typed-secret";
+        env = {
+            POLARIS_CALL_SERVER_URL: "wss://deployed.example.com",
+            POLARIS_CALL_SERVER_API_KEY: "deployed",
+            POLARIS_CALL_SERVER_API_SECRET: "deployed-secret"
+        };
+
+        expect((await calls.callServerSettings()).unused).toBe("environment");
+    });
+
+    it("says the stored pairing is half a pairing when that is why", async () => {
+        stored = { enabled: true, config: { url: "wss://typed.example.com" } };
+        secret = null;
+        // No .env line to clear here, and telling somebody to clear one would
+        // send them after a line that does not exist for a save that never had
+        // its key.
+        expect((await calls.callServerSettings()).unused).toBe("incomplete");
+    });
+
+    it("says nothing about an address calls actually go to", async () => {
+        stored = { enabled: true, config: { url: "wss://typed.example.com", apiKey: "typed" } };
+        secret = "typed-secret";
+
+        expect((await calls.callServerSettings()).unused).toBeNull();
+    });
+
+    it("says nothing when nobody typed an address at all", async () => {
+        expect((await calls.callServerSettings()).unused).toBeNull();
+    });
+
+    it("hands back the key name stored with the address", async () => {
+        stored = { enabled: true, config: { url: "wss://typed.example.com", apiKey: "typed" } };
+        secret = "typed-secret";
+
+        // The box that holds it is filled from this. Left out, it came up empty
+        // on every load and the next save sent that blank back.
+        const settings = await calls.callServerSettings();
+        expect(settings.key).toBe("typed");
+        expect(settings.hasSecret).toBe(true);
     });
 });

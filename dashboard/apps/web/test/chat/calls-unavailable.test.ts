@@ -13,11 +13,12 @@
  * is exactly as useless as the first.
  */
 
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { mkdtemp, rm } from "node:fs/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@polaris/db", () => ({
-    prisma: { meetingParticipant: { findUnique: async () => null } }
-}));
+vi.mock("@polaris/db", () => ({ prisma: { meetingParticipant: { findUnique: async () => null } } }));
 vi.mock("@/lib/integration-service", () => ({
     getIntegrationState: async () => null,
     getIntegrationSecret: async () => null,
@@ -36,13 +37,12 @@ vi.stubGlobal("fetch", async (input: string) => {
     return { ok: true } as Response;
 });
 
-const calls = await import("@/lib/chat/call-server");
+/** The volume the dashboard and the media server share their key on, somewhere
+ *  this suite may write. */
+const keysDir = await mkdtemp(join(tmpdir(), "polaris-call-keys-"));
+process.env.POLARIS_CALL_KEYS_DIR = keysDir;
 
-const SHIPPED = {
-    POLARIS_CALL_SERVER_URL: "/livekit",
-    POLARIS_CALL_SERVER_API_KEY: "polaris",
-    POLARIS_CALL_SERVER_API_SECRET: "s".repeat(32)
-};
+const calls = await import("@/lib/chat/call-server");
 
 beforeEach(() => {
     env = {};
@@ -54,12 +54,25 @@ beforeEach(() => {
 });
 
 describe("whether a call can be started", () => {
-    it("refuses when nothing is configured", async () => {
-        expect(await calls.callsUnavailable()).toBe(calls.NO_CALL_SERVER);
+    it("runs on the shipped server with nothing configured at all", async () => {
+        // Not "refused because nothing is set up", which is what this used to
+        // say: a deployment where nobody has touched anything is the ordinary
+        // one, and calls have to work there.
+        expect(await calls.callsUnavailable()).toBeNull();
     });
 
-    it("refuses when it is configured and not answering", async () => {
-        env = { ...SHIPPED };
+    it("refuses when there is nowhere for a call to run at all", async () => {
+        // No volume for the shared key, which is a process running outside the
+        // Polaris stack - and there is no media server beside it either.
+        process.env.POLARIS_CALL_KEYS_DIR = join(keysDir, "missing");
+        try {
+            expect(await calls.callsUnavailable()).toBe(calls.NO_CALL_SERVER);
+        } finally {
+            process.env.POLARIS_CALL_KEYS_DIR = keysDir;
+        }
+    });
+
+    it("refuses when the server is there and not answering", async () => {
         reachable = false;
         // Configured is not the same as working, and this is the case that
         // looked fine from every screen: the address is set, the key is set, and
@@ -68,12 +81,10 @@ describe("whether a call can be started", () => {
     });
 
     it("allows it once the server answers", async () => {
-        env = { ...SHIPPED };
         expect(await calls.callsUnavailable()).toBeNull();
     });
 
     it("asks the shipped server on the host rather than on its path", async () => {
-        env = { ...SHIPPED };
         await calls.callsUnavailable();
         // `/livekit` is an address only a browser can resolve - it means "the
         // host this page came from". Asked from here it would be a path against
@@ -93,7 +104,6 @@ describe("whether a call can be started", () => {
     });
 
     it("asks once for a burst of readers", async () => {
-        env = { ...SHIPPED };
         await calls.callsUnavailable();
         const first = asked.length;
         await calls.callsUnavailable();

@@ -29,9 +29,7 @@ export async function register(): Promise<void> {
 
     // Write the Traefik dynamic routes for deployed-app domains on startup, so the
     // edge self-heals after a restart or a fresh dynamic volume. Best-effort.
-    const { syncAppRoutes, reconcileNasMounts, recoverAbandonedDeployments } = await import(
-        "./lib/deploy-service"
-    );
+    const { syncAppRoutes, reconcileNasMounts, recoverAbandonedDeployments } = await import("./lib/deploy-service");
     const { guardVacantReachable } = await import("./lib/deploy/router");
     void syncAppRoutes()
         .then(async () => {
@@ -58,25 +56,39 @@ export async function register(): Promise<void> {
         console.error("polaris: could not close out interrupted deploys:", error)
     );
 
+    // The key the media server signs with, minted here rather than by the
+    // installer: .env is only ever written by a script and an installed Polaris
+    // is only ever updated from a button, so a key that had to appear there is a
+    // key no existing deployment has and no operator can give it one. The
+    // container refuses to start until this lands, and restarts until it does -
+    // which is why this is awaited rather than fired off with everything else.
+    // What it writes is decided inside: an install that already had a pair keeps
+    // it, so an update does not change the key of a deployment whose calls work.
+    const { ensureCallKey } = await import("./lib/chat/call-keys");
+    await ensureCallKey().catch((error) =>
+        console.error("polaris: could not prepare the call server key:", error)
+    );
+
     // Same for the dashboard's own public hostnames, which the compose labels cannot
     // carry: they are fixed at `up` time, so a domain configured afterwards would only
     // reach the edge again the next time it was saved.
+    //
+    // The call server's path goes out with them, from inside that same function:
+    // it rides these hostnames and carries their allowlist, so the two must not
+    // be written by two callers racing on one directory Traefik watches.
+    //
+    // Retried until it lands, which neither of the others needs: both files are
+    // read from the database, and the one carrying the call route is the only way
+    // a browser can reach the media server at all - so a database that is still
+    // starting here means every call fails at the first WebSocket until somebody
+    // happens to save a domain, and on a LAN-only install nobody ever does.
     const { syncDashboardRoute } = await import("./lib/domain-edge");
-    void syncDashboardRoute();
-
-    // And the call server's path, for a stronger version of the same reason: it
-    // runs on the host's network, so there is no container address for the edge's
-    // label discovery to route to and this file is the only way it is reachable
-    // at all. Without it every call fails at the first WebSocket.
-    const { syncCallServerRoute } = await import("./lib/chat/call-edge");
-    void syncCallServerRoute();
+    void publishEdgeRoutes(syncDashboardRoute);
 
     // Migrate any quick tunnel still forwarding straight to an app's port onto the edge,
     // so its traffic is logged (and future restarts leave an edge tunnel untouched).
     const { reconcileQuickTunnels } = await import("./lib/deploy/quick-tunnel-service");
-    void reconcileQuickTunnels().catch((error) =>
-        console.error("polaris: quick-tunnel reconcile failed:", error)
-    );
+    void reconcileQuickTunnels().catch((error) => console.error("polaris: quick-tunnel reconcile failed:", error));
 
     // And the server's own tunnel, for the same reason: a connector raised against an
     // origin that has since changed keeps running and forwards into nothing. Only one
@@ -87,9 +99,7 @@ export async function register(): Promise<void> {
     // Re-establish NAS volume mounts a host reboot dropped, restarting any app whose
     // mount had to be re-created - so a NAS-backed volume survives reboots like a real
     // docker volume. Best-effort; a routine restart keeps live mounts and is a no-op.
-    void reconcileNasMounts().catch((error) =>
-        console.error("polaris: initial NAS mount reconcile failed:", error)
-    );
+    void reconcileNasMounts().catch((error) => console.error("polaris: initial NAS mount reconcile failed:", error));
 
     // Mint (once) an internal CA + leaf for the LAN hostnames and hand the leaf to
     // Traefik as its default certificate, so polaris.local can be trusted HTTPS
@@ -120,9 +130,7 @@ export async function register(): Promise<void> {
     // place and the next boot retries, rather than leaving deploys without a
     // clone credential.
     const { adoptInstanceGithubPat } = await import("./lib/connections/adopt-github-pat");
-    void adoptInstanceGithubPat().catch((error) =>
-        console.error("polaris: GitHub token adoption failed:", error)
-    );
+    void adoptInstanceGithubPat().catch((error) => console.error("polaris: GitHub token adoption failed:", error));
 
     // Vercel-style auto-deploy: poll connected GitHub repos and redeploy on a new
     // commit. Works without a public webhook (LAN installs can't receive one).
@@ -204,4 +212,39 @@ export async function register(): Promise<void> {
     // "connected" in the DB but dead at the bridge until manually reconnected.
     const { startChannelReconcile } = await import("./lib/messaging-service");
     startChannelReconcile();
+}
+
+/** How long each further attempt waits, in order. Backed off rather than
+ *  repeated: what it is waiting on is a database still coming up, which is
+ *  seconds on an ordinary boot and minutes on the one where migrations are
+ *  running on a slow disk. Just over eight minutes in all. */
+const ROUTE_RETRY_MS = [30_000, 60_000, 120_000, 300_000];
+
+/**
+ * Publish the dashboard's route, and the call server's with it, until one
+ * attempt reports the file written.
+ *
+ * Reported rather than fired and forgotten, because there is no screen that can
+ * ask for this and no button that repairs it: an edge left with no call route
+ * serves every page and no call, and the only other thing that rewrites the file
+ * is saving a domain or a firewall rule - which a deployment that only ever
+ * calls between rooms in the house never does. Giving up is logged, so a support
+ * question has an answer.
+ *
+ * Takes the sync as an argument, so the one thing worth asserting here - that a
+ * boot which cannot reach the database yet ends with a route rather than with
+ * silence - can be asserted without starting a server.
+ */
+export async function publishEdgeRoutes(sync: () => Promise<boolean>): Promise<void> {
+    for (const wait of [0, ...ROUTE_RETRY_MS]) {
+        if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait).unref());
+        const written = await sync().catch((error) => {
+            console.error("polaris: publishing the edge routes failed:", error);
+            return false;
+        });
+        if (written) return;
+    }
+    console.error(
+        "polaris: gave up publishing the call server route - calls have no way through the edge until a domain or a firewall rule is saved, or this deployment restarts"
+    );
 }

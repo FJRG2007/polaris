@@ -156,7 +156,7 @@ RUN chmod +x /usr/local/bin/polaris && ln -sf /usr/local/bin/polaris /usr/local/
 # runtime user. Create and own it here so a fresh named volume inherits node's
 # ownership; the backup service still falls back to a temp dir if a bind mount
 # overrides this with root ownership.
-RUN mkdir -p /var/lib/polaris /dynamic && chown -R node:node /var/lib/polaris /dynamic
+RUN mkdir -p /var/lib/polaris /dynamic /call-keys && chown -R node:node /var/lib/polaris /dynamic /call-keys
 
 # Where the mDNS responder publishes the host's LAN address. Created and owned
 # here as well as in the responder's image: Docker seeds a fresh named volume

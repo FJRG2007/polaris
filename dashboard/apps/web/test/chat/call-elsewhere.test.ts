@@ -57,9 +57,7 @@ vi.mock("@polaris/db", () => ({
                             kind: channel.kind,
                             name: channel.name,
                             spaceId: channel.spaceId,
-                            members: channel.members.map((member) => ({
-                                user: { name: member.name }
-                            }))
+                            members: channel.members.map((member) => ({ user: { name: member.name } }))
                         }
                     }
                 };

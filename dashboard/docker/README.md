@@ -82,10 +82,13 @@ must be freshly generated, never copied:
 Set `POLARIS_SITE_ADDRESS` to your domain for automatic HTTPS via Caddy, and
 `POLARIS_APP_URL` to the origin users reach.
 
-Chat calls run through the `livekit` service in this stack, which the installer
-configures. Calls between devices on this network work as soon as it is up.
-Calls from outside need two ports forwarded on the router, `7881/tcp` and
-`7882/udp`; the Domains screen lists them and reports when they answer.
+Chat calls run through the `livekit` service in this stack. The dashboard and
+that service agree on a signing key through a file on a volume they share -
+the dashboard writes it on first boot, so there is nothing to configure, on a
+fresh install or an existing one. Calls between devices on this network work
+as soon as it is up. Calls from outside need two ports forwarded on the
+router, `7881/tcp` and `7882/udp`; the Domains screen lists them and reports
+when they answer.
 
 ## Updates
 

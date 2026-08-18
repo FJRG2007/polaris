@@ -23,8 +23,8 @@
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
 import { dashboardHosts } from "@/lib/domain-edge";
-import { callServer } from "@/lib/chat/call-server";
 import { resolvePolarisWaf } from "@/lib/waf-service";
+import { CALL_PATH, callServer } from "@/lib/chat/call-server";
 
 /** Traefik's file-provider directory, the volume both containers mount. */
 function dynamicDir(): string {
@@ -47,10 +47,6 @@ const STRIP = `${ROUTER}-strip`;
  *  one config, so a name borrowed from the dashboard's route is a duplicate. */
 const GUARDED = `${ROUTER}-guarded`;
 const ALLOW = `${ROUTER}-allow`;
-
-/** The path the browser dials. Matches POLARIS_CALL_SERVER_URL's default, which
- *  is what tells the browser to come here in the first place. */
-export const CALL_PATH = "/livekit";
 
 /**
  * Above the dashboard's own host rules, which would otherwise take this path.
@@ -143,8 +139,13 @@ export function renderCallServerRoute(serve: boolean, guard?: CallRouteGuard): s
  * Publish it, or unpublish it. Idempotent, and best-effort in the same way the
  * dashboard's own route is: a dynamic directory that is missing is a dev run
  * outside compose, and it must not turn saving a setting into an error.
+ *
+ * @returns whether the route was written. Reported rather than swallowed because
+ *   this file is the whole of how a browser reaches the media server: a database
+ *   still starting when this first runs would otherwise leave no route at all,
+ *   and every call would fail at the WebSocket until somebody saved a domain.
  */
-export async function syncCallServerRoute(): Promise<void> {
+export async function syncCallServerRoute(): Promise<boolean> {
     try {
         const endpoint = await callServer();
         // Only for the server this stack runs. One somebody typed has an address
@@ -156,10 +157,19 @@ export async function syncCallServerRoute(): Promise<void> {
         const [hosts, waf] = await Promise.all([dashboardHosts(), resolvePolarisWaf()]);
         const guard = { hosts, allow: waf.allowLists[0] ?? [] };
         await writeFile(join(dynamicDir(), FILE), renderCallServerRoute(serve, guard), "utf8");
+        // Written, and still not settled. There are two reasons this publishes
+        // nothing - calls deliberately run somewhere else, or the shipped server
+        // could not be prepared this early - and only the first is an answer, so
+        // what is reported is whether where calls run is known at all. Reported
+        // as success, the second takes the route away at boot and nothing puts it
+        // back, so every call fails at the WebSocket on a deployment that was one
+        // retry from working.
+        return endpoint !== null;
     } catch (error) {
         console.error(
             "polaris: publishing the call server route failed:",
             error instanceof Error ? error.message : error
         );
+        return false;
     }
 }

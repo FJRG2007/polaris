@@ -34,6 +34,7 @@ import { NewChannelDialog } from "./new-channel-dialog";
 import { useParams, usePathname } from "next/navigation";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import { MuteOptions, type MenuParts } from "./mute-menu";
+import { NicknameDialog } from "./nickname-dialog";
 import { ChannelSettingsDialog } from "./channel-settings-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
@@ -45,6 +46,7 @@ import {
     Link2,
     Lock,
     MessageSquarePlus,
+    Pencil,
     Pin,
     PinOff,
     Plus,
@@ -779,8 +781,13 @@ function RowMenu({
 }) {
     const baseUrl = useAppUrl();
     const { refresh } = useChat();
+    const [naming, setNaming] = useState(false);
+    // A one-to-one conversation, which is the only kind where there is one
+    // person to have a name for. A group is called what the group is called.
+    const person = channel.kind === "dm" && channel.others.length === 1 ? channel.others[0]! : null;
 
     return (
+        <>
         <ContextMenu>
             <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
             <ContextMenuContent className="w-48">
@@ -812,6 +819,17 @@ function RowMenu({
                     }}
                 />
 
+                {/* What you call them, offered from the row as well as from
+                    the open conversation: it is a note about a person, and the
+                    place somebody reaches for it is wherever their name is
+                    written. Nothing is announced and nobody else sees it. */}
+                {person && (
+                    <ContextMenuItem onSelect={() => setNaming(true)}>
+                        <Pencil className="size-3.5" />
+                        Nickname
+                    </ContextMenuItem>
+                )}
+
                 {/* Only for somebody who administers the space, and only for a
                     channel in one: a direct message has no settings and a group
                     is managed from its own header. */}
@@ -826,6 +844,15 @@ function RowMenu({
                 )}
             </ContextMenuContent>
         </ContextMenu>
+        {/* Outside the menu, which closes on the item that opens this: a dialog
+            mounted inside one is unmounted the moment it is asked for. */}
+        <NicknameDialog
+            open={naming}
+            onOpenChange={setNaming}
+            person={person}
+            onSaved={refresh}
+        />
+        </>
     );
 }
 

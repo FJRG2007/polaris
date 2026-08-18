@@ -20,11 +20,8 @@
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { AccessToken } from "livekit-server-sdk";
-import {
-    getIntegrationSecret,
-    getIntegrationState,
-    upsertIntegration
-} from "@/lib/integration-service";
+import { ensureCallKey } from "@/lib/chat/call-keys";
+import { getIntegrationSecret, getIntegrationState, upsertIntegration } from "@/lib/integration-service";
 
 /** Where the pairing is kept. One per instance: a call server is infrastructure,
  *  not something a conversation chooses. */
@@ -39,8 +36,7 @@ const TOKEN_TTL = "10m";
  *  worked around: with no server there is no call, and a button that opens a
  *  microphone for a connection that cannot be made is the failure people report
  *  and nobody can act on. */
-export const NO_CALL_SERVER =
-    "The call server is not answering, so a call would reach nobody. An administrator can check it under Chat settings.";
+export const NO_CALL_SERVER = "The call server is not answering, so a call would reach nobody. An administrator can check it under Chat settings.";
 
 /** What is stored beside the secret: everything that is not the secret. */
 interface CallServerConfig {
@@ -92,7 +88,9 @@ function servedHere(address: string): boolean {
 }
 
 /** Point calls at a server somebody runs themselves, or unpoint them. A blank
- *  address clears the pairing, which is how this is switched off. */
+ *  address clears the pairing and calls fall back to the server this stack runs
+ *  - it is not a way to switch calls off, and there is none here: whether an
+ *  account may be in a call at all is the `chat.call` grant. */
 export async function setCallServer(url: string, apiKey: string, apiSecret: string): Promise<void> {
     const trimmed = url.trim().replace(/\/+$/, "");
     if (trimmed) {
@@ -112,10 +110,13 @@ export async function setCallServer(url: string, apiKey: string, apiSecret: stri
         config: {
             ...current,
             url: trimmed || undefined,
-            apiKey: trimmed ? apiKey.trim() : undefined
+            apiKey: trimmed ? apiKey.trim() || current.apiKey : undefined
         },
-        // An empty secret on a save that only changed the address leaves the
-        // stored one alone; clearing the address clears the pairing outright.
+        // An empty key or secret on a save that only changed the address leaves
+        // the stored ones alone; clearing the address clears the pairing
+        // outright. Blank is what a form that has not been retyped sends, and
+        // taking it as a deletion turned correcting a typo in the address into a
+        // pairing that signs nothing and calls that quietly moved server.
         ...(trimmed ? (apiSecret.trim() ? { secret: apiSecret.trim() } : {}) : { secret: null })
     });
 }
@@ -129,22 +130,83 @@ function websocket(address: string): string {
 }
 
 /**
- * Where calls run, or null when nothing is set up.
+ * The server this stack runs, which needs nothing configured anywhere.
  *
- * The deployment's own answer comes first. An operator who put a call server in
- * this process's environment has already decided, and asking them to go and
- * confirm it in a settings screen is how an instance ends up shipping with calls
- * that cannot cross a network and nobody realising.
+ * The address is a path, so the browser resolves it against whatever hostname it
+ * reached Polaris on, and the key comes off the volume the two containers share
+ * rather than out of `.env` - see `call-keys`. That is the whole point: `.env` is
+ * written by the installer and an installed Polaris is only ever updated from a
+ * button, so anything that has to appear there is a feature that is switched off
+ * on every deployment in the world.
+ *
+ * Null only when the key file could not be read or written, which means there is
+ * no shared volume, which means there is no media server beside this process
+ * either.
+ */
+async function shippedServer(): Promise<CallServerEndpoint | null> {
+    const key = await ensureCallKey();
+    return key ? { url: CALL_PATH, apiKey: key.apiKey, apiSecret: key.apiSecret, shipped: true } : null;
+}
+
+/** Where the shipped server is served from: the address the browser is handed,
+ *  and the prefix the edge publishes and strips - `call-edge` takes it from
+ *  here rather than repeating it, because two literals that have to be equal
+ *  and are not is a WebSocket that never connects with nothing in either file
+ *  to point at. A path rather than a hostname because only the browser knows
+ *  which hostname it used. */
+export const CALL_PATH = "/livekit";
+
+/**
+ * Where calls run, or null when there is nowhere at all.
+ *
+ * Three answers, in the order of how deliberately somebody chose them:
+ *
+ * 1. **A server named in this process's environment**, when it is somebody
+ *    else's. An operator who put an address in `.env` has decided. A `/livekit`
+ *    in there is not that decision - it is what every install written before the
+ *    key file existed carries, and it names the shipped server anyway, whose key
+ *    now lives on the volume rather than beside that line.
+ * 2. **A server typed into the settings screen.**
+ * 3. **The one this stack runs**, which is the answer on a deployment where
+ *    nobody has done either - and that is meant to be almost all of them.
  */
 export async function callServer(): Promise<CallServerEndpoint | null> {
     const fromEnv = environmentServer();
-    if (fromEnv) return fromEnv;
+    if (fromEnv && !fromEnv.shipped) return fromEnv;
 
     const stored = await config();
-    const secret = stored.url ? await getIntegrationSecret(PROVIDER) : null;
-    return stored.url && stored.apiKey && secret
-        ? { url: stored.url, apiKey: stored.apiKey, apiSecret: secret, shipped: false }
-        : null;
+    return endpointFor(stored, await storedSecret(stored));
+}
+
+/** The same three answers, from a pairing that has already been read. Taken as
+ *  arguments rather than read again because the settings screen needs both the
+ *  pairing and where calls ended up, and it polls while the server comes up:
+ *  read twice, that is two integration rows and two decrypts per tick. */
+async function endpointFor(
+    stored: CallServerConfig,
+    secret: string | null
+): Promise<CallServerEndpoint | null> {
+    const fromEnv = environmentServer();
+    if (fromEnv && !fromEnv.shipped) return fromEnv;
+    if (stored.url && stored.apiKey && secret) {
+        return { url: stored.url, apiKey: stored.apiKey, apiSecret: secret, shipped: false };
+    }
+    return shippedServer();
+}
+
+/** The stored signing secret, when there is an address for it to sign for.
+ *  Never thrown out of: a secret that cannot be decrypted is a pairing that
+ *  cannot be used, which is the shipped server's case, and every screen with a
+ *  call button on it asks this. */
+async function storedSecret(stored: CallServerConfig): Promise<string | null> {
+    if (!stored.url) return null;
+    return getIntegrationSecret(PROVIDER).catch((error) => {
+        console.error(
+            "polaris: could not read the stored call server secret:",
+            error instanceof Error ? error.message : error
+        );
+        return null;
+    });
 }
 
 /**
@@ -197,7 +259,15 @@ export async function joinToken(
 export interface CallServerSettings {
     /** An address somebody typed, if they did. */
     readonly url: string;
-    readonly hasKey: boolean;
+    /** The key name stored with it. Shown rather than kept back - it is a name
+     *  that travels in every token, not a secret - so the box holds what is
+     *  saved instead of coming up blank and saving that blank back over it. */
+    readonly key: string;
+    /** Whether a signing secret is stored for that address. About the SECRET,
+     *  not the key name: it is what the secret box's placeholder says, and
+     *  answering it from the key name told somebody a secret was saved on the
+     *  exact state the warning above it describes as missing one. */
+    readonly hasSecret: boolean;
     /** Whether calls run through the server this stack starts, rather than one
      *  somebody pointed them at. */
     readonly shipped: boolean;
@@ -206,17 +276,34 @@ export interface CallServerSettings {
     /** Whether it answers yet - a fresh install spends a moment starting, and
      *  "configured but silent" is the state people ask about. */
     readonly answering: boolean;
+    /** Why the stored address is not where calls go, when one is stored and they
+     *  do not: this process was started with a server of its own, or what was
+     *  saved here is missing the key and secret that would let it sign. Null when
+     *  it is in use, and when there is nothing stored to be in use. An address
+     *  that is saved and silently unused is the state nobody can diagnose from a
+     *  screen that only shows it. */
+    readonly unused: "environment" | "incomplete" | null;
 }
 
 export async function callServerSettings(): Promise<CallServerSettings> {
     const stored = await config();
-    const endpoint = await callServer();
+    const secret = await storedSecret(stored);
+    const endpoint = await endpointFor(stored, secret);
+    const fromEnv = environmentServer();
     return {
         url: stored.url ?? "",
-        hasKey: Boolean(stored.apiKey),
+        key: stored.apiKey ?? "",
+        hasSecret: Boolean(secret),
         shipped: endpoint?.shipped ?? false,
         ready: endpoint !== null,
-        answering: endpoint ? await answering(endpoint) : false
+        answering: endpoint ? await answering(endpoint) : false,
+        unused: !stored.url
+            ? null
+            : fromEnv && !fromEnv.shipped
+              ? "environment"
+              : endpoint && !endpoint.shipped
+                ? null
+                : "incomplete"
     };
 }
 
@@ -251,11 +338,7 @@ export function forgetAnswer(): void {
  * starting is a fact to report rather than a reason to hold the page.
  */
 export async function answering(endpoint: CallServerEndpoint): Promise<boolean> {
-    if (
-        lastAnswer &&
-        lastAnswer.url === endpoint.url &&
-        Date.now() - lastAnswer.at < ANSWER_TTL_MS
-    ) {
+    if (lastAnswer && lastAnswer.url === endpoint.url && Date.now() - lastAnswer.at < ANSWER_TTL_MS) {
         return lastAnswer.answering;
     }
     // A path names the edge in front of this app, which this process cannot

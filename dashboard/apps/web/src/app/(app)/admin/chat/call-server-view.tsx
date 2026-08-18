@@ -30,18 +30,24 @@ const STARTING_TRIES = 24;
 
 interface Settings {
     url: string;
-    hasKey: boolean;
+    /** The key name saved with that address. A name, not a secret. */
+    key: string;
+    hasSecret: boolean;
     shipped: boolean;
     ready: boolean;
     answering: boolean;
+    /** Why the address below is not the one calls go to, when it is not. */
+    unused: "environment" | "incomplete" | null;
 }
 
 const NOTHING: Settings = {
     url: "",
-    hasKey: false,
+    key: "",
+    hasSecret: false,
     shipped: false,
     ready: false,
-    answering: false
+    answering: false,
+    unused: null
 };
 
 export function CallServerView() {
@@ -65,6 +71,10 @@ export function CallServerView() {
             const value = result.settings ?? NOTHING;
             setSettings(value);
             setUrl(value.url);
+            // Shown rather than left blank: a box that comes up empty is one a
+            // save sends back empty, and the address it belongs to would go on
+            // being stored while signing nothing.
+            setKey(value.key);
             // Only opened by hand. An instance that already typed an address keeps
             // seeing it; everybody else is shown the shipped server and nothing else.
             setManual(Boolean(value.url));
@@ -109,10 +119,7 @@ export function CallServerView() {
         setSaving(true);
         setSaved(false);
         setError(null);
-        const result = await runAction(
-            () => actions.setCallServerAction(url, key, secret),
-            setError
-        );
+        const result = await runAction(() => actions.setCallServerAction(url, key, secret), setError);
         setSaving(false);
         if (result?.error) {
             setError(result.error);
@@ -133,8 +140,9 @@ export function CallServerView() {
                 <h2 className="text-[13px] font-semibold text-foreground">Where calls run</h2>
                 <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
                     Every call goes through a media server, so each browser sends its camera once
-                    instead of once per person. Polaris starts one with the stack; until it answers,
-                    Chat says calls are unavailable rather than offering one that reaches nobody.
+                    instead of once per person. Polaris starts one with the stack and hands it its
+                    own key, so there is nothing to set up; until it answers, Chat says calls are
+                    unavailable rather than offering one that reaches nobody.
                 </p>
             </div>
 
@@ -152,7 +160,7 @@ export function CallServerView() {
                                 <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
                             )}
                             {!settings.ready
-                                ? "No call server is configured."
+                                ? "The call server could not be prepared."
                                 : settings.answering
                                   ? `Running ${where}.`
                                   : waited
@@ -160,25 +168,22 @@ export function CallServerView() {
                                     : `Starting ${where}.`}
                         </p>
                         <p className="text-[11px] text-foreground-subtle">
-                            {!settings.ready ? (
-                                "Calls are off until there is one. Re-run the installer, or point this at a server you already run."
-                            ) : settings.answering ? (
-                                <>
-                                    Calls between devices on this network work now. For calls from
-                                    outside, two ports have to reach this machine -{" "}
-                                    <Link
-                                        href="/admin/domains"
-                                        className="text-primary hover:underline"
-                                    >
-                                        Domains
-                                    </Link>{" "}
-                                    lists them and reports when they answer.
-                                </>
-                            ) : waited ? (
-                                "It has had a couple of minutes and has not come up. Check the `livekit` container on this machine."
-                            ) : (
-                                "It comes up a few seconds after the stack does."
-                            )}
+                            {!settings.ready
+                                ? "Calls have nowhere to run on this deployment yet. Nothing to do here: it repairs itself the next time Polaris starts, and this says so as soon as it has."
+                                : settings.answering ? (
+                                      <>
+                                          Calls between devices on this network work now. For calls
+                                          from outside, two ports have to reach this machine -{" "}
+                                          <Link href="/admin/domains" className="text-primary hover:underline">
+                                              Domains
+                                          </Link>{" "}
+                                          lists them and reports when they answer.
+                                      </>
+                                  ) : waited ? (
+                                      "It has had a couple of minutes and has not come up. It keeps trying, and calls come back on their own the moment it answers."
+                                  ) : (
+                                      "It comes up a few seconds after the stack does."
+                                  )}
                         </p>
                         {waited ? (
                             <Button
@@ -192,16 +197,26 @@ export function CallServerView() {
                         ) : null}
                     </div>
 
-                    {manual && settings.shipped ? (
-                        // The address in this deployment's own configuration wins
-                        // over anything stored here, so an address typed in while
-                        // that is set is saved and then never used. Said here
-                        // rather than left to be discovered on a call that keeps
-                        // going through the shipped server.
+                    {settings.unused === "environment" ? (
+                        // A whole address in this deployment's own configuration
+                        // wins over anything stored here, so an address typed in
+                        // while that is set is saved and then never used. Said
+                        // here rather than left to be discovered on a call that
+                        // keeps going somewhere else.
                         <p className="text-[11px] text-warning">
-                            This deployment names a call server in its own configuration, so calls
-                            go there and the address below is not in use. Clear
-                            POLARIS_CALL_SERVER_URL in .env to use this one instead.
+                            This deployment was started pointing at another call server, so calls go
+                            there and the address below is not in use.
+                        </p>
+                    ) : settings.unused === "incomplete" ? (
+                        // Half a pairing signs nothing, so it is skipped. Nothing
+                        // on the screen said so: the address sat there looking
+                        // like the one calls were going to.
+                        <p className="text-[11px] text-warning">
+                            {settings.key
+                                ? "The address below has no secret saved with it, so it signs nothing and is not in use. Paste it and save."
+                                : settings.hasSecret
+                                  ? "The address below has no key saved with it, so it signs nothing and is not in use. Fill it in and save."
+                                  : "The address below has no key and secret saved with it, so it signs nothing and is not in use. Fill both in and save."}
                         </p>
                     ) : null}
 
@@ -249,15 +264,11 @@ export function CallServerView() {
                                     type="password"
                                     autoComplete="off"
                                     aria-label="Call server secret"
-                                    placeholder={
-                                        settings.hasKey ? "Stored. Type to replace it." : "Paste it"
-                                    }
+                                    placeholder={settings.hasSecret ? "Stored. Type to replace it." : "Paste it"}
                                 />
                             </label>
                             <Button variant="secondary" onClick={save} disabled={saving}>
-                                {saving ? (
-                                    <Loader2 className="size-4 shrink-0 animate-spin" />
-                                ) : null}
+                                {saving ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                                 Save
                             </Button>
                             {saved ? (

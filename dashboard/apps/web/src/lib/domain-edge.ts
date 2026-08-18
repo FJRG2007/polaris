@@ -67,8 +67,7 @@ export function publicHostname(value: string | null | undefined): string | null 
         .replace(/:\d+$/, "")
         .replace(/\.$/, "");
     if (!host || !host.includes(".")) return null;
-    if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(host))
-        return null;
+    if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(host)) return null;
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return null;
     if (PRIVATE_SUFFIXES.some((suffix) => host.endsWith(suffix))) return null;
     return host;
@@ -118,11 +117,7 @@ export function renderDashboardConfig(hosts: readonly string[], waf?: DashboardW
     if (allow.length > 0) {
         const mw = `${ROUTER}-allow`;
         middlewares.push(mw);
-        definitions.push(
-            `    ${mw}:`,
-            "      ipAllowList:",
-            `        sourceRange: [${allow.map((entry) => `"${entry}"`).join(", ")}]`
-        );
+        definitions.push(`    ${mw}:`, "      ipAllowList:", `        sourceRange: [${allow.map((entry) => `"${entry}"`).join(", ")}]`);
     }
     if (
         deny.length > 0 ||
@@ -143,8 +138,7 @@ export function renderDashboardConfig(hosts: readonly string[], waf?: DashboardW
             `        address: "${guardUrl()}/authz"`
         );
     }
-    const httpsMiddlewares =
-        middlewares.length > 0 ? [`      middlewares: [${middlewares.join(", ")}]`] : [];
+    const httpsMiddlewares = middlewares.length > 0 ? [`      middlewares: [${middlewares.join(", ")}]`] : [];
     // The allowlist still applies to the :80 router; the guard does not, since that
     // router only redirects and the canonical https URL is where a request is judged.
     const httpMiddlewares = [allow.length > 0 ? `${ROUTER}-allow` : null, REDIRECT].filter(
@@ -223,9 +217,7 @@ function parseExtra(raw: string | null): string[] {
     if (!raw) return [];
     try {
         const parsed: unknown = JSON.parse(raw);
-        return Array.isArray(parsed)
-            ? parsed.filter((value): value is string => typeof value === "string")
-            : [];
+        return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
     } catch {
         return [];
     }
@@ -236,8 +228,13 @@ function parseExtra(raw: string | null): string[] {
  * the same way the local CA is: the dashboard is reachable on its local names either
  * way, so a dynamic directory that is missing (a dev run outside compose) must not turn
  * saving a domain into an error.
+ *
+ * @returns whether the edge was written. False is not an error to report - the caller
+ *   that saved a domain has nothing to do about it - but it is what lets startup try
+ *   again, and startup is where it matters: the call server's route goes out with this
+ *   one, and it is the only way a browser reaches the media server at all.
  */
-export async function syncDashboardRoute(): Promise<void> {
+export async function syncDashboardRoute(): Promise<boolean> {
     try {
         // Both reads, then one write. A failure to read the firewall rule is not
         // caught into a permissive default: writing the route without it would
@@ -263,11 +260,11 @@ export async function syncDashboardRoute(): Promise<void> {
         // instance. Imported here rather than at the top: that module reads this
         // one's hostnames.
         const { syncCallServerRoute } = await import("./chat/call-edge");
-        await syncCallServerRoute();
+        // Its answer is this function's answer: a dashboard route written beside a
+        // missing call route is an edge that serves every page and no call.
+        return await syncCallServerRoute();
     } catch (error) {
-        console.error(
-            "polaris: publishing the dashboard route failed:",
-            error instanceof Error ? error.message : error
-        );
+        console.error("polaris: publishing the dashboard route failed:", error instanceof Error ? error.message : error);
+        return false;
     }
 }

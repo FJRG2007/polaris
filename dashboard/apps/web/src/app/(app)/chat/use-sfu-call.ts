@@ -251,8 +251,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             for (const publication of participant.trackPublications.values()) {
                 const track = publication.track?.mediaStreamTrack;
                 if (!track || track.readyState !== "live") continue;
-                const onScreen =
-                    publication.source === SCREEN || publication.source === SCREEN_AUDIO;
+                const onScreen = publication.source === SCREEN || publication.source === SCREEN_AUDIO;
                 (onScreen ? display : camera).push(track);
             }
             faces.set(participant.identity, camera);
@@ -302,34 +301,38 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * the end - stopping one on unpublish would cost a permission prompt to turn
      * a camera back on.
      */
-    const publish = useCallback(async (source: Track.Source, track: MediaStreamTrack | null) => {
-        const current = room.current;
-        if (!current || current.state !== CONNECTED) return;
-        const local = current.localParticipant;
-        const existing = local.getTrackPublication(source);
+    const publish = useCallback(
+        async (source: Track.Source, track: MediaStreamTrack | null) => {
+            const current = room.current;
+            if (!current || current.state !== CONNECTED) return;
+            const local = current.localParticipant;
+            const existing = local.getTrackPublication(source);
 
-        if (!track) {
-            if (existing?.track) {
-                await local.unpublishTrack(existing.track, false).catch(() => undefined);
+            if (!track) {
+                if (existing?.track) {
+                    await local.unpublishTrack(existing.track, false).catch(() => undefined);
+                }
+                return;
             }
-            return;
-        }
-        if (existing?.track) {
-            // `true` is "this track is the caller's": the old one is left
-            // alone rather than stopped, which is what makes a microphone
-            // swap reversible.
-            await existing.track.replaceTrack(track, true).catch(() => undefined);
-            return;
-        }
-        await local
-            .publishTrack(track, {
-                source,
-                // A screen is text as often as it is video, and text survives
-                // a dropped frame far better than it survives being blurred.
-                degradationPreference: source === SCREEN ? "maintain-resolution" : undefined
-            })
-            .catch(() => undefined);
-    }, []);
+            if (existing?.track) {
+                // `true` is "this track is the caller's": the old one is left
+                // alone rather than stopped, which is what makes a microphone
+                // swap reversible.
+                await existing.track.replaceTrack(track, true).catch(() => undefined);
+                return;
+            }
+            await local
+                .publishTrack(track, {
+                    source,
+                    // A screen is text as often as it is video, and text survives
+                    // a dropped frame far better than it survives being blurred.
+                    degradationPreference:
+                        source === SCREEN ? "maintain-resolution" : undefined
+                })
+                .catch(() => undefined);
+        },
+        []
+    );
 
     /**
      * Turn this browser's voice on or off.
@@ -342,7 +345,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const setVoiceEnabled = useCallback((on: boolean) => {
         if (mic.current) mic.current.enabled = on;
         if (filtered.current) filtered.current.track.enabled = on;
-        const publication = room.current?.localParticipant.getTrackPublication(MICROPHONE);
+        const publication = room.current?.localParticipant.getTrackPublication(
+            MICROPHONE
+        );
         if (!publication?.track) return;
         if (on) void publication.track.unmute().catch(() => undefined);
         else void publication.track.mute().catch(() => undefined);
@@ -452,9 +457,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             if (stopped || connecting || room.current) return;
             const ticket = await actions
                 .callTokenAction(inCall)
-                .catch(
-                    () => ({ error: "The call could not be reached. Try again." }) as CallTicket
-                );
+                .catch(() => ({ error: "The call could not be reached. Try again." }) as CallTicket);
             if (stopped) return;
             if (ticket.waiting) return;
             if (ticket.error) {

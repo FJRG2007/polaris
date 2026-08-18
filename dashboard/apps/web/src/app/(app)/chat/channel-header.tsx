@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { Avatar } from "@/components/avatar";
 import { LeaveDialog } from "./leave-dialog";
+import { NicknameDialog } from "./nickname-dialog";
 import { channelLink, copyText } from "./links";
 import { useAppUrl } from "@/components/app-url";
 import { ChatPictureDialog } from "./picture-dialog";
@@ -111,7 +112,6 @@ export function ChannelHeader({
     const [picturing, setPicturing] = useState(false);
     const [settings, setSettings] = useState(false);
     const [naming, setNaming] = useState(false);
-    const [nickname, setNickname] = useState("");
     const [name, setName] = useState("");
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [leaving, setLeaving] = useState(false);
@@ -300,7 +300,9 @@ export function ChannelHeader({
                                 a channel, a group or one person - they are one
                                 kind of thing with one id. */}
                             <DropdownMenuItem
-                                onSelect={() => void copyText(channelLink(baseUrl, channel.id))}
+                                onSelect={() =>
+                                    void copyText(channelLink(baseUrl, channel.id))
+                                }
                             >
                                 <Link2 className="size-3.5" />
                                 Copy link
@@ -391,59 +393,20 @@ export function ChannelHeader({
             </div>
 
             {error && (
-                <p role="alert" className="border-b border-border px-4 py-1 text-xs text-danger">
+                <p
+                    role="alert"
+                    className="border-b border-border px-4 py-1 text-xs text-danger"
+                >
                     {error}
                 </p>
             )}
 
-            {/* Opened on what they are called now, which is either the nickname
-                already set or their own name - so clearing the box is how the
-                nickname comes off. */}
-            <Dialog
+            <NicknameDialog
                 open={naming}
-                onOpenChange={(next: boolean) => {
-                    setNaming(next);
-                    if (next) setNickname(channel.others[0]?.name ?? "");
-                }}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>What you call them</DialogTitle>
-                    </DialogHeader>
-                    <Input
-                        value={nickname}
-                        autoFocus
-                        maxLength={60}
-                        aria-label="What you call them"
-                        placeholder="Leave it empty to use their own name"
-                        onChange={(event) => setNickname(event.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                        Only you see this. They are not told, and everybody else goes on seeing
-                        their own name.
-                    </p>
-                    <DialogFooter>
-                        <Button variant="ghost" size="sm" onClick={() => setNaming(false)}>
-                            Cancel
-                        </Button>
-                        <Button
-                            size="sm"
-                            onClick={async () => {
-                                const person = channel.others[0];
-                                if (!person) return;
-                                await runAction(
-                                    () => actions.setNicknameAction(person.id, nickname),
-                                    setError
-                                );
-                                setNaming(false);
-                                onChanged();
-                            }}
-                        >
-                            Save
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                onOpenChange={setNaming}
+                person={channel.others[0] ?? null}
+                onSaved={onChanged}
+            />
 
             {group && (
                 <LeaveDialog
