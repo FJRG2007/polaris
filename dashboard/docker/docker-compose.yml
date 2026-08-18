@@ -174,6 +174,40 @@ services:
       retries: 5
       start_period: 60s
 
+  # --- Call server ----------------------------------------------------------
+  # Chat's calls, carried by LiveKit. Part of the default stack rather than
+  # something an administrator installs later: a call server that has to be
+  # switched on is a call server that is off on every fresh install, and what
+  # that looks like to the two people trying to talk is a call that connects to
+  # silence with no explanation either of them can act on.
+  #
+  # Each browser sends its microphone here once and receives everybody else's
+  # back, so four people are four uploads rather than the twelve connections a
+  # browser-to-browser call would hold. Polaris signs a ticket for one room, for
+  # a few minutes, per person; the signing key never leaves the two of them.
+  livekit:
+    # The same image the catalog's call-server app installs, so an instance that
+    # ends up with both is running one version of one server.
+    image: livekit/livekit-server:latest
+    restart: unless-stopped
+    command: ["--config", "/etc/livekit/livekit.yaml"]
+    environment:
+      # `name: secret`, which is the shape the server reads. The dashboard signs
+      # with the same pair, from the same .env, so there is one copy of it.
+      LIVEKIT_KEYS: "${POLARIS_CALL_SERVER_API_KEY:-polaris}: ${POLARIS_CALL_SERVER_API_SECRET:?POLARIS_CALL_SERVER_API_SECRET is required}"
+    ports:
+      # Signalling, the TCP fallback for browsers on networks that block UDP,
+      # the media port, and the relay. All four have to reach a browser, so they
+      # are published on the host rather than kept on the compose network.
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+      - "3478:3478/udp"
+    volumes:
+      # Absolute host path for the same reason caddy's mount uses one: a
+      # self-update runs compose from the container path /polaris.
+      - ${POLARIS_HOST_REPO:-../..}/dashboard/docker/livekit.yaml:/etc/livekit/livekit.yaml:ro
+
   # Legacy edge, kept behind the `caddy` profile for rollback. Traefik is the
   # default edge now (automatic HTTPS for every site); to fall back, stop traefik
   # and run `docker compose --profile caddy --profile full up -d caddy`.

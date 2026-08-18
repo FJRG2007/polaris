@@ -98,6 +98,25 @@ const envSchema = z.object({
     POLARIS_TURN_USERNAME: z.string().optional(),
     POLARIS_TURN_PASSWORD: z.string().optional(),
 
+    /**
+     * The call server (LiveKit) a deployment was handed, as a WebSocket address
+     * and its key pair.
+     *
+     * Calls can also be pointed at a server from the admin screens, and that is
+     * the right shape for somebody running Polaris at home who acquires one
+     * later. It is the wrong shape for a deployment: it makes working calls
+     * something an administrator has to go and switch on after the fact, in a
+     * screen they have no reason to open, and until they do every call between
+     * two networks is a pair of people who cannot hear each other.
+     *
+     * So a deployment can hand them over the way it hands over a database URL,
+     * and then nobody configures anything: these win over anything stored, since
+     * an operator who put them in the environment of this process meant them.
+     */
+    POLARIS_CALL_SERVER_URL: z.string().optional(),
+    POLARIS_CALL_SERVER_API_KEY: z.string().optional(),
+    POLARIS_CALL_SERVER_API_SECRET: z.string().optional(),
+
     /** Directory for container-local storage and upload scratch space. */
     POLARIS_DATA_DIR: z.string().default("/var/lib/polaris"),
 

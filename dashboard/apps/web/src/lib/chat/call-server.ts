@@ -27,6 +27,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { loadEnv } from "@polaris/config";
 import { AccessToken } from "livekit-server-sdk";
 import { installApp } from "@/lib/apps/install-service";
 import { installEnvSecret } from "@/lib/apps/install-secret";
@@ -66,6 +67,23 @@ export interface CallServerEndpoint {
 async function config(): Promise<CallServerConfig> {
     const state = await getIntegrationState(PROVIDER);
     return (state?.config ?? {}) as CallServerConfig;
+}
+
+/**
+ * The call server this process was started with, if it was started with one.
+ *
+ * All three or none: a URL with no key signs nothing, and a key with no URL
+ * points nowhere. Half a pairing is a misconfiguration rather than a server, and
+ * treating it as one would take an instance that has a working admin-configured
+ * server and quietly break its calls.
+ */
+function environmentServer(): CallServerEndpoint | null {
+    const env = loadEnv();
+    const url = env.POLARIS_CALL_SERVER_URL?.trim().replace(/\/+$/, "");
+    const apiKey = env.POLARIS_CALL_SERVER_API_KEY?.trim();
+    const apiSecret = env.POLARIS_CALL_SERVER_API_SECRET?.trim();
+    if (!url || !apiKey || !apiSecret) return null;
+    return { url: websocket(url), apiKey, apiSecret };
 }
 
 /**
@@ -171,6 +189,13 @@ function websocket(address: string): string {
 /** Where calls run, or null when nothing has been set up - in which case Chat
  *  falls back to browser-to-browser, which still works inside one network. */
 export async function callServer(): Promise<CallServerEndpoint | null> {
+    // The deployment's own answer comes first. An operator who put a call server
+    // in this process's environment has already decided, and asking them to go
+    // and confirm it in a settings screen is how an instance ends up shipping
+    // with calls that cannot cross a network and nobody realising.
+    const fromEnv = environmentServer();
+    if (fromEnv) return fromEnv;
+
     const stored = await config();
     if (stored.installId) {
         const installed = await installedServer(stored.installId);

@@ -42,6 +42,12 @@ vi.mock("@/lib/integration-service", () => ({
     }
 }));
 
+/** What this process was started with. Mutable, because "the deployment was
+ *  handed a call server" and "it was not" are two different instances. */
+let env: Record<string, string | undefined> = {};
+
+vi.mock("@polaris/config", () => ({ loadEnv: () => env }));
+
 vi.mock("@/lib/apps/install-service", () => ({ installApp: async () => undefined }));
 vi.mock("@/lib/apps/install-secret", () => ({ installEnvSecret: async () => null }));
 vi.mock("@/lib/home/side-service", () => ({
@@ -64,6 +70,7 @@ const endpoint = { url: "wss://calls.example.com", apiKey: "polaris", apiSecret:
 beforeEach(() => {
     stored = null;
     secret = null;
+    env = {};
     saved.length = 0;
 });
 
@@ -147,6 +154,47 @@ describe("where calls run", () => {
             apiKey: "polaris",
             apiSecret: "kept"
         });
+    });
+
+    it("is the server the deployment was started with, with nobody configuring anything", async () => {
+        // The point of it. A deployment that was handed a call server has
+        // working calls on first boot: no administrator opens a settings screen,
+        // and until this existed every call between two networks failed on an
+        // instance where nobody knew there was a screen to open.
+        env = {
+            POLARIS_CALL_SERVER_URL: "https://calls.example.com/",
+            POLARIS_CALL_SERVER_API_KEY: "polaris",
+            POLARIS_CALL_SERVER_API_SECRET: "from-the-environment"
+        };
+
+        expect(await calls.callServer()).toEqual({
+            // Dialled as a WebSocket, whichever half of the pair was written.
+            url: "wss://calls.example.com",
+            apiKey: "polaris",
+            apiSecret: "from-the-environment"
+        });
+    });
+
+    it("takes the deployment's server over one somebody typed", async () => {
+        stored = { enabled: true, config: { url: "wss://typed.example.com", apiKey: "typed" } };
+        secret = "typed-secret";
+        env = {
+            POLARIS_CALL_SERVER_URL: "wss://deployed.example.com",
+            POLARIS_CALL_SERVER_API_KEY: "deployed",
+            POLARIS_CALL_SERVER_API_SECRET: "deployed-secret"
+        };
+
+        expect((await calls.callServer())?.url).toBe("wss://deployed.example.com");
+    });
+
+    it("ignores half a pairing in the environment rather than breaking a working one", async () => {
+        stored = { enabled: true, config: { url: "wss://typed.example.com", apiKey: "typed" } };
+        secret = "typed-secret";
+        // A URL with no key signs nothing. Treating it as a server would take an
+        // instance whose calls work and stop them.
+        env = { POLARIS_CALL_SERVER_URL: "wss://deployed.example.com" };
+
+        expect((await calls.callServer())?.url).toBe("wss://typed.example.com");
     });
 
     it("refuses an address that is not one", async () => {
