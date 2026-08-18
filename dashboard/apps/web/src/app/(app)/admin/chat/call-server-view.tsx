@@ -184,13 +184,19 @@ export function CallServerView() {
                                 <>
                                     Its container was never created here, which is why this said it
                                     was starting and never finished. Updating again brings it up -{" "}
-                                    <Link href="/admin/updates" className="text-primary hover:underline">
-                                        Settings, Update
+                                    <Link href="/settings" className="text-primary hover:underline">
+                                        Settings
                                     </Link>
-                                    .
+                                    , Update.
                                 </>
                             ) : settings.container === "stopped" ? (
-                                "Its container exists and is not running. Starting it is under Containers, by the name livekit."
+                                <>
+                                    Its container exists and is not running. Start it from{" "}
+                                    <Link href="/apps/containers" className="text-primary hover:underline">
+                                        Containers
+                                    </Link>
+                                    , where it is listed as the call server.
+                                </>
                             ) : settings.answering ? (
                                       <>
                                           Calls between devices on this network work now. For calls
