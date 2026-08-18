@@ -104,8 +104,7 @@ export async function presenceFor(
             status: statusOf(
                 inForce(person.presence, person.presenceUntil, now),
                 seen.get(person.id),
-                now,
-                mine
+                now
             ),
             inCall
         });
@@ -176,18 +175,19 @@ function inForce(chosen: string, until: Date | null, now: number): PresenceChoic
 }
 
 /** The rule, on its own so it can be read in one place. */
-function statusOf(
-    chosen: string,
-    lastSeen: Date | undefined,
-    now: number,
-    mine: boolean
-): Presence {
+function statusOf(chosen: string, lastSeen: Date | undefined, now: number): Presence {
     if (chosen === "busy") return "busy";
     if (chosen === "away") return "idle";
-    // To themselves an invisible account is idle rather than offline - they are
-    // plainly here, they are reading this - and to everybody else it is the
-    // absence they asked for.
-    if (chosen === "invisible") return mine ? "idle" : "offline";
+    // Invisible is offline to everybody, the account's own screen included.
+    //
+    // It used to draw itself as idle to the person who chose it, on the
+    // reasoning that they are plainly here and reading this. What that actually
+    // did was answer the only question they were asking - "am I hidden?" - with
+    // the amber dot that means away, which is a state they did not pick and
+    // which the picker right above it draws in grey. Somebody who sets
+    // themselves invisible and then sees the away dot has been told they are
+    // not invisible.
+    if (chosen === "invisible") return "offline";
 
     if (!lastSeen) return "offline";
     const since = now - lastSeen.getTime();
