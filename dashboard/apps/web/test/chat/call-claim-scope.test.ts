@@ -43,7 +43,7 @@ vi.mock("@polaris/db", () => ({
 }));
 
 const { GET } = await import("../../src/app/api/chat/meetings/[meetingId]/stream/route");
-const { publishMeetingEvent } = await import("../../src/lib/chat/meeting-signal");
+const { publishMeetingEvent } = await import("../../src/lib/chat/meeting-events");
 
 /** Long enough for a published event to have been written, or to have had its
  *  chance and not been. */

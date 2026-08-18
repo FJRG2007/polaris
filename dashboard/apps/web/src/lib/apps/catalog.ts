@@ -12,7 +12,15 @@
  */
 
 import { ARK_MAPS, DEFAULT_ARK_MAP } from "@/lib/apps/ark/maps";
-import { Bot, Gamepad2, House, MessagesSquare, PhoneCall, ScanFace, Video, type LucideIcon } from "lucide-react";
+import {
+    Bot,
+    Gamepad2,
+    House,
+    MessagesSquare,
+    ScanFace,
+    Video,
+    type LucideIcon
+} from "lucide-react";
 
 export type AppCategory = "Messaging" | "AI" | "Game servers" | "Home" | "Tools";
 
@@ -192,9 +200,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
             // from dashboard/services/messaging-bridge; the marketplace installs it as
             // a managed Deploy app rather than building from source on the host.
             image: "ghcr.io/fjrg2007/polaris-messaging-bridge:latest",
-            volumes: [
-                { name: "sessions", mountPath: "/app/.sessions", label: "Channel sessions" }
-            ],
+            volumes: [{ name: "sessions", mountPath: "/app/.sessions", label: "Channel sessions" }],
             ports: [{ container: 8787, protocol: "http", label: "Bridge API" }]
         }
     },
@@ -712,7 +718,10 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     default: DEFAULT_ARK_MAP,
                     options: ARK_MAPS.map((map) => ({
                         value: map.value,
-                        label: map.requires === "base" ? map.label : `${map.label} (${map.requires === "paid" ? "needs the DLC" : "a separate free download"})`
+                        label:
+                            map.requires === "base"
+                                ? map.label
+                                : `${map.label} (${map.requires === "paid" ? "needs the DLC" : "a separate free download"})`
                     })),
                     tunable: true,
                     group: "World"
@@ -938,84 +947,6 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         }
     },
     {
-        /**
-         * What carries a call, once there is more than one person in it or more
-         * than one network between them.
-         *
-         * Chat's own calls are browser-to-browser, which is the right shape for
-         * two people in one house and the wrong one for everybody else: with no
-         * server in the middle, each browser can only offer the addresses of its
-         * own network, so a call between two houses never connects at all. This
-         * is the server in the middle - every browser sends its camera and its
-         * microphone here once, and this sends them on.
-         *
-         * LiveKit rather than something written here. It is the thing this job
-         * has: an SFU, Apache-licensed, one container, and the same piece every
-         * other product that does this uses.
-         *
-         * Never offered on its own. Chat installs it from its own settings, on
-         * the machine the owner picked, and it does nothing without a call.
-         */
-        id: "call-server",
-        name: "Call server",
-        internal: true,
-        category: "Messaging",
-        icon: PhoneCall,
-        summary: "Carries the sound and the picture in a call, so browsers do not have to reach each other.",
-        description:
-            "The server a call runs through. Without one, two browsers have to find a route to each other directly - which works inside one house and fails between two. With one, each browser talks only to this, on the machine you chose. Nothing is recorded and nothing is kept: it forwards what it is given while the call is on and holds none of it.",
-        docsUrl: "https://docs.livekit.io",
-        installMethod: "compose-template",
-        capabilities: ["tool"],
-        dashboard: "generic",
-        template: {
-            image: "livekit/livekit-server:latest",
-            env: [
-                // The name and the secret, as one YAML pair, because that is the
-                // shape the server reads (`--keys`, `LIVEKIT_KEYS`). Minted here
-                // and never shown: Polaris signs every join token with it and
-                // nobody types it.
-                {
-                    key: "LIVEKIT_KEYS",
-                    label: "Signing key",
-                    generated: true,
-                    generatedPrefix: "polaris: "
-                },
-                /**
-                 * Everything else, as the one variable the server actually
-                 * reads.
-                 *
-                 * The upstream example passes `UDP_PORT` and `NODE_IP`, and it
-                 * does it by substituting them into a config file with a shell -
-                 * the binary itself has never heard of either, so setting them
-                 * here would have looked configured and done nothing. This is the
-                 * config, in flow style so it stays one line.
-                 *
-                 * What it says: one media port rather than the ten thousand the
-                 * defaults use, because a range that size cannot be forwarded
-                 * through a home router by anybody who is not already enjoying
-                 * this. And `use_external_ip`, which is how the server finds out
-                 * what address to tell browsers to send to - without it a call
-                 * between two houses is advertised at an address on the wrong
-                 * side of the router.
-                 */
-                {
-                    key: "LIVEKIT_CONFIG",
-                    label: "Server settings",
-                    help: "One line of YAML. Change `udp_port` if 7882 is taken, and add `node_ip: <address>` inside `rtc` if the machine cannot work out its own public address.",
-                    default:
-                        "{port: 7880, rtc: {tcp_port: 7881, udp_port: 7882, use_external_ip: true}}",
-                    tunable: true
-                }
-            ],
-            ports: [
-                { container: 7880, protocol: "http", label: "Signalling" },
-                { container: 7881, protocol: "tcp", label: "Media over TCP" },
-                { container: 7882, protocol: "udp", host: 7882, label: "Media" }
-            ]
-        }
-    },
-    {
         // The machine that does the looking. Never offered on its own: Home puts
         // one on whichever server a camera's detection was pointed at, and it is
         // useless without a camera to watch.
@@ -1105,7 +1036,9 @@ export function isInstallable(app: AppManifest): boolean {
 /** The env vars an operator fills in: everything the manifest declares except the
  *  ones the install mints itself and the ones installing already answers. */
 export function promptedEnvVars(app: AppManifest): readonly TemplateEnvVar[] {
-    return (app.template?.env ?? []).filter((field) => !field.generated && !isConsentField(app, field));
+    return (app.template?.env ?? []).filter(
+        (field) => !field.generated && !isConsentField(app, field)
+    );
 }
 
 /** The env vars an installed app exposes as settings, in manifest order. */

@@ -57,7 +57,9 @@ vi.mock("@polaris/db", () => ({
                             kind: channel.kind,
                             name: channel.name,
                             spaceId: channel.spaceId,
-                            members: channel.members.map((member) => ({ user: { name: member.name } }))
+                            members: channel.members.map((member) => ({
+                                user: { name: member.name }
+                            }))
                         }
                     }
                 };
@@ -79,7 +81,7 @@ vi.mock("@/lib/chat/access", () => ({
 
 vi.mock("@/lib/chat/live", () => ({ publishChatChange: () => undefined }));
 
-vi.mock("@/lib/chat/meeting-signal", () => ({
+vi.mock("@/lib/chat/meeting-events", () => ({
     publishMeetingEvent: (event: unknown) => {
         published.push(event);
     },

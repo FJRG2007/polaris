@@ -1,11 +1,10 @@
 /**
  * What a call looks like to the screens that draw one.
  *
- * There are two ways Polaris carries a call - through a media server when one is
- * set up, and browser-to-browser when there is not - and neither of them is
- * something the call screen should have to know about. So the shape is written
- * once, here, and both implementations answer to it: the grid, the audio, the
- * controls and the guest page are the same code either way.
+ * Separate from the hook that fills it in, so the grid, the audio, the controls
+ * and the guest page are written against a shape rather than against a
+ * connection - and none of them mentions the media server, which is the only
+ * thing that carries a call here.
  */
 
 import type { MeetingView } from "@/lib/chat/meetings";

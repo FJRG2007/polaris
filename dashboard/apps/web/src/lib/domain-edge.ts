@@ -39,9 +39,12 @@ const ROUTER = "polaris-dashboard";
 /** Its own redirect middleware: the file provider merges every file into one config,
  *  so reusing the name the app routes define would be a duplicate definition. */
 const REDIRECT = `${ROUTER}-redirect-https`;
-/** Below the terminal WebSocket router's 100, which carries no host of its own and
- *  has to keep winning its path prefix on these hostnames too. Traefik otherwise
- *  ranks by rule length, and a few hostnames is enough to overtake it. */
+/** Between the two. Below the path routers at 100 - the terminal WebSocket and the
+ *  call server, neither of which carries a host of its own and both of which have to
+ *  keep winning their prefix on these hostnames - and above the compose labels' own
+ *  catch-all at 10, so these hostnames get this router's certificate and firewall
+ *  rather than the plain one. Stated rather than left to Traefik, which otherwise
+ *  ranks by rule length: a few hostnames is enough to overtake a path. */
 const PRIORITY = 50;
 
 /** Suffixes that never get a public certificate, so an ACME order on one is an order
@@ -64,7 +67,8 @@ export function publicHostname(value: string | null | undefined): string | null 
         .replace(/:\d+$/, "")
         .replace(/\.$/, "");
     if (!host || !host.includes(".")) return null;
-    if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(host)) return null;
+    if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(host))
+        return null;
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return null;
     if (PRIVATE_SUFFIXES.some((suffix) => host.endsWith(suffix))) return null;
     return host;
@@ -114,7 +118,11 @@ export function renderDashboardConfig(hosts: readonly string[], waf?: DashboardW
     if (allow.length > 0) {
         const mw = `${ROUTER}-allow`;
         middlewares.push(mw);
-        definitions.push(`    ${mw}:`, "      ipAllowList:", `        sourceRange: [${allow.map((entry) => `"${entry}"`).join(", ")}]`);
+        definitions.push(
+            `    ${mw}:`,
+            "      ipAllowList:",
+            `        sourceRange: [${allow.map((entry) => `"${entry}"`).join(", ")}]`
+        );
     }
     if (
         deny.length > 0 ||
@@ -135,7 +143,8 @@ export function renderDashboardConfig(hosts: readonly string[], waf?: DashboardW
             `        address: "${guardUrl()}/authz"`
         );
     }
-    const httpsMiddlewares = middlewares.length > 0 ? [`      middlewares: [${middlewares.join(", ")}]`] : [];
+    const httpsMiddlewares =
+        middlewares.length > 0 ? [`      middlewares: [${middlewares.join(", ")}]`] : [];
     // The allowlist still applies to the :80 router; the guard does not, since that
     // router only redirects and the canonical https URL is where a request is judged.
     const httpMiddlewares = [allow.length > 0 ? `${ROUTER}-allow` : null, REDIRECT].filter(
@@ -214,7 +223,9 @@ function parseExtra(raw: string | null): string[] {
     if (!raw) return [];
     try {
         const parsed: unknown = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((value): value is string => typeof value === "string")
+            : [];
     } catch {
         return [];
     }
@@ -245,7 +256,18 @@ export async function syncDashboardRoute(): Promise<void> {
             xssProtection: waf.xssProtection
         };
         await writeFile(join(dynamicDir(), FILE), renderDashboardConfig(hosts, rule), "utf8");
+        // The call server's path rides on these same hostnames and carries the same
+        // allowlist, so it is rewritten here rather than at each of the half-dozen
+        // places a domain or a firewall rule changes - one of which would eventually
+        // be added without the other and leave the path open on a locked-down
+        // instance. Imported here rather than at the top: that module reads this
+        // one's hostnames.
+        const { syncCallServerRoute } = await import("./chat/call-edge");
+        await syncCallServerRoute();
     } catch (error) {
-        console.error("polaris: publishing the dashboard route failed:", error instanceof Error ? error.message : error);
+        console.error(
+            "polaris: publishing the dashboard route failed:",
+            error instanceof Error ? error.message : error
+        );
     }
 }

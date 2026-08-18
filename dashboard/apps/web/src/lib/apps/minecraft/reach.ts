@@ -13,22 +13,29 @@
  * pure and can be rendered in the browser; everything here is sockets and rows.
  */
 
-import { connect } from "node:net";
 import { prisma } from "@polaris/db";
 import { pingSteamQuery } from "@/lib/apps/ark/a2s";
 import { pingJava } from "@/lib/apps/minecraft/slp";
 import { pingBedrock } from "@/lib/apps/minecraft/raknet";
-import { isCarrierGradeNat, isPublicIpv4 } from "@polaris/core";
+import { getLocalEnvironment } from "@/lib/network-service";
 import { getHostLanIp, isLanAddress } from "@/lib/host-address";
 import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
-import { detectPublicIp, getLocalEnvironment } from "@/lib/network-service";
+import { probeTcpPort, publicProbeHost, PROBE_TIMEOUT_MS } from "@/lib/net/port-probe";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
-import { gameReachAdvice, gameStoppedAdvice, type GamePort, type GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
+import {
+    gameReachAdvice,
+    gameStoppedAdvice,
+    type GamePort,
+    type GameReachAdvice
+} from "@/lib/apps/minecraft/reach-advice";
 
 /** The ports a game install actually publishes, from what its deploy pinned. */
 export async function gamePorts(applicationId: string | null): Promise<GamePort[]> {
     if (!applicationId) return [];
-    const app = await prisma.application.findUnique({ where: { id: applicationId }, select: { sourceConfig: true } });
+    const app = await prisma.application.findUnique({
+        where: { id: applicationId },
+        select: { sourceConfig: true }
+    });
     if (!app) return [];
     let config: {
         hostPort?: unknown;
@@ -42,13 +49,19 @@ export async function gamePorts(applicationId: string | null): Promise<GamePort[
     }
     const ports: GamePort[] = [];
     if (typeof config.hostPort === "number") {
-        ports.push({ port: config.hostPort, protocol: config.hostProtocol === "udp" ? "udp" : "tcp" });
+        ports.push({
+            port: config.hostPort,
+            protocol: config.hostProtocol === "udp" ? "udp" : "tcp"
+        });
     }
     if (Array.isArray(config.extraPorts)) {
         for (const entry of config.extraPorts) {
             const extra = entry as { host?: unknown; protocol?: unknown };
             if (typeof extra.host === "number") {
-                ports.push({ port: extra.host, protocol: extra.protocol === "udp" ? "udp" : "tcp" });
+                ports.push({
+                    port: extra.host,
+                    protocol: extra.protocol === "udp" ? "udp" : "tcp"
+                });
             }
         }
     }
@@ -97,31 +110,6 @@ export async function noteReachedFrom(installedAppId: string, address: string): 
     return true;
 }
 
-/** How long to wait on a port before calling the probe inconclusive. */
-const PROBE_TIMEOUT_MS = 4000;
-
-/**
- * Try to open the port from here, through the public address.
- *
- * Positive evidence only: a connection that completes went out to the public
- * address and came back in, which is the forward working. A refusal or a timeout
- * is reported as false and means nothing on its own - most routers do not loop
- * their own WAN address back inward. This one speaks TCP; a UDP port is asked the
- * only question it can answer, in `raknet.ts`.
- */
-export function probeGamePort(host: string, port: number, timeoutMs = PROBE_TIMEOUT_MS): Promise<boolean> {
-    return new Promise((resolve) => {
-        const socket = connect({ host, port, timeout: timeoutMs });
-        const settle = (reached: boolean): void => {
-            socket.destroy();
-            resolve(reached);
-        };
-        socket.once("connect", () => settle(true));
-        socket.once("timeout", () => settle(false));
-        socket.once("error", () => settle(false));
-    });
-}
-
 /**
  * Whether anything answers on one UDP port, asked in every language a game server
  * here might reply in.
@@ -137,9 +125,10 @@ export function probeGamePort(host: string, port: number, timeoutMs = PROBE_TIME
  * threading a catalog id through every caller of this.
  */
 function answersOnUdp(host: string, port: number, timeoutMs: number): Promise<boolean> {
-    return Promise.all([pingBedrock(host, port, timeoutMs), pingSteamQuery(host, port, timeoutMs)]).then(
-        (answers) => answers.some(Boolean)
-    );
+    return Promise.all([
+        pingBedrock(host, port, timeoutMs),
+        pingSteamQuery(host, port, timeoutMs)
+    ]).then((answers) => answers.some(Boolean));
 }
 
 /** A ping that crosses no router is answered at once or not at all. Short enough
@@ -170,7 +159,10 @@ const LOCAL_PROBE_TIMEOUT_MS = 700;
  * Null when there is nothing to ask about, so a caller with no ports is not handed
  * a verdict about them.
  */
-export async function probeListening(ports: readonly GamePort[], lanIp: string | null): Promise<boolean | null> {
+export async function probeListening(
+    ports: readonly GamePort[],
+    lanIp: string | null
+): Promise<boolean | null> {
     if (ports.length === 0) return null;
     const host = lanIp ?? "127.0.0.1";
     // Every port at once: a game publishes several and only one of them answers,
@@ -209,7 +201,7 @@ export interface PendingReach {
  * This is the half that lets a panel notice a forward that has just been made,
  * rather than waiting for a player to arrive: the packet still has to leave this
  * network and come back through the router, so a connection that completes is the
- * forward working. Nothing is concluded from silence - see `probeGamePort` - and
+ * forward working. Nothing is concluded from silence - see `probeTcpPort` - and
  * nothing is attempted at all unless this line has an address the internet could
  * dial, since knocking on a LAN address would clear the warning for the one
  * operator whose forward does not exist.
@@ -218,7 +210,7 @@ export interface PendingReach {
  */
 export async function probeReach(pending: readonly PendingReach[]): Promise<string[]> {
     if (pending.length === 0) return [];
-    const host = await probeHost();
+    const host = await publicProbeHost();
     if (!host) return [];
     const reached: string[] = [];
     for (const entry of pending) {
@@ -232,7 +224,7 @@ export async function probeReach(pending: readonly PendingReach[]): Promise<stri
         const answers = await Promise.all(
             entry.ports.map((port) =>
                 port.protocol === "tcp"
-                    ? probeGamePort(host, port.port)
+                    ? probeTcpPort(host, port.port)
                     : answersOnUdp(host, port.port, PROBE_TIMEOUT_MS)
             )
         );
@@ -243,15 +235,6 @@ export async function probeReach(pending: readonly PendingReach[]): Promise<stri
     return reached;
 }
 
-/** The address to knock on: what this network reaches the internet from, and only
- *  when it is one an outside client could use. A carrier-NAT address is shared
- *  with other customers, so what answers on it need not be this machine at all. */
-async function probeHost(): Promise<string | null> {
-    const ip = await detectPublicIp().catch(() => null);
-    if (!ip || !isPublicIpv4(ip) || isCarrierGradeNat(ip)) return null;
-    return ip;
-}
-
 /**
  * What is still in the way for one install, gathered from everything it depends
  * on. Shared by the page that renders the panel and the endpoint it polls, so the
@@ -260,7 +243,10 @@ async function probeHost(): Promise<string | null> {
  * `probe` is off for a render and on for a poll: knocking on a port costs seconds
  * against a router that drops the packet, and a page must not wait on it to paint.
  */
-export async function reachAdviceFor(installedAppId: string, probe = false): Promise<GameReachAdvice> {
+export async function reachAdviceFor(
+    installedAppId: string,
+    probe = false
+): Promise<GameReachAdvice> {
     const install = await prisma.installedApp.findUnique({
         where: { id: installedAppId },
         select: { applicationId: true, config: true }

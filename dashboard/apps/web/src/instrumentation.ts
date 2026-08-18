@@ -29,7 +29,9 @@ export async function register(): Promise<void> {
 
     // Write the Traefik dynamic routes for deployed-app domains on startup, so the
     // edge self-heals after a restart or a fresh dynamic volume. Best-effort.
-    const { syncAppRoutes, reconcileNasMounts, recoverAbandonedDeployments } = await import("./lib/deploy-service");
+    const { syncAppRoutes, reconcileNasMounts, recoverAbandonedDeployments } = await import(
+        "./lib/deploy-service"
+    );
     const { guardVacantReachable } = await import("./lib/deploy/router");
     void syncAppRoutes()
         .then(async () => {
@@ -62,10 +64,19 @@ export async function register(): Promise<void> {
     const { syncDashboardRoute } = await import("./lib/domain-edge");
     void syncDashboardRoute();
 
+    // And the call server's path, for a stronger version of the same reason: it
+    // runs on the host's network, so there is no container address for the edge's
+    // label discovery to route to and this file is the only way it is reachable
+    // at all. Without it every call fails at the first WebSocket.
+    const { syncCallServerRoute } = await import("./lib/chat/call-edge");
+    void syncCallServerRoute();
+
     // Migrate any quick tunnel still forwarding straight to an app's port onto the edge,
     // so its traffic is logged (and future restarts leave an edge tunnel untouched).
     const { reconcileQuickTunnels } = await import("./lib/deploy/quick-tunnel-service");
-    void reconcileQuickTunnels().catch((error) => console.error("polaris: quick-tunnel reconcile failed:", error));
+    void reconcileQuickTunnels().catch((error) =>
+        console.error("polaris: quick-tunnel reconcile failed:", error)
+    );
 
     // And the server's own tunnel, for the same reason: a connector raised against an
     // origin that has since changed keeps running and forwards into nothing. Only one
@@ -76,7 +87,9 @@ export async function register(): Promise<void> {
     // Re-establish NAS volume mounts a host reboot dropped, restarting any app whose
     // mount had to be re-created - so a NAS-backed volume survives reboots like a real
     // docker volume. Best-effort; a routine restart keeps live mounts and is a no-op.
-    void reconcileNasMounts().catch((error) => console.error("polaris: initial NAS mount reconcile failed:", error));
+    void reconcileNasMounts().catch((error) =>
+        console.error("polaris: initial NAS mount reconcile failed:", error)
+    );
 
     // Mint (once) an internal CA + leaf for the LAN hostnames and hand the leaf to
     // Traefik as its default certificate, so polaris.local can be trusted HTTPS
@@ -107,7 +120,9 @@ export async function register(): Promise<void> {
     // place and the next boot retries, rather than leaving deploys without a
     // clone credential.
     const { adoptInstanceGithubPat } = await import("./lib/connections/adopt-github-pat");
-    void adoptInstanceGithubPat().catch((error) => console.error("polaris: GitHub token adoption failed:", error));
+    void adoptInstanceGithubPat().catch((error) =>
+        console.error("polaris: GitHub token adoption failed:", error)
+    );
 
     // Vercel-style auto-deploy: poll connected GitHub repos and redeploy on a new
     // commit. Works without a public webhook (LAN installs can't receive one).

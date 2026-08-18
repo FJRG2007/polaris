@@ -120,7 +120,7 @@ export function ChannelView({
 }) {
     const router = useRouter();
     const params = useSearchParams();
-    const { viewerId, channels, refresh, rulesFor, may } = useChat();
+    const { viewerId, channels, refresh, rulesFor, may, callsOff } = useChat();
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
     const [pending, setPending] = useState<readonly ChatMessageView[]>([]);
     const [olderThan, setOlderThan] = useState<string | null>(null);
@@ -1019,6 +1019,7 @@ export function ChannelView({
                     <VoiceStrip
                         name={channel.name}
                         count={live?.count ?? 0}
+                        off={callsOff}
                         onJoin={(video) => {
                             void runAction(() => calls.startCallAction(channelId), setError).then(
                                 (result) => {
@@ -1333,11 +1334,15 @@ export function ChannelView({
 function VoiceStrip({
     name,
     count,
-    onJoin
+    onJoin,
+    off
 }: {
     name: string;
     count: number;
     onJoin: (withVideo: boolean) => void;
+    /** Why nobody can walk in right now, or null. A voice room whose way in is
+     *  a button that fails is a room people press twice and then give up on. */
+    off: string | null;
 }) {
     return (
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-4 py-2">
@@ -1352,14 +1357,20 @@ function VoiceStrip({
                           : ` - ${count} people are in here`}
                 </span>
             </span>
-            <Button size="xs" onClick={() => onJoin(false)}>
-                <Mic className="size-3.5" />
-                Join
-            </Button>
-            <Button size="xs" variant="secondary" onClick={() => onJoin(true)}>
-                <Video className="size-3.5" />
-                With video
-            </Button>
+            {off ? (
+                <span className="text-xs text-muted-foreground">{off}</span>
+            ) : (
+                <>
+                    <Button size="xs" onClick={() => onJoin(false)}>
+                        <Mic className="size-3.5" />
+                        Join
+                    </Button>
+                    <Button size="xs" variant="secondary" onClick={() => onJoin(true)}>
+                        <Video className="size-3.5" />
+                        With video
+                    </Button>
+                </>
+            )}
         </div>
     );
 }

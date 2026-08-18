@@ -18,7 +18,10 @@ let publicIp: string | null = "127.0.0.1";
 
 /** The install the advice is asked about, and the application behind it - the
  *  ports it published and whether Polaris means it to be up. */
-let install: { applicationId: string | null; config: string | null } = { applicationId: "app", config: null };
+let install: { applicationId: string | null; config: string | null } = {
+    applicationId: "app",
+    config: null
+};
 let application: { sourceConfig: string; desiredState: string } | null = null;
 
 vi.mock("@polaris/db", () => ({
@@ -29,7 +32,11 @@ vi.mock("@polaris/db", () => ({
 }));
 vi.mock("@/lib/network-service", () => ({
     detectPublicIp: async () => publicIp,
-    getLocalEnvironment: async () => ({ environment: "home-nat", detected: "home-nat", confirmed: true })
+    getLocalEnvironment: async () => ({
+        environment: "home-nat",
+        detected: "home-nat",
+        confirmed: true
+    })
 }));
 vi.mock("@/lib/apps/install-config", () => ({
     patchInstallConfig: async (id: string, patch: Record<string, unknown>) => {
@@ -46,7 +53,10 @@ vi.mock("@/lib/host-address", async (importActual) => ({
 }));
 vi.mock("@/lib/apps/port-block-store", () => ({
     getPortPolicy: async () => "range",
-    getPortBlocks: async () => ({ tcp: { start: 25565, end: 25664 }, udp: { start: 19132, end: 19231 } })
+    getPortBlocks: async () => ({
+        tcp: { start: 25565, end: 25664 },
+        udp: { start: 19132, end: 19231 }
+    })
 }));
 vi.mock("@polaris/core", async (importActual) => ({
     ...(await importActual<typeof import("@polaris/core")>()),
@@ -55,9 +65,10 @@ vi.mock("@polaris/core", async (importActual) => ({
     isPublicIpv4: (value: string) => value === "127.0.0.1"
 }));
 
-const { noteReachedFrom, probeGamePort, probeListening, probeReach, reachAdviceFor } = await import(
+const { noteReachedFrom, probeListening, probeReach, reachAdviceFor } = await import(
     "@/lib/apps/minecraft/reach"
 );
+const { probeTcpPort } = await import("@/lib/net/port-probe");
 
 /** A port with something listening on it, and the same port once nothing is. */
 async function listener(): Promise<{ port: number; server: Server }> {
@@ -124,7 +135,9 @@ function statusReply(): Buffer {
  * a running server is what sent an operator into their router about a server that
  * had not started yet.
  */
-async function java(speaks: "status" | "silence" | "gibberish"): Promise<{ port: number; server: Server }> {
+async function java(
+    speaks: "status" | "silence" | "gibberish"
+): Promise<{ port: number; server: Server }> {
     const server = createServer((socket) => {
         // The probe hangs up the moment it has its answer, and a hang-up on a
         // request this side never read is a reset - which is an error event with
@@ -137,7 +150,9 @@ async function java(speaks: "status" | "silence" | "gibberish"): Promise<{ port:
             socket.resume();
             return;
         }
-        socket.once("data", () => socket.write(speaks === "status" ? statusReply() : Buffer.from("HTTP/1.1 200 OK")));
+        socket.once("data", () =>
+            socket.write(speaks === "status" ? statusReply() : Buffer.from("HTTP/1.1 200 OK"))
+        );
     });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
@@ -156,11 +171,11 @@ describe("knocking on a single port", () => {
     it("reports the port that answers, and only that", async () => {
         const { port, server } = await listener();
 
-        expect(await probeGamePort("127.0.0.1", port)).toBe(true);
+        expect(await probeTcpPort("127.0.0.1", port)).toBe(true);
         await close(server);
         // Nothing is listening now, so the same call has to come back false - a
         // probe that keeps saying yes is worse than one that never says it.
-        expect(await probeGamePort("127.0.0.1", port)).toBe(false);
+        expect(await probeTcpPort("127.0.0.1", port)).toBe(false);
     });
 });
 
@@ -168,9 +183,9 @@ describe("proving a server's ports", () => {
     it("records the install when its port answers from the outside address", async () => {
         const { port, server } = await listener();
 
-        expect(await probeReach([{ installedAppId: "answers", ports: [{ port, protocol: "tcp" }] }])).toEqual([
-            "answers"
-        ]);
+        expect(
+            await probeReach([{ installedAppId: "answers", ports: [{ port, protocol: "tcp" }] }])
+        ).toEqual(["answers"]);
         expect(patched).toHaveLength(1);
         expect(patched[0]?.id).toBe("answers");
         expect(typeof patched[0]?.patch.portReachableAt).toBe("string");
@@ -195,9 +210,9 @@ describe("proving a server's ports", () => {
         // Without this a Bedrock server could never be proven at all: UDP was
         // skipped here and its log prints no player address either, so the panel
         // asked for a forward that already existed and never took it back.
-        expect(await probeReach([{ installedAppId: "bedrock", ports: [{ port, protocol: "udp" }] }])).toEqual([
-            "bedrock"
-        ]);
+        expect(
+            await probeReach([{ installedAppId: "bedrock", ports: [{ port, protocol: "udp" }] }])
+        ).toEqual(["bedrock"]);
         expect(patched).toHaveLength(1);
         await closeSocket(socket);
     });
@@ -207,7 +222,9 @@ describe("proving a server's ports", () => {
 
         // Something replied, which is exactly the trap: only a packet carrying
         // RakNet's magic came from the game server the operator is asking about.
-        expect(await probeReach([{ installedAppId: "impostor", ports: [{ port, protocol: "udp" }] }])).toEqual([]);
+        expect(
+            await probeReach([{ installedAppId: "impostor", ports: [{ port, protocol: "udp" }] }])
+        ).toEqual([]);
         expect(patched).toEqual([]);
         await closeSocket(socket);
     });
@@ -215,7 +232,9 @@ describe("proving a server's ports", () => {
     it("stays silent on a UDP port that answers nothing", async () => {
         const { port, server } = await listener();
 
-        expect(await probeReach([{ installedAppId: "quiet", ports: [{ port, protocol: "udp" }] }])).toEqual([]);
+        expect(
+            await probeReach([{ installedAppId: "quiet", ports: [{ port, protocol: "udp" }] }])
+        ).toEqual([]);
         expect(patched).toEqual([]);
         await close(server);
     });
@@ -226,7 +245,9 @@ describe("proving a server's ports", () => {
 
         // The forward is exactly what is in question, so a probe that never leaves
         // the network can only ever answer the wrong question.
-        expect(await probeReach([{ installedAppId: "natted", ports: [{ port, protocol: "tcp" }] }])).toEqual([]);
+        expect(
+            await probeReach([{ installedAppId: "natted", ports: [{ port, protocol: "tcp" }] }])
+        ).toEqual([]);
         expect(patched).toEqual([]);
         await close(server);
     });
@@ -311,13 +332,23 @@ describe("whether the game is answering here", () => {
         const published = await java("silence");
         const impostor = await java("gibberish");
 
-        expect(await probeListening([{ port: answering.port, protocol: "tcp" }], "127.0.0.1")).toBe(true);
+        expect(await probeListening([{ port: answering.port, protocol: "tcp" }], "127.0.0.1")).toBe(
+            true
+        );
         // This is the state that used to be read as "your router is not forwarding
         // it": the port is held and open, and nothing is playing Minecraft behind
         // it. Something answered on the third, and it was not the game.
-        expect(await probeListening([{ port: published.port, protocol: "tcp" }], "127.0.0.1")).toBe(false);
-        expect(await probeListening([{ port: impostor.port, protocol: "tcp" }], "127.0.0.1")).toBe(false);
-        await Promise.all([close(answering.server), close(published.server), close(impostor.server)]);
+        expect(await probeListening([{ port: published.port, protocol: "tcp" }], "127.0.0.1")).toBe(
+            false
+        );
+        expect(await probeListening([{ port: impostor.port, protocol: "tcp" }], "127.0.0.1")).toBe(
+            false
+        );
+        await Promise.all([
+            close(answering.server),
+            close(published.server),
+            close(impostor.server)
+        ]);
     });
 
     it("hears a Bedrock server on UDP, and nothing else", async () => {

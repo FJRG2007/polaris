@@ -15,12 +15,14 @@
  */
 
 import * as core from "@polaris/core";
-import { chatRulesAction, listCategoriesAction, listChannelsAction, listSpacesAction } from "./actions";
-import type {
-    ChatCategoryView,
-    ChatChannelView,
-    ChatSpaceView
-} from "@/lib/chat/chat-service";
+import { callsUnavailableAction } from "./meeting-actions";
+import {
+    chatRulesAction,
+    listCategoriesAction,
+    listChannelsAction,
+    listSpacesAction
+} from "./actions";
+import type { ChatCategoryView, ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
 import {
     createContext,
     useCallback,
@@ -75,9 +77,23 @@ interface ChatContextValue {
      *  defaults until the answer arrives, so the composer is never briefly
      *  stricter than the server. */
     readonly rulesFor: (channel: { spaceId: string | null; kind: string }) => core.ChatRules;
+    /**
+     * Why a call cannot be started, or null when one can.
+     *
+     * Null until the first answer arrives, so nothing flashes as broken while
+     * the app opens. The server refuses a call for the same reason either way;
+     * this is what stops somebody pressing a button that was never going to
+     * work, and what tells them why.
+     */
+    readonly callsOff: string | null;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
+
+/** How often to ask again while calls are not working. Only while: a working
+ *  instance asks once and stops, and a restarting one gets its buttons back
+ *  within a few seconds of the media server coming up. */
+const CALLS_RECHECK_MS = 8000;
 
 export function ChatProvider({
     viewerId,
@@ -135,6 +151,46 @@ export function ChatProvider({
             });
     }, []);
 
+    /**
+     * Whether calls work at all, asked once and then only while they do not.
+     *
+     * The media server starts with the stack and takes a moment to come up, so
+     * "not yet" is a state a browser can sit in for the first minute after a
+     * restart. Re-asking only in that state is what lets the buttons come back
+     * on their own, without every open tab knocking on it forever afterwards.
+     */
+    const [callsOff, setCallsOff] = useState<string | null>(null);
+    // Whether, not why. The effect below turns on this rather than on the
+    // sentence, so a reworded answer does not restart the timer.
+    const callsAreOff = callsOff !== null;
+
+    useEffect(() => {
+        if (!may.call) return;
+        let stopped = false;
+        const ask = (): void => {
+            void callsUnavailableAction()
+                .then((reason) => {
+                    if (!stopped) setCallsOff(reason);
+                })
+                .catch(() => {
+                    // Left as it was. A question that could not be asked is not
+                    // an answer, and reading it as "calls are off" would take
+                    // the buttons away over one failed request.
+                });
+        };
+        ask();
+        if (!callsAreOff) {
+            return () => {
+                stopped = true;
+            };
+        }
+        const timer = setInterval(ask, CALLS_RECHECK_MS);
+        return () => {
+            stopped = true;
+            clearInterval(timer);
+        };
+    }, [may.call, callsAreOff]);
+
     const rulesFor = useCallback(
         (channel: { spaceId: string | null; kind: string }) =>
             rules?.[core.chatRuleScopeOf(channel)] ?? core.DEFAULT_CHAT_RULES,
@@ -155,7 +211,8 @@ export function ChatProvider({
             setActiveSpaceId,
             loaded,
             refresh,
-            rulesFor
+            rulesFor,
+            callsOff
         }),
         [
             viewerId,
@@ -169,7 +226,8 @@ export function ChatProvider({
             activeSpaceId,
             loaded,
             refresh,
-            rulesFor
+            rulesFor,
+            callsOff
         ]
     );
 

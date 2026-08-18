@@ -261,9 +261,9 @@ Chat (talking to the people here):
       Only offered where the ticks already are, and only what the other
       person's privacy setting allows
 - [x] Reached by being in it. No administrator override, no instance-wide read
-- [x] Calls: audio and video started from a conversation, browser to browser
-      with no media ever passing through Polaris. Mute, camera, and a roster of
-      who is in the room. Capped at 8, which is what a mesh carries
+- [x] Calls: audio and video started from a conversation through the media
+      server the stack runs, browsers never exchanging media directly. Mute,
+      camera, and a roster of who is in the room. Capped at 8
 - [x] The microphone is one choice remembered per browser, not per feature - the
       one picked for a call is also the one a voice message records with, so
       picking the good headset for a call and being recorded through a laptop
@@ -272,10 +272,11 @@ Chat (talking to the people here):
       per-meeting link an account holder opens. They wait in a lobby until
       somebody inside lets them in, the link dies with the call, and the cookie
       they get is a seat in one room rather than anything resembling a session
-- [ ] STUN/TURN are configuration (`POLARIS_STUN_URLS`, `POLARIS_TURN_URL`).
-      With neither set, calls work on one network and between reachable
-      addresses, and not otherwise - a hosted TURN default is not something
-      Polaris should decide for an operator
+- [x] Calls are carried by the media server the stack starts, and by nothing
+      else. Between devices on this network it needs no setup at all; from
+      outside it needs two ports forwarded, which Domains lists and checks -
+      and until the server answers, Chat says so instead of offering a call
+      that would connect to silence
 - [x] Files on a message: staged in the composer, dropped onto the conversation,
       pasted from the clipboard, or picked - a pasted screenshot gets the same
       preview and limits as a picked file rather than being eaten silently.

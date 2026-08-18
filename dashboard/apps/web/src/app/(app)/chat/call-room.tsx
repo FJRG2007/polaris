@@ -243,12 +243,11 @@ export function CallRoom({
                 while it is there. Above the faces and across the whole width
                 rather than in a tile the size of a head: a shared screen is
                 usually text, and text in a ninth of a window is not readable.
-                One per sharer, because a mesh has no reason to allow only one. */}
+                One per sharer: the server sends each subscriber only what
+                    they are watching, so there is no reason to allow only one. */}
             {(live?.startsWith("camera:")
                 ? []
-                : [...call.screens].filter(
-                      ([personId]) => !live || live === `screen:${personId}`
-                  )
+                : [...call.screens].filter(([personId]) => !live || live === `screen:${personId}`)
             ).map(([personId, stream]) => (
                 <div key={personId} className="min-h-0 flex-[2]">
                     <Tile
@@ -714,7 +713,8 @@ function Tile({
     }, []);
 
     const toggleFull = () => {
-        if (document.fullscreenElement === frame.current) void document.exitFullscreen().catch(() => undefined);
+        if (document.fullscreenElement === frame.current)
+            void document.exitFullscreen().catch(() => undefined);
         else void frame.current?.requestFullscreen().catch(() => undefined);
     };
 
@@ -887,7 +887,11 @@ function Tile({
                             title={focused ? "Back to the grid" : "Make this bigger"}
                             className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
                         >
-                            {focused ? <Shrink className="size-3.5" /> : <Expand className="size-3.5" />}
+                            {focused ? (
+                                <Shrink className="size-3.5" />
+                            ) : (
+                                <Expand className="size-3.5" />
+                            )}
                         </button>
                     )}
                     <button
@@ -897,7 +901,11 @@ function Tile({
                         title={full ? "Leave full screen" : "Full screen"}
                         className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
                     >
-                        {full ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+                        {full ? (
+                            <Minimize2 className="size-3.5" />
+                        ) : (
+                            <Maximize2 className="size-3.5" />
+                        )}
                     </button>
                 </span>
             )}
@@ -1044,7 +1052,7 @@ function nameOf(
     return people?.find((person) => person.id === personId)?.name ?? "Somebody";
 }
 
-/** Enough columns to keep the tiles roughly square at every size a mesh call can
+/** Enough columns to keep the tiles roughly square at every size a call can
  *  reach. A lookup rather than a measurement: the room is capped at eight. */
 function gridColumns(people: number): string {
     if (people <= 1) return "grid-cols-1";

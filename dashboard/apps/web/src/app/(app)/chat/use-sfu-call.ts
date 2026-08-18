@@ -3,20 +3,17 @@
 /**
  * A call through the media server.
  *
- * This is the way a call is carried whenever an instance has a call server set
- * up, and it is the difference between a call that works and a call that only
- * works in one house. Each browser opens **one** connection, publishes its
- * microphone and camera **once**, and receives everybody else's back from the
- * server. The mesh next door does the opposite - one connection and one upload
- * of the same camera per other person - which is fine for two people on the same
- * wifi and falls over at four on domestic upstream.
+ * The only way a call is carried. Each browser opens **one** connection,
+ * publishes its microphone and camera **once**, and receives everybody else's
+ * back from the server - rather than one connection and one upload of the same
+ * camera per other person, which is fine for two people on one wifi and falls
+ * over at four on domestic upstream.
  *
  * Three things follow from having something in the middle, and they are the
  * reasons for doing it rather than side effects:
  *
- * - **It connects.** The server has a public address, so neither browser has to
- *   discover its own; two people on different networks reach each other through
- *   it without a STUN server, a TURN relay or a port forward.
+ * - **It connects.** The server has an address both browsers can reach, so
+ *   neither has to discover its own and neither needs a relay of its own.
  * - **It sends less.** `dynacast` stops publishing the quality layers nobody is
  *   currently watching, and `adaptiveStream` asks for the resolution a tile is
  *   actually being drawn at - so a face in a 160px tile is not a 720p stream
@@ -24,8 +21,7 @@
  *   instead of paying for frames nobody sees.
  * - **There is nothing to negotiate.** No offers, no answers, no candidates, no
  *   book of which slot carries the screen. Publishing a track says what it is,
- *   and a subscriber is told. All of the mesh's signalling, and every bug that
- *   lives in it, simply is not here.
+ *   and a subscriber is told.
  *
  * What Polaris still owns is everything about *who*: the meeting, the roster,
  * the waiting room, and the ticket that lets a browser in - see `call-server`.
@@ -42,8 +38,8 @@
 import { z } from "zod";
 import { setMicDevice } from "./mic-device";
 import { callDeviceId } from "./call-device";
-import { callServerUrl } from "./call-address";
 import * as actions from "./meeting-actions";
+import { callServerUrl } from "./call-address";
 import { playCallSound } from "@/lib/call-sounds";
 import type { MeetingView } from "@/lib/chat/meetings";
 import { callDevices, openMedia, settle } from "./call-media";
@@ -99,9 +95,9 @@ const CONNECTED = "connected" as Room["state"];
 /**
  * The meeting's own stream, which is about people rather than media.
  *
- * The same frames the mesh reads, minus the signalling one: with a server in the
- * middle there is nothing for one browser to say to another. What is left is who
- * is here, who is waiting, and whether it is over.
+ * Only the room, never the media: with a server in the middle there is nothing
+ * for one browser to say to another. What is left is who is here, who is
+ * waiting, and whether it is over.
  */
 const frameSchema = z.discriminatedUnion("kind", [
     z.object({
@@ -109,7 +105,6 @@ const frameSchema = z.discriminatedUnion("kind", [
         participantId: z.string(),
         admission: z.string()
     }),
-    z.object({ kind: z.literal("signal"), fromId: z.string(), payload: z.string() }),
     z.object({ kind: z.literal("roster") }),
     z.object({ kind: z.literal("ended") }),
     /** Another browser of this same account took the call. */
@@ -126,6 +121,10 @@ const frameSchema = z.discriminatedUnion("kind", [
  * one small key-value bag the server keeps per person and gossips to the room.
  */
 const DEAFENED = "deafened";
+
+/** What asking for a ticket answers. Named so a request that could not be made
+ *  at all can be turned into the same shape and read the same way. */
+type CallTicket = Awaited<ReturnType<typeof actions.callTokenAction>>;
 
 export function useSfuCall(meetingId: string | null, options?: { video?: boolean }): CallState {
     const withVideo = options?.video ?? true;
@@ -154,9 +153,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     /** The connection to the media server, for as long as this browser is in the
      *  call. One of them, whatever the size of the room. */
     const room = useRef<Room | null>(null);
-    // The three devices this browser can put on the wire, held separately for the
-    // same reason the mesh holds them: what is published is one of them, and the
-    // others have to stay openable without a second permission prompt.
+    // The three devices this browser can put on the wire, held separately: what
+    // is published is one of them, and the others have to stay openable without
+    // a second permission prompt.
     const mic = useRef<MediaStreamTrack | null>(null);
     const camera = useRef<MediaStreamTrack | null>(null);
     const screen = useRef<MediaStreamTrack | null>(null);
@@ -232,8 +231,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * in a map nobody rebuilt.
      *
      * Which tile a track belongs in is the publication's `source`, decided by
-     * the publisher when it published and carried by the server. That is the
-     * whole of what the mesh needed a `mid` book and a hand-rolled message for.
+     * the publisher when it published and carried by the server, so there is no
+     * book of which slot carries what and nothing to keep in step.
      *
      * Everybody's is worked out, and only the ones that actually changed get a
      * new `MediaStream` - see `settle`. A stream object is what a tile is pointed
@@ -252,7 +251,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             for (const publication of participant.trackPublications.values()) {
                 const track = publication.track?.mediaStreamTrack;
                 if (!track || track.readyState !== "live") continue;
-                const onScreen = publication.source === SCREEN || publication.source === SCREEN_AUDIO;
+                const onScreen =
+                    publication.source === SCREEN || publication.source === SCREEN_AUDIO;
                 (onScreen ? display : camera).push(track);
             }
             faces.set(participant.identity, camera);
@@ -302,38 +302,34 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * the end - stopping one on unpublish would cost a permission prompt to turn
      * a camera back on.
      */
-    const publish = useCallback(
-        async (source: Track.Source, track: MediaStreamTrack | null) => {
-            const current = room.current;
-            if (!current || current.state !== CONNECTED) return;
-            const local = current.localParticipant;
-            const existing = local.getTrackPublication(source);
+    const publish = useCallback(async (source: Track.Source, track: MediaStreamTrack | null) => {
+        const current = room.current;
+        if (!current || current.state !== CONNECTED) return;
+        const local = current.localParticipant;
+        const existing = local.getTrackPublication(source);
 
-            if (!track) {
-                if (existing?.track) {
-                    await local.unpublishTrack(existing.track, false).catch(() => undefined);
-                }
-                return;
-            }
+        if (!track) {
             if (existing?.track) {
-                // `true` is "this track is the caller's": the old one is left
-                // alone rather than stopped, which is what makes a microphone
-                // swap reversible.
-                await existing.track.replaceTrack(track, true).catch(() => undefined);
-                return;
+                await local.unpublishTrack(existing.track, false).catch(() => undefined);
             }
-            await local
-                .publishTrack(track, {
-                    source,
-                    // A screen is text as often as it is video, and text survives
-                    // a dropped frame far better than it survives being blurred.
-                    degradationPreference:
-                        source === SCREEN ? "maintain-resolution" : undefined
-                })
-                .catch(() => undefined);
-        },
-        []
-    );
+            return;
+        }
+        if (existing?.track) {
+            // `true` is "this track is the caller's": the old one is left
+            // alone rather than stopped, which is what makes a microphone
+            // swap reversible.
+            await existing.track.replaceTrack(track, true).catch(() => undefined);
+            return;
+        }
+        await local
+            .publishTrack(track, {
+                source,
+                // A screen is text as often as it is video, and text survives
+                // a dropped frame far better than it survives being blurred.
+                degradationPreference: source === SCREEN ? "maintain-resolution" : undefined
+            })
+            .catch(() => undefined);
+    }, []);
 
     /**
      * Turn this browser's voice on or off.
@@ -346,9 +342,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const setVoiceEnabled = useCallback((on: boolean) => {
         if (mic.current) mic.current.enabled = on;
         if (filtered.current) filtered.current.track.enabled = on;
-        const publication = room.current?.localParticipant.getTrackPublication(
-            MICROPHONE
-        );
+        const publication = room.current?.localParticipant.getTrackPublication(MICROPHONE);
         if (!publication?.track) return;
         if (on) void publication.track.unmute().catch(() => undefined);
         else void publication.track.mute().catch(() => undefined);
@@ -412,6 +406,32 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
          * is what keeps it from being repeated afterwards as well.
          */
         let connecting = false;
+        /**
+         * What a failed attempt put on screen, so the attempt that succeeds can
+         * take it back down.
+         *
+         * Only that message. A call that opens while the media server is
+         * restarting fails once and joins on the next roster change, and the
+         * banner it left said the call reached nobody while both people could
+         * hear each other. What the devices had to say - no microphone, no
+         * camera - is not this and stays where it is.
+         */
+        let reported = "";
+
+        /** Say why the call has not started. */
+        function report(message: string): void {
+            reported = message;
+            setError(message);
+        }
+
+        /** Take back what the last failed attempt said, if it is still what the
+         *  screen is showing. */
+        function connected(): void {
+            if (!reported) return;
+            const stale = reported;
+            reported = "";
+            setError((current) => (current === stale ? "" : current));
+        }
 
         // This is a different call, so nothing about the last one is true of it.
         // `ended` in particular: it is only ever set, never cleared, so a second
@@ -422,18 +442,25 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         /**
          * Ask for the ticket and join, if there is one to be had.
          *
-         * A refusal here is the ordinary case rather than an error: somebody in
-         * the waiting room is told "not yet", and the next roster change asks
-         * again. Only a call whose media server has actually gone is worth a
-         * line on screen.
+         * Waiting is the ordinary case and says nothing: somebody in the lobby
+         * is told "not yet", and the next roster change asks again. Anything
+         * else has gone wrong and goes on screen - most often a media server
+         * that is not answering, which without this was a room that showed
+         * everybody's name and carried no sound, with nothing to read.
          */
         async function connect(): Promise<void> {
             if (stopped || connecting || room.current) return;
             const ticket = await actions
                 .callTokenAction(inCall)
-                .catch(() => ({}) as { url?: string; token?: string });
+                .catch(
+                    () => ({ error: "The call could not be reached. Try again." }) as CallTicket
+                );
             if (stopped) return;
-            // Still in the lobby. The roster frame that admits them runs this again.
+            if (ticket.waiting) return;
+            if (ticket.error) {
+                report(ticket.error);
+                return;
+            }
             if (!ticket.url || !ticket.token) return;
 
             connecting = true;
@@ -514,7 +541,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             } catch {
                 connecting = false;
                 room.current = null;
-                setError(
+                report(
                     "This call could not reach the call server. It may be starting up, or an administrator may need to look at it."
                 );
                 return;
@@ -525,6 +552,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 room.current = null;
                 return;
             }
+            connected();
 
             // Everything this browser already had open goes up now. Nothing was
             // published before the connection existed, so this is the one place
@@ -724,8 +752,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      *
      * Its own publication beside the camera, rather than in place of it: the
      * server sends each subscriber only what they are watching, so a sharer's
-     * face costs nothing to keep on and everybody can share at once. That is the
-     * trade the mesh could not make.
+     * face costs nothing to keep on and everybody can share at once.
      */
     const toggleShare = useCallback(() => {
         if (screen.current) {

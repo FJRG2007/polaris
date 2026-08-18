@@ -216,8 +216,12 @@ install_cli() {
     rm -f "$tmp"
 }
 
-# Fill the three secrets in a freshly copied .env, in place, using # as the sed
+# Fill the secrets in a freshly copied .env, in place, using # as the sed
 # delimiter so base64 '/' characters pass through untouched.
+#
+# Every secret gets a placeholder of its own, and that is load-bearing: sed
+# substitutes per line, so two keys sharing one placeholder are written the same
+# value and each ends up holding a key that belongs to something else.
 generate_env() {
     example="$1"
     target="$2"
@@ -228,10 +232,21 @@ generate_env() {
     auth_secret=$(durable_secret POLARIS_AUTH_SECRET b64_48)
     pg_password=$(durable_secret POSTGRES_PASSWORD hex_24)
     setup_token=$(openssl rand -hex 24)
+    # Its own placeholder rather than sharing the auth secret's. sed substitutes
+    # per line, so a shared one hands the same string to both - and the call
+    # server's signing key would be the key that signs every session in the
+    # instance, held by a container whose whole job is to talk to the internet.
+    call_secret=$(durable_secret POLARIS_CALL_SERVER_API_SECRET b64_32)
+    # And its own for the same reason: it is handed to whatever drives
+    # /api/cron/*, while the master key it used to be written from is what
+    # envelope-encrypts every credential this instance stores.
+    cron_secret=$(durable_secret POLARIS_CRON_SECRET b64_32)
 
     sed \
         -e "s#REPLACE_ME_openssl_rand_base64_32#${master_key}#" \
         -e "s#REPLACE_ME_long_random_string#${auth_secret}#" \
+        -e "s#REPLACE_ME_call_server_secret#${call_secret}#" \
+        -e "s#REPLACE_ME_cron_secret#${cron_secret}#" \
         -e "s#REPLACE_ME_setup_token#${setup_token}#" \
         -e "s#REPLACE_ME_strong_password#${pg_password}#g" \
         "$example" > "$target"
@@ -249,6 +264,8 @@ materialize() {
     case "$2" in
         REPLACE_ME_openssl_rand_base64_32) durable_secret "$key" b64_32 ;;
         REPLACE_ME_long_random_string) durable_secret "$key" b64_48 ;;
+        REPLACE_ME_call_server_secret) durable_secret "$key" b64_32 ;;
+        REPLACE_ME_cron_secret) durable_secret "$key" b64_32 ;;
         REPLACE_ME_strong_password) durable_secret "$key" hex_24 ;;
         REPLACE_ME_setup_token) openssl rand -hex 24 ;;
         *) printf '%s' "$2" ;;
@@ -365,6 +382,49 @@ sync_database_url() {
         sed -i "s#^POLARIS_DATABASE_URL=.*#POLARIS_DATABASE_URL=${desired}#" "$target"
         log "kept POLARIS_DATABASE_URL consistent with POSTGRES_PASSWORD"
     fi
+}
+
+# Give KEY a secret of its own when it was written as a copy of PEER's.
+#
+# Earlier releases filled several keys from a single placeholder, and sed
+# substitutes per line: every .env they wrote handed one component another
+# component's key. Decided by comparing the two values rather than by looking at
+# a version, so an .env carried over from one of those installs is repaired too,
+# and done here rather than left to the next reinstall - a shared secret only
+# ever spreads further. NOTE is printed when the repair fires, for a key that
+# something outside this stack also holds.
+separate_secret() {
+    target="$1"
+    key="$2"
+    peer="$3"
+    note="${4:-}"
+    value=$(sed -n "s/^${key}=//p" "$target" | head -n1)
+    [ -n "$value" ] || return 0
+    other=$(sed -n "s/^${peer}=//p" "$target" | head -n1)
+    [ -n "$other" ] || return 0
+    [ "$value" = "$other" ] || return 0
+    fresh=$(gen_secret b64_32)
+    remember_secret "$key" "$fresh"
+    set_env_var "$target" "$key" "$fresh"
+    log "gave ${key} a secret of its own (it held a copy of ${peer})"
+    if [ -n "$note" ]; then
+        err "$note"
+    fi
+}
+
+# Every pair a shared placeholder aliased. Both keys here are handed to something
+# else - the media container, an outside scheduler - so each was holding a secret
+# it has no business holding: the string that signs this instance's sessions, and
+# the one that envelope-encrypts every credential it stores.
+#
+# The call secret is read only by the two things that mint join tickets, so
+# replacing it costs a call in progress and nothing else. The cron secret is held
+# by whatever calls /api/cron/*, which is why replacing it says so.
+separate_shared_secrets() {
+    target="$1"
+    separate_secret "$target" POLARIS_CALL_SERVER_API_SECRET POLARIS_AUTH_SECRET
+    separate_secret "$target" POLARIS_CRON_SECRET POLARIS_MASTER_KEY \
+        "POLARIS_CRON_SECRET changed: an outside scheduler calling /api/cron/* needs the new value from .env"
 }
 
 # Whether the web container is serving. Prefers the container healthcheck; on an
@@ -571,6 +631,7 @@ main() {
 
     # Guarantee the app's database URL and the Postgres password always agree.
     sync_database_url ".env"
+    separate_shared_secrets ".env"
 
     # The placeholder example.com domain can never get a certificate (RFC 2606
     # reserves it), so leaving it makes Caddy loop on ACME forever while the site
