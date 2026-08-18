@@ -72,7 +72,7 @@ when a deploy finishes".
 
 | Item | Status | Prio | Size | Notes |
 |------|--------|------|------|-------|
-| Slowmode per channel | ⬜ | P0 | S | One column, one check on send, one field in channel settings. Every reference has it; it is the cheapest moderation tool there is. |
+| Slowmode per channel | ✅ | P0 | S | A ladder from off to six hours in channel settings, measured from the last thing each person said. Counted down above the composer on the same arithmetic the server refuses on. Moderators exempt; deleted messages still count; edits never held. |
 | Block somebody | ⬜ | P0 | M | Polaris has privacy audiences and reports but no block. Signal and Matrix both treat this as core. Needs: no direct messages, no mentions, their messages collapsed. |
 | Mature-content gate on an attachment | ⬜ | P2 | M | Fluxer has `mature_content`; a per-space switch plus a click-to-reveal. |
 | Trusted domains (warn before following an unknown link) | ⬜ | P1 | S | Fluxer's `trusted_domain`. Polaris already unfurls links, so the domain is known at render time - this is a confirmation step on anything outside a list. |
