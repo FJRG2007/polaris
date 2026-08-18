@@ -114,6 +114,15 @@ template and the updater itself live there rather than in any image, so that ste
 is how a release's deployment changes reach the host. It is a fast-forward of a
 checkout that is already there, never a clone.
 
+If the checkout cannot fast-forward - a local edit left it unable to move - it is
+put back onto its branch instead of being left frozen on an old commit, which is
+what silently skips every release since: whatever the checkout held that the
+branch did not is kept under a ref of its own first, so nothing is lost. A
+deployment building its own image stops and asks you to resolve the checkout
+instead, since that path has no published build to fall back on. A supporting
+service that comes up with no container - typically one a release just added - is
+named and retried on its own rather than folded into a generic warning.
+
 ```sh
 curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.sh | sh
 # or, from a checkout:
