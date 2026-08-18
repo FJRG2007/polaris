@@ -317,7 +317,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             for (const publication of participant.trackPublications.values()) {
                 const track = publication.track?.mediaStreamTrack;
                 if (!track || track.readyState !== "live") continue;
-                const onScreen = publication.source === SCREEN || publication.source === SCREEN_AUDIO;
+                const onScreen =
+                    publication.source === SCREEN || publication.source === SCREEN_AUDIO;
                 (onScreen ? display : camera).push(track);
             }
             faces.set(participant.identity, camera);
@@ -418,10 +419,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                         : {}),
                     ...(screening
                         ? {
-                              screenShareEncoding: quality.encodingFor(
-                                  quality.SCREEN_LADDER,
-                                  level
-                              )
+                              screenShareEncoding: quality.encodingFor(quality.SCREEN_LADDER, level)
                           }
                         : {}),
                     // A document survives a dropped frame far better than it
@@ -450,9 +448,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const setVoiceEnabled = useCallback((on: boolean) => {
         if (mic.current) mic.current.enabled = on;
         if (filtered.current) filtered.current.track.enabled = on;
-        const publication = room.current?.localParticipant.getTrackPublication(
-            MICROPHONE
-        );
+        const publication = room.current?.localParticipant.getTrackPublication(MICROPHONE);
         if (!publication?.track) return;
         if (on) void publication.track.unmute().catch(() => undefined);
         else void publication.track.mute().catch(() => undefined);
@@ -498,6 +494,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         setScreens(new Map());
         setStates(new Map());
         setSpeaking(new Set());
+        // The screen is reset, unlike the microphone and camera, because
+        // nothing opens one on the way in. Leaving stops the track without
+        // going back through `publishLocalPreview`, so a call left while
+        // sharing kept a picture over a track that had ended - and the next
+        // call opened on a dead "Your screen" holding the big place, above a
+        // button offering to stop a share nobody was making.
+        setLocalScreen(null);
+        setSharing(false);
     }, []);
 
     /** Open the devices, connect, publish, and take it all down again. */
@@ -570,7 +574,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             connecting = true;
             const ticket = await actions
                 .callTokenAction(inCall)
-                .catch(() => ({ error: "The call could not be reached. Try again." }) as CallTicket);
+                .catch(
+                    () => ({ error: "The call could not be reached. Try again." }) as CallTicket
+                );
             // Released on every path that gives up before there is a room to guard
             // the attempt instead. `waiting` in particular: somebody in the lobby is
             // told "not yet", and the next roster change has to be able to try again.
@@ -999,7 +1005,16 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 })
                 .catch(() => setError("Polaris could not open that device."));
         },
-        [cameraOn, deafened, levelNow, micOn, outgoingMic, publish, publishLocalPreview, startFilter]
+        [
+            cameraOn,
+            deafened,
+            levelNow,
+            micOn,
+            outgoingMic,
+            publish,
+            publishLocalPreview,
+            startFilter
+        ]
     );
 
     const chooseMicrophone = useCallback(

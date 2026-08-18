@@ -36,7 +36,7 @@ import { playCallSound } from "@/lib/call-sounds";
 import { useEffect, useRef, useState } from "react";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
-import { stagesOf } from "./call-media";
+import { stagesOf, stagingOf } from "./call-media";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
     CAMERA_LADDER,
@@ -105,6 +105,7 @@ export function CallRoom({
     call,
     onLeave,
     onMoved,
+    onStage,
     /** Whoever is watching, when they have an account. The guest link is the
      *  host's to open and nobody else's, so the control is drawn from who the
      *  call says its host is rather than from who opened this screen - offering
@@ -118,6 +119,10 @@ export function CallRoom({
      *  one-to-one cannot hold three people, so it becomes a group and this
      *  browser has to follow it there. Absent for a guest, who cannot invite. */
     onMoved?: (to: { meetingId: string; channelId: string }) => void;
+    /** Told whether a screen or an enlarged face currently has the big place in
+     *  the room. Must keep its identity across renders, as any state setter
+     *  does. */
+    onStage?: (staged: boolean) => void;
     viewerId?: string;
 }) {
     const [inviting, setInviting] = useState(false);
@@ -179,15 +184,17 @@ export function CallRoom({
         focused && [...stages.map((stage) => stage.key), ...cameraKeys].includes(focused)
             ? focused
             : null;
-    // What the room is built around right now: the screens on show, which is all
-    // of them until somebody asks for one.
-    const showing = live?.startsWith("camera:")
-        ? []
-        : stages.filter((stage) => !live || live === stage.key);
-    /** Whether anything at all has the big place. The faces then become a strip
-     *  along the bottom: a picture somebody asked to see bigger, sharing the
-     *  room equally with eight thumbnails, is not bigger. */
-    const staged = showing.length > 0 || Boolean(live?.startsWith("camera:"));
+    /** What the room is built around right now - see `stagingOf`, which is where
+     *  the reasoning lives. */
+    const { showing, staged, enlarged } = stagingOf(stages, live);
+
+    /** Said out loud rather than worked out again outside, because it is decided
+     *  here: what is being watched turns on what somebody in this room asked
+     *  for, and that is this component's own. */
+    useEffect(() => {
+        onStage?.(staged);
+        return () => onStage?.(false);
+    }, [onStage, staged]);
 
     useEffect(() => {
         if (!call.meeting?.guestToken) return;
@@ -275,12 +282,7 @@ export function CallRoom({
                 side when there are several, rather than stacked - two shares
                 stacked in a panel this tall leave each of them a strip. */}
             {showing.length > 0 && (
-                <div
-                    className={cn(
-                        "grid min-h-0 flex-[3] gap-2",
-                        gridColumns(showing.length)
-                    )}
-                >
+                <div className={cn("grid min-h-0 flex-[3] gap-2", gridColumns(showing.length))}>
                     {showing.map((stage) => (
                         <Tile
                             key={stage.key}
@@ -332,56 +334,66 @@ export function CallRoom({
                 </div>
             )}
 
-            <div
-                className={cn(
-                    "grid min-h-0 gap-2",
-                    // A strip of thumbnails along the bottom while something has
-                    // the room, and an even grid when nothing does. Scrolling
-                    // sideways rather than shrinking further: eight faces on a
-                    // phone, each a twelfth of a strip, are eight grey squares.
-                    staged
-                        ? "h-24 shrink-0 auto-cols-[9rem] grid-flow-col overflow-x-auto"
-                        : cn("flex-1", columns)
-                )}
-            >
-                <Tile
-                    stream={call.localStream}
-                    name="You"
-                    personId={mine?.userId ?? viewerId ?? null}
-                    own
-                    speaking={
-                        call.participantId !== null &&
-                        call.speaking.has(call.participantId) &&
-                        call.micOn
-                    }
-                    cameraOff={!call.cameraOn}
-                    sharing={call.sharing}
-                    focused={live === `camera:${call.participantId}`}
-                    onFocus={
-                        call.participantId ? () => focus(`camera:${call.participantId}`) : undefined
-                    }
-                />
-                {(admitted ?? [])
-                    .filter((person) => person.id !== call.participantId)
-                    .map((person) => (
-                        <Tile
-                            key={person.id}
-                            stream={call.remote.get(person.id) ?? null}
-                            name={person.name}
-                            personId={person.userId ?? null}
-                            guest={person.guest}
-                            speaking={call.speaking.has(person.id)}
-                            muted={call.states.get(person.id)?.muted}
-                            deafened={call.states.get(person.id)?.deafened}
-                            focused={live === `camera:${person.id}`}
-                            onFocus={() => focus(`camera:${person.id}`)}
-                            // Their account where they have one, so turning
-                            // somebody down holds across calls; their seat where
-                            // they do not, which lasts as long as the seat.
-                            volumeKey={person.userId ?? person.id}
-                        />
-                    ))}
-            </div>
+            {/* The faces. Gone entirely while a screen has been asked for by
+                name, because they are the only room left to give it: the tile
+                asked to be bigger, and the strip along the bottom is the last
+                thing between it and the whole panel. */}
+            {!enlarged && (
+                <div
+                    className={cn(
+                        "grid min-h-0 gap-2",
+                        // A strip of thumbnails along the bottom while something
+                        // has the room, and an even grid when nothing does.
+                        // Scrolling sideways rather than shrinking further: eight
+                        // faces on a phone, each a twelfth of a strip, are eight
+                        // grey squares.
+                        staged
+                            ? "h-24 shrink-0 auto-cols-[9rem] grid-flow-col overflow-x-auto"
+                            : cn("flex-1", columns)
+                    )}
+                >
+                    <Tile
+                        stream={call.localStream}
+                        name="You"
+                        personId={mine?.userId ?? viewerId ?? null}
+                        own
+                        speaking={
+                            call.participantId !== null &&
+                            call.speaking.has(call.participantId) &&
+                            call.micOn
+                        }
+                        cameraOff={!call.cameraOn}
+                        sharing={call.sharing}
+                        focused={live === `camera:${call.participantId}`}
+                        onFocus={
+                            call.participantId
+                                ? () => focus(`camera:${call.participantId}`)
+                                : undefined
+                        }
+                    />
+                    {(admitted ?? [])
+                        .filter((person) => person.id !== call.participantId)
+                        .map((person) => (
+                            <Tile
+                                key={person.id}
+                                stream={call.remote.get(person.id) ?? null}
+                                name={person.name}
+                                personId={person.userId ?? null}
+                                guest={person.guest}
+                                speaking={call.speaking.has(person.id)}
+                                muted={call.states.get(person.id)?.muted}
+                                deafened={call.states.get(person.id)?.deafened}
+                                focused={live === `camera:${person.id}`}
+                                onFocus={() => focus(`camera:${person.id}`)}
+                                // Their account where they have one, so turning
+                                // somebody down holds across calls; their seat
+                                // where they do not, which lasts as long as the
+                                // seat.
+                                volumeKey={person.userId ?? person.id}
+                            />
+                        ))}
+                </div>
+            )}
 
             {/* Never squeezed. It wraps to a second row on a narrow window, and
                 a flex row that is allowed to shrink gives that second row away
@@ -651,8 +663,8 @@ function Split({
                                     <span className="flex min-w-0 flex-col">
                                         <span>Automatic</span>
                                         <span className="text-xs text-muted-foreground">
-                                            Drops when the connection struggles and comes back
-                                            when it recovers.
+                                            Drops when the connection struggles and comes back when
+                                            it recovers.
                                         </span>
                                     </span>
                                 </DropdownMenuItem>
@@ -859,7 +871,8 @@ function Tile({
     }, []);
 
     const toggleFull = () => {
-        if (document.fullscreenElement === frame.current) void document.exitFullscreen().catch(() => undefined);
+        if (document.fullscreenElement === frame.current)
+            void document.exitFullscreen().catch(() => undefined);
         else void frame.current?.requestFullscreen().catch(() => undefined);
     };
 
@@ -1035,7 +1048,11 @@ function Tile({
                             title={focused ? "Back to the grid" : "Make this bigger"}
                             className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
                         >
-                            {focused ? <Shrink className="size-3.5" /> : <Expand className="size-3.5" />}
+                            {focused ? (
+                                <Shrink className="size-3.5" />
+                            ) : (
+                                <Expand className="size-3.5" />
+                            )}
                         </button>
                     )}
                     <button
@@ -1045,7 +1062,11 @@ function Tile({
                         title={full ? "Leave full screen" : "Full screen"}
                         className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
                     >
-                        {full ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+                        {full ? (
+                            <Minimize2 className="size-3.5" />
+                        ) : (
+                            <Maximize2 className="size-3.5" />
+                        )}
                     </button>
                 </span>
             )}
