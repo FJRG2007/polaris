@@ -282,12 +282,7 @@ export function CallRoom({
                 side when there are several, rather than stacked - two shares
                 stacked in a panel this tall leave each of them a strip. */}
             {showing.length > 0 && (
-                <div
-                    className={cn(
-                        "grid min-h-0 flex-[3] gap-2",
-                        gridColumns(showing.length)
-                    )}
-                >
+                <div className={cn("grid min-h-0 flex-[3] gap-2", gridColumns(showing.length))}>
                     {showing.map((stage) => (
                         <Tile
                             key={stage.key}
@@ -668,8 +663,8 @@ function Split({
                                     <span className="flex min-w-0 flex-col">
                                         <span>Automatic</span>
                                         <span className="text-xs text-muted-foreground">
-                                            Drops when the connection struggles and comes back
-                                            when it recovers.
+                                            Drops when the connection struggles and comes back when
+                                            it recovers.
                                         </span>
                                     </span>
                                 </DropdownMenuItem>
@@ -876,7 +871,8 @@ function Tile({
     }, []);
 
     const toggleFull = () => {
-        if (document.fullscreenElement === frame.current) void document.exitFullscreen().catch(() => undefined);
+        if (document.fullscreenElement === frame.current)
+            void document.exitFullscreen().catch(() => undefined);
         else void frame.current?.requestFullscreen().catch(() => undefined);
     };
 
@@ -1052,7 +1048,11 @@ function Tile({
                             title={focused ? "Back to the grid" : "Make this bigger"}
                             className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
                         >
-                            {focused ? <Shrink className="size-3.5" /> : <Expand className="size-3.5" />}
+                            {focused ? (
+                                <Shrink className="size-3.5" />
+                            ) : (
+                                <Expand className="size-3.5" />
+                            )}
                         </button>
                     )}
                     <button
@@ -1062,7 +1062,11 @@ function Tile({
                         title={full ? "Leave full screen" : "Full screen"}
                         className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
                     >
-                        {full ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+                        {full ? (
+                            <Minimize2 className="size-3.5" />
+                        ) : (
+                            <Maximize2 className="size-3.5" />
+                        )}
                     </button>
                 </span>
             )}

@@ -93,7 +93,10 @@ export async function callDevices(): Promise<{
                 id: device.deviceId,
                 label: device.label || `${fallback} ${index + 1}`
             }));
-    return { microphones: named("audioinput", "Microphone"), cameras: named("videoinput", "Camera") };
+    return {
+        microphones: named("audioinput", "Microphone"),
+        cameras: named("videoinput", "Camera")
+    };
 }
 
 /** What this browser's own screen is keyed by, whoever else is in the room and

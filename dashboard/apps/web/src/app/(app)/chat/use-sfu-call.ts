@@ -317,7 +317,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             for (const publication of participant.trackPublications.values()) {
                 const track = publication.track?.mediaStreamTrack;
                 if (!track || track.readyState !== "live") continue;
-                const onScreen = publication.source === SCREEN || publication.source === SCREEN_AUDIO;
+                const onScreen =
+                    publication.source === SCREEN || publication.source === SCREEN_AUDIO;
                 (onScreen ? display : camera).push(track);
             }
             faces.set(participant.identity, camera);
@@ -418,10 +419,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                         : {}),
                     ...(screening
                         ? {
-                              screenShareEncoding: quality.encodingFor(
-                                  quality.SCREEN_LADDER,
-                                  level
-                              )
+                              screenShareEncoding: quality.encodingFor(quality.SCREEN_LADDER, level)
                           }
                         : {}),
                     // A document survives a dropped frame far better than it
@@ -450,9 +448,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const setVoiceEnabled = useCallback((on: boolean) => {
         if (mic.current) mic.current.enabled = on;
         if (filtered.current) filtered.current.track.enabled = on;
-        const publication = room.current?.localParticipant.getTrackPublication(
-            MICROPHONE
-        );
+        const publication = room.current?.localParticipant.getTrackPublication(MICROPHONE);
         if (!publication?.track) return;
         if (on) void publication.track.unmute().catch(() => undefined);
         else void publication.track.mute().catch(() => undefined);
@@ -578,7 +574,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             connecting = true;
             const ticket = await actions
                 .callTokenAction(inCall)
-                .catch(() => ({ error: "The call could not be reached. Try again." }) as CallTicket);
+                .catch(
+                    () => ({ error: "The call could not be reached. Try again." }) as CallTicket
+                );
             // Released on every path that gives up before there is a room to guard
             // the attempt instead. `waiting` in particular: somebody in the lobby is
             // told "not yet", and the next roster change has to be able to try again.
@@ -1007,7 +1005,16 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 })
                 .catch(() => setError("Polaris could not open that device."));
         },
-        [cameraOn, deafened, levelNow, micOn, outgoingMic, publish, publishLocalPreview, startFilter]
+        [
+            cameraOn,
+            deafened,
+            levelNow,
+            micOn,
+            outgoingMic,
+            publish,
+            publishLocalPreview,
+            startFilter
+        ]
     );
 
     const chooseMicrophone = useCallback(
@@ -1130,11 +1137,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             let moved = false;
 
             if (quality.cameraQuality() === "auto") {
-                const next = quality.driftAuto(
-                    autoCamera.current,
-                    reading,
-                    quality.CAMERA_LADDER
-                );
+                const next = quality.driftAuto(autoCamera.current, reading, quality.CAMERA_LADDER);
                 if (next.level !== autoCamera.current.level) {
                     moved = true;
                     void quality.retune(camera.current, quality.cameraConstraints(next.level));
@@ -1142,11 +1145,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 autoCamera.current = next;
             }
             if (quality.screenQuality() === "auto") {
-                const next = quality.driftAuto(
-                    autoScreen.current,
-                    reading,
-                    quality.SCREEN_LADDER
-                );
+                const next = quality.driftAuto(autoScreen.current, reading, quality.SCREEN_LADDER);
                 if (next.level !== autoScreen.current.level) {
                     moved = true;
                     void quality.retune(screen.current, quality.screenConstraints(next.level));
