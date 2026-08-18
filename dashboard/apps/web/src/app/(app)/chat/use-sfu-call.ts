@@ -36,6 +36,7 @@
  */
 
 import { z } from "zod";
+import * as quality from "./call-quality";
 import { setMicDevice } from "./mic-device";
 import { callDeviceId } from "./call-device";
 import * as actions from "./meeting-actions";
@@ -150,6 +151,31 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const [micFilter, setMicFilter] = useState<FilteredMic["using"] | null>(null);
     const [licensedFilter, setLicensedFilter] = useState(false);
 
+    /**
+     * How much picture this browser sends, and how much it is sending now.
+     *
+     * Two halves that have to be kept apart. The *setting* is what somebody
+     * chose and is read from storage by `useCallQuality` after mount, which is
+     * the only way a value that does not exist on the server can be rendered
+     * without a mismatch. The *rung* is what is actually going out, which under
+     * `auto` is the connection's business rather than anybody's choice.
+     *
+     * Everything that opens a device reads the setting straight out of storage
+     * instead of off this state - see `levelNow`. A call that starts in the same
+     * commit as the hook that loads the setting would otherwise open its camera
+     * at the default before the stored answer arrived, and nothing after that
+     * reopens it.
+     */
+    const chosen = quality.useCallQuality();
+    const autoCamera = useRef<quality.AutoState>(quality.startAuto(quality.CAMERA_LADDER));
+    const autoScreen = useRef<quality.AutoState>(quality.startAuto(quality.SCREEN_LADDER));
+    const [cameraLevel, setCameraLevel] = useState<quality.CallLevel>(
+        quality.CAMERA_LADDER.ceiling
+    );
+    const [screenLevel, setScreenLevel] = useState<quality.CallLevel>(
+        quality.SCREEN_LADDER.ceiling
+    );
+
     /** The connection to the media server, for as long as this browser is in the
      *  call. One of them, whatever the size of the room. */
     const room = useRef<Room | null>(null);
@@ -182,6 +208,26 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     /** Whether this pair of ears is switched off, held beside the state it
      *  mirrors so a connection made after the press still says so. */
     const deafenedRef = useRef(false);
+
+    /**
+     * The rung in force right now, for one of the two ladders.
+     *
+     * Read from storage rather than from state on purpose: this is called by the
+     * code that opens a device, and that code runs in the same commit as the
+     * effect which loads the setting. State would still hold the default.
+     */
+    const levelNow = useCallback((which: "camera" | "screen"): quality.CallLevel => {
+        return which === "camera"
+            ? quality.levelOf(quality.cameraQuality(), autoCamera.current.level)
+            : quality.levelOf(quality.screenQuality(), autoScreen.current.level);
+    }, []);
+
+    /** Put what is actually going out on screen. Only the controls read this;
+     *  nothing about the call depends on it. */
+    const settleLevels = useCallback(() => {
+        setCameraLevel(levelNow("camera"));
+        setScreenLevel(levelNow("screen"));
+    }, [levelNow]);
 
     /** The stream the local tile shows: whatever is going out right now. */
     const publishLocalPreview = useCallback(() => {
@@ -300,9 +346,20 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * Nothing here stops a device. The tracks are this hook's, stopped once at
      * the end - stopping one on unpublish would cost a permission prompt to turn
      * a camera back on.
+     *
+     * `again` is for the one case a swap cannot cover: the allowance handed to
+     * the encoder is fixed when a track is published and `replaceTrack` does not
+     * revisit it, so moving the quality bar to a rung with a different ceiling
+     * has to take the publication down and put it back up. It costs everybody a
+     * moment of black rectangle, which is why it is reserved for somebody
+     * deliberately moving the bar and never used by the automatic walk.
      */
     const publish = useCallback(
-        async (source: Track.Source, track: MediaStreamTrack | null) => {
+        async (
+            source: Track.Source,
+            track: MediaStreamTrack | null,
+            options?: { again?: boolean }
+        ) => {
             const current = room.current;
             if (!current || current.state !== CONNECTED) return;
             const local = current.localParticipant;
@@ -314,24 +371,52 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 }
                 return;
             }
-            if (existing?.track) {
+            if (existing?.track && !options?.again) {
                 // `true` is "this track is the caller's": the old one is left
                 // alone rather than stopped, which is what makes a microphone
                 // swap reversible.
                 await existing.track.replaceTrack(track, true).catch(() => undefined);
                 return;
             }
+            if (existing?.track) {
+                await local.unpublishTrack(existing.track, false).catch(() => undefined);
+            }
+            const screening = source === SCREEN;
+            const level = levelNow(screening ? "screen" : "camera");
             await local
                 .publishTrack(track, {
                     source,
-                    // A screen is text as often as it is video, and text survives
-                    // a dropped frame far better than it survives being blurred.
-                    degradationPreference:
-                        source === SCREEN ? "maintain-resolution" : undefined
+                    // What the encoder is allowed to spend, sized to the picture
+                    // it is being given. Left out, the client sizes it from the
+                    // track's own dimensions, which is right for a camera and
+                    // half the story for a screen - and either way says nothing
+                    // about the rung somebody chose.
+                    ...(source === CAMERA
+                        ? {
+                              videoEncoding: quality.encodingFor(quality.CAMERA_LADDER, level)
+                          }
+                        : {}),
+                    ...(screening
+                        ? {
+                              screenShareEncoding: quality.encodingFor(
+                                  quality.SCREEN_LADDER,
+                                  level
+                              )
+                          }
+                        : {}),
+                    // A document survives a dropped frame far better than it
+                    // survives being blurred; a video is the other way round.
+                    // Which of the two this is was decided by the framerate on
+                    // the rung - see `screenIsMotion`.
+                    degradationPreference: screening
+                        ? quality.screenIsMotion(level)
+                            ? "maintain-framerate"
+                            : "maintain-resolution"
+                        : undefined
                 })
                 .catch(() => undefined);
         },
-        []
+        [levelNow]
     );
 
     /**
@@ -500,9 +585,22 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 // Stop sending the quality layers nobody is subscribed to.
                 dynacast: true,
                 publishDefaults: {
+                    // Roughly half the bits for the same picture, which on a
+                    // domestic upstream is the difference between a sharp call
+                    // and a soft one. It also replaces simulcast with layers cut
+                    // from a single encode, so the three sizes below cost one
+                    // encoder instead of three.
+                    //
+                    // Safe to ask for unconditionally. A browser that cannot
+                    // encode it is given the old codec by the client itself, and
+                    // a subscriber that cannot decode it makes the publisher
+                    // fall back for the room - so the worst case is exactly what
+                    // this did before, never a call with no picture.
+                    videoCodec: "vp9",
                     // Three sizes of the same camera, so the server has something
                     // to give a small tile and a slow connection without asking
-                    // the publisher to change anything.
+                    // the publisher to change anything. Read only on the fallback
+                    // path: the codec above carries its own layers.
                     simulcast: true,
                     // Cheap on the wire and free of charge: silence costs nothing
                     // to send, and a lost audio packet is covered by the next.
@@ -605,7 +703,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             licensed.current = await actions.licensedFilterAction(inCall).catch(() => null);
             setLicensedFilter(licensed.current !== null);
 
-            const opened = await openMedia(withVideo);
+            const opened = await openMedia(
+                withVideo,
+                quality.cameraConstraints(levelNow("camera"))
+            );
             if (stopped) {
                 for (const track of opened.stream?.getTracks() ?? []) track.stop();
                 return;
@@ -714,6 +815,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         };
     }, [
         forget,
+        levelNow,
         listDevices,
         meetingId,
         outgoingMic,
@@ -752,7 +854,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             return;
         }
         void navigator.mediaDevices
-            .getUserMedia({ video: true })
+            .getUserMedia({ video: quality.cameraConstraints(levelNow("camera")) })
             .then(async (stream) => {
                 const track = stream.getVideoTracks()[0] ?? null;
                 camera.current = track;
@@ -764,7 +866,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 void listDevices();
             })
             .catch(() => setError("Polaris could not reach your camera."));
-    }, [cameraOn, listDevices, publish, publishLocalPreview]);
+    }, [cameraOn, levelNow, listDevices, publish, publishLocalPreview]);
 
     /**
      * Share a screen, or stop.
@@ -783,11 +885,17 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             playCallSound("shareOff");
             return;
         }
+        const level = levelNow("screen");
         void navigator.mediaDevices
-            .getDisplayMedia({ video: true })
+            .getDisplayMedia({ video: quality.screenConstraints(level) })
             .then(async (stream) => {
                 const track = stream.getVideoTracks()[0];
                 if (!track) return;
+                // What the encoder is looking at, said out loud. Without it the
+                // browser guesses from the track alone and guesses "motion",
+                // which spends the whole allowance smoothing a page of text that
+                // never moved.
+                track.contentHint = quality.screenIsMotion(level) ? "motion" : "detail";
                 // The browser's own "stop sharing" bar ends the track without
                 // going through this hook, and the call has to notice.
                 track.onended = () => {
@@ -807,7 +915,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 // Cancelling the picker is the ordinary way out of this dialog,
                 // not a failure worth a line on the screen.
             });
-    }, [publish, publishLocalPreview]);
+    }, [levelNow, publish, publishLocalPreview]);
 
     /**
      * Silence everybody, and yourself with them.
@@ -837,7 +945,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             const constraints: MediaStreamConstraints =
                 kind === "audio"
                     ? { audio: micConstraints(deviceId) }
-                    : { video: { deviceId: { exact: deviceId } } };
+                    : { video: quality.cameraConstraints(levelNow("camera"), deviceId) };
             void navigator.mediaDevices
                 .getUserMedia(constraints)
                 .then(async (stream) => {
@@ -871,7 +979,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 })
                 .catch(() => setError("Polaris could not open that device."));
         },
-        [cameraOn, deafened, micOn, outgoingMic, publish, publishLocalPreview, startFilter]
+        [cameraOn, deafened, levelNow, micOn, outgoingMic, publish, publishLocalPreview, startFilter]
     );
 
     const chooseMicrophone = useCallback(
@@ -902,6 +1010,125 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         },
         [outgoingMic, publish, publishLocalPreview, rememberCleanMic, startFilter]
     );
+
+    /**
+     * Move the quality bar, mid-call.
+     *
+     * Two things happen and they are not the same thing. The device is retuned,
+     * which changes the picture being captured and nothing else - no
+     * renegotiation, no gap. Then the publication is put up again, because the
+     * allowance the encoder was given is fixed at publish time and a bar moved
+     * to "Highest" that quietly kept the old ceiling would be a setting that
+     * does nothing.
+     *
+     * Choosing a rung by hand also resets the automatic walk. Somebody who
+     * turns automatic back on later should get a fresh look at their line rather
+     * than the rung it had drifted to before they overrode it.
+     */
+    const changeQuality = useCallback(
+        (which: "camera" | "screen", value: quality.CallQuality) => {
+            if (which === "camera") {
+                // Stored through the module rather than through the hook's own
+                // setter, so this callback does not depend on an object the hook
+                // rebuilds every render. The hook hears the same announcement
+                // every other tab does and catches up with it.
+                quality.setCameraQuality(value);
+                autoCamera.current = quality.startAuto(quality.CAMERA_LADDER);
+            } else {
+                quality.setScreenQuality(value);
+                autoScreen.current = quality.startAuto(quality.SCREEN_LADDER);
+            }
+            const level = quality.levelOf(
+                value,
+                which === "camera" ? autoCamera.current.level : autoScreen.current.level
+            );
+            if (which === "camera") setCameraLevel(level);
+            else setScreenLevel(level);
+
+            void (async () => {
+                if (which === "camera") {
+                    await quality.retune(camera.current, quality.cameraConstraints(level));
+                    if (cameraOn && camera.current) {
+                        await publish(CAMERA, camera.current, { again: true });
+                    }
+                } else {
+                    await quality.retune(screen.current, quality.screenConstraints(level));
+                    if (screen.current) {
+                        screen.current.contentHint = quality.screenIsMotion(level)
+                            ? "motion"
+                            : "detail";
+                        await publish(SCREEN, screen.current, { again: true });
+                    }
+                }
+                publishLocalPreview();
+            })();
+        },
+        [cameraOn, publish, publishLocalPreview]
+    );
+
+    const setCameraQuality = useCallback(
+        (value: quality.CallQuality) => changeQuality("camera", value),
+        [changeQuality]
+    );
+    const setScreenQuality = useCallback(
+        (value: quality.CallQuality) => changeQuality("screen", value),
+        [changeQuality]
+    );
+
+    /**
+     * Follow the connection, while nobody has taken the wheel.
+     *
+     * Polled rather than driven by the client's own quality event, and that is
+     * the point of it: the event fires when the reading *changes*, so a line
+     * that went bad once and has been quietly excellent for ten minutes since
+     * says nothing at all - and a call that dropped a rung during that one bad
+     * minute would sit there for the rest of the hour.
+     *
+     * The picture is retuned and nothing is republished. A wobble in the wifi
+     * must not cost everybody in the room a black rectangle, and it does not
+     * need to: the allowance is a ceiling, and a smaller picture spends less of
+     * it without being told to.
+     */
+    useEffect(() => {
+        if (!meetingId) return;
+        // What is stored, before the first reading: a call opened at a rung
+        // somebody chose should say so rather than showing the default for a
+        // quarter of a minute.
+        settleLevels();
+        const timer = setInterval(() => {
+            const current = room.current;
+            if (!current || current.state !== CONNECTED) return;
+            const reading = String(current.localParticipant.connectionQuality ?? "unknown");
+            let moved = false;
+
+            if (quality.cameraQuality() === "auto") {
+                const next = quality.driftAuto(
+                    autoCamera.current,
+                    reading,
+                    quality.CAMERA_LADDER
+                );
+                if (next.level !== autoCamera.current.level) {
+                    moved = true;
+                    void quality.retune(camera.current, quality.cameraConstraints(next.level));
+                }
+                autoCamera.current = next;
+            }
+            if (quality.screenQuality() === "auto") {
+                const next = quality.driftAuto(
+                    autoScreen.current,
+                    reading,
+                    quality.SCREEN_LADDER
+                );
+                if (next.level !== autoScreen.current.level) {
+                    moved = true;
+                    void quality.retune(screen.current, quality.screenConstraints(next.level));
+                }
+                autoScreen.current = next;
+            }
+            if (moved) settleLevels();
+        }, quality.DRIFT_EVERY_MS);
+        return () => clearInterval(timer);
+    }, [meetingId, settleLevels]);
 
     /**
      * Somebody arrived, or somebody left.
@@ -946,6 +1173,12 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         cameras,
         microphoneId,
         cameraId,
+        cameraQuality: chosen.camera,
+        screenQuality: chosen.screen,
+        cameraLevel,
+        screenLevel,
+        setCameraQuality,
+        setScreenQuality,
         toggleMic,
         toggleCamera,
         toggleShare,

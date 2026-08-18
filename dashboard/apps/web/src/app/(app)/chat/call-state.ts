@@ -9,6 +9,7 @@
 
 import type { MeetingView } from "@/lib/chat/meetings";
 import type { FilteredMic, MicFilter } from "./mic-filter";
+import type { CallLevel, CallQuality } from "./call-quality";
 
 /** What somebody else's controls are set to, as far as they have said. */
 export interface PeerState {
@@ -55,6 +56,17 @@ export interface CallState {
     readonly cameras: readonly CallDevice[];
     readonly microphoneId: string | null;
     readonly cameraId: string | null;
+    /** How much picture to send, as chosen. `auto` is the default and means the
+     *  connection decides - see `call-quality`. */
+    readonly cameraQuality: CallQuality;
+    readonly screenQuality: CallQuality;
+    /** What is actually going out. The same as the setting unless it is `auto`,
+     *  in which case this is where the connection has settled - which is worth
+     *  showing, because "automatic" with no number is a shrug. */
+    readonly cameraLevel: CallLevel;
+    readonly screenLevel: CallLevel;
+    setCameraQuality: (value: CallQuality) => void;
+    setScreenQuality: (value: CallQuality) => void;
     /** How much is being done to what the microphone hears. */
     readonly cleanMic: MicFilter;
     setCleanMic: (level: MicFilter) => void;

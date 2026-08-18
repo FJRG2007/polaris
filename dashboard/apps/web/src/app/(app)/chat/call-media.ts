@@ -21,9 +21,14 @@ import { micConstraints } from "./mic-cleanup";
  * somebody with Discord or OBS holding the camera joined a call able to hear and
  * unable to speak, with nothing on screen saying why. So both, then sound alone,
  * then picture alone.
+ *
+ * @param camera - The size to ask the camera for, from `call-quality`. Left out,
+ *   the browser picks, and what it picks is 640x480 - which is where every
+ *   report of a soft picture in a call came from.
  */
 export async function openMedia(
-    withVideo: boolean
+    withVideo: boolean,
+    camera?: MediaTrackConstraints
 ): Promise<{ stream: MediaStream | null; note: string }> {
     const ask = (audio: boolean, video: boolean) =>
         navigator.mediaDevices.getUserMedia({
@@ -31,7 +36,7 @@ export async function openMedia(
             // from across the room, all handled by the browser before anything
             // is sent - see `mic-cleanup`.
             audio: audio ? micConstraints() : false,
-            video
+            video: video ? (camera ?? true) : false
         });
 
     try {

@@ -38,6 +38,14 @@ import type { FilteredMic, MicFilter } from "./mic-filter";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
+    CAMERA_LADDER,
+    LEVELS,
+    SCREEN_LADDER,
+    type CallLevel,
+    type CallQuality,
+    type QualityLadder
+} from "./call-quality";
+import {
     Check,
     ChevronUp,
     Expand,
@@ -345,7 +353,8 @@ export function CallRoom({
                 <Split
                     label={call.micOn ? "Mute" : "Unmute"}
                     icon={call.micOn ? <Mic className="size-4" /> : <MicOff className="size-4" />}
-                    danger={!call.micOn}
+                    variant={call.micOn ? "secondary" : "danger"}
+                    pressed={!call.micOn}
                     onClick={call.toggleMic}
                     devices={call.microphones}
                     chosenId={call.microphoneId}
@@ -366,27 +375,45 @@ export function CallRoom({
                             <VideoOff className="size-4" />
                         )
                     }
-                    danger={!call.cameraOn}
+                    variant={call.cameraOn ? "secondary" : "danger"}
+                    pressed={!call.cameraOn}
                     onClick={call.toggleCamera}
                     devices={call.cameras}
                     chosenId={call.cameraId}
                     devicesLabel="Camera"
                     onChoose={call.chooseCamera}
+                    ladder={CAMERA_LADDER}
+                    quality={call.cameraQuality}
+                    level={call.cameraLevel}
+                    onQuality={call.setCameraQuality}
+                    qualityLabel="Video quality"
                 />
 
-                <Button
-                    size="sm"
+                <Split
+                    label={call.sharing ? "Stop sharing" : "Share screen"}
+                    icon={
+                        call.sharing ? (
+                            <MonitorX className="size-4" />
+                        ) : (
+                            <MonitorUp className="size-4" />
+                        )
+                    }
                     variant={call.sharing ? "primary" : "secondary"}
+                    pressed={call.sharing}
                     onClick={call.toggleShare}
-                    aria-pressed={call.sharing}
-                >
-                    {call.sharing ? (
-                        <MonitorX className="size-4" />
-                    ) : (
-                        <MonitorUp className="size-4" />
-                    )}
-                    {call.sharing ? "Stop sharing" : "Share screen"}
-                </Button>
+                    // A screen is not a device to pick between: the browser's own
+                    // picker does that, every time, and it is the only thing
+                    // allowed to.
+                    devices={[]}
+                    chosenId={null}
+                    devicesLabel="Screen"
+                    onChoose={() => undefined}
+                    ladder={SCREEN_LADDER}
+                    quality={call.screenQuality}
+                    level={call.screenLevel}
+                    onQuality={call.setScreenQuality}
+                    qualityLabel="Screen quality"
+                />
 
                 {/* Bringing somebody in. In a group they are added and their
                     telephone rings; in a one-to-one the call becomes a group,
@@ -495,7 +522,8 @@ export function CallRoom({
 function Split({
     label,
     icon,
-    danger,
+    variant,
+    pressed,
     onClick,
     devices,
     chosenId,
@@ -504,16 +532,31 @@ function Split({
     cleanMic,
     onCleanMic,
     filterRunning,
-    licensedOffered
+    licensedOffered,
+    ladder,
+    quality,
+    level,
+    onQuality,
+    qualityLabel
 }: {
     label: string;
     icon: React.ReactNode;
-    danger: boolean;
+    /** How the button reads: off is danger, on-and-sending is primary. */
+    variant: "secondary" | "danger" | "primary";
+    pressed: boolean;
     onClick: () => void;
     devices: readonly { id: string; label: string }[];
     chosenId: string | null;
     devicesLabel: string;
     onChoose: (deviceId: string) => void;
+    /** How much picture this control sends, when it sends one. Four of these
+     *  arrive together or none of them do. */
+    ladder?: QualityLadder;
+    quality?: CallQuality;
+    /** What is going out right now, which under `auto` is not the setting. */
+    level?: CallLevel;
+    onQuality?: (value: CallQuality) => void;
+    qualityLabel?: string;
     /** Microphone only: how much is being done to what it hears. It belongs in
      *  this menu, beside the input it applies to, which is where every call
      *  client puts it. */
@@ -526,16 +569,18 @@ function Split({
     licensedOffered?: boolean;
 }) {
     // Worth a menu for the setting alone: a machine with one microphone still
-    // sits in a room with a fan in it.
-    const hasMenu = devices.length > 1 || onCleanMic !== undefined;
+    // sits in a room with a fan in it, and a machine with one screen still has a
+    // choice to make about how much of it to send.
+    const hasMenu = devices.length > 1 || onCleanMic !== undefined || onQuality !== undefined;
+    const showing = ladder && level ? ladder.rungs[level] : null;
 
     return (
         <span className="flex items-center">
             <Button
                 size="sm"
-                variant={danger ? "danger" : "secondary"}
+                variant={variant}
                 onClick={onClick}
-                aria-pressed={danger}
+                aria-pressed={pressed}
                 className={hasMenu ? "rounded-r-none" : undefined}
             >
                 {icon}
@@ -546,7 +591,7 @@ function Split({
                     <DropdownMenuTrigger asChild>
                         <Button
                             size="sm"
-                            variant={danger ? "danger" : "secondary"}
+                            variant={variant}
                             aria-label={`${devicesLabel} settings`}
                             className="rounded-l-none border-l border-border-strong px-1.5"
                         >
@@ -554,6 +599,65 @@ function Split({
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="center" side="top" className="max-w-72">
+                        {onQuality && ladder && quality && level && showing && (
+                            <>
+                                <DropdownMenuLabel>{qualityLabel}</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onSelect={() => onQuality("auto")}>
+                                    <Check
+                                        className={cn(
+                                            "size-3.5 shrink-0",
+                                            quality === "auto" ? "opacity-100" : "opacity-0"
+                                        )}
+                                    />
+                                    <span className="flex min-w-0 flex-col">
+                                        <span>Automatic</span>
+                                        <span className="text-xs text-muted-foreground">
+                                            Drops when the connection struggles and comes back
+                                            when it recovers.
+                                        </span>
+                                    </span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onSelect={(event) => {
+                                        // The menu would otherwise close on the
+                                        // press that moved the bar, which is the
+                                        // one control here used by dragging.
+                                        event.preventDefault();
+                                    }}
+                                    className="flex-col items-stretch gap-1.5"
+                                >
+                                    <span className="flex items-center justify-between text-xs text-muted-foreground">
+                                        {/* Always what is going out, never what
+                                            was asked for: under Automatic those
+                                            are different, and the one worth
+                                            reading is the one being sent. */}
+                                        <span>{showing.label}</span>
+                                        <span className="tabular-nums">{showing.detail}</span>
+                                    </span>
+                                    <input
+                                        type="range"
+                                        min={0}
+                                        max={LEVELS.length - 1}
+                                        step={1}
+                                        value={LEVELS.indexOf(level)}
+                                        aria-label={qualityLabel}
+                                        onChange={(event) => {
+                                            const picked = LEVELS[Number(event.target.value)];
+                                            // Moving it by hand is how Automatic
+                                            // is turned off - there is nothing
+                                            // else the gesture could mean.
+                                            if (picked) onQuality(picked);
+                                        }}
+                                        className="w-full accent-primary"
+                                    />
+                                    <span className="flex items-center justify-between text-[11px] text-foreground-subtle">
+                                        <span>Least data</span>
+                                        <span>Best picture</span>
+                                    </span>
+                                </DropdownMenuItem>
+                            </>
+                        )}
                         {onCleanMic && (
                             <>
                                 <DropdownMenuLabel>Background noise</DropdownMenuLabel>
