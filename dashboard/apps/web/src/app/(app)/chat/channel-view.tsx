@@ -153,6 +153,10 @@ export function ChannelView({
     // their camera opened for them.
     const { call, session, enter, leave: leaveCall, withVideo } = useCallHold();
     const inCall = session?.channelId === channelId ? session.meetingId : null;
+    // Whether a picture in the call has the big place, which the room says
+    // rather than this screen guessing: what is being watched depends on what
+    // somebody in there asked for. It goes back on its own when they stop.
+    const [staged, setStaged] = useState(false);
 
     const scroller = useRef<HTMLDivElement>(null);
     // The end of the list, scrolled to rather than computed. `scrollTop =
@@ -1045,23 +1049,21 @@ export function ChannelView({
                     <div
                         className={cn(
                             "flex min-h-0 shrink-0 flex-col border-b border-border",
-                            // A screen being shared changes what this column is
-                            // for. At the usual height the share got a third of
-                            // 60% of the column - about a hand's width of
-                            // somebody's document - and "make it bigger" could
-                            // not make it bigger, because the room it would take
-                            // was being held for messages nobody was reading
-                            // while a screen was up. It goes back on its own
-                            // when the sharing stops.
-                            call.screens.size > 0 || call.localScreen
-                                ? "max-h-[78%]"
-                                : "max-h-[60%]"
+                            // A picture worth watching changes what this column
+                            // is for. At the usual height a shared screen got a
+                            // third of 60% of the column - about a hand's width
+                            // of somebody's document - and "make it bigger"
+                            // could not make it bigger, because the room it
+                            // would take was being held for messages nobody was
+                            // reading while a screen was up.
+                            staged ? "max-h-[78%]" : "max-h-[60%]"
                         )}
                     >
                         <CallRoom
                             call={call}
                             meetingId={inCall}
                             viewerId={viewerId}
+                            onStage={setStaged}
                             onLeave={() => {
                                 leaveCall();
                                 checkCall();

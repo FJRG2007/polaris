@@ -96,6 +96,12 @@ export async function callDevices(): Promise<{
     return { microphones: named("audioinput", "Microphone"), cameras: named("videoinput", "Camera") };
 }
 
+/** What this browser's own screen is keyed by, whoever else is in the room and
+ *  whether or not its seat has been named yet. A key that changed when the seat
+ *  landed would take the video element down with it and drop the focus somebody
+ *  had just asked for. */
+export const LOCAL_SCREEN_KEY = "screen:self";
+
 /** One screen with the big place in the room: which picture, whose, and how it
  *  is named while it is up there. */
 export interface CallStage {
@@ -120,30 +126,65 @@ export interface CallStage {
  */
 export function stagesOf(room: {
     localScreen: MediaStream | null;
-    /** This browser's seat, which is what its own screen is keyed by so that
-     *  focusing it survives somebody else starting to share. */
+    /** This browser's seat, which is how its own screen is recognised coming
+     *  back from the server. Not known for the first moment of a call. */
     participantId: string | null;
     screens: ReadonlyMap<string, MediaStream>;
     nameOf: (personId: string) => string;
 }): CallStage[] {
     const stages: CallStage[] = [];
     if (room.localScreen) {
-        stages.push({
-            key: `screen:${room.participantId ?? "mine"}`,
-            stream: room.localScreen,
-            name: "Your screen"
-        });
+        stages.push({ key: LOCAL_SCREEN_KEY, stream: room.localScreen, name: "Your screen" });
     }
     for (const [personId, stream] of room.screens) {
-        // A screen that is already on the list is this browser's own coming back
-        // from the server, which happens where a client subscribes to itself.
-        // Drawn twice it would be two copies of one picture, one of them a round
-        // trip late.
-        const key = `screen:${personId}`;
-        if (stages.some((stage) => stage.key === key)) continue;
-        stages.push({ key, stream, name: `${room.nameOf(personId)} - screen` });
+        // This browser's own screen coming back from the server, which happens
+        // where a client subscribes to itself. Drawn twice it would be two
+        // copies of one picture, one of them a round trip late.
+        if (room.localScreen && personId === room.participantId) continue;
+        stages.push({
+            key: `screen:${personId}`,
+            stream,
+            name: `${room.nameOf(personId)} - screen`
+        });
     }
     return stages;
+}
+
+/** How the room is laid out around whatever is being watched. */
+export interface CallStaging {
+    /** The screens with the big place, in the order they take it. */
+    readonly showing: readonly CallStage[];
+    /** Something is being watched, so the faces are a strip along the bottom
+     *  rather than an even grid, and the panel is worth more of the column it
+     *  sits in. */
+    readonly staged: boolean;
+    /** A screen was asked for by name and takes the panel whole. With one screen
+     *  shared the faces are the only room left to give it: the share already had
+     *  the big place and the strip, so "make this bigger" made nothing bigger
+     *  until a second person shared. */
+    readonly enlarged: boolean;
+}
+
+/**
+ * What the room is built around right now.
+ *
+ * One answer rather than the same question asked in several places. The height
+ * of the panel was decided a second time from the streams alone and disagreed
+ * with the room: a face enlarged with nobody sharing got no more room, and a
+ * screen hidden behind an enlarged face held room it was not using.
+ *
+ * @param live The key somebody asked to see bigger, already checked against
+ *  what is in the room. A key naming nothing leaves the room as it was.
+ */
+export function stagingOf(stages: readonly CallStage[], live: string | null): CallStaging {
+    // A face and a screen take the same place, so only one of them can have it.
+    const camera = live !== null && live.startsWith("camera:");
+    const showing = camera ? [] : stages.filter((stage) => live === null || live === stage.key);
+    return {
+        showing,
+        staged: showing.length > 0 || camera,
+        enlarged: !camera && live !== null && showing.length > 0
+    };
 }
 
 /**

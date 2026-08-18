@@ -498,6 +498,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         setScreens(new Map());
         setStates(new Map());
         setSpeaking(new Set());
+        // The screen is reset, unlike the microphone and camera, because
+        // nothing opens one on the way in. Leaving stops the track without
+        // going back through `publishLocalPreview`, so a call left while
+        // sharing kept a picture over a track that had ended - and the next
+        // call opened on a dead "Your screen" holding the big place, above a
+        // button offering to stop a share nobody was making.
+        setLocalScreen(null);
+        setSharing(false);
     }, []);
 
     /** Open the devices, connect, publish, and take it all down again. */
