@@ -36,10 +36,23 @@ describe("the incoming ring", () => {
         }
     });
 
-    it("holds each note instead of fading from the moment it starts", () => {
-        // This is the whole of the original complaint. Without it the ring is
-        // four blips, whatever volume they are written at.
-        for (const note of SOUNDS.ring) expect(note.sustain).toBe(true);
+    it("is rung rather than played", () => {
+        // The first attempt at making it audible held every note at full volume
+        // until it stopped, which is audible in the way a smoke detector is
+        // audible: a sustained tone is what a machine sounds like. A bell is the
+        // note with an octave and a twelfth over it, all fading together, and
+        // that is the difference between a chime and an alarm.
+        for (const note of SOUNDS.ring) {
+            expect(note.bell).toBe(true);
+            expect(note.sustain).toBeUndefined();
+        }
+    });
+
+    it("overlaps its notes, so it rings rather than beeps", () => {
+        // Each note starts before the one before it has finished. Struck one
+        // after another with gaps, the same three notes are a doorbell.
+        const [first, second] = SOUNDS.ring;
+        expect(second?.at ?? 0).toBeLessThan((first?.at ?? 0) + (first?.seconds ?? 0));
     });
 
     it("rings twice per pass, the way a telephone does", () => {
@@ -64,8 +77,11 @@ describe("the tone the caller hears", () => {
         expect(back).toBeLessThan(ring);
     });
 
-    it("is held rather than plucked, like a telephone's", () => {
-        expect(SOUNDS.ringBack.every((note) => note.sustain)).toBe(true);
+    it("is the same chime, quieter", () => {
+        // One tone rather than three, so the caller's end is plainly a different
+        // sound from the one the other person is hearing - but the same kind of
+        // sound, because two unrelated timbres in one call is two products.
+        expect(SOUNDS.ringBack.every((note) => note.bell)).toBe(true);
     });
 
     it("finishes before it starts again", () => {

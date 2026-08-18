@@ -4,11 +4,14 @@
  * Nothing carried from the last time the forward dialog was open.
  *
  * The dialog is never unmounted when it closes - `message` is what opens it,
- * and the component stays there holding whatever was typed or chosen. Two
- * bugs shipped from that: a private reply meant for one person was still in
- * the box, focused, when the dialog reopened for somebody else - one press
- * from being sent to the wrong person - and a forward cancelled with
+ * and the component stays there holding whatever was typed or chosen. Two bugs
+ * shipped from that: what somebody wrote about one message was still in the box
+ * when the dialog reopened on another, and a forward cancelled with
  * conversations chosen offered to send the next message to those same ones.
+ *
+ * The second is the one worth keeping a test on forever. A stale note is
+ * embarrassing; a stale set of recipients is a message sent to people nobody
+ * meant to send it to, one press away.
  */
 
 import userEvent from "@testing-library/user-event";
@@ -76,26 +79,24 @@ function message(id: string): ChatMessageView {
 afterEach(cleanup);
 
 describe("the forward dialog reopened on a different message", () => {
-    it("does not keep a private reply typed for somebody else", async () => {
+    it("does not keep the note typed about the last message", async () => {
         const user = userEvent.setup();
         const { rerender } = render(
             <ForwardDialog
                 message={message("m1")}
-                privately={{ channelId: "c1", name: "Grace" }}
                 onOpenChange={() => undefined}
                 onSent={() => undefined}
             />
         );
 
-        const field = screen.getByLabelText("Your reply") as HTMLInputElement;
-        await user.type(field, "a reply meant only for Grace");
-        expect(field.value).toBe("a reply meant only for Grace");
+        const field = screen.getByLabelText("Say something about it") as HTMLInputElement;
+        await user.type(field, "look at this one");
+        expect(field.value).toBe("look at this one");
 
-        // Closed, then reopened for a private reply to somebody else.
+        // Closed, then reopened on a different message.
         rerender(
             <ForwardDialog
                 message={null}
-                privately={null}
                 onOpenChange={() => undefined}
                 onSent={() => undefined}
             />
@@ -103,13 +104,14 @@ describe("the forward dialog reopened on a different message", () => {
         rerender(
             <ForwardDialog
                 message={message("m2")}
-                privately={{ channelId: "c2", name: "Ada" }}
                 onOpenChange={() => undefined}
                 onSent={() => undefined}
             />
         );
 
-        expect((screen.getByLabelText("Your reply") as HTMLInputElement).value).toBe("");
+        expect((screen.getByLabelText("Say something about it") as HTMLInputElement).value).toBe(
+            ""
+        );
     });
 
     it("does not keep a forward's chosen conversations after it reopens", async () => {

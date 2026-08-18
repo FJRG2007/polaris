@@ -76,6 +76,7 @@ export function Composer({
     placeholder,
     editing,
     replyingTo,
+    replyingFrom,
     onCancelReply,
     onSend,
     onMedia,
@@ -101,6 +102,15 @@ export function Composer({
     /** The message being answered, if any. Shown above the field so nobody
      *  sends a reply having forgotten what it answers. */
     replyingTo?: ChatMessageView | null;
+    /**
+     * Where the message being answered was said, when that is not here.
+     *
+     * Only ever set for a private answer: somebody has been brought to a
+     * conversation with one person in order to reply to something said in a room
+     * of thirty, and without this the bar says a name and a line of text with no
+     * hint of which of today's four channels it came out of.
+     */
+    replyingFrom?: { name: string; channel: boolean } | null;
     onCancelReply?: () => void;
     /** Files come back alongside the text. Empty for the ordinary case, which is
      *  why the caller can still take the fast optimistic path when it is.
@@ -375,6 +385,11 @@ export function Composer({
                     <span className="shrink-0 font-medium">
                         {replyingTo.authorName ?? "somebody who has left"}
                     </span>
+                    {replyingFrom && (
+                        <span className="shrink-0 text-muted-foreground">
+                            in {replyingFrom.channel ? `#${replyingFrom.name}` : replyingFrom.name}
+                        </span>
+                    )}
                     {/* The words, not the Markdown. Answering a code block used
                         to fill this bar with backticks and a language tag. */}
                     <span

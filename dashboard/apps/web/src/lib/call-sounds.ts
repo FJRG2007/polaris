@@ -35,21 +35,35 @@ interface Note {
      * Held at full volume until a short release at the end, rather than fading
      * from the moment it starts.
      *
-     * This is most of why the ring could not be heard. Every note used to decay
-     * across its whole length, so a note marked at a fifth of a second had spent
-     * most of that at a tenth of its peak - a blip, not a tone. That is right for
-     * something that fires all day and wrong for the one sound whose entire job
-     * is to be noticed from the next room.
+     * A sustained tone is what a machine sounds like: an alarm, a lift, a door
+     * held open. Nothing here uses it any more - it was the first attempt at
+     * making the ring audible and it worked, in the sense that a smoke detector
+     * works. It stays because it is the right envelope for anything that ever
+     * needs to be insisted on rather than heard.
      */
     readonly sustain?: boolean;
+    /**
+     * Rung rather than played: the note, its octave and its twelfth, together.
+     *
+     * This is what the difference between a tone and a chime actually is. A bare
+     * sine has nothing above the fundamental, which is why it reads as
+     * electronic however loud it is made; a bell is the same note with a couple
+     * of quieter partials over it, all fading together. Three oscillators, a few
+     * hundred bytes, and it stops sounding like a fire door.
+     *
+     * The partials are deliberately not a musician's harmonic series - a real
+     * bell is inharmonic and this is not trying to be one. An octave and a
+     * twelfth are consonant with anything else sounding at the time, which
+     * matters here because the notes of a ring overlap on purpose.
+     */
+    readonly bell?: boolean;
     /**
      * The shape of the wave.
      *
      * A sine is the default because it has no harmonics to clash with speech,
      * which is the one thing these are played over. A ring is not played over
-     * anything - it is played instead of a call - and a sine is the quietest
-     * thing an oscillator can make at a given amplitude: the ear reads a tone
-     * with harmonics in it as far louder than a bare sine of the same height.
+     * anything - it is played instead of a call - so it can afford the partials
+     * `bell` adds, which is a warmer way to be heard than a harder waveform.
      */
     readonly wave?: OscillatorType;
 }
@@ -68,7 +82,7 @@ export type CallSound =
  *  is the point of it: every other sound is played to somebody already looking
  *  at the screen, and this one is played to somebody who is not in the room. A
  *  single oscillator sounds at a time, so nothing here can sum into clipping. */
-const RING_GAIN = 0.34;
+const RING_GAIN = 0.26;
 
 /**
  * Every sound, as data.
@@ -128,16 +142,18 @@ export const SOUNDS: Record<CallSound, readonly Note[]> = {
      * is not looking at the screen.
      */
     ring: [
-        { from: 880, at: 0, seconds: 0.32, gain: RING_GAIN, sustain: true, wave: "triangle" },
-        { from: 659.25, at: 0.34, seconds: 0.42, gain: RING_GAIN, sustain: true, wave: "triangle" },
-        { from: 880, at: 0.92, seconds: 0.32, gain: RING_GAIN, sustain: true, wave: "triangle" },
-        { from: 659.25, at: 1.26, seconds: 0.5, gain: RING_GAIN, sustain: true, wave: "triangle" }
+        { from: 440, at: 0, seconds: 1, gain: RING_GAIN, bell: true },
+        { from: 554.37, at: 0.16, seconds: 1, gain: RING_GAIN, bell: true },
+        { from: 659.25, at: 0.32, seconds: 1.2, gain: RING_GAIN, bell: true },
+        { from: 440, at: 1.1, seconds: 1, gain: RING_GAIN, bell: true },
+        { from: 554.37, at: 1.26, seconds: 1, gain: RING_GAIN, bell: true },
+        { from: 659.25, at: 1.42, seconds: 1.3, gain: RING_GAIN, bell: true }
     ],
     /** What the caller hears while nobody has answered. Held rather than
      *  plucked, like the tone a telephone gives back, and deliberately far
      *  quieter than the ring: this one plays to somebody who is already looking
      *  at the screen and knows what they just pressed. */
-    ringBack: [{ from: 440, at: 0, seconds: 0.9, gain: 0.12, sustain: true }]
+    ringBack: [{ from: 440, at: 0, seconds: 1.1, gain: 0.1, bell: true }]
 };
 
 /**
@@ -166,6 +182,13 @@ export const DEFAULT_GAIN = 0.1;
 const ATTACK_SECONDS = 0.012;
 const RELEASE_SECONDS = 0.05;
 
+/** How loud a bell's partials are beside its fundamental. Quiet enough that the
+ *  note is still the note somebody hears, present enough that it stops sounding
+ *  like a signal generator. Kept low for a second reason: the notes of the ring
+ *  overlap, and three bells sounding at once must not add up past full scale. */
+const OCTAVE_SHARE = 0.3;
+const TWELFTH_SHARE = 0.12;
+
 let context: AudioContext | null = null;
 
 /** The one audio context, made the first time something is played. */
@@ -187,29 +210,50 @@ export function playCallSound(name: CallSound): void {
     if (!ctx) return;
     const start = ctx.currentTime;
     for (const note of SOUNDS[name]) {
-        const oscillator = ctx.createOscillator();
-        const gain = ctx.createGain();
-        oscillator.type = note.wave ?? "sine";
-        oscillator.frequency.setValueAtTime(note.from, start + note.at);
-        if (note.to !== undefined) {
-            oscillator.frequency.linearRampToValueAtTime(note.to, start + note.at + note.seconds);
-        }
-        const peak = note.gain ?? DEFAULT_GAIN;
-        const from = start + note.at;
-        const to = from + note.seconds;
-        gain.gain.setValueAtTime(0.0001, from);
-        gain.gain.exponentialRampToValueAtTime(peak, from + ATTACK_SECONDS);
-        if (note.sustain) {
-            // Held at the peak, then let go over the last few hundredths. The
-            // note below decays across its whole length instead, which is right
-            // for a blip and is what made the ring inaudible.
-            gain.gain.setValueAtTime(peak, Math.max(from + ATTACK_SECONDS, to - RELEASE_SECONDS));
-        }
-        gain.gain.exponentialRampToValueAtTime(0.0001, to);
-        oscillator.connect(gain).connect(ctx.destination);
-        oscillator.start(start + note.at);
-        oscillator.stop(start + note.at + note.seconds + 0.02);
+        // One partial, or three of them. `sound` is the whole note: the tone
+        // itself is the first call and a bell adds its octave and its twelfth
+        // over the top, each quieter and all fading together.
+        sound(ctx, note, start, 1, 1);
+        if (!note.bell) continue;
+        sound(ctx, note, start, 2, OCTAVE_SHARE);
+        sound(ctx, note, start, 3, TWELFTH_SHARE);
     }
+}
+
+/** One oscillator: the note at some multiple of its frequency, at some share of
+ *  its volume, with the note's own envelope. */
+function sound(
+    ctx: AudioContext,
+    note: Note,
+    start: number,
+    multiple: number,
+    share: number
+): void {
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.type = note.wave ?? "sine";
+    oscillator.frequency.setValueAtTime(note.from * multiple, start + note.at);
+    if (note.to !== undefined) {
+        oscillator.frequency.linearRampToValueAtTime(
+            note.to * multiple,
+            start + note.at + note.seconds
+        );
+    }
+    const peak = (note.gain ?? DEFAULT_GAIN) * share;
+    const from = start + note.at;
+    const to = from + note.seconds;
+    gain.gain.setValueAtTime(0.0001, from);
+    gain.gain.exponentialRampToValueAtTime(peak, from + ATTACK_SECONDS);
+    if (note.sustain) {
+        // Held at the peak, then let go over the last few hundredths. Everything
+        // else fades across its whole length, which is what a struck thing does
+        // and what keeps a ring from sounding like an alarm.
+        gain.gain.setValueAtTime(peak, Math.max(from + ATTACK_SECONDS, to - RELEASE_SECONDS));
+    }
+    gain.gain.exponentialRampToValueAtTime(0.0001, to);
+    oscillator.connect(gain).connect(ctx.destination);
+    oscillator.start(from);
+    oscillator.stop(to + 0.02);
 }
 
 /**

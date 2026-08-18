@@ -598,6 +598,59 @@ export interface ChatEditHistory {
  * it is that "(edited)" without it asks the room to take the change on trust,
  * and a history only the author could open would not answer that.
  */
+/** One message, with the conversation it came out of named. */
+export interface CarriedMessage {
+    readonly message: ChatMessageView;
+    /** What to call the room it came from, for the line above the box: a person
+     *  answering privately needs to know which of the four channels they are in
+     *  today this was said in. Null for a conversation with no name of its own,
+     *  where "in" would have nothing to follow it. */
+    readonly from: string | null;
+    /** Whether that name is a channel, so the screen can write the hash in front
+     *  of it without guessing from the shape of the name. */
+    readonly channel: boolean;
+}
+
+/**
+ * Read one message, wherever it is, for carrying it somewhere else.
+ *
+ * What answering somebody privately needs: the message is quoted in a
+ * conversation it was not said in, so it has to be fetched on its own rather
+ * than found in the page already on screen - the two conversations are different
+ * screens and the second one has never loaded the first.
+ *
+ * Authorized the way everything else here is: the channel it sits in, asked
+ * before a word of it is returned. Somebody who cannot read the room cannot
+ * carry a line out of it by holding onto an id.
+ */
+export async function readMessage(actor: ChatActor, messageId: string): Promise<CarriedMessage> {
+    const found = await prisma.chatMessage.findUnique({
+        where: { id: messageId },
+        select: { channelId: true }
+    });
+    if (!found) throw new ChatAccessError("That message is gone");
+    await requireChannel(actor, found.channelId);
+
+    const [row, channel] = await Promise.all([
+        prisma.chatMessage.findUnique({ where: { id: messageId }, select: MESSAGE_SELECT }),
+        prisma.chatChannel.findUnique({
+            where: { id: found.channelId },
+            select: { name: true, spaceId: true, kind: true }
+        })
+    ]);
+    if (!row) throw new ChatAccessError("That message is gone");
+    const [message] = await decorateMessages(actor, [row]);
+    if (!message) throw new ChatAccessError("That message is gone");
+    return {
+        message,
+        // A direct message is named after whoever is in it, which from here is
+        // the person being answered - saying "in Grace" above a box addressed to
+        // Grace is noise, so it is left off.
+        from: channel && channel.kind !== "dm" ? channel.name : null,
+        channel: channel?.spaceId !== null && channel?.spaceId !== undefined
+    };
+}
+
 export async function editHistory(actor: ChatActor, messageId: string): Promise<ChatEditHistory> {
     const message = await prisma.chatMessage.findUnique({
         where: { id: messageId },

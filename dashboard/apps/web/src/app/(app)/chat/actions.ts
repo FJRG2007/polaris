@@ -233,6 +233,21 @@ export async function deleteMessageAction(messageId: string): Promise<{ error?: 
 }
 
 /** What a message said before it was edited, for the panel behind "(edited)". */
+/**
+ * One message, fetched on its own so it can be answered somewhere else.
+ *
+ * What "reply privately" needs after it has opened the conversation: the message
+ * being answered was said in a different room, on a different screen, which this
+ * one has never loaded.
+ */
+export async function carriedMessageAction(
+    messageId: string
+): Promise<{ carried?: messages.CarriedMessage; error?: string }> {
+    const me = await actor();
+    const result = await guard(() => messages.readMessage(me, messageId));
+    return result.error ? { error: result.error } : { carried: result.value };
+}
+
 export async function editHistoryAction(
     messageId: string
 ): Promise<{ history?: messages.ChatEditHistory; error?: string }> {

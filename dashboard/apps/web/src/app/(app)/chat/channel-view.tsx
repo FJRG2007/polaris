@@ -36,11 +36,12 @@ import { useCallHold } from "./call-session";
 import { ChannelHeader } from "./channel-header";
 import { useChatStream } from "./use-chat-stream";
 import type { RecordedSound } from "./voice-recorder";
+import type * as messagesLib from "@/lib/chat/messages";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useRouter, useSearchParams } from "next/navigation";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { ChannelMembers, useMembersPanel } from "./members-panel";
-import { ForwardDialog, type PrivateReply } from "./forward-dialog";
+import { ForwardDialog } from "./forward-dialog";
 import { ArrowDown, Loader2, MessageCircle, Mic, Video, Volume2 } from "lucide-react";
 import { Button, ConfirmDeleteDialog, EmptyState, Skeleton, cn } from "@polaris/ui";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -140,13 +141,17 @@ export function ChannelView({
     const [deleting, setDeleting] = useState<ChatMessageView | null>(null);
     const [replyingTo, setReplyingTo] = useState<ChatMessageView | null>(null);
     const [forwarding, setForwarding] = useState<ChatMessageView | null>(null);
-    /** Answering somebody where the room cannot read it: the message, and the
-     *  conversation with them that it is going into. Both together, because the
-     *  second is fetched and the dialog must not open before it exists. */
-    const [aside, setAside] = useState<{
-        message: ChatMessageView;
-        reply: PrivateReply;
-    } | null>(null);
+    /**
+     * A message said somewhere else, brought here to be answered.
+     *
+     * What "reply privately" leaves behind: the conversation with that person is
+     * opened, and this is what the bar above the box is about. It is not a reply
+     * in the data sense - a reply belongs to the conversation its parent is in,
+     * and this one deliberately is not - so it travels as a quote, which is the
+     * same movement forwarding already makes. What changes is only how it reads:
+     * a reply bar with the room it came from named on it, rather than a dialog.
+     */
+    const [carried, setCarried] = useState<messagesLib.CarriedMessage | null>(null);
     const [typists, setTypists] = useState<readonly Typist[]>([]);
     // How much arrived below somebody who is reading further up. They are not
     // dragged to it - that is the one thing a chat must not do to somebody
@@ -569,6 +574,46 @@ export function ChannelView({
         });
     }, [answering, channelId, router, checkCall, enter, callTitle]);
 
+    /**
+     * Arrived to answer somebody privately.
+     *
+     * The message is named in the address for the same reason a call answer is:
+     * getting here is a navigation, and a navigation carries nothing but its
+     * address. It is fetched rather than passed, because it was said in a room
+     * this screen has never loaded - and it is fetched through the server, which
+     * checks that whoever is asking can read that room before it hands over a
+     * word of it.
+     *
+     * Taken out of the address as soon as it is acted on, so a reload tomorrow
+     * does not put the bar back over an empty box.
+     */
+    const quoting = params.get("quote");
+    const quoted = useRef<string | null>(null);
+    useEffect(() => {
+        if (!quoting || quoted.current === quoting) return;
+        quoted.current = quoting;
+        router.replace(`/chat/c/${channelId}`, { scroll: false });
+        void runAction(() => actions.carriedMessageAction(quoting), setError).then((result) => {
+            if (result?.carried) setCarried(result.carried);
+        });
+    }, [channelId, quoting, router]);
+
+    // Leaving the conversation drops it. What is on the bar is about this box in
+    // this room; carrying it to the next one would offer to answer a stranger's
+    // message in a conversation that has nothing to do with it.
+    //
+    // On a change of conversation and never on arriving at one: the effect above
+    // strips the address as soon as it has read it, which re-runs everything
+    // here with no quote in it - and a reset that fired then would wipe the
+    // message it had just gone and fetched.
+    const lastRoom = useRef(channelId);
+    useEffect(() => {
+        if (lastRoom.current === channelId) return;
+        lastRoom.current = channelId;
+        setCarried(null);
+        quoted.current = null;
+    }, [channelId]);
+
     // The message being answered, taken back while the box was open.
     //
     // The server refuses the reply - answering something that is no longer there
@@ -724,11 +769,13 @@ export function ChannelView({
         opening.current = null;
         setOpeningName(null);
         if (!result || result.error || !result.id) return;
-        setAside({
-            message,
-            reply: { channelId: result.id, name: message.authorName ?? "them" }
-        });
-    }, []);
+        // Straight there, with the message named in the address. That
+        // conversation draws its own bar from it - see `carried` - so answering
+        // privately ends up looking exactly like answering anything else, which
+        // is the whole point: a dialog with a box of its own was a second way to
+        // write a message, and people already know the first one.
+        router.push(`/chat/c/${result.id}?quote=${message.id}`);
+    }, [router]);
 
     /**
      * Walk into a voice channel by opening it.
@@ -976,12 +1023,21 @@ export function ChannelView({
         following.current = true;
 
         const answering = replyingTo?.id ?? null;
-        // Cleared before the round trip: the reply bar is about what is being
-        // written, and the message has left.
+        // A message said in another room cannot be a reply here - a reply belongs
+        // to the conversation its parent is in - so it goes the way forwarding
+        // goes: quoted, with what was typed as the note on top. The bar above the
+        // box reads as a reply either way, which is the only part anybody sees.
+        const elsewhere = !replyingTo && carried ? carried.message.id : null;
+        // Cleared before the round trip: the bar is about what is being written,
+        // and the message has left.
         setReplyingTo(null);
+        setCarried(null);
 
         const result = await runAction(
-            () => actions.sendAction({ channelId, body, replyToId: answering }),
+            () =>
+                elsewhere
+                    ? actions.forwardAction({ messageId: elsewhere, channelId, note: body })
+                    : actions.sendAction({ channelId, body, replyToId: answering }),
             setError
         );
         if (result?.error || !result?.id) {
@@ -1257,8 +1313,14 @@ export function ChannelView({
                         : "This conversation is archived."
                 }
                 editing={editing}
-                replyingTo={replyingTo}
-                onCancelReply={() => setReplyingTo(null)}
+                replyingTo={replyingTo ?? carried?.message ?? null}
+                replyingFrom={
+                    carried?.from ? { name: carried.from, channel: carried.channel } : null
+                }
+                onCancelReply={() => {
+                    setReplyingTo(null);
+                    setCarried(null);
+                }}
                 onCancelEdit={() => setEditing(null)}
                 onSend={send}
                 onMedia={async (address) => {
@@ -1467,15 +1529,6 @@ export function ChannelView({
             <ForwardDialog
                 message={forwarding}
                 onOpenChange={(open) => !open && setForwarding(null)}
-                onSent={refresh}
-            />
-
-            {/* The same dialog with the choosing taken out of it: where it goes
-                was decided by whose message was pressed. */}
-            <ForwardDialog
-                message={aside?.message ?? null}
-                privately={aside?.reply ?? null}
-                onOpenChange={(open) => !open && setAside(null)}
                 onSent={refresh}
             />
 

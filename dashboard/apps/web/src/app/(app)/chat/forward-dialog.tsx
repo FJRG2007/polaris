@@ -33,11 +33,10 @@ import { forwardAction } from "./actions";
 import { runAction } from "@/lib/run-action";
 import { Avatar, AvatarStack } from "@/components/avatar";
 import type { ChatMessageView } from "@/lib/chat/messages";
-import { listedTargets, type PrivateReply, type Target } from "./forward-targets";
+import { listedTargets, type Target } from "./forward-targets";
 import {
     ChevronLeft,
     ChevronRight,
-    CornerUpLeft,
     Forward,
     Hash,
     Loader2,
@@ -56,19 +55,14 @@ import {
     cn
 } from "@polaris/ui";
 
-export type { PrivateReply } from "./forward-targets";
-
 export function ForwardDialog({
     message,
-    privately = null,
     onOpenChange,
     onSent
 }: {
     /** The message being forwarded. Null closes the dialog - one prop rather
      *  than a boolean beside it, so the two cannot disagree. */
     message: ChatMessageView | null;
-    /** Set when this is a private answer to somebody rather than a forward. */
-    privately?: PrivateReply | null;
     onOpenChange: (open: boolean) => void;
     onSent: () => void;
 }) {
@@ -152,9 +146,8 @@ export function ForwardDialog({
             current.includes(id) ? current.filter((one) => one !== id) : [...current, id]
         );
 
-    /** Where it is actually going: what was chosen, or the one conversation that
-     *  was decided before this opened. */
-    const going = privately ? [privately.channelId] : chosen;
+    /** Where it is actually going. */
+    const going = chosen;
 
     const send = async () => {
         if (!message || going.length === 0) return;
@@ -173,13 +166,7 @@ export function ForwardDialog({
         }
         setBusy(false);
         const named = refused.map(
-            (id) =>
-                targets.find((target) => target.id === id)?.name ??
-                // A conversation opened a moment ago to answer somebody is not
-                // in this browser's list yet, and naming it "a conversation"
-                // when the dialog is titled with their name reads as a bug.
-                privately?.name ??
-                "a conversation"
+            (id) => targets.find((target) => target.id === id)?.name ?? "a conversation"
         );
         if (refused.length === going.length) {
             setError(
@@ -209,29 +196,21 @@ export function ForwardDialog({
         <Dialog open={message !== null} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>
-                        {privately
-                            ? `Reply to ${privately.name} privately`
-                            : "Forward this message"}
-                    </DialogTitle>
+                    <DialogTitle>Forward this message</DialogTitle>
                     <DialogDescription>
-                        {privately
-                            ? "It goes to them alone, with the original quoted - nobody else in this conversation sees it."
-                            : "It arrives quoted, so who said it and when goes with it."}
+                        It arrives quoted, so who said it and when goes with it.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
-                    {!privately && (
-                        <Input
-                            value={query}
-                            placeholder="Find a person, a group or a channel"
-                            aria-label="Find a person, a group or a channel"
-                            onChange={(event) => setQuery(event.target.value)}
-                        />
-                    )}
+                    <Input
+                        value={query}
+                        placeholder="Find a person, a group or a channel"
+                        aria-label="Find a person, a group or a channel"
+                        onChange={(event) => setQuery(event.target.value)}
+                    />
 
-                    {!privately && inside && !searching && (
+                    {inside && !searching && (
                         <button
                             type="button"
                             onClick={() => setInside(null)}
@@ -242,94 +221,89 @@ export function ForwardDialog({
                         </button>
                     )}
 
-                    {!privately && (
-                        <ul className="max-h-64 overflow-y-auto rounded-md border border-border">
-                            {openServers &&
-                                spaces
-                                    .filter((space) => !space.archived)
-                                    .map((space) => (
-                                        <li key={space.id}>
-                                            <button
-                                                type="button"
-                                                onClick={() => setInside(space.id)}
-                                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
-                                            >
-                                                <Server className="size-3.5 shrink-0 text-muted-foreground" />
-                                                <span
-                                                    className="min-w-0 flex-1 truncate"
-                                                    title={space.name}
-                                                >
-                                                    {space.name}
-                                                </span>
-                                                {/* How many of the chosen are in
-                                                there, so a server closed over a
-                                                choice does not hide it. */}
-                                                {targets.some(
-                                                    (target) =>
-                                                        target.spaceId === space.id &&
-                                                        chosen.includes(target.id)
-                                                ) && (
-                                                    <span className="shrink-0 rounded bg-primary/15 px-1.5 text-[11px] text-primary">
-                                                        chosen
-                                                    </span>
-                                                )}
-                                                <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
-                                            </button>
-                                        </li>
-                                    ))}
-
-                            {listed.length === 0 && !openServers ? (
-                                <li className="px-3 py-6 text-center text-xs text-muted-foreground">
-                                    {searching
-                                        ? "Nothing matches that."
-                                        : "Nothing to forward to yet."}
-                                </li>
-                            ) : (
-                                listed.map((target) => (
-                                    <li key={target.id}>
+                    <ul className="max-h-64 overflow-y-auto rounded-md border border-border">
+                        {openServers &&
+                            spaces
+                                .filter((space) => !space.archived)
+                                .map((space) => (
+                                    <li key={space.id}>
                                         <button
                                             type="button"
-                                            onClick={() => pick(target.id)}
-                                            aria-pressed={chosen.includes(target.id)}
-                                            className={cn(
-                                                "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
-                                                chosen.includes(target.id) && "bg-card-hover"
-                                            )}
+                                            onClick={() => setInside(space.id)}
+                                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
                                         >
-                                            <Face target={target} />
-                                            <span className="flex min-w-0 flex-1 flex-col">
-                                                <span className="truncate" title={target.name}>
-                                                    {target.name}
-                                                </span>
-                                                {/* Only while searching: inside a
-                                                server every row is in it, and
-                                                repeating its name on all thirty
-                                                is noise. */}
-                                                {searching && target.place && (
-                                                    <span className="truncate text-xs text-muted-foreground">
-                                                        {target.place}
-                                                    </span>
-                                                )}
+                                            <Server className="size-3.5 shrink-0 text-muted-foreground" />
+                                            <span
+                                                className="min-w-0 flex-1 truncate"
+                                                title={space.name}
+                                            >
+                                                {space.name}
                                             </span>
-                                            {chosen.includes(target.id) && (
-                                                <span className="shrink-0 text-[11px] text-primary">
+                                            {/* How many of the chosen are in
+                                            there, so a server closed over a
+                                            choice does not hide it. */}
+                                            {targets.some(
+                                                (target) =>
+                                                    target.spaceId === space.id &&
+                                                    chosen.includes(target.id)
+                                            ) && (
+                                                <span className="shrink-0 rounded bg-primary/15 px-1.5 text-[11px] text-primary">
                                                     chosen
                                                 </span>
                                             )}
+                                            <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
                                         </button>
                                     </li>
-                                ))
-                            )}
-                        </ul>
-                    )}
+                                ))}
+
+                        {listed.length === 0 && !openServers ? (
+                            <li className="px-3 py-6 text-center text-xs text-muted-foreground">
+                                {searching
+                                    ? "Nothing matches that."
+                                    : "Nothing to forward to yet."}
+                            </li>
+                        ) : (
+                            listed.map((target) => (
+                                <li key={target.id}>
+                                    <button
+                                        type="button"
+                                        onClick={() => pick(target.id)}
+                                        aria-pressed={chosen.includes(target.id)}
+                                        className={cn(
+                                            "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
+                                            chosen.includes(target.id) && "bg-card-hover"
+                                        )}
+                                    >
+                                        <Face target={target} />
+                                        <span className="flex min-w-0 flex-1 flex-col">
+                                            <span className="truncate" title={target.name}>
+                                                {target.name}
+                                            </span>
+                                            {/* Only while searching: inside a
+                                            server every row is in it, and
+                                            repeating its name on all thirty
+                                            is noise. */}
+                                            {searching && target.place && (
+                                                <span className="truncate text-xs text-muted-foreground">
+                                                    {target.place}
+                                                </span>
+                                            )}
+                                        </span>
+                                        {chosen.includes(target.id) && (
+                                            <span className="shrink-0 text-[11px] text-primary">
+                                                chosen
+                                            </span>
+                                        )}
+                                    </button>
+                                </li>
+                            ))
+                        )}
+                    </ul>
 
                     <Input
                         value={note}
-                        autoFocus={privately !== null}
-                        placeholder={
-                            privately ? "Write your reply" : "Say something about it (optional)"
-                        }
-                        aria-label={privately ? "Your reply" : "Say something about it"}
+                        placeholder="Say something about it (optional)"
+                        aria-label="Say something about it"
                         onChange={(event) => setNote(event.target.value)}
                     />
 
@@ -351,16 +325,10 @@ export function ForwardDialog({
                     >
                         {busy ? (
                             <Loader2 className="size-4 animate-spin" />
-                        ) : privately ? (
-                            <CornerUpLeft className="size-4" />
                         ) : (
                             <Forward className="size-4" />
                         )}
-                        {privately
-                            ? "Send"
-                            : chosen.length > 1
-                              ? `Forward to ${chosen.length}`
-                              : "Forward"}
+                        {chosen.length > 1 ? `Forward to ${chosen.length}` : "Forward"}
                     </Button>
                 </DialogFooter>
             </DialogContent>

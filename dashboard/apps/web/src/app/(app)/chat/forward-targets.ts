@@ -24,19 +24,6 @@ export interface Target {
 }
 
 /**
- * Where a message is going, when that was decided before the dialog opened.
- *
- * Answering somebody privately is the same movement as forwarding - their words
- * arrive quoted in a conversation they are not currently in - and the only
- * difference is that there is nothing to choose. So it is this dialog with the
- * list taken away and the note turned into what is being said.
- */
-export interface PrivateReply {
-    readonly channelId: string;
-    readonly name: string;
-}
-
-/**
  * What the list shows, given what has been typed and where somebody has browsed.
  *
  * Pulled out of the render because it is the whole of the complaint that led to
