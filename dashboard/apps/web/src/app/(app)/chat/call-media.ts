@@ -96,6 +96,56 @@ export async function callDevices(): Promise<{
     return { microphones: named("audioinput", "Microphone"), cameras: named("videoinput", "Camera") };
 }
 
+/** One screen with the big place in the room: which picture, whose, and how it
+ *  is named while it is up there. */
+export interface CallStage {
+    readonly key: string;
+    readonly stream: MediaStream;
+    readonly name: string;
+}
+
+/**
+ * Every screen being shared into the room, this browser's own included.
+ *
+ * Its own included, and that is the whole reason this exists. A screen used to
+ * be folded into the sharer's own camera stream, so the one person in the call
+ * who could not see what was being shared was the person sharing it: it turned
+ * up in their head-sized tile down in the grid while everybody else had it
+ * across the top of theirs.
+ *
+ * Theirs first, because it is the one they are responsible for and the one they
+ * need to notice is going out. A list rather than a single value because several
+ * people can share at once - each subscriber is only sent what they are
+ * watching, so there was never a reason to allow only one.
+ */
+export function stagesOf(room: {
+    localScreen: MediaStream | null;
+    /** This browser's seat, which is what its own screen is keyed by so that
+     *  focusing it survives somebody else starting to share. */
+    participantId: string | null;
+    screens: ReadonlyMap<string, MediaStream>;
+    nameOf: (personId: string) => string;
+}): CallStage[] {
+    const stages: CallStage[] = [];
+    if (room.localScreen) {
+        stages.push({
+            key: `screen:${room.participantId ?? "mine"}`,
+            stream: room.localScreen,
+            name: "Your screen"
+        });
+    }
+    for (const [personId, stream] of room.screens) {
+        // A screen that is already on the list is this browser's own coming back
+        // from the server, which happens where a client subscribes to itself.
+        // Drawn twice it would be two copies of one picture, one of them a round
+        // trip late.
+        const key = `screen:${personId}`;
+        if (stages.some((stage) => stage.key === key)) continue;
+        stages.push({ key, stream, name: `${room.nameOf(personId)} - screen` });
+    }
+    return stages;
+}
+
 /**
  * The new picture of the room, keeping every stream that has not changed.
  *

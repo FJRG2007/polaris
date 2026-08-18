@@ -42,7 +42,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { ChannelMembers, useMembersPanel } from "./members-panel";
 import { ArrowDown, MessageCircle, Mic, Video, Volume2 } from "lucide-react";
-import { Button, ConfirmDeleteDialog, EmptyState, Skeleton } from "@polaris/ui";
+import { Button, ConfirmDeleteDialog, EmptyState, Skeleton, cn } from "@polaris/ui";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 /** How close to the bottom still counts as "following along". A few pixels of
@@ -1042,7 +1042,22 @@ export function ChannelView({
                 )}
 
                 {inCall && (
-                    <div className="flex max-h-[60%] min-h-0 shrink-0 flex-col border-b border-border">
+                    <div
+                        className={cn(
+                            "flex min-h-0 shrink-0 flex-col border-b border-border",
+                            // A screen being shared changes what this column is
+                            // for. At the usual height the share got a third of
+                            // 60% of the column - about a hand's width of
+                            // somebody's document - and "make it bigger" could
+                            // not make it bigger, because the room it would take
+                            // was being held for messages nobody was reading
+                            // while a screen was up. It goes back on its own
+                            // when the sharing stops.
+                            call.screens.size > 0 || call.localScreen
+                                ? "max-h-[78%]"
+                                : "max-h-[60%]"
+                        )}
+                    >
                         <CallRoom
                             call={call}
                             meetingId={inCall}

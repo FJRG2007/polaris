@@ -36,6 +36,7 @@ import { playCallSound } from "@/lib/call-sounds";
 import { useEffect, useRef, useState } from "react";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
+import { stagesOf } from "./call-media";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
     CAMERA_LADDER,
@@ -164,9 +165,29 @@ export function CallRoom({
      */
     const [focused, setFocused] = useState<string | null>(null);
     const focus = (key: string) => setFocused((current) => (current === key ? null : key));
-    const screenKeys = [...call.screens.keys()].map((personId) => `screen:${personId}`);
+
+    /** Every screen being shared into this room, this browser's own included -
+     *  see `stagesOf`, which is where the reasoning lives. */
+    const stages = stagesOf({
+        localScreen: call.localScreen,
+        participantId: call.participantId,
+        screens: call.screens,
+        nameOf: (personId) => nameOf(admitted, personId)
+    });
     const cameraKeys = (admitted ?? []).map((person) => `camera:${person.id}`);
-    const live = focused && [...screenKeys, ...cameraKeys].includes(focused) ? focused : null;
+    const live =
+        focused && [...stages.map((stage) => stage.key), ...cameraKeys].includes(focused)
+            ? focused
+            : null;
+    // What the room is built around right now: the screens on show, which is all
+    // of them until somebody asks for one.
+    const showing = live?.startsWith("camera:")
+        ? []
+        : stages.filter((stage) => !live || live === stage.key);
+    /** Whether anything at all has the big place. The faces then become a strip
+     *  along the bottom: a picture somebody asked to see bigger, sharing the
+     *  room equally with eight thumbnails, is not bigger. */
+    const staged = showing.length > 0 || Boolean(live?.startsWith("camera:"));
 
     useEffect(() => {
         if (!call.meeting?.guestToken) return;
@@ -247,34 +268,37 @@ export function CallRoom({
                 </ul>
             )}
 
-            {/* Somebody's screen, which is the thing everybody is looking at
-                while it is there. Above the faces and across the whole width
-                rather than in a tile the size of a head: a shared screen is
-                usually text, and text in a ninth of a window is not readable.
-                One per sharer: the server sends each subscriber only what
-                    they are watching, so there is no reason to allow only one. */}
-            {(live?.startsWith("camera:")
-                ? []
-                : [...call.screens].filter(
-                      ([personId]) => !live || live === `screen:${personId}`
-                  )
-            ).map(([personId, stream]) => (
-                <div key={personId} className="min-h-0 flex-[2]">
-                    <Tile
-                        stream={stream}
-                        name={`${nameOf(admitted, personId)} - screen`}
-                        personId={null}
-                        focused={live === `screen:${personId}`}
-                        onFocus={() => focus(`screen:${personId}`)}
-                        volumeKey={undefined}
-                    />
+            {/* The screens, which are the thing everybody is looking at while
+                they are there. Above the faces and across the whole width rather
+                than in a tile the size of a head: a shared screen is usually
+                text, and text in a ninth of a window is not readable. Side by
+                side when there are several, rather than stacked - two shares
+                stacked in a panel this tall leave each of them a strip. */}
+            {showing.length > 0 && (
+                <div
+                    className={cn(
+                        "grid min-h-0 flex-[3] gap-2",
+                        gridColumns(showing.length)
+                    )}
+                >
+                    {showing.map((stage) => (
+                        <Tile
+                            key={stage.key}
+                            stream={stage.stream}
+                            name={stage.name}
+                            personId={null}
+                            focused={live === stage.key}
+                            onFocus={() => focus(stage.key)}
+                            volumeKey={undefined}
+                        />
+                    ))}
                 </div>
-            ))}
+            )}
 
             {/* A face somebody asked to see bigger takes the same place a screen
                 would. One at a time: two big pictures is the grid again. */}
             {live?.startsWith("camera:") && (
-                <div className="min-h-0 flex-[2]">
+                <div className="min-h-0 flex-[3]">
                     {live === `camera:${call.participantId}` ? (
                         <Tile
                             stream={call.localStream}
@@ -283,8 +307,7 @@ export function CallRoom({
                             own
                             focused
                             onFocus={() => focus(live)}
-                            cameraOff={!call.cameraOn && !call.sharing}
-                            sharing={call.sharing}
+                            cameraOff={!call.cameraOn}
                         />
                     ) : (
                         (() => {
@@ -309,7 +332,18 @@ export function CallRoom({
                 </div>
             )}
 
-            <div className={cn("grid min-h-0 flex-1 gap-2", columns)}>
+            <div
+                className={cn(
+                    "grid min-h-0 gap-2",
+                    // A strip of thumbnails along the bottom while something has
+                    // the room, and an even grid when nothing does. Scrolling
+                    // sideways rather than shrinking further: eight faces on a
+                    // phone, each a twelfth of a strip, are eight grey squares.
+                    staged
+                        ? "h-24 shrink-0 auto-cols-[9rem] grid-flow-col overflow-x-auto"
+                        : cn("flex-1", columns)
+                )}
+            >
                 <Tile
                     stream={call.localStream}
                     name="You"
@@ -320,7 +354,7 @@ export function CallRoom({
                         call.speaking.has(call.participantId) &&
                         call.micOn
                     }
-                    cameraOff={!call.cameraOn && !call.sharing}
+                    cameraOff={!call.cameraOn}
                     sharing={call.sharing}
                     focused={live === `camera:${call.participantId}`}
                     onFocus={
@@ -349,7 +383,11 @@ export function CallRoom({
                     ))}
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-2">
+            {/* Never squeezed. It wraps to a second row on a narrow window, and
+                a flex row that is allowed to shrink gives that second row away
+                to the pictures above it - which is how the button somebody
+                needed to leave the call ended up half off the panel. */}
+            <div className="flex shrink-0 flex-wrap items-center justify-center gap-2">
                 <Split
                     label={call.micOn ? "Mute" : "Unmute"}
                     icon={call.micOn ? <Mic className="size-4" /> : <MicOff className="size-4" />}
@@ -780,7 +818,9 @@ function Tile({
     own?: boolean;
     guest?: boolean;
     cameraOff?: boolean;
-    /** Whether YOUR picture is a screen rather than a camera. */
+    /** Whether you are sharing a screen. Said on your own tile because the
+     *  screen itself is up on the stage rather than in it, so nothing else on
+     *  this tile would tell you it is going out. */
     sharing?: boolean;
     speaking?: boolean;
     /** Their microphone is off, or they have stopped listening altogether.
@@ -939,7 +979,10 @@ function Tile({
                     // thing they are pointing at is. Only your own picture is
                     // cropped to fill the tile, because it is the only one this
                     // browser knows the shape of.
-                    own && !sharing ? "object-cover" : "object-contain",
+                    // Your own is always a camera now - the screen you are
+                    // sharing has its own tile up on the stage - so this no
+                    // longer has to ask which of the two it is holding.
+                    own ? "object-cover" : "object-contain",
                     blank && "invisible"
                 )}
             />

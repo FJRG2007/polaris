@@ -133,6 +133,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const [meeting, setMeeting] = useState<MeetingView | null>(null);
     const [participantId, setParticipantId] = useState<string | null>(null);
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+    const [localScreen, setLocalScreen] = useState<MediaStream | null>(null);
     const [remote, setRemote] = useState<ReadonlyMap<string, MediaStream>>(new Map());
     const [screens, setScreens] = useState<ReadonlyMap<string, MediaStream>>(new Map());
     const [states, setStates] = useState<ReadonlyMap<string, PeerState>>(new Map());
@@ -229,12 +230,31 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         setScreenLevel(levelNow("screen"));
     }, [levelNow]);
 
-    /** The stream the local tile shows: whatever is going out right now. */
+    /**
+     * What this browser is putting out, in the two shapes the room draws.
+     *
+     * Two, not one, and that split is a bug fix. A screen used to be folded into
+     * the same stream as the camera and shown in place of it - so the one person
+     * who could not see the screen being shared was the person sharing it: it
+     * arrived in their own head-sized tile down in the grid while everybody else
+     * had it across the top. It is its own publication on the wire; it is its own
+     * picture here too.
+     *
+     * The screen stream keeps its object while the track behind it is unchanged.
+     * Pointing a video element at a different object restarts it, and this is
+     * called on every track event in the call.
+     */
     const publishLocalPreview = useCallback(() => {
-        const tracks = [mic.current, screen.current ?? camera.current].filter(
+        const tracks = [mic.current, camera.current].filter(
             (track): track is MediaStreamTrack => track !== null
         );
         setLocalStream(tracks.length > 0 ? new MediaStream(tracks) : null);
+        setLocalScreen((current) => {
+            const track = screen.current;
+            if (!track) return null;
+            if (current?.getTrackById(track.id)) return current;
+            return new MediaStream([track]);
+        });
     }, []);
 
     /** What this browser has to offer, named. */
@@ -1154,6 +1174,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         meeting,
         participantId,
         localStream,
+        localScreen,
         remote,
         screens,
         speaking,

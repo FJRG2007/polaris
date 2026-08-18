@@ -27,6 +27,10 @@ export interface CallState {
     readonly meeting: MeetingView | null;
     readonly participantId: string | null;
     readonly localStream: MediaStream | null;
+    /** This browser's own screen, while it is sharing one. Kept apart from the
+     *  stream above so the room can put it where every other screen goes -
+     *  folded in, the one person who could not see the share was the sharer. */
+    readonly localScreen: MediaStream | null;
     /** Remote camera and audio, by the participant id it belongs to. */
     readonly remote: ReadonlyMap<string, MediaStream>;
     /** Remote screens, by the participant id sharing one. Separate from their
