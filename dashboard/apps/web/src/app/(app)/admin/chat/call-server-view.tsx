@@ -30,6 +30,7 @@ const STARTING_TRIES = 24;
 
 interface Settings {
     url: string;
+    container: "running" | "stopped" | "missing" | "unknown";
     /** The key name saved with that address. A name, not a secret. */
     key: string;
     hasSecret: boolean;
@@ -43,6 +44,7 @@ interface Settings {
 const NOTHING: Settings = {
     url: "",
     key: "",
+    container: "unknown",
     hasSecret: false,
     shipped: false,
     ready: false,
@@ -133,6 +135,10 @@ export function CallServerView() {
     };
 
     const where = settings?.shipped ? "on this server" : "at the address below";
+    // Never created, which is a different thing from slow to start and the only
+    // one of the two anybody can act on. Asked of the container engine rather
+    // than inferred from the key file - see `shippedContainer`.
+    const missing = settings?.container === "missing";
 
     return (
         <section className="flex flex-col gap-3">
@@ -154,7 +160,7 @@ export function CallServerView() {
                         <p className="flex items-center gap-1.5 text-[12px] text-foreground">
                             {settings.answering ? (
                                 <CircleCheck className="size-3.5 shrink-0 text-success" />
-                            ) : waited || !settings.ready ? (
+                            ) : waited || missing || !settings.ready || settings.container === "stopped" ? (
                                 <CircleAlert className="size-3.5 shrink-0 text-warning" />
                             ) : (
                                 <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
@@ -163,14 +169,29 @@ export function CallServerView() {
                                 ? "The call server could not be prepared."
                                 : settings.answering
                                   ? `Running ${where}.`
-                                  : waited
-                                    ? `Not answering ${where}.`
-                                    : `Starting ${where}.`}
+                                  : missing
+                                    ? "The call server is not part of this deployment."
+                                    : settings.container === "stopped"
+                                      ? "The call server is stopped."
+                                      : waited
+                                        ? `Not answering ${where}.`
+                                        : `Starting ${where}.`}
                         </p>
                         <p className="text-[11px] text-foreground-subtle">
-                            {!settings.ready
-                                ? "Calls have nowhere to run on this deployment yet. Nothing to do here: it repairs itself the next time Polaris starts, and this says so as soon as it has."
-                                : settings.answering ? (
+                            {!settings.ready ? (
+                                "Calls have nowhere to run on this deployment yet. Nothing to do here: it repairs itself the next time Polaris starts, and this says so as soon as it has."
+                            ) : missing ? (
+                                <>
+                                    Its container was never created here, which is why this said it
+                                    was starting and never finished. Updating again brings it up -{" "}
+                                    <Link href="/admin/updates" className="text-primary hover:underline">
+                                        Settings, Update
+                                    </Link>
+                                    .
+                                </>
+                            ) : settings.container === "stopped" ? (
+                                "Its container exists and is not running. Starting it is under Containers, by the name livekit."
+                            ) : settings.answering ? (
                                       <>
                                           Calls between devices on this network work now. For calls
                                           from outside, two ports have to reach this machine -{" "}
