@@ -11,13 +11,26 @@
  * dashboard's own route is: what is being protected is what Traefik is handed.
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { mkdtemp, readFile } from "node:fs/promises";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/chat/call-server", () => ({ callServer: async () => null }));
+/** Where calls run, per case: nowhere at all, or somebody else's server. */
+let endpoint: { url: string; shipped: boolean } | null = null;
+vi.mock("@/lib/chat/call-server", () => ({ callServer: async () => endpoint }));
 vi.mock("@/lib/domain-edge", () => ({ dashboardHosts: async () => [] }));
 vi.mock("@/lib/waf-service", () => ({ resolvePolarisWaf: async () => ({ allowLists: [] }) }));
 
-const { CALL_PATH, renderCallServerRoute } = await import("@/lib/chat/call-edge");
+process.env.POLARIS_TRAEFIK_DYNAMIC_DIR = await mkdtemp(join(tmpdir(), "polaris-dynamic-"));
+
+const { CALL_PATH, renderCallServerRoute, syncCallServerRoute } = await import(
+    "@/lib/chat/call-edge"
+);
+
+beforeEach(() => {
+    endpoint = null;
+});
 
 describe("the call server's route", () => {
     it("carries the path a browser is told to dial", () => {
@@ -91,3 +104,34 @@ describe("the call server's route", () => {
         expect(config).toBe(renderCallServerRoute(true));
     });
 });
+
+describe("publishing it", () => {
+    it("reports the route as unsettled when the shipped server could not be prepared", async () => {
+        // It writes an empty config either way, and the two reasons for that are
+        // not the same answer. Called settled, this one takes the route away at
+        // boot and nothing puts it back: startup only retries what reports back
+        // as unwritten, so every call fails at the WebSocket on a deployment that
+        // was one retry from working.
+        expect(await syncCallServerRoute()).toBe(false);
+        expect((await readFile(routeFile(), "utf8")).trim()).toBe("http: {}");
+    });
+
+    it("is settled when calls deliberately run somewhere else", async () => {
+        endpoint = { url: "wss://calls.example.com", shipped: false };
+        // Nothing to publish, and nothing missing either. Retrying this forever
+        // would be a deployment knocking on its own edge for a path it does not
+        // want.
+        expect(await syncCallServerRoute()).toBe(true);
+    });
+
+    it("publishes the path for the server this stack runs", async () => {
+        endpoint = { url: "/livekit", shipped: true };
+        expect(await syncCallServerRoute()).toBe(true);
+        expect(await readFile(routeFile(), "utf8")).toContain("polaris-livekit");
+    });
+});
+
+/** The file the edge watches, wherever this suite pointed it. */
+function routeFile(): string {
+    return join(process.env.POLARIS_TRAEFIK_DYNAMIC_DIR!, "polaris-livekit.yml");
+}

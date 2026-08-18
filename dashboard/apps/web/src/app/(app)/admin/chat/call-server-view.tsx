@@ -30,7 +30,7 @@ const STARTING_TRIES = 24;
 
 interface Settings {
     url: string;
-    hasKey: boolean;
+    hasSecret: boolean;
     shipped: boolean;
     ready: boolean;
     answering: boolean;
@@ -40,7 +40,7 @@ interface Settings {
 
 const NOTHING: Settings = {
     url: "",
-    hasKey: false,
+    hasSecret: false,
     shipped: false,
     ready: false,
     answering: false,
@@ -162,7 +162,7 @@ export function CallServerView() {
                         </p>
                         <p className="text-[11px] text-foreground-subtle">
                             {!settings.ready
-                                ? "This deployment has no volume for the key the dashboard and the call server share, which means it was brought up outside the Polaris stack. Update from Settings, or point this at a server you already run."
+                                ? "Calls have nowhere to run on this deployment yet. Nothing to do here: it repairs itself the next time Polaris starts, and this says so as soon as it has."
                                 : settings.answering ? (
                                       <>
                                           Calls between devices on this network work now. For calls
@@ -173,7 +173,7 @@ export function CallServerView() {
                                           lists them and reports when they answer.
                                       </>
                                   ) : waited ? (
-                                      "It has had a couple of minutes and has not come up. Check the `livekit` container on this machine."
+                                      "It has had a couple of minutes and has not come up. It keeps trying, and calls come back on their own the moment it answers."
                                   ) : (
                                       "It comes up a few seconds after the stack does."
                                   )}
@@ -197,9 +197,8 @@ export function CallServerView() {
                         // here rather than left to be discovered on a call that
                         // keeps going somewhere else.
                         <p className="text-[11px] text-warning">
-                            This deployment names a call server in its own configuration, so calls go
-                            there and the address below is not in use. Clear POLARIS_CALL_SERVER_URL
-                            in .env to use this one instead.
+                            This deployment was started pointing at another call server, so calls go
+                            there and the address below is not in use.
                         </p>
                     ) : settings.unused === "incomplete" ? (
                         // Half a pairing signs nothing, so it is skipped. Nothing
@@ -255,7 +254,7 @@ export function CallServerView() {
                                     type="password"
                                     autoComplete="off"
                                     aria-label="Call server secret"
-                                    placeholder={settings.hasKey ? "Stored. Type to replace it." : "Paste it"}
+                                    placeholder={settings.hasSecret ? "Stored. Type to replace it." : "Paste it"}
                                 />
                             </label>
                             <Button variant="secondary" onClick={save} disabled={saving}>

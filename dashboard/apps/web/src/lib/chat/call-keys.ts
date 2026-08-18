@@ -110,11 +110,14 @@ async function mint(file: string): Promise<CallKey | null> {
     const key = adopted() ?? minted();
     if (await write(file, key, "wx")) return key;
 
-    const raced = await read(file);
-    if (raced) return raced;
-    // Not a race, then: what is there is not a pair at all, which is a file to
-    // replace rather than one to adopt. Left alone it would be a deployment
-    // whose calls never work again and nothing on the machine that repairs it.
+    const raced = await load(file);
+    if (raced.key) return raced.key;
+    // Only when the file was read and is not a pair. A read that FAILED says
+    // nothing about what is in there, and overwriting on that would replace a
+    // perfectly good key over a transient EACCES or EMFILE - which the media
+    // server, having read the old one once at boot, answers by refusing every
+    // token until somebody restarts it, silently.
+    if (!raced.read) return null;
     return (await write(file, key, "w")) ? key : null;
 }
 
@@ -178,8 +181,28 @@ export async function readCallKey(): Promise<CallKey | null> {
 }
 
 async function read(file: string): Promise<CallKey | null> {
-    const text = await readFile(file, "utf8").catch(() => null);
-    return text === null ? null : parse(text);
+    return (await load(file)).key;
+}
+
+/**
+ * What is in the file, and whether it could be looked at.
+ *
+ * The two are different answers and everything above turns on the difference:
+ * "there is no pair in there" invites replacing it, and "I could not read it"
+ * must not. A missing file counts as read - there is nothing in it, and that is
+ * the ordinary case on a first boot.
+ */
+async function load(file: string): Promise<{ read: boolean; key: CallKey | null }> {
+    try {
+        return { read: true, key: parse(await readFile(file, "utf8")) };
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException)?.code === "ENOENT") return { read: true, key: null };
+        console.error(
+            "polaris: could not read the call server key:",
+            error instanceof Error ? error.message : error
+        );
+        return { read: false, key: null };
+    }
 }
 
 /**

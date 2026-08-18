@@ -88,7 +88,9 @@ function servedHere(address: string): boolean {
 }
 
 /** Point calls at a server somebody runs themselves, or unpoint them. A blank
- *  address clears the pairing, which is how this is switched off. */
+ *  address clears the pairing and calls fall back to the server this stack runs
+ *  - it is not a way to switch calls off, and there is none here: whether an
+ *  account may be in a call at all is the `chat.call` grant. */
 export async function setCallServer(url: string, apiKey: string, apiSecret: string): Promise<void> {
     const trimmed = url.trim().replace(/\/+$/, "");
     if (trimmed) {
@@ -220,7 +222,11 @@ export async function joinToken(
 export interface CallServerSettings {
     /** An address somebody typed, if they did. */
     readonly url: string;
-    readonly hasKey: boolean;
+    /** Whether a signing secret is stored for that address. About the SECRET,
+     *  not the key name: it is what the secret box's placeholder says, and
+     *  answering it from the key name told somebody a secret was saved on the
+     *  exact state the warning above it describes as missing one. */
+    readonly hasSecret: boolean;
     /** Whether calls run through the server this stack starts, rather than one
      *  somebody pointed them at. */
     readonly shipped: boolean;
@@ -239,12 +245,15 @@ export interface CallServerSettings {
 }
 
 export async function callServerSettings(): Promise<CallServerSettings> {
-    const stored = await config();
-    const endpoint = await callServer();
+    const [stored, endpoint, storedSecret] = await Promise.all([
+        config(),
+        callServer(),
+        getIntegrationSecret(PROVIDER).catch(() => null)
+    ]);
     const fromEnv = environmentServer();
     return {
         url: stored.url ?? "",
-        hasKey: Boolean(stored.apiKey),
+        hasSecret: Boolean(storedSecret),
         shipped: endpoint?.shipped ?? false,
         ready: endpoint !== null,
         answering: endpoint ? await answering(endpoint) : false,

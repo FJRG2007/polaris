@@ -17,7 +17,7 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 
 /** What this process was started with. Mutable, because "an install that already
  *  had a pair" and "a fresh one" are two different deployments. */
@@ -173,6 +173,17 @@ describe("the call server's key", () => {
         expect(key?.apiKey).toBe(CALL_API_KEY);
         forgetCallKey();
         expect(await readCallKey()).toEqual(key);
+    });
+
+    it("never overwrites a key file it could not read", async () => {
+        // A directory where the file should be stands in for any read that fails
+        // for a reason other than "it is not there" - EACCES on a root-owned
+        // volume, EMFILE, EIO. Treating that as "not a pair" and writing over it
+        // would replace a key the media server read once at boot, and it answers
+        // that by refusing every token until somebody restarts it, silently.
+        await mkdir(callKeyFile(), { recursive: true });
+        expect(await ensureCallKey()).toBeNull();
+        expect((await stat(callKeyFile())).isDirectory()).toBe(true);
     });
 
     it("says so rather than throwing when there is no volume", async () => {

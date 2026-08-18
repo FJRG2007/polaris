@@ -4,6 +4,28 @@ Repo-wide constraints that change how a feature has to be built here. Style and
 general engineering rules live elsewhere; this file is only the things that are
 specific to this project and that are expensive to rediscover.
 
+## The user never touches a terminal
+
+Polaris is installed with one script and run from its interface. After that
+install, **the command line is not a requirement for anything** - not updating,
+not enabling a feature, not repairing one. The person running it does not open
+`.env`, does not edit a file in the checkout, and does not read a container's
+logs. Assume they cannot.
+
+So:
+
+- **No screen may ask for a command, a file edit, or a log.** Not "set X in
+  `.env`", not "re-run the installer", not "check the such-and-such container".
+  If Polaris can do the thing, it does it; if it cannot, the screen says what is
+  wrong in terms of what the reader can see, and offers the button that fixes it.
+- **A feature is not shipped until it works with no setup.** Anything that needs
+  a value only a script can write is switched off everywhere and cannot be
+  switched on.
+- The exception is what genuinely is not Polaris's to do - a rule in the
+  operator's own router, a DNS record at their registrar. Those are named
+  precisely, with the values to type, and checked from here so the screen can say
+  when they start working.
+
 ## How a deployment actually gets your change
 
 **An installed Polaris is only ever updated from the Update button in Settings.**

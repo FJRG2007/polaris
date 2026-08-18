@@ -161,7 +161,13 @@ export async function syncCallServerRoute(): Promise<boolean> {
         const [hosts, waf] = await Promise.all([dashboardHosts(), resolvePolarisWaf()]);
         const guard = { hosts, allow: waf.allowLists[0] ?? [] };
         await writeFile(join(dynamicDir(), FILE), renderCallServerRoute(serve, guard), "utf8");
-        return true;
+        // Written, and still not settled. There are two reasons this publishes
+        // nothing - calls deliberately run somewhere else, or the shipped server
+        // could not be prepared this early - and only the first is an answer.
+        // Reported as success, the second takes the route away at boot and nothing
+        // puts it back, so every call fails at the WebSocket on a deployment that
+        // was one retry from working.
+        return serve || endpoint !== null;
     } catch (error) {
         console.error(
             "polaris: publishing the call server route failed:",
