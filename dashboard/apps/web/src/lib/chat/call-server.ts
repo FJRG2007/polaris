@@ -107,9 +107,16 @@ export async function setCallServer(url: string, apiKey: string, apiSecret: stri
     const current = await config();
     await upsertIntegration(PROVIDER, {
         enabled: true,
-        config: { ...current, url: trimmed || undefined, apiKey: trimmed ? apiKey.trim() : undefined },
-        // An empty secret on a save that only changed the address leaves the
-        // stored one alone; clearing the address clears the pairing outright.
+        config: {
+            ...current,
+            url: trimmed || undefined,
+            apiKey: trimmed ? apiKey.trim() || current.apiKey : undefined
+        },
+        // An empty key or secret on a save that only changed the address leaves
+        // the stored ones alone; clearing the address clears the pairing
+        // outright. Blank is what a form that has not been retyped sends, and
+        // taking it as a deletion turned correcting a typo in the address into a
+        // pairing that signs nothing and calls that quietly moved server.
         ...(trimmed ? (apiSecret.trim() ? { secret: apiSecret.trim() } : {}) : { secret: null })
     });
 }
@@ -138,13 +145,16 @@ function websocket(address: string): string {
  */
 async function shippedServer(): Promise<CallServerEndpoint | null> {
     const key = await ensureCallKey();
-    return key ? { url: SHIPPED_PATH, apiKey: key.apiKey, apiSecret: key.apiSecret, shipped: true } : null;
+    return key ? { url: CALL_PATH, apiKey: key.apiKey, apiSecret: key.apiSecret, shipped: true } : null;
 }
 
-/** Where the shipped server is served from, and the default the browser is told
- *  to dial. It is a path rather than a hostname because only the browser knows
+/** Where the shipped server is served from: the address the browser is handed,
+ *  and the prefix the edge publishes and strips - `call-edge` takes it from
+ *  here rather than repeating it, because two literals that have to be equal
+ *  and are not is a WebSocket that never connects with nothing in either file
+ *  to point at. A path rather than a hostname because only the browser knows
  *  which hostname it used. */
-const SHIPPED_PATH = "/livekit";
+export const CALL_PATH = "/livekit";
 
 /**
  * Where calls run, or null when there is nowhere at all.
@@ -165,11 +175,38 @@ export async function callServer(): Promise<CallServerEndpoint | null> {
     if (fromEnv && !fromEnv.shipped) return fromEnv;
 
     const stored = await config();
-    const secret = stored.url ? await getIntegrationSecret(PROVIDER) : null;
+    return endpointFor(stored, await storedSecret(stored));
+}
+
+/** The same three answers, from a pairing that has already been read. Taken as
+ *  arguments rather than read again because the settings screen needs both the
+ *  pairing and where calls ended up, and it polls while the server comes up:
+ *  read twice, that is two integration rows and two decrypts per tick. */
+async function endpointFor(
+    stored: CallServerConfig,
+    secret: string | null
+): Promise<CallServerEndpoint | null> {
+    const fromEnv = environmentServer();
+    if (fromEnv && !fromEnv.shipped) return fromEnv;
     if (stored.url && stored.apiKey && secret) {
         return { url: stored.url, apiKey: stored.apiKey, apiSecret: secret, shipped: false };
     }
     return shippedServer();
+}
+
+/** The stored signing secret, when there is an address for it to sign for.
+ *  Never thrown out of: a secret that cannot be decrypted is a pairing that
+ *  cannot be used, which is the shipped server's case, and every screen with a
+ *  call button on it asks this. */
+async function storedSecret(stored: CallServerConfig): Promise<string | null> {
+    if (!stored.url) return null;
+    return getIntegrationSecret(PROVIDER).catch((error) => {
+        console.error(
+            "polaris: could not read the stored call server secret:",
+            error instanceof Error ? error.message : error
+        );
+        return null;
+    });
 }
 
 /**
@@ -222,6 +259,10 @@ export async function joinToken(
 export interface CallServerSettings {
     /** An address somebody typed, if they did. */
     readonly url: string;
+    /** The key name stored with it. Shown rather than kept back - it is a name
+     *  that travels in every token, not a secret - so the box holds what is
+     *  saved instead of coming up blank and saving that blank back over it. */
+    readonly key: string;
     /** Whether a signing secret is stored for that address. About the SECRET,
      *  not the key name: it is what the secret box's placeholder says, and
      *  answering it from the key name told somebody a secret was saved on the
@@ -245,15 +286,14 @@ export interface CallServerSettings {
 }
 
 export async function callServerSettings(): Promise<CallServerSettings> {
-    const [stored, endpoint, storedSecret] = await Promise.all([
-        config(),
-        callServer(),
-        getIntegrationSecret(PROVIDER).catch(() => null)
-    ]);
+    const stored = await config();
+    const secret = await storedSecret(stored);
+    const endpoint = await endpointFor(stored, secret);
     const fromEnv = environmentServer();
     return {
         url: stored.url ?? "",
-        hasSecret: Boolean(storedSecret),
+        key: stored.apiKey ?? "",
+        hasSecret: Boolean(secret),
         shipped: endpoint?.shipped ?? false,
         ready: endpoint !== null,
         answering: endpoint ? await answering(endpoint) : false,

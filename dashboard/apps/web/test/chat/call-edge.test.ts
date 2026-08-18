@@ -16,17 +16,20 @@ import { join } from "node:path";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+/** The path a browser is told to dial, which is the one the edge has to
+ *  publish. Written out here rather than imported, so the assertions below are
+ *  about the string the two modules agreed on. */
+const CALL_PATH = "/livekit";
+
 /** Where calls run, per case: nowhere at all, or somebody else's server. */
 let endpoint: { url: string; shipped: boolean } | null = null;
-vi.mock("@/lib/chat/call-server", () => ({ callServer: async () => endpoint }));
+vi.mock("@/lib/chat/call-server", () => ({ CALL_PATH, callServer: async () => endpoint }));
 vi.mock("@/lib/domain-edge", () => ({ dashboardHosts: async () => [] }));
 vi.mock("@/lib/waf-service", () => ({ resolvePolarisWaf: async () => ({ allowLists: [] }) }));
 
 process.env.POLARIS_TRAEFIK_DYNAMIC_DIR = await mkdtemp(join(tmpdir(), "polaris-dynamic-"));
 
-const { CALL_PATH, renderCallServerRoute, syncCallServerRoute } = await import(
-    "@/lib/chat/call-edge"
-);
+const { renderCallServerRoute, syncCallServerRoute } = await import("@/lib/chat/call-edge");
 
 beforeEach(() => {
     endpoint = null;

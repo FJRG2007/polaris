@@ -267,10 +267,14 @@ describe("where calls run", () => {
 
     it("leaves the stored key alone when only the address was changed", async () => {
         stored = { enabled: true, config: { url: "wss://old.example.com", apiKey: "polaris" } };
-        await calls.setCallServer("wss://calls.example.com/", "polaris", "");
+        await calls.setCallServer("wss://calls.example.com/", "", "");
 
         const written = saved[0] as { input: { config: Record<string, unknown>; secret?: unknown } };
         expect(written.input.config.url).toBe("wss://calls.example.com");
+        // Both halves. Written through, an empty key left an address that signs
+        // nothing, and calls moved to the shipped server without a word - which
+        // looks like nothing at all, because they keep working.
+        expect(written.input.config.apiKey).toBe("polaris");
         expect("secret" in written.input).toBe(false);
     });
 });
@@ -313,5 +317,16 @@ describe("what the settings screen is told", () => {
 
     it("says nothing when nobody typed an address at all", async () => {
         expect((await calls.callServerSettings()).unused).toBeNull();
+    });
+
+    it("hands back the key name stored with the address", async () => {
+        stored = { enabled: true, config: { url: "wss://typed.example.com", apiKey: "typed" } };
+        secret = "typed-secret";
+
+        // The box that holds it is filled from this. Left out, it came up empty
+        // on every load and the next save sent that blank back.
+        const settings = await calls.callServerSettings();
+        expect(settings.key).toBe("typed");
+        expect(settings.hasSecret).toBe(true);
     });
 });

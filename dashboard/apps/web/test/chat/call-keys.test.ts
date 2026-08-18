@@ -23,7 +23,16 @@ import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
  *  had a pair" and "a fresh one" are two different deployments. */
 let env: Record<string, string | undefined> = {};
 
-vi.mock("@polaris/config", () => ({ loadEnv: () => env }));
+/** An environment that cannot be read at all, which is the one thing on this
+ *  path that throws rather than answering. */
+let unreadableEnv = false;
+
+vi.mock("@polaris/config", () => ({
+    loadEnv: () => {
+        if (unreadableEnv) throw new Error("the environment could not be read");
+        return env;
+    }
+}));
 
 const dir = await mkdtemp(join(tmpdir(), "polaris-call-keys-"));
 
@@ -35,6 +44,7 @@ const { CALL_API_KEY, callKeyFile, ensureCallKey, forgetCallKey, readCallKey } =
  *  two different deployments. */
 beforeEach(async () => {
     env = {};
+    unreadableEnv = false;
     forgetCallKey();
     process.env.POLARIS_CALL_KEYS_DIR = await mkdtemp(join(dir, "run-"));
 });
@@ -184,6 +194,42 @@ describe("the call server's key", () => {
         await mkdir(callKeyFile(), { recursive: true });
         expect(await ensureCallKey()).toBeNull();
         expect((await stat(callKeyFile())).isDirectory()).toBe(true);
+    });
+
+    it.skipIf(process.platform === "win32")("takes the world's bits off a file it replaced", async () => {
+        // The mode goes to open(2), which ignores it for a file that is already
+        // there - so a volume seeded by anything but this module kept whatever
+        // bits it came with, and LiveKit refuses to start on a key file others
+        // can read. Nothing rewrites it after that either: it is a valid pair.
+        await writeFile(callKeyFile(), "not a key file\n", { encoding: "utf8", mode: 0o644 });
+        await ensureCallKey();
+
+        expect((await stat(callKeyFile())).mode & 0o007).toBe(0);
+    });
+
+    it.skipIf(process.platform === "win32")("takes them off a pair it only read", async () => {
+        // A pair somebody else seeded is kept, but its permissions are not
+        // theirs to decide, and a file that is never rewritten is never repaired
+        // by the write path either.
+        await writeFile(callKeyFile(), '"polaris": "seeded-by-somebody-else"\n', {
+            encoding: "utf8",
+            mode: 0o644
+        });
+
+        expect((await ensureCallKey())?.apiSecret).toBe("seeded-by-somebody-else");
+        expect((await stat(callKeyFile())).mode & 0o007).toBe(0);
+    });
+
+    it("tries again after a failure rather than answering with it forever", async () => {
+        unreadableEnv = true;
+        await expect(ensureCallKey()).rejects.toThrow();
+
+        // The rejected promise used to stay cached for the life of the process,
+        // so one bad moment at boot answered every later request with the same
+        // throw - and a chat request that could have said calls are unavailable
+        // failed outright instead.
+        unreadableEnv = false;
+        expect((await ensureCallKey())?.apiKey).toBe(CALL_API_KEY);
     });
 
     it("says so rather than throwing when there is no volume", async () => {

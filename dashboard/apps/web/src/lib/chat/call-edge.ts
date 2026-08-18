@@ -23,8 +23,8 @@
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
 import { dashboardHosts } from "@/lib/domain-edge";
-import { callServer } from "@/lib/chat/call-server";
 import { resolvePolarisWaf } from "@/lib/waf-service";
+import { CALL_PATH, callServer } from "@/lib/chat/call-server";
 
 /** Traefik's file-provider directory, the volume both containers mount. */
 function dynamicDir(): string {
@@ -47,10 +47,6 @@ const STRIP = `${ROUTER}-strip`;
  *  one config, so a name borrowed from the dashboard's route is a duplicate. */
 const GUARDED = `${ROUTER}-guarded`;
 const ALLOW = `${ROUTER}-allow`;
-
-/** The path the browser dials. Matches POLARIS_CALL_SERVER_URL's default, which
- *  is what tells the browser to come here in the first place. */
-export const CALL_PATH = "/livekit";
 
 /**
  * Above the dashboard's own host rules, which would otherwise take this path.
@@ -163,11 +159,12 @@ export async function syncCallServerRoute(): Promise<boolean> {
         await writeFile(join(dynamicDir(), FILE), renderCallServerRoute(serve, guard), "utf8");
         // Written, and still not settled. There are two reasons this publishes
         // nothing - calls deliberately run somewhere else, or the shipped server
-        // could not be prepared this early - and only the first is an answer.
-        // Reported as success, the second takes the route away at boot and nothing
-        // puts it back, so every call fails at the WebSocket on a deployment that
-        // was one retry from working.
-        return serve || endpoint !== null;
+        // could not be prepared this early - and only the first is an answer, so
+        // what is reported is whether where calls run is known at all. Reported
+        // as success, the second takes the route away at boot and nothing puts it
+        // back, so every call fails at the WebSocket on a deployment that was one
+        // retry from working.
+        return endpoint !== null;
     } catch (error) {
         console.error(
             "polaris: publishing the call server route failed:",

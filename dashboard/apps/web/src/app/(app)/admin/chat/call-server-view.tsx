@@ -30,6 +30,8 @@ const STARTING_TRIES = 24;
 
 interface Settings {
     url: string;
+    /** The key name saved with that address. A name, not a secret. */
+    key: string;
     hasSecret: boolean;
     shipped: boolean;
     ready: boolean;
@@ -40,6 +42,7 @@ interface Settings {
 
 const NOTHING: Settings = {
     url: "",
+    key: "",
     hasSecret: false,
     shipped: false,
     ready: false,
@@ -68,6 +71,10 @@ export function CallServerView() {
             const value = result.settings ?? NOTHING;
             setSettings(value);
             setUrl(value.url);
+            // Shown rather than left blank: a box that comes up empty is one a
+            // save sends back empty, and the address it belongs to would go on
+            // being stored while signing nothing.
+            setKey(value.key);
             // Only opened by hand. An instance that already typed an address keeps
             // seeing it; everybody else is shown the shipped server and nothing else.
             setManual(Boolean(value.url));
@@ -205,8 +212,11 @@ export function CallServerView() {
                         // on the screen said so: the address sat there looking
                         // like the one calls were going to.
                         <p className="text-[11px] text-warning">
-                            The address below has no key and secret saved with it, so it signs
-                            nothing and is not in use. Fill both in and save.
+                            {settings.key
+                                ? "The address below has no secret saved with it, so it signs nothing and is not in use. Paste it and save."
+                                : settings.hasSecret
+                                  ? "The address below has no key saved with it, so it signs nothing and is not in use. Fill it in and save."
+                                  : "The address below has no key and secret saved with it, so it signs nothing and is not in use. Fill both in and save."}
                         </p>
                     ) : null}
 

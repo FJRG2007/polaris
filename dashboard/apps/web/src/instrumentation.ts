@@ -77,16 +77,13 @@ export async function register(): Promise<void> {
     // it rides these hostnames and carries their allowlist, so the two must not
     // be written by two callers racing on one directory Traefik watches.
     //
-    // Retried once, which neither of the others needs: both files are read from
-    // the database, and the one carrying the call route is the only way a browser
-    // can reach the media server at all - so a database that is still starting
-    // here means every call fails at the first WebSocket until somebody happens
-    // to save a domain. The same thirty seconds the guard resync waits.
+    // Retried until it lands, which neither of the others needs: both files are
+    // read from the database, and the one carrying the call route is the only way
+    // a browser can reach the media server at all - so a database that is still
+    // starting here means every call fails at the first WebSocket until somebody
+    // happens to save a domain, and on a LAN-only install nobody ever does.
     const { syncDashboardRoute } = await import("./lib/domain-edge");
-    void syncDashboardRoute().then((written) => {
-        if (written) return;
-        setTimeout(() => void syncDashboardRoute(), 30_000).unref();
-    });
+    void publishEdgeRoutes(syncDashboardRoute);
 
     // Migrate any quick tunnel still forwarding straight to an app's port onto the edge,
     // so its traffic is logged (and future restarts leave an edge tunnel untouched).
@@ -215,4 +212,39 @@ export async function register(): Promise<void> {
     // "connected" in the DB but dead at the bridge until manually reconnected.
     const { startChannelReconcile } = await import("./lib/messaging-service");
     startChannelReconcile();
+}
+
+/** How long each further attempt waits, in order. Backed off rather than
+ *  repeated: what it is waiting on is a database still coming up, which is
+ *  seconds on an ordinary boot and minutes on the one where migrations are
+ *  running on a slow disk. Just over eight minutes in all. */
+const ROUTE_RETRY_MS = [30_000, 60_000, 120_000, 300_000];
+
+/**
+ * Publish the dashboard's route, and the call server's with it, until one
+ * attempt reports the file written.
+ *
+ * Reported rather than fired and forgotten, because there is no screen that can
+ * ask for this and no button that repairs it: an edge left with no call route
+ * serves every page and no call, and the only other thing that rewrites the file
+ * is saving a domain or a firewall rule - which a deployment that only ever
+ * calls between rooms in the house never does. Giving up is logged, so a support
+ * question has an answer.
+ *
+ * Takes the sync as an argument, so the one thing worth asserting here - that a
+ * boot which cannot reach the database yet ends with a route rather than with
+ * silence - can be asserted without starting a server.
+ */
+export async function publishEdgeRoutes(sync: () => Promise<boolean>): Promise<void> {
+    for (const wait of [0, ...ROUTE_RETRY_MS]) {
+        if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait).unref());
+        const written = await sync().catch((error) => {
+            console.error("polaris: publishing the edge routes failed:", error);
+            return false;
+        });
+        if (written) return;
+    }
+    console.error(
+        "polaris: gave up publishing the call server route - calls have no way through the edge until a domain or a firewall rule is saved, or this deployment restarts"
+    );
 }

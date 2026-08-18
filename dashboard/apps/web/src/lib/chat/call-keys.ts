@@ -24,7 +24,7 @@
 import { join } from "node:path";
 import { loadEnv } from "@polaris/config";
 import { randomBytes } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { chmod, readFile, stat, writeFile } from "node:fs/promises";
 
 /** The volume both containers mount. */
 function keysDir(): string {
@@ -86,15 +86,28 @@ export async function ensureCallKey(): Promise<CallKey | null> {
 }
 
 async function resolve(file: string): Promise<CallKey | null> {
-    const key = (await read(file)) ?? (await mint(file));
-    if (key) {
-        cached = { file, key };
-        missed = null;
-    } else {
-        missed = { file, at: Date.now() };
+    try {
+        const existing = await read(file);
+        // A pair somebody else left here is used as it is, but its permissions
+        // are not somebody else's to decide: a file the world can read is a
+        // media server that refuses to start, and one that is never rewritten
+        // is never repaired either.
+        if (existing) await secure(file);
+        const key = existing ?? (await mint(file));
+        if (key) {
+            cached = { file, key };
+            missed = null;
+        } else {
+            missed = { file, at: Date.now() };
+        }
+        return key;
+    } finally {
+        // Cleared however this ended. Left behind on a throw, the rejected
+        // promise is the answer every later caller gets for the life of the
+        // process, and a request that could have degraded to "calls are
+        // unavailable" fails outright instead.
+        if (inflight?.file === file) inflight = null;
     }
-    if (inflight?.file === file) inflight = null;
-    return key;
 }
 
 /**
@@ -132,6 +145,11 @@ async function write(file: string, key: CallKey, flag: "w" | "wx"): Promise<bool
         // The mode matters: LiveKit refuses a key file anybody else can read, and
         // the refusal is a container that will not start rather than a warning.
         await writeFile(file, render(key), { encoding: "utf8", mode: 0o600, flag });
+        // And the mode is not the write's to give when the file was already
+        // there: it goes to open(2), which ignores it for a file it did not
+        // create. So a 0644 file replaced here would keep its bits and take the
+        // media server down with a pair that is otherwise perfectly good.
+        await secure(file);
         return true;
     } catch (error) {
         if ((error as NodeJS.ErrnoException)?.code === "EEXIST") return false;
@@ -142,6 +160,28 @@ async function write(file: string, key: CallKey, flag: "w" | "wx"): Promise<bool
             error instanceof Error ? error.message : error
         );
         return false;
+    }
+}
+
+/**
+ * Take the `others` bits off, which are the ones the media server checks.
+ *
+ * Read first so that a file that is already restricted is left alone: one owned
+ * by another user is one this process cannot chmod, and reporting that every
+ * boot for a file nobody needed to touch is a false alarm on a healthy install.
+ *
+ * Never throws. A key that is on disk and readable is worth more than a mode
+ * this process was not allowed to set, and the log line says which happened.
+ */
+async function secure(file: string): Promise<void> {
+    try {
+        if (((await stat(file)).mode & 0o007) === 0) return;
+        await chmod(file, 0o600);
+    } catch (error) {
+        console.error(
+            "polaris: could not restrict who may read the call server key:",
+            error instanceof Error ? error.message : error
+        );
     }
 }
 
