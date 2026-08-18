@@ -48,6 +48,33 @@ export function CallAudio({ call }: { call: CallState }) {
         (person) => person.admission === "admitted" && person.id !== call.participantId
     );
 
+    /**
+     * Forget whoever is no longer here.
+     *
+     * A refusal was recorded per person and never taken back. Their element
+     * unmounts when they leave, which stops the sound but says nothing to this,
+     * so the id sat in the set forever - and since the prompt is drawn whenever
+     * the set is not empty, "Press to hear the call" went on floating over the
+     * whole dashboard after the person had left and after the call itself had
+     * ended, offering to start audio for a room that was not there. A reload was
+     * the only thing that cleared it.
+     *
+     * Keyed by the ids rather than the array: the roster is rebuilt on every
+     * refresh, and depending on the array itself would run this on each one.
+     */
+    const present = others.map((person) => person.id).join(" ");
+    useEffect(() => {
+        const here = new Set(present ? present.split(" ") : []);
+        for (const id of unblock.current.keys()) {
+            if (!here.has(id)) unblock.current.delete(id);
+        }
+        setBlocked((current) => {
+            const stale = [...current].filter((id) => !here.has(id));
+            if (stale.length === 0) return current;
+            return new Set([...current].filter((id) => here.has(id)));
+        });
+    }, [present]);
+
     return (
         <>
             {others.map((person) => (
