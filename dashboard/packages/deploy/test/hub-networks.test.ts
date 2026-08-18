@@ -1,4 +1,3 @@
-import { mkdirSync, writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { appComposeSpec, renderComposeYaml } from "../src/compose-spec.js";
 import type { AppDeployPlan } from "../src/runtime/driver.js";
@@ -12,7 +11,6 @@ import type { AppDeployPlan } from "../src/runtime/driver.js";
 const PROXY_NETWORK = "polaris-proxy";
 const HUB_NETWORK = "polaris-hub";
 const WEB_INTERNAL_INGEST_URL = "http://web:3000/api/inbox/ingest";
-const EVIDENCE_DIR = "C:/Users/admin/AppData/Local/Temp/enigma-gate-evidence/01KY9R1BCWRK53KKJGWV6D1MRH";
 
 function basePlan(overrides: Partial<AppDeployPlan> = {}): AppDeployPlan {
     return {
@@ -64,18 +62,14 @@ describe("hub deploy networks", () => {
         // to the already-created named networks rather than minting fresh ones.
         expect(yaml).toContain("networks:\n  polaris-proxy:\n    external: true\n  polaris-hub:\n    external: true");
 
-        // Persist the rendered hub compose as reviewer-visible evidence.
+        // And a normal app is left where it was, which is the half of this that
+        // says the change is not a routing change for everybody else.
         const normal = renderComposeYaml(
             appComposeSpec(basePlan(), "img:latest", PROXY_NETWORK),
             "/var/polaris/volumes",
             "/var/polaris/mounts"
         );
-        mkdirSync(EVIDENCE_DIR, { recursive: true });
-        writeFileSync(
-            `${EVIDENCE_DIR}/hub-compose.rendered.yml`,
-            `# Local messaging hub (extraNetworks: [polaris-hub]) - joins the web<->hub network:\n${yaml}\n` +
-                `# Normal app (no extraNetworks) - proxy network only, routing unchanged:\n${normal}`,
-            "utf8"
-        );
+        expect(normal).toContain("    networks:\n      - polaris-proxy");
+        expect(normal).not.toContain("polaris-hub");
     });
 });
