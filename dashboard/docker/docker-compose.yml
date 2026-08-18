@@ -195,11 +195,31 @@ services:
       # `name: secret`, which is the shape the server reads. The dashboard signs
       # with the same pair, from the same .env, so there is one copy of it.
       LIVEKIT_KEYS: "${POLARIS_CALL_SERVER_API_KEY:-polaris}: ${POLARIS_CALL_SERVER_API_SECRET:?POLARIS_CALL_SERVER_API_SECRET is required}"
+    labels:
+      # Signalling goes through the edge, on the existing 443 and the existing
+      # certificate. It has to: the dashboard is served over HTTPS, and a page
+      # on HTTPS is not allowed to open a plain `ws://` socket - so a call
+      # server published on a bare port is one the browser refuses to dial
+      # before it has sent a byte. A subdomain rather than a path, which is the
+      # shape LiveKit's own deployment guide uses.
+      #
+      # Needs `livekit.<your domain>` pointing at this machine. That DNS record
+      # is the one thing here nobody can create from inside the stack.
+      - "polaris.role=edge"
+      - "traefik.enable=true"
+      - "traefik.docker.network=polaris_default"
+      - "traefik.http.routers.polaris-livekit.rule=Host(`livekit.${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`)"
+      - "traefik.http.routers.polaris-livekit.entrypoints=websecure"
+      - "traefik.http.routers.polaris-livekit.tls=true"
+      - "traefik.http.routers.polaris-livekit.service=polaris-livekit"
+      - "traefik.http.services.polaris-livekit.loadbalancer.server.port=7880"
     ports:
-      # Signalling, the TCP fallback for browsers on networks that block UDP,
-      # the media port, and the relay. All four have to reach a browser, so they
-      # are published on the host rather than kept on the compose network.
+      # Signalling on the LAN, where there is no certificate to need and
+      # `http://polaris.local` may dial `ws://` freely.
       - "7880:7880"
+      # The rest cannot go through the edge and must reach a browser directly:
+      # the TCP fallback for networks that block UDP, the media itself, and the
+      # relay for the networks that refuse a direct path.
       - "7881:7881"
       - "7882:7882/udp"
       - "3478:3478/udp"
