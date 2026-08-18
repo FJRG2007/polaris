@@ -26,6 +26,8 @@ import * as nav from "@/lib/apps";
 import { ChevronLeft } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { hasOrgPermission } from "@polaris/core";
+import { badgeLabel } from "@/lib/notification-badge";
+import { useChatUnread } from "@/components/chat-unread";
 import { useOrgNav } from "@/components/use-org-nav";
 import { useInstalledNav } from "@/components/use-installed-nav";
 
@@ -120,6 +122,10 @@ function appRail(appIds: readonly string[]): nav.AppSection[] {
     }));
 }
 
+/** The Chat entry, by the one thing a rail entry is keyed on. Read off the
+ *  app list rather than written again, so a move takes the badge with it. */
+const CHAT_HREF = nav.POLARIS_APPS.find((app) => app.id === "chat")?.href ?? "/chat";
+
 function RailLink({
     item,
     pathname,
@@ -131,6 +137,11 @@ function RailLink({
 }) {
     const active = nav.isSectionActive(pathname, item.href, sections);
     const Icon = item.icon;
+    const waiting = useChatUnread();
+    // Only on Chat, and only when there is something. A count beside every entry
+    // would be a rail of numbers; what this answers is "is anybody waiting for
+    // me", which is a question about one app.
+    const unread = item.href === CHAT_HREF ? waiting.messages : 0;
     // The active row is the one place the rail spends colour: a faint accent fill
     // and an accent icon. Everything else is a hover away and stays neutral, so
     // where you are is readable at a glance rather than hunted for.
@@ -143,8 +154,17 @@ function RailLink({
                 active && "bg-primary/15 font-medium text-foreground hover:bg-primary/15"
             )}
         >
-            <Icon className={cn("size-4", active ? "text-primary" : "text-foreground-subtle")} />
+            <Icon className={cn("size-4 shrink-0", active ? "text-primary" : "text-foreground-subtle")} />
             <span className="truncate" title={item.label}>{item.label}</span>
+            {unread > 0 ? (
+                <span
+                    aria-label={`${unread} unread ${unread === 1 ? "message" : "messages"}`}
+                    title={`${unread} unread ${unread === 1 ? "message" : "messages"}`}
+                    className="ml-auto shrink-0 rounded-full bg-primary px-1.5 text-[11px] font-medium leading-4 text-primary-foreground"
+                >
+                    {badgeLabel(unread)}
+                </span>
+            ) : null}
         </Link>
     );
 }

@@ -29,6 +29,8 @@ import { VisitRecorder } from "@/components/overview/visit-recorder";
 import { AppShell, CapabilityProvider, ToastProvider } from "@polaris/ui";
 import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 import { PresenceReporter } from "@/components/notifications/presence-reporter";
+import { unreadTotal } from "@/lib/chat/chat-service";
+import { ChatUnreadProvider } from "@/components/chat-unread";
 import { NotificationFavicon } from "@/components/notifications/notification-favicon";
 import { NotificationsProvider } from "@/components/notifications/notifications-provider";
 
@@ -44,6 +46,9 @@ import { NotificationsProvider } from "@/components/notifications/notifications-
  * reader has been is noted here as well, once for the whole shell, so a screen
  * added anywhere turns up on their Overview without doing anything.
  */
+/** Nothing waiting. Named so the two branches below cannot drift apart. */
+const NO_CHAT_UNREAD = { messages: 0, conversations: 0 };
+
 export default async function AppLayout({ children }: { children: ReactNode }) {
     const user = await requireUser();
     const capabilities = getCapabilities();
@@ -56,12 +61,21 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         scopeChoices(user.id),
         presenceChoiceOf(user.id)
     ]);
+    // Seeded here rather than fetched by the provider, so the badge on the tab
+    // icon is right on the first paint instead of appearing a second into the
+    // page - which reads as a message that has just arrived when it has been
+    // waiting since yesterday. Only for somebody who has Chat: the count is
+    // zero for everybody else and asking would be a query per page load.
+    const chatUnread = apps.ids.includes("chat")
+        ? await unreadTotal({ id: user.id }).catch(() => NO_CHAT_UNREAD)
+        : NO_CHAT_UNREAD;
 
     return (
         <CapabilityProvider capabilities={capabilities}>
             <AppUrlProvider baseUrl={baseUrl}>
                 <DisplayFormatProvider preferences={display}>
                     <SessionScopeProvider userId={user.id}>
+                        <ChatUnreadProvider initial={chatUnread} enabled={apps.ids.includes("chat")}>
                         <NotificationsProvider initial={notifications}>
                             <ToastProvider>
                                 {/* Where everybody on screen is, asked once for
@@ -134,6 +148,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                                 </PresenceProvider>
                             </ToastProvider>
                         </NotificationsProvider>
+                        </ChatUnreadProvider>
                     </SessionScopeProvider>
                 </DisplayFormatProvider>
             </AppUrlProvider>

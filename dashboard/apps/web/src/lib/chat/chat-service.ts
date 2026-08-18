@@ -1119,6 +1119,56 @@ async function isPrivate(channelId: string): Promise<boolean> {
 }
 
 /**
+ * How much is waiting for one person across the whole of Chat.
+ *
+ * For the badge on the tab icon and on the Chat entry in the rail. Somebody
+ * using the rest of Polaris never opens Chat, and until this existed nothing
+ * anywhere told them a message had arrived - the count lived inside the app
+ * that already had their attention.
+ *
+ * Counts only conversations they are a MEMBER of, which is narrower than the
+ * rail: a public channel in a space they can reach but never joined has no
+ * membership row, so every message in it would read as unread and the tab icon
+ * would carry a number nobody can ever take down. Muted and archived ones are
+ * left out too - a mute is somebody asking not to be told, and a badge is being
+ * told.
+ */
+export interface ChatUnread {
+    /** Messages waiting, for the number on the badge. */
+    readonly messages: number;
+    /** How many conversations they are in, for a screen that would rather say
+     *  "two conversations" than "seventeen messages". */
+    readonly conversations: number;
+}
+
+export async function unreadTotal(actor: ChatActor): Promise<ChatUnread> {
+    const memberships = await prisma.chatChannelMember.findMany({
+        where: { userId: actor.id },
+        select: { channelId: true, lastReadAt: true, muted: true, mutedUntil: true }
+    });
+    // Worked out rather than read, for the reason the rail works it out: a mute
+    // with an end that has passed is not a mute, and nothing runs to clear it.
+    const heard = memberships.filter((row) => !core.muteInForce(row));
+    if (heard.length === 0) return { messages: 0, conversations: 0 };
+
+    const live = await prisma.chatChannel.findMany({
+        where: { id: { in: heard.map((row) => row.channelId) }, archived: false },
+        select: { id: true }
+    });
+    if (live.length === 0) return { messages: 0, conversations: 0 };
+
+    const counts = await unreadCounts(actor, live, new Map(heard.map((row) => [row.channelId, row])));
+    let messages = 0;
+    let conversations = 0;
+    for (const count of counts.values()) {
+        if (count <= 0) continue;
+        messages += count;
+        conversations += 1;
+    }
+    return { messages, conversations };
+}
+
+/**
  * How much each channel has moved since this reader last looked.
  *
  * Counted from the read mark rather than stored as a number, because a stored

@@ -28,13 +28,18 @@ export interface PolarisApp {
     readonly href: string;
     /** A locked app is shown but not yet available (future app or needs unlock). */
     readonly locked?: boolean;
+    /** Something is waiting inside this app, written short enough for a pill -
+     *  a count, or "9+". The switcher only draws it; what counts as waiting is
+     *  the app's business. */
+    readonly badge?: string;
 }
 
 export function AppSwitcher({
     apps,
     currentAppId,
     currentApp,
-    linkAs: Anchor = "a"
+    linkAs: Anchor = "a",
+    alert = false
 }: {
     apps: readonly PolarisApp[];
     currentAppId: string;
@@ -53,6 +58,15 @@ export function AppSwitcher({
      * Chat and not one screen further. The app passes its router's link.
      */
     linkAs?: ElementType;
+    /**
+     * Whether anything in the menu is waiting, for a mark on the trigger itself.
+     *
+     * Passed rather than derived from the badges, because on a phone the trigger
+     * is all there is: the label is hidden and the menu is shut, so a badge that
+     * only exists inside it is a badge nobody sees until they go looking - which
+     * is the state this was added to fix.
+     */
+    alert?: boolean;
 }) {
     const current = currentApp ?? apps.find((app) => app.id === currentAppId) ?? apps[0];
     if (!current) return null;
@@ -75,8 +89,14 @@ export function AppSwitcher({
             {/* On a phone the bar also carries the page's own controls, so the
                 trigger keeps its glyph and drops the app name and the chevron. */}
             <DropdownMenuTrigger className="flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1.5 text-sm font-medium transition-colors hover:bg-muted sm:px-2">
-                <span className="grid size-6 shrink-0 place-items-center rounded bg-primary/15 text-primary">
+                <span className="relative grid size-6 shrink-0 place-items-center rounded bg-primary/15 text-primary">
                     <CurrentIcon className="size-4" />
+                    {alert ? (
+                        <span
+                            aria-hidden="true"
+                            className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-primary ring-2 ring-surface"
+                        />
+                    ) : null}
                 </span>
                 <span className="sr-only sm:not-sr-only">{current.label}</span>
                 <ChevronDown className="hidden size-4 text-muted-foreground sm:block" />
@@ -103,6 +123,11 @@ export function AppSwitcher({
                                         </span>
                                     ) : null}
                                 </span>
+                                {app.badge ? (
+                                    <span className="shrink-0 rounded-full bg-primary px-1.5 text-[11px] font-medium leading-4 text-primary-foreground">
+                                        {app.badge}
+                                    </span>
+                                ) : null}
                                 {app.locked ? (
                                     <Lock className="size-3.5 text-muted-foreground" />
                                 ) : active ? (
