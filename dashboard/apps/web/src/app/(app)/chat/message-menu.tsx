@@ -27,6 +27,7 @@ import {
     Forward,
     Info,
     Link2,
+    MessageCircleReply,
     MessageSquare,
     Pencil,
     Star,
@@ -54,6 +55,15 @@ export interface MessageActions {
      *  happen in the channel, and an item that does nothing is worse than one
      *  that is not there. */
     readonly onReply?: (message: ChatMessageView) => void;
+    /**
+     * Answer whoever wrote this, where nobody else in the room can read it.
+     *
+     * Absent on your own words, on a message from an account that is gone, and
+     * in a conversation that is already between the two of you - in a direct
+     * message every reply is already private, and offering it there would be an
+     * item that appears to do something and does nothing.
+     */
+    readonly onReplyPrivately?: (message: ChatMessageView) => void;
     readonly onForward?: (message: ChatMessageView) => void;
     readonly onEdit?: (message: ChatMessageView) => void;
     readonly onOpenThread?: (message: ChatMessageView) => void;
@@ -125,6 +135,19 @@ export function MessageMenu({
                                 <span className="ml-auto pl-6 text-[11px] text-foreground-subtle">
                                     R
                                 </span>
+                            </ContextMenuItem>
+                        )}
+                        {/* Only where there is somebody to answer and it is not
+                            already just the two of you - see `onReplyPrivately`.
+                            It leaves the room without saying so: nothing appears
+                            here, and what they get is these words quoted in the
+                            conversation the two of you would have had anyway. */}
+                        {!mine && message.authorId && actions.onReplyPrivately && (
+                            <ContextMenuItem
+                                onSelect={() => actions.onReplyPrivately?.(message)}
+                            >
+                                <MessageCircleReply className="size-3.5" />
+                                Reply privately
                             </ContextMenuItem>
                         )}
                         {/* Absent rather than refused when whoever wrote it does

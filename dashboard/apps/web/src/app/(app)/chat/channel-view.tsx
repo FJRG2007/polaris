@@ -33,7 +33,6 @@ import { SearchPanel } from "./search-panel";
 import { MessageList } from "./message-list";
 import { runAction } from "@/lib/run-action";
 import { useCallHold } from "./call-session";
-import { ForwardDialog } from "./forward-dialog";
 import { ChannelHeader } from "./channel-header";
 import { useChatStream } from "./use-chat-stream";
 import type { RecordedSound } from "./voice-recorder";
@@ -41,6 +40,7 @@ import type { ChatMessageView } from "@/lib/chat/messages";
 import { useRouter, useSearchParams } from "next/navigation";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { ChannelMembers, useMembersPanel } from "./members-panel";
+import { ForwardDialog, type PrivateReply } from "./forward-dialog";
 import { ArrowDown, MessageCircle, Mic, Video, Volume2 } from "lucide-react";
 import { Button, ConfirmDeleteDialog, EmptyState, Skeleton, cn } from "@polaris/ui";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -140,6 +140,13 @@ export function ChannelView({
     const [deleting, setDeleting] = useState<ChatMessageView | null>(null);
     const [replyingTo, setReplyingTo] = useState<ChatMessageView | null>(null);
     const [forwarding, setForwarding] = useState<ChatMessageView | null>(null);
+    /** Answering somebody where the room cannot read it: the message, and the
+     *  conversation with them that it is going into. Both together, because the
+     *  second is fetched and the dialog must not open before it exists. */
+    const [aside, setAside] = useState<{
+        message: ChatMessageView;
+        reply: PrivateReply;
+    } | null>(null);
     const [typists, setTypists] = useState<readonly Typist[]>([]);
     // How much arrived below somebody who is reading further up. They are not
     // dragged to it - that is the one thing a chat must not do to somebody
@@ -669,6 +676,32 @@ export function ChannelView({
         held.current = messages ?? [];
     }, [messages]);
 
+    /**
+     * Answer whoever wrote a message, privately.
+     *
+     * The conversation with them is opened first and the dialog only after, so
+     * somebody whose direct messages that person does not accept is told before
+     * they have written anything rather than after. It is a find rather than a
+     * create where one already exists, which is why there is nothing here about
+     * whether they have spoken before.
+     */
+    const replyPrivately = useCallback(
+        async (message: ChatMessageView) => {
+            const authorId = message.authorId;
+            if (!authorId) return;
+            const result = await runAction(
+                () => actions.openDirectAction({ userIds: [authorId] }),
+                setError
+            );
+            if (!result || result.error || !result.id) return;
+            setAside({
+                message,
+                reply: { channelId: result.id, name: message.authorName ?? "them" }
+            });
+        },
+        []
+    );
+
     const shown = useMemo(() => [...(messages ?? []), ...pending], [messages, pending]);
 
     /** Put the newest message on screen. */
@@ -1144,6 +1177,14 @@ export function ChannelView({
                             onReact={react}
                             onStar={star}
                             onReply={setReplyingTo}
+                            // Not in a direct message, where every reply is
+                            // already private and the item would do nothing
+                            // anybody could tell apart from Reply.
+                            onReplyPrivately={
+                                channel?.kind === "dm"
+                                    ? undefined
+                                    : (message) => void replyPrivately(message)
+                            }
                             onForward={setForwarding}
                             onEdit={setEditing}
                             onDelete={setDeleting}
@@ -1297,6 +1338,15 @@ export function ChannelView({
             <ForwardDialog
                 message={forwarding}
                 onOpenChange={(open) => !open && setForwarding(null)}
+                onSent={refresh}
+            />
+
+            {/* The same dialog with the choosing taken out of it: where it goes
+                was decided by whose message was pressed. */}
+            <ForwardDialog
+                message={aside?.message ?? null}
+                privately={aside?.reply ?? null}
+                onOpenChange={(open) => !open && setAside(null)}
                 onSent={refresh}
             />
 

@@ -85,6 +85,9 @@ export interface MessageListProps {
      * button, a Forward item and an Edit item that all quietly did nothing.
      */
     onReply?: (message: ChatMessageView) => void;
+    /** Answer the author where the room cannot read it. Absent inside a thread
+     *  and inside a direct message, for the reasons `MessageActions` gives. */
+    onReplyPrivately?: (message: ChatMessageView) => void;
     onForward?: (message: ChatMessageView) => void;
     onEdit?: (message: ChatMessageView) => void;
     onDelete: (message: ChatMessageView) => void;
@@ -103,6 +106,7 @@ export function MessageList({
     onReact,
     onStar,
     onReply,
+    onReplyPrivately,
     onForward,
     onEdit,
     onDelete
@@ -151,6 +155,7 @@ export function MessageList({
                             onReact={onReact}
                             onStar={onStar}
                             onReply={onReply}
+                            onReplyPrivately={onReplyPrivately}
                             onForward={onForward}
                             onEdit={onEdit}
                             onDelete={onDelete}
@@ -314,6 +319,7 @@ function Message({
     onReact,
     onStar,
     onReply,
+    onReplyPrivately,
     onForward,
     onEdit,
     onDelete,
@@ -332,6 +338,7 @@ function Message({
     onReact: (messageId: string, emoji: string) => void;
     onStar: (message: ChatMessageView) => void;
     onReply?: (message: ChatMessageView) => void;
+    onReplyPrivately?: (message: ChatMessageView) => void;
     onForward?: (message: ChatMessageView) => void;
     onEdit?: (message: ChatMessageView) => void;
     onDelete: (message: ChatMessageView) => void;
@@ -367,6 +374,7 @@ function Message({
                 canPost,
                 canModerate,
                 onReply,
+                onReplyPrivately,
                 onForward,
                 onOpenThread,
                 onStar,
