@@ -189,9 +189,11 @@ async function sampleHost(
                 subjectType: "host",
                 subjectId,
                 ts,
-                // Normalized against the core count, so a 4-core box at 200% of one
-                // core reads as 50% busy rather than "200".
-                cpuPercent: info.ncpu > 0 ? round2(Math.min(100, cpu / info.ncpu)) : round2(cpu),
+                // Already a share of the machine per container, so this sum is one
+                // too and needs no core count. Clamped anyway: the samples are read
+                // one container at a time over a moment, and a busy box can hand
+                // back a set that adds up to a hair over the whole machine.
+                cpuPercent: round2(Math.min(100, cpu)),
                 memUsedBytes: bigBytes(memory),
                 memTotalBytes: bigBytes(info.memTotal)
             }

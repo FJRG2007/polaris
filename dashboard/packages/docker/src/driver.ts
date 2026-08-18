@@ -43,6 +43,12 @@ export interface ContainerSummary {
 }
 
 export interface ContainerStats {
+    /** Share of the WHOLE machine, so it never exceeds 100 however many cores there
+     *  are. Docker's own `stats` reports a share of one core instead and happily
+     *  prints 121% on a busy container, which reads as nonsense on a screen that
+     *  puts it beside the host's CPU - the two numbers have to mean the same thing.
+     *  A container's own graph is capped at 100 as well, and used to be overflowed
+     *  by the per-core reading rather than scaled by it. */
     readonly cpuPercent: number;
     readonly memUsage: number;
     readonly memLimit: number;
@@ -426,18 +432,17 @@ function demultiplex(buffer: Buffer): Buffer {
     return Buffer.concat(parts);
 }
 
-/** Derive CPU percent and memory usage from a raw stats sample (Docker's formula). */
+/** Derive CPU percent and memory usage from a raw stats sample. */
 function computeStats(raw: Record<string, unknown>): ContainerStats {
     const cpu = (raw.cpu_stats ?? {}) as Record<string, Record<string, number>>;
     const precpu = (raw.precpu_stats ?? {}) as Record<string, Record<string, number>>;
     const cpuDelta = (cpu.cpu_usage?.total_usage ?? 0) - (precpu.cpu_usage?.total_usage ?? 0);
     const systemDelta = (cpu.system_cpu_usage as unknown as number ?? 0) - (precpu.system_cpu_usage as unknown as number ?? 0);
-    const onlineCpus =
-        (cpu.online_cpus as unknown as number) ||
-        (cpu.cpu_usage?.percpu_usage as unknown as number[] | undefined)?.length ||
-        1;
-    const cpuPercent =
-        systemDelta > 0 && cpuDelta > 0 ? (cpuDelta / systemDelta) * onlineCpus * 100 : 0;
+    // systemDelta already spans every core, so this ratio is the share of the whole
+    // machine. Docker's own formula multiplies it back up by the core count, which is
+    // where "121% CPU" comes from: a per-core reading printed under a per-machine
+    // label, on a screen that shows the machine's own CPU right beside it.
+    const cpuPercent = systemDelta > 0 && cpuDelta > 0 ? (cpuDelta / systemDelta) * 100 : 0;
 
     const memory = (raw.memory_stats ?? {}) as Record<string, number> & { stats?: Record<string, number> };
     const cache = memory.stats?.cache ?? 0;

@@ -106,8 +106,9 @@ describe("docker driver", () => {
             })
         );
         const stats = await driver.stats("abc");
-        // cpuDelta=100, sysDelta=1000, online=2 -> (100/1000)*2*100 = 20
-        expect(stats.cpuPercent).toBe(20);
+        // cpuDelta=100, sysDelta=1000 -> a tenth of the machine. The core count does
+        // not enter into it: sysDelta already counts every core.
+        expect(stats.cpuPercent).toBe(10);
         // memUsage = 150 - 50 = 100; limit 1000 -> 10%
         expect(stats.memUsage).toBe(100);
         expect(stats.memPercent).toBe(10);
