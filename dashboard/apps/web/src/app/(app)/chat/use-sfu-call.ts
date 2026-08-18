@@ -702,6 +702,13 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // published before the connection existed, so this is the one place
             // the first publication happens.
             await publish(MICROPHONE, outgoingMic());
+            // Walked in muted, and now that there is a publication, said so.
+            // The device being disabled is what stops the sound; muting the
+            // publication is what puts the icon on this browser's tile for
+            // everybody else. Without the second half somebody who came into a
+            // room muted looked exactly like somebody who could hear the room
+            // perfectly well and was choosing not to answer.
+            if (mic.current && !mic.current.enabled) setVoiceEnabled(false);
             await publish(CAMERA, camera.current);
             if (screen.current) await publish(SCREEN, screen.current);
             if (deafenedRef.current) {
@@ -858,6 +865,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         refresh,
         resort,
         resortStates,
+        setVoiceEnabled,
         startFilter,
         withVideo
     ]);
