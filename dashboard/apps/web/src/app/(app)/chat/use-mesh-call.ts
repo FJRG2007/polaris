@@ -204,6 +204,22 @@ export function useMeshCall(meetingId: string | null, options?: { video?: boolea
     // rather than held in the page: it is instance configuration.
     const licensed = useRef<{ moduleUrl: string; token: string } | null>(null);
     const me = useRef<string | null>(null);
+    /**
+     * Whether this browser was pushed off the call by another device of the same
+     * account, rather than leaving.
+     *
+     * The two look identical on the way out and must not be treated alike. An
+     * account has one seat, so both devices are the same participant row: a
+     * browser that tears down and releases the seat releases the seat the OTHER
+     * device is sitting in. Picking a call up on a phone therefore killed it on
+     * the phone a moment later - the row went to `leftAt`, the heartbeat could
+     * never revive it, the phone was gone from everybody's roster while still
+     * holding a microphone, and getting back in took a reload.
+     *
+     * So this says which of the two happened. Displaced, the seat is not this
+     * browser's to give up; it hangs up and says nothing to the server.
+     */
+    const displaced = useRef(false);
     // Candidates that arrived before the description they belong to, which is
     // ordinary rather than exceptional - the two travel over different requests.
     const early = useRef(new Map<string, RTCIceCandidateInit[]>());
@@ -699,6 +715,10 @@ export function useMeshCall(meetingId: string | null, options?: { video?: boolea
                 // one seat, both holding a microphone, neither aware.
                 if (frame.data.kind === "claimed") {
                     if (frame.data.deviceId && frame.data.deviceId !== callDeviceId()) {
+                        // Marked before the teardown it is about to cause, so
+                        // the cleanup below knows not to hand back a seat that
+                        // is now the other device's.
+                        displaced.current = true;
                         setEnded(true);
                     }
                     return;
@@ -827,7 +847,13 @@ export function useMeshCall(meetingId: string | null, options?: { video?: boolea
             mic.current = null;
             camera.current = null;
             screen.current = null;
-            void actions.leaveCallAction(inCall);
+            // Leaving releases the participant row, and an account has one of
+            // those however many devices it is signed in on. So a browser that
+            // was displaced must not: the row it would hand back is the one the
+            // phone that just took the call is sitting in, and handing it back
+            // struck that phone off the roster mid-call, with a heartbeat that
+            // could never revive it and a reload the only way back in.
+            if (!displaced.current) void actions.leaveCallAction(inCall);
         };
     }, [
         forget,
