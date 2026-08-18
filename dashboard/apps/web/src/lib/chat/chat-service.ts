@@ -91,6 +91,10 @@ export interface ChatChannelView {
     readonly ownerId: string | null;
     /** Whether the owner has let the rest of the group change how it looks. */
     readonly membersMayEdit: boolean;
+    /** How long somebody waits between messages here, in seconds. Zero is off.
+     *  Read by the composer so the wait is shown while it applies rather than
+     *  discovered by being refused. */
+    readonly slowmode: number;
     /** The other people in a direct message, for the avatars beside it. Empty
      *  for a named channel, where the name is the whole label. */
     readonly others: readonly { id: string; name: string }[];
@@ -398,6 +402,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             ownerId: true,
             createdById: true,
             membersMayEdit: true,
+            slowmode: true,
             members: { select: { userId: true, user: { select: { name: true } } } }
         }
     });
@@ -454,6 +459,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             mayPicture: picturesAllowed({ ...channel, mayAdminister }, actor.id),
             ownerId: groupOwnerId(channel),
             membersMayEdit: channel.membersMayEdit,
+            slowmode: channel.slowmode,
             others: channel.spaceId ? [] : others
         };
     });
@@ -681,7 +687,8 @@ export async function updateChannel(
             ...(input.name !== undefined ? { name: input.name } : {}),
             ...(input.topic !== undefined ? { topic: input.topic } : {}),
             ...(input.archived !== undefined ? { archived: input.archived } : {}),
-            ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {})
+            ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
+            ...(input.slowmode !== undefined ? { slowmode: input.slowmode } : {})
         }
     });
     publishChatChange({ channelId: input.channelId, kind: "channels", actorId: actor.id });

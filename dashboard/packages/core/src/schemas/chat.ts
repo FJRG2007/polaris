@@ -223,13 +223,87 @@ export const chatChannelCreateSchema = z.object({
 
 export type ChatChannelCreateInput = z.infer<typeof chatChannelCreateSchema>;
 
+/**
+ * How long somebody waits between messages in one channel, in seconds.
+ *
+ * A ladder rather than a free number, because the useful settings are few and a
+ * box accepting 4 is a box somebody will type 40000 into. Zero is off, which is
+ * every channel until somebody decides otherwise.
+ *
+ * It is the per-room version of the instance's own rate limit: that one exists
+ * to stop a script, this one exists to stop a hundred people shouting over each
+ * other, and a room that needs the second usually needs it for an hour rather
+ * than forever.
+ */
+export const CHAT_SLOWMODE_STEPS = [0, 5, 10, 15, 30, 60, 120, 300, 600, 900, 3600, 21600] as const;
+
+export type ChatSlowmode = (typeof CHAT_SLOWMODE_STEPS)[number];
+
+/** The setting as a schema: one of the steps, and nothing else. */
+export const chatSlowmodeSchema = z
+    .number()
+    .int()
+    .refine(
+        (value): value is ChatSlowmode =>
+            (CHAT_SLOWMODE_STEPS as readonly number[]).includes(value),
+        "That is not one of the waits offered"
+    );
+
+/**
+ * How much longer somebody has to wait, in seconds.
+ *
+ * Zero means they may send. Kept as arithmetic rather than a query so the same
+ * answer can be given in two places without asking the database twice: the
+ * server refuses on it, and the composer counts down on it so the wait is
+ * something somebody watches rather than something they are told about after
+ * writing a paragraph.
+ */
+export function slowmodeWait(input: {
+    /** The channel's setting, in seconds. */
+    slowmode: number;
+    /** When this person last said something here, or null if they have not. */
+    lastSentAt: Date | null;
+    now: Date;
+}): number {
+    if (input.slowmode <= 0 || !input.lastSentAt) return 0;
+    const elapsed = (input.now.getTime() - input.lastSentAt.getTime()) / 1000;
+    // Rounded up: half a second left is still a wait, and telling somebody zero
+    // and then refusing them is the one answer worse than the truth.
+    const left = Math.max(0, Math.ceil(input.slowmode - elapsed));
+    // And never longer than the wait itself. Two machines mean two clocks, and a
+    // message stamped in the future would otherwise hold somebody for the
+    // difference between them - an hour of skew being an hour of silence in a
+    // room set to thirty seconds.
+    return Math.min(input.slowmode, left);
+}
+
+/**
+ * A wait, written the way somebody would say it.
+ *
+ * Whole units only. "1 minute 43 seconds" is a stopwatch; what a person needs to
+ * know is roughly how long they are being asked to hold on for, and every
+ * messenger that shows this shows it coarsely.
+ */
+export function slowmodeSpoken(seconds: number): string {
+    if (seconds >= 3600) {
+        const hours = Math.round(seconds / 3600);
+        return hours === 1 ? "an hour" : `${hours} hours`;
+    }
+    if (seconds >= 60) {
+        const minutes = Math.round(seconds / 60);
+        return minutes === 1 ? "a minute" : `${minutes} minutes`;
+    }
+    return seconds === 1 ? "a second" : `${seconds} seconds`;
+}
+
 export const chatChannelUpdateSchema = z.object({
     channelId: z.string().uuid(),
     name: channelName.optional(),
     topic: z.string().trim().max(MAX_CHAT_TOPIC).optional(),
     archived: z.boolean().optional(),
     /** Moving it under a different heading, or out from under all of them. */
-    categoryId: z.string().uuid().nullable().optional()
+    categoryId: z.string().uuid().nullable().optional(),
+    slowmode: chatSlowmodeSchema.optional()
 });
 
 export type ChatChannelUpdateInput = z.infer<typeof chatChannelUpdateSchema>;

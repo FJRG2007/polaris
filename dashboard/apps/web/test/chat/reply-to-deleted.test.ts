@@ -32,8 +32,8 @@ vi.mock("@/lib/chat/access", async () => {
     const actual = await vi.importActual<typeof import("@/lib/chat/access")>("@/lib/chat/access");
     return {
         ...actual,
-        requireChannel: async () => ({ mayPost: true, mayModerate: false }),
-        requirePostable: async () => ({ mayPost: true, mayModerate: false })
+        requireChannel: async () => ({ channelId: "c1", mayPost: true, mayModerate: false }),
+        requirePostable: async () => ({ channelId: "c1", mayPost: true, mayModerate: false })
     };
 });
 vi.mock("@/lib/chat/rules", () => ({
@@ -72,7 +72,11 @@ vi.mock("@polaris/db", () => ({
             update: async () => undefined,
             count: async () => 0
         },
-        chatChannel: { update: async () => undefined },
+        chatChannel: {
+            update: async () => undefined,
+            // Read by the send path for the room's own wait between messages.
+            findUnique: async () => ({ slowmode: 0 })
+        },
         chatChannelMember: { updateMany: async () => undefined, findMany: async () => [] },
         $transaction: async (run: (tx: unknown) => Promise<unknown>) =>
             run({

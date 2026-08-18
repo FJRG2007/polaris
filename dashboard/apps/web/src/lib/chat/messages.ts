@@ -279,8 +279,8 @@ export async function send(
     /** The message this one answers, or the one being forwarded. */
     quote: { readonly messageId: string; readonly forwarded: boolean } | null = null
 ): Promise<string> {
-    await requirePostable(actor, input.channelId);
-    await requireSendable(actor, input.channelId, input.body);
+    const access = await requirePostable(actor, input.channelId);
+    await requireSendable(actor, access, input.body);
 
     // Nothing but whitespace, whatever punctuation it serialized into. The
     // schema refuses an empty string and the composer refuses a blank one, and
@@ -403,7 +403,13 @@ export async function send(
  * whole instance would punish a busy afternoon in one channel by silencing
  * everybody's direct messages.
  */
-async function requireSendable(actor: ChatActor, channelId: string, body: string): Promise<void> {
+async function requireSendable(
+    actor: ChatActor,
+    access: ChannelAccess,
+    body: string,
+    options: { wait?: boolean } = {}
+): Promise<void> {
+    const channelId = access.channelId;
     const rules = await rulesForChannel(channelId);
 
     // Code points rather than UTF-16 units: a limit that counted the latter
@@ -426,6 +432,45 @@ async function requireSendable(actor: ChatActor, channelId: string, body: string
             throw new ChatRuleError("You are sending messages too quickly. Wait a moment.");
         }
     }
+
+    if (options.wait === false) return;
+
+    /**
+     * Slow mode: how long this room makes somebody wait between messages.
+     *
+     * A different thing from the limit above, which is the instance stopping a
+     * script. This one is a room stopping a hundred people talking over each
+     * other, it is set by whoever runs the room, and it is measured from the
+     * last thing this person said rather than counted over a window - which is
+     * what makes it predictable enough to wait out.
+     *
+     * Whoever may moderate the room is not held by it. A moderator who cannot
+     * answer for ten minutes cannot moderate, and every client that has this
+     * exempts them.
+     */
+    if (access.mayModerate) return;
+    const channel = await prisma.chatChannel.findUnique({
+        where: { id: channelId },
+        select: { slowmode: true }
+    });
+    if (!channel || channel.slowmode <= 0) return;
+    // Deleted messages count. Otherwise the way round slow mode is to send and
+    // delete, which is the same room full of noise plus a trail of tombstones.
+    const last = await prisma.chatMessage.findFirst({
+        where: { channelId, authorId: actor.id },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true }
+    });
+    const wait = core.slowmodeWait({
+        slowmode: channel.slowmode,
+        lastSentAt: last?.createdAt ?? null,
+        now: new Date()
+    });
+    if (wait > 0) {
+        throw new ChatRuleError(
+            `Slow mode is on here. You can send again in ${core.slowmodeSpoken(wait)}.`
+        );
+    }
 }
 
 /**
@@ -446,11 +491,14 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
         select: { channelId: true, authorId: true, body: true, deletedAt: true, createdAt: true }
     });
     if (!message) throw new ChatAccessError("That message is gone");
-    await requirePostable(actor, message.channelId);
+    const editable = await requirePostable(actor, message.channelId);
     if (message.authorId !== actor.id)
         throw new ChatAccessError("You can only edit your own messages");
     if (message.deletedAt) throw new ChatAccessError("That message was deleted");
-    await requireSendable(actor, message.channelId, input.body);
+    // The length and the instance's own limit, but never the wait: slow mode is
+    // about how often somebody speaks, and rewriting what you already said is
+    // not speaking again.
+    await requireSendable(actor, editable, input.body, { wait: false });
     // Emptying a message is deleting it, and there is a delete for that.
     if (isBlankMarkdown(input.body)) throw new ChatRuleError("Write something first");
 

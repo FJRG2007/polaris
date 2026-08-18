@@ -1194,6 +1194,22 @@ export function ChannelView({
 
                     <TypingLine typists={typists} viewerId={viewerId} />
 
+                {/* The wait, while there is one. Counted down rather than
+                    discovered: a room that refuses a paragraph after it has
+                    been written is a room people write paragraphs in twice.
+                    Nobody who may moderate sees this, because it does not
+                    apply to them. */}
+                {!canModerate && (
+                    <SlowmodeLine
+                        seconds={channel?.slowmode ?? 0}
+                        lastSentAt={
+                            [...shown]
+                                .reverse()
+                                .find((message) => message.authorId === viewerId)?.createdAt ?? null
+                        }
+                    />
+                )}
+
                     {error && (
                         <p role="alert" className="px-4 pb-1 text-xs text-danger">
                             {error}
@@ -1534,6 +1550,43 @@ function VoiceStrip({
                 </>
             )}
         </div>
+    );
+}
+
+/**
+ * How long this reader still has to wait, counted down.
+ *
+ * The arithmetic is shared with the server - see `slowmodeWait` - so the number
+ * on screen is the number the send path will refuse on, rather than a second
+ * guess that disagrees with it by a second and makes a liar of one of them.
+ *
+ * Drawn from the last message of this reader's that is currently loaded. Somebody
+ * who has scrolled far enough up that their own last message fell out of the
+ * window sees no countdown and is refused once, which is the honest failure: the
+ * alternative is a query per keystroke to tell them something they will know in a
+ * moment anyway.
+ */
+function SlowmodeLine({ seconds, lastSentAt }: { seconds: number; lastSentAt: string | null }) {
+    const [left, setLeft] = useState(0);
+
+    useEffect(() => {
+        if (seconds <= 0 || !lastSentAt) {
+            setLeft(0);
+            return;
+        }
+        const sentAt = new Date(lastSentAt);
+        const tick = () =>
+            setLeft(core.slowmodeWait({ slowmode: seconds, lastSentAt: sentAt, now: new Date() }));
+        tick();
+        const timer = setInterval(tick, 1000);
+        return () => clearInterval(timer);
+    }, [lastSentAt, seconds]);
+
+    if (left <= 0) return null;
+    return (
+        <p className="px-4 pb-1 text-xs text-muted-foreground">
+            Slow mode is on here. You can send again in {core.slowmodeSpoken(left)}.
+        </p>
     );
 }
 

@@ -5827,6 +5827,11 @@ model ChatChannel {
     // the owner. Off by default: a group photo anybody can change is a group
     // photo that changes.
     membersMayEdit Boolean  @default(false)
+    // How long somebody waits between messages here, in seconds. Zero is off,
+    // which is every channel until whoever runs it decides otherwise. Whoever
+    // may moderate the room is not held by it - a moderator who cannot answer
+    // for five minutes cannot moderate.
+    slowmode      Int       @default(0)
     // Denormalized so the rail can sort conversations by what is happening
     // without reading every message table.
     lastMessageAt DateTime?

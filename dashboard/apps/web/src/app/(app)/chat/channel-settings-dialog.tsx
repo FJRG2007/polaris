@@ -31,7 +31,8 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    Select
 } from "@polaris/ui";
 
 export function ChannelSettingsDialog({
@@ -47,6 +48,7 @@ export function ChannelSettingsDialog({
     const { refresh } = useChat();
     const [name, setName] = useState("");
     const [topic, setTopic] = useState("");
+    const [slowmode, setSlowmode] = useState(0);
     const [busy, setBusy] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [error, setError] = useState("");
@@ -57,18 +59,21 @@ export function ChannelSettingsDialog({
         if (!channel) return;
         setName(channel.name);
         setTopic(channel.topic ?? "");
+        setSlowmode(channel.slowmode);
         setError("");
     }, [channel]);
 
     const stored = useMemo(() => core.normalizeChannelName(name), [name]);
-    const dirty = channel !== null && (stored !== channel.name || topic !== (channel.topic ?? ""));
+    const dirty =
+        channel !== null &&
+        (stored !== channel.name || topic !== (channel.topic ?? "") || slowmode !== channel.slowmode);
 
     const save = async () => {
         if (!channel) return;
         setBusy(true);
         setError("");
         const result = await runAction(
-            () => actions.updateChannelAction({ channelId: channel.id, name, topic }),
+            () => actions.updateChannelAction({ channelId: channel.id, name, topic, slowmode }),
             setError
         );
         setBusy(false);
@@ -117,6 +122,27 @@ export function ChannelSettingsDialog({
                             maxLength={core.MAX_CHAT_TOPIC}
                             onChange={(event) => setTopic(event.target.value)}
                         />
+
+                        {/* How long between messages. A room stopping a hundred
+                            people talking over each other, which is a different
+                            thing from the instance's own limit on how fast
+                            anything may be sent - that one exists to stop a
+                            script. Whoever moderates the room is not held by
+                            it. */}
+                        <label className="flex flex-col gap-1">
+                            <span className="text-[12px] font-medium text-muted-foreground">
+                                Wait between messages
+                            </span>
+                            <Select
+                                value={String(slowmode)}
+                                onValueChange={(value) => setSlowmode(Number(value))}
+                                aria-label="Wait between messages"
+                                options={core.CHAT_SLOWMODE_STEPS.map((seconds) => ({
+                                    value: String(seconds),
+                                    label: seconds === 0 ? "Off" : core.slowmodeSpoken(seconds)
+                                }))}
+                            />
+                        </label>
 
                         {error && (
                             <p role="alert" className="text-sm text-danger">
