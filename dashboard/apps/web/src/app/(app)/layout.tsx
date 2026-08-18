@@ -32,6 +32,8 @@ import { PresenceReporter } from "@/components/notifications/presence-reporter";
 import { unreadTotal } from "@/lib/chat/chat-service";
 import { ChatUnreadProvider } from "@/components/chat-unread";
 import { NotificationFavicon } from "@/components/notifications/notification-favicon";
+import { buildStamp } from "@/lib/build-stamp";
+import { NewBuildBanner } from "@/components/new-build-banner";
 import { NotificationsProvider } from "@/components/notifications/notifications-provider";
 
 /**
@@ -89,6 +91,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                                     into a bar instead of hanging up. */}
                                 <CallHolder viewerId={user.id} hasChat={apps.ids.includes("chat")}>
                                 <NotificationFavicon />
+                                {/* An update landing under an open tab, said out
+                                    loud before a click is refused by a server that
+                                    no longer knows this bundle. */}
+                                <NewBuildBanner served={buildStamp()} />
                                 <PresenceReporter />
                                 <VisitRecorder />
                                 {/* Out here rather than inside Chat: a call you only

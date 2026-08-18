@@ -254,13 +254,33 @@ services:
           # comes back, and Chat says calls are unavailable in the meantime
           # rather than offering one that would carry nothing.
           use_external_ip: true
+          # Take that answer without testing it, and this is the line the whole
+          # feature turned on. The test is the server sending a packet to its own
+          # public address and waiting for it to come back through the router -
+          # a hairpin, which consumer routers routinely do not do. When it times
+          # out the address is treated as unproven and every local address is
+          # dropped with it, leaving the public one as the only way in. A browser
+          # in the same house then has to go out to the router and back for its
+          # own media, and on a router that will not hairpin it simply never
+          # connects: eight checks sent, nothing returned, a call that joins and
+          # carries no sound.
+          #
+          # Nothing is lost by not testing. An address that turns out to be wrong
+          # is one candidate among several that fails in the usual way, in the
+          # second ICE spends on it.
+          skip_external_ip_validation: true
           # Offer the local addresses as well as the public one. A call between
           # two devices in the same house then never leaves it, which is both
           # faster and the case that has to work before anybody has been near a
-          # router. Without this the only address on offer is the public one,
-          # and every call in the house goes out to the router and back - if it
-          # comes back at all.
+          # router.
           advertise_internal_ip: true
+          # Named rather than left to the default list, which also reaches for a
+          # commercial provider's server. One request at startup, to learn the
+          # address on the far side of the router; nothing about a call is ever
+          # sent here.
+          stun_servers:
+            - stun.l.google.com:19302
+            - stun1.l.google.com:19302
         logging:
           level: info
     volumes:

@@ -27,6 +27,7 @@ import { Button, Card, CardBody } from "@polaris/ui";
 import { RotateCcw, TriangleAlert } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { isStaleBuildError, reloadForNewBuild } from "@/lib/stale-build";
+import { checkForNewBuild } from "@/lib/new-build";
 
 export default function AppError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
     const router = useRouter();
@@ -37,6 +38,9 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
     useEffect(() => {
         console.error(error);
         setAttempts(countFailure(error));
+        // Not every stale build says so in words the patterns below recognise. Ask
+        // outright, so the banner can name the cause even when this screen cannot.
+        void checkForNewBuild();
     }, [error]);
 
     // Before anything is drawn: an old tab is a reload, not a message. It returns
@@ -70,7 +74,7 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
                                     ? "This tab is still running the old build, and the server no longer answers it. Reloading picks up the new one; anything typed into the page is lost."
                                     : attempts > 1
                                       ? "It failed the same way again, so trying once more will not clear it. Reload to pick up a new build, or send what is below to whoever is looking at it."
-                                      : "The rest of Polaris is still running. Try again, and if Polaris was just updated, reload the page to pick up the new build."}
+                                      : "The rest of Polaris is still running. Try again - and if an update landed under this tab, Polaris says so at the corner of the screen."}
                             </p>
                         </div>
                     </div>
