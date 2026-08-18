@@ -16,13 +16,12 @@
 
 import * as core from "@polaris/core";
 import { callsUnavailableAction } from "./meeting-actions";
-import {
-    chatRulesAction,
-    listCategoriesAction,
-    listChannelsAction,
-    listSpacesAction
-} from "./actions";
-import type { ChatCategoryView, ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
+import { chatRulesAction, listCategoriesAction, listChannelsAction, listSpacesAction } from "./actions";
+import type {
+    ChatCategoryView,
+    ChatChannelView,
+    ChatSpaceView
+} from "@/lib/chat/chat-service";
 import {
     createContext,
     useCallback,

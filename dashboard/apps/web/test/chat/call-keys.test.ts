@@ -52,24 +52,19 @@ describe("the call server's key", () => {
     // the file always reports 0666 and the assertion would be about the
     // development machine rather than about the code. It runs where it means
     // something, which is also where the container runs.
-    it.skipIf(process.platform === "win32")(
-        "writes it where only the owner can read it",
-        async () => {
-            await ensureCallKey();
-            const mode = (await stat(callKeyFile())).mode & 0o777;
-            // The check LiveKit actually makes is on the `others` bits, and it is
-            // fatal: a key file the world can read is a server that refuses to boot.
-            expect(mode & 0o007).toBe(0);
-        }
-    );
+    it.skipIf(process.platform === "win32")("writes it where only the owner can read it", async () => {
+        await ensureCallKey();
+        const mode = (await stat(callKeyFile())).mode & 0o777;
+        // The check LiveKit actually makes is on the `others` bits, and it is
+        // fatal: a key file the world can read is a server that refuses to boot.
+        expect(mode & 0o007).toBe(0);
+    });
 
     it("writes it in the shape the media server reads", async () => {
         const key = await ensureCallKey();
         // `name: secret`, which is what `key_file` is parsed as. A shape it
         // cannot read is the same as no key at all.
-        expect(await readFile(callKeyFile(), "utf8")).toBe(
-            `"${key!.apiKey}": "${key!.apiSecret}"\n`
-        );
+        expect(await readFile(callKeyFile(), "utf8")).toBe(`"${key!.apiKey}": "${key!.apiSecret}"\n`);
     });
 
     it("quotes a secret YAML would read as something else", async () => {

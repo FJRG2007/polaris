@@ -79,10 +79,7 @@ vi.mock("@polaris/db", () => ({
             findFirst: async ({ where }: { where: Record<string, unknown> }) =>
                 participants
                     .filter((row) => matches(row, where))
-                    .sort(
-                        (left, right) =>
-                            (right.leftAt?.getTime() ?? 0) - (left.leftAt?.getTime() ?? 0)
-                    )
+                    .sort((left, right) => (right.leftAt?.getTime() ?? 0) - (left.leftAt?.getTime() ?? 0))
                     .at(0) ?? null,
             updateMany: async ({
                 where,
