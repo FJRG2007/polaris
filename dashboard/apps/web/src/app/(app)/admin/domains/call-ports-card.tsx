@@ -97,6 +97,15 @@ export function CallPortsCard() {
                                 <Badge title="Nothing answers an unsolicited packet on this port, so it cannot be checked from here - forward it alongside the other one">
                                     Cannot be checked
                                 </Badge>
+                            ) : !reading.running ? (
+                                // Three states, not two, for the reason the game
+                                // ports card has three: a stopped server answers
+                                // nothing on any port, so "not confirmed" would
+                                // put a warning on a rule that is very likely
+                                // right and send somebody into their router.
+                                <Badge title="A call server that is not answering is silent on every port, so this cannot be checked from here">
+                                    Checked once it answers
+                                </Badge>
                             ) : reading.confirmed ? (
                                 <Badge
                                     className="border-success/40 text-success"

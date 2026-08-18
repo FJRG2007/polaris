@@ -20,7 +20,9 @@
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { AccessToken } from "livekit-server-sdk";
+import { isPolarisPart } from "@/lib/polaris-parts";
 import { ensureCallKey } from "@/lib/chat/call-keys";
+import { localDockerDriver } from "@/lib/docker-service";
 import { getIntegrationSecret, getIntegrationState, upsertIntegration } from "@/lib/integration-service";
 
 /** Where the pairing is kept. One per instance: a call server is infrastructure,
@@ -255,6 +257,44 @@ export async function joinToken(
     return token.toJwt();
 }
 
+/** The compose service the media server runs as. What a screen looks for when
+ *  it wants to know whether the thing exists at all. */
+const CALL_SERVICE = "livekit";
+
+/** Whether the shipped media server is part of this deployment, and running.
+ *  `unknown` where Docker cannot be reached, which is a limited edition or a dev
+ *  run - not a verdict about the container. */
+export type CallServerContainer = "running" | "stopped" | "missing" | "unknown";
+
+/**
+ * Look for the container, rather than believing the key file.
+ *
+ * The file is written into a volume both containers mount - and the mount point
+ * exists in the dashboard's own image, so that the volume has an owner that can
+ * write to it. Which means a deployment whose stack never got the media server
+ * writes the key into its own filesystem, finds it there next boot, and reports
+ * itself configured for ever: "Starting on this server", in a loop, with nothing
+ * starting. Asking the container engine is the only question with a real answer
+ * in it.
+ *
+ * Only from the settings screen. Never from `callServer()`, which every chat tab
+ * asks on a timer.
+ */
+async function shippedContainer(): Promise<CallServerContainer> {
+    let driver: ReturnType<typeof localDockerDriver> | null = null;
+    try {
+        driver = localDockerDriver();
+        const own = (await driver.listContainers(true)).filter(isPolarisPart);
+        const mine = own.find((container) => container.composeService === CALL_SERVICE);
+        if (!mine) return "missing";
+        return mine.state === "running" ? "running" : "stopped";
+    } catch {
+        return "unknown";
+    } finally {
+        await driver?.dispose().catch(() => undefined);
+    }
+}
+
 /** What the settings screen shows. The signing key never goes back to a browser. */
 export interface CallServerSettings {
     /** An address somebody typed, if they did. */
@@ -276,6 +316,10 @@ export interface CallServerSettings {
     /** Whether it answers yet - a fresh install spends a moment starting, and
      *  "configured but silent" is the state people ask about. */
     readonly answering: boolean;
+    /** Whether the shipped media server is in this deployment's stack at all.
+     *  The one thing the key file cannot tell anybody, and the difference
+     *  between "starting" and "was never there". */
+    readonly container: CallServerContainer;
     /** Why the stored address is not where calls go, when one is stored and they
      *  do not: this process was started with a server of its own, or what was
      *  saved here is missing the key and secret that would let it sign. Null when
@@ -296,6 +340,9 @@ export async function callServerSettings(): Promise<CallServerSettings> {
         hasSecret: Boolean(secret),
         shipped: endpoint?.shipped ?? false,
         ready: endpoint !== null,
+        // Only about the shipped one. A server somebody else runs is on their
+        // machine and no container here is any evidence about it.
+        container: endpoint?.shipped ? await shippedContainer() : "unknown",
         answering: endpoint ? await answering(endpoint) : false,
         unused: !stored.url
             ? null

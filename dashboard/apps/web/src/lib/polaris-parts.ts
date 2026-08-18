@@ -48,6 +48,7 @@ const PARTS: Record<string, { label: string; summary: string }> = {
         summary: "Applies the firewall to requests as they arrive."
     },
     hostd: { label: "Host daemon", summary: "Mounts, host files and the Docker proxy." },
+    livekit: { label: "Call server", summary: "Carries the sound and the picture in a call." },
     mdns: { label: "Local discovery", summary: "Answers to polaris.local on the network." },
     "mc-router": { label: "Minecraft router", summary: "One port for every Java server." },
     caddy: { label: "Edge (legacy)", summary: "The previous edge, kept for rollback." },
