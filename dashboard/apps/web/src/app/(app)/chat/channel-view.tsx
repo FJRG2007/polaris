@@ -171,6 +171,11 @@ export function ChannelView({
      */
     const walkedIn = useRef<string | null>(null);
     const [joining, setJoining] = useState(false);
+    /** Whoever is being answered privately while their conversation is being
+     *  found, or null. The ref is the guard against a second press, the name is
+     *  what the line under the list says - see `replyPrivately`. */
+    const opening = useRef<string | null>(null);
+    const [openingName, setOpeningName] = useState<string | null>(null);
     // Whether a picture in the call has the big place, which the room says
     // rather than this screen guessing: what is being watched depends on what
     // somebody in there asked for. It goes back on its own when they stop.
@@ -699,15 +704,26 @@ export function ChannelView({
      * they have written anything rather than after. It is a find rather than a
      * create where one already exists, which is why there is nothing here about
      * whether they have spoken before.
+     *
+     * That round trip is the reason for `opening`. Between the menu closing and
+     * the dialog appearing there was nothing on screen at all, so on a slow
+     * answer the item read as broken and got pressed again - which is a second
+     * conversation being asked for. It says who is being answered while it
+     * waits, and the second press does nothing until the first has landed.
      */
     const replyPrivately = useCallback(
         async (message: ChatMessageView) => {
             const authorId = message.authorId;
             if (!authorId) return;
+            if (opening.current) return;
+            opening.current = authorId;
+            setOpeningName(message.authorName ?? "them");
             const result = await runAction(
                 () => actions.openDirectAction({ userIds: [authorId] }),
                 setError
             );
+            opening.current = null;
+            setOpeningName(null);
             if (!result || result.error || !result.id) return;
             setAside({
                 message,
@@ -729,9 +745,21 @@ export function ChannelView({
      * keeps that from being frightening is that the room remembers whether this
      * browser was muted last time and joins that way - see `call-muted` - so
      * somebody who mutes once stays muted every time after.
+     *
+     * It never happens to somebody already in a call, wherever that call is.
+     * `enter` replaces whatever this browser was in, so walking in on sight
+     * would mean that opening a voice channel to see who is in it hangs up the
+     * conversation you are having - silently, with no press. While a call is
+     * held, the strip's button is the way in, and moving rooms stays deliberate.
      */
     useEffect(() => {
-        if (channel?.kind !== "voice" || callsOff || inCall) return;
+        if (channel?.kind !== "voice" || callsOff) return;
+        if (session) {
+            // Marked as walked into all the same, so hanging up while standing
+            // here does not then open a microphone nobody asked it to.
+            walkedIn.current = channelId;
+            return;
+        }
         if (walkedIn.current === channelId) return;
         walkedIn.current = channelId;
         setJoining(true);
@@ -747,7 +775,7 @@ export function ChannelView({
             enter({ meetingId: result.meetingId, channelId, title: callTitle }, false);
             checkCall();
         });
-    }, [callTitle, callsOff, channel?.kind, channelId, checkCall, enter, inCall]);
+    }, [callTitle, callsOff, channel?.kind, channelId, checkCall, enter, session]);
 
     const shown = useMemo(() => [...(messages ?? []), ...pending], [messages, pending]);
 
@@ -1193,6 +1221,13 @@ export function ChannelView({
                     </div>
 
                     <TypingLine typists={typists} viewerId={viewerId} />
+
+                    {openingName && (
+                        <p className="flex items-center gap-1.5 px-4 pb-1 text-xs text-muted-foreground">
+                            <Loader2 className="size-3 shrink-0 animate-spin" />
+                            Opening your conversation with {openingName}
+                        </p>
+                    )}
 
                     {error && (
                         <p role="alert" className="px-4 pb-1 text-xs text-danger">

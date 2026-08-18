@@ -324,6 +324,31 @@ describe("the automatic walk", () => {
         expect(driftAuto(state, clean, CAMERA_LADDER).level).toBe("medium");
     });
 
+    it("remembers the second rung that failed as well as the first", () => {
+        // Remembering only the highest was the metronome one rung down: 1080p
+        // fails, 720p fails, and then 720p is ordinary ground again - so the
+        // call climbed into it every minute, failed, and came back, for as long
+        // as it lasted. What is remembered is the lowest rung that failed.
+        let state = driftAuto(camera(), { connection: "excellent", limitation: "cpu" }, CAMERA_LADDER);
+        state = driftAuto(state, { connection: "excellent", limitation: "cpu" }, CAMERA_LADDER);
+        expect(state.level).toBe("medium");
+        expect(state.blocked).toBe("high");
+        for (let reading = 1; reading < HEALTHY_TO_RETRY; reading += 1) {
+            state = driftAuto(state, clean, CAMERA_LADDER);
+            expect(state.level).toBe("medium");
+        }
+        expect(driftAuto(state, clean, CAMERA_LADDER).level).toBe("high");
+    });
+
+    it("reads the picture quickly while the call is still finding its level", () => {
+        // The greedy start has to be paid for somewhere: opening at the top rung
+        // means a line that cannot carry it is stuttering until the walk down
+        // finishes, and at a quarter of a minute a rung that was three quarters
+        // of a minute. The settling window covers the whole ladder.
+        expect(quality.DRIFT_SETTLING_MS).toBeLessThan(quality.DRIFT_EVERY_MS);
+        expect(quality.DRIFT_SETTLING_READS).toBeGreaterThanOrEqual(LEVELS.length - 1);
+    });
+
     it("will not climb past the ceiling however long the line stays clean", () => {
         let state = camera();
         for (let reading = 0; reading < HEALTHY_TO_CLIMB * 4; reading += 1) {

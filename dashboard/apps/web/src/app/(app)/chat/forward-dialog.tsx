@@ -28,7 +28,7 @@
 
 import Fuse from "fuse.js";
 import { useChat } from "./chat-context";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { forwardAction } from "./actions";
 import { runAction } from "@/lib/run-action";
 import { Avatar, AvatarStack } from "@/components/avatar";
@@ -80,6 +80,27 @@ export function ForwardDialog({
     const [query, setQuery] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+
+    /**
+     * Nothing carried from the last time this was open.
+     *
+     * The dialog is not unmounted when it closes - `message` is what opens it,
+     * and the component stays there holding whatever was typed into it. So the
+     * reply meant for one person was still in the box, focused, when the next
+     * one opened, one press from being sent to somebody it was not about; and a
+     * forward cancelled with three conversations chosen offered to send the next
+     * message to those same three.
+     *
+     * Keyed on the message rather than only on closing, so a dialog reopened
+     * straight onto a different message starts clean as well.
+     */
+    useEffect(() => {
+        setChosen([]);
+        setNote("");
+        setQuery("");
+        setInside(null);
+        setError("");
+    }, [message?.id]);
 
     const open = useMemo(() => channels.filter((channel) => !channel.archived), [channels]);
 
@@ -178,10 +199,6 @@ export function ForwardDialog({
             setChosen(refused);
             return;
         }
-        setChosen([]);
-        setNote("");
-        setQuery("");
-        setInside(null);
         onOpenChange(false);
         onSent();
     };
