@@ -228,8 +228,13 @@ function parseExtra(raw: string | null): string[] {
  * the same way the local CA is: the dashboard is reachable on its local names either
  * way, so a dynamic directory that is missing (a dev run outside compose) must not turn
  * saving a domain into an error.
+ *
+ * @returns whether the edge was written. False is not an error to report - the caller
+ *   that saved a domain has nothing to do about it - but it is what lets startup try
+ *   again, and startup is where it matters: the call server's route goes out with this
+ *   one, and it is the only way a browser reaches the media server at all.
  */
-export async function syncDashboardRoute(): Promise<void> {
+export async function syncDashboardRoute(): Promise<boolean> {
     try {
         // Both reads, then one write. A failure to read the firewall rule is not
         // caught into a permissive default: writing the route without it would
@@ -255,8 +260,11 @@ export async function syncDashboardRoute(): Promise<void> {
         // instance. Imported here rather than at the top: that module reads this
         // one's hostnames.
         const { syncCallServerRoute } = await import("./chat/call-edge");
-        await syncCallServerRoute();
+        // Its answer is this function's answer: a dashboard route written beside a
+        // missing call route is an edge that serves every page and no call.
+        return await syncCallServerRoute();
     } catch (error) {
         console.error("polaris: publishing the dashboard route failed:", error instanceof Error ? error.message : error);
+        return false;
     }
 }

@@ -424,7 +424,7 @@ separate_shared_secrets() {
     target="$1"
     separate_secret "$target" POLARIS_CALL_SERVER_API_SECRET POLARIS_AUTH_SECRET
     separate_secret "$target" POLARIS_CRON_SECRET POLARIS_MASTER_KEY \
-        "POLARIS_CRON_SECRET changed: an outside scheduler calling /api/cron/* needs the new value from .env"
+        "POLARIS_CRON_SECRET changed: give the new value to whatever calls /api/cron/*. The value it held until now WAS this instance's POLARIS_MASTER_KEY, which encrypts every stored credential - rotating the cron secret does not retire that. Treat it as exposed wherever it was configured, and rotate the master key if it ever left this machine."
 }
 
 # Whether the web container is serving. Prefers the container healthcheck; on an

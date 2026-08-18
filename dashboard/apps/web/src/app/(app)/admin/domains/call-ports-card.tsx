@@ -115,7 +115,16 @@ export function CallPortsCard() {
                     ))}
                 </ul>
 
-                {reading.confirmed ? null : (
+                {/* Only when the router is the thing in the way. A stopped media
+                    server answers nothing on any port, and sending somebody into
+                    their router over that is an hour spent on a rule that was
+                    already right. */}
+                {!reading.running ? (
+                    <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                        The call server is not answering, so these ports carry nothing yet and
+                        cannot be checked. Chat settings says what it is doing.
+                    </p>
+                ) : reading.confirmed ? null : (
                     <div className="flex flex-col gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs">
                         <p className="font-medium text-foreground">
                             Calls only reach this network so far

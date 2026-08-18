@@ -59,15 +59,21 @@ export async function register(): Promise<void> {
     // Same for the dashboard's own public hostnames, which the compose labels cannot
     // carry: they are fixed at `up` time, so a domain configured afterwards would only
     // reach the edge again the next time it was saved.
+    //
+    // The call server's path goes out with them, from inside that same function:
+    // it rides these hostnames and carries their allowlist, so the two must not
+    // be written by two callers racing on one directory Traefik watches.
+    //
+    // Retried once, which neither of the others needs: both files are read from
+    // the database, and the one carrying the call route is the only way a browser
+    // can reach the media server at all - so a database that is still starting
+    // here means every call fails at the first WebSocket until somebody happens
+    // to save a domain. The same thirty seconds the guard resync waits.
     const { syncDashboardRoute } = await import("./lib/domain-edge");
-    void syncDashboardRoute();
-
-    // And the call server's path, for a stronger version of the same reason: it
-    // runs on the host's network, so there is no container address for the edge's
-    // label discovery to route to and this file is the only way it is reachable
-    // at all. Without it every call fails at the first WebSocket.
-    const { syncCallServerRoute } = await import("./lib/chat/call-edge");
-    void syncCallServerRoute();
+    void syncDashboardRoute().then((written) => {
+        if (written) return;
+        setTimeout(() => void syncDashboardRoute(), 30_000).unref();
+    });
 
     // Migrate any quick tunnel still forwarding straight to an app's port onto the edge,
     // so its traffic is logged (and future restarts leave an edge tunnel untouched).

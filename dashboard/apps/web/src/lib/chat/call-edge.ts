@@ -143,8 +143,13 @@ export function renderCallServerRoute(serve: boolean, guard?: CallRouteGuard): s
  * Publish it, or unpublish it. Idempotent, and best-effort in the same way the
  * dashboard's own route is: a dynamic directory that is missing is a dev run
  * outside compose, and it must not turn saving a setting into an error.
+ *
+ * @returns whether the route was written. Reported rather than swallowed because
+ *   this file is the whole of how a browser reaches the media server: a database
+ *   still starting when this first runs would otherwise leave no route at all,
+ *   and every call would fail at the WebSocket until somebody saved a domain.
  */
-export async function syncCallServerRoute(): Promise<void> {
+export async function syncCallServerRoute(): Promise<boolean> {
     try {
         const endpoint = await callServer();
         // Only for the server this stack runs. One somebody typed has an address
@@ -156,10 +161,12 @@ export async function syncCallServerRoute(): Promise<void> {
         const [hosts, waf] = await Promise.all([dashboardHosts(), resolvePolarisWaf()]);
         const guard = { hosts, allow: waf.allowLists[0] ?? [] };
         await writeFile(join(dynamicDir(), FILE), renderCallServerRoute(serve, guard), "utf8");
+        return true;
     } catch (error) {
         console.error(
             "polaris: publishing the call server route failed:",
             error instanceof Error ? error.message : error
         );
+        return false;
     }
 }
