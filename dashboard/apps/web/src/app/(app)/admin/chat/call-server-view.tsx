@@ -36,13 +36,7 @@ interface Settings {
     answering: boolean;
 }
 
-const NOTHING: Settings = {
-    url: "",
-    hasKey: false,
-    shipped: false,
-    ready: false,
-    answering: false
-};
+const NOTHING: Settings = { url: "", hasKey: false, shipped: false, ready: false, answering: false };
 
 export function CallServerView() {
     const [settings, setSettings] = useState<Settings | null>(null);
@@ -109,10 +103,7 @@ export function CallServerView() {
         setSaving(true);
         setSaved(false);
         setError(null);
-        const result = await runAction(
-            () => actions.setCallServerAction(url, key, secret),
-            setError
-        );
+        const result = await runAction(() => actions.setCallServerAction(url, key, secret), setError);
         setSaving(false);
         if (result?.error) {
             setError(result.error);
@@ -160,25 +151,22 @@ export function CallServerView() {
                                     : `Starting ${where}.`}
                         </p>
                         <p className="text-[11px] text-foreground-subtle">
-                            {!settings.ready ? (
-                                "Calls are off until there is one. Re-run the installer, or point this at a server you already run."
-                            ) : settings.answering ? (
-                                <>
-                                    Calls between devices on this network work now. For calls from
-                                    outside, two ports have to reach this machine -{" "}
-                                    <Link
-                                        href="/admin/domains"
-                                        className="text-primary hover:underline"
-                                    >
-                                        Domains
-                                    </Link>{" "}
-                                    lists them and reports when they answer.
-                                </>
-                            ) : waited ? (
-                                "It has had a couple of minutes and has not come up. Check the `livekit` container on this machine."
-                            ) : (
-                                "It comes up a few seconds after the stack does."
-                            )}
+                            {!settings.ready
+                                ? "Calls are off until there is one. Re-run the installer, or point this at a server you already run."
+                                : settings.answering ? (
+                                      <>
+                                          Calls between devices on this network work now. For calls
+                                          from outside, two ports have to reach this machine -{" "}
+                                          <Link href="/admin/domains" className="text-primary hover:underline">
+                                              Domains
+                                          </Link>{" "}
+                                          lists them and reports when they answer.
+                                      </>
+                                  ) : waited ? (
+                                      "It has had a couple of minutes and has not come up. Check the `livekit` container on this machine."
+                                  ) : (
+                                      "It comes up a few seconds after the stack does."
+                                  )}
                         </p>
                         {waited ? (
                             <Button
@@ -199,9 +187,9 @@ export function CallServerView() {
                         // rather than left to be discovered on a call that keeps
                         // going through the shipped server.
                         <p className="text-[11px] text-warning">
-                            This deployment names a call server in its own configuration, so calls
-                            go there and the address below is not in use. Clear
-                            POLARIS_CALL_SERVER_URL in .env to use this one instead.
+                            This deployment names a call server in its own configuration, so calls go
+                            there and the address below is not in use. Clear POLARIS_CALL_SERVER_URL
+                            in .env to use this one instead.
                         </p>
                     ) : null}
 
@@ -249,15 +237,11 @@ export function CallServerView() {
                                     type="password"
                                     autoComplete="off"
                                     aria-label="Call server secret"
-                                    placeholder={
-                                        settings.hasKey ? "Stored. Type to replace it." : "Paste it"
-                                    }
+                                    placeholder={settings.hasKey ? "Stored. Type to replace it." : "Paste it"}
                                 />
                             </label>
                             <Button variant="secondary" onClick={save} disabled={saving}>
-                                {saving ? (
-                                    <Loader2 className="size-4 shrink-0 animate-spin" />
-                                ) : null}
+                                {saving ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                                 Save
                             </Button>
                             {saved ? (

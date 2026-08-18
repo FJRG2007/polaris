@@ -247,7 +247,9 @@ export function CallRoom({
                     they are watching, so there is no reason to allow only one. */}
             {(live?.startsWith("camera:")
                 ? []
-                : [...call.screens].filter(([personId]) => !live || live === `screen:${personId}`)
+                : [...call.screens].filter(
+                      ([personId]) => !live || live === `screen:${personId}`
+                  )
             ).map(([personId, stream]) => (
                 <div key={personId} className="min-h-0 flex-[2]">
                     <Tile
@@ -713,8 +715,7 @@ function Tile({
     }, []);
 
     const toggleFull = () => {
-        if (document.fullscreenElement === frame.current)
-            void document.exitFullscreen().catch(() => undefined);
+        if (document.fullscreenElement === frame.current) void document.exitFullscreen().catch(() => undefined);
         else void frame.current?.requestFullscreen().catch(() => undefined);
     };
 
@@ -887,11 +888,7 @@ function Tile({
                             title={focused ? "Back to the grid" : "Make this bigger"}
                             className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
                         >
-                            {focused ? (
-                                <Shrink className="size-3.5" />
-                            ) : (
-                                <Expand className="size-3.5" />
-                            )}
+                            {focused ? <Shrink className="size-3.5" /> : <Expand className="size-3.5" />}
                         </button>
                     )}
                     <button
@@ -901,11 +898,7 @@ function Tile({
                         title={full ? "Leave full screen" : "Full screen"}
                         className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
                     >
-                        {full ? (
-                            <Minimize2 className="size-3.5" />
-                        ) : (
-                            <Maximize2 className="size-3.5" />
-                        )}
+                        {full ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
                     </button>
                 </span>
             )}

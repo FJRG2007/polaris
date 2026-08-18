@@ -16,522 +16,521 @@
 name: polaris
 
 services:
-    postgres:
-        image: postgres:16-alpine
-        restart: unless-stopped
-        environment:
-            POSTGRES_USER: ${POSTGRES_USER:-polaris}
-            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-            POSTGRES_DB: ${POSTGRES_DB:-polaris}
-        volumes:
-            - polaris-postgres:/var/lib/postgresql/data
-        healthcheck:
-            test:
-                ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-polaris} -d ${POSTGRES_DB:-polaris}"]
-            interval: 5s
-            timeout: 5s
-            retries: 10
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-polaris}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-polaris}
+    volumes:
+      - polaris-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-polaris} -d ${POSTGRES_DB:-polaris}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
-    web:
-        # Prebuilt image (release workflow) with a local-build fallback for dev.
-        image: ghcr.io/fjrg2007/polaris-dashboard:${POLARIS_IMAGE_TAG:-latest}
-        build:
-            context: ..
-            dockerfile: docker/Dockerfile
-            args:
-                # Baked into the image as POLARIS_BUILD_SHA so the running build reports the
-                # exact commit it came from. The updater sets this when it builds from source
-                # at HEAD, so a local build clears "update available" just like a CI build.
-                POLARIS_BUILD_SHA: ${POLARIS_BUILD_SHA:-}
-        # Normally re-pull the tag so `up`/`start` never runs a stale cached image; the
-        # tag tracks releases, so freshness matters more than an offline start. The
-        # updater overrides this to `never` for a deterministic source build at HEAD, so
-        # `up` uses the image it just built instead of a registry `latest` that lags it.
-        pull_policy: ${POLARIS_WEB_PULL_POLICY:-always}
-        restart: unless-stopped
-        env_file:
-            - .env
-        environment:
-            # Trust the local-network names for auth; kept in sync with the mdns service.
-            POLARIS_LOCAL_HOSTNAME: ${POLARIS_MDNS_HOSTNAME:-polaris}
-            # The address the edge dials a deployed app's published port on. The host as
-            # seen from inside the Docker network, not the LAN address it happens to hold:
-            # a lease that changes, or a wireless link that drops, must not turn every
-            # deployed domain into a 502. Traefik and the edge guard resolve this name
-            # through the same `host-gateway` entry they are given below - they are
-            # configured from this file, so the name and the resolver ship together.
-            POLARIS_APP_DIAL_HOST: ${POLARIS_APP_DIAL_HOST:-host.docker.internal}
-            # Where the Minecraft routing table is written for mc-router to watch, and the
-            # port it answers on - the dashboard checks that something is listening there
-            # before it takes a server's own port away, so the two have to agree.
-            POLARIS_MC_ROUTES_DIR: /mc-routes
-            POLARIS_MC_ROUTER_PORT: ${POLARIS_MC_ROUTER_PORT:-25565}
-        # Traefik routes the dashboard by these labels (discovered on the default
-        # network). The dashboard answers only on its own names - the local names, an
-        # optional public domain, and any address of the machine itself - so an unknown
-        # *name* (e.g. a random sslip.io subdomain) still 404s at the edge instead of
-        # leaking the control plane.
-        #
-        # Addresses are matched by shape rather than listed, because listing them was
-        # wrong the moment the machine had two. POLARIS_PUBLIC_IP is captured once at
-        # install, so a box that also answers on a second interface - a bridge beside
-        # the wifi, a VPN, a new lease - 404s the whole dashboard on that address with
-        # nothing to say why. A bare IPv4 literal in the Host header means somebody
-        # reached this machine directly on a network they are already on, which is the
-        # case the named list was meant to cover and kept missing. It is not the case
-        # the list exists to refuse: a hostname that resolves here is still refused
-        # unless it is named, so `1.2.3.4.sslip.io` does not match this.
-        #
-        # TLS on :443 (Traefik's default self-signed cert for the local names, or a
-        # Let's Encrypt cert for a public domain), with :80 redirected to https.
-        labels:
-            # Marks this as the only container the edge's docker provider routes.
-            - "polaris.role=edge"
-            - "traefik.enable=true"
-            - "traefik.docker.network=polaris_default"
-            - "traefik.http.routers.polaris-web.rule=Host(`polaris`) || Host(`polaris.local`) || Host(`${POLARIS_PUBLIC_IP:-127.0.0.1}`) || Host(`${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`) || HostRegexp(`^[0-9]{1,3}(\\.[0-9]{1,3}){3}$$`)"
-            - "traefik.http.routers.polaris-web.entrypoints=websecure"
-            - "traefik.http.routers.polaris-web.tls=true"
-            # Lowest, and stated rather than left to work itself out. Unset, Traefik
-            # ranks routers by the LENGTH of their rule - and this rule is 136
-            # characters of hostnames, which quietly outranks every path router in
-            # the deployment. It matches any path on these names, so it was taking
-            # `/livekit` and `/api/deploy/ws` on the local hostnames and handing them
-            # to the dashboard: a call that could not open its socket, and a terminal
-            # that would not connect, on exactly the addresses used from the sofa.
-            # This one is the catch-all and belongs underneath all of them.
-            - "traefik.http.routers.polaris-web.priority=10"
-            # The container exposes two services (dashboard + WS sidecar), so every
-            # router must name its service explicitly - Traefik will not auto-link.
-            - "traefik.http.routers.polaris-web.service=polaris-web"
-            - "traefik.http.services.polaris-web.loadbalancer.server.port=3000"
-            - "traefik.http.routers.polaris-web-http.rule=Host(`polaris`) || Host(`polaris.local`) || Host(`${POLARIS_PUBLIC_IP:-127.0.0.1}`) || Host(`${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`) || HostRegexp(`^[0-9]{1,3}(\\.[0-9]{1,3}){3}$$`)"
-            - "traefik.http.routers.polaris-web-http.entrypoints=web"
-            - "traefik.http.routers.polaris-web-http.service=polaris-web"
-            - "traefik.http.routers.polaris-web-http.priority=10"
-            - "traefik.http.routers.polaris-web-http.middlewares=polaris-redirect-https"
-            - "traefik.http.middlewares.polaris-redirect-https.redirectscheme.scheme=https"
-            # The interactive-terminal WebSocket sidecar listens on a separate port.
-            - "traefik.http.routers.polaris-ws.rule=PathPrefix(`/api/deploy/ws`)"
-            - "traefik.http.routers.polaris-ws.entrypoints=websecure"
-            - "traefik.http.routers.polaris-ws.tls=true"
-            - "traefik.http.routers.polaris-ws.service=polaris-ws"
-            - "traefik.http.routers.polaris-ws.priority=100"
-            - "traefik.http.services.polaris-ws.loadbalancer.server.port=${POLARIS_WS_PORT:-3001}"
-        depends_on:
-            postgres:
-                condition: service_healthy
-        # Default network (edge routing + database) plus the dedicated hub network, so a
-        # locally-installed messaging bridge - deployed as its own compose stack - can
-        # POST inbound events to the web by service DNS (http://web:3000). Edge labels
-        # still reference polaris_default, so routing is unchanged.
-        networks:
-            - default
-            - polaris-hub
-        # Resolve the host from inside the container so the Docker-over-SSH connector
-        # can reach the host Engine at host.docker.internal on Linux too.
-        extra_hosts:
-            - "host.docker.internal:host-gateway"
-        volumes:
-            # Socket + token shared with the daemon (populated only in the full edition).
-            - polaris-run:/run/polaris
-            # The host's LAN address, published by the mDNS responder. Read-only: only
-            # the responder can see that address, and only it should write it.
-            - polaris-hostip:/run/polaris-host:ro
-            # Container-local storage and upload scratch (POLARIS_DATA_DIR).
-            - polaris-data:/var/lib/polaris
-            # Traefik dynamic-config dir the dashboard writes deployed-app routes into.
-            - polaris-traefik-dynamic:/dynamic
-            # Traefik's per-request access log, read by the HTTP Logs view and by the
-            # firewall's jails (read-only).
-            - polaris-traefik-log:/traefik-log:ro
-            # The firewall's address snapshot - bans, Tor exits, flagged addresses - which
-            # the dashboard writes and the edge guard reads. Its own volume rather than the
-            # dynamic dir: Traefik parses every .json it finds there as a route config.
-            - polaris-edge-intel:/edge-intel
-            # Minecraft hostname routes, written here and watched by mc-router. Its own
-            # volume for the same reason as the one above: Traefik reads every .json in
-            # the dynamic dir, and this is not one of its routes.
-            - polaris-mc-routes:/mc-routes
-            # Dedicated SSH key + pinned known_hosts for the Docker connector, mounted
-            # read-only. Populated by `install.sh --ssh`; empty (and ignored) otherwise.
-            # Absolute host path so the mount is correct even when compose runs inside the
-            # self-update container (POLARIS_HOST_REPO is the true host repo root); the
-            # `../..` default resolves to the repo root for a direct host run.
-            - ${POLARIS_HOST_REPO:-../..}/dashboard/docker/secrets/ssh:/run/polaris-ssh:ro
-            # NAS mount root. The daemon mounts SMB/NFS shares here in the host
-            # namespace; `rslave` is what makes those mounts appear inside this
-            # container, so Drive and the volume browser read a share through the
-            # kernel mount instead of opening a userspace SMB session per call.
-            # Without it the path exists but is empty, or missing entirely.
-            - type: bind
-              source: /mnt/polaris
-              target: /mnt/polaris
-              bind:
-                  propagation: rslave
-                  create_host_path: true
-        # Not published to the host: Caddy is the only public entry point.
-        expose:
-            - "3000"
-        # Readiness: 200 from /api/health means the app is serving AND its database
-        # answers. start_period covers first-boot migrations so they do not count as
-        # failures. `polaris status` and the installer's post-deploy check read this.
-        healthcheck:
-            test:
-                - "CMD-SHELL"
-                - 'node -e "fetch(''http://127.0.0.1:3000/api/health'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"'
-            interval: 15s
-            timeout: 5s
-            retries: 5
-            start_period: 60s
-
-    # --- Call server ----------------------------------------------------------
-    # Chat's calls, carried by LiveKit. Part of the default stack rather than
-    # something an administrator installs later: a call server that has to be
-    # switched on is a call server that is off on every fresh install, and what
-    # that looks like to the two people trying to talk is a call that connects to
-    # silence with no explanation either of them can act on.
+  web:
+    # Prebuilt image (release workflow) with a local-build fallback for dev.
+    image: ghcr.io/fjrg2007/polaris-dashboard:${POLARIS_IMAGE_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        # Baked into the image as POLARIS_BUILD_SHA so the running build reports the
+        # exact commit it came from. The updater sets this when it builds from source
+        # at HEAD, so a local build clears "update available" just like a CI build.
+        POLARIS_BUILD_SHA: ${POLARIS_BUILD_SHA:-}
+    # Normally re-pull the tag so `up`/`start` never runs a stale cached image; the
+    # tag tracks releases, so freshness matters more than an offline start. The
+    # updater overrides this to `never` for a deterministic source build at HEAD, so
+    # `up` uses the image it just built instead of a registry `latest` that lags it.
+    pull_policy: ${POLARIS_WEB_PULL_POLICY:-always}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Trust the local-network names for auth; kept in sync with the mdns service.
+      POLARIS_LOCAL_HOSTNAME: ${POLARIS_MDNS_HOSTNAME:-polaris}
+      # The address the edge dials a deployed app's published port on. The host as
+      # seen from inside the Docker network, not the LAN address it happens to hold:
+      # a lease that changes, or a wireless link that drops, must not turn every
+      # deployed domain into a 502. Traefik and the edge guard resolve this name
+      # through the same `host-gateway` entry they are given below - they are
+      # configured from this file, so the name and the resolver ship together.
+      POLARIS_APP_DIAL_HOST: ${POLARIS_APP_DIAL_HOST:-host.docker.internal}
+      # Where the Minecraft routing table is written for mc-router to watch, and the
+      # port it answers on - the dashboard checks that something is listening there
+      # before it takes a server's own port away, so the two have to agree.
+      POLARIS_MC_ROUTES_DIR: /mc-routes
+      POLARIS_MC_ROUTER_PORT: ${POLARIS_MC_ROUTER_PORT:-25565}
+    # Traefik routes the dashboard by these labels (discovered on the default
+    # network). The dashboard answers only on its own names - the local names, an
+    # optional public domain, and any address of the machine itself - so an unknown
+    # *name* (e.g. a random sslip.io subdomain) still 404s at the edge instead of
+    # leaking the control plane.
     #
-    # Each browser sends its microphone here once and receives everybody else's
-    # back, so four people are four uploads rather than the twelve connections a
-    # browser-to-browser call would hold. Polaris signs a ticket for one room, for
-    # a few minutes, per person; the signing key never leaves the two of them.
-    livekit:
-        # Pinned to the minor series, as Traefik is: patches arrive, a version that
-        # changes how the thing is configured does not arrive on its own.
-        image: livekit/livekit-server:v1.13
-        restart: unless-stopped
-        # On the host's network, and that is the whole job of this container.
-        #
-        # What a media server does is hand each browser an address to send audio to.
-        # On a bridged network the only addresses it has are the daemon's own
-        # (172.x), which no browser anywhere can reach - not from another house and
-        # not from the sofa. Publishing the ports does not help: the port is
-        # reachable, and the address the server advertised inside its handshake is
-        # still one that goes nowhere. The call then connects, shows everybody's
-        # name, and carries no sound, which is exactly the failure people report.
-        #
-        # Here it sees the machine's real interfaces, so it offers browsers the LAN
-        # address - which every device in the house can already reach, with no
-        # router rule - and, once discovery confirms it, the public one as well.
-        network_mode: host
-        environment:
-            # `name: secret`, which is the shape the server reads. The dashboard signs
-            # with the same pair, from the same .env, so there is one copy of it.
-            # Deliberately not `:?` - a missing value must fail this container alone,
-            # not refuse to start the dashboard along with it.
-            LIVEKIT_KEYS: "${POLARIS_CALL_SERVER_API_KEY:-polaris}: ${POLARIS_CALL_SERVER_API_SECRET:-}"
-            # Held here rather than in a mounted file: one place to read, and nothing
-            # to keep in step with a host path that moves during a self-update.
-            LIVEKIT_CONFIG: |
-                port: 7880
-                rtc:
-                  # One TCP and one UDP port rather than the ten-thousand-port range
-                  # LiveKit defaults to. A range that size is a nuisance to open on a
-                  # router, and one port carries every call this is going to hold.
-                  # TCP is the fallback that gets through the networks UDP cannot:
-                  # the browser dials out to it, so a restrictive NAT on the caller's
-                  # side is not in the way. It is why there is no TURN relay here.
-                  tcp_port: 7881
-                  udp_port: 7882
-                  # Find the public address by asking a STUN server. One request at
-                  # startup, never in the path of a call, and it is the only way the
-                  # server can learn the address on the far side of the router - which
-                  # is the address it has to hand to anybody calling in from outside.
-                  #
-                  # It is also a dependency worth naming: with no route to the internet
-                  # the server refuses to start, and calls are off until there is one.
-                  # That is the honest failure - it restarts by itself when the line
-                  # comes back, and Chat says calls are unavailable in the meantime
-                  # rather than offering one that would carry nothing.
-                  use_external_ip: true
-                  # Offer the local addresses as well as the public one. A call between
-                  # two devices in the same house then never leaves it, which is both
-                  # faster and the case that has to work before anybody has been near a
-                  # router. Without this the only address on offer is the public one,
-                  # and every call in the house goes out to the router and back - if it
-                  # comes back at all.
-                  advertise_internal_ip: true
-                logging:
-                  level: info
-
-    # Legacy edge, kept behind the `caddy` profile for rollback. Traefik is the
-    # default edge now (automatic HTTPS for every site); to fall back, stop traefik
-    # and run `docker compose --profile caddy --profile full up -d caddy`.
-    caddy:
-        profiles: ["caddy"]
-        image: caddy:2-alpine
-        restart: unless-stopped
-        depends_on:
-            - web
-        environment:
-            # Public site address (domain, or :443 / :80 for IP-only setups).
-            POLARIS_SITE_ADDRESS: ${POLARIS_SITE_ADDRESS:-:80}
-        ports:
-            - "80:80"
-            - "443:443"
-            - "443:443/udp"
-        volumes:
-            # Absolute host path (see the hostd ssh mount note) so caddy's Caddyfile mount
-            # survives a self-update, where compose runs from the container path /polaris.
-            - ${POLARIS_HOST_REPO:-../..}/dashboard/docker/Caddyfile:/etc/caddy/Caddyfile:ro
-            - polaris-caddy-data:/data
-            - polaris-caddy-config:/config
-
-    # --- Local network discovery (polaris.local) ------------------------------
-    # Advertises polaris.local over mDNS, the way Home Assistant publishes
-    # homeassistant.local. Needs the host network because multicast does not cross
-    # a bridged docker network (works on Linux/WSL; Docker Desktop restricts host
-    # networking, where the installer's hosts entry covers the local machine).
-    mdns:
-        image: ghcr.io/fjrg2007/polaris-mdns:${POLARIS_IMAGE_TAG:-latest}
-        build:
-            context: ../mdns
-        pull_policy: always
-        network_mode: host
-        restart: unless-stopped
-        environment:
-            POLARIS_MDNS_HOSTNAME: ${POLARIS_MDNS_HOSTNAME:-polaris}
-            POLARIS_MDNS_PORT: ${POLARIS_MDNS_PORT:-80}
-        volumes:
-            # On the host network, so this is the only service that can see the LAN
-            # address; it writes it here for the dashboard, which needs it to say what
-            # a port forward should point at. Its own volume, never polaris-run: that
-            # one carries the host daemon's socket and bearer token, and this process
-            # parses unsolicited multicast from the whole network.
-            - polaris-hostip:/run/polaris-host
-
-    # --- Full edition ---------------------------------------------------------
-    # Privileged host daemon. Runs the static musl `polaris-hostd` binary and
-    # brokers host access for the web container over the shared unix socket:
-    # native mounts, host filesystem, the allowlisted Docker proxy, and in-band
-    # updates. Kept in the `full` profile; the installer enables that profile by
-    # default (opt out with `install.sh --limited`), so a bare `docker compose up`
-    # without the profile still starts only the sandboxed services.
-    hostd:
-        profiles: ["full"]
-        image: ghcr.io/fjrg2007/polaris-hostd:${POLARIS_IMAGE_TAG:-latest}
-        # Build from the Rust workspace when the published image is unavailable
-        # (offline, or before the registry has it). Context is the repo root.
-        build:
-            context: ../..
-            dockerfile: crates/polaris-hostd/Dockerfile
-        pull_policy: always
-        restart: unless-stopped
-        # Required for kernel mounts (SMB/NFS) and host filesystem access.
-        privileged: true
-        environment:
-            POLARIS_HOSTD_SOCKET: /run/polaris/hostd.sock
-            POLARIS_HOSTD_TOKEN_FILE: /run/polaris/hostd.token
-            # Auto-update: mirrors the app's master switch. The command is written by
-            # the installer with the host repo path baked in; unset -> /v1/update 501.
-            POLARIS_HOSTD_AUTOUPDATE: ${POLARIS_AUTO_UPDATE:-true}
-            POLARIS_HOSTD_UPDATE_CMD: ${POLARIS_HOSTD_UPDATE_CMD:-}
-        volumes:
-            # Same socket/token volume the web container reads.
-            - polaris-run:/run/polaris
-            # Docker control for the container-management app.
-            - /var/run/docker.sock:/var/run/docker.sock
-            # Mount root, shared so mounts the daemon creates propagate to the host.
-            - type: bind
-              source: /mnt/polaris
-              target: /mnt/polaris
-              bind:
-                  propagation: rshared
-
-    # --- Edge proxy -----------------------------------------------------------
-    # Traefik is the single edge for both the dashboard and deployed apps. It binds
-    # 80/443 and discovers every service by its container labels: the dashboard (on
-    # the default network) and deployed apps (on the shared `polaris-proxy`
-    # network). TLS is automatic - Let's Encrypt (HTTP-01) for public domains, a
-    # self-signed default cert for the local names and free sslip.io subdomains -
-    # and :80 redirects to https. An unknown host 404s instead of falling through
-    # to the dashboard. Set POLARIS_ACME_EMAIL for Let's Encrypt. The same Traefik
-    # is installed on remote servers by the Deploy onboarding script.
-    # v3.6+ auto-negotiates the Docker API version. Newer Docker Engines (28/29)
-    # raised the minimum API version and reject Traefik's old 1.24 default, so an
-    # older Traefik discovers no services; the pinned DOCKER_API_VERSION is a
-    # belt-and-suspenders floor the daemon accepts.
-    traefik:
-        image: traefik:v3.6
-        restart: unless-stopped
-        environment:
-            DOCKER_API_VERSION: "1.44"
-        depends_on:
-            - web
-        command:
-            - "--providers.docker=true"
-            - "--providers.docker.exposedbydefault=false"
-            - "--providers.docker.network=polaris-proxy"
-            # The docker provider only routes the dashboard (labelled polaris.role=edge);
-            # deployed-app domains are served from the file provider below, so a
-            # label-less or manually-run app container still routes. Remote servers run
-            # their own Traefik without this constraint and route apps by their labels.
-            - "--providers.docker.constraints=Label(`polaris.role`,`edge`)"
-            # Deployed-app routes, regenerated by the dashboard and hot-reloaded here.
-            - "--providers.file.directory=/dynamic"
-            - "--providers.file.watch=true"
-            # Per-request access logs (JSON) the dashboard's HTTP Logs view reads, so
-            # they work for ANY app - even one (e.g. a Next.js server) that writes no
-            # access logs of its own. Logged at the edge, like Railway.
-            - "--accesslog=true"
-            - "--accesslog.format=json"
-            - "--accesslog.filepath=/var/log/traefik/access.log"
-            - "--entrypoints.web.address=:80"
-            - "--entrypoints.websecure.address=:443"
-            - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
-            - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-            - "--certificatesresolvers.letsencrypt.acme.email=${POLARIS_ACME_EMAIL:-admin@example.com}"
-            - "--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json"
-        ports:
-            - "80:80"
-            - "443:443"
-        volumes:
-            - /var/run/docker.sock:/var/run/docker.sock:ro
-            - polaris-traefik:/traefik
-            - polaris-traefik-dynamic:/dynamic:ro
-            - polaris-traefik-log:/var/log/traefik
-        networks:
-            - default
-            - polaris-proxy
-        # An app's route dials it on its published host port, so the edge has to be able
-        # to reach the host from inside the network. By this name rather than by the box's
-        # LAN address: that one is detected once and stored, and when the lease moves or
-        # the interface it was read from goes down, every deployed domain answers 502 with
-        # a healthy container behind it. POLARIS_APP_DIAL_HOST (on `web`) is the name
-        # written into those routes.
-        extra_hosts:
-            - "host.docker.internal:host-gateway"
-
-    # Co-located WAF sentinel. Traefik forwardAuths to it for the deploy denylist and
-    # require-login controls; it holds no rule state (rules arrive per request in a
-    # header Traefik stamps on) and verifies login tokens offline, so it keeps
-    # enforcing if the Polaris control plane is down. Aliased to the name the generated
-    # forwardAuth address uses, on both networks that address it (see below); never
-    # published to the host. Idle when no app has a denylist/require-login rule.
+    # Addresses are matched by shape rather than listed, because listing them was
+    # wrong the moment the machine had two. POLARIS_PUBLIC_IP is captured once at
+    # install, so a box that also answers on a second interface - a bridge beside
+    # the wifi, a VPN, a new lease - 404s the whole dashboard on that address with
+    # nothing to say why. A bare IPv4 literal in the Host header means somebody
+    # reached this machine directly on a network they are already on, which is the
+    # case the named list was meant to cover and kept missing. It is not the case
+    # the list exists to refuse: a hostname that resolves here is still refused
+    # unless it is named, so `1.2.3.4.sslip.io` does not match this.
     #
-    # Build-only, exactly like the mdns sidecar: with no `image`, `docker compose pull`
-    # skips it instead of trying - and failing - to fetch an unpublished image, which
-    # would otherwise flip the whole update onto the slow (and failure-prone) build-
-    # from-source path. It is built once on first `up`; a later release that changes it
-    # will ship a published image so updates pull it (see the WAF follow-up notes).
-    edge-guard:
-        # Published like every other sidecar, and pinned to the same tag as the dashboard.
-        # It was build-only, which meant `update.sh` never replaced it: compose reuses an
-        # image it already built, so the guard stayed frozen at install time while the
-        # dashboard advanced past it - and a route the newer dashboard pointed at the
-        # guard's proxy port reached a container that had no such listener (502).
-        image: ghcr.io/fjrg2007/polaris-edge-guard:${POLARIS_IMAGE_TAG:-latest}
-        build:
-            context: ..
-            dockerfile: services/edge-guard/Dockerfile
-        restart: unless-stopped
-        environment:
-            POLARIS_AUTH_SECRET: ${POLARIS_AUTH_SECRET:?POLARIS_AUTH_SECRET is required}
-            # Where the guard sends visitors to sign in for require-login routes.
-            POLARIS_PUBLIC_URL: ${POLARIS_PUBLIC_URL:-https://polaris.local}
-            # Bans, Tor exits and flagged addresses, held in memory and re-read only when
-            # the file changes - so enforcing one costs a map lookup, never a query.
-            POLARIS_EDGE_INTEL_FILE: /edge-intel/waf-intel.json
-        volumes:
-            - polaris-edge-intel:/edge-intel:ro
-        networks:
-            # Both networks, under the same alias, because two different callers address it
-            # by that one name. Traefik reaches it from the proxy network, where the routers
-            # it generates point their forwardAuth and their vacant-page service. The control
-            # plane reaches it from the default network, where it asks - before writing those
-            # routers - whether this container is new enough to serve the pages they name.
-            #
-            # Without the second entry that question can never be answered: the web container
-            # is not on the proxy network (deliberately - deployed apps live there, and the
-            # control plane has no business being addressable from them), so the probe failed
-            # to connect and was read as "too old". Every install therefore wrote no vacant
-            # routers and no error page, and served the edge's bare 404 and Bad Gateway
-            # instead. The guard only listens, so joining the control plane's own network
-            # exposes nothing further to anything deployed.
-            default:
-                aliases:
-                    - polaris-edge-guard
-            polaris-proxy:
-                aliases:
-                    - polaris-edge-guard
-        # A route whose response the guard rewrites dials the app through this container,
-        # so it needs the same way to reach the host that Traefik does.
-        extra_hosts:
-            - "host.docker.internal:host-gateway"
+    # TLS on :443 (Traefik's default self-signed cert for the local names, or a
+    # Let's Encrypt cert for a public domain), with :80 redirected to https.
+    labels:
+      # Marks this as the only container the edge's docker provider routes.
+      - "polaris.role=edge"
+      - "traefik.enable=true"
+      - "traefik.docker.network=polaris_default"
+      - "traefik.http.routers.polaris-web.rule=Host(`polaris`) || Host(`polaris.local`) || Host(`${POLARIS_PUBLIC_IP:-127.0.0.1}`) || Host(`${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`) || HostRegexp(`^[0-9]{1,3}(\\.[0-9]{1,3}){3}$$`)"
+      - "traefik.http.routers.polaris-web.entrypoints=websecure"
+      - "traefik.http.routers.polaris-web.tls=true"
+      # Lowest, and stated rather than left to work itself out. Unset, Traefik
+      # ranks routers by the LENGTH of their rule - and this rule is 136
+      # characters of hostnames, which quietly outranks every path router in
+      # the deployment. It matches any path on these names, so it was taking
+      # `/livekit` and `/api/deploy/ws` on the local hostnames and handing them
+      # to the dashboard: a call that could not open its socket, and a terminal
+      # that would not connect, on exactly the addresses used from the sofa.
+      # This one is the catch-all and belongs underneath all of them.
+      - "traefik.http.routers.polaris-web.priority=10"
+      # The container exposes two services (dashboard + WS sidecar), so every
+      # router must name its service explicitly - Traefik will not auto-link.
+      - "traefik.http.routers.polaris-web.service=polaris-web"
+      - "traefik.http.services.polaris-web.loadbalancer.server.port=3000"
+      - "traefik.http.routers.polaris-web-http.rule=Host(`polaris`) || Host(`polaris.local`) || Host(`${POLARIS_PUBLIC_IP:-127.0.0.1}`) || Host(`${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`) || HostRegexp(`^[0-9]{1,3}(\\.[0-9]{1,3}){3}$$`)"
+      - "traefik.http.routers.polaris-web-http.entrypoints=web"
+      - "traefik.http.routers.polaris-web-http.service=polaris-web"
+      - "traefik.http.routers.polaris-web-http.priority=10"
+      - "traefik.http.routers.polaris-web-http.middlewares=polaris-redirect-https"
+      - "traefik.http.middlewares.polaris-redirect-https.redirectscheme.scheme=https"
+      # The interactive-terminal WebSocket sidecar listens on a separate port.
+      - "traefik.http.routers.polaris-ws.rule=PathPrefix(`/api/deploy/ws`)"
+      - "traefik.http.routers.polaris-ws.entrypoints=websecure"
+      - "traefik.http.routers.polaris-ws.tls=true"
+      - "traefik.http.routers.polaris-ws.service=polaris-ws"
+      - "traefik.http.routers.polaris-ws.priority=100"
+      - "traefik.http.services.polaris-ws.loadbalancer.server.port=${POLARIS_WS_PORT:-3001}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Default network (edge routing + database) plus the dedicated hub network, so a
+    # locally-installed messaging bridge - deployed as its own compose stack - can
+    # POST inbound events to the web by service DNS (http://web:3000). Edge labels
+    # still reference polaris_default, so routing is unchanged.
+    networks:
+      - default
+      - polaris-hub
+    # Resolve the host from inside the container so the Docker-over-SSH connector
+    # can reach the host Engine at host.docker.internal on Linux too.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # Socket + token shared with the daemon (populated only in the full edition).
+      - polaris-run:/run/polaris
+      # The host's LAN address, published by the mDNS responder. Read-only: only
+      # the responder can see that address, and only it should write it.
+      - polaris-hostip:/run/polaris-host:ro
+      # Container-local storage and upload scratch (POLARIS_DATA_DIR).
+      - polaris-data:/var/lib/polaris
+      # Traefik dynamic-config dir the dashboard writes deployed-app routes into.
+      - polaris-traefik-dynamic:/dynamic
+      # Traefik's per-request access log, read by the HTTP Logs view and by the
+      # firewall's jails (read-only).
+      - polaris-traefik-log:/traefik-log:ro
+      # The firewall's address snapshot - bans, Tor exits, flagged addresses - which
+      # the dashboard writes and the edge guard reads. Its own volume rather than the
+      # dynamic dir: Traefik parses every .json it finds there as a route config.
+      - polaris-edge-intel:/edge-intel
+      # Minecraft hostname routes, written here and watched by mc-router. Its own
+      # volume for the same reason as the one above: Traefik reads every .json in
+      # the dynamic dir, and this is not one of its routes.
+      - polaris-mc-routes:/mc-routes
+      # Dedicated SSH key + pinned known_hosts for the Docker connector, mounted
+      # read-only. Populated by `install.sh --ssh`; empty (and ignored) otherwise.
+      # Absolute host path so the mount is correct even when compose runs inside the
+      # self-update container (POLARIS_HOST_REPO is the true host repo root); the
+      # `../..` default resolves to the repo root for a direct host run.
+      - ${POLARIS_HOST_REPO:-../..}/dashboard/docker/secrets/ssh:/run/polaris-ssh:ro
+      # NAS mount root. The daemon mounts SMB/NFS shares here in the host
+      # namespace; `rslave` is what makes those mounts appear inside this
+      # container, so Drive and the volume browser read a share through the
+      # kernel mount instead of opening a userspace SMB session per call.
+      # Without it the path exists but is empty, or missing entirely.
+      - type: bind
+        source: /mnt/polaris
+        target: /mnt/polaris
+        bind:
+          propagation: rslave
+          create_host_path: true
+    # Not published to the host: Caddy is the only public entry point.
+    expose:
+      - "3000"
+    # Readiness: 200 from /api/health means the app is serving AND its database
+    # answers. start_period covers first-boot migrations so they do not count as
+    # failures. `polaris status` and the installer's post-deploy check read this.
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "node -e \"fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
-    # --- Minecraft hostname routing -------------------------------------------
-    # One port for every Java server. A Java client puts the address it was given
-    # into the handshake, before login and before anything is encrypted, so a router
-    # reading that field can send each connection to the right server: every world
-    # answers on 25565 under its own name, with no port for a player to remember and
-    # no SRV record for Polaris to write. That last part is why this exists - a SRV
-    # record is the one thing a wildcard cannot replace (a wildcard may only be the
-    # leftmost label), so it was the last per-server DNS record left.
+  # --- Call server ----------------------------------------------------------
+  # Chat's calls, carried by LiveKit. Part of the default stack rather than
+  # something an administrator installs later: a call server that has to be
+  # switched on is a call server that is off on every fresh install, and what
+  # that looks like to the two people trying to talk is a call that connects to
+  # silence with no explanation either of them can act on.
+  #
+  # Each browser sends its microphone here once and receives everybody else's
+  # back, so four people are four uploads rather than the twelve connections a
+  # browser-to-browser call would hold. Polaris signs a ticket for one room, for
+  # a few minutes, per person; the signing key never leaves the two of them.
+  livekit:
+    # Pinned to the minor series, as Traefik is: patches arrive, a version that
+    # changes how the thing is configured does not arrive on its own.
+    image: livekit/livekit-server:v1.13
+    restart: unless-stopped
+    # On the host's network, and that is the whole job of this container.
     #
-    # Behind a profile, and off unless the operator asks for it, because it binds
-    # 25565 on the host: an existing install whose first Minecraft server was pinned
-    # to that port would otherwise fail to start the whole stack on the next `up`.
-    # Turn it on by adding `mcrouter` to COMPOSE_PROFILES in .env.
+    # What a media server does is hand each browser an address to send audio to.
+    # On a bridged network the only addresses it has are the daemon's own
+    # (172.x), which no browser anywhere can reach - not from another house and
+    # not from the sofa. Publishing the ports does not help: the port is
+    # reachable, and the address the server advertised inside its handshake is
+    # still one that goes nowhere. The call then connects, shows everybody's
+    # name, and carries no sound, which is exactly the failure people report.
     #
-    # The table is a file the dashboard writes and this watches. No API, no token,
-    # no port between them, and it survives a restart of either side - the same seam
-    # the edge already uses for deployed-app routes.
-    #
-    # Two deliberate omissions:
-    #  - No DEFAULT/default-server. A connection naming a hostname nothing claims is
-    #    dropped rather than sent somewhere, so a port scanner - which connects by
-    #    address and names no hostname - never lands on somebody's world.
-    #  - No USE_PROXY_PROTOCOL. Vanilla servers do not speak it and would break on
-    #    the header, and turning it on while the backends keep their own published
-    #    ports would let a client that dials one directly forge its source address.
-    #    The cost is that a routed server sees connections from this container, which
-    #    is why routing is opted into per server rather than switched on for all.
-    mc-router:
-        profiles: ["mcrouter"]
-        image: itzg/mc-router:1.46.2
-        restart: unless-stopped
-        environment:
-            # The table, reloaded whenever the dashboard rewrites it.
-            ROUTES_CONFIG: /mc-routes/mc-routes.json
-            ROUTES_CONFIG_WATCH: "true"
-            # New connections per second. The upstream default is 1, which a server with
-            # a queue of players rejoining after a restart would trip over immediately.
-            CONNECTION_RATE_LIMIT: ${POLARIS_MC_ROUTER_RATE_LIMIT:-20}
-        ports:
-            - "${POLARIS_MC_ROUTER_PORT:-25565}:25565"
-        volumes:
-            - polaris-mc-routes:/mc-routes:ro
-        # Backends are dialled on the host by their published port, exactly as the edge
-        # dials a deployed app - so nothing about how a game server is deployed has to
-        # change for it to be routable.
-        extra_hosts:
-            - "host.docker.internal:host-gateway"
+    # Here it sees the machine's real interfaces, so it offers browsers the LAN
+    # address - which every device in the house can already reach, with no
+    # router rule - and, once discovery confirms it, the public one as well.
+    network_mode: host
+    environment:
+      # `name: secret`, which is the shape the server reads. The dashboard signs
+      # with the same pair, from the same .env, so there is one copy of it.
+      # Deliberately not `:?` - a missing value must fail this container alone,
+      # not refuse to start the dashboard along with it.
+      LIVEKIT_KEYS: "${POLARIS_CALL_SERVER_API_KEY:-polaris}: ${POLARIS_CALL_SERVER_API_SECRET:-}"
+      # Held here rather than in a mounted file: one place to read, and nothing
+      # to keep in step with a host path that moves during a self-update.
+      LIVEKIT_CONFIG: |
+        port: 7880
+        rtc:
+          # One TCP and one UDP port rather than the ten-thousand-port range
+          # LiveKit defaults to. A range that size is a nuisance to open on a
+          # router, and one port carries every call this is going to hold.
+          # TCP is the fallback that gets through the networks UDP cannot:
+          # the browser dials out to it, so a restrictive NAT on the caller's
+          # side is not in the way. It is why there is no TURN relay here.
+          tcp_port: 7881
+          udp_port: 7882
+          # Find the public address by asking a STUN server. One request at
+          # startup, never in the path of a call, and it is the only way the
+          # server can learn the address on the far side of the router - which
+          # is the address it has to hand to anybody calling in from outside.
+          #
+          # It is also a dependency worth naming: with no route to the internet
+          # the server refuses to start, and calls are off until there is one.
+          # That is the honest failure - it restarts by itself when the line
+          # comes back, and Chat says calls are unavailable in the meantime
+          # rather than offering one that would carry nothing.
+          use_external_ip: true
+          # Offer the local addresses as well as the public one. A call between
+          # two devices in the same house then never leaves it, which is both
+          # faster and the case that has to work before anybody has been near a
+          # router. Without this the only address on offer is the public one,
+          # and every call in the house goes out to the router and back - if it
+          # comes back at all.
+          advertise_internal_ip: true
+        logging:
+          level: info
+
+  # Legacy edge, kept behind the `caddy` profile for rollback. Traefik is the
+  # default edge now (automatic HTTPS for every site); to fall back, stop traefik
+  # and run `docker compose --profile caddy --profile full up -d caddy`.
+  caddy:
+    profiles: ["caddy"]
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    environment:
+      # Public site address (domain, or :443 / :80 for IP-only setups).
+      POLARIS_SITE_ADDRESS: ${POLARIS_SITE_ADDRESS:-:80}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      # Absolute host path (see the hostd ssh mount note) so caddy's Caddyfile mount
+      # survives a self-update, where compose runs from the container path /polaris.
+      - ${POLARIS_HOST_REPO:-../..}/dashboard/docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - polaris-caddy-data:/data
+      - polaris-caddy-config:/config
+
+  # --- Local network discovery (polaris.local) ------------------------------
+  # Advertises polaris.local over mDNS, the way Home Assistant publishes
+  # homeassistant.local. Needs the host network because multicast does not cross
+  # a bridged docker network (works on Linux/WSL; Docker Desktop restricts host
+  # networking, where the installer's hosts entry covers the local machine).
+  mdns:
+    image: ghcr.io/fjrg2007/polaris-mdns:${POLARIS_IMAGE_TAG:-latest}
+    build:
+      context: ../mdns
+    pull_policy: always
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      POLARIS_MDNS_HOSTNAME: ${POLARIS_MDNS_HOSTNAME:-polaris}
+      POLARIS_MDNS_PORT: ${POLARIS_MDNS_PORT:-80}
+    volumes:
+      # On the host network, so this is the only service that can see the LAN
+      # address; it writes it here for the dashboard, which needs it to say what
+      # a port forward should point at. Its own volume, never polaris-run: that
+      # one carries the host daemon's socket and bearer token, and this process
+      # parses unsolicited multicast from the whole network.
+      - polaris-hostip:/run/polaris-host
+
+  # --- Full edition ---------------------------------------------------------
+  # Privileged host daemon. Runs the static musl `polaris-hostd` binary and
+  # brokers host access for the web container over the shared unix socket:
+  # native mounts, host filesystem, the allowlisted Docker proxy, and in-band
+  # updates. Kept in the `full` profile; the installer enables that profile by
+  # default (opt out with `install.sh --limited`), so a bare `docker compose up`
+  # without the profile still starts only the sandboxed services.
+  hostd:
+    profiles: ["full"]
+    image: ghcr.io/fjrg2007/polaris-hostd:${POLARIS_IMAGE_TAG:-latest}
+    # Build from the Rust workspace when the published image is unavailable
+    # (offline, or before the registry has it). Context is the repo root.
+    build:
+      context: ../..
+      dockerfile: crates/polaris-hostd/Dockerfile
+    pull_policy: always
+    restart: unless-stopped
+    # Required for kernel mounts (SMB/NFS) and host filesystem access.
+    privileged: true
+    environment:
+      POLARIS_HOSTD_SOCKET: /run/polaris/hostd.sock
+      POLARIS_HOSTD_TOKEN_FILE: /run/polaris/hostd.token
+      # Auto-update: mirrors the app's master switch. The command is written by
+      # the installer with the host repo path baked in; unset -> /v1/update 501.
+      POLARIS_HOSTD_AUTOUPDATE: ${POLARIS_AUTO_UPDATE:-true}
+      POLARIS_HOSTD_UPDATE_CMD: ${POLARIS_HOSTD_UPDATE_CMD:-}
+    volumes:
+      # Same socket/token volume the web container reads.
+      - polaris-run:/run/polaris
+      # Docker control for the container-management app.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount root, shared so mounts the daemon creates propagate to the host.
+      - type: bind
+        source: /mnt/polaris
+        target: /mnt/polaris
+        bind:
+          propagation: rshared
+
+  # --- Edge proxy -----------------------------------------------------------
+  # Traefik is the single edge for both the dashboard and deployed apps. It binds
+  # 80/443 and discovers every service by its container labels: the dashboard (on
+  # the default network) and deployed apps (on the shared `polaris-proxy`
+  # network). TLS is automatic - Let's Encrypt (HTTP-01) for public domains, a
+  # self-signed default cert for the local names and free sslip.io subdomains -
+  # and :80 redirects to https. An unknown host 404s instead of falling through
+  # to the dashboard. Set POLARIS_ACME_EMAIL for Let's Encrypt. The same Traefik
+  # is installed on remote servers by the Deploy onboarding script.
+  # v3.6+ auto-negotiates the Docker API version. Newer Docker Engines (28/29)
+  # raised the minimum API version and reject Traefik's old 1.24 default, so an
+  # older Traefik discovers no services; the pinned DOCKER_API_VERSION is a
+  # belt-and-suspenders floor the daemon accepts.
+  traefik:
+    image: traefik:v3.6
+    restart: unless-stopped
+    environment:
+      DOCKER_API_VERSION: "1.44"
+    depends_on:
+      - web
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=polaris-proxy"
+      # The docker provider only routes the dashboard (labelled polaris.role=edge);
+      # deployed-app domains are served from the file provider below, so a
+      # label-less or manually-run app container still routes. Remote servers run
+      # their own Traefik without this constraint and route apps by their labels.
+      - "--providers.docker.constraints=Label(`polaris.role`,`edge`)"
+      # Deployed-app routes, regenerated by the dashboard and hot-reloaded here.
+      - "--providers.file.directory=/dynamic"
+      - "--providers.file.watch=true"
+      # Per-request access logs (JSON) the dashboard's HTTP Logs view reads, so
+      # they work for ANY app - even one (e.g. a Next.js server) that writes no
+      # access logs of its own. Logged at the edge, like Railway.
+      - "--accesslog=true"
+      - "--accesslog.format=json"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${POLARIS_ACME_EMAIL:-admin@example.com}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - polaris-traefik:/traefik
+      - polaris-traefik-dynamic:/dynamic:ro
+      - polaris-traefik-log:/var/log/traefik
+    networks:
+      - default
+      - polaris-proxy
+    # An app's route dials it on its published host port, so the edge has to be able
+    # to reach the host from inside the network. By this name rather than by the box's
+    # LAN address: that one is detected once and stored, and when the lease moves or
+    # the interface it was read from goes down, every deployed domain answers 502 with
+    # a healthy container behind it. POLARIS_APP_DIAL_HOST (on `web`) is the name
+    # written into those routes.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Co-located WAF sentinel. Traefik forwardAuths to it for the deploy denylist and
+  # require-login controls; it holds no rule state (rules arrive per request in a
+  # header Traefik stamps on) and verifies login tokens offline, so it keeps
+  # enforcing if the Polaris control plane is down. Aliased to the name the generated
+  # forwardAuth address uses, on both networks that address it (see below); never
+  # published to the host. Idle when no app has a denylist/require-login rule.
+  #
+  # Build-only, exactly like the mdns sidecar: with no `image`, `docker compose pull`
+  # skips it instead of trying - and failing - to fetch an unpublished image, which
+  # would otherwise flip the whole update onto the slow (and failure-prone) build-
+  # from-source path. It is built once on first `up`; a later release that changes it
+  # will ship a published image so updates pull it (see the WAF follow-up notes).
+  edge-guard:
+    # Published like every other sidecar, and pinned to the same tag as the dashboard.
+    # It was build-only, which meant `update.sh` never replaced it: compose reuses an
+    # image it already built, so the guard stayed frozen at install time while the
+    # dashboard advanced past it - and a route the newer dashboard pointed at the
+    # guard's proxy port reached a container that had no such listener (502).
+    image: ghcr.io/fjrg2007/polaris-edge-guard:${POLARIS_IMAGE_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: services/edge-guard/Dockerfile
+    restart: unless-stopped
+    environment:
+      POLARIS_AUTH_SECRET: ${POLARIS_AUTH_SECRET:?POLARIS_AUTH_SECRET is required}
+      # Where the guard sends visitors to sign in for require-login routes.
+      POLARIS_PUBLIC_URL: ${POLARIS_PUBLIC_URL:-https://polaris.local}
+      # Bans, Tor exits and flagged addresses, held in memory and re-read only when
+      # the file changes - so enforcing one costs a map lookup, never a query.
+      POLARIS_EDGE_INTEL_FILE: /edge-intel/waf-intel.json
+    volumes:
+      - polaris-edge-intel:/edge-intel:ro
+    networks:
+      # Both networks, under the same alias, because two different callers address it
+      # by that one name. Traefik reaches it from the proxy network, where the routers
+      # it generates point their forwardAuth and their vacant-page service. The control
+      # plane reaches it from the default network, where it asks - before writing those
+      # routers - whether this container is new enough to serve the pages they name.
+      #
+      # Without the second entry that question can never be answered: the web container
+      # is not on the proxy network (deliberately - deployed apps live there, and the
+      # control plane has no business being addressable from them), so the probe failed
+      # to connect and was read as "too old". Every install therefore wrote no vacant
+      # routers and no error page, and served the edge's bare 404 and Bad Gateway
+      # instead. The guard only listens, so joining the control plane's own network
+      # exposes nothing further to anything deployed.
+      default:
+        aliases:
+          - polaris-edge-guard
+      polaris-proxy:
+        aliases:
+          - polaris-edge-guard
+    # A route whose response the guard rewrites dials the app through this container,
+    # so it needs the same way to reach the host that Traefik does.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # --- Minecraft hostname routing -------------------------------------------
+  # One port for every Java server. A Java client puts the address it was given
+  # into the handshake, before login and before anything is encrypted, so a router
+  # reading that field can send each connection to the right server: every world
+  # answers on 25565 under its own name, with no port for a player to remember and
+  # no SRV record for Polaris to write. That last part is why this exists - a SRV
+  # record is the one thing a wildcard cannot replace (a wildcard may only be the
+  # leftmost label), so it was the last per-server DNS record left.
+  #
+  # Behind a profile, and off unless the operator asks for it, because it binds
+  # 25565 on the host: an existing install whose first Minecraft server was pinned
+  # to that port would otherwise fail to start the whole stack on the next `up`.
+  # Turn it on by adding `mcrouter` to COMPOSE_PROFILES in .env.
+  #
+  # The table is a file the dashboard writes and this watches. No API, no token,
+  # no port between them, and it survives a restart of either side - the same seam
+  # the edge already uses for deployed-app routes.
+  #
+  # Two deliberate omissions:
+  #  - No DEFAULT/default-server. A connection naming a hostname nothing claims is
+  #    dropped rather than sent somewhere, so a port scanner - which connects by
+  #    address and names no hostname - never lands on somebody's world.
+  #  - No USE_PROXY_PROTOCOL. Vanilla servers do not speak it and would break on
+  #    the header, and turning it on while the backends keep their own published
+  #    ports would let a client that dials one directly forge its source address.
+  #    The cost is that a routed server sees connections from this container, which
+  #    is why routing is opted into per server rather than switched on for all.
+  mc-router:
+    profiles: ["mcrouter"]
+    image: itzg/mc-router:1.46.2
+    restart: unless-stopped
+    environment:
+      # The table, reloaded whenever the dashboard rewrites it.
+      ROUTES_CONFIG: /mc-routes/mc-routes.json
+      ROUTES_CONFIG_WATCH: "true"
+      # New connections per second. The upstream default is 1, which a server with
+      # a queue of players rejoining after a restart would trip over immediately.
+      CONNECTION_RATE_LIMIT: ${POLARIS_MC_ROUTER_RATE_LIMIT:-20}
+    ports:
+      - "${POLARIS_MC_ROUTER_PORT:-25565}:25565"
+    volumes:
+      - polaris-mc-routes:/mc-routes:ro
+    # Backends are dialled on the host by their published port, exactly as the edge
+    # dials a deployed app - so nothing about how a game server is deployed has to
+    # change for it to be routable.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 networks:
-    # Shared network deployed apps and the edge join for name-based routing. hostd
-    # creates it at startup, so it is external here - compose uses the existing
-    # network instead of trying to manage a second one.
-    polaris-proxy:
-        external: true
-        name: polaris-proxy
-    # Dedicated web<->hub network for a locally-installed messaging bridge. External
-    # (install.sh creates it before `up`, like polaris-proxy) so the hub, deployed as
-    # a separate compose stack, can join the same named network and reach the web by
-    # service DNS without sharing the control-plane default network with postgres.
-    polaris-hub:
-        external: true
-        name: polaris-hub
+  # Shared network deployed apps and the edge join for name-based routing. hostd
+  # creates it at startup, so it is external here - compose uses the existing
+  # network instead of trying to manage a second one.
+  polaris-proxy:
+    external: true
+    name: polaris-proxy
+  # Dedicated web<->hub network for a locally-installed messaging bridge. External
+  # (install.sh creates it before `up`, like polaris-proxy) so the hub, deployed as
+  # a separate compose stack, can join the same named network and reach the web by
+  # service DNS without sharing the control-plane default network with postgres.
+  polaris-hub:
+    external: true
+    name: polaris-hub
 
 volumes:
-    polaris-postgres:
-    polaris-run:
-    polaris-hostip:
-    polaris-data:
-    polaris-caddy-data:
-    polaris-caddy-config:
-    polaris-traefik:
-    polaris-traefik-dynamic:
-    polaris-traefik-log:
-    polaris-edge-intel:
-    polaris-mc-routes:
+  polaris-postgres:
+  polaris-run:
+  polaris-hostip:
+  polaris-data:
+  polaris-caddy-data:
+  polaris-caddy-config:
+  polaris-traefik:
+  polaris-traefik-dynamic:
+  polaris-traefik-log:
+  polaris-edge-intel:
+  polaris-mc-routes:

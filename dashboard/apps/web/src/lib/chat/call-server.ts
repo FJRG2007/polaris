@@ -20,11 +20,7 @@
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { AccessToken } from "livekit-server-sdk";
-import {
-    getIntegrationSecret,
-    getIntegrationState,
-    upsertIntegration
-} from "@/lib/integration-service";
+import { getIntegrationSecret, getIntegrationState, upsertIntegration } from "@/lib/integration-service";
 
 /** Where the pairing is kept. One per instance: a call server is infrastructure,
  *  not something a conversation chooses. */
@@ -39,8 +35,7 @@ const TOKEN_TTL = "10m";
  *  worked around: with no server there is no call, and a button that opens a
  *  microphone for a connection that cannot be made is the failure people report
  *  and nobody can act on. */
-export const NO_CALL_SERVER =
-    "The call server is not answering, so a call would reach nobody. An administrator can check it under Chat settings.";
+export const NO_CALL_SERVER = "The call server is not answering, so a call would reach nobody. An administrator can check it under Chat settings.";
 
 /** What is stored beside the secret: everything that is not the secret. */
 interface CallServerConfig {
@@ -109,11 +104,7 @@ export async function setCallServer(url: string, apiKey: string, apiSecret: stri
     const current = await config();
     await upsertIntegration(PROVIDER, {
         enabled: true,
-        config: {
-            ...current,
-            url: trimmed || undefined,
-            apiKey: trimmed ? apiKey.trim() : undefined
-        },
+        config: { ...current, url: trimmed || undefined, apiKey: trimmed ? apiKey.trim() : undefined },
         // An empty secret on a save that only changed the address leaves the
         // stored one alone; clearing the address clears the pairing outright.
         ...(trimmed ? (apiSecret.trim() ? { secret: apiSecret.trim() } : {}) : { secret: null })
@@ -251,11 +242,7 @@ export function forgetAnswer(): void {
  * starting is a fact to report rather than a reason to hold the page.
  */
 export async function answering(endpoint: CallServerEndpoint): Promise<boolean> {
-    if (
-        lastAnswer &&
-        lastAnswer.url === endpoint.url &&
-        Date.now() - lastAnswer.at < ANSWER_TTL_MS
-    ) {
+    if (lastAnswer && lastAnswer.url === endpoint.url && Date.now() - lastAnswer.at < ANSWER_TTL_MS) {
         return lastAnswer.answering;
     }
     // A path names the edge in front of this app, which this process cannot
