@@ -162,13 +162,15 @@ describe("a call this account is in somewhere else", () => {
 });
 
 describe("taking the call over", () => {
-    it("tells the room which browser has it", () => {
-        meetings.claimCall("m1", "device-phone");
+    it("says which seat was claimed as well as which browser has it", () => {
+        meetings.claimCall("m1", "p-desk", "device-phone");
 
-        // Every browser in the call is told, and each compares it with its own.
-        // The one that does not recognise it is the one that has been replaced.
+        // The seat is what makes the claim deliverable to the browsers it is
+        // about. Without it the stream had no way to tell "another of your
+        // devices took your seat" from "somebody else joined the call", and it
+        // told everybody the second thing was the first.
         expect(published).toEqual([
-            { meetingId: "m1", kind: "claimed", deviceId: "device-phone" }
+            { meetingId: "m1", kind: "claimed", participantId: "p-desk", deviceId: "device-phone" }
         ]);
     });
 });

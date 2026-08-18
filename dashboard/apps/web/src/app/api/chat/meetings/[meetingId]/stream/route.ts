@@ -100,10 +100,15 @@ export async function GET(
 
             offEvents = subscribeMeetingEvents((event) => {
                 if (closed || event.meetingId !== meetingId) return;
-                // The claim carries which browser made it, and nothing else
-                // does: every browser in the call is told, and each compares it
-                // with its own to find out whether it is still the one on the
-                // line.
+                // A claim is about one seat and concerns only the browsers
+                // sitting in it. Sent to the whole room it did the opposite of
+                // its job: everybody else read a device id they could not
+                // recognise, concluded they had been replaced, and hung up - so
+                // a second person joining ended the call for the first. The
+                // browsers of this seat still compare the device id with their
+                // own, which is what separates "another of my devices took it"
+                // from "this is my own claim coming back".
+                if (event.kind === "claimed" && event.participantId !== participantId) return;
                 send({ kind: event.kind, ...(event.deviceId ? { deviceId: event.deviceId } : {}) });
                 // The roster moving is the only thing that can admit somebody,
                 // and only a stream that is still waiting has to ask.

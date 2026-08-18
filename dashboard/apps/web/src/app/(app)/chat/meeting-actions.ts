@@ -227,7 +227,9 @@ export async function callElsewhereAction(): Promise<meetings.CallElsewhere | nu
 export async function claimCallAction(meetingId: string, deviceId: string): Promise<void> {
     const seat = await resolveSeat(meetingId);
     if (!seat || seat.admission !== "admitted") return;
-    meetings.claimCall(meetingId, String(deviceId).slice(0, 100));
+    // The seat comes from the request rather than from the browser: which chair
+    // a claim is about is exactly the thing a browser must not be able to name.
+    meetings.claimCall(meetingId, seat.participantId, String(deviceId).slice(0, 100));
 }
 
 /** Still here. */

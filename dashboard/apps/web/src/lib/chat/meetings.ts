@@ -451,16 +451,23 @@ const MAX_TITLE_NAMES = 4;
 /**
  * Say which browser is on the call now.
  *
- * Sent to everybody in the room, and meant for exactly one of them: whichever
- * other browser of the same account thought it was still on the line. It reads a
- * device it does not recognise and hangs up.
+ * A claim is about one seat, and it carries which one. That was the missing
+ * half: it used to say only "this device has it", which every browser in the
+ * room read as being addressed to them, and a device id nobody else could
+ * recognise means everybody else concluded they had been replaced. The result
+ * was that two people could not hold a call - the second to arrive ended the
+ * first, whose rejoin then ended the second - and nothing on either screen
+ * explained why the call kept dropping.
+ *
+ * With the seat on it the claim reaches only the browsers sitting in that seat,
+ * which is the set it was always meant for: an account's other devices.
  *
  * Nothing is stored. The claim is only true until the next one, which is the
  * whole of what it has to be - and a column recording "the current device" would
  * be a fact about a browser session living in the call's row, outliving both.
  */
-export function claimCall(meetingId: string, deviceId: string): void {
-    publishMeetingEvent({ meetingId, kind: "claimed", deviceId });
+export function claimCall(meetingId: string, participantId: string, deviceId: string): void {
+    publishMeetingEvent({ meetingId, kind: "claimed", participantId, deviceId });
 }
 
 /** Leave. The last one out ends the call, so a room is never left running with
