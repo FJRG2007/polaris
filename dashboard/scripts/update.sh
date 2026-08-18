@@ -190,7 +190,7 @@ roll_dashboard() {
         return 0
     fi
     if [ -n "$want" ] && [ -n "$have" ] && [ "$want" != "$have" ]; then
-        log "this release changes how the dashboard itself is wired; recreating it"
+        log "the dashboard's container was not created from the definition on disk; recreating it"
     fi
 
     log "starting the new dashboard alongside the running one"
@@ -281,20 +281,47 @@ retire() {
 # never create it and the dashboard would go on offering a feature that was never
 # installed.
 #
-# Anything actually modified here is left alone and reported instead. Discarding a
-# change somebody made by hand is worse than an update that skipped a file, and on
-# a machine nobody was supposed to touch, a dirty tree is worth saying out loud.
+# A tree that was edited here is what froze the checkout in the first place, so
+# refusing to touch one would decline the very case this exists for, and would say
+# so by naming a directory the operator has no way to open. The release wins
+# instead - but nothing is thrown away: whatever this checkout holds that upstream
+# does not is put under a ref of its own before the files go back, and a snapshot
+# that cannot be taken abandons the realignment rather than losing the change.
 realign_checkout() {
-    state=$(git -C "$dash_dir" status --porcelain 2>/dev/null || printf 'unreadable')
-    if [ -n "$state" ]; then
-        err "the deployment files at $repo_root have local changes; leaving them alone"
-        return 1
-    fi
     git -C "$dash_dir" fetch --prune >/dev/null 2>&1 || return 1
     upstream=$(git -C "$dash_dir" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)
     [ -n "$upstream" ] || return 1
+
+    # Uncommitted and committed alike: a clean tree with commits of its own reads as
+    # unmodified to `status`, and is exactly the state the reset below would erase.
+    dirty=$(git -C "$dash_dir" status --porcelain 2>/dev/null || printf 'unreadable')
+    ahead=$(git -C "$dash_dir" rev-list --count "$upstream..HEAD" 2>/dev/null || printf '0')
+    if [ -n "$dirty" ] || [ "$ahead" != "0" ]; then
+        keep_checkout || return 1
+    fi
+
     git -C "$dash_dir" reset --hard "$upstream" >/dev/null 2>&1 || return 1
     log "the deployment files had diverged; put back onto $upstream"
+    return 0
+}
+
+# Preserve what this checkout holds, as a commit reachable from a ref of its own.
+#
+# A stash commit carries the working tree and has HEAD for a parent, so one object
+# covers an edit made by hand and a commit made here at the same time; a tree with
+# nothing uncommitted produces none, and HEAD is already that object. The identity
+# is supplied on the command line because this runs as root inside a container,
+# where git has none configured and would refuse to write the commit.
+keep_checkout() {
+    snapshot=$(git -C "$dash_dir" -c user.name="Polaris" -c user.email="polaris@localhost" \
+        stash create "superseded by an update" 2>/dev/null || true)
+    [ -n "$snapshot" ] || snapshot=$(git -C "$dash_dir" rev-parse HEAD 2>/dev/null || true)
+    if [ -z "$snapshot" ] \
+        || ! git -C "$dash_dir" update-ref "refs/polaris/superseded/$snapshot" "$snapshot" >/dev/null 2>&1; then
+        err "the deployment files were changed here and that state could not be preserved; leaving them alone"
+        return 1
+    fi
+    log "the deployment files were changed here; keeping that state as $snapshot before restoring the release's"
     return 0
 }
 
