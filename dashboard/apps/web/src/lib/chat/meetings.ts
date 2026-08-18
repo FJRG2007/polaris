@@ -1,16 +1,11 @@
 /**
  * Calls.
  *
- * The media never touches Polaris. Browsers connect to each other and send audio
- * and video directly; what this server does is introduce them, hold the list of
- * who is in the room, and decide who is allowed in. That is the whole reason a
- * call can exist on a box running on somebody's shelf: relaying video for eight
- * people is a different machine, and none of it is needed for the case Polaris
- * is actually in.
- *
- * It follows that a call between people on different networks may not connect at
- * all without a STUN or TURN server configured, and this module says so rather
- * than pretending. See POLARIS_STUN_URLS and POLARIS_TURN_URL.
+ * The media never touches this process. It goes to the call server the stack
+ * runs beside it, which is the piece that makes a call between two houses
+ * possible at all; what this module does is hold the list of who is in the room
+ * and decide who is allowed in. Where that server is and how a browser is let
+ * through its door is `call-server.ts`.
  *
  * Two ways in, and they are deliberately different:
  *
@@ -23,10 +18,9 @@
  *     them - a link that can be forwarded is a link that will be.
  */
 
-import { loadEnv } from "@polaris/config";
 import { randomBytes } from "node:crypto";
 import { prisma, type Prisma } from "@polaris/db";
-import { publishMeetingEvent } from "./meeting-signal";
+import { publishMeetingEvent } from "./meeting-events";
 import { publishChatChange, type CallState } from "./live";
 import { ChatAccessError, requireChannel, type ChatActor } from "./access";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
@@ -87,32 +81,6 @@ export interface MeetingSeat {
     /** Set only for a guest, and only on the join that minted it. */
     readonly guestKey?: string;
     readonly admission: "admitted" | "waiting" | "denied";
-}
-
-/**
- * The addresses a browser should try when connecting to another one.
- *
- * Read from the environment on every call rather than cached: it is two string
- * lookups, and an operator who adds a TURN server should not have to restart to
- * find out whether it helped.
- */
-export function iceServers(): { urls: string[]; username?: string; credential?: string }[] {
-    const env = loadEnv();
-    const servers: { urls: string[]; username?: string; credential?: string }[] = [];
-
-    const stun = env.POLARIS_STUN_URLS.split(",")
-        .map((url) => url.trim())
-        .filter(Boolean);
-    if (stun.length) servers.push({ urls: stun });
-
-    if (env.POLARIS_TURN_URL) {
-        servers.push({
-            urls: [env.POLARIS_TURN_URL],
-            username: env.POLARIS_TURN_USERNAME,
-            credential: env.POLARIS_TURN_PASSWORD
-        });
-    }
-    return servers;
 }
 
 /**

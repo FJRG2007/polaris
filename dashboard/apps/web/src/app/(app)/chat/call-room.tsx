@@ -243,7 +243,8 @@ export function CallRoom({
                 while it is there. Above the faces and across the whole width
                 rather than in a tile the size of a head: a shared screen is
                 usually text, and text in a ninth of a window is not readable.
-                One per sharer, because a mesh has no reason to allow only one. */}
+                One per sharer: the server sends each subscriber only what
+                    they are watching, so there is no reason to allow only one. */}
             {(live?.startsWith("camera:")
                 ? []
                 : [...call.screens].filter(
@@ -1044,7 +1045,7 @@ function nameOf(
     return people?.find((person) => person.id === personId)?.name ?? "Somebody";
 }
 
-/** Enough columns to keep the tiles roughly square at every size a mesh call can
+/** Enough columns to keep the tiles roughly square at every size a call can
  *  reach. A lookup rather than a measurement: the room is capped at eight. */
 function gridColumns(people: number): string {
     if (people <= 1) return "grid-cols-1";

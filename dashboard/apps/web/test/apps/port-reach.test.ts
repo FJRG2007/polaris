@@ -55,9 +55,10 @@ vi.mock("@polaris/core", async (importActual) => ({
     isPublicIpv4: (value: string) => value === "127.0.0.1"
 }));
 
-const { noteReachedFrom, probeGamePort, probeListening, probeReach, reachAdviceFor } = await import(
+const { noteReachedFrom, probeListening, probeReach, reachAdviceFor } = await import(
     "@/lib/apps/minecraft/reach"
 );
+const { probeTcpPort } = await import("@/lib/net/port-probe");
 
 /** A port with something listening on it, and the same port once nothing is. */
 async function listener(): Promise<{ port: number; server: Server }> {
@@ -156,11 +157,11 @@ describe("knocking on a single port", () => {
     it("reports the port that answers, and only that", async () => {
         const { port, server } = await listener();
 
-        expect(await probeGamePort("127.0.0.1", port)).toBe(true);
+        expect(await probeTcpPort("127.0.0.1", port)).toBe(true);
         await close(server);
         // Nothing is listening now, so the same call has to come back false - a
         // probe that keeps saying yes is worse than one that never says it.
-        expect(await probeGamePort("127.0.0.1", port)).toBe(false);
+        expect(await probeTcpPort("127.0.0.1", port)).toBe(false);
     });
 });
 

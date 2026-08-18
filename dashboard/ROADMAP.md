@@ -272,10 +272,11 @@ Chat (talking to the people here):
       per-meeting link an account holder opens. They wait in a lobby until
       somebody inside lets them in, the link dies with the call, and the cookie
       they get is a seat in one room rather than anything resembling a session
-- [ ] STUN/TURN are configuration (`POLARIS_STUN_URLS`, `POLARIS_TURN_URL`).
-      With neither set, calls work on one network and between reachable
-      addresses, and not otherwise - a hosted TURN default is not something
-      Polaris should decide for an operator
+- [x] Calls are carried by the media server the stack starts, and by nothing
+      else. Between devices on this network it needs no setup at all; from
+      outside it needs two ports forwarded, which Domains lists and checks -
+      and until the server answers, Chat says so instead of offering a call
+      that would connect to silence
 - [x] Files on a message: staged in the composer, dropped onto the conversation,
       pasted from the clipboard, or picked - a pasted screenshot gets the same
       preview and limits as a picked file rather than being eaten silently.

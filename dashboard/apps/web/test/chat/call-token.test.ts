@@ -48,14 +48,6 @@ let env: Record<string, string | undefined> = {};
 
 vi.mock("@polaris/config", () => ({ loadEnv: () => env }));
 
-vi.mock("@/lib/apps/install-service", () => ({ installApp: async () => undefined }));
-vi.mock("@/lib/apps/install-secret", () => ({ installEnvSecret: async () => null }));
-vi.mock("@/lib/home/side-service", () => ({
-    assertServer: async () => undefined,
-    findService: async () => null,
-    serviceUrls: async () => null
-}));
-
 const calls = await import("@/lib/chat/call-server");
 
 /** The claims, without verifying the signature - what is being asserted is what
@@ -65,7 +57,12 @@ function claims(token: string): Record<string, unknown> {
     return JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
 }
 
-const endpoint = { url: "wss://calls.example.com", apiKey: "polaris", apiSecret: "s".repeat(32) };
+const endpoint = {
+    url: "wss://calls.example.com",
+    apiKey: "polaris",
+    apiSecret: "s".repeat(32),
+    shipped: false
+};
 
 beforeEach(() => {
     stored = null;
@@ -152,7 +149,8 @@ describe("where calls run", () => {
         expect(await calls.callServer()).toEqual({
             url: "wss://calls.example.com",
             apiKey: "polaris",
-            apiSecret: "kept"
+            apiSecret: "kept",
+            shipped: false
         });
     });
 
@@ -171,7 +169,9 @@ describe("where calls run", () => {
             // Dialled as a WebSocket, whichever half of the pair was written.
             url: "wss://calls.example.com",
             apiKey: "polaris",
-            apiSecret: "from-the-environment"
+            apiSecret: "from-the-environment",
+            // An address of its own, so none of the port advice is about it.
+            shipped: false
         });
     });
 

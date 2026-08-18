@@ -1,23 +1,14 @@
 /**
  * The server a call runs through.
  *
- * Chat's calls were browser-to-browser, which is the right shape for two people
- * in one house and the wrong one for everybody else. With nothing in the middle,
- * each browser can only offer the addresses of the network it is on, so a call
- * between two houses needs a STUN server to discover a public address and a TURN
- * server whenever that is not enough - and with neither, it simply never
- * connects: both people sit there watching each other's names and hearing
- * nothing. It also does not scale: four people is twelve connections and four
- * uploads of the same camera.
+ * Every call goes through one, and there is no second way. A browser sends its
+ * microphone and its camera there once and receives everybody else's back, which
+ * is what makes a call between two houses possible and a call between four
+ * people cheap. Polaris ships one - the `livekit` service, started with the
+ * stack - so a fresh install can already call, and an instance that runs its own
+ * can be pointed at that instead.
  *
- * So there is a server in the middle now, and it is the piece every product that
- * does this uses: LiveKit, an SFU. Each browser sends its microphone and its
- * camera to it once and receives everybody else's back. Polaris installs it the
- * way Home installs the recognizer - one container, on a machine the owner picks,
- * with a key nobody types - and a house that already runs one can point at that
- * instead.
- *
- * What Polaris does here is mint the ticket. A browser is never given the signing
+ * What this module does is mint the ticket. A browser is never given the signing
  * key: it asks for a token, this checks the seat it already holds in that call -
  * the same admission the waiting room enforces - and signs a token that is good
  * for that one room, for a few minutes. The media itself never passes through
@@ -29,13 +20,7 @@
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { AccessToken } from "livekit-server-sdk";
-import { installApp } from "@/lib/apps/install-service";
-import { installEnvSecret } from "@/lib/apps/install-secret";
-import { assertServer, findService, serviceUrls } from "@/lib/home/side-service";
 import { getIntegrationSecret, getIntegrationState, upsertIntegration } from "@/lib/integration-service";
-
-/** The catalog app this module installs. */
-const CALL_APP = "call-server";
 
 /** Where the pairing is kept. One per instance: a call server is infrastructure,
  *  not something a conversation chooses. */
@@ -46,11 +31,14 @@ const PROVIDER = "call-server";
  *  reads it - the browser asks for a fresh one every time it joins. */
 const TOKEN_TTL = "10m";
 
+/** What a screen says when there is nowhere for a call to run. Said rather than
+ *  worked around: with no server there is no call, and a button that opens a
+ *  microphone for a connection that cannot be made is the failure people report
+ *  and nobody can act on. */
+export const NO_CALL_SERVER = "The call server is not answering, so a call would reach nobody. An administrator can check it under Chat settings.";
+
 /** What is stored beside the secret: everything that is not the secret. */
 interface CallServerConfig {
-    /** The install Polaris put up, when it did. Takes precedence - it is the one
-     *  this instance is responsible for. */
-    installId?: string;
     /** An address somebody typed, for a server they run themselves. */
     url?: string;
     apiKey?: string;
@@ -58,10 +46,15 @@ interface CallServerConfig {
 
 /** Where a call server is and what signs for it. */
 export interface CallServerEndpoint {
-    /** The address a browser connects to, as a WebSocket URL. */
+    /** The address a browser connects to: a WebSocket URL, or a path on this
+     *  deployment's own hostname. */
     readonly url: string;
     readonly apiKey: string;
     readonly apiSecret: string;
+    /** Whether this is the one the stack runs, rather than one somebody typed.
+     *  Decides where it is asked whether it is up: the shipped one answers on
+     *  the host, and its `/livekit` path is only meaningful in a browser. */
+    readonly shipped: boolean;
 }
 
 async function config(): Promise<CallServerConfig> {
@@ -83,7 +76,7 @@ function environmentServer(): CallServerEndpoint | null {
     const apiKey = env.POLARIS_CALL_SERVER_API_KEY?.trim();
     const apiSecret = env.POLARIS_CALL_SERVER_API_SECRET?.trim();
     if (!url || !apiKey || !apiSecret) return null;
-    return { url: websocket(url), apiKey, apiSecret };
+    return { url: websocket(url), apiKey, apiSecret, shipped: servedHere(url) };
 }
 
 /** Whether an address names the host it is served from rather than another one.
@@ -91,42 +84,6 @@ function environmentServer(): CallServerEndpoint | null {
  *  place the hostname somebody actually typed is known. */
 function servedHere(address: string): boolean {
     return address.startsWith("/");
-}
-
-/**
- * Put a call server on a server.
- *
- * Idempotent: a machine that already has one is adopted rather than given a
- * second. Two of them would each hold half of a call, and nobody in it would
- * hear everybody.
- */
-export async function installCallServer(
-    ownerId: string,
-    actorId: string,
-    serverId: string
-): Promise<void> {
-    await assertServer(ownerId, serverId);
-
-    if (!(await findService(CALL_APP, serverId))) {
-        await installApp(ownerId, actorId, {
-            catalogId: CALL_APP,
-            name: "Call server",
-            serverId,
-            storage: [],
-            // Its key is minted by the install and never shown: Polaris is the
-            // only thing that signs with it.
-            env: []
-        });
-    }
-    const service = await findService(CALL_APP, serverId);
-    if (!service) throw new Error("The call server was installed but cannot be found");
-
-    // The typed address is left alone rather than cleared, so somebody who had
-    // their own server can go back to it by removing this install.
-    await upsertIntegration(PROVIDER, {
-        enabled: true,
-        config: { ...(await config()), installId: service.installedAppId }
-    });
 }
 
 /** Point calls at a server somebody runs themselves, or unpoint them. A blank
@@ -154,65 +111,30 @@ export async function setCallServer(url: string, apiKey: string, apiSecret: stri
     });
 }
 
-/**
- * The one Polaris installed, resolved now rather than written down.
- *
- * Its address is whatever Deploy publishes for it today, and its key is read
- * back off the install's own environment - the same place the container reads
- * it from, so there is one copy of it and it is never in two places disagreeing.
- */
-async function installedServer(installId: string): Promise<CallServerEndpoint | null> {
-    const row = await prisma.installedApp.findFirst({
-        where: { id: installId, status: { not: "removed" }, applicationId: { not: null } },
-        select: { applicationId: true, ownerId: true }
-    });
-    if (!row?.applicationId) return null;
-    const [urls, keys] = await Promise.all([
-        serviceUrls(row.applicationId, row.ownerId),
-        installEnvSecret(row.applicationId, row.ownerId, "LIVEKIT_KEYS")
-    ]);
-    if (!urls || !keys) return null;
-
-    // `name: secret`, which is the shape the server reads and therefore the shape
-    // it was minted in. Anything else is an install somebody edited by hand.
-    const [apiKey, apiSecret] = splitKeys(keys);
-    if (!apiKey || !apiSecret) return null;
-    return { url: websocket(urls.baseUrl), apiKey, apiSecret };
-}
-
-/** `polaris: <secret>` as its two halves. */
-function splitKeys(keys: string): [string, string] {
-    const at = keys.indexOf(":");
-    if (at < 0) return ["", ""];
-    return [keys.slice(0, at).trim(), keys.slice(at + 1).trim()];
-}
-
 /** The same address, as a browser has to dial it. LiveKit speaks WebSocket on
- *  the port Deploy publishes as HTTP. A path is left alone: it has no scheme to
- *  change, and the browser gives it the one the page is on. */
+ *  the port it serves HTTP on. A path is left alone: it has no scheme to change,
+ *  and the browser gives it the one the page is on. */
 function websocket(address: string): string {
     if (servedHere(address)) return address;
     return address.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
 }
 
-/** Where calls run, or null when nothing has been set up - in which case Chat
- *  falls back to browser-to-browser, which still works inside one network. */
+/**
+ * Where calls run, or null when nothing is set up.
+ *
+ * The deployment's own answer comes first. An operator who put a call server in
+ * this process's environment has already decided, and asking them to go and
+ * confirm it in a settings screen is how an instance ends up shipping with calls
+ * that cannot cross a network and nobody realising.
+ */
 export async function callServer(): Promise<CallServerEndpoint | null> {
-    // The deployment's own answer comes first. An operator who put a call server
-    // in this process's environment has already decided, and asking them to go
-    // and confirm it in a settings screen is how an instance ends up shipping
-    // with calls that cannot cross a network and nobody realising.
     const fromEnv = environmentServer();
     if (fromEnv) return fromEnv;
 
     const stored = await config();
-    if (stored.installId) {
-        const installed = await installedServer(stored.installId);
-        if (installed) return installed;
-    }
     const secret = stored.url ? await getIntegrationSecret(PROVIDER) : null;
     return stored.url && stored.apiKey && secret
-        ? { url: stored.url, apiKey: stored.apiKey, apiSecret: secret }
+        ? { url: stored.url, apiKey: stored.apiKey, apiSecret: secret, shipped: false }
         : null;
 }
 
@@ -267,12 +189,13 @@ export interface CallServerSettings {
     /** An address somebody typed, if they did. */
     readonly url: string;
     readonly hasKey: boolean;
-    /** Whether Polaris is running one of its own, and where. */
-    readonly installedOn: string | null;
+    /** Whether calls run through the server this stack starts, rather than one
+     *  somebody pointed them at. */
+    readonly shipped: boolean;
     /** Whether calls have somewhere to run at all. */
     readonly ready: boolean;
-    /** Whether it answers yet - a fresh install spends a minute or two starting,
-     *  and "installed but silent" is the state people ask about. */
+    /** Whether it answers yet - a fresh install spends a moment starting, and
+     *  "configured but silent" is the state people ask about. */
     readonly answering: boolean;
 }
 
@@ -282,10 +205,29 @@ export async function callServerSettings(): Promise<CallServerSettings> {
     return {
         url: stored.url ?? "",
         hasKey: Boolean(stored.apiKey),
-        installedOn: stored.installId ? await serverNameFor(stored.installId) : null,
+        shipped: endpoint?.shipped ?? false,
         ready: endpoint !== null,
         answering: endpoint ? await answering(endpoint) : false
     };
+}
+
+/** Where the shipped call server answers from inside the stack. Two addresses
+ *  because there are two ways this process runs: in a container beside it, where
+ *  the host is reached by name, and directly on the machine in development. */
+const INTERNAL_CALL_SERVER = ["http://host.docker.internal:7880", "http://127.0.0.1:7880"];
+
+/** How long an answer stands. Every open Chat tab asks whether calls work, so
+ *  without this a busy instance would knock on the media server once per poll
+ *  per reader for a fact that changes when a container restarts. */
+const ANSWER_TTL_MS = 10_000;
+
+let lastAnswer: { at: number; url: string; answering: boolean } | null = null;
+
+/** Throw the cached answer away. For a test that is a different instance every
+ *  case; nothing in the app calls it, since the address changing already misses
+ *  the cache and a container restarting is what the short life covers. */
+export function forgetAnswer(): void {
+    lastAnswer = null;
 }
 
 /**
@@ -294,40 +236,43 @@ export async function callServerSettings(): Promise<CallServerSettings> {
  * Asked over HTTP rather than over the address a browser dials, which is the
  * same server on the same port speaking the other half of its protocol: a
  * WebSocket handshake would need a signed token to get anywhere, and this
- * question is "is the container up", not "may I join a call".
+ * question is "is it up", not "may I join a call".
  *
- * Short timeout: this runs while a settings page is rendering, and a server
- * still starting is a fact to report rather than a reason to hold the page.
+ * Short timeout: this runs while a page is rendering, and a server still
+ * starting is a fact to report rather than a reason to hold the page.
  */
-async function answering(endpoint: CallServerEndpoint): Promise<boolean> {
+export async function answering(endpoint: CallServerEndpoint): Promise<boolean> {
+    if (lastAnswer && lastAnswer.url === endpoint.url && Date.now() - lastAnswer.at < ANSWER_TTL_MS) {
+        return lastAnswer.answering;
+    }
     // A path names the edge in front of this app, which this process cannot
     // dial: it would have to know the hostname somebody typed, and only their
-    // browser knows that. The container answers on its own name on the compose
-    // network instead, which is the same server reached the other way round.
-    const address = servedHere(endpoint.url)
+    // browser knows that. The shipped server answers on the host instead, which
+    // is the same server reached the other way round.
+    const addresses = endpoint.shipped
         ? INTERNAL_CALL_SERVER
-        : endpoint.url.replace(/^ws:/, "http:").replace(/^wss:/, "https:");
-    const response = await fetch(address, { signal: AbortSignal.timeout(2500) }).catch(() => null);
-    return response?.ok === true;
+        : [endpoint.url.replace(/^ws:/, "http:").replace(/^wss:/, "https:")];
+    const answers = await Promise.all(
+        addresses.map((address) =>
+            fetch(address, { signal: AbortSignal.timeout(2500) })
+                .then((response) => response.ok)
+                .catch(() => false)
+        )
+    );
+    const up = answers.some(Boolean);
+    lastAnswer = { at: Date.now(), url: endpoint.url, answering: up };
+    return up;
 }
 
-/** Where the shipped call server answers from inside the stack, for the one
- *  question that is about the container rather than about a call. */
-const INTERNAL_CALL_SERVER = "http://livekit:7880";
-
-/** Which machine the installed server sits on, in words. Null when the install
- *  has gone, which is also how the screen offers to put one back. */
-async function serverNameFor(installId: string): Promise<string | null> {
-    const row = await prisma.installedApp.findFirst({
-        where: { id: installId, status: { not: "removed" } },
-        select: { targetId: true }
-    });
-    if (!row) return null;
-    if (!row.targetId) return "this server";
-    const target = await prisma.deployTarget.findFirst({
-        where: { id: row.targetId },
-        select: { kind: true, name: true, host: { select: { name: true } } }
-    });
-    if (!target || target.kind === "local") return "this server";
-    return target.host?.name ?? target.name ?? "another server";
+/**
+ * Why a call cannot be started here, or null when one can.
+ *
+ * One question, asked by every screen with a call button on it and by the action
+ * behind those buttons, so a button that is drawn as available is one the server
+ * will accept.
+ */
+export async function callsUnavailable(): Promise<string | null> {
+    const endpoint = await callServer();
+    if (!endpoint) return NO_CALL_SERVER;
+    return (await answering(endpoint)) ? null : NO_CALL_SERVER;
 }

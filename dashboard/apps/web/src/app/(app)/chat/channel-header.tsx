@@ -39,6 +39,7 @@ import {
     MoreHorizontal,
     Pencil,
     Phone,
+    PhoneOff,
     Search,
     Settings2,
     Trash2,
@@ -103,7 +104,7 @@ export function ChannelHeader({
 }) {
     const router = useRouter();
     const baseUrl = useAppUrl();
-    const { may } = useChat();
+    const { may, callsOff } = useChat();
     const mayCall = may.call;
     const [adding, setAdding] = useState(false);
     const [renaming, setRenaming] = useState(false);
@@ -215,7 +216,22 @@ export function ChannelHeader({
                     {/* An account that may not be in calls is not shown the way
                         in, and is not told a call is running either: it is a room
                         it cannot enter. */}
-                    {!mayCall ? null : call ? (
+                    {!mayCall ? null : callsOff ? (
+                        // Drawn, and refused. Taking the button away would leave
+                        // a conversation that simply has no calls in it, with
+                        // nowhere to read why; this way the reason is one hover
+                        // from anybody wondering where the call button went, and
+                        // it comes back on its own when the server does.
+                        <button
+                            type="button"
+                            disabled
+                            aria-label="Calls are unavailable"
+                            title={callsOff}
+                            className="cursor-not-allowed rounded p-1.5 text-foreground-subtle"
+                        >
+                            <PhoneOff className="size-4" />
+                        </button>
+                    ) : call ? (
                         // One button once a call is running: joining is joining,
                         // and the camera is a switch inside the room.
                         //

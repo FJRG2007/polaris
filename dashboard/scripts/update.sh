@@ -295,6 +295,7 @@ main() {
         seed_store_from_env ".env"
         reconcile_env ".env.example" ".env"
         sync_database_url ".env"
+        separate_call_secret ".env"
     else
         err "no .env in $(pwd); run the installer first"
         exit 1

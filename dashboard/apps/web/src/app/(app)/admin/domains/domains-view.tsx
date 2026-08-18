@@ -22,6 +22,7 @@
  */
 
 import { readJson } from "@/lib/read-json";
+import { CallPortsCard } from "./call-ports-card";
 import { GamePortsCard } from "./game-ports-card";
 import { DomainSetupWizard } from "./setup-wizard";
 import { AddressList } from "@/components/address-list";
@@ -223,6 +224,11 @@ export function DomainsView() {
                 rather than folded into advice that disappears when the website
                 works. Renders nothing when no game server exists. */}
             <GamePortsCard />
+
+            {/* Same reason again, for the other traffic 443 does not carry: a
+                call's audio. Renders nothing when calls run through a server
+                somebody else operates. */}
+            <CallPortsCard />
 
             {/* Below the instance's own addresses, because it is a different
                 decision: not what Polaris answers on, but what other people are

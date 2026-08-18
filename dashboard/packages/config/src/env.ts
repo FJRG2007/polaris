@@ -67,21 +67,6 @@ const envSchema = z.object({
     POLARIS_MASTER_KEY: z.string().min(1, "POLARIS_MASTER_KEY is required"),
 
     /**
-     * STUN servers a call uses to find a path between two browsers, comma
-     * separated (`stun:stun.example.org:3478`).
-     *
-     * Empty by default, and that is a working default rather than a missing one:
-     * two browsers on the same network reach each other on their own addresses,
-     * which is the case Polaris is usually in. It is also the private default -
-     * with none set, no address of anybody's is offered to a third party.
-     *
-     * Set it when calls have to cross the internet. Two people behind different
-     * NATs frequently still cannot connect with STUN alone, which is what the
-     * TURN keys below are for.
-     */
-    POLARIS_STUN_URLS: z.string().default(""),
-
-    /**
      * A Tenor API key, for the GIF and sticker tabs of the chat picker.
      *
      * Unset means those two tabs say so and offer nothing; emoji still work,
@@ -91,27 +76,18 @@ const envSchema = z.object({
      */
     POLARIS_TENOR_KEY: z.string().optional(),
 
-    /** A TURN server to relay a call through when the browsers cannot reach each
-     *  other directly. Unset means calls work on the local network and between
-     *  anybody with a reachable address, and not otherwise. */
-    POLARIS_TURN_URL: z.string().optional(),
-    POLARIS_TURN_USERNAME: z.string().optional(),
-    POLARIS_TURN_PASSWORD: z.string().optional(),
-
     /**
-     * The call server (LiveKit) a deployment was handed, as a WebSocket address
+     * The call server (LiveKit) this deployment carries calls on, as an address
      * and its key pair.
      *
-     * Calls can also be pointed at a server from the admin screens, and that is
-     * the right shape for somebody running Polaris at home who acquires one
-     * later. It is the wrong shape for a deployment: it makes working calls
-     * something an administrator has to go and switch on after the fact, in a
-     * screen they have no reason to open, and until they do every call between
-     * two networks is a pair of people who cannot hear each other.
+     * The stack starts one, so these are filled in by the installer and normally
+     * nobody touches them: `/livekit` on the dashboard's own hostname, which the
+     * browser resolves against whatever address it reached Polaris on. Write a
+     * whole address (`wss://calls.example.com`) to point at a server somebody
+     * else runs.
      *
-     * So a deployment can hand them over the way it hands over a database URL,
-     * and then nobody configures anything: these win over anything stored, since
-     * an operator who put them in the environment of this process meant them.
+     * They win over anything stored in the database, because an operator who put
+     * a call server in this process's environment has already decided.
      */
     POLARIS_CALL_SERVER_URL: z.string().optional(),
     POLARIS_CALL_SERVER_API_KEY: z.string().optional(),

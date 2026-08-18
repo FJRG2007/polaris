@@ -13,15 +13,14 @@
  * pure and can be rendered in the browser; everything here is sockets and rows.
  */
 
-import { connect } from "node:net";
 import { prisma } from "@polaris/db";
 import { pingSteamQuery } from "@/lib/apps/ark/a2s";
 import { pingJava } from "@/lib/apps/minecraft/slp";
 import { pingBedrock } from "@/lib/apps/minecraft/raknet";
-import { isCarrierGradeNat, isPublicIpv4 } from "@polaris/core";
+import { getLocalEnvironment } from "@/lib/network-service";
 import { getHostLanIp, isLanAddress } from "@/lib/host-address";
 import { getPortBlocks, getPortPolicy } from "@/lib/apps/port-block-store";
-import { detectPublicIp, getLocalEnvironment } from "@/lib/network-service";
+import { probeTcpPort, publicProbeHost, PROBE_TIMEOUT_MS } from "@/lib/net/port-probe";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import { gameReachAdvice, gameStoppedAdvice, type GamePort, type GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 
@@ -95,31 +94,6 @@ export async function noteReachedFrom(installedAppId: string, address: string): 
     if (isLanAddress(address)) return false;
     await patchInstallConfig(installedAppId, { portReachableAt: new Date().toISOString() });
     return true;
-}
-
-/** How long to wait on a port before calling the probe inconclusive. */
-const PROBE_TIMEOUT_MS = 4000;
-
-/**
- * Try to open the port from here, through the public address.
- *
- * Positive evidence only: a connection that completes went out to the public
- * address and came back in, which is the forward working. A refusal or a timeout
- * is reported as false and means nothing on its own - most routers do not loop
- * their own WAN address back inward. This one speaks TCP; a UDP port is asked the
- * only question it can answer, in `raknet.ts`.
- */
-export function probeGamePort(host: string, port: number, timeoutMs = PROBE_TIMEOUT_MS): Promise<boolean> {
-    return new Promise((resolve) => {
-        const socket = connect({ host, port, timeout: timeoutMs });
-        const settle = (reached: boolean): void => {
-            socket.destroy();
-            resolve(reached);
-        };
-        socket.once("connect", () => settle(true));
-        socket.once("timeout", () => settle(false));
-        socket.once("error", () => settle(false));
-    });
 }
 
 /**
@@ -209,7 +183,7 @@ export interface PendingReach {
  * This is the half that lets a panel notice a forward that has just been made,
  * rather than waiting for a player to arrive: the packet still has to leave this
  * network and come back through the router, so a connection that completes is the
- * forward working. Nothing is concluded from silence - see `probeGamePort` - and
+ * forward working. Nothing is concluded from silence - see `probeTcpPort` - and
  * nothing is attempted at all unless this line has an address the internet could
  * dial, since knocking on a LAN address would clear the warning for the one
  * operator whose forward does not exist.
@@ -218,7 +192,7 @@ export interface PendingReach {
  */
 export async function probeReach(pending: readonly PendingReach[]): Promise<string[]> {
     if (pending.length === 0) return [];
-    const host = await probeHost();
+    const host = await publicProbeHost();
     if (!host) return [];
     const reached: string[] = [];
     for (const entry of pending) {
@@ -232,7 +206,7 @@ export async function probeReach(pending: readonly PendingReach[]): Promise<stri
         const answers = await Promise.all(
             entry.ports.map((port) =>
                 port.protocol === "tcp"
-                    ? probeGamePort(host, port.port)
+                    ? probeTcpPort(host, port.port)
                     : answersOnUdp(host, port.port, PROBE_TIMEOUT_MS)
             )
         );
@@ -241,15 +215,6 @@ export async function probeReach(pending: readonly PendingReach[]): Promise<stri
         }
     }
     return reached;
-}
-
-/** The address to knock on: what this network reaches the internet from, and only
- *  when it is one an outside client could use. A carrier-NAT address is shared
- *  with other customers, so what answers on it need not be this machine at all. */
-async function probeHost(): Promise<string | null> {
-    const ip = await detectPublicIp().catch(() => null);
-    if (!ip || !isPublicIpv4(ip) || isCarrierGradeNat(ip)) return null;
-    return ip;
 }
 
 /**

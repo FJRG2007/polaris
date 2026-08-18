@@ -45,12 +45,34 @@ async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: str
     }
 }
 
-/** Start the call in a conversation, or step into the one already running. */
+/**
+ * Why a call cannot be started here, or null when one can.
+ *
+ * Read by every screen with a call button on it, so a button that is drawn as
+ * available is one this will accept. It is about the instance rather than about
+ * the reader - what it can say is "there is nowhere for a call to run", which is
+ * not a fact about anybody - so holding the chat is gate enough.
+ */
+export async function callsUnavailableAction(): Promise<string | null> {
+    await requirePermission("chat.use");
+    return calls.callsUnavailable();
+}
+
+/**
+ * Start the call in a conversation, or step into the one already running.
+ *
+ * Refused outright when there is no working call server. Every call goes through
+ * one, so starting without it is a room that opens microphones and carries
+ * nothing - two people watching each other's names, which is the state nobody
+ * can diagnose from inside.
+ */
 export async function startCallAction(
     channelId: string
 ): Promise<{ meetingId?: string; error?: string }> {
     const user = await requirePermission("chat.use");
     if (!(await can(user.id, "chat.call"))) return { error: NO_CALLS };
+    const off = await calls.callsUnavailable();
+    if (off) return { error: off };
     const result = await guard(() =>
         meetings.startOrJoin({ id: user.id, name: user.name }, channelId)
     );
@@ -93,6 +115,8 @@ export async function inviteToCallAction(
 export async function joinCallAction(meetingId: string): Promise<{ error?: string }> {
     const user = await requirePermission("chat.use");
     if (!(await can(user.id, "chat.call"))) return { error: NO_CALLS };
+    const off = await calls.callsUnavailable();
+    if (off) return { error: off };
     const result = await guard(() => meetings.join({ id: user.id, name: user.name }, meetingId));
     return result.error ? { error: result.error } : {};
 }
@@ -158,42 +182,29 @@ export async function readCallAction(meetingId: string): Promise<{
 }
 
 /**
- * Which way this call will be carried.
- *
- * Asked before anything is opened, because the two ways of carrying a call are
- * two different pieces of code in the browser and starting the wrong one costs a
- * second permission prompt. It answers about the instance rather than about the
- * caller - so a seat is the only gate, and somebody still in the waiting room
- * gets a truthful answer, which is what lets their browser be ready the moment
- * they are let in.
- */
-export async function callTransportAction(meetingId: string): Promise<"sfu" | "mesh"> {
-    const seat = await resolveSeat(meetingId);
-    if (!seat) return "mesh";
-    return (await calls.callServer()) ? "sfu" : "mesh";
-}
-
-/**
  * The ticket for the server a call runs through.
- *
- * Answered with nothing at all when this instance has no call server, which is
- * not an error: the browser then talks to the other browsers directly, which is
- * what Chat did before there was one and still works inside a single network.
  *
  * The signing key never leaves the server. What comes back is good for one room,
  * for a few minutes, under the identity of the seat this request already holds -
  * so a browser cannot ask for a ticket to a call it was not admitted to, and the
  * waiting room is enforced exactly once, here.
+ *
+ * Waiting in the lobby is answered as waiting rather than as an error, and that
+ * distinction is the whole reason this returns three things instead of two. A
+ * browser at the door is told "not yet" and asks again on the next roster
+ * change, silently; anything else has gone wrong and belongs on screen. Reported
+ * as one shape, an instance whose media server had died looked exactly like a
+ * guest waiting to be let in, and said nothing to either of them.
  */
 export async function callTokenAction(
     meetingId: string
-): Promise<{ url?: string; token?: string; error?: string }> {
+): Promise<{ url?: string; token?: string; waiting?: boolean; error?: string }> {
     const seat = await resolveSeat(meetingId);
     if (!seat) return { error: "You are not in that call" };
-    if (seat.admission !== "admitted") return { error: "Still waiting to be let in" };
+    if (seat.admission !== "admitted") return { waiting: true };
 
     const endpoint = await calls.callServer();
-    if (!endpoint) return {};
+    if (!endpoint) return { error: calls.NO_CALL_SERVER };
 
     const token = await calls.joinToken(endpoint, meetingId, seat.participantId);
     return { url: endpoint.url, token };
@@ -291,28 +302,13 @@ export async function liveCallAction(
 }
 
 /**
- * The addresses this browser should try. Server-side because a TURN credential
- * is configuration, and the browser needs it to connect at all.
- *
- * A seat in the call it is for is the gate. A TURN credential relays whatever is
- * handed to it, so an action that gave one to anybody who could reach the app
- * would be an open relay with a Polaris login page in front of it - and this one
- * ships in the guest bundle, where there is not even that.
- */
-export async function iceServersAction(meetingId: string): Promise<RTCIceServer[]> {
-    const seat = await resolveSeat(meetingId);
-    if (!seat || seat.admission !== "admitted") return [];
-    return meetings.iceServers() as RTCIceServer[];
-}
-
-/**
  * The licensed noise filter an administrator connected, if there is one.
  *
  * Both halves of it reach the browser, because that is where a filter on a
  * microphone runs - there is no arrangement in which the page does not hold
- * them. So the gate is the same one the TURN credential has: a seat in this
- * call, admitted. That is the most that can be true of something a browser has
- * to be given, and the dialog that stores it says so.
+ * them. So the gate is the same one the join ticket has: a seat in this call,
+ * admitted. That is the most that can be true of something a browser has to be
+ * given, and the dialog that stores it says so.
  */
 export async function licensedFilterAction(
     meetingId: string

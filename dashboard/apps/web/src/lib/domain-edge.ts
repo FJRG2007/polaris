@@ -39,9 +39,12 @@ const ROUTER = "polaris-dashboard";
 /** Its own redirect middleware: the file provider merges every file into one config,
  *  so reusing the name the app routes define would be a duplicate definition. */
 const REDIRECT = `${ROUTER}-redirect-https`;
-/** Below the terminal WebSocket router's 100, which carries no host of its own and
- *  has to keep winning its path prefix on these hostnames too. Traefik otherwise
- *  ranks by rule length, and a few hostnames is enough to overtake it. */
+/** Between the two. Below the path routers at 100 - the terminal WebSocket and the
+ *  call server, neither of which carries a host of its own and both of which have to
+ *  keep winning their prefix on these hostnames - and above the compose labels' own
+ *  catch-all at 10, so these hostnames get this router's certificate and firewall
+ *  rather than the plain one. Stated rather than left to Traefik, which otherwise
+ *  ranks by rule length: a few hostnames is enough to overtake a path. */
 const PRIORITY = 50;
 
 /** Suffixes that never get a public certificate, so an ACME order on one is an order

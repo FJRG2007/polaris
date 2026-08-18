@@ -91,6 +91,15 @@ services:
       - "traefik.http.routers.polaris-web.rule=Host(`polaris`) || Host(`polaris.local`) || Host(`${POLARIS_PUBLIC_IP:-127.0.0.1}`) || Host(`${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`) || HostRegexp(`^[0-9]{1,3}(\\.[0-9]{1,3}){3}$$`)"
       - "traefik.http.routers.polaris-web.entrypoints=websecure"
       - "traefik.http.routers.polaris-web.tls=true"
+      # Lowest, and stated rather than left to work itself out. Unset, Traefik
+      # ranks routers by the LENGTH of their rule - and this rule is 136
+      # characters of hostnames, which quietly outranks every path router in
+      # the deployment. It matches any path on these names, so it was taking
+      # `/livekit` and `/api/deploy/ws` on the local hostnames and handing them
+      # to the dashboard: a call that could not open its socket, and a terminal
+      # that would not connect, on exactly the addresses used from the sofa.
+      # This one is the catch-all and belongs underneath all of them.
+      - "traefik.http.routers.polaris-web.priority=10"
       # The container exposes two services (dashboard + WS sidecar), so every
       # router must name its service explicitly - Traefik will not auto-link.
       - "traefik.http.routers.polaris-web.service=polaris-web"
@@ -98,6 +107,7 @@ services:
       - "traefik.http.routers.polaris-web-http.rule=Host(`polaris`) || Host(`polaris.local`) || Host(`${POLARIS_PUBLIC_IP:-127.0.0.1}`) || Host(`${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`) || HostRegexp(`^[0-9]{1,3}(\\.[0-9]{1,3}){3}$$`)"
       - "traefik.http.routers.polaris-web-http.entrypoints=web"
       - "traefik.http.routers.polaris-web-http.service=polaris-web"
+      - "traefik.http.routers.polaris-web-http.priority=10"
       - "traefik.http.routers.polaris-web-http.middlewares=polaris-redirect-https"
       - "traefik.http.middlewares.polaris-redirect-https.redirectscheme.scheme=https"
       # The interactive-terminal WebSocket sidecar listens on a separate port.
@@ -186,80 +196,63 @@ services:
   # browser-to-browser call would hold. Polaris signs a ticket for one room, for
   # a few minutes, per person; the signing key never leaves the two of them.
   livekit:
-    # The same image the catalog's call-server app installs, so an instance that
-    # ends up with both is running one version of one server.
-    image: livekit/livekit-server:latest
+    # Pinned to the minor series, as Traefik is: patches arrive, a version that
+    # changes how the thing is configured does not arrive on its own.
+    image: livekit/livekit-server:v1.13
     restart: unless-stopped
+    # On the host's network, and that is the whole job of this container.
+    #
+    # What a media server does is hand each browser an address to send audio to.
+    # On a bridged network the only addresses it has are the daemon's own
+    # (172.x), which no browser anywhere can reach - not from another house and
+    # not from the sofa. Publishing the ports does not help: the port is
+    # reachable, and the address the server advertised inside its handshake is
+    # still one that goes nowhere. The call then connects, shows everybody's
+    # name, and carries no sound, which is exactly the failure people report.
+    #
+    # Here it sees the machine's real interfaces, so it offers browsers the LAN
+    # address - which every device in the house can already reach, with no
+    # router rule - and, once discovery confirms it, the public one as well.
+    network_mode: host
     environment:
       # `name: secret`, which is the shape the server reads. The dashboard signs
       # with the same pair, from the same .env, so there is one copy of it.
-      LIVEKIT_KEYS: "${POLARIS_CALL_SERVER_API_KEY:-polaris}: ${POLARIS_CALL_SERVER_API_SECRET:?POLARIS_CALL_SERVER_API_SECRET is required}"
-      # Held here rather than in a mounted file so the public address can be
-      # interpolated from .env. A file cannot read a variable, and that address
-      # is the one thing about this that differs per house.
+      # Deliberately not `:?` - a missing value must fail this container alone,
+      # not refuse to start the dashboard along with it.
+      LIVEKIT_KEYS: "${POLARIS_CALL_SERVER_API_KEY:-polaris}: ${POLARIS_CALL_SERVER_API_SECRET:-}"
+      # Held here rather than in a mounted file: one place to read, and nothing
+      # to keep in step with a host path that moves during a self-update.
       LIVEKIT_CONFIG: |
         port: 7880
         rtc:
           # One TCP and one UDP port rather than the ten-thousand-port range
-          # LiveKit defaults to. A range that size is a nuisance to publish
-          # through Docker and a worse one to open on a router, and one port
-          # carries every call this is going to hold.
+          # LiveKit defaults to. A range that size is a nuisance to open on a
+          # router, and one port carries every call this is going to hold.
+          # TCP is the fallback that gets through the networks UDP cannot:
+          # the browser dials out to it, so a restrictive NAT on the caller's
+          # side is not in the way. It is why there is no TURN relay here.
           tcp_port: 7881
           udp_port: 7882
-          # Discovery stays off. Turned on, LiveKit finds its public address by
-          # asking a STUN server it has hardcoded, which is a third party in the
-          # path of something meant to be entirely local.
-          use_external_ip: false
-          # What to tell browsers to send media to. Without it the server
-          # advertises the address it can see, which is a Docker address - right
-          # inside the house and meaningless past the router. Filled in from the
-          # public IP Polaris already knows; absent, calls stay on the LAN.
-          ${POLARIS_PUBLIC_IP:+node_ip: }${POLARIS_PUBLIC_IP}
-        turn:
-          # For the networks that refuse a direct path at all. A symmetric NAT
-          # hands out a different address per destination, so there is nothing
-          # to discover and the only way through is something both ends can
-          # reach forwarding the media. Idle until it is needed.
-          enabled: true
-          udp_port: 3478
-          # TLS is terminated at the edge. A second place certificates have to
-          # be kept fresh is a second place they go stale.
-          tls_port: 0
+          # Find the public address by asking a STUN server. One request at
+          # startup, never in the path of a call, and it is the only way the
+          # server can learn the address on the far side of the router - which
+          # is the address it has to hand to anybody calling in from outside.
+          #
+          # It is also a dependency worth naming: with no route to the internet
+          # the server refuses to start, and calls are off until there is one.
+          # That is the honest failure - it restarts by itself when the line
+          # comes back, and Chat says calls are unavailable in the meantime
+          # rather than offering one that would carry nothing.
+          use_external_ip: true
+          # Offer the local addresses as well as the public one. A call between
+          # two devices in the same house then never leaves it, which is both
+          # faster and the case that has to work before anybody has been near a
+          # router. Without this the only address on offer is the public one,
+          # and every call in the house goes out to the router and back - if it
+          # comes back at all.
+          advertise_internal_ip: true
         logging:
           level: info
-    labels:
-      # Signalling rides the dashboard's own address, on a path.
-      #
-      # It has to go through the edge: the dashboard is served over HTTPS, a
-      # page on HTTPS may not open a plain `ws://` socket, and so a call server
-      # on a bare port is one the browser refuses to dial before it has sent a
-      # byte. A path rather than a subdomain, because a subdomain is a DNS
-      # record somebody has to create and this is meant to need nothing - the
-      # certificate, the domain and the port are the ones Polaris already has.
-      - "polaris.role=edge"
-      - "traefik.enable=true"
-      - "traefik.docker.network=polaris_default"
-      - "traefik.http.routers.polaris-livekit.rule=PathPrefix(`/livekit`)"
-      - "traefik.http.routers.polaris-livekit.entrypoints=websecure"
-      - "traefik.http.routers.polaris-livekit.tls=true"
-      - "traefik.http.routers.polaris-livekit.service=polaris-livekit"
-      # Above the dashboard's own catch-all, which would otherwise take it.
-      - "traefik.http.routers.polaris-livekit.priority=100"
-      - "traefik.http.routers.polaris-livekit.middlewares=polaris-livekit-strip"
-      # LiveKit serves from the root, so the prefix comes back off on the way in.
-      - "traefik.http.middlewares.polaris-livekit-strip.stripprefix.prefixes=/livekit"
-      - "traefik.http.services.polaris-livekit.loadbalancer.server.port=7880"
-    ports:
-      # Media and the relay cannot go through the edge - none of it is HTTP - so
-      # they are published directly. These are the ports to forward on a router,
-      # and the only manual step left in setting calls up.
-      - "7881:7881"
-      - "7882:7882/udp"
-      - "3478:3478/udp"
-    volumes:
-      # Absolute host path for the same reason caddy's mount uses one: a
-      # self-update runs compose from the container path /polaris.
-      - ${POLARIS_HOST_REPO:-../..}/dashboard/docker/livekit.yaml:/etc/livekit/livekit.yaml:ro
 
   # Legacy edge, kept behind the `caddy` profile for rollback. Traefik is the
   # default edge now (automatic HTTPS for every site); to fall back, stop traefik

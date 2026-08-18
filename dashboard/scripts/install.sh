@@ -228,10 +228,16 @@ generate_env() {
     auth_secret=$(durable_secret POLARIS_AUTH_SECRET b64_48)
     pg_password=$(durable_secret POSTGRES_PASSWORD hex_24)
     setup_token=$(openssl rand -hex 24)
+    # Its own placeholder rather than sharing the auth secret's. sed substitutes
+    # per line, so a shared one hands the same string to both - and the call
+    # server's signing key would be the key that signs every session in the
+    # instance, held by a container whose whole job is to talk to the internet.
+    call_secret=$(durable_secret POLARIS_CALL_SERVER_API_SECRET b64_32)
 
     sed \
         -e "s#REPLACE_ME_openssl_rand_base64_32#${master_key}#" \
         -e "s#REPLACE_ME_long_random_string#${auth_secret}#" \
+        -e "s#REPLACE_ME_call_server_secret#${call_secret}#" \
         -e "s#REPLACE_ME_setup_token#${setup_token}#" \
         -e "s#REPLACE_ME_strong_password#${pg_password}#g" \
         "$example" > "$target"
@@ -249,6 +255,7 @@ materialize() {
     case "$2" in
         REPLACE_ME_openssl_rand_base64_32) durable_secret "$key" b64_32 ;;
         REPLACE_ME_long_random_string) durable_secret "$key" b64_48 ;;
+        REPLACE_ME_call_server_secret) durable_secret "$key" b64_32 ;;
         REPLACE_ME_strong_password) durable_secret "$key" hex_24 ;;
         REPLACE_ME_setup_token) openssl rand -hex 24 ;;
         *) printf '%s' "$2" ;;
@@ -365,6 +372,25 @@ sync_database_url() {
         sed -i "s#^POLARIS_DATABASE_URL=.*#POLARIS_DATABASE_URL=${desired}#" "$target"
         log "kept POLARIS_DATABASE_URL consistent with POSTGRES_PASSWORD"
     fi
+}
+
+# Give the call server a signing key of its own.
+#
+# An earlier release filled both it and POLARIS_AUTH_SECRET from one placeholder,
+# so every .env written by it hands the media container the string that signs
+# this instance's sessions. Repairing it here rather than leaving it to the next
+# reinstall: the value is only ever read by the two things that mint join
+# tickets, so replacing it costs a call in progress and nothing else.
+separate_call_secret() {
+    target="$1"
+    call=$(sed -n 's/^POLARIS_CALL_SERVER_API_SECRET=//p' "$target" | head -n1)
+    [ -n "$call" ] || return 0
+    auth=$(sed -n 's/^POLARIS_AUTH_SECRET=//p' "$target" | head -n1)
+    [ "$call" = "$auth" ] || return 0
+    fresh=$(gen_secret b64_32)
+    remember_secret POLARIS_CALL_SERVER_API_SECRET "$fresh"
+    set_env_var "$target" "POLARIS_CALL_SERVER_API_SECRET" "$fresh"
+    log "gave the call server a signing key of its own"
 }
 
 # Whether the web container is serving. Prefers the container healthcheck; on an
@@ -571,6 +597,7 @@ main() {
 
     # Guarantee the app's database URL and the Postgres password always agree.
     sync_database_url ".env"
+    separate_call_secret ".env"
 
     # The placeholder example.com domain can never get a certificate (RFC 2606
     # reserves it), so leaving it makes Caddy loop on ACME forever while the site

@@ -62,6 +62,13 @@ export async function register(): Promise<void> {
     const { syncDashboardRoute } = await import("./lib/domain-edge");
     void syncDashboardRoute();
 
+    // And the call server's path, for a stronger version of the same reason: it
+    // runs on the host's network, so there is no container address for the edge's
+    // label discovery to route to and this file is the only way it is reachable
+    // at all. Without it every call fails at the first WebSocket.
+    const { syncCallServerRoute } = await import("./lib/chat/call-edge");
+    void syncCallServerRoute();
+
     // Migrate any quick tunnel still forwarding straight to an app's port onto the edge,
     // so its traffic is logged (and future restarts leave an edge tunnel untouched).
     const { reconcileQuickTunnels } = await import("./lib/deploy/quick-tunnel-service");

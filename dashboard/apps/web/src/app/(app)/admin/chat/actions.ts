@@ -11,10 +11,10 @@
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
-import { listHosts } from "@/lib/host-service";
 import { setChatRules } from "@/lib/chat/rules";
 import * as calls from "@/lib/chat/call-server";
 import { recordAudit } from "@/lib/audit-service";
+import { syncCallServerRoute } from "@/lib/chat/call-edge";
 
 export async function setChatRulesAction(
     scope: unknown,
@@ -51,57 +51,13 @@ export async function callServerSettingsAction(): Promise<{
     return { settings: await calls.callServerSettings() };
 }
 
-/** The machines a call server can be put on. */
-export async function callServerMachinesAction(): Promise<{
-    machines?: { id: string; label: string }[];
-    error?: string;
-}> {
-    const admin = await requireAdmin();
-    const hosts = await listHosts(admin.id);
-    return {
-        machines: [
-            { id: "local", label: "This machine" },
-            ...hosts.map((host) => ({ id: host.id, label: host.name }))
-        ]
-    };
-}
-
-/**
- * Put a call server up, on a machine somebody chose.
- *
- * Slow the first time - it is a deploy - and instant afterwards. Nothing about
- * an existing call changes when it lands: a call already running browser to
- * browser stays that way until it ends, and the next one goes through this.
- */
-export async function installCallServerAction(serverId: unknown): Promise<{ error?: string }> {
-    const admin = await requireAdmin();
-    const server = typeof serverId === "string" ? serverId : "";
-    if (!server) return { error: "Pick a machine to run it on" };
-
-    try {
-        await calls.installCallServer(admin.id, admin.id, server);
-    } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "It could not be installed" };
-    }
-    await recordAudit({
-        actorId: admin.id,
-        action: "chat.calls.install",
-        targetType: "setting",
-        targetId: "chat.calls",
-        metadata: { server }
-    });
-    revalidatePath("/admin/chat");
-    return {};
-}
-
 /**
  * Point calls at a server somebody runs themselves, or unpoint them.
  *
- * Still here after the button above, and on purpose: a house that already runs
- * one should not have to install a second. An empty address clears the pairing,
- * which is how this is switched off - and the audit records that it changed
- * rather than what it changed to, because one of the three values is a signing
- * key.
+ * The stack starts one, so this is for a house that already runs its own rather
+ * than the way calls are switched on. An empty address clears the pairing - and
+ * the audit records that it changed rather than what it changed to, because one
+ * of the three values is a signing key.
  */
 export async function setCallServerAction(
     url: unknown,
@@ -114,6 +70,10 @@ export async function setCallServerAction(
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "That could not be saved" };
     }
+    // Pointing calls elsewhere takes the shipped server's path off the edge, and
+    // clearing the address puts it back. Left alone, an instance that switched
+    // away would go on publishing a path that reaches a server nobody uses.
+    await syncCallServerRoute();
     await recordAudit({
         actorId: admin.id,
         action: "chat.calls.configure",

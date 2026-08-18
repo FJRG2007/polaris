@@ -1,32 +1,22 @@
 /**
  * What a browser in a call listens to.
  *
- * Two things come down it: signals addressed to this participant, and the fact
- * that the roster moved. Signals are filtered by participant id here, so one
- * peer's offer never reaches a third browser - and since the payload is opaque
- * to this server, that filter is the only thing standing between them.
+ * The room, and only the room: who is in it, when it ended, and when this seat
+ * was taken over by another device. The call itself is negotiated with the call
+ * server over its own connection and none of it passes here.
  *
  * A stream is opened by proving a seat, which is either a session that reaches
- * the conversation or a guest cookie minted on the way in. Somebody still in the
- * lobby gets the roster and no signals, which is exactly what waiting is:
- * nothing of the call reaches them until they are admitted - and admission is
- * re-read rather than frozen at the moment the stream opened, since waiting to
- * be let in is precisely the state that is about to change.
- *
- * Anything addressed here before this stream existed is handed over first. The
- * browser that joins second is in the roster before it is listening, so the
- * first browser's offer is usually already waiting by the time it gets here.
+ * the conversation or a guest cookie minted on the way in. Admission is re-read
+ * rather than frozen at the moment the stream opened, since waiting to be let in
+ * is precisely the state that is about to change - and the browser only asks the
+ * call server for a ticket once this has told it that it is in.
  *
  * Node runtime, never cached.
  */
 
 import { prisma } from "@polaris/db";
 import { resolveSeat } from "@/lib/chat/meeting-seat";
-import {
-    subscribeMeetingEvents,
-    subscribeSignals,
-    takeHeldSignals
-} from "@/lib/chat/meeting-signal";
+import { subscribeMeetingEvents } from "@/lib/chat/meeting-events";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,21 +42,18 @@ export async function GET(
     const encoder = new TextEncoder();
     let closed = false;
     let heartbeat: ReturnType<typeof setInterval> | null = null;
-    let offSignals: (() => void) | null = null;
     let offEvents: (() => void) | null = null;
     // Whether the person at this end is in the room rather than at the door.
     // Mutable, because being let in is a thing that happens to an open stream,
     // and a stream that kept the answer it opened with would leave an admitted
-    // guest waiting for signals that were being filtered out on their behalf.
+    // guest sitting in a lobby their browser had already been let out of.
     let admitted = seat.admission === "admitted";
 
     function stop(): void {
         closed = true;
         if (heartbeat) clearInterval(heartbeat);
         heartbeat = null;
-        offSignals?.();
         offEvents?.();
-        offSignals = null;
         offEvents = null;
     }
 
@@ -84,19 +71,6 @@ export async function GET(
             function send(payload: unknown): void {
                 write(`data: ${JSON.stringify(payload)}\n\n`);
             }
-
-            offSignals = subscribeSignals((signal) => {
-                if (closed) return false;
-                if (signal.meetingId !== meetingId) return false;
-                if (signal.toId !== participantId) return false;
-                // Waiting in the lobby means hearing nothing of the call itself.
-                // Answering false rather than true holds it, so an offer sent
-                // while somebody was at the door reaches them once they are let
-                // in instead of being lost to the wait.
-                if (!admitted) return false;
-                send({ kind: "signal", fromId: signal.fromId, payload: signal.payload });
-                return true;
-            });
 
             offEvents = subscribeMeetingEvents((event) => {
                 if (closed || event.meetingId !== meetingId) return;
@@ -125,8 +99,7 @@ export async function GET(
             });
 
             /**
-             * Ask again whether this seat has been let in, and hand over what
-             * was held while it was not.
+             * Ask again whether this seat has been let in.
              *
              * Read straight from the row rather than by resolving the seat
              * again: the seat was proved from the request, and this runs long
@@ -147,25 +120,13 @@ export async function GET(
                     participantId,
                     admission: "admitted"
                 });
-                drainHeld();
-            }
-
-            /** Whatever arrived for this participant before it was listening. */
-            function drainHeld(): void {
-                if (!admitted) return;
-                for (const signal of takeHeldSignals(meetingId, participantId)) {
-                    send({ kind: "signal", fromId: signal.fromId, payload: signal.payload });
-                }
             }
 
             // Gets the response on the wire so EventSource fires `open`, and
-            // tells the browser which participant it is - it needs its own id to
-            // address the offers it is about to make.
+            // tells the browser which participant it is - the identity it is
+            // about to be given a ticket under.
             write(":ok\n\n");
             send({ kind: "seated", participantId, admission: seat.admission });
-            // After the seat, never before: the browser has to know who it is
-            // before it can make sense of an offer addressed to it.
-            drainHeld();
             heartbeat = setInterval(() => write(":\n\n"), HEARTBEAT_MS);
         },
         cancel() {
