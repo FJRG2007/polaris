@@ -39,10 +39,10 @@ import { z } from "zod";
 import * as quality from "./call-quality";
 import { setMicDevice } from "./mic-device";
 import { callDeviceId } from "./call-device";
-import { callMuted, setCallMuted } from "./call-muted";
 import * as actions from "./meeting-actions";
 import { callServerUrl } from "./call-address";
 import { playCallSound } from "@/lib/call-sounds";
+import { callMuted, setCallMuted } from "./call-muted";
 import type { MeetingView } from "@/lib/chat/meetings";
 import { callDevices, openMedia, settle } from "./call-media";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -1166,27 +1166,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                   }
                 | undefined;
             const stats = await sender?.getSenderStats?.().catch(() => undefined);
-            // Empty rather than absent is the ordinary case, not a strange one:
-            // a track published a moment ago has no outbound report yet. It is
-            // the same "no evidence" as a browser that answers nothing, and it
-            // has to be checked for, because reducing an empty array with no
-            // initial value throws - inside a floating promise, which would take
-            // the screen's reading down with the camera's.
-            if (!stats || stats.length === 0) return { connection };
-            const top = stats.reduce((best, entry) =>
-                (entry.frameHeight ?? 0) > (best.frameHeight ?? 0) ? entry : best
-            );
-            // Any layer naming a limit is the encoder being held back, so the
-            // whole picture is. On the current codec there is one entry; the
-            // fallback path has three, and a complaint from any of them counts.
-            const limited = stats.find(
-                (entry) => entry.qualityLimitationReason && entry.qualityLimitationReason !== "none"
-            );
-            return {
-                connection,
-                limitation: limited?.qualityLimitationReason ?? top.qualityLimitationReason,
-                fps: countFrames ? top.framesPerSecond : undefined
-            };
+            return quality.senderHealthFrom(stats, connection, countFrames);
         },
         []
     );

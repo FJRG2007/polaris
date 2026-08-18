@@ -245,6 +245,45 @@ export interface CallHealth {
     readonly fps?: number;
 }
 
+/** One report from a sender's own stats, narrowed to what the walk reads. */
+export interface SenderStatEntry {
+    readonly qualityLimitationReason?: string;
+    readonly framesPerSecond?: number;
+    readonly frameHeight?: number;
+}
+
+/**
+ * Turns one encoder's stats into a reading `driftAuto` can use.
+ *
+ * Empty rather than absent is the ordinary case, not a strange one: a track
+ * published a moment ago has no outbound report yet. It is the same "no
+ * evidence" as a browser that answers nothing, and it has to be checked for,
+ * because reducing an empty array with no initial value throws - inside a
+ * floating promise, which would take the screen's reading down with the
+ * camera's.
+ */
+export function senderHealthFrom(
+    stats: readonly SenderStatEntry[] | undefined,
+    connection: string,
+    countFrames: boolean
+): CallHealth {
+    if (!stats || stats.length === 0) return { connection };
+    const top = stats.reduce((best, entry) =>
+        (entry.frameHeight ?? 0) > (best.frameHeight ?? 0) ? entry : best
+    );
+    // Any layer naming a limit is the encoder being held back, so the whole
+    // picture is. On the current codec there is one entry; the fallback path
+    // has three, and a complaint from any of them counts.
+    const limited = stats.find(
+        (entry) => entry.qualityLimitationReason && entry.qualityLimitationReason !== "none"
+    );
+    return {
+        connection,
+        limitation: limited?.qualityLimitationReason ?? top.qualityLimitationReason,
+        fps: countFrames ? top.framesPerSecond : undefined
+    };
+}
+
 /** Readings in a row before auto tries a bigger picture. Four of them at a
  *  quarter minute each is a minute of calm, which is long enough that a lull
  *  between two bad patches does not count as a recovery. */

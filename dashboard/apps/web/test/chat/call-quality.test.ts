@@ -49,6 +49,7 @@ const {
     screenConstraints,
     screenIsMotion,
     screenQuality,
+    senderHealthFrom,
     setCameraQuality,
     setScreenQuality,
     shift,
@@ -367,6 +368,56 @@ describe("the automatic walk", () => {
             state = driftAuto(state, clean, CAMERA_LADDER);
         }
         expect(state.level).toBe(CAMERA_LADDER.floor);
+    });
+});
+
+describe("reading one encoder's own stats", () => {
+    it("reports no evidence rather than throwing, for a track with no report yet", () => {
+        // A track published a moment ago has an empty stats array, not an
+        // absent one. Reducing that with no initial value throws - inside a
+        // floating promise, which used to take the whole reading down.
+        expect(() => senderHealthFrom([], "excellent", true)).not.toThrow();
+        expect(senderHealthFrom([], "excellent", true)).toEqual({ connection: "excellent" });
+    });
+
+    it("reports no evidence when the browser answers nothing at all", () => {
+        expect(senderHealthFrom(undefined, "excellent", true)).toEqual({ connection: "excellent" });
+    });
+
+    it("reads the tallest layer's numbers, on the fallback path with three", () => {
+        const health = senderHealthFrom(
+            [
+                { frameHeight: 180, framesPerSecond: 15 },
+                { frameHeight: 720, framesPerSecond: 30, qualityLimitationReason: "none" },
+                { frameHeight: 360, framesPerSecond: 24 }
+            ],
+            "excellent",
+            true
+        );
+        expect(health).toEqual({ connection: "excellent", limitation: "none", fps: 30 });
+    });
+
+    it("counts a limitation named by any layer, not only the tallest", () => {
+        const health = senderHealthFrom(
+            [
+                { frameHeight: 720, framesPerSecond: 30, qualityLimitationReason: "none" },
+                { frameHeight: 360, framesPerSecond: 24, qualityLimitationReason: "bandwidth" }
+            ],
+            "good",
+            true
+        );
+        expect(health.limitation).toBe("bandwidth");
+    });
+
+    it("leaves the frame count out for a screen, even with a healthy report", () => {
+        // Counting frames on a still screen would read "nobody is touching it"
+        // as a stall, and walk a document down to 720p for doing its job.
+        const health = senderHealthFrom(
+            [{ frameHeight: 1080, framesPerSecond: 2, qualityLimitationReason: "none" }],
+            "excellent",
+            false
+        );
+        expect(health.fps).toBeUndefined();
     });
 });
 
