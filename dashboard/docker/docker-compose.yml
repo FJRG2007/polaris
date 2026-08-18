@@ -190,36 +190,69 @@ services:
     # ends up with both is running one version of one server.
     image: livekit/livekit-server:latest
     restart: unless-stopped
-    command: ["--config", "/etc/livekit/livekit.yaml"]
     environment:
       # `name: secret`, which is the shape the server reads. The dashboard signs
       # with the same pair, from the same .env, so there is one copy of it.
       LIVEKIT_KEYS: "${POLARIS_CALL_SERVER_API_KEY:-polaris}: ${POLARIS_CALL_SERVER_API_SECRET:?POLARIS_CALL_SERVER_API_SECRET is required}"
+      # Held here rather than in a mounted file so the public address can be
+      # interpolated from .env. A file cannot read a variable, and that address
+      # is the one thing about this that differs per house.
+      LIVEKIT_CONFIG: |
+        port: 7880
+        rtc:
+          # One TCP and one UDP port rather than the ten-thousand-port range
+          # LiveKit defaults to. A range that size is a nuisance to publish
+          # through Docker and a worse one to open on a router, and one port
+          # carries every call this is going to hold.
+          tcp_port: 7881
+          udp_port: 7882
+          # Discovery stays off. Turned on, LiveKit finds its public address by
+          # asking a STUN server it has hardcoded, which is a third party in the
+          # path of something meant to be entirely local.
+          use_external_ip: false
+          # What to tell browsers to send media to. Without it the server
+          # advertises the address it can see, which is a Docker address - right
+          # inside the house and meaningless past the router. Filled in from the
+          # public IP Polaris already knows; absent, calls stay on the LAN.
+          ${POLARIS_PUBLIC_IP:+node_ip: }${POLARIS_PUBLIC_IP}
+        turn:
+          # For the networks that refuse a direct path at all. A symmetric NAT
+          # hands out a different address per destination, so there is nothing
+          # to discover and the only way through is something both ends can
+          # reach forwarding the media. Idle until it is needed.
+          enabled: true
+          udp_port: 3478
+          # TLS is terminated at the edge. A second place certificates have to
+          # be kept fresh is a second place they go stale.
+          tls_port: 0
+        logging:
+          level: info
     labels:
-      # Signalling goes through the edge, on the existing 443 and the existing
-      # certificate. It has to: the dashboard is served over HTTPS, and a page
-      # on HTTPS is not allowed to open a plain `ws://` socket - so a call
-      # server published on a bare port is one the browser refuses to dial
-      # before it has sent a byte. A subdomain rather than a path, which is the
-      # shape LiveKit's own deployment guide uses.
+      # Signalling rides the dashboard's own address, on a path.
       #
-      # Needs `livekit.<your domain>` pointing at this machine. That DNS record
-      # is the one thing here nobody can create from inside the stack.
+      # It has to go through the edge: the dashboard is served over HTTPS, a
+      # page on HTTPS may not open a plain `ws://` socket, and so a call server
+      # on a bare port is one the browser refuses to dial before it has sent a
+      # byte. A path rather than a subdomain, because a subdomain is a DNS
+      # record somebody has to create and this is meant to need nothing - the
+      # certificate, the domain and the port are the ones Polaris already has.
       - "polaris.role=edge"
       - "traefik.enable=true"
       - "traefik.docker.network=polaris_default"
-      - "traefik.http.routers.polaris-livekit.rule=Host(`livekit.${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`)"
+      - "traefik.http.routers.polaris-livekit.rule=PathPrefix(`/livekit`)"
       - "traefik.http.routers.polaris-livekit.entrypoints=websecure"
       - "traefik.http.routers.polaris-livekit.tls=true"
       - "traefik.http.routers.polaris-livekit.service=polaris-livekit"
+      # Above the dashboard's own catch-all, which would otherwise take it.
+      - "traefik.http.routers.polaris-livekit.priority=100"
+      - "traefik.http.routers.polaris-livekit.middlewares=polaris-livekit-strip"
+      # LiveKit serves from the root, so the prefix comes back off on the way in.
+      - "traefik.http.middlewares.polaris-livekit-strip.stripprefix.prefixes=/livekit"
       - "traefik.http.services.polaris-livekit.loadbalancer.server.port=7880"
     ports:
-      # Signalling on the LAN, where there is no certificate to need and
-      # `http://polaris.local` may dial `ws://` freely.
-      - "7880:7880"
-      # The rest cannot go through the edge and must reach a browser directly:
-      # the TCP fallback for networks that block UDP, the media itself, and the
-      # relay for the networks that refuse a direct path.
+      # Media and the relay cannot go through the edge - none of it is HTTP - so
+      # they are published directly. These are the ports to forward on a router,
+      # and the only manual step left in setting calls up.
       - "7881:7881"
       - "7882:7882/udp"
       - "3478:3478/udp"

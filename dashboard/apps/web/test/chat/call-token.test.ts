@@ -175,6 +175,19 @@ describe("where calls run", () => {
         });
     });
 
+    it("hands a path through untouched, for the server this instance serves itself", async () => {
+        env = {
+            POLARIS_CALL_SERVER_URL: "/livekit",
+            POLARIS_CALL_SERVER_API_KEY: "polaris",
+            POLARIS_CALL_SERVER_API_SECRET: "from-the-environment"
+        };
+
+        // Not turned into an address here. The host is whichever one the reader
+        // reached Polaris on, which this process never learns - their browser
+        // resolves it against the page it is already on.
+        expect((await calls.callServer())?.url).toBe("/livekit");
+    });
+
     it("takes the deployment's server over one somebody typed", async () => {
         stored = { enabled: true, config: { url: "wss://typed.example.com", apiKey: "typed" } };
         secret = "typed-secret";

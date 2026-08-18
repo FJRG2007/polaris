@@ -42,6 +42,7 @@
 import { z } from "zod";
 import { setMicDevice } from "./mic-device";
 import { callDeviceId } from "./call-device";
+import { callServerUrl } from "./call-address";
 import * as actions from "./meeting-actions";
 import { playCallSound } from "@/lib/call-sounds";
 import type { MeetingView } from "@/lib/chat/meetings";
@@ -509,7 +510,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 });
 
             try {
-                await joined.connect(ticket.url, ticket.token);
+                await joined.connect(callServerUrl(ticket.url), ticket.token);
             } catch {
                 connecting = false;
                 room.current = null;

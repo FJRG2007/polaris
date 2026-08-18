@@ -86,6 +86,13 @@ function environmentServer(): CallServerEndpoint | null {
     return { url: websocket(url), apiKey, apiSecret };
 }
 
+/** Whether an address names the host it is served from rather than another one.
+ *  The browser resolves these against the page it is on, which is the only
+ *  place the hostname somebody actually typed is known. */
+function servedHere(address: string): boolean {
+    return address.startsWith("/");
+}
+
 /**
  * Put a call server on a server.
  *
@@ -181,8 +188,10 @@ function splitKeys(keys: string): [string, string] {
 }
 
 /** The same address, as a browser has to dial it. LiveKit speaks WebSocket on
- *  the port Deploy publishes as HTTP. */
+ *  the port Deploy publishes as HTTP. A path is left alone: it has no scheme to
+ *  change, and the browser gives it the one the page is on. */
 function websocket(address: string): string {
+    if (servedHere(address)) return address;
     return address.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
 }
 
@@ -291,10 +300,20 @@ export async function callServerSettings(): Promise<CallServerSettings> {
  * still starting is a fact to report rather than a reason to hold the page.
  */
 async function answering(endpoint: CallServerEndpoint): Promise<boolean> {
-    const address = endpoint.url.replace(/^ws:/, "http:").replace(/^wss:/, "https:");
+    // A path names the edge in front of this app, which this process cannot
+    // dial: it would have to know the hostname somebody typed, and only their
+    // browser knows that. The container answers on its own name on the compose
+    // network instead, which is the same server reached the other way round.
+    const address = servedHere(endpoint.url)
+        ? INTERNAL_CALL_SERVER
+        : endpoint.url.replace(/^ws:/, "http:").replace(/^wss:/, "https:");
     const response = await fetch(address, { signal: AbortSignal.timeout(2500) }).catch(() => null);
     return response?.ok === true;
 }
+
+/** Where the shipped call server answers from inside the stack, for the one
+ *  question that is about the container rather than about a call. */
+const INTERNAL_CALL_SERVER = "http://livekit:7880";
 
 /** Which machine the installed server sits on, in words. Null when the install
  *  has gone, which is also how the screen offers to put one back. */
