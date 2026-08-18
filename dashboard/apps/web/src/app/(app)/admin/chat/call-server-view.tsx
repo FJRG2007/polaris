@@ -195,7 +195,7 @@ export function CallServerView() {
                                     <Link href="/apps/containers" className="text-primary hover:underline">
                                         Containers
                                     </Link>
-                                    , where it is listed as the call server.
+                                    , on the row named polaris-livekit-1.
                                 </>
                             ) : settings.answering ? (
                                       <>
