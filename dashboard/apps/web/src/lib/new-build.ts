@@ -55,7 +55,7 @@ export async function checkForNewBuild(): Promise<boolean> {
     if (moved || served === null) return moved;
     asking ??= (async () => {
         try {
-            const response = await fetch("/api/build", { cache: "no-store" });
+            const response = await fetch("/api/version", { cache: "no-store" });
             if (!response.ok) return false;
             const data = (await response.json()) as { build?: unknown };
             const current = typeof data.build === "string" ? data.build : null;

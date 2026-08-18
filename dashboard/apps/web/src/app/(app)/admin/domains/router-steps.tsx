@@ -25,6 +25,7 @@ import {
     detectRouterBrand,
     fitRuleNames,
     likelyGateway,
+    mergeProtocolRules,
     routerGuide,
     FORWARD_RULES,
     ROUTER_BRANDS,
@@ -108,7 +109,10 @@ export function RouterSteps({
     // Named for the form in front of the operator rather than for Polaris: a brand
     // whose Name field is too short to hold `polaris-games-tcp` gets it shortened
     // here, so what the page shows is what the router will accept.
-    const named = fitRuleNames(rules, guide.nameLimit);
+    // Merged first, then named: a brand that can express two transports in one rule
+    // needs one name, and shortening two names it will never show would be work done
+    // for a table that does not exist.
+    const named = fitRuleNames(mergeProtocolRules(rules, guide.combinedProtocol), guide.nameLimit);
 
     return (
         <div className="flex flex-col gap-3">

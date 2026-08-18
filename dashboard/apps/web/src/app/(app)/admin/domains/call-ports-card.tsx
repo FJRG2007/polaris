@@ -140,7 +140,7 @@ export function CallPortsCard() {
                         </p>
                         <p className="text-muted-foreground">
                             {reading.cannotProbe ??
-                                "Nothing has arrived on the call ports from outside yet. Two rules in the router fix it, and this ticks itself the moment they work."}
+                                "Nothing has arrived on the call ports from outside yet. Forwarding them in the router fixes it, and this ticks itself the moment they work."}
                         </p>
                         <div className="text-muted-foreground">
                             <RouterSteps server={null} lanIp={reading.lanIp} rules={CALL_FORWARD_RULES} />

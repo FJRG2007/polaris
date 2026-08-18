@@ -14,6 +14,7 @@ import {
     fitRuleNames,
     gameForwardRules,
     likelyGateway,
+    mergeProtocolRules,
     routerGuide,
     ROUTER_BRANDS
 } from "../../src/lib/router-guide";
@@ -231,5 +232,61 @@ describe("finding the router's own address", () => {
     it("proposes nothing when the address is unknown or malformed", () => {
         expect(likelyGateway(null)).toBeNull();
         expect(likelyGateway("not-an-ip")).toBeNull();
+    });
+});
+
+describe("one rule where the router's form can hold two", () => {
+    const calls = [
+        { name: "polaris-calls-udp", protocol: "UDP", port: 7882 },
+        { name: "polaris-calls-tcp", protocol: "TCP", port: 7881 }
+    ];
+
+    it("collapses the two call rules on a brand whose Protocol field does both", () => {
+        expect(mergeProtocolRules(calls, "TCP And UDP")).toEqual([
+            { name: "polaris-calls", protocol: "TCP And UDP", port: 7881, endPort: 7882 }
+        ]);
+    });
+
+    it("leaves them alone on a brand that has no such option", () => {
+        expect(mergeProtocolRules(calls, null)).toEqual(calls);
+    });
+
+    it("refuses a set with a gap in it, however both-capable the form is", () => {
+        // 80 and 443 with a merged rule would open every port between them.
+        const web = [
+            { name: "polaris-http", protocol: "TCP", port: 80 },
+            { name: "polaris-https", protocol: "UDP", port: 443 }
+        ];
+        expect(mergeProtocolRules(web, "TCP And UDP")).toEqual(web);
+    });
+
+    it("leaves a set that is already one transport", () => {
+        const web = [
+            { name: "polaris-http", protocol: "TCP", port: 80 },
+            { name: "polaris-https", protocol: "TCP", port: 81 }
+        ];
+        expect(mergeProtocolRules(web, "TCP And UDP")).toEqual(web);
+    });
+
+    it("merges the same range published over both transports into one", () => {
+        const games = [
+            { name: "polaris-games-tcp", protocol: "TCP", port: 30000, endPort: 30010 },
+            { name: "polaris-games-udp", protocol: "UDP", port: 30000, endPort: 30010 }
+        ];
+        expect(mergeProtocolRules(games, "TCP And UDP")).toEqual([
+            { name: "polaris-games", protocol: "TCP And UDP", port: 30000, endPort: 30010 }
+        ]);
+    });
+
+    it("keeps the first name when the rules share nothing worth calling a name", () => {
+        const odd = [
+            { name: "ab-tcp", protocol: "TCP", port: 500 },
+            { name: "zz-udp", protocol: "UDP", port: 501 }
+        ];
+        expect(mergeProtocolRules(odd, "TCP And UDP")[0]?.name).toBe("ab-tcp");
+    });
+
+    it("gives ZTE the both-at-once label its form actually shows", () => {
+        expect(ROUTER_BRANDS.find((brand) => brand.id === "zte")?.combinedProtocol).toBe("TCP And UDP");
     });
 });

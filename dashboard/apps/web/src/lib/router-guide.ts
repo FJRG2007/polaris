@@ -72,6 +72,10 @@ export interface RouterBrandGuide {
     readonly forwardFields: readonly RouterFormField[] | null;
     /** The control that commits a rule, when the brand names it something particular. */
     readonly forwardSave: string | null;
+    /** What this brand's Protocol field calls "both", when it offers one. Rules that
+     *  differ only by transport are then a single rule, which is one fewer thing to
+     *  get wrong in a form nobody enjoys. Null where the field is one-or-the-other. */
+    readonly combinedProtocol: string | null;
     /** How long a rule's name may be, on a brand that caps it short enough to
      *  refuse the names Polaris writes. Null leaves them as they are. */
     readonly nameLimit: number | null;
@@ -152,6 +156,10 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             { label: "LAN Host Port", value: "portRange" }
         ],
         forwardSave: "Create New Item",
+        // The Protocol dropdown carries a both-at-once entry, so the two call rules
+        // are one rule on this brand. Worth the special case: a rule typed into a
+        // router by hand is a rule that can be mistyped or left switched off.
+        combinedProtocol: "TCP And UDP",
         // The Name field is capped at 16 characters and the form refuses anything
         // longer outright, so `polaris-games-tcp` cannot be typed at all.
         nameLimit: 16,
@@ -179,6 +187,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         forwardPath: "Forward Rules > Port Mapping Configuration, with Type set to Custom",
         forwardFields: null,
         forwardSave: null,
+        combinedProtocol: null,
         nameLimit: null,
         forwardEnable: null,
         remotePath: "Security > ACL Rules, which is what usually publishes the admin page on the WAN side",
@@ -203,6 +212,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         forwardPath: "Advanced > NAT Forwarding > Virtual Servers > Add",
         forwardFields: null,
         forwardSave: null,
+        combinedProtocol: null,
         nameLimit: null,
         forwardEnable: null,
         remotePath: "Advanced > System Tools > Administration > Remote Management",
@@ -227,6 +237,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         forwardPath: "WAN > Virtual Server / Port Forwarding, with Enable Port Forwarding set to Yes",
         forwardFields: null,
         forwardSave: null,
+        combinedProtocol: null,
         nameLimit: null,
         forwardEnable: null,
         remotePath: "Administration > System > Enable Web Access from WAN",
@@ -245,6 +256,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         forwardPath: "Internet > Permit Access > Port Sharing > Add Device for Sharing",
         forwardFields: null,
         forwardSave: null,
+        combinedProtocol: null,
         nameLimit: null,
         forwardEnable: null,
         remotePath: "Internet > Permit Access > FRITZ!Box Services",
@@ -270,6 +282,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         forwardPath: "ADVANCED > Advanced Setup > Port Forwarding / Port Triggering > Add Custom Service",
         forwardFields: null,
         forwardSave: null,
+        combinedProtocol: null,
         nameLimit: null,
         forwardEnable: null,
         remotePath: "ADVANCED > Advanced Setup > Remote Management",
@@ -288,6 +301,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         forwardPath: "IP > Firewall > NAT > Add, chain dstnat",
         forwardFields: null,
         forwardSave: null,
+        combinedProtocol: null,
         nameLimit: null,
         forwardEnable: null,
         remotePath: "IP > Services, where the www and www-ssl services hold 80 and 443",
@@ -313,6 +327,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             "Look for Port forwarding, Virtual server, NAT/PAT or Applications & Gaming - the same form under four different names.",
         forwardFields: null,
         forwardSave: null,
+        combinedProtocol: null,
         nameLimit: null,
         // Said for every unknown brand because it is the failure with nothing to
         // see: the rule is listed, its values are right, and it does nothing.
@@ -415,6 +430,61 @@ export function gameForwardRules(
         }
     }
     return rules;
+}
+
+/**
+ * The same ports, as few rules as this brand's form can express.
+ *
+ * A router that offers "both" on its Protocol field carries rules differing only
+ * by transport in one row, and a contiguous run of ports in one range. The two
+ * call rules - one UDP port and the TCP port beside it - are then a single rule
+ * instead of two, which matters more than it looks: every rule typed into a router
+ * by hand is a rule that can be mistyped, left switched off, or pointed at the
+ * wrong address.
+ *
+ * Only ever narrows the work, never the correctness. Rules merge when they cover a
+ * contiguous run of ports AND genuinely use different transports; a set that is all
+ * one transport, or that has a gap in it (80 and 443), is left exactly as it was.
+ * A merged rule spans the whole run, so it can open a port and transport nothing is
+ * listening on - which is a packet the host refuses, not a service reached.
+ */
+export function mergeProtocolRules(
+    rules: readonly RouterForwardRule[],
+    combined: string | null
+): readonly RouterForwardRule[] {
+    if (!combined || rules.length < 2) return rules;
+    if (new Set(rules.map((rule) => rule.protocol)).size < 2) return rules;
+    const first = Math.min(...rules.map((rule) => rule.port));
+    const last = Math.max(...rules.map((rule) => rule.endPort ?? rule.port));
+    const covered = new Set<number>();
+    for (const rule of rules) {
+        for (let port = rule.port; port <= (rule.endPort ?? rule.port); port += 1) covered.add(port);
+    }
+    if (covered.size !== last - first + 1) return rules;
+    return [
+        {
+            name: sharedName(rules),
+            protocol: combined,
+            port: first,
+            ...(last === first ? {} : { endPort: last })
+        }
+    ];
+}
+
+/** One name for a merged rule: what the originals have in common, minus the part
+ *  that was only there to tell the transports apart. Falls back to the first name
+ *  rather than inventing one - a name is what the operator looks for in the
+ *  router's own list afterwards. */
+function sharedName(rules: readonly RouterForwardRule[]): string {
+    const [first, ...rest] = rules.map((rule) => rule.name);
+    let shared = first ?? "";
+    for (const name of rest) {
+        let index = 0;
+        while (index < shared.length && index < name.length && shared[index] === name[index]) index += 1;
+        shared = shared.slice(0, index);
+    }
+    const trimmed = shared.replace(/[-_]+$/, "");
+    return trimmed.length >= 3 ? trimmed : (first ?? "");
 }
 
 /**
