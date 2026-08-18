@@ -361,11 +361,7 @@ function lower(one: CallLevel | undefined, two: CallLevel): CallLevel {
  * complaint, when it comes, is specific: this machine cannot encode that, or
  * this line cannot carry it.
  */
-export function driftAuto(
-    state: AutoState,
-    health: CallHealth,
-    ladder: QualityLadder
-): AutoState {
+export function driftAuto(state: AutoState, health: CallHealth, ladder: QualityLadder): AutoState {
     if (struggling(health, ladder, state.level)) {
         const down = shift(ladder, state.level, -1);
         return {

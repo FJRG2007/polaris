@@ -282,7 +282,11 @@ describe("the automatic walk", () => {
     });
 
     it("holds on a reading nobody understands", () => {
-        const after = driftAuto({ level: "low", healthy: 2 }, { connection: "unknown" }, CAMERA_LADDER);
+        const after = driftAuto(
+            { level: "low", healthy: 2 },
+            { connection: "unknown" },
+            CAMERA_LADDER
+        );
         expect(after.level).toBe("low");
         expect(after.healthy).toBe(0);
     });
@@ -291,9 +295,10 @@ describe("the automatic walk", () => {
         // "Excellent" is rarer than it sounds, and waiting for it on a line that
         // is plainly fine is how the top rung never gets used.
         let state = { level: "low" as const, healthy: HEALTHY_TO_CLIMB - 1 };
-        expect(driftAuto(state, { connection: "good", limitation: "none", fps: 20 }, CAMERA_LADDER).level).toBe(
-            "medium"
-        );
+        expect(
+            driftAuto(state, { connection: "good", limitation: "none", fps: 20 }, CAMERA_LADDER)
+                .level
+        ).toBe("medium");
     });
 
     it("climbs only after a run of clean readings", () => {
@@ -309,7 +314,11 @@ describe("the automatic walk", () => {
         // Without this the greedy default is a metronome: a machine that cannot
         // encode 1080p cannot encode it a minute later either, and the call
         // rediscovers that every minute for as long as it lasts.
-        let state = driftAuto(camera(), { connection: "excellent", limitation: "cpu" }, CAMERA_LADDER);
+        let state = driftAuto(
+            camera(),
+            { connection: "excellent", limitation: "cpu" },
+            CAMERA_LADDER
+        );
         expect(state.level).toBe("high");
         expect(state.blocked).toBe("max");
         for (let reading = 1; reading < HEALTHY_TO_RETRY; reading += 1) {
@@ -321,7 +330,11 @@ describe("the automatic walk", () => {
 
     it("still climbs at the ordinary pace below the rung that failed", () => {
         // Only the retry is slow. Everything under it is ordinary ground.
-        let state = { level: "low" as const, healthy: HEALTHY_TO_CLIMB - 1, blocked: "max" as const };
+        let state = {
+            level: "low" as const,
+            healthy: HEALTHY_TO_CLIMB - 1,
+            blocked: "max" as const
+        };
         expect(driftAuto(state, clean, CAMERA_LADDER).level).toBe("medium");
     });
 
@@ -330,7 +343,11 @@ describe("the automatic walk", () => {
         // fails, 720p fails, and then 720p is ordinary ground again - so the
         // call climbed into it every minute, failed, and came back, for as long
         // as it lasted. What is remembered is the lowest rung that failed.
-        let state = driftAuto(camera(), { connection: "excellent", limitation: "cpu" }, CAMERA_LADDER);
+        let state = driftAuto(
+            camera(),
+            { connection: "excellent", limitation: "cpu" },
+            CAMERA_LADDER
+        );
         state = driftAuto(state, { connection: "excellent", limitation: "cpu" }, CAMERA_LADDER);
         expect(state.level).toBe("medium");
         expect(state.blocked).toBe("high");

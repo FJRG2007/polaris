@@ -1233,10 +1233,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     );
                     if (next.level !== autoCamera.current.level) {
                         moved = true;
-                        void quality.retune(
-                            camera.current,
-                            quality.cameraConstraints(next.level)
-                        );
+                        void quality.retune(camera.current, quality.cameraConstraints(next.level));
                     }
                     autoCamera.current = next;
                 }
@@ -1249,10 +1246,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     );
                     if (next.level !== autoScreen.current.level) {
                         moved = true;
-                        void quality.retune(
-                            screen.current,
-                            quality.screenConstraints(next.level)
-                        );
+                        void quality.retune(screen.current, quality.screenConstraints(next.level));
                     }
                     autoScreen.current = next;
                 }

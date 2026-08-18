@@ -123,12 +123,14 @@ describe("the forward dialog reopened on a different message", () => {
         );
 
         await user.click(screen.getByRole("button", { name: "GRGrace" }));
-        expect((screen.getByRole("button", { name: "Forward" }) as HTMLButtonElement).disabled).toBe(
-            false
-        );
+        expect(
+            (screen.getByRole("button", { name: "Forward" }) as HTMLButtonElement).disabled
+        ).toBe(false);
 
         // Cancelled, then reopened on a different message entirely.
-        rerender(<ForwardDialog message={null} onOpenChange={() => undefined} onSent={() => undefined} />);
+        rerender(
+            <ForwardDialog message={null} onOpenChange={() => undefined} onSent={() => undefined} />
+        );
         rerender(
             <ForwardDialog
                 message={message("m2")}
@@ -138,8 +140,8 @@ describe("the forward dialog reopened on a different message", () => {
         );
 
         // With nothing chosen again, sending is refused.
-        expect((screen.getByRole("button", { name: "Forward" }) as HTMLButtonElement).disabled).toBe(
-            true
-        );
+        expect(
+            (screen.getByRole("button", { name: "Forward" }) as HTMLButtonElement).disabled
+        ).toBe(true);
     });
 });

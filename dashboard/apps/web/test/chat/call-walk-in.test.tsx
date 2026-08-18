@@ -117,9 +117,11 @@ describe("opening a voice channel", () => {
     it("walks in on its own when this browser holds no call", async () => {
         render(<ChannelView channelId="c1" />);
 
-        await vi.waitFor(() => expect(entered).toEqual([
-            [{ meetingId: "meeting-c1", channelId: "c1", title: "General voice" }, false]
-        ]));
+        await vi.waitFor(() =>
+            expect(entered).toEqual([
+                [{ meetingId: "meeting-c1", channelId: "c1", title: "General voice" }, false]
+            ])
+        );
         expect(started).toEqual(["c1"]);
     });
 

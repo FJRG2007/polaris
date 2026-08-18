@@ -210,7 +210,9 @@ export function ForwardDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>
-                        {privately ? `Reply to ${privately.name} privately` : "Forward this message"}
+                        {privately
+                            ? `Reply to ${privately.name} privately`
+                            : "Forward this message"}
                     </DialogTitle>
                     <DialogDescription>
                         {privately
@@ -241,79 +243,84 @@ export function ForwardDialog({
                     )}
 
                     {!privately && (
-                    <ul className="max-h-64 overflow-y-auto rounded-md border border-border">
-                        {openServers &&
-                            spaces
-                                .filter((space) => !space.archived)
-                                .map((space) => (
-                                    <li key={space.id}>
-                                        <button
-                                            type="button"
-                                            onClick={() => setInside(space.id)}
-                                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
-                                        >
-                                            <Server className="size-3.5 shrink-0 text-muted-foreground" />
-                                            <span className="min-w-0 flex-1 truncate" title={space.name}>
-                                                {space.name}
-                                            </span>
-                                            {/* How many of the chosen are in
+                        <ul className="max-h-64 overflow-y-auto rounded-md border border-border">
+                            {openServers &&
+                                spaces
+                                    .filter((space) => !space.archived)
+                                    .map((space) => (
+                                        <li key={space.id}>
+                                            <button
+                                                type="button"
+                                                onClick={() => setInside(space.id)}
+                                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
+                                            >
+                                                <Server className="size-3.5 shrink-0 text-muted-foreground" />
+                                                <span
+                                                    className="min-w-0 flex-1 truncate"
+                                                    title={space.name}
+                                                >
+                                                    {space.name}
+                                                </span>
+                                                {/* How many of the chosen are in
                                                 there, so a server closed over a
                                                 choice does not hide it. */}
-                                            {targets.some(
-                                                (target) =>
-                                                    target.spaceId === space.id &&
-                                                    chosen.includes(target.id)
-                                            ) && (
-                                                <span className="shrink-0 rounded bg-primary/15 px-1.5 text-[11px] text-primary">
-                                                    chosen
-                                                </span>
-                                            )}
-                                            <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
-                                        </button>
-                                    </li>
-                                ))}
+                                                {targets.some(
+                                                    (target) =>
+                                                        target.spaceId === space.id &&
+                                                        chosen.includes(target.id)
+                                                ) && (
+                                                    <span className="shrink-0 rounded bg-primary/15 px-1.5 text-[11px] text-primary">
+                                                        chosen
+                                                    </span>
+                                                )}
+                                                <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
+                                            </button>
+                                        </li>
+                                    ))}
 
-                        {listed.length === 0 && !openServers ? (
-                            <li className="px-3 py-6 text-center text-xs text-muted-foreground">
-                                {searching ? "Nothing matches that." : "Nothing to forward to yet."}
-                            </li>
-                        ) : (
-                            listed.map((target) => (
-                                <li key={target.id}>
-                                    <button
-                                        type="button"
-                                        onClick={() => pick(target.id)}
-                                        aria-pressed={chosen.includes(target.id)}
-                                        className={cn(
-                                            "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
-                                            chosen.includes(target.id) && "bg-card-hover"
-                                        )}
-                                    >
-                                        <Face target={target} />
-                                        <span className="flex min-w-0 flex-1 flex-col">
-                                            <span className="truncate" title={target.name}>
-                                                {target.name}
-                                            </span>
-                                            {/* Only while searching: inside a
+                            {listed.length === 0 && !openServers ? (
+                                <li className="px-3 py-6 text-center text-xs text-muted-foreground">
+                                    {searching
+                                        ? "Nothing matches that."
+                                        : "Nothing to forward to yet."}
+                                </li>
+                            ) : (
+                                listed.map((target) => (
+                                    <li key={target.id}>
+                                        <button
+                                            type="button"
+                                            onClick={() => pick(target.id)}
+                                            aria-pressed={chosen.includes(target.id)}
+                                            className={cn(
+                                                "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
+                                                chosen.includes(target.id) && "bg-card-hover"
+                                            )}
+                                        >
+                                            <Face target={target} />
+                                            <span className="flex min-w-0 flex-1 flex-col">
+                                                <span className="truncate" title={target.name}>
+                                                    {target.name}
+                                                </span>
+                                                {/* Only while searching: inside a
                                                 server every row is in it, and
                                                 repeating its name on all thirty
                                                 is noise. */}
-                                            {searching && target.place && (
-                                                <span className="truncate text-xs text-muted-foreground">
-                                                    {target.place}
+                                                {searching && target.place && (
+                                                    <span className="truncate text-xs text-muted-foreground">
+                                                        {target.place}
+                                                    </span>
+                                                )}
+                                            </span>
+                                            {chosen.includes(target.id) && (
+                                                <span className="shrink-0 text-[11px] text-primary">
+                                                    chosen
                                                 </span>
                                             )}
-                                        </span>
-                                        {chosen.includes(target.id) && (
-                                            <span className="shrink-0 text-[11px] text-primary">
-                                                chosen
-                                            </span>
-                                        )}
-                                    </button>
-                                </li>
-                            ))
-                        )}
-                    </ul>
+                                        </button>
+                                    </li>
+                                ))
+                            )}
+                        </ul>
                     )}
 
                     <Input
@@ -337,7 +344,11 @@ export function ForwardDialog({
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
                         Cancel
                     </Button>
-                    <Button size="sm" disabled={busy || going.length === 0} onClick={() => void send()}>
+                    <Button
+                        size="sm"
+                        disabled={busy || going.length === 0}
+                        onClick={() => void send()}
+                    >
                         {busy ? (
                             <Loader2 className="size-4 animate-spin" />
                         ) : privately ? (

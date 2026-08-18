@@ -711,27 +711,24 @@ export function ChannelView({
      * conversation being asked for. It says who is being answered while it
      * waits, and the second press does nothing until the first has landed.
      */
-    const replyPrivately = useCallback(
-        async (message: ChatMessageView) => {
-            const authorId = message.authorId;
-            if (!authorId) return;
-            if (opening.current) return;
-            opening.current = authorId;
-            setOpeningName(message.authorName ?? "them");
-            const result = await runAction(
-                () => actions.openDirectAction({ userIds: [authorId] }),
-                setError
-            );
-            opening.current = null;
-            setOpeningName(null);
-            if (!result || result.error || !result.id) return;
-            setAside({
-                message,
-                reply: { channelId: result.id, name: message.authorName ?? "them" }
-            });
-        },
-        []
-    );
+    const replyPrivately = useCallback(async (message: ChatMessageView) => {
+        const authorId = message.authorId;
+        if (!authorId) return;
+        if (opening.current) return;
+        opening.current = authorId;
+        setOpeningName(message.authorName ?? "them");
+        const result = await runAction(
+            () => actions.openDirectAction({ userIds: [authorId] }),
+            setError
+        );
+        opening.current = null;
+        setOpeningName(null);
+        if (!result || result.error || !result.id) return;
+        setAside({
+            message,
+            reply: { channelId: result.id, name: message.authorName ?? "them" }
+        });
+    }, []);
 
     /**
      * Walk into a voice channel by opening it.
@@ -1098,80 +1095,79 @@ export function ChannelView({
      */
     const conversation = (
         <>
-                    <div
-                        ref={scroller}
-                        onScroll={(event) => {
-                            const element = event.currentTarget;
-                            const below =
-                                element.scrollHeight - element.scrollTop - element.clientHeight;
-                            // At the bottom is always "following along". Away from
-                            // it only counts once the list has settled: until then
-                            // the movement is the page growing under itself, not
-                            // somebody deciding to read further up.
-                            if (below < AT_BOTTOM_SLACK) {
-                                following.current = true;
-                                // Back at the live end, so nothing is waiting below
-                                // and everything on screen has now been seen.
-                                setUnseen(0);
-                                catchUpMark();
-                            } else if (Date.now() > settling.current) following.current = false;
-                            // Both edges, because the window moves in both
-                            // directions: up into the history, and back down out of
-                            // it. Each is a no-op when there is no page that way.
-                            if (element.scrollTop < NEAR_EDGE) void loadOlder();
-                            else if (below < NEAR_EDGE) void loadNewer();
-                        }}
-                        className="min-h-0 flex-1 overflow-y-auto py-2 [overflow-anchor:none]"
-                    >
-                        {olderThan && (
-                            // A line rather than a button. Scrolling is what loads
-                            // the next page now; this says the conversation goes
-                            // further back, and is what somebody sees for the
-                            // moment it takes.
-                            <p className="py-2 text-center text-xs text-muted-foreground">
-                                {loadingOlder ? "Loading earlier messages" : "Earlier messages"}
-                            </p>
-                        )}
+            <div
+                ref={scroller}
+                onScroll={(event) => {
+                    const element = event.currentTarget;
+                    const below = element.scrollHeight - element.scrollTop - element.clientHeight;
+                    // At the bottom is always "following along". Away from
+                    // it only counts once the list has settled: until then
+                    // the movement is the page growing under itself, not
+                    // somebody deciding to read further up.
+                    if (below < AT_BOTTOM_SLACK) {
+                        following.current = true;
+                        // Back at the live end, so nothing is waiting below
+                        // and everything on screen has now been seen.
+                        setUnseen(0);
+                        catchUpMark();
+                    } else if (Date.now() > settling.current) following.current = false;
+                    // Both edges, because the window moves in both
+                    // directions: up into the history, and back down out of
+                    // it. Each is a no-op when there is no page that way.
+                    if (element.scrollTop < NEAR_EDGE) void loadOlder();
+                    else if (below < NEAR_EDGE) void loadNewer();
+                }}
+                className="min-h-0 flex-1 overflow-y-auto py-2 [overflow-anchor:none]"
+            >
+                {olderThan && (
+                    // A line rather than a button. Scrolling is what loads
+                    // the next page now; this says the conversation goes
+                    // further back, and is what somebody sees for the
+                    // moment it takes.
+                    <p className="py-2 text-center text-xs text-muted-foreground">
+                        {loadingOlder ? "Loading earlier messages" : "Earlier messages"}
+                    </p>
+                )}
 
-                        {messages === null ? (
-                            <div className="flex flex-col gap-3 p-4" aria-hidden="true">
-                                {[0, 1, 2].map((row) => (
-                                    <Skeleton key={row} className="h-8 w-2/3" />
-                                ))}
-                            </div>
-                        ) : shown.length === 0 ? (
-                            <div className="flex h-full items-center justify-center p-6">
-                                <EmptyState
-                                    title="Nothing here yet."
-                                    description="Say something. Everybody in this conversation will see it."
-                                />
-                            </div>
-                        ) : (
-                            <MessageList
-                                messages={shown}
-                                viewerId={viewerId}
-                                canPost={canPost}
-                                canModerate={canModerate}
-                                highlightId={highlight}
-                                onOpenThread={setThread}
-                                onReact={react}
-                                onStar={star}
-                                onReply={setReplyingTo}
-                                // Not in a direct message, where every reply is
-                                // already private and the item would do nothing
-                                // anybody could tell apart from Reply.
-                                onReplyPrivately={
-                                    channel?.kind === "dm"
-                                        ? undefined
-                                        : (message) => void replyPrivately(message)
-                                }
-                                onForward={setForwarding}
-                                onEdit={setEditing}
-                                onDelete={setDeleting}
-                            />
-                        )}
+                {messages === null ? (
+                    <div className="flex flex-col gap-3 p-4" aria-hidden="true">
+                        {[0, 1, 2].map((row) => (
+                            <Skeleton key={row} className="h-8 w-2/3" />
+                        ))}
+                    </div>
+                ) : shown.length === 0 ? (
+                    <div className="flex h-full items-center justify-center p-6">
+                        <EmptyState
+                            title="Nothing here yet."
+                            description="Say something. Everybody in this conversation will see it."
+                        />
+                    </div>
+                ) : (
+                    <MessageList
+                        messages={shown}
+                        viewerId={viewerId}
+                        canPost={canPost}
+                        canModerate={canModerate}
+                        highlightId={highlight}
+                        onOpenThread={setThread}
+                        onReact={react}
+                        onStar={star}
+                        onReply={setReplyingTo}
+                        // Not in a direct message, where every reply is
+                        // already private and the item would do nothing
+                        // anybody could tell apart from Reply.
+                        onReplyPrivately={
+                            channel?.kind === "dm"
+                                ? undefined
+                                : (message) => void replyPrivately(message)
+                        }
+                        onForward={setForwarding}
+                        onEdit={setEditing}
+                        onDelete={setDeleting}
+                    />
+                )}
 
-                        {/* The way back, for somebody who has read a long way up.
+                {/* The way back, for somebody who has read a long way up.
                             Scrolling down would work and would take a page at a
                             time; this is one press.
 
@@ -1181,123 +1177,121 @@ export function ChannelView({
                             somebody reading - but before this they were not told
                             either, so a message that had arrived was a message they
                             found later by accident. */}
-                        {(newerThan || unseen > 0) && (
-                            <div className="sticky bottom-2 flex justify-center">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        following.current = true;
-                                        anchor.current = null;
-                                        setUnseen(0);
-                                        // A window that has been trimmed has to fetch
-                                        // its way back; one that is whole only has to
-                                        // scroll, and reloading it would throw away
-                                        // the history above. Either way the reader is
-                                        // now at the newest message, which is a read
-                                        // nothing else would report - scrolling does
-                                        // not change the list a fetch would.
-                                        if (newerThan) void load();
-                                        else {
-                                            stick();
-                                            catchUpMark();
-                                        }
-                                    }}
-                                    className="flex items-center gap-1.5 rounded-full border border-border bg-elevated px-3 py-1 text-xs shadow-md transition-colors hover:bg-card-hover"
-                                >
-                                    <ArrowDown className="size-3" />
-                                    {unseen === 0
-                                        ? "Jump to the newest"
-                                        : unseen === 1
-                                          ? "1 new message"
-                                          : `${unseen} new messages`}
-                                </button>
-                            </div>
-                        )}
+                {(newerThan || unseen > 0) && (
+                    <div className="sticky bottom-2 flex justify-center">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                following.current = true;
+                                anchor.current = null;
+                                setUnseen(0);
+                                // A window that has been trimmed has to fetch
+                                // its way back; one that is whole only has to
+                                // scroll, and reloading it would throw away
+                                // the history above. Either way the reader is
+                                // now at the newest message, which is a read
+                                // nothing else would report - scrolling does
+                                // not change the list a fetch would.
+                                if (newerThan) void load();
+                                else {
+                                    stick();
+                                    catchUpMark();
+                                }
+                            }}
+                            className="flex items-center gap-1.5 rounded-full border border-border bg-elevated px-3 py-1 text-xs shadow-md transition-colors hover:bg-card-hover"
+                        >
+                            <ArrowDown className="size-3" />
+                            {unseen === 0
+                                ? "Jump to the newest"
+                                : unseen === 1
+                                  ? "1 new message"
+                                  : `${unseen} new messages`}
+                        </button>
+                    </div>
+                )}
 
-                        {/* The end of the list, and what "the bottom" means to
+                {/* The end of the list, and what "the bottom" means to
                             everything above. Last, after the sticky button, since a
                             sticky element still takes its place in the flow. */}
-                        <div ref={foot} aria-hidden="true" />
-                    </div>
+                <div ref={foot} aria-hidden="true" />
+            </div>
 
-                    <TypingLine typists={typists} viewerId={viewerId} />
+            <TypingLine typists={typists} viewerId={viewerId} />
 
-                    {/* The wait, while there is one. Counted down rather than
+            {/* The wait, while there is one. Counted down rather than
                         discovered: a room that refuses a paragraph after it has
                         been written is a room people write paragraphs in twice.
                         Nobody who may moderate sees this, because it does not
                         apply to them. */}
-                    {!canModerate && (
-                        <SlowmodeLine
-                            seconds={channel?.slowmode ?? 0}
-                            lastSentAt={
-                                [...shown]
-                                    .reverse()
-                                    .find((message) => message.authorId === viewerId)
-                                    ?.createdAt ?? null
-                            }
-                        />
-                    )}
+            {!canModerate && (
+                <SlowmodeLine
+                    seconds={channel?.slowmode ?? 0}
+                    lastSentAt={
+                        [...shown].reverse().find((message) => message.authorId === viewerId)
+                            ?.createdAt ?? null
+                    }
+                />
+            )}
 
-                    {openingName && (
-                        <p className="flex items-center gap-1.5 px-4 pb-1 text-xs text-muted-foreground">
-                            <Loader2 className="size-3 shrink-0 animate-spin" />
-                            Opening your conversation with {openingName}
-                        </p>
-                    )}
+            {openingName && (
+                <p className="flex items-center gap-1.5 px-4 pb-1 text-xs text-muted-foreground">
+                    <Loader2 className="size-3 shrink-0 animate-spin" />
+                    Opening your conversation with {openingName}
+                </p>
+            )}
 
-                    {error && (
-                        <p role="alert" className="px-4 pb-1 text-xs text-danger">
-                            {error}
-                        </p>
-                    )}
+            {error && (
+                <p role="alert" className="px-4 pb-1 text-xs text-danger">
+                    {error}
+                </p>
+            )}
 
-                    <Composer
-                        channelId={channelId}
-                        rules={rules}
-                        disabled={!canPost}
-                        attachable={may.attach}
-                        placeholder={
-                            canPost
-                                ? `Message ${channel.kind === "text" ? `#${channel.name}` : channel.name}`
-                                : "This conversation is archived."
-                        }
-                        editing={editing}
-                        replyingTo={replyingTo}
-                        onCancelReply={() => setReplyingTo(null)}
-                        onCancelEdit={() => setEditing(null)}
-                        onSend={send}
-                        onMedia={async (address) => {
-                            following.current = true;
-                            const result = await runAction(
-                                () => actions.sendMediaAction(channelId, address),
-                                setError
-                            );
-                            if (!result?.error) {
-                                await load();
-                                refresh();
-                            }
-                        }}
-                        onSaved={async (savedId) => {
-                            following.current = true;
-                            const result = await runAction(
-                                () => actions.sendSavedMediaAction(channelId, savedId),
-                                setError
-                            );
-                            if (!result?.error) {
-                                await load();
-                                refresh();
-                            }
-                        }}
-                        onSaveEdit={async (messageId, body) => {
-                            const result = await runAction(
-                                () => actions.editAction({ messageId, body }),
-                                setError
-                            );
-                            setEditing(null);
-                            if (!result?.error) patchMessage(messageId, { body, edited: true });
-                        }}
-                    />
+            <Composer
+                channelId={channelId}
+                rules={rules}
+                disabled={!canPost}
+                attachable={may.attach}
+                placeholder={
+                    canPost
+                        ? `Message ${channel.kind === "text" ? `#${channel.name}` : channel.name}`
+                        : "This conversation is archived."
+                }
+                editing={editing}
+                replyingTo={replyingTo}
+                onCancelReply={() => setReplyingTo(null)}
+                onCancelEdit={() => setEditing(null)}
+                onSend={send}
+                onMedia={async (address) => {
+                    following.current = true;
+                    const result = await runAction(
+                        () => actions.sendMediaAction(channelId, address),
+                        setError
+                    );
+                    if (!result?.error) {
+                        await load();
+                        refresh();
+                    }
+                }}
+                onSaved={async (savedId) => {
+                    following.current = true;
+                    const result = await runAction(
+                        () => actions.sendSavedMediaAction(channelId, savedId),
+                        setError
+                    );
+                    if (!result?.error) {
+                        await load();
+                        refresh();
+                    }
+                }}
+                onSaveEdit={async (messageId, body) => {
+                    const result = await runAction(
+                        () => actions.editAction({ messageId, body }),
+                        setError
+                    );
+                    setEditing(null);
+                    if (!result?.error) patchMessage(messageId, { body, edited: true });
+                }}
+            />
         </>
     );
 
@@ -1387,11 +1381,7 @@ export function ChannelView({
                             // could not make it bigger, because the room it
                             // would take was being held for messages nobody was
                             // reading while a screen was up.
-                            voiceRoom
-                                ? "flex-1"
-                                : staged
-                                  ? "max-h-[78%]"
-                                  : "max-h-[60%]"
+                            voiceRoom ? "flex-1" : staged ? "max-h-[78%]" : "max-h-[60%]"
                         )}
                     >
                         <CallRoom
