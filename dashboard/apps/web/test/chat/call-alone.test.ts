@@ -52,7 +52,7 @@ function matches(row: ParticipantRow, where: Record<string, unknown>): boolean {
     return true;
 }
 
-vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_STUN_URLS: "" }) }));
+vi.mock("@polaris/config", () => ({ loadEnv: () => ({}) }));
 vi.mock("@/lib/orgs/org-service", () => ({ memberOrgIds: async () => [] }));
 
 vi.mock("@polaris/db", () => ({
