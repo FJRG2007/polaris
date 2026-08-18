@@ -1096,7 +1096,61 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     );
 
     /**
-     * Follow the connection, while nobody has taken the wheel.
+     * What the encoder says about one of the two pictures going out.
+     *
+     * The connection alone was never enough to be greedy on. It notices packets
+     * going missing, which is late; the encoder knows it is being held back
+     * while it is happening, and knows which of the two things is holding it -
+     * this machine, or this line. That is what lets automatic ask for the top
+     * rung and simply listen, rather than settling for the middle and never
+     * finding out what the line could have carried.
+     *
+     * Read through the publication rather than the raw track, because it is the
+     * publication that has a sender behind it. Nothing here is required to
+     * answer: a browser that does not report the reason, or a picture that is
+     * not currently published, comes back as no evidence rather than as bad
+     * news.
+     */
+    const senderHealth = useCallback(
+        async (
+            source: Track.Source,
+            connection: string,
+            countFrames: boolean
+        ): Promise<quality.CallHealth> => {
+            const publication = room.current?.localParticipant.getTrackPublication(source);
+            const sender = publication?.track as
+                | {
+                      getSenderStats?: () => Promise<
+                          {
+                              qualityLimitationReason?: string;
+                              framesPerSecond?: number;
+                              frameHeight?: number;
+                          }[]
+                      >;
+                  }
+                | undefined;
+            const stats = await sender?.getSenderStats?.().catch(() => undefined);
+            const top = stats?.reduce((best, entry) =>
+                (entry.frameHeight ?? 0) > (best.frameHeight ?? 0) ? entry : best
+            );
+            if (!top) return { connection };
+            // Any layer naming a limit is the encoder being held back, so the
+            // whole picture is. On the current codec there is one entry; the
+            // fallback path has three, and a complaint from any of them counts.
+            const limited = stats?.find(
+                (entry) => entry.qualityLimitationReason && entry.qualityLimitationReason !== "none"
+            );
+            return {
+                connection,
+                limitation: limited?.qualityLimitationReason ?? top.qualityLimitationReason,
+                fps: countFrames ? top.framesPerSecond : undefined
+            };
+        },
+        []
+    );
+
+    /**
+     * Follow the picture, while nobody has taken the wheel.
      *
      * Polled rather than driven by the client's own quality event, and that is
      * the point of it: the event fires when the reading *changes*, so a line
@@ -1118,37 +1172,50 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         const timer = setInterval(() => {
             const current = room.current;
             if (!current || current.state !== CONNECTED) return;
-            const reading = String(current.localParticipant.connectionQuality ?? "unknown");
-            let moved = false;
+            const connection = String(current.localParticipant.connectionQuality ?? "unknown");
 
-            if (quality.cameraQuality() === "auto") {
-                const next = quality.driftAuto(
-                    autoCamera.current,
-                    reading,
-                    quality.CAMERA_LADDER
-                );
-                if (next.level !== autoCamera.current.level) {
-                    moved = true;
-                    void quality.retune(camera.current, quality.cameraConstraints(next.level));
+            void (async () => {
+                let moved = false;
+                if (quality.cameraQuality() === "auto") {
+                    // Frames counted here and not below: a camera always has
+                    // some, and a screen nobody is touching has almost none
+                    // because there is no new picture to send.
+                    const health = await senderHealth(CAMERA, connection, true);
+                    const next = quality.driftAuto(
+                        autoCamera.current,
+                        health,
+                        quality.CAMERA_LADDER
+                    );
+                    if (next.level !== autoCamera.current.level) {
+                        moved = true;
+                        void quality.retune(
+                            camera.current,
+                            quality.cameraConstraints(next.level)
+                        );
+                    }
+                    autoCamera.current = next;
                 }
-                autoCamera.current = next;
-            }
-            if (quality.screenQuality() === "auto") {
-                const next = quality.driftAuto(
-                    autoScreen.current,
-                    reading,
-                    quality.SCREEN_LADDER
-                );
-                if (next.level !== autoScreen.current.level) {
-                    moved = true;
-                    void quality.retune(screen.current, quality.screenConstraints(next.level));
+                if (quality.screenQuality() === "auto") {
+                    const health = await senderHealth(SCREEN, connection, false);
+                    const next = quality.driftAuto(
+                        autoScreen.current,
+                        health,
+                        quality.SCREEN_LADDER
+                    );
+                    if (next.level !== autoScreen.current.level) {
+                        moved = true;
+                        void quality.retune(
+                            screen.current,
+                            quality.screenConstraints(next.level)
+                        );
+                    }
+                    autoScreen.current = next;
                 }
-                autoScreen.current = next;
-            }
-            if (moved) settleLevels();
+                if (moved) settleLevels();
+            })();
         }, quality.DRIFT_EVERY_MS);
         return () => clearInterval(timer);
-    }, [meetingId, settleLevels]);
+    }, [meetingId, senderHealth, settleLevels]);
 
     /**
      * Somebody arrived, or somebody left.

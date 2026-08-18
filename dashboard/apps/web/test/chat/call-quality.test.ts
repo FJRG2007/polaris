@@ -12,10 +12,12 @@
  * picture than the rung below it - the setting appearing to do the opposite of
  * what it says.
  *
- * The third is the shape of the automatic walk: down on the first bad reading,
- * up only after a run of good ones, and never past the rung a person has to ask
- * for. Symmetrical hysteresis is how a call oscillates between two qualities for
- * an hour instead of settling.
+ * The third is the shape of the automatic walk. It asks for the best rung there
+ * is and comes down only on evidence - the encoder naming what is holding it
+ * back, or the frames plainly not arriving - then climbs again after a run of
+ * clean readings, and takes three times as long to climb back into a rung that
+ * has already failed once. Symmetrical hysteresis is how a call oscillates
+ * between two qualities for an hour instead of settling.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -36,6 +38,7 @@ const quality = await import("@/app/(app)/chat/call-quality");
 const {
     CAMERA_LADDER,
     HEALTHY_TO_CLIMB,
+    HEALTHY_TO_RETRY,
     LEVELS,
     SCREEN_LADDER,
     cameraConstraints,
@@ -162,11 +165,12 @@ describe("the ladders themselves", () => {
         }
     });
 
-    it("keeps the top rung out of reach of the automatic walk", () => {
-        // Sending a screen at its full size is a decision somebody makes, not
-        // somewhere a connection that looked good for a minute should wander.
-        expect(CAMERA_LADDER.ceiling).not.toBe("max");
-        expect(SCREEN_LADDER.ceiling).not.toBe("max");
+    it("lets the automatic walk reach the top rung", () => {
+        // The whole point of reading the encoder rather than guessing: ask for
+        // the best there is and listen for a complaint, rather than settling for
+        // the middle and never finding out what the line could have carried.
+        expect(CAMERA_LADDER.ceiling).toBe("max");
+        expect(SCREEN_LADDER.ceiling).toBe("max");
     });
 });
 
@@ -182,58 +186,150 @@ describe("which rung is in force", () => {
 
 describe("the automatic walk", () => {
     const camera = () => startAuto(CAMERA_LADDER);
+    /** A reading with nothing wrong in it. */
+    const clean = { connection: "excellent", limitation: "none", fps: 30 };
 
-    it("starts at the best rung it is allowed", () => {
-        // A line is presumed fine until it says otherwise. Starting at the
-        // bottom would open every call soft and take a minute to sharpen, which
-        // reads as a broken camera rather than as caution.
-        expect(camera().level).toBe(CAMERA_LADDER.ceiling);
+    it("starts at the very top", () => {
+        // Greedy on purpose. A line is presumed fine until it says otherwise -
+        // starting cautiously and working up means every call opens soft, and
+        // most calls are short enough that it never gets there.
+        expect(camera().level).toBe("max");
     });
 
     it("drops a rung on the first poor reading", () => {
-        expect(driftAuto(camera(), "poor", CAMERA_LADDER).level).toBe("medium");
+        expect(driftAuto(camera(), { connection: "poor" }, CAMERA_LADDER).level).toBe("high");
     });
 
     it("treats a lost connection the same way", () => {
-        expect(driftAuto(camera(), "lost", CAMERA_LADDER).level).toBe("medium");
+        expect(driftAuto(camera(), { connection: "lost" }, CAMERA_LADDER).level).toBe("high");
+    });
+
+    it("drops when the encoder says the line cannot carry it", () => {
+        // The reading that makes greed safe: the encoder naming what is holding
+        // it back, while it is happening, rather than packets going missing
+        // afterwards.
+        const after = driftAuto(
+            camera(),
+            { connection: "excellent", limitation: "bandwidth", fps: 30 },
+            CAMERA_LADDER
+        );
+        expect(after.level).toBe("high");
+    });
+
+    it("drops when the encoder says the machine cannot encode it", () => {
+        const after = driftAuto(
+            camera(),
+            { connection: "excellent", limitation: "cpu", fps: 30 },
+            CAMERA_LADDER
+        );
+        expect(after.level).toBe("high");
+    });
+
+    it("drops when the frames stop arriving, whatever anything else claims", () => {
+        // The freeze somebody actually notices. Half of what the rung asked for
+        // is far enough down that a camera in a dim room does not trip it.
+        const after = driftAuto(
+            camera(),
+            { connection: "excellent", limitation: "none", fps: 8 },
+            CAMERA_LADDER
+        );
+        expect(after.level).toBe("high");
+    });
+
+    it("does not read a still screen as a stall", () => {
+        // A screen nobody is touching encodes almost nothing, because there is
+        // no new picture to send. Counting frames there would walk a document
+        // down to 720p for doing its job perfectly - so the screen sends none.
+        const after = driftAuto(
+            startAuto(SCREEN_LADDER),
+            { connection: "excellent", limitation: "none" },
+            SCREEN_LADDER
+        );
+        expect(after.level).toBe("max");
     });
 
     it("will not drop below the floor, however bad it gets", () => {
-        let state = { level: CAMERA_LADDER.floor, healthy: 0 } as const;
+        let state = { level: CAMERA_LADDER.floor, healthy: 0 };
         for (let attempt = 0; attempt < 5; attempt += 1) {
-            state = driftAuto(state, "poor", CAMERA_LADDER);
+            state = driftAuto(state, { connection: "poor" }, CAMERA_LADDER);
         }
         expect(state.level).toBe(CAMERA_LADDER.floor);
     });
 
-    it("holds on a merely good reading, and forgets the run of excellent ones", () => {
-        const after = driftAuto({ level: "low", healthy: 3 }, "good", CAMERA_LADDER);
-        expect(after.level).toBe("low");
-        // The reset is the point: three excellent readings, one ordinary one and
-        // then a fourth excellent one is not a minute of calm.
+    it("blames nothing when it is already at the floor", () => {
+        // Otherwise the bottom rung is marked as the one that failed, and
+        // climbing out of a bad patch takes three times as long as it should.
+        const after = driftAuto(
+            { level: CAMERA_LADDER.floor, healthy: 0 },
+            { connection: "poor" },
+            CAMERA_LADDER
+        );
+        expect(after.blocked).toBeUndefined();
+    });
+
+    it("holds while the encoder is trimming something, even on a clean line", () => {
+        // Not struggling is not the same as having room to spare. An encoder
+        // already holding back is no evidence that a bigger picture would
+        // arrive intact.
+        const after = driftAuto(
+            { level: "medium", healthy: 3 },
+            { connection: "excellent", limitation: "other", fps: 24 },
+            CAMERA_LADDER
+        );
+        expect(after.level).toBe("medium");
         expect(after.healthy).toBe(0);
     });
 
     it("holds on a reading nobody understands", () => {
-        const after = driftAuto({ level: "low", healthy: 2 }, "unknown", CAMERA_LADDER);
+        const after = driftAuto({ level: "low", healthy: 2 }, { connection: "unknown" }, CAMERA_LADDER);
         expect(after.level).toBe("low");
+        expect(after.healthy).toBe(0);
     });
 
-    it("climbs only after a run of excellent readings", () => {
+    it("climbs on a merely good line, since nothing is complaining", () => {
+        // "Excellent" is rarer than it sounds, and waiting for it on a line that
+        // is plainly fine is how the top rung never gets used.
+        let state = { level: "low" as const, healthy: HEALTHY_TO_CLIMB - 1 };
+        expect(driftAuto(state, { connection: "good", limitation: "none", fps: 20 }, CAMERA_LADDER).level).toBe(
+            "medium"
+        );
+    });
+
+    it("climbs only after a run of clean readings", () => {
         let state = { level: "low" as const, healthy: 0 };
         for (let reading = 1; reading < HEALTHY_TO_CLIMB; reading += 1) {
-            state = driftAuto(state, "excellent", CAMERA_LADDER);
+            state = driftAuto(state, clean, CAMERA_LADDER);
             expect(state.level).toBe("low");
         }
-        expect(driftAuto(state, "excellent", CAMERA_LADDER).level).toBe("medium");
+        expect(driftAuto(state, clean, CAMERA_LADDER).level).toBe("medium");
+    });
+
+    it("takes far longer to climb back into the rung that already failed", () => {
+        // Without this the greedy default is a metronome: a machine that cannot
+        // encode 1080p cannot encode it a minute later either, and the call
+        // rediscovers that every minute for as long as it lasts.
+        let state = driftAuto(camera(), { connection: "excellent", limitation: "cpu" }, CAMERA_LADDER);
+        expect(state.level).toBe("high");
+        expect(state.blocked).toBe("max");
+        for (let reading = 1; reading < HEALTHY_TO_RETRY; reading += 1) {
+            state = driftAuto(state, clean, CAMERA_LADDER);
+            expect(state.level).toBe("high");
+        }
+        expect(driftAuto(state, clean, CAMERA_LADDER).level).toBe("max");
+    });
+
+    it("still climbs at the ordinary pace below the rung that failed", () => {
+        // Only the retry is slow. Everything under it is ordinary ground.
+        let state = { level: "low" as const, healthy: HEALTHY_TO_CLIMB - 1, blocked: "max" as const };
+        expect(driftAuto(state, clean, CAMERA_LADDER).level).toBe("medium");
     });
 
     it("will not climb past the ceiling however long the line stays clean", () => {
         let state = camera();
         for (let reading = 0; reading < HEALTHY_TO_CLIMB * 4; reading += 1) {
-            state = driftAuto(state, "excellent", CAMERA_LADDER);
+            state = driftAuto(state, clean, CAMERA_LADDER);
         }
-        expect(state.level).toBe(CAMERA_LADDER.ceiling);
+        expect(state.level).toBe("max");
     });
 
     it("does not oscillate between two rungs on an alternating line", () => {
@@ -241,9 +337,9 @@ describe("the automatic walk", () => {
         // flickers therefore settles at the bottom rather than changing the
         // picture every fifteen seconds, which is the thing people notice.
         let state = camera();
-        for (let round = 0; round < 6; round += 1) {
-            state = driftAuto(state, "poor", CAMERA_LADDER);
-            state = driftAuto(state, "excellent", CAMERA_LADDER);
+        for (let round = 0; round < 8; round += 1) {
+            state = driftAuto(state, { connection: "poor" }, CAMERA_LADDER);
+            state = driftAuto(state, clean, CAMERA_LADDER);
         }
         expect(state.level).toBe(CAMERA_LADDER.floor);
     });
@@ -255,9 +351,7 @@ describe("stepping by hand", () => {
         expect(shift(CAMERA_LADDER, CAMERA_LADDER.ceiling, 1)).toBe(CAMERA_LADDER.ceiling);
     });
 
-    it("brings a hand-picked rung above the ceiling back into range", () => {
-        // Somebody chose "Highest" and then turned automatic back on. The walk
-        // has to start from somewhere it is allowed to be.
-        expect(shift(CAMERA_LADDER, "max", 1)).toBe(CAMERA_LADDER.ceiling);
+    it("has nowhere left to go from the top", () => {
+        expect(shift(CAMERA_LADDER, "max", 1)).toBe("max");
     });
 });

@@ -28,8 +28,30 @@ interface Note {
     /** Seconds from the start of the sound. */
     readonly at: number;
     readonly seconds: number;
-    /** Peak volume, 0 to 1. These are notifications and sit well under a voice. */
+    /** Peak volume, 0 to 1. These are notifications and sit well under a voice.
+     *  A ring is the exception and says so: it is not played over anything. */
     readonly gain?: number;
+    /**
+     * Held at full volume until a short release at the end, rather than fading
+     * from the moment it starts.
+     *
+     * This is most of why the ring could not be heard. Every note used to decay
+     * across its whole length, so a note marked at a fifth of a second had spent
+     * most of that at a tenth of its peak - a blip, not a tone. That is right for
+     * something that fires all day and wrong for the one sound whose entire job
+     * is to be noticed from the next room.
+     */
+    readonly sustain?: boolean;
+    /**
+     * The shape of the wave.
+     *
+     * A sine is the default because it has no harmonics to clash with speech,
+     * which is the one thing these are played over. A ring is not played over
+     * anything - it is played instead of a call - and a sine is the quietest
+     * thing an oscillator can make at a given amplitude: the ear reads a tone
+     * with harmonics in it as far louder than a bare sine of the same height.
+     */
+    readonly wave?: OscillatorType;
 }
 
 export type CallSound =
@@ -42,7 +64,21 @@ export type CallSound =
     | "ring"
     | "ringBack";
 
-const SOUNDS: Record<CallSound, readonly Note[]> = {
+/** How loud the incoming ring is. Several times everything else here, and that
+ *  is the point of it: every other sound is played to somebody already looking
+ *  at the screen, and this one is played to somebody who is not in the room. A
+ *  single oscillator sounds at a time, so nothing here can sum into clipping. */
+const RING_GAIN = 0.34;
+
+/**
+ * Every sound, as data.
+ *
+ * Exported so the two things that cannot be heard from the code can be asserted
+ * instead: that a ring fits inside the gap before it starts again, and that the
+ * one sound meant to carry across a room is actually louder than the ones meant
+ * not to. Both were wrong once, silently.
+ */
+export const SOUNDS: Record<CallSound, readonly Note[]> = {
     /**
      * Somebody said something in a conversation that is not the one on screen.
      *
@@ -79,24 +115,56 @@ const SOUNDS: Record<CallSound, readonly Note[]> = {
         { from: 466.16, at: 0, seconds: 0.11 },
         { from: 349.23, at: 0.1, seconds: 0.22 }
     ],
-    /** One pass of an incoming ring. Repeated by `startRinging`. */
+    /**
+     * One pass of an incoming ring. Repeated by `startRinging`.
+     *
+     * The shape a telephone has always had: a pair of notes, a breath, the same
+     * pair again, then a long silence. Two pulses rather than one because a
+     * single one is indistinguishable from any other notification a machine
+     * makes - the repeat is what says somebody is waiting on the other end.
+     *
+     * Loud, sustained and with harmonics in it, which the first version of this
+     * was none of. It is the only sound here that has to carry to somebody who
+     * is not looking at the screen.
+     */
     ring: [
-        { from: 659.25, at: 0, seconds: 0.22, gain: 0.16 },
-        { from: 523.25, at: 0.26, seconds: 0.26, gain: 0.16 }
+        { from: 880, at: 0, seconds: 0.32, gain: RING_GAIN, sustain: true, wave: "triangle" },
+        { from: 659.25, at: 0.34, seconds: 0.42, gain: RING_GAIN, sustain: true, wave: "triangle" },
+        { from: 880, at: 0.92, seconds: 0.32, gain: RING_GAIN, sustain: true, wave: "triangle" },
+        { from: 659.25, at: 1.26, seconds: 0.5, gain: RING_GAIN, sustain: true, wave: "triangle" }
     ],
-    /** What the caller hears while nobody has answered. */
-    ringBack: [{ from: 440, at: 0, seconds: 0.4, gain: 0.07 }]
+    /** What the caller hears while nobody has answered. Held rather than
+     *  plucked, like the tone a telephone gives back, and deliberately far
+     *  quieter than the ring: this one plays to somebody who is already looking
+     *  at the screen and knows what they just pressed. */
+    ringBack: [{ from: 440, at: 0, seconds: 0.9, gain: 0.12, sustain: true }]
 };
 
-/** How often an unanswered ring repeats, and the longest it goes on for. Both
- *  the shape a telephone has always had: somebody who is not there is not going
- *  to be there, and a browser tab that rings forever is one people close. */
-const RING_EVERY_MS = 2400;
+/**
+ * How often each ring repeats, and the longest either goes on for.
+ *
+ * One interval per sound rather than one for both, because they are two
+ * different lengths: a pass of the incoming ring is nearly two seconds of
+ * pattern and a ringback is one held note. A single interval short enough for
+ * the second starts the first again over the top of itself, which is how a ring
+ * turns into a drone.
+ *
+ * The give-up is the shape a telephone has always had: somebody who is not there
+ * is not going to be there, and a browser tab that rings forever is one people
+ * close.
+ */
+export const RING_EVERY_MS: Record<"ring" | "ringBack", number> = { ring: 3400, ringBack: 3000 };
 export const RING_FOR_MS = 45_000;
 
 /** How loud a tone is by default. Low: these play over whatever the reader is
  *  already listening to, and over the call itself. */
-const DEFAULT_GAIN = 0.1;
+export const DEFAULT_GAIN = 0.1;
+
+/** How long a note takes to reach its peak, and to let go of it. Ramped rather
+ *  than switched: a square edge on a gain node is an audible click, and a click
+ *  on every join is worse than silence. */
+const ATTACK_SECONDS = 0.012;
+const RELEASE_SECONDS = 0.05;
 
 let context: AudioContext | null = null;
 
@@ -121,19 +189,23 @@ export function playCallSound(name: CallSound): void {
     for (const note of SOUNDS[name]) {
         const oscillator = ctx.createOscillator();
         const gain = ctx.createGain();
-        // A sine has no harmonics to clash with speech, which is the one thing
-        // these will always be played over.
-        oscillator.type = "sine";
+        oscillator.type = note.wave ?? "sine";
         oscillator.frequency.setValueAtTime(note.from, start + note.at);
         if (note.to !== undefined) {
             oscillator.frequency.linearRampToValueAtTime(note.to, start + note.at + note.seconds);
         }
-        // Ramped in and out rather than switched: a square edge on a gain node
-        // is an audible click, and a click on every join is worse than silence.
         const peak = note.gain ?? DEFAULT_GAIN;
-        gain.gain.setValueAtTime(0.0001, start + note.at);
-        gain.gain.exponentialRampToValueAtTime(peak, start + note.at + 0.012);
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + note.at + note.seconds);
+        const from = start + note.at;
+        const to = from + note.seconds;
+        gain.gain.setValueAtTime(0.0001, from);
+        gain.gain.exponentialRampToValueAtTime(peak, from + ATTACK_SECONDS);
+        if (note.sustain) {
+            // Held at the peak, then let go over the last few hundredths. The
+            // note below decays across its whole length instead, which is right
+            // for a blip and is what made the ring inaudible.
+            gain.gain.setValueAtTime(peak, Math.max(from + ATTACK_SECONDS, to - RELEASE_SECONDS));
+        }
+        gain.gain.exponentialRampToValueAtTime(0.0001, to);
         oscillator.connect(gain).connect(ctx.destination);
         oscillator.start(start + note.at);
         oscillator.stop(start + note.at + note.seconds + 0.02);
@@ -148,7 +220,7 @@ export function playCallSound(name: CallSound): void {
  */
 export function startRinging(name: "ring" | "ringBack" = "ring"): () => void {
     playCallSound(name);
-    const timer = setInterval(() => playCallSound(name), RING_EVERY_MS);
+    const timer = setInterval(() => playCallSound(name), RING_EVERY_MS[name]);
     const stopAt = setTimeout(() => clearInterval(timer), RING_FOR_MS);
     return () => {
         clearInterval(timer);
