@@ -15,7 +15,9 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@polaris/db", () => ({ prisma: { meetingParticipant: { findUnique: async () => null } } }));
+vi.mock("@polaris/db", () => ({
+    prisma: { meetingParticipant: { findUnique: async () => null } }
+}));
 vi.mock("@/lib/integration-service", () => ({
     getIntegrationState: async () => null,
     getIntegrationSecret: async () => null,
