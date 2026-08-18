@@ -39,6 +39,7 @@ import { z } from "zod";
 import * as quality from "./call-quality";
 import { setMicDevice } from "./mic-device";
 import { callDeviceId } from "./call-device";
+import { callMuted, setCallMuted } from "./call-muted";
 import * as actions from "./meeting-actions";
 import { callServerUrl } from "./call-address";
 import { playCallSound } from "@/lib/call-sounds";
@@ -743,6 +744,13 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 setHasCamera(camera.current !== null);
                 setMicOn(mic.current !== null);
                 setCameraOn(camera.current !== null);
+                // Muted the way this browser was left, before anything is
+                // published. Opening a voice channel is now a single press, so
+                // without this a press opens a microphone - see `call-muted`.
+                if (mic.current && callMuted()) {
+                    mic.current.enabled = false;
+                    setMicOn(false);
+                }
                 setMicrophoneId(mic.current?.getSettings().deviceId ?? null);
                 setCameraId(camera.current?.getSettings().deviceId ?? null);
                 publishLocalPreview();
@@ -859,6 +867,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         if (!track) return;
         setVoiceEnabled(!track.enabled);
         setMicOn(track.enabled);
+        // Kept for the next room. Only a deliberate press is remembered:
+        // deafening also silences the microphone, and coming back tomorrow
+        // muted because you once put your headphones down is not what anybody
+        // meant by it.
+        setCallMuted(!track.enabled);
     }, [setVoiceEnabled]);
 
     /**
