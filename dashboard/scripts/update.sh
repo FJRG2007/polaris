@@ -171,9 +171,26 @@ roll_dashboard() {
     fi
 
     first=$(printf '%s' "$old" | tr ' ' '\n' | head -n1)
-    if [ -n "$target" ] && [ "$(container_image "$first")" = "$target" ]; then
-        log "the dashboard already runs the published image; nothing to roll over"
+    # The image is only half of what makes a container current. A release that changes
+    # the service's DEFINITION - a volume it has to mount, a variable, a label - leaves
+    # the image byte-identical and still has to recreate the container, and skipping on
+    # the image alone is how a deployment ends up running the new build wired the old
+    # way. That is not hypothetical: it is how the call server shipped, came up, and
+    # found no key - the dashboard writes that key onto a volume the release added, and
+    # the dashboard was never recreated to mount it.
+    #
+    # Compose stamps every container with a hash of the definition it was created from,
+    # and will hand back the hash of the definition on disk right now. They have to
+    # agree. A compose too old to be asked gives an empty answer and the rollover simply
+    # happens, which is the harmless direction to be wrong in.
+    want=$(compose_hash web)
+    have=$(container_hash "$first")
+    if [ -n "$target" ] && [ "$(container_image "$first")" = "$target" ] && [ -n "$want" ] && [ "$want" = "$have" ]; then
+        log "the dashboard already runs the published image and this release's wiring; nothing to roll over"
         return 0
+    fi
+    if [ -n "$want" ] && [ -n "$have" ] && [ "$want" != "$have" ]; then
+        log "this release changes how the dashboard itself is wired; recreating it"
     fi
 
     log "starting the new dashboard alongside the running one"
@@ -223,6 +240,18 @@ roll_dashboard() {
     return 0
 }
 
+# The definition compose would create a service from right now, as the same hash it
+# stamps onto a container it creates. Empty when compose is too old to be asked, which
+# the caller reads as "cannot tell" rather than as "unchanged".
+compose_hash() {
+    $compose config --hash "$1" 2>/dev/null | awk 'NR == 1 { print $2 }'
+}
+
+# The definition a running container was actually created from.
+container_hash() {
+    docker inspect --format '{{ index .Config.Labels "com.docker.compose.config-hash" }}' "$1" 2>/dev/null
+}
+
 # A container's edge-routing labels, as one sorted block to compare against another's.
 edge_labels() {
     docker inspect --format '{{range $key, $value := .Config.Labels}}{{$key}}={{$value}}{{"\n"}}{{end}}' "$1" 2>/dev/null \
@@ -241,6 +270,32 @@ retire() {
     id="$1"
     docker stop -t 20 "$id" >/dev/null 2>&1 || true
     docker rm -f "$id" >/dev/null 2>&1 || true
+}
+
+# Put a deployment checkout that will not fast-forward back onto its branch.
+#
+# Only reached on a published deployment, where this checkout holds no work of its
+# own: it is a copy of the release, and the operator has never been asked to open
+# it. Left behind, it is not a cosmetic problem - the compose file, the settings
+# template and this script all live here, so a release that adds a service would
+# never create it and the dashboard would go on offering a feature that was never
+# installed.
+#
+# Anything actually modified here is left alone and reported instead. Discarding a
+# change somebody made by hand is worse than an update that skipped a file, and on
+# a machine nobody was supposed to touch, a dirty tree is worth saying out loud.
+realign_checkout() {
+    state=$(git -C "$dash_dir" status --porcelain 2>/dev/null || printf 'unreadable')
+    if [ -n "$state" ]; then
+        err "the deployment files at $repo_root have local changes; leaving them alone"
+        return 1
+    fi
+    git -C "$dash_dir" fetch --prune >/dev/null 2>&1 || return 1
+    upstream=$(git -C "$dash_dir" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)
+    [ -n "$upstream" ] || return 1
+    git -C "$dash_dir" reset --hard "$upstream" >/dev/null 2>&1 || return 1
+    log "the deployment files had diverged; put back onto $upstream"
+    return 0
 }
 
 main() {
@@ -262,24 +317,24 @@ main() {
     if git -C "$dash_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         log "syncing the deployment files"
         before=$(git -C "$dash_dir" rev-parse HEAD 2>/dev/null || true)
-        if git -C "$dash_dir" pull --ff-only; then
-            after=$(git -C "$dash_dir" rev-parse HEAD 2>/dev/null || true)
-            # The pull may have replaced this very script. A shell keeps running the
-            # copy it already parsed, so re-exec once (guarded against a loop) to be
-            # sure the newest updater does the work.
-            if [ "$before" != "$after" ] && [ -z "${POLARIS_UPDATE_REEXEC:-}" ]; then
-                log "the updater itself changed; continuing with the new one"
-                POLARIS_UPDATE_REEXEC=1
-                export POLARIS_UPDATE_REEXEC
-                trap - EXIT
-                exec sh "$dash_dir/scripts/update.sh" "$@"
+        if ! git -C "$dash_dir" pull --ff-only; then
+            if [ "$source" = "build" ]; then
+                err "could not fast-forward the checkout, and this deployment builds its own image"
+                err "resolve the checkout at $repo_root, or switch Settings back to the published build"
+                exit 1
             fi
-        elif [ "$source" = "build" ]; then
-            err "could not fast-forward the checkout, and this deployment builds its own image"
-            err "resolve the checkout at $repo_root, or switch Settings back to the published build"
-            exit 1
-        else
-            err "could not fast-forward the checkout; continuing with the published images"
+            realign_checkout || err "could not fast-forward the checkout; continuing with the published images"
+        fi
+        after=$(git -C "$dash_dir" rev-parse HEAD 2>/dev/null || true)
+        # The sync may have replaced this very script. A shell keeps running the copy
+        # it already parsed, so re-exec once (guarded against a loop) to be sure the
+        # newest updater does the work.
+        if [ "$before" != "$after" ] && [ -z "${POLARIS_UPDATE_REEXEC:-}" ]; then
+            log "the updater itself changed; continuing with the new one"
+            POLARIS_UPDATE_REEXEC=1
+            export POLARIS_UPDATE_REEXEC
+            trap - EXIT
+            exec sh "$dash_dir/scripts/update.sh" "$@"
         fi
     elif [ "$source" = "build" ]; then
         err "this deployment builds its own image, but $repo_root is not a git checkout"
@@ -373,7 +428,27 @@ main() {
 
         log "updating the supporting services"
         # shellcheck disable=SC2086 # deliberate word splitting: a service list
-        $compose up -d --no-deps $build_flag $others || err "some supporting services did not come up; the dashboard is updated below"
+        $compose up -d --no-deps $build_flag $others || err "some supporting services did not come up"
+
+        # Which of them actually exist afterwards. A batch `up` reports one failure
+        # for the whole list, so on its own the line above leaves the operator to
+        # guess which service it meant - and the case that matters most, a service
+        # this release ADDS and that never gets created, looks exactly like one that
+        # was already running. Named here, the update log says which, the dashboard's
+        # own screen for it agrees, and the retry gives the common cause (a pull that
+        # had not finished when the batch ran) a second chance.
+        absent=""
+        for service in $others; do
+            [ -n "$($compose ps -aq "$service" 2>/dev/null)" ] || absent="$absent $service"
+        done
+        if [ -n "$absent" ]; then
+            err "no container for:$absent"
+            for service in $absent; do
+                log "starting $service on its own"
+                # shellcheck disable=SC2086 # deliberate word splitting: a build flag
+                $compose up -d --no-deps $build_flag "$service" || err "$service could not be started"
+            done
+        fi
     else
         err "could not list the stack's services; only the dashboard is being updated"
     fi
