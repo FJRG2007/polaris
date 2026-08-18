@@ -135,11 +135,7 @@ function websocket(address: string): string {
  * either.
  */
 async function shippedServer(): Promise<CallServerEndpoint | null> {
-    // The environment's secret, when an install predating the key file has one,
-    // so the file is seeded with the secret its media server is already using
-    // instead of a new one that would not match.
-    const seed = loadEnv().POLARIS_CALL_SERVER_API_SECRET?.trim();
-    const key = await ensureCallKey(seed);
+    const key = await ensureCallKey();
     return key ? { url: SHIPPED_PATH, apiKey: key.apiKey, apiSecret: key.apiSecret, shipped: true } : null;
 }
 
@@ -233,17 +229,32 @@ export interface CallServerSettings {
     /** Whether it answers yet - a fresh install spends a moment starting, and
      *  "configured but silent" is the state people ask about. */
     readonly answering: boolean;
+    /** Why the stored address is not where calls go, when one is stored and they
+     *  do not: this process was started with a server of its own, or what was
+     *  saved here is missing the key and secret that would let it sign. Null when
+     *  it is in use, and when there is nothing stored to be in use. An address
+     *  that is saved and silently unused is the state nobody can diagnose from a
+     *  screen that only shows it. */
+    readonly unused: "environment" | "incomplete" | null;
 }
 
 export async function callServerSettings(): Promise<CallServerSettings> {
     const stored = await config();
     const endpoint = await callServer();
+    const fromEnv = environmentServer();
     return {
         url: stored.url ?? "",
         hasKey: Boolean(stored.apiKey),
         shipped: endpoint?.shipped ?? false,
         ready: endpoint !== null,
-        answering: endpoint ? await answering(endpoint) : false
+        answering: endpoint ? await answering(endpoint) : false,
+        unused: !stored.url
+            ? null
+            : fromEnv && !fromEnv.shipped
+              ? "environment"
+              : endpoint && !endpoint.shipped
+                ? null
+                : "incomplete"
     };
 }
 

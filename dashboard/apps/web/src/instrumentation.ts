@@ -62,6 +62,8 @@ export async function register(): Promise<void> {
     // key no existing deployment has and no operator can give it one. The
     // container refuses to start until this lands, and restarts until it does -
     // which is why this is awaited rather than fired off with everything else.
+    // What it writes is decided inside: an install that already had a pair keeps
+    // it, so an update does not change the key of a deployment whose calls work.
     const { ensureCallKey } = await import("./lib/chat/call-keys");
     await ensureCallKey().catch((error) =>
         console.error("polaris: could not prepare the call server key:", error)

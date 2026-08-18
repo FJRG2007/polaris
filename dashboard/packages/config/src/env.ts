@@ -80,14 +80,17 @@ const envSchema = z.object({
      * The call server (LiveKit) this deployment carries calls on, as an address
      * and its key pair.
      *
-     * The stack starts one, so these are filled in by the installer and normally
-     * nobody touches them: `/livekit` on the dashboard's own hostname, which the
-     * browser resolves against whatever address it reached Polaris on. Write a
-     * whole address (`wss://calls.example.com`) to point at a server somebody
-     * else runs.
+     * Unset on a current install: the stack starts one, and the key it signs with
+     * lives on the volume the two containers share rather than here. Write a whole
+     * address (`wss://calls.example.com`) with its pair to point calls at a server
+     * somebody else runs.
      *
-     * They win over anything stored in the database, because an operator who put
-     * a call server in this process's environment has already decided.
+     * A whole address wins over anything stored in the database, because an
+     * operator who pointed this process at another server has already decided. A
+     * `/livekit` does not, and that is deliberate: every install written before
+     * the key file existed carries that line, nobody chose it, and it names the
+     * server this stack starts anyway. On one of those the secret seeds the key
+     * file, so an update keeps the key its media server is already using.
      */
     POLARIS_CALL_SERVER_URL: z.string().optional(),
     POLARIS_CALL_SERVER_API_KEY: z.string().optional(),

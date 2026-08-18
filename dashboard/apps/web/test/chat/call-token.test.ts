@@ -55,6 +55,10 @@ vi.mock("@polaris/config", () => ({ loadEnv: () => env }));
 // share, so point it somewhere this suite may write.
 process.env.POLARIS_CALL_KEYS_DIR = await mkdtemp(join(tmpdir(), "polaris-call-keys-"));
 
+/** Whether a server answers is a different question, asked over the network and
+ *  answered in its own suite. */
+vi.stubGlobal("fetch", async () => ({ ok: true }) as Response);
+
 const calls = await import("@/lib/chat/call-server");
 
 /** The claims, without verifying the signature - what is being asserted is what
@@ -268,5 +272,46 @@ describe("where calls run", () => {
         const written = saved[0] as { input: { config: Record<string, unknown>; secret?: unknown } };
         expect(written.input.config.url).toBe("wss://calls.example.com");
         expect("secret" in written.input).toBe(false);
+    });
+});
+
+/**
+ * A stored address that is saved and then not used is the state nobody can
+ * diagnose from a screen that only draws it, so the screen is told why rather
+ * than left to guess from where calls ended up.
+ */
+describe("what the settings screen is told", () => {
+    beforeEach(() => calls.forgetAnswer());
+
+    it("names the deployment's own configuration when that is what wins", async () => {
+        stored = { enabled: true, config: { url: "wss://typed.example.com", apiKey: "typed" } };
+        secret = "typed-secret";
+        env = {
+            POLARIS_CALL_SERVER_URL: "wss://deployed.example.com",
+            POLARIS_CALL_SERVER_API_KEY: "deployed",
+            POLARIS_CALL_SERVER_API_SECRET: "deployed-secret"
+        };
+
+        expect((await calls.callServerSettings()).unused).toBe("environment");
+    });
+
+    it("says the stored pairing is half a pairing when that is why", async () => {
+        stored = { enabled: true, config: { url: "wss://typed.example.com" } };
+        secret = null;
+        // No .env line to clear here, and telling somebody to clear one would
+        // send them after a line that does not exist for a save that never had
+        // its key.
+        expect((await calls.callServerSettings()).unused).toBe("incomplete");
+    });
+
+    it("says nothing about an address calls actually go to", async () => {
+        stored = { enabled: true, config: { url: "wss://typed.example.com", apiKey: "typed" } };
+        secret = "typed-secret";
+
+        expect((await calls.callServerSettings()).unused).toBeNull();
+    });
+
+    it("says nothing when nobody typed an address at all", async () => {
+        expect((await calls.callServerSettings()).unused).toBeNull();
     });
 });

@@ -21,9 +21,10 @@
  * Server-only.
  */
 
+import { join } from "node:path";
+import { loadEnv } from "@polaris/config";
 import { randomBytes } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 
 /** The volume both containers mount. */
 function keysDir(): string {
@@ -45,64 +46,180 @@ export interface CallKey {
     readonly apiSecret: string;
 }
 
+/** How long a failure stands before the file is tried again. Every screen with a
+ *  call button asks where calls run, so without this a deployment with no volume
+ *  writes a log line per render and buries everything else in it. */
+const RETRY_AFTER_MS = 30_000;
+
+let cached: { file: string; key: CallKey } | null = null;
+let missed: { file: string; at: number } | null = null;
+let inflight: { file: string; work: Promise<CallKey | null> } | null = null;
+
+/** Throw the cached pair away. For a test asserting what is on disk rather than
+ *  what this module already answered; nothing in the app calls it, since the file
+ *  is written once and never changes under a running process. */
+export function forgetCallKey(): void {
+    cached = null;
+    missed = null;
+    inflight = null;
+}
+
 /**
  * Read the pair, or mint it.
  *
- * Idempotent, and the reason it is safe to call on every boot: a file that is
- * already there is read rather than replaced. Replacing it would invalidate
- * every token in flight and, worse, leave the media server signing with one
- * secret and the dashboard with another until the container next restarted.
+ * Idempotent, and the reason it is safe to call on every boot and on every
+ * request: a file that is already there is read rather than replaced. Replacing
+ * it would invalidate every token in flight and, worse, leave the media server
+ * signing with one secret and the dashboard with another until the container
+ * next restarted.
  *
- * @param seed - a secret this deployment already used, from an install that
- *   predates the file. Adopted rather than replaced, so an update does not change
- *   the key of a deployment whose calls were working.
+ * The answer is held for the life of the process, because this is on the path of
+ * every screen that draws a call button and the file cannot change underneath a
+ * running one: whoever wrote it wrote it once.
  */
-export async function ensureCallKey(seed?: string): Promise<CallKey | null> {
-    const existing = await readCallKey();
-    if (existing) return existing;
+export async function ensureCallKey(): Promise<CallKey | null> {
+    const file = callKeyFile();
+    if (cached?.file === file) return cached.key;
+    if (missed?.file === file && Date.now() - missed.at < RETRY_AFTER_MS) return null;
+    if (inflight?.file !== file) inflight = { file, work: resolve(file) };
+    return inflight.work;
+}
 
-    const apiSecret = seed?.trim() || randomBytes(32).toString("base64");
-    const key: CallKey = { apiKey: CALL_API_KEY, apiSecret };
+async function resolve(file: string): Promise<CallKey | null> {
+    const key = (await read(file)) ?? (await mint(file));
+    if (key) {
+        cached = { file, key };
+        missed = null;
+    } else {
+        missed = { file, at: Date.now() };
+    }
+    if (inflight?.file === file) inflight = null;
+    return key;
+}
+
+/**
+ * Write a pair nobody has written yet.
+ *
+ * Created exclusively rather than written over, because two web containers is
+ * the ordinary case during an update - the rollout raises the new one beside the
+ * old - and both starting against an empty volume would otherwise mint two
+ * different secrets, of which the media server accepts one. The loser reads back
+ * what the winner wrote and the two agree.
+ */
+async function mint(file: string): Promise<CallKey | null> {
+    const key = adopted() ?? minted();
+    if (await write(file, key, "wx")) return key;
+
+    const raced = await read(file);
+    if (raced) return raced;
+    // Not a race, then: what is there is not a pair at all, which is a file to
+    // replace rather than one to adopt. Left alone it would be a deployment
+    // whose calls never work again and nothing on the machine that repairs it.
+    return (await write(file, key, "w")) ? key : null;
+}
+
+/** A pair for a deployment that has never had one. LiveKit logs a secret under
+ *  32 characters as an error, and a short one is a signing key worth guessing. */
+function minted(): CallKey {
+    return { apiKey: CALL_API_KEY, apiSecret: randomBytes(32).toString("base64") };
+}
+
+async function write(file: string, key: CallKey, flag: "w" | "wx"): Promise<boolean> {
     try {
         // The mode matters: LiveKit refuses a key file anybody else can read, and
         // the refusal is a container that will not start rather than a warning.
-        await writeFile(callKeyFile(), render(key), { encoding: "utf8", mode: 0o600 });
+        await writeFile(file, render(key), { encoding: "utf8", mode: 0o600, flag });
+        return true;
     } catch (error) {
+        if ((error as NodeJS.ErrnoException)?.code === "EEXIST") return false;
         // A deployment with no such volume - a dev run outside compose - has no
         // media server either, and the screens say so. Not worth an exception.
         console.error(
             "polaris: could not write the call server key:",
             error instanceof Error ? error.message : error
         );
-        return null;
+        return false;
     }
-    return key;
+}
+
+/**
+ * The pair an install predating the file was already using, out of the
+ * environment its installer wrote.
+ *
+ * Adopted rather than replaced, so an update does not change the key of a
+ * deployment whose calls were working - including one whose compose file is
+ * older than the image it runs, where the media server is still keyed from
+ * `.env` and would refuse every token signed with a new secret.
+ *
+ * Both halves, not only the secret: the name travels in the token and the
+ * installer let it be set.
+ */
+function adopted(): CallKey | null {
+    const env = loadEnv();
+    const apiSecret = env.POLARIS_CALL_SERVER_API_SECRET?.trim();
+    if (!apiSecret) return null;
+    // An install that aliased the two carries one value in both, and this file is
+    // read by another container: seeding it would hand that container the secret
+    // every session is signed with. install.sh separates them, but it only runs
+    // from a script, and the whole point of this file is a deployment that never
+    // runs one.
+    if (apiSecret === env.POLARIS_AUTH_SECRET?.trim()) return null;
+    // A whole address names somebody else's server, so that is their key rather
+    // than this stack's, and it does not belong on this volume. The shipped
+    // server gets one of its own.
+    const url = env.POLARIS_CALL_SERVER_URL?.trim();
+    if (url && !url.startsWith("/")) return null;
+    return { apiKey: env.POLARIS_CALL_SERVER_API_KEY?.trim() || CALL_API_KEY, apiSecret };
 }
 
 /** The pair on disk, or null when there is not one yet. */
 export async function readCallKey(): Promise<CallKey | null> {
-    const text = await readFile(callKeyFile(), "utf8").catch(() => null);
+    return read(callKeyFile());
+}
+
+async function read(file: string): Promise<CallKey | null> {
+    const text = await readFile(file, "utf8").catch(() => null);
     return text === null ? null : parse(text);
 }
 
-/** `name: secret`, which is the shape LiveKit reads. One pair: this file exists
- *  so that two containers agree on one key, and a second would be a second
- *  answer to that question. */
+/**
+ * `name: secret`, which is the shape LiveKit reads. One pair: this file exists
+ * so that two containers agree on one key, and a second would be a second answer
+ * to that question.
+ *
+ * Both halves quoted, because the far side is a real YAML parser and an adopted
+ * secret is whatever an operator put in `.env`: one starting with `*` or `&` is
+ * an alias there, one starting with `@` is reserved outright, and one carrying
+ * ` #` ends early. Each of those fails silently - both sides believe they hold a
+ * key and every token is refused at the media server.
+ */
 function render(key: CallKey): string {
-    return `${key.apiKey}: ${key.apiSecret}\n`;
+    return `${quote(key.apiKey)}: ${quote(key.apiSecret)}\n`;
 }
 
-/** The first `name: secret` line, or null when the file is not one. Parsed by
- *  hand rather than with a YAML library: it is one line this module wrote, and a
+function quote(value: string): string {
+    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+function unquote(value: string): string {
+    if (value.length < 2 || !value.startsWith('"') || !value.endsWith('"')) return value;
+    return value.slice(1, -1).replace(/\\(["\\])/g, "$1");
+}
+
+/** A `name: secret` line, quoted or not. */
+const PAIR = /^("(?:[^"\\]|\\.)*"|[^:]*?)\s*:\s*(.*)$/;
+
+/** The first pair in the file, or null when the file is not one. Parsed by hand
+ *  rather than with a YAML library: it is one line this module wrote, and a
  *  parser for it is smaller than the argument for adding a dependency. */
 function parse(text: string): CallKey | null {
     for (const line of text.split("\n")) {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith("#")) continue;
-        const at = trimmed.indexOf(":");
-        if (at < 0) return null;
-        const apiKey = trimmed.slice(0, at).trim();
-        const apiSecret = trimmed.slice(at + 1).trim();
+        const match = PAIR.exec(trimmed);
+        if (!match) return null;
+        const apiKey = unquote(match[1]!.trim());
+        const apiSecret = unquote(match[2]!.trim());
         return apiKey && apiSecret ? { apiKey, apiSecret } : null;
     }
     return null;

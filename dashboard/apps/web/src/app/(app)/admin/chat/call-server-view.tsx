@@ -34,9 +34,18 @@ interface Settings {
     shipped: boolean;
     ready: boolean;
     answering: boolean;
+    /** Why the address below is not the one calls go to, when it is not. */
+    unused: "environment" | "incomplete" | null;
 }
 
-const NOTHING: Settings = { url: "", hasKey: false, shipped: false, ready: false, answering: false };
+const NOTHING: Settings = {
+    url: "",
+    hasKey: false,
+    shipped: false,
+    ready: false,
+    answering: false,
+    unused: null
+};
 
 export function CallServerView() {
     const [settings, setSettings] = useState<Settings | null>(null);
@@ -181,16 +190,24 @@ export function CallServerView() {
                         ) : null}
                     </div>
 
-                    {manual && settings.shipped ? (
-                        // The address in this deployment's own configuration wins
-                        // over anything stored here, so an address typed in while
-                        // that is set is saved and then never used. Said here
-                        // rather than left to be discovered on a call that keeps
-                        // going through the shipped server.
+                    {settings.unused === "environment" ? (
+                        // A whole address in this deployment's own configuration
+                        // wins over anything stored here, so an address typed in
+                        // while that is set is saved and then never used. Said
+                        // here rather than left to be discovered on a call that
+                        // keeps going somewhere else.
                         <p className="text-[11px] text-warning">
                             This deployment names a call server in its own configuration, so calls go
                             there and the address below is not in use. Clear POLARIS_CALL_SERVER_URL
                             in .env to use this one instead.
+                        </p>
+                    ) : settings.unused === "incomplete" ? (
+                        // Half a pairing signs nothing, so it is skipped. Nothing
+                        // on the screen said so: the address sat there looking
+                        // like the one calls were going to.
+                        <p className="text-[11px] text-warning">
+                            The address below has no key and secret saved with it, so it signs
+                            nothing and is not in use. Fill both in and save.
                         </p>
                     ) : null}
 
