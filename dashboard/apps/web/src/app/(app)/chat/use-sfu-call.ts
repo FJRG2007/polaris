@@ -455,18 +455,34 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
          */
         async function connect(): Promise<void> {
             if (stopped || connecting || room.current) return;
+            // Claimed here, before the first await, and not after the ticket comes
+            // back. Two attempts a moment apart - the roster change that admits
+            // somebody, and the one that follows it - both got past this guard while
+            // the first was still waiting for its ticket, and both went on to join.
+            // The media server sees one identity twice and closes the older session,
+            // which that tab reports as having lost the call server: a call that
+            // connects, publishes, and is then thrown out of itself.
+            connecting = true;
             const ticket = await actions
                 .callTokenAction(inCall)
                 .catch(() => ({ error: "The call could not be reached. Try again." }) as CallTicket);
-            if (stopped) return;
-            if (ticket.waiting) return;
-            if (ticket.error) {
-                report(ticket.error);
+            // Released on every path that gives up before there is a room to guard
+            // the attempt instead. `waiting` in particular: somebody in the lobby is
+            // told "not yet", and the next roster change has to be able to try again.
+            if (stopped || ticket.waiting) {
+                connecting = false;
                 return;
             }
-            if (!ticket.url || !ticket.token) return;
+            if (ticket.error) {
+                report(ticket.error);
+                connecting = false;
+                return;
+            }
+            if (!ticket.url || !ticket.token) {
+                connecting = false;
+                return;
+            }
 
-            connecting = true;
             // Fetched now rather than imported: see `livekit` above. It is one
             // request, cached, and it happens while the browser is already
             // waiting on the ticket.

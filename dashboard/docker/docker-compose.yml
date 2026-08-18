@@ -274,6 +274,17 @@ services:
           # faster and the case that has to work before anybody has been near a
           # router.
           advertise_internal_ip: true
+          # A machine running containers has half a dozen bridge addresses no browser
+          # can reach, and each one offered is another dead pair for ICE to work
+          # through before it settles on the one that carries the call. Named
+          # exactly rather than matched: these two are Docker's own and libvirt's,
+          # so no real network is ever hidden by this. The per-project bridges are
+          # named after a hash and cannot be listed here; they cost a few wasted
+          # checks and nothing else.
+          interfaces:
+            excludes:
+              - docker0
+              - virbr0
           # Named rather than left to the default list, which also reaches for a
           # commercial provider's server. One request at startup, to learn the
           # address on the far side of the router; nothing about a call is ever
