@@ -269,7 +269,9 @@ describe("where calls run", () => {
         stored = { enabled: true, config: { url: "wss://old.example.com", apiKey: "polaris" } };
         await calls.setCallServer("wss://calls.example.com/", "polaris", "");
 
-        const written = saved[0] as { input: { config: Record<string, unknown>; secret?: unknown } };
+        const written = saved[0] as {
+            input: { config: Record<string, unknown>; secret?: unknown };
+        };
         expect(written.input.config.url).toBe("wss://calls.example.com");
         expect("secret" in written.input).toBe(false);
     });

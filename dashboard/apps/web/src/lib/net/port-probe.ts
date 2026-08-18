@@ -24,7 +24,11 @@ export const PROBE_TIMEOUT_MS = 4000;
  * which is the forward working. A refusal or a timeout is reported as false and
  * means nothing on its own.
  */
-export function probeTcpPort(host: string, port: number, timeoutMs = PROBE_TIMEOUT_MS): Promise<boolean> {
+export function probeTcpPort(
+    host: string,
+    port: number,
+    timeoutMs = PROBE_TIMEOUT_MS
+): Promise<boolean> {
     return new Promise((resolve) => {
         const socket = connect({ host, port, timeout: timeoutMs });
         const settle = (reached: boolean): void => {
