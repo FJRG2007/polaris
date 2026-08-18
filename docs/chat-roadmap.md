@@ -73,7 +73,8 @@ when a deploy finishes".
 | Item | Status | Prio | Size | Notes |
 |------|--------|------|------|-------|
 | Slowmode per channel | ✅ | P0 | S | A ladder from off to six hours in channel settings, measured from the last thing each person said. Counted down above the composer on the same arithmetic the server refuses on. Moderators exempt; deleted messages still count; edits never held. |
-| Block somebody | ⬜ | P0 | M | Polaris has privacy audiences and reports but no block. Signal and Matrix both treat this as core. Needs: no direct messages, no mentions, their messages collapsed. |
+| Timeout, kick and ban from a server | ✅ | P0 | M | Right-click somebody in the roster. A timeout is a moment so it ends on its own; a ban is a row checked wherever anybody is let in, with a "kept out" list on the server menu to lift one. A group has no ban - it has no door to stand at. |
+| Block somebody | ⬜ | P0 | M | Polaris has privacy audiences and reports but no block. Signal and Matrix both treat this as core. Needs: no direct messages, no mentions, their messages collapsed. Different from a timeout, which is a room's decision rather than a person's. |
 | Mature-content gate on an attachment | ⬜ | P2 | M | Fluxer has `mature_content`; a per-space switch plus a click-to-reveal. |
 | Trusted domains (warn before following an unknown link) | ⬜ | P1 | S | Fluxer's `trusted_domain`. Polaris already unfurls links, so the domain is known at render time - this is a confirmation step on anything outside a list. |
 | Virus scanning on upload | ⬜ | P2 | M | Stoat runs ClamAV over attachments. |
