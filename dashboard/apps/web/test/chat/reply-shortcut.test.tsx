@@ -22,7 +22,33 @@ import { cleanup, render, screen } from "@testing-library/react";
 vi.mock("@/app/(app)/chat/actions", () => ({
     saveMediaAction: async () => ({}),
     unsaveMediaAction: async () => ({}),
-    linkPreviewAction: async () => ({})
+    linkPreviewAction: async () => ({}),
+    openDirectAction: async () => ({ id: "d1" })
+}));
+
+// A name in a message is the person, and the person's menu asks the app which
+// room this is and what this reader runs - see `Writer`.
+vi.mock("@/app/(app)/chat/chat-context", () => ({
+    useChat: () => ({
+        channels: [
+            {
+                id: "c1",
+                spaceId: null,
+                categoryId: null,
+                kind: "group",
+                name: "A room",
+                archived: false,
+                ownerId: null,
+                others: []
+            }
+        ],
+        spaces: [],
+        refresh: () => undefined
+    })
+}));
+
+vi.mock("next/navigation", () => ({
+    useRouter: () => ({ push: () => undefined, refresh: () => undefined })
 }));
 
 function message(id: string, authorId: string, body = `message ${id}`) {

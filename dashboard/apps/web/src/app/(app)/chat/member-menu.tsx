@@ -35,7 +35,8 @@ import { runAction } from "@/lib/run-action";
 import { useState, type ReactNode } from "react";
 import { setVolumeFor, volumeFor } from "./call-volumes";
 import { memberActions } from "./member-actions";
-import type { ChatChannelView, ChatMemberView } from "@/lib/chat/chat-service";
+import { useOpenDirect } from "./use-open-direct";
+import type { ChatChannelView } from "@/lib/chat/chat-service";
 import {
     AtSign,
     Ban,
@@ -58,7 +59,8 @@ import {
     ContextMenuSub,
     ContextMenuSubContent,
     ContextMenuSubTrigger,
-    ContextMenuTrigger
+    ContextMenuTrigger,
+    keepFocusOnClose
 } from "@polaris/ui";
 
 /**
@@ -76,10 +78,23 @@ const TIMEOUTS: readonly { minutes: number; label: string }[] = [
     { minutes: 60 * 24 * 7, label: "a week" }
 ];
 
+/**
+ * Somebody the menu is about.
+ *
+ * Deliberately not the roster's own row: the same menu opens on a name in the
+ * middle of a conversation, where all that is known about the writer is who they
+ * are and what they are called. Nothing in here needs more than that, and asking
+ * for a role that is not to hand would mean inventing one.
+ */
+export interface MenuPerson {
+    readonly userId: string;
+    readonly name: string;
+}
+
 /** How somebody is written into a message. The same address the rest of Polaris
  *  uses for a person, so it resolves to their current name wherever it is read
  *  rather than freezing whatever they were called today. */
-function mentionOf(member: ChatMemberView): string {
+function mentionOf(member: MenuPerson): string {
     return `[${member.name.replace(/[[\]]/g, "").trim() || "Somebody"}](polaris:user/${member.userId})`;
 }
 
@@ -93,16 +108,17 @@ export function MemberMenu({
     onError,
     children
 }: {
-    member: ChatMemberView;
+    member: MenuPerson;
     /** The conversation their name was pressed in, which decides nearly
      *  everything below: whether there is a space to invite to or be banned
      *  from, whether this is a group with an owner, and who may moderate. */
     channel: ChatChannelView;
     viewerId: string;
     /** Put them in what is being written. The composer owns the box; this only
-     *  says what to drop in it. */
-    onMention: (text: string) => void;
-    onNickname: (member: ChatMemberView) => void;
+     *  says what to drop in it. Absent where there is no box under the list, and
+     *  then the item is not drawn rather than drawn doing nothing. */
+    onMention?: (text: string) => void;
+    onNickname: (member: MenuPerson) => void;
     onChanged: () => void;
     onError: (message: string) => void;
     children: ReactNode;
@@ -110,6 +126,7 @@ export function MemberMenu({
     const router = useRouter();
     const { spaces } = useChat();
     const [busy, setBusy] = useState(false);
+    const direct = useOpenDirect(onError);
     // Read once, when the menu is built. A volume is not something that changes
     // under somebody while they are looking at the menu that sets it.
     const [silenced, setSilenced] = useState(() => volumeFor(member.userId) === 0);
@@ -133,31 +150,25 @@ export function MemberMenu({
         if (!result?.error) onChanged();
     };
 
-    /** Open the conversation with them, and go there. */
-    const openDirect = async (then: (channelId: string) => void) => {
-        setBusy(true);
-        const result = await runAction(
-            () => actions.openDirectAction({ userIds: [member.userId] }),
-            onError
-        );
-        setBusy(false);
-        if (result?.id) then(result.id);
-    };
+    const working = busy || direct.busy;
 
     return (
         <ContextMenu>
             <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-            <ContextMenuContent className="w-56">
+            {/* Focus is not handed back to whatever was right-clicked. Mention
+                puts the caret in the composer, and the hand-back landed a beat
+                later and took it straight out again - which read as a mention
+                that dropped the name in and then refused to let anybody finish
+                the sentence. */}
+            <ContextMenuContent className="w-56" onCloseAutoFocus={keepFocusOnClose}>
                 <ContextMenuLabel className="truncate">{member.name}</ContextMenuLabel>
                 <ContextMenuSeparator />
 
                 {!you && (
                     <>
                         <ContextMenuItem
-                            disabled={busy}
-                            onSelect={() =>
-                                void openDirect((id) => router.push(`/chat/c/${id}`))
-                            }
+                            disabled={working}
+                            onSelect={() => void direct.open(member.userId)}
                         >
                             <MessageSquare className="size-3.5" />
                             Message
@@ -166,18 +177,22 @@ export function MemberMenu({
                             starting. The address is what carries that, the way
                             answering a call from outside a conversation does. */}
                         <ContextMenuItem
-                            disabled={busy}
+                            disabled={working}
                             onSelect={() =>
-                                void openDirect((id) => router.push(`/chat/c/${id}?answer=1`))
+                                void direct.open(member.userId, (id) =>
+                                    router.push(`/chat/c/${id}?answer=1`)
+                                )
                             }
                         >
                             <Phone className="size-3.5" />
                             Call
                         </ContextMenuItem>
-                        <ContextMenuItem onSelect={() => onMention(mentionOf(member))}>
-                            <AtSign className="size-3.5" />
-                            Mention
-                        </ContextMenuItem>
+                        {onMention && (
+                            <ContextMenuItem onSelect={() => onMention(mentionOf(member))}>
+                                <AtSign className="size-3.5" />
+                                Mention
+                            </ContextMenuItem>
+                        )}
                         <ContextMenuItem onSelect={() => onNickname(member)}>
                             <PenLine className="size-3.5" />
                             Change nickname
@@ -217,7 +232,7 @@ export function MemberMenu({
                                     {invitable.map((entry) => (
                                         <ContextMenuItem
                                             key={entry.id}
-                                            disabled={busy}
+                                            disabled={working}
                                             onSelect={() =>
                                                 void run(() =>
                                                     actions.addSpaceMembersAction({
@@ -242,7 +257,7 @@ export function MemberMenu({
                         {/* A group that cannot be handed over is a group that
                             dies with an account. */}
                         <ContextMenuItem
-                            disabled={busy}
+                            disabled={working}
                             onSelect={() =>
                                 void run(() =>
                                     actions.transferGroupAction(channel.id, member.userId)
@@ -267,7 +282,7 @@ export function MemberMenu({
                                 {TIMEOUTS.map((choice) => (
                                     <ContextMenuItem
                                         key={choice.minutes}
-                                        disabled={busy}
+                                        disabled={working}
                                         onSelect={() =>
                                             void run(() =>
                                                 actions.timeOutMemberAction(
@@ -285,7 +300,7 @@ export function MemberMenu({
                                 ))}
                                 <ContextMenuSeparator />
                                 <ContextMenuItem
-                                    disabled={busy}
+                                    disabled={working}
                                     onSelect={() =>
                                         void run(() =>
                                             actions.timeOutMemberAction(
@@ -302,7 +317,7 @@ export function MemberMenu({
                         </ContextMenuSub>
 
                         <ContextMenuItem
-                            disabled={busy}
+                            disabled={working}
                             onSelect={() =>
                                 void run(() =>
                                     space
@@ -321,7 +336,7 @@ export function MemberMenu({
                         {/* Only a space. See `memberActions`. */}
                         {may.ban && space && (
                             <ContextMenuItem
-                                disabled={busy}
+                                disabled={working}
                                 onSelect={() =>
                                     void run(() =>
                                         actions.banFromSpaceAction(space, member.userId)

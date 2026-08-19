@@ -25,10 +25,9 @@
 
 import * as actions from "./actions";
 import { useChat } from "./chat-context";
-import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/avatar";
-import { runAction } from "@/lib/run-action";
-import { MemberMenu } from "./member-menu";
+import { MemberMenu, type MenuPerson } from "./member-menu";
+import { useOpenDirect } from "./use-open-direct";
 import { NicknameDialog } from "./nickname-dialog";
 import { Crown, Users, X } from "lucide-react";
 import { useChatStream } from "./use-chat-stream";
@@ -191,13 +190,12 @@ function MemberRows({
     onMention: (text: string) => void;
     onChanged: () => void;
 }) {
-    const router = useRouter();
-    const [busyId, setBusyId] = useState<string | null>(null);
     const [error, setError] = useState("");
+    const direct = useOpenDirect(setError);
     /** Whose nickname is being changed. Held here rather than in the menu: the
      *  menu is unmounted the moment an item is chosen, and a dialog opened by
      *  something that is about to disappear never appears. */
-    const [naming, setNaming] = useState<ChatMemberView | null>(null);
+    const [naming, setNaming] = useState<MenuPerson | null>(null);
 
     if (loading) {
         return (
@@ -236,20 +234,9 @@ function MemberRows({
                             >
                             <button
                                 type="button"
-                                disabled={you || busyId !== null}
+                                disabled={you || direct.busy}
                                 title={you ? member.name : `Message ${member.name}`}
-                                onClick={async () => {
-                                    setBusyId(member.userId);
-                                    setError("");
-                                    const result = await runAction(
-                                        () =>
-                                            actions.openDirectAction({ userIds: [member.userId] }),
-                                        setError
-                                    );
-                                    setBusyId(null);
-                                    if (result?.error) setError(result.error);
-                                    else if (result?.id) router.push(`/chat/c/${result.id}`);
-                                }}
+                                onClick={() => void direct.open(member.userId)}
                                 className={cn(
                                     "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors",
                                     you ? "cursor-default" : "hover:bg-card-hover disabled:opacity-70"

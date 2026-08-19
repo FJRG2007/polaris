@@ -1224,6 +1224,15 @@ export function ChannelView({
                         onForward={setForwarding}
                         onEdit={setEditing}
                         onDelete={setDeleting}
+                        // The same box the roster's menu writes into, so a name
+                        // mentioned from the messages lands where one mentioned
+                        // from the column does.
+                        onMention={(text) =>
+                            setInserting((current) => ({
+                                token: (current?.token ?? 0) + 1,
+                                text
+                            }))
+                        }
                     />
                 )}
 

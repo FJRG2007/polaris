@@ -25,6 +25,7 @@ import { SelectionToolbar } from "./toolbar";
 import { mentionExtension, popupOpen } from "./suggestion";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
+import type { JSONContent } from "@tiptap/core";
 import { resolveReferencesAction, searchMentionsAction } from "@/app/(app)/mention-actions";
 
 export interface RichTextEditorProps {
@@ -59,6 +60,19 @@ export interface RichTextEditorProps {
      * means nothing.
      */
     focusAt?: number;
+    /**
+     * Something to drop in where the caret is.
+     *
+     * Written as Markdown, the way everything else that reaches this surface is,
+     * and read into real nodes before it lands - a mention has to arrive as the
+     * chip it is rather than as the source of one.
+     *
+     * At the caret rather than at the end, which is the whole reason it is the
+     * editor's job and not the caller's: the caller has a string, and the only
+     * thing that knows where somebody left off is the document. Bumped by the
+     * caller; the number itself means nothing.
+     */
+    insert?: { readonly token: number; readonly text: string } | null;
     /**
      * Where the caret lands when `focusAt` fires.
      *
@@ -119,6 +133,7 @@ export function RichTextEditor({
     disabled = false,
     autoFocus = false,
     focusAt = 0,
+    insert = null,
     focusWhere = "end",
     onPasteFiles,
     mentionsIn = null,
@@ -282,6 +297,32 @@ export function RichTextEditor({
         return () => window.clearTimeout(timer);
     }, [focusAt, editor, disabled]);
 
+    /**
+     * Somebody handed something in.
+     *
+     * On the same zero timer as the caret, and for the same reason: what asks
+     * for this is a menu item, and the menu is still on screen holding focus
+     * when the effect runs.
+     *
+     * The caret ends up after what was inserted, which is what somebody who
+     * pressed "mention" is about to type into. A space goes with it, because the
+     * alternative is a name welded to the next word.
+     */
+    const insertToken = insert?.token ?? 0;
+    useEffect(() => {
+        const text = insert?.text ?? "";
+        if (!insertToken || !editor || disabled || !text) return;
+        const timer = window.setTimeout(() => {
+            if (editor.isDestroyed) return;
+            const doc = md.markdownToDoc(text, origin());
+            const pending = collectReferences(doc);
+            editor.chain().focus().insertContent(inlineIfOneLine(doc)).insertContent(" ").run();
+            if (pending.length > 0) void nameReferences(editor, pending);
+        }, 0);
+        return () => window.clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately the token
+    }, [insertToken, editor, disabled]);
+
     if (!editor) {
         // The same box, before the view exists, so nothing jumps when it does.
         return <div className={cn(surfaceClass(bordered, disabled), "min-h-[3rem]", className)} />;
@@ -312,6 +353,22 @@ function surfaceClass(bordered: boolean, disabled: boolean): string {
 }
 
 /** Where this Polaris answers, so a pasted link to it is recognized as one. */
+/**
+ * What to hand `insertContent`, given a document that is usually one line.
+ *
+ * A mention is a link in a paragraph, and inserting that paragraph in the middle
+ * of a sentence splits the sentence in two. So a single paragraph is unwrapped
+ * to the inline nodes inside it and lands in the line somebody is writing;
+ * anything with real structure - which nothing does today, but a pasted table
+ * would - goes in whole.
+ */
+function inlineIfOneLine(doc: JSONContent): JSONContent[] {
+    const blocks = doc.content ?? [];
+    const only = blocks.length === 1 ? blocks[0] : null;
+    if (only?.type === "paragraph") return only.content ?? [];
+    return blocks;
+}
+
 function origin(): string | null {
     return typeof window === "undefined" ? null : window.location.origin;
 }

@@ -20,9 +20,13 @@
 
 import * as actions from "./actions";
 import { VoiceNote } from "./voice-note";
+import { useChat } from "./chat-context";
 import { Avatar } from "@/components/avatar";
 import { MessageMenu } from "./message-menu";
 import { ReportDialog } from "./report-dialog";
+import { NicknameDialog } from "./nickname-dialog";
+import { useOpenDirect } from "./use-open-direct";
+import { MemberMenu, type MenuPerson } from "./member-menu";
 import { usableAccent } from "@/lib/chat/accent";
 import { useEffect, useRef, useState } from "react";
 import { autoplaying, embedFor } from "@/lib/chat/embeds";
@@ -40,7 +44,8 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
-    keepFocusOnClose
+    keepFocusOnClose,
+    useToast
 } from "@polaris/ui";
 import {
     Check,
@@ -91,6 +96,10 @@ export interface MessageListProps {
     onForward?: (message: ChatMessageView) => void;
     onEdit?: (message: ChatMessageView) => void;
     onDelete: (message: ChatMessageView) => void;
+    /** Put somebody into what is being written, for the mention a name offers.
+     *  Absent where there is no composer under the list, and then that one item
+     *  is not drawn rather than drawn doing nothing. */
+    onMention?: (text: string) => void;
     /** A message to point at, after arriving from a search result. It fades on
      *  its own: a highlight that stays is a highlight somebody has to dismiss. */
     highlightId?: string | null;
@@ -109,15 +118,29 @@ export function MessageList({
     onReplyPrivately,
     onForward,
     onEdit,
-    onDelete
+    onDelete,
+    onMention
 }: MessageListProps) {
     useMessageKeys({ messages, viewerId, canPost, canModerate, onReply, onEdit, onDelete });
+    const { refresh } = useChat();
 
     // The picture being looked at, held here rather than in each message: one
     // viewer is open at a time, and it is drawn over the whole conversation.
     const [viewing, setViewing] = useState<ViewedImage | null>(null);
     const [reporting, setReporting] = useState<string | null>(null);
     const [explaining, setExplaining] = useState<ChatMessageView | null>(null);
+    /** Whose nickname is being changed. Up here with the other dialogs, and for
+     *  the same reason: the menu that asks for it is unmounted the moment an
+     *  item is chosen, and a dialog opened by something that is about to
+     *  disappear never appears. */
+    const [naming, setNaming] = useState<MenuPerson | null>(null);
+    const toast = useToast();
+    /** A refusal from a name's menu has nowhere in the stream to sit, so it is
+     *  said over the conversation. The empty string is the hook clearing a
+     *  previous failure and has nothing to say. */
+    const say = (message: string) => {
+        if (message) toast.show({ title: message });
+    };
 
     return (
         <ol className="flex flex-col">
@@ -146,6 +169,10 @@ export function MessageList({
                             // and five ticks say that five times.
                             lastOfBlock={!sharesBlock(message, messages[index + 1])}
                             mine={message.authorId === viewerId}
+                            viewerId={viewerId}
+                            onMention={onMention}
+                            onNickname={setNaming}
+                            onError={say}
                             onOpenImage={setViewing}
                             onReport={(target) => setReporting(target.id)}
                             onExplain={setExplaining}
@@ -193,6 +220,12 @@ export function MessageList({
             <MessageInfoDialog
                 message={explaining}
                 onOpenChange={(next) => !next && setExplaining(null)}
+            />
+            <NicknameDialog
+                open={naming !== null}
+                person={naming ? { id: naming.userId, name: naming.name } : null}
+                onOpenChange={(open) => !open && setNaming(null)}
+                onSaved={refresh}
             />
         </ol>
     );
@@ -325,7 +358,11 @@ function Message({
     onDelete,
     onOpenImage,
     onReport,
-    onExplain
+    onExplain,
+    viewerId,
+    onMention,
+    onNickname,
+    onError
 }: {
     message: ChatMessageView;
     grouped: boolean;
@@ -349,10 +386,21 @@ function Message({
     onReport: (message: ChatMessageView) => void;
     /** Open the three moments behind the ticks. */
     onExplain: (message: ChatMessageView) => void;
+    /** Who is reading, which is what decides that their own name is a name
+     *  rather than somebody to act on - see `Writer`. */
+    viewerId: string;
+    onMention?: (text: string) => void;
+    onNickname: (person: MenuPerson) => void;
+    onError: (message: string) => void;
 }) {
     const format = useDisplayFormat();
     const [showingHistory, setShowingHistory] = useState(false);
+    const direct = useOpenDirect(onError);
     const author = message.authorName ?? "Somebody who has left";
+    /** Who wrote it, when that is somebody other than the reader. Read out here
+     *  so the name and the face can both ask about them without narrowing it
+     *  again in two places. */
+    const writer = message.authorId && !mine ? message.authorId : null;
 
     // Something Polaris said rather than somebody: joined, left, was added.
     // Indented to where message text starts rather than to the avatar gutter,
@@ -405,11 +453,25 @@ function Message({
                             {format.time(message.createdAt)}
                         </span>
                     ) : message.authorId ? (
-                        <Avatar
-                            openable
-                            person={{ id: message.authorId, name: author }}
-                            size={28}
-                        />
+                        // Right-clicking a face asks about the person, the way it
+                        // does in the roster. Pressing it still opens their photo,
+                        // which is what a face has always done here.
+                        <Writer
+                            person={{ userId: message.authorId, name: author }}
+                            channelId={message.channelId}
+                            viewerId={viewerId}
+                            onMention={onMention}
+                            onNickname={onNickname}
+                            onError={onError}
+                        >
+                            <span className="inline-flex">
+                                <Avatar
+                                    openable
+                                    person={{ id: message.authorId, name: author }}
+                                    size={28}
+                                />
+                            </span>
+                        </Writer>
                     ) : (
                         <span className="inline-flex size-7 items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground">
                             ?
@@ -420,7 +482,33 @@ function Message({
                 <div className="min-w-0 flex-1 pb-0.5">
                     {!grouped && (
                         <p className="flex items-baseline gap-2">
-                            <span className="text-sm font-medium">{author}</span>
+                            {writer ? (
+                                <Writer
+                                    person={{ userId: writer, name: author }}
+                                    channelId={message.channelId}
+                                    viewerId={viewerId}
+                                    onMention={onMention}
+                                    onNickname={onNickname}
+                                    onError={onError}
+                                >
+                                    {/* Underlined on the hover and nothing else:
+                                        a name that grows a background or a border
+                                        moves every line under it by a pixel, and a
+                                        conversation that shifts as the pointer
+                                        crosses it is unreadable. */}
+                                    <button
+                                        type="button"
+                                        disabled={direct.busy}
+                                        title={`Message ${author}`}
+                                        onClick={() => void direct.open(writer)}
+                                        className="rounded text-left text-sm font-medium underline-offset-2 hover:underline focus-visible:underline"
+                                    >
+                                        {author}
+                                    </button>
+                                </Writer>
+                            ) : (
+                                <span className="text-sm font-medium">{author}</span>
+                            )}
                             <span
                                 className="text-[11px] text-foreground-subtle"
                                 title={format.dateTime(message.createdAt)}
@@ -735,6 +823,56 @@ function KeepableImage({
                 <Star className={cn("size-3.5", kept === true && "fill-current")} />
             </button>
         </span>
+    );
+}
+
+/**
+ * Somebody's name or face, in the middle of what they said.
+ *
+ * The same menu the roster opens, in the place people actually reach for it:
+ * every client with rooms in it answers a right-click on a name with what can be
+ * done about that person, and a reader looking at a message is already pointing
+ * at the name they mean. The roster is a column somebody has to open first, and
+ * in a busy channel the person who needs muting is the one on screen, not the
+ * one being scrolled to in a list of two hundred.
+ *
+ * Nothing about yourself, and nothing when the conversation is not one this
+ * reader has open - who may do what to whom is decided from the room, and a room
+ * that cannot be found is not one to guess about.
+ */
+function Writer({
+    person,
+    channelId,
+    viewerId,
+    onMention,
+    onNickname,
+    onError,
+    children
+}: {
+    person: MenuPerson;
+    /** The conversation the name was read in. The room decides the menu. */
+    channelId: string;
+    viewerId: string;
+    onMention?: (text: string) => void;
+    onNickname: (person: MenuPerson) => void;
+    onError: (message: string) => void;
+    children: React.ReactNode;
+}) {
+    const { channels, refresh } = useChat();
+    const channel = channels.find((entry) => entry.id === channelId);
+    if (person.userId === viewerId || !channel) return <>{children}</>;
+    return (
+        <MemberMenu
+            member={person}
+            channel={channel}
+            viewerId={viewerId}
+            onMention={onMention}
+            onNickname={onNickname}
+            onChanged={refresh}
+            onError={onError}
+        >
+            {children}
+        </MemberMenu>
     );
 }
 

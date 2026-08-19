@@ -52,6 +52,10 @@ export function ThreadPanel({
     const { may } = useChat();
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
     const [error, setError] = useState("");
+    /** Somebody to drop into the reply being written. The thread has its own box,
+     *  so a name mentioned in here belongs in this one rather than in the
+     *  channel's - see the composer's `insert`. */
+    const [inserting, setInserting] = useState<{ token: number; text: string } | null>(null);
 
     const load = useCallback(async () => {
         const result = await actions.readThreadAction(root.id);
@@ -130,6 +134,12 @@ export function ThreadPanel({
                             );
                             await load();
                         }}
+                        onMention={(text) =>
+                            setInserting((current) => ({
+                                token: (current?.token ?? 0) + 1,
+                                text
+                            }))
+                        }
                         onDelete={async (message) => {
                             await runAction(
                                 () => actions.deleteMessageAction(message.id),
@@ -151,6 +161,7 @@ export function ThreadPanel({
             <Composer
                 channelId={root.channelId}
                 rules={rules}
+                insert={inserting}
                 disabled={!canPost}
                 attachable={may.attach}
                 placeholder="Reply in this thread"
