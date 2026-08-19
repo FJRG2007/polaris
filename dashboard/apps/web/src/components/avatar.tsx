@@ -183,6 +183,11 @@ export function Avatar({
     const face = (
         <span
             title={person.name}
+            // Says this picture is a person rather than something in the page.
+            // A menu that offers "copy image" over everything with an <img> in
+            // it offers it over every face in the room, where what somebody
+            // right-clicking a face wants is the person - see `messageTarget`.
+            data-avatar=""
             className={cn(
                 "relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden font-medium text-white ring-1 ring-border",
                 shape,

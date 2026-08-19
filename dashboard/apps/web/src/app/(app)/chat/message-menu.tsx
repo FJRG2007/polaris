@@ -10,18 +10,28 @@
  * It wraps the row rather than living inside it, so the whole message is the
  * target - right-clicking the text, the avatar or the empty space to the right
  * all open the same menu, which is what everybody expects from a chat client.
+ *
+ * Wrapping the whole row is also what takes the browser's own menu away, and
+ * with it the only way there was to copy a link somebody wrote or save a picture
+ * they sent. So the menu asks what the pointer was over - see `messageTarget` -
+ * and puts that first: the link's own actions over a link, the picture's over a
+ * picture, and the message's underneath either. Nothing is lost by right-
+ * clicking one pixel to the left of where you meant.
  */
 
 import { isPlayable } from "./voice-recorder";
 import { copyText, messageLink } from "./links";
 import { useAppUrl } from "@/components/app-url";
-import { useState, type ReactNode } from "react";
+import { imageItems } from "@/components/image-actions";
+import { useRef, useState, type ReactNode } from "react";
+import { messageTarget, NOTHING, type MessageTarget } from "./message-target";
 import { plainText } from "@/components/rich-text/excerpt";
 import type { ChatAttachmentView, ChatMessageView } from "@/lib/chat/messages";
 import { AUDIO_FORMATS, extensionOf, saveRecording, type AudioFormat } from "./audio-download";
 import {
     Copy,
     Download,
+    ExternalLink,
     Flag,
     CornerUpLeft,
     Forward,
@@ -89,6 +99,21 @@ export function MessageMenu({
     /** Which recording is being converted, so its menu cannot be pressed twice
      *  while a few seconds of encoding are going on. */
     const [saving, setSaving] = useState<string | null>(null);
+    /**
+     * What the pointer was over when the menu was opened.
+     *
+     * A ref rather than state: it is written in the same event that opens the
+     * menu, and the menu's contents are built after that event - so the value is
+     * already there to read, and a message row does not re-render on every press
+     * to carry it. Recorded on the press as well as on the menu, because a long
+     * press on a touch screen opens this without a context-menu event ever
+     * happening.
+     */
+    const pointed = useRef<MessageTarget>(NOTHING);
+    const at = pointed.current;
+    const link = at.link;
+    const picture = at.image;
+    const announce = (words: string) => toast.show({ title: words });
     // A recording is the one attachment with no way to save it from the message
     // itself: a picture opens into a viewer that offers it and a document is a
     // link, but a player is a player. So the menu is where it lives.
@@ -121,11 +146,67 @@ export function MessageMenu({
 
     return (
         <ContextMenu>
-            <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+            <ContextMenuTrigger
+                asChild
+                onPointerDown={(event) => {
+                    pointed.current = messageTarget(
+                        event.target as Element | null,
+                        event.currentTarget,
+                        baseUrl
+                    );
+                }}
+                onContextMenu={(event) => {
+                    pointed.current = messageTarget(
+                        event.target as Element | null,
+                        event.currentTarget,
+                        baseUrl
+                    );
+                }}
+            >
+                {children}
+            </ContextMenuTrigger>
             {/* Focus is not handed back to the message row on the way out: Reply
                 and Edit put the caret in the composer, and the hand-back landed
                 a beat later and took it straight out again. */}
             <ContextMenuContent className="w-52" onCloseAutoFocus={keepFocusOnClose}>
+                {/* Forwarding and reporting are left out of the picture's own
+                    set here: they are about the message, and the message's own
+                    items are a few lines below in the same menu. */}
+                {picture && (
+                    <>
+                        {imageItems({
+                            image: picture,
+                            baseUrl,
+                            announce,
+                            Item: ContextMenuItem,
+                            Separator: ContextMenuSeparator
+                        })}
+                        <ContextMenuSeparator />
+                    </>
+                )}
+
+                {link && (
+                    <>
+                        <ContextMenuItem onSelect={() => void copyText(link.copy)}>
+                            <Link2 className="size-3.5" />
+                            {link.kind === "email" ? "Copy email address" : "Copy link"}
+                        </ContextMenuItem>
+                        {/* The address as the browser has it, not the one that
+                            gets copied: a page inside Polaris opens on this
+                            tab's own origin, which is the hostname known to
+                            work from here. */}
+                        <ContextMenuItem
+                            onSelect={() =>
+                                window.open(link.open, "_blank", "noopener,noreferrer")
+                            }
+                        >
+                            <ExternalLink className="size-3.5" />
+                            {link.kind === "email" ? "Send an email" : "Open link"}
+                        </ContextMenuItem>
+                        <ContextMenuSeparator />
+                    </>
+                )}
+
                 {canPost && !message.deleted && (
                     <>
                         {actions.onReply && (
@@ -182,7 +263,7 @@ export function MessageMenu({
                     }
                 >
                     <Link2 className="size-3.5" />
-                    Copy link
+                    Copy message link
                 </ContextMenuItem>
                 {/* What it reads as, not what it is stored as. Markdown escapes
                     its punctuation, so copying the source hands back a line full

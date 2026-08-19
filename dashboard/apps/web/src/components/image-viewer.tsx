@@ -21,27 +21,15 @@
  * every viewer has settled on.
  *
  * The menu is the same set twice - once as three dots and once as the right
- * click - because those are two habits and neither is wrong. Copying the image
- * copies the bytes, which is what somebody pasting into another conversation
- * means; copying the link copies an address only somebody in the conversation
- * can open, which is what somebody quoting it in a ticket means.
+ * click - because those are two habits and neither is wrong. What is in it is
+ * `image-actions`, shared with the conversation: right-clicking a picture in a
+ * message offers the same things without opening it first.
  */
 
 import { useAppUrl } from "@/components/app-url";
-import { copyText, downloadFile } from "@/app/(app)/chat/links";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-    Copy,
-    Download,
-    ExternalLink,
-    Flag,
-    Forward,
-    Link2,
-    MoreHorizontal,
-    X,
-    ZoomIn,
-    ZoomOut
-} from "lucide-react";
+import { imageItems, type ActionableImage } from "@/components/image-actions";
+import { MoreHorizontal, X, ZoomIn, ZoomOut } from "lucide-react";
 import {
     ContextMenu,
     ContextMenuContent,
@@ -68,17 +56,9 @@ const WHEEL_STEP = 0.0015;
  *  A hand on a trackpad or a thumb on glass never lands on exactly one pixel. */
 const DRAG_SLOP = 4;
 
-export interface ViewedImage {
-    readonly url: string;
-    readonly name: string;
-    /** The message it is on, for forwarding and reporting. Absent for a picture
-     *  that is not in a conversation - a profile photo, which there is nowhere
-     *  to forward and nothing to report. */
-    readonly messageId?: string;
-    /** Whether whoever sent it lets it be passed on. The viewer offers the
-     *  action or does not; it never offers one that would be refused. */
-    readonly forwardable?: boolean;
-}
+/** A picture, as the viewer needs it - which is what any menu about a picture
+ *  needs, so it is the shared shape rather than a second one beside it. */
+export type ViewedImage = ActionableImage;
 
 export function ImageViewer({
     image,
@@ -130,79 +110,8 @@ export function ImageViewer({
 
     if (!image) return null;
 
-    /** The address somebody else could open, which is the configured one rather
-     *  than whatever hostname this tab happens to be on. */
-    const shareable = `${baseUrl}${image.url}`;
-
-    /** The message this picture is on, when it is on one. Read out here so the
-     *  two actions that need it are drawn only when there is one to act on. */
-    const messageId = image.messageId;
-
-    /**
-     * The bytes on the clipboard.
-     *
-     * Fetched and handed over as a blob, because "copy image" means the picture
-     * and not its address - pasting a URL into a chat is a link, and somebody
-     * copying an image expects to paste an image. PNG because that is the one
-     * format every clipboard implementation takes.
-     */
-    const copyImage = async () => {
-        try {
-            const response = await fetch(image.url);
-            const blob = await response.blob();
-            const painted = await toPng(blob);
-            await navigator.clipboard.write([new ClipboardItem({ "image/png": painted })]);
-            say("Copied");
-        } catch {
-            // A browser without the clipboard image API, or a refused permission.
-            // The link is the honest fallback and is one press away.
-            say("This browser would not take the image - copy the link instead");
-        }
-    };
-
-    const items = (
-        Item: typeof DropdownMenuItem,
-        Separator: typeof DropdownMenuSeparator
-    ): React.ReactNode => (
-        <>
-            <Item onSelect={() => void copyImage()}>
-                <Copy className="size-3.5" />
-                Copy image
-            </Item>
-            <Item
-                onSelect={() => {
-                    void copyText(shareable);
-                    say("Link copied");
-                }}
-            >
-                <Link2 className="size-3.5" />
-                Copy media link
-            </Item>
-            <Item onSelect={() => downloadFile(image.url, image.name)}>
-                <Download className="size-3.5" />
-                Download
-            </Item>
-            <Item onSelect={() => window.open(image.url, "_blank", "noopener,noreferrer")}>
-                <ExternalLink className="size-3.5" />
-                Open in the browser
-            </Item>
-            {onForward && image.forwardable && messageId && (
-                <Item onSelect={() => onForward(messageId)}>
-                    <Forward className="size-3.5" />
-                    Forward
-                </Item>
-            )}
-            {onReport && messageId && (
-                <>
-                    <Separator />
-                    <Item variant="danger" onSelect={() => onReport(messageId)}>
-                        <Flag className="size-3.5" />
-                        Report
-                    </Item>
-                </>
-            )}
-        </>
-    );
+    const items = (Item: typeof DropdownMenuItem, Separator: typeof DropdownMenuSeparator) =>
+        imageItems({ image, baseUrl, announce: say, onForward, onReport, Item, Separator });
 
     return (
         <div
@@ -362,31 +271,4 @@ function clamp(value: number): number {
  *  change and small enough to land where somebody meant. */
 function step(current: number, direction: 1 | -1): number {
     return clamp(current + direction * 0.25);
-}
-
-/**
- * The picture as a PNG.
- *
- * Clipboards take PNG and argue about everything else - a WebP or an AVIF handed
- * over as itself is a paste that silently does nothing in half the applications
- * somebody would paste into. Anything already a PNG is passed straight through.
- */
-async function toPng(blob: Blob): Promise<Blob> {
-    if (blob.type === "image/png") return blob;
-    const bitmap = await createImageBitmap(blob);
-    try {
-        const canvas = document.createElement("canvas");
-        canvas.width = bitmap.width;
-        canvas.height = bitmap.height;
-        const context = canvas.getContext("2d");
-        if (!context) throw new Error("This browser cannot convert the image");
-        context.drawImage(bitmap, 0, 0);
-        const painted = await new Promise<Blob | null>((resolve) =>
-            canvas.toBlob(resolve, "image/png")
-        );
-        if (!painted) throw new Error("This browser cannot convert the image");
-        return painted;
-    } finally {
-        bitmap.close();
-    }
 }
