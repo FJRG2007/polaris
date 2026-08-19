@@ -1045,6 +1045,10 @@ export function ChannelView({
             // Nobody blocks themselves, and the menu that would offer it does
             // not appear on your own row.
             blocked: false,
+            // Resolved by the server on the reload a moment from now. A draft
+            // that guessed would draw a card and then replace it with a
+            // different one.
+            references: [],
             // Your own words, which your own setting never stands between you and.
             forwardable: true,
             // The server has not looked at any link in it yet. Left as settled

@@ -18,22 +18,26 @@
  * was taken back.
  */
 
+import Link from "next/link";
 import * as actions from "./actions";
 import { VoiceNote } from "./voice-note";
 import { useChat } from "./chat-context";
 import { Avatar } from "@/components/avatar";
 import { MessageMenu } from "./message-menu";
+import { referenced } from "./message-references";
 import { ReportDialog } from "./report-dialog";
 import { NicknameDialog } from "./nickname-dialog";
 import { useOpenDirect } from "./use-open-direct";
 import { MemberMenu, type MenuPerson } from "./member-menu";
 import { usableAccent } from "@/lib/chat/accent";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { autoplaying, embedFor } from "@/lib/chat/embeds";
 import { EditHistoryDialog } from "./edit-history-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import { MessageInfoDialog } from "./message-info-dialog";
+import type { VoicePresence } from "@/lib/chat/meetings";
 import type { ChatMessageView } from "@/lib/chat/messages";
+import type { ChatReferenceView } from "@/lib/chat/references";
 import { RichText } from "@/components/rich-text/rich-text";
 import { isPlayable, isVoiceMessage } from "./voice-recorder";
 import { useDisplayFormat } from "@/components/display-format";
@@ -57,7 +61,8 @@ import {
     Play,
     SmilePlus,
     Star,
-    Trash2
+    Trash2,
+    Volume2
 } from "lucide-react";
 
 /** How close together two messages have to be to share a header. Long enough
@@ -146,6 +151,50 @@ export function MessageList({
         if (message) toast.show({ title: message });
     };
 
+    /**
+     * Who is sitting in each voice room this conversation points at.
+     *
+     * Asked when the page of messages is read, which is the whole point: a
+     * message pasting a voice room is worth nothing if it lists whoever was in
+     * there when it was sent. Asked once for the page rather than once per card,
+     * and only while a card exists to want it - a conversation naming no voice
+     * room asks nothing at all.
+     */
+    const voiceIds = useMemo(
+        () =>
+            [
+                ...new Set(
+                    messages.flatMap((message) =>
+                        message.references
+                            .filter(
+                                (found) =>
+                                    found.reachable &&
+                                    found.kind === "channel" &&
+                                    found.channelKind === "voice"
+                            )
+                            .map((found) => found.id)
+                    )
+                )
+            ].sort(),
+        [messages]
+    );
+    const asked = voiceIds.join(",");
+    const [inVoice, setInVoice] = useState<ReadonlyMap<string, readonly VoicePresence[]>>(new Map());
+
+    useEffect(() => {
+        if (!asked) {
+            setInVoice(new Map());
+            return;
+        }
+        let live = true;
+        void actions.voicePresenceAction(asked.split(",")).then((result) => {
+            if (live) setInVoice(new Map(Object.entries(result.inRoom)));
+        });
+        return () => {
+            live = false;
+        };
+    }, [asked]);
+
     return (
         <ol className="flex flex-col">
             {messages.map((message, index) => {
@@ -186,6 +235,7 @@ export function MessageList({
                             onReact={onReact}
                             onStar={onStar}
                             onMarkUnread={onMarkUnread}
+                            inVoice={inVoice}
                             onReply={onReply}
                             onReplyPrivately={onReplyPrivately}
                             onForward={onForward}
@@ -357,6 +407,7 @@ function Message({
     onReact,
     onStar,
     onMarkUnread,
+    inVoice,
     onReply,
     onReplyPrivately,
     onForward,
@@ -381,6 +432,10 @@ function Message({
     onReact: (messageId: string, emoji: string) => void;
     onStar: (message: ChatMessageView) => void;
     onMarkUnread?: (message: ChatMessageView) => void;
+    /** Who is in each voice room this page of messages points at, gathered once
+     *  by the list. Empty until the answer arrives, which draws a card saying
+     *  the room is empty for a moment rather than no card at all. */
+    inVoice: ReadonlyMap<string, readonly VoicePresence[]>;
     onReply?: (message: ChatMessageView) => void;
     onReplyPrivately?: (message: ChatMessageView) => void;
     onForward?: (message: ChatMessageView) => void;
@@ -574,7 +629,7 @@ function Message({
                         </p>
                     ) : (
                         <div className="text-sm">
-                            <RichText value={message.body} />
+                            <RichText value={message.body} references={referenced(message)} />
                             {/* Under the last message of a block only. Five ticks
                             down a run of five messages say the same thing five
                             times, and seeing the newest is seeing the rest. */}
@@ -600,6 +655,7 @@ function Message({
                     )}
 
                     <LinkArea message={message} />
+                    <ReferenceCards message={message} inRoom={inVoice} />
 
                     {message.attachments.length > 0 && (
                         <ul className="mt-1 flex flex-col gap-1">
@@ -947,6 +1003,120 @@ function Ticks({
         >
             {receipt === "sent" ? <Check className="size-3" /> : <CheckCheck className="size-3" />}
         </button>
+    );
+}
+
+/** How many cards one message may draw. A message that pastes six rooms is a
+ *  message, not six cards: the rest stay the chips they already are in the
+ *  sentence. */
+const MOST_CARDS = 2;
+
+/**
+ * The things a message pointed at that are worth more than a name in the line.
+ *
+ * Two of them are. A voice room is somewhere to go, and the useful question
+ * about one is never its name but who is in it - which is why the card carries
+ * the people who are in it **now**, at the moment somebody reads the message,
+ * rather than whoever happened to be there when it was pasted. A message
+ * somewhere else is worth quoting, for the same reason a reply is: the point of
+ * pasting one is what it said.
+ *
+ * Everything else stays inline. A text channel is a name in a sentence, and a
+ * card repeating that name under it would be the sentence twice.
+ */
+function ReferenceCards({
+    message,
+    inRoom
+}: {
+    message: ChatMessageView;
+    /** Who is sitting in each voice room right now, gathered once for the whole
+     *  conversation by the list above. */
+    inRoom: ReadonlyMap<string, readonly VoicePresence[]>;
+}) {
+    const cards = message.references
+        .filter(
+            (found) =>
+                found.reachable &&
+                (found.kind === "message" || (found.kind === "channel" && found.channelKind === "voice"))
+        )
+        .slice(0, MOST_CARDS);
+    if (cards.length === 0) return null;
+
+    return (
+        <ul className="mt-1 flex flex-col gap-1">
+            {cards.map((found) => (
+                <li key={`${found.kind}/${found.id}`}>
+                    {found.kind === "channel" ? (
+                        <VoiceCard reference={found} inRoom={inRoom.get(found.id) ?? []} />
+                    ) : (
+                        <QuotedMessageCard reference={found} />
+                    )}
+                </li>
+            ))}
+        </ul>
+    );
+}
+
+/** A voice room somebody pasted: what it is called, who is in it, and the way
+ *  in. Pressing it walks into the room, which is what opening a voice channel
+ *  does everywhere else in Chat. */
+function VoiceCard({
+    reference,
+    inRoom
+}: {
+    reference: ChatReferenceView;
+    inRoom: readonly VoicePresence[];
+}) {
+    return (
+        <div className="flex max-w-md flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-border bg-surface px-3 py-2">
+            <Volume2 className="size-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium" title={reference.name}>
+                    {reference.name}
+                </span>
+                <span className="block truncate text-xs text-muted-foreground">
+                    {inRoom.length === 0
+                        ? "Nobody in here"
+                        : inRoom.map((person) => person.name).join(", ")}
+                </span>
+            </span>
+            <Link
+                href={`/chat/c/${reference.id}`}
+                className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground no-underline hover:bg-primary/90"
+            >
+                Join
+            </Link>
+        </div>
+    );
+}
+
+/** A message from somewhere else, quoted where it was pasted. The same shape as
+ *  a reply's quote line, one size up, because it is the same act. */
+function QuotedMessageCard({ reference }: { reference: ChatReferenceView }) {
+    return (
+        <Link
+            href={`/chat/c/${reference.channelId}/${reference.id}`}
+            className="block max-w-md rounded-md border border-border bg-surface px-3 py-2 no-underline hover:bg-card-hover"
+        >
+            <span className="flex items-baseline gap-2">
+                <span className="truncate text-xs font-medium">
+                    {reference.authorName || "Somebody who has left"}
+                </span>
+                {reference.name && (
+                    <span className="truncate text-[11px] text-foreground-subtle">
+                        in {reference.name}
+                    </span>
+                )}
+                {reference.at && (
+                    <span className="shrink-0 text-[11px] text-foreground-subtle">
+                        <RelativeTime iso={reference.at} />
+                    </span>
+                )}
+            </span>
+            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                {reference.excerpt || "No text"}
+            </span>
+        </Link>
     );
 }
 

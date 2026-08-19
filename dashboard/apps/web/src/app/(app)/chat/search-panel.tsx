@@ -23,6 +23,7 @@ import { searchMessagesAction, searchPeopleAction } from "./actions";
 import { useEffect, useMemo, useState } from "react";
 import type { ChatSearchHit } from "@/lib/chat/search";
 import { RelativeTime } from "@/components/relative-time";
+import { referenced } from "./message-references";
 import { RichText } from "@/components/rich-text/rich-text";
 import { Hash, Loader2, Search, Users, X } from "lucide-react";
 import { Button, Input, SegmentedControl, cn } from "@polaris/ui";
@@ -218,7 +219,10 @@ export function SearchPanel({
                                         usually a paragraph, and one line of it
                                         is rarely the line that matched. */}
                                     <span className="line-clamp-3 text-xs text-muted-foreground">
-                                        <RichText value={hit.message.body} />
+                                        <RichText
+                                            value={hit.message.body}
+                                            references={referenced(hit.message)}
+                                        />
                                     </span>
                                 </button>
                             </li>

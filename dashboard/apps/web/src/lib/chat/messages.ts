@@ -17,6 +17,14 @@ import { rulesForChannel } from "./rules";
 import { publishChatChange } from "./live";
 import { blockedBy } from "@/lib/blocks";
 import { nicknamesFor } from "@/lib/contact-names";
+import { referenceFromUrl } from "@/components/rich-text/references";
+import {
+    anyAbsolute,
+    chatReferencesIn,
+    polarisOrigin,
+    resolveChatReferences,
+    type ChatReferenceView
+} from "./references";
 import { announceRoomMention } from "./room-mentions";
 import { noticePeople, renderNotice } from "./notice-text";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
@@ -71,6 +79,17 @@ export interface ChatMessageView {
      * wrote, and hiding it would tell the reader something they were not told.
      */
     readonly blocked: boolean;
+    /**
+     * What this message points at inside Polaris, resolved for this reader.
+     *
+     * Carried rather than looked up by the screen for the reason every other
+     * per-reader field here is: a page of messages is one resolution, and a
+     * component asking per chip would be a request per name. Resolved on every
+     * read rather than stored on the message, because what a reference is - the
+     * conversation's name, whether this reader may see it - is a fact about now
+     * and not about when somebody pasted it.
+     */
+    readonly references: readonly ChatReferenceView[];
     /**
      * Whether this reader may send it into another conversation.
      *
@@ -1345,11 +1364,23 @@ export async function decorateMessages(
     // The links in the page, looked up in one query rather than one per message.
     // Nothing is fetched here: a read path that could reach out to a third party
     // is a read path that hangs when they are slow.
+    // The address this deployment answers on, for the bodies that still carry a
+    // full `https://` one: anything written in the composer had its links folded
+    // to a `polaris:` address when it was pasted, and needs no origin at all. A
+    // body written before Chat knew its own links, or sent through the API,
+    // does - and a page with no absolute address in it does not ask at all,
+    // which is nearly every page.
+    const origin = await polarisOrigin(anyAbsolute(rows.map((row) => row.body)));
+
     const links = new Map<string, string>();
     for (const row of rows) {
         if (row.deletedAt) continue;
         const link = core.firstLink(row.body);
-        if (link) links.set(row.id, link);
+        // Never our own. Fetching Polaris's own page to describe it back to
+        // somebody already inside it is what this used to do, and the card it
+        // drew said less than the address it replaced - the reference below is
+        // what that link becomes instead.
+        if (link && !referenceFromUrl(link, origin)) links.set(row.id, link);
     }
 
     // How far the reader's own messages got, in a one-to-one conversation where
@@ -1418,6 +1449,13 @@ export async function decorateMessages(
     // One query for the page, the same shape as the nicknames above: a block is
     // per reader, so it cannot be answered where the messages are.
     const shut = await blockedBy(actor.id, authorIds);
+
+    const pointedAt = new Map<string, string[]>();
+    for (const row of rows) {
+        const keys = chatReferencesIn(row.body, origin);
+        if (keys.length > 0) pointedAt.set(row.id, keys);
+    }
+    const references = await resolveChatReferences(actor, [...pointedAt.values()].flat());
     const names = new Map(
         [...authors, ...quoteAuthors].map((author) => [
             author.id,
@@ -1477,6 +1515,9 @@ export async function decorateMessages(
         quote: quoteViewOf(row, quotes, names),
         starred: kept.has(row.id),
         blocked: row.authorId !== null && shut.has(row.authorId),
+        references: (pointedAt.get(row.id) ?? [])
+            .map((key) => references.get(key))
+            .filter((found): found is ChatReferenceView => found !== undefined),
         // A message whose author has since deleted their account carries no
         // setting to honour, and a deleted one has nothing left to send.
         forwardable:

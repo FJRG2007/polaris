@@ -76,6 +76,7 @@ function message(id: string, authorId: string, body = `message ${id}`) {
         attachments: [],
         quote: null,
         starred: false,
+        references: [],
         forwardable: true,
         link: null,
         preview: null,

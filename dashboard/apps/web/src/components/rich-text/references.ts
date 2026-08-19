@@ -14,7 +14,15 @@
  */
 
 /** What a reference can point at. */
-export const REFERENCE_KINDS = ["user", "team", "task", "doc", "note"] as const;
+export const REFERENCE_KINDS = [
+    "user",
+    "team",
+    "task",
+    "doc",
+    "note",
+    "channel",
+    "message"
+] as const;
 
 export type ReferenceKind = (typeof REFERENCE_KINDS)[number];
 
@@ -31,10 +39,21 @@ export interface PolarisReference {
 /** Ids are uuids. Anything else in the address is somebody else's link. */
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const ADDRESS = /^polaris:(user|team|task|doc|note)\/([0-9a-f-]{36})$/i;
+const ADDRESS = /^polaris:(user|team|task|doc|note|channel|message)\/([0-9a-f-]{36})$/i;
 
-/** In-app paths a pasted link can carry, in the order they are tried. */
+/**
+ * In-app paths a pasted link can carry, in the order they are tried.
+ *
+ * Order is load-bearing for the two chat ones: a message address is a
+ * conversation address with the message on the end, so the conversation pattern
+ * would swallow every message link if it were tried first.
+ */
 const ROUTES: readonly { readonly kind: ReferenceKind; readonly match: RegExp }[] = [
+    // A message, which is identified by its own id alone - the conversation in
+    // the address is where it happens to live, and the reader is told that by
+    // whoever resolves it rather than by the link.
+    { kind: "message", match: /^\/chat\/c\/[0-9a-f-]{36}\/([0-9a-f-]{36})/i },
+    { kind: "channel", match: /^\/chat\/c\/([0-9a-f-]{36})/i },
     { kind: "task", match: /^\/tasks\/t\/([0-9a-f-]{36})/i },
     { kind: "doc", match: /^\/tasks\/docs\?(?:.*&)?doc=([0-9a-f-]{36})/i },
     { kind: "note", match: /^\/notes\?(?:.*&)?note=([0-9a-f-]{36})/i },
@@ -65,6 +84,11 @@ export function referenceHref(kind: ReferenceKind, id: string): string | null {
     if (kind === "task") return `/tasks/t/${id}`;
     if (kind === "doc") return `/tasks/docs?doc=${id}`;
     if (kind === "note") return `/notes?note=${id}`;
+    if (kind === "channel") return `/chat/c/${id}`;
+    // A message deliberately has none. Its address needs the conversation it
+    // lives in, which this function is not given and which is not the link's to
+    // assert anyway - whoever resolves the reference for a particular reader
+    // says where it is, and only if that reader may go there.
     return null;
 }
 
@@ -102,7 +126,15 @@ export function referenceFromUrl(
     return null;
 }
 
-/** The character that opens a mention of this kind, or "" for a plain chip. */
+/** The character that opens a mention of this kind, or "" for a plain chip.
+ *  A conversation wears the `#` every client writes a channel with. */
 export function referenceSigil(kind: ReferenceKind): string {
+    if (kind === "channel") return "#";
     return MENTION_KINDS.includes(kind) ? "@" : "";
 }
+
+/** The kinds whose meaning is a fact about the reader rather than about the
+ *  text: which conversation this is, whether they may see it, who is in it right
+ *  now. Rendered from a resolution rather than from the label frozen into the
+ *  link when somebody pasted it. */
+export const RESOLVED_KINDS: readonly ReferenceKind[] = ["channel", "message"];

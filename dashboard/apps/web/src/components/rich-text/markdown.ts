@@ -265,7 +265,13 @@ function withMark(nodes: readonly JSONContent[], mark: { type: string; attrs?: R
  * expression over the Markdown, so an address inside a code fence is not a
  * mention - which is exactly where somebody would paste one to avoid pinging.
  */
-export function extractReferences(markdown: string): { kind: refs.ReferenceKind; id: string }[] {
+export function extractReferences(
+    markdown: string,
+    /** Where this Polaris answers, so a body still carrying a full `https://`
+     *  address - one written before its links were folded, or sent through the
+     *  API - is read the same as one written in the editor. */
+    origin: string | null = null
+): { kind: refs.ReferenceKind; id: string }[] {
     const found = new Map<string, { kind: refs.ReferenceKind; id: string }>();
     const walk = (node: JSONContent) => {
         if (node.type === REFERENCE && node.attrs?.kind && node.attrs?.id) {
@@ -275,7 +281,7 @@ export function extractReferences(markdown: string): { kind: refs.ReferenceKind;
         }
         for (const child of node.content ?? []) walk(child);
     };
-    walk(markdownToDoc(markdown));
+    walk(markdownToDoc(markdown, origin));
     return [...found.values()];
 }
 

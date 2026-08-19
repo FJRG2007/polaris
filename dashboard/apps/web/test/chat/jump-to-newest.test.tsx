@@ -39,6 +39,7 @@ function message(id: string, authorId: string) {
         editedAt: null,
         deletedAt: null,
         starred: false,
+        references: [],
         mine: authorId === "ada",
         preview: null,
         previewPending: false,

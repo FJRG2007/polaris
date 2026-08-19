@@ -22,10 +22,78 @@ import { chipClass, chipLabel } from "./chip";
 import type { JSONContent } from "@tiptap/core";
 import { markdownToDoc, splitChannelMentions, MARKDOWN_BLOCK, REFERENCE } from "./markdown";
 
-export function RichText({ value, className }: { value: string; className?: string }) {
-    const doc = markdownToDoc(value);
+/**
+ * What a reference turned out to be, for the reader in front of it.
+ *
+ * A chip normally draws the label frozen into the link when it was written,
+ * which is right for a task and wrong for anything whose meaning is a fact about
+ * the reader: whether they may see that conversation at all, and what it is
+ * called today. Whoever knows that resolves it and hands it in here, keyed by
+ * `kind/id`.
+ *
+ * Deliberately the smallest shape that answers those two questions. This module
+ * is read by every app in Polaris and must not learn what a channel is.
+ */
+export interface ResolvedReference {
+    /** False draws the chip as a thing the reader cannot see, and never names
+     *  it. The name of a room somebody is not in is the thing being withheld. */
+    readonly reachable: boolean;
+    /** What it is called now. Ignored when it is out of reach. */
+    readonly label: string;
+}
+
+export function RichText({
+    value,
+    className,
+    origin = null,
+    references
+}: {
+    value: string;
+    className?: string;
+    /** Where this Polaris answers. Given, a full `https://` address written into
+     *  the text reads as the thing it points at rather than as a link - which is
+     *  what makes an old message, or one sent through the API, render like one
+     *  written in the editor today. */
+    origin?: string | null;
+    /** Resolutions for the references in this text, by `kind/id`. Anything not
+     *  in the map keeps the label it was written with. */
+    references?: ReadonlyMap<string, ResolvedReference>;
+}) {
+    const doc = markdownToDoc(value, origin);
     if (!value.trim()) return null;
-    return <div className={cn(RICH_TEXT_PROSE, className)}>{blocks(doc.content)}</div>;
+    return (
+        <div className={cn(RICH_TEXT_PROSE, className)}>
+            {blocks(references ? resolve(doc, references).content : doc.content)}
+        </div>
+    );
+}
+
+/**
+ * Lay the resolutions over the document before anything is drawn.
+ *
+ * One walk here rather than a lookup inside the chip, so the renderer below
+ * stays a pure function of the node it is given and nothing has to be threaded
+ * through five levels of recursion to reach it.
+ */
+function resolve(doc: JSONContent, references: ReadonlyMap<string, ResolvedReference>): JSONContent {
+    const walk = (node: JSONContent): JSONContent => {
+        if (node.type === REFERENCE && node.attrs?.kind && node.attrs?.id) {
+            const found = references.get(`${String(node.attrs.kind)}/${String(node.attrs.id)}`);
+            if (found) {
+                return {
+                    ...node,
+                    attrs: {
+                        ...node.attrs,
+                        label: found.reachable ? found.label : "",
+                        unavailable: !found.reachable
+                    }
+                };
+            }
+        }
+        if (!node.content) return node;
+        return { ...node, content: node.content.map(walk) };
+    };
+    return walk(doc);
 }
 
 function blocks(nodes: readonly JSONContent[] | undefined): React.ReactNode {
@@ -215,6 +283,22 @@ export function isSafeHref(href: string): boolean {
 function Chip({ node }: { node: JSONContent }) {
     const kind = node.attrs?.kind as refs.ReferenceKind;
     const id = String(node.attrs?.id ?? "");
+
+    // Something this reader may not see. Drawn as a chip rather than left as a
+    // raw address - the message still says a thing was pointed at - and named
+    // nowhere, because the name is what is being withheld. No link either: it
+    // would go somewhere that would refuse them.
+    if (node.attrs?.unavailable === true) {
+        return (
+            <span
+                className={`${chipClass(kind)} italic opacity-70`}
+                title="You do not have access to this"
+            >
+                Unavailable
+            </span>
+        );
+    }
+
     const label = chipLabel(kind, String(node.attrs?.label ?? ""));
     const href = refs.referenceHref(kind, id);
     if (!href) return <span className={chipClass(kind)}>{label}</span>;

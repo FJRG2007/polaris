@@ -21,7 +21,26 @@ export function chipClass(kind: refs.ReferenceKind): string {
     return `${CHIP_CLASS} ${tone}`;
 }
 
+/**
+ * What a chip is called when nothing better is known.
+ *
+ * A pasted address carries no name - the label a fold produces is the URL
+ * itself - and a chip reading `#https://polaris.example/chat/c/0193...` is worse
+ * than the link it replaced. Whoever resolves the reference replaces this with
+ * the real name; this is what is drawn until then, and on the screens that
+ * resolve nothing.
+ */
+const UNNAMED: Partial<Record<refs.ReferenceKind, string>> = {
+    channel: "Conversation",
+    message: "Message",
+    task: "Task",
+    doc: "Document",
+    note: "Note"
+};
+
 /** What a chip says: an @ for a person or a team, the name alone otherwise. */
 export function chipLabel(kind: refs.ReferenceKind, label: string): string {
-    return `${refs.referenceSigil(kind)}${label}`;
+    const named =
+        /^https?:\/\//i.test(label.trim()) || !label.trim() ? (UNNAMED[kind] ?? label) : label;
+    return `${refs.referenceSigil(kind)}${named}`;
 }
