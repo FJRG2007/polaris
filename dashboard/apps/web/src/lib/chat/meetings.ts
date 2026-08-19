@@ -72,7 +72,37 @@ export interface MeetingView {
      *  one. Only ever handed to somebody who is already in the call. */
     readonly guestToken: string | null;
     readonly approveGuests: boolean;
+    /** Whether the link only lets somebody in once they have signed in. */
+    readonly requireAccount: boolean;
+    /** When it was meant to happen, for a meeting somebody put in the diary.
+     *  Null for a call that started when a button was pressed. */
+    readonly scheduledAt: string | null;
+    /** Whether this is a room of its own rather than a conversation's call.
+     *  What can be done to it differs - a conversation's call has no host to
+     *  hand over and no door to lock. */
+    readonly standalone: boolean;
     readonly participants: readonly MeetingParticipantView[];
+}
+
+/** A meeting on somebody's list, before they are in it. */
+export interface MeetingSummary {
+    readonly id: string;
+    readonly title: string;
+    readonly hostId: string;
+    readonly hostName: string;
+    readonly scheduledAt: string | null;
+    readonly startedAt: string;
+    /** How many people are in the room right now. Zero for one that has not
+     *  started, which is most of a list of things happening later. */
+    readonly present: number;
+    /** The link to hand out, and only ever to the host: it is the credential,
+     *  and everybody else on this list was invited by name. */
+    readonly guestToken: string | null;
+    readonly requireAccount: boolean;
+    readonly approveGuests: boolean;
+    readonly mine: boolean;
+    /** Who has been convened, so the host can see who they asked. */
+    readonly invited: readonly { readonly id: string; readonly name: string }[];
 }
 
 /** Who this browser is in a call: its own participant row. */
@@ -276,12 +306,20 @@ export async function join(
  * default - the seat starts in the lobby and no signalling reaches it until
  * somebody inside admits them.
  */
+/** Said to somebody on a link into a meeting whose host asked for accounts. It
+ *  is an instruction rather than a refusal: there is a way in, and this is it. */
+export const SIGN_IN_FIRST = "This meeting is only open to people signed in to Polaris";
+
 export async function joinAsGuest(token: string, name: string): Promise<MeetingSeat> {
     const meeting = await prisma.meeting.findUnique({
         where: { guestToken: token },
-        select: { id: true, endedAt: true, approveGuests: true }
+        select: { id: true, endedAt: true, approveGuests: true, requireAccount: true }
     });
     if (!meeting || meeting.endedAt) throw new ChatAccessError("That call has ended");
+    // The host asked for people to be signed in. The link still names the
+    // meeting - it is how somebody knows what they are signing in for - and this
+    // is the only way through it.
+    if (meeting.requireAccount) throw new ChatAccessError(SIGN_IN_FIRST);
     await requireRoom(meeting.id);
 
     const guestKey = randomBytes(32).toString("base64url");
@@ -529,7 +567,14 @@ export async function readMeeting(seat: {
     if (seated.admission !== "admitted") {
         const meeting = await prisma.meeting.findUnique({
             where: { id: seat.meetingId },
-            select: { id: true, title: true, startedAt: true, endedAt: true }
+            select: {
+                id: true,
+                title: true,
+                startedAt: true,
+                endedAt: true,
+                channelId: true,
+                scheduledAt: true
+            }
         });
         if (!meeting) return null;
         return {
@@ -541,6 +586,9 @@ export async function readMeeting(seat: {
             ended: meeting.endedAt !== null,
             guestToken: null,
             approveGuests: true,
+            requireAccount: false,
+            scheduledAt: meeting.scheduledAt?.toISOString() ?? null,
+            standalone: meeting.channelId === null,
             participants: [
                 {
                     id: seated.id,
@@ -565,6 +613,8 @@ export async function readMeeting(seat: {
             endedAt: true,
             guestToken: true,
             approveGuests: true,
+            requireAccount: true,
+            scheduledAt: true,
             participants: {
                 where: { leftAt: null, admission: { not: "denied" } },
                 orderBy: { joinedAt: "asc" },
@@ -589,6 +639,9 @@ export async function readMeeting(seat: {
         ended: meeting.endedAt !== null,
         guestToken: meeting.guestToken,
         approveGuests: meeting.approveGuests,
+        requireAccount: meeting.requireAccount,
+        scheduledAt: meeting.scheduledAt?.toISOString() ?? null,
+        standalone: meeting.channelId === null,
         participants: meeting.participants.map((row) => ({
             id: row.id,
             userId: row.userId,
@@ -706,26 +759,43 @@ export async function seatForUser(userId: string, meetingId: string): Promise<Me
 
 /** One row per person per call. Rejoining after a drop reuses the seat rather
  *  than adding a second face with the same name to the room. */
-async function seatFor(meetingId: string, userId: string, name: string): Promise<MeetingSeat> {
+async function seatFor(
+    meetingId: string,
+    userId: string,
+    name: string,
+    /** Where a *new* seat starts. Admitted everywhere a conversation decided who
+     *  may be in the room; at the door for a meeting of its own, whose host
+     *  asked to see who turns up. Never applied to a seat that already exists -
+     *  somebody in the room does not go back to the lobby by reloading. */
+    options?: { admission: MeetingSeat["admission"] }
+): Promise<MeetingSeat> {
     const existing = await prisma.meetingParticipant.findFirst({
         where: { meetingId, userId, leftAt: null },
-        select: { id: true }
+        select: { id: true, admission: true }
     });
     if (existing) {
         await prisma.meetingParticipant.update({
             where: { id: existing.id },
             data: { lastSeenAt: new Date() }
         });
-        return { meetingId, participantId: existing.id, admission: "admitted" };
+        return {
+            meetingId,
+            participantId: existing.id,
+            admission: existing.admission as MeetingSeat["admission"]
+        };
     }
 
-    await requireRoom(meetingId);
+    const admission = options?.admission ?? "admitted";
+    // Only what would take a place in the room. Somebody waiting at the door is
+    // not in it, and a full call must still let people knock - the host decides
+    // who comes in as somebody else leaves.
+    if (admission === "admitted") await requireRoom(meetingId);
     const participant = await prisma.meetingParticipant.create({
-        data: { meetingId, userId, name, admission: "admitted" },
+        data: { meetingId, userId, name, admission },
         select: { id: true }
     });
     publishMeetingEvent({ meetingId, kind: "roster" });
-    return { meetingId, participantId: participant.id, admission: "admitted" };
+    return { meetingId, participantId: participant.id, admission };
 }
 
 /** Refuse a join that would take the call past what a mesh can carry. */
@@ -874,8 +944,23 @@ async function endIfAlone(meetingId: string): Promise<void> {
     await closeMeeting(meetingId);
 }
 
+/**
+ * The last person out of a *call* turns the lights off.
+ *
+ * Not of a meeting. A room somebody created on purpose, put in the diary and
+ * sent an address for is not over because it is momentarily empty: the host who
+ * arrives early and steps out again would take it away with them, and the link
+ * they sent last week would stop opening anything. That one ends when the host
+ * ends it.
+ */
 async function endIfEmpty(meetingId: string): Promise<void> {
-    if ((await admittedCount(meetingId)) === 0) await closeMeeting(meetingId);
+    if ((await admittedCount(meetingId)) > 0) return;
+    const meeting = await prisma.meeting.findUnique({
+        where: { id: meetingId },
+        select: { channelId: true }
+    });
+    if (!meeting?.channelId) return;
+    await closeMeeting(meetingId);
 }
 
 /** End a call and shut its door: the guest token goes with it, so a link that
@@ -903,4 +988,449 @@ async function closeMeeting(meetingId: string): Promise<void> {
     // several places - the last person out, a lone call timing out, the host
     // pressing the button - and each would otherwise announce it again.
     if (stillLive) await announceCall(meetingId, "ended", "");
+}
+// ---------------------------------------------------------------------------
+// Meetings of their own
+// ---------------------------------------------------------------------------
+
+/**
+ * A room that belongs to nobody's conversation.
+ *
+ * Everything above this line is a call inside Chat: it lives in a channel, the
+ * channel decides who may be in it, and it ends when the people talking stop.
+ * This is the other kind - a room somebody creates on purpose and hands an
+ * address to, where half the people who turn up have no account here and never
+ * will. A client, a candidate, somebody's accountant.
+ *
+ * Two things follow from that, and they shape everything below.
+ *
+ * **The link is the invitation, so it is minted with the room.** A meeting whose
+ * guest link had to be opened afterwards is a meeting somebody schedules on
+ * Monday, sends on Tuesday, and finds nobody could open on Wednesday.
+ *
+ * **Emptiness does not end it.** A conversation's call is over when the last
+ * person leaves, which is right for a call and wrong for a meeting: the host who
+ * joins early and steps out for a coffee would take the room with them, and the
+ * address they sent last week would stop working. It ends when the host ends it.
+ */
+
+/** How long a title may be. Long enough for a sentence about what the meeting
+ *  is, short enough to sit in a row on a phone. */
+export const MAX_MEETING_TITLE = 120;
+
+/** How far ahead something may be put in the diary. A year is past the point
+ *  where anybody is scheduling a call and into the point where somebody has
+ *  typed the wrong year. */
+export const MAX_SCHEDULE_AHEAD_MS = 365 * 24 * 60 * 60 * 1000;
+
+/** How many meetings a list answers with. Past this it is not a list anybody
+ *  reads, and a diary that long is a diary with something wrong in it. */
+const MOST_MEETINGS = 100;
+
+/** What somebody whose account is gone is called, wherever a name is drawn from
+ *  an id that no longer resolves. */
+const GONE_NAME = "Somebody who has left";
+
+export interface NewMeeting {
+    readonly title: string;
+    /** When it is meant to happen, or null for now. */
+    readonly scheduledAt: Date | null;
+    /** Whether somebody arriving on the link waits to be let in. */
+    readonly approveGuests: boolean;
+    /** Whether the link only opens for somebody signed in to Polaris. */
+    readonly requireAccount: boolean;
+}
+
+/**
+ * Create one, and mint the link that is the whole point of it.
+ *
+ * The permission to do this is checked where the request arrives rather than
+ * here: whether this instance hands out addresses anybody at all can open is a
+ * decision about the instance, and it is made once.
+ */
+export async function createMeeting(
+    actor: ChatActor,
+    input: NewMeeting
+): Promise<{ meetingId: string; guestToken: string }> {
+    const title = input.title.trim().slice(0, MAX_MEETING_TITLE);
+    if (!title) throw new ChatAccessError("Give the meeting a name");
+    if (input.scheduledAt) {
+        const ahead = input.scheduledAt.getTime() - Date.now();
+        if (ahead > MAX_SCHEDULE_AHEAD_MS) throw new ChatAccessError("That is too far ahead");
+    }
+
+    const guestToken = randomBytes(24).toString("base64url");
+    const meeting = await prisma.meeting.create({
+        data: {
+            channelId: null,
+            hostId: actor.id,
+            title,
+            guestToken,
+            approveGuests: input.approveGuests,
+            requireAccount: input.requireAccount,
+            scheduledAt: input.scheduledAt
+        },
+        select: { id: true }
+    });
+    return { meetingId: meeting.id, guestToken };
+}
+
+/**
+ * Join a meeting as an account.
+ *
+ * The host and anybody convened walk straight in - being asked by name is the
+ * approval - and everybody else knocks, when the host asked to approve people.
+ * An account is not a lesser guest here: somebody signed in who was never
+ * invited is exactly as much a stranger as somebody on a forwarded link, and the
+ * host seeing them at the door is the same check.
+ *
+ * Somebody the host removed stays removed. It is the one thing a rejoin must not
+ * undo, or being shown out of a meeting would mean nothing at all.
+ */
+export async function joinMeeting(
+    actor: ChatActor & { name: string },
+    meetingId: string
+): Promise<MeetingSeat> {
+    const meeting = await prisma.meeting.findUnique({
+        where: { id: meetingId },
+        select: {
+            id: true,
+            channelId: true,
+            endedAt: true,
+            hostId: true,
+            approveGuests: true,
+            invites: { where: { userId: actor.id }, select: { id: true } }
+        }
+    });
+    if (!meeting || meeting.endedAt) throw new ChatAccessError("That meeting has ended");
+    // A conversation's call is reached through the conversation, which is what
+    // decides who may be in it. Sending one through here would be a way past it.
+    if (meeting.channelId) return join(actor, meetingId);
+
+    const shown = await prisma.meetingParticipant.findFirst({
+        where: { meetingId, userId: actor.id, admission: "denied" },
+        select: { id: true }
+    });
+    if (shown) throw new ChatAccessError("You were removed from this meeting");
+
+    const known = meeting.hostId === actor.id || meeting.invites.length > 0;
+    return seatFor(meetingId, actor.id, actor.name, {
+        admission: known || !meeting.approveGuests ? "admitted" : "waiting"
+    });
+}
+
+/**
+ * The meetings this account has any business seeing.
+ *
+ * Theirs, and the ones they were asked to. Not "every meeting running", which
+ * would be a list of who is talking to whom - a meeting is a room, not a
+ * directory.
+ */
+export async function listMeetings(actor: ChatActor): Promise<MeetingSummary[]> {
+    const rows = await prisma.meeting.findMany({
+        where: {
+            channelId: null,
+            endedAt: null,
+            OR: [{ hostId: actor.id }, { invites: { some: { userId: actor.id } } }]
+        },
+        orderBy: [{ scheduledAt: "asc" }, { createdAt: "desc" }],
+        take: MOST_MEETINGS,
+        select: {
+            id: true,
+            hostId: true,
+            title: true,
+            guestToken: true,
+            requireAccount: true,
+            approveGuests: true,
+            scheduledAt: true,
+            startedAt: true,
+            invites: { select: { userId: true } },
+            participants: {
+                where: {
+                    leftAt: null,
+                    admission: "admitted",
+                    lastSeenAt: { gte: new Date(Date.now() - PARTICIPANT_TTL_MS) }
+                },
+                select: { id: true }
+            }
+        }
+    });
+
+    // One query for every name on the list rather than one per row: a host and a
+    // dozen invitations across ten meetings is otherwise a hundred lookups.
+    const wanted = new Set<string>();
+    for (const row of rows) {
+        wanted.add(row.hostId);
+        for (const invite of row.invites) wanted.add(invite.userId);
+    }
+    const people = await prisma.user.findMany({
+        where: { id: { in: [...wanted] } },
+        select: { id: true, name: true }
+    });
+    const named = new Map(people.map((person) => [person.id, person.name]));
+
+    return rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        hostId: row.hostId,
+        hostName: named.get(row.hostId) ?? GONE_NAME,
+        scheduledAt: row.scheduledAt?.toISOString() ?? null,
+        startedAt: row.startedAt.toISOString(),
+        present: row.participants.length,
+        // The credential, and it goes to the host alone. Everybody else on this
+        // list was asked by name and gets in as themselves.
+        guestToken: row.hostId === actor.id ? row.guestToken : null,
+        requireAccount: row.requireAccount,
+        approveGuests: row.approveGuests,
+        mine: row.hostId === actor.id,
+        invited: row.invites.map((invite) => ({
+            id: invite.userId,
+            name: named.get(invite.userId) ?? GONE_NAME
+        }))
+    }));
+}
+
+/**
+ * Convene people who do have accounts.
+ *
+ * An invitation is not a seat and not a permission - it is a record that they
+ * were asked, which is what puts the meeting on their own list and lets them
+ * walk in without knocking. Taking one away does not remove somebody already in
+ * the room; that is what removing them is for.
+ */
+export async function inviteToMeeting(
+    actor: ChatActor,
+    meetingId: string,
+    userIds: readonly string[]
+): Promise<{ title: string; invited: readonly string[] }> {
+    const meeting = await requireHost(actor, meetingId);
+    const wanted = [...new Set(userIds)].filter((id) => id !== actor.id);
+    if (wanted.length === 0) throw new ChatAccessError("Pick somebody to invite");
+
+    // Only people who exist, so a bad id is a name that is not added rather than
+    // an invitation to nobody sitting on the meeting forever.
+    const real = await prisma.user.findMany({
+        where: { id: { in: wanted } },
+        select: { id: true }
+    });
+    if (real.length === 0) throw new ChatAccessError("Pick somebody to invite");
+
+    await prisma.meetingInvite.createMany({
+        data: real.map((person) => ({ meetingId, userId: person.id, invitedById: actor.id })),
+        skipDuplicates: true
+    });
+    return { title: meeting.title, invited: real.map((person) => person.id) };
+}
+
+/** Take back an invitation. Somebody already in the room stays in it - being
+ *  asked and being here are different facts, and this is only the first. */
+export async function uninviteFromMeeting(
+    actor: ChatActor,
+    meetingId: string,
+    userId: string
+): Promise<void> {
+    await requireHost(actor, meetingId);
+    await prisma.meetingInvite.deleteMany({ where: { meetingId, userId } });
+}
+
+/**
+ * Hand the meeting over.
+ *
+ * To somebody with an account and nobody else. The host can end the room, open
+ * and close its door and show people out; a guest is somebody who typed a name
+ * into a link ten seconds ago, and handing them that is handing it to whoever is
+ * holding a forwarded address.
+ */
+export async function transferHost(
+    actor: ChatActor,
+    meetingId: string,
+    participantId: string
+): Promise<void> {
+    await requireHost(actor, meetingId);
+    const target = await prisma.meetingParticipant.findFirst({
+        where: { id: participantId, meetingId, leftAt: null, admission: "admitted" },
+        select: { userId: true }
+    });
+    if (!target) throw new ChatAccessError("They are not in this meeting");
+    if (!target.userId) {
+        throw new ChatAccessError("Only somebody with a Polaris account can host a meeting");
+    }
+
+    await prisma.meeting.update({ where: { id: meetingId }, data: { hostId: target.userId } });
+    publishMeetingEvent({ meetingId, kind: "roster" });
+}
+
+/**
+ * Show somebody out.
+ *
+ * Their seat is closed and marked refused rather than merely emptied, and that
+ * difference is the whole of it: an emptied seat is what leaving looks like, and
+ * anybody who left may walk back in. Refused, their browser loses the room on
+ * its next breath - the stream is a seat it no longer holds - and a rejoin under
+ * the same account is turned away at the door.
+ *
+ * A guest can come back on the link under another name. That is true of every
+ * meeting link ever made, and the answer to it is the lobby: with approval on,
+ * what they come back to is the door.
+ */
+export async function removeFromMeeting(
+    actor: ChatActor,
+    meetingId: string,
+    participantId: string
+): Promise<void> {
+    const meeting = await requireHost(actor, meetingId);
+    const target = await prisma.meetingParticipant.findFirst({
+        where: { id: participantId, meetingId, leftAt: null },
+        select: { id: true, userId: true }
+    });
+    if (!target) throw new ChatAccessError("They are not in this meeting");
+    if (target.userId && target.userId === meeting.hostId) {
+        throw new ChatAccessError("You cannot remove yourself from your own meeting");
+    }
+
+    await prisma.meetingParticipant.update({
+        where: { id: target.id },
+        data: { admission: "denied", leftAt: new Date() }
+    });
+    publishMeetingEvent({ meetingId, kind: "roster" });
+}
+
+/** What the host may change about a meeting while it stands. */
+export interface MeetingOptions {
+    readonly title?: string;
+    readonly scheduledAt?: Date | null;
+    readonly approveGuests?: boolean;
+    readonly requireAccount?: boolean;
+}
+
+export async function setMeetingOptions(
+    actor: ChatActor,
+    meetingId: string,
+    options: MeetingOptions
+): Promise<void> {
+    await requireHost(actor, meetingId);
+    const title = options.title?.trim().slice(0, MAX_MEETING_TITLE);
+    if (options.title !== undefined && !title) throw new ChatAccessError("Give the meeting a name");
+
+    await prisma.meeting.update({
+        where: { id: meetingId },
+        data: {
+            ...(title ? { title } : {}),
+            ...(options.scheduledAt !== undefined ? { scheduledAt: options.scheduledAt } : {}),
+            ...(options.approveGuests !== undefined
+                ? { approveGuests: options.approveGuests }
+                : {}),
+            ...(options.requireAccount !== undefined
+                ? { requireAccount: options.requireAccount }
+                : {})
+        }
+    });
+    publishMeetingEvent({ meetingId, kind: "roster" });
+}
+
+/** End a meeting, with the same door-shutting every other ending does: the link
+ *  stops opening anything. */
+export async function endMeeting(actor: ChatActor, meetingId: string): Promise<void> {
+    await requireHost(actor, meetingId);
+    await closeMeeting(meetingId);
+}
+
+/** Whoever is asking must be the host, and the meeting must still be standing. */
+async function requireHost(
+    actor: ChatActor,
+    meetingId: string
+): Promise<{ title: string; hostId: string }> {
+    const meeting = await prisma.meeting.findUnique({
+        where: { id: meetingId },
+        select: { hostId: true, title: true, endedAt: true }
+    });
+    if (!meeting || meeting.endedAt) throw new ChatAccessError("That meeting has ended");
+    if (meeting.hostId !== actor.id) {
+        throw new ChatAccessError("Only whoever is hosting the meeting can do that");
+    }
+    return { title: meeting.title, hostId: meeting.hostId };
+}
+
+// ---------------------------------------------------------------------------
+// What the room says to itself
+// ---------------------------------------------------------------------------
+
+/**
+ * The chat inside a call.
+ *
+ * Its own table rather than the conversation's, and it has to be: every message
+ * in Chat is written by an account against a channel somebody is a member of,
+ * and neither is true of a guest who typed a name into a link ten seconds ago.
+ * So a line here belongs to a *seat*, which is the only identity a meeting can
+ * promise for everybody in it, and it goes when the meeting goes.
+ *
+ * It is where a link, an address or a name gets dropped while people are
+ * talking, which is the one thing a call cannot do out loud.
+ */
+export const MAX_MEETING_LINE = 2000;
+
+/** How much of the chat a browser is given. A call is not a conversation with a
+ *  history to walk back through: this is the last of it, and there is no
+ *  paging - what was said before somebody arrived was not said to them. */
+export const MEETING_LINES = 200;
+
+export interface MeetingLine {
+    readonly id: string;
+    /** The seat that said it, so a screen can tell its own lines apart. */
+    readonly participantId: string;
+    readonly name: string;
+    readonly guest: boolean;
+    readonly body: string;
+    readonly at: string;
+}
+
+/** Say something to the room. Only somebody actually in it: the lobby is not a
+ *  place to be heard from. */
+export async function sayInMeeting(
+    seat: { meetingId: string; participantId: string },
+    body: string
+): Promise<void> {
+    const seated = await requireSeated(seat);
+    if (seated.admission !== "admitted") {
+        throw new ChatAccessError("You are still waiting to be let in");
+    }
+    const said = body.trim().slice(0, MAX_MEETING_LINE);
+    if (!said) throw new ChatAccessError("Write something first");
+
+    await prisma.meetingMessage.create({
+        data: { meetingId: seat.meetingId, participantId: seat.participantId, body: said }
+    });
+    publishMeetingEvent({ meetingId: seat.meetingId, kind: "said" });
+}
+
+/** What the room has said. The name comes off the seat that said it, so a guest
+ *  is named the way they named themselves and nobody has to have an account. */
+export async function saidInMeeting(seat: {
+    meetingId: string;
+    participantId: string;
+}): Promise<readonly MeetingLine[]> {
+    const seated = await requireSeated(seat);
+    if (seated.admission !== "admitted") return [];
+
+    const rows = await prisma.meetingMessage.findMany({
+        where: { meetingId: seat.meetingId },
+        orderBy: { createdAt: "desc" },
+        take: MEETING_LINES,
+        select: {
+            id: true,
+            participantId: true,
+            body: true,
+            createdAt: true,
+            participant: { select: { name: true, userId: true } }
+        }
+    });
+
+    return rows.reverse().map((row) => ({
+        id: row.id,
+        participantId: row.participantId,
+        name: row.participant.name,
+        guest: row.participant.userId === null,
+        body: row.body,
+        at: row.createdAt.toISOString()
+    }));
 }

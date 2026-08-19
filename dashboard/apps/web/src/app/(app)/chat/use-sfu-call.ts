@@ -109,6 +109,11 @@ const frameSchema = z.discriminatedUnion("kind", [
     }),
     z.object({ kind: z.literal("roster") }),
     z.object({ kind: z.literal("ended") }),
+    // Somebody typed something into the room's chat. Carried on the connection
+    // the room already holds rather than on one of its own: a second stream per
+    // browser, to the same route, to be told the same kind of thing, is a
+    // connection nobody needs.
+    z.object({ kind: z.literal("said") }),
     /** Another browser of this same account took the call. */
     z.object({ kind: z.literal("claimed"), deviceId: z.string().optional() })
 ]);
@@ -145,6 +150,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const [sharing, setSharing] = useState(false);
     const [deafened, setDeafened] = useState(false);
     const [ended, setEnded] = useState(false);
+    /** When the room last said something in its own chat. A moment rather than
+     *  the messages themselves: what was said is read from the server by
+     *  whatever is drawing it, and this is only the nudge to go and ask. */
+    const [saidAt, setSaidAt] = useState(0);
     const [error, setError] = useState("");
     const [microphones, setMicrophones] = useState<readonly CallDevice[]>([]);
     const [cameras, setCameras] = useState<readonly CallDevice[]>([]);
@@ -838,6 +847,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     }
                     return;
                 }
+                if (frame.data.kind === "said") {
+                    setSaidAt(Date.now());
+                    return;
+                }
                 if (frame.data.kind === "ended") setEnded(true);
             };
 
@@ -1313,6 +1326,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         sharing,
         deafened,
         ended,
+        saidAt,
         error,
         microphones,
         cameras,

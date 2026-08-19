@@ -53,6 +53,10 @@ export interface CallState {
      *  decision about this pair of ears. */
     readonly deafened: boolean;
     readonly ended: boolean;
+    /** When the room's own chat last changed, as a moment in time. What was said
+     *  is read from the server by whatever draws it; this is the nudge that
+     *  there is something new to read, so nothing has to poll. */
+    readonly saidAt: number;
     /** What went wrong, in a sentence the call screen can show. Most often the
      *  browser refusing the camera, which is the reader's decision to reverse. */
     readonly error: string;

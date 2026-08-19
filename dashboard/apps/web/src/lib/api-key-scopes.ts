@@ -29,6 +29,7 @@ export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
     "chat.groups": "Start group conversations",
     "chat.attach": "Send files in chat",
     "chat.call": "Join chat calls",
+    "chat.meetings": "Create meeting links",
     "deploy.read": "Read deployments",
     "deploy.manage": "Manage deployments",
     "games.read": "Read game servers",
@@ -71,6 +72,7 @@ export const SCOPE_HINTS: Readonly<Record<Permission, string>> = {
     "chat.groups": "Open a conversation with several people at once.",
     "chat.attach": "Put files and voice messages on a message.",
     "chat.call": "Start a call in a conversation, and join one.",
+    "chat.meetings": "Create meetings anybody holding the link can join, and host them.",
     "deploy.read": "Inspect apps, deployments, and logs.",
     "deploy.manage": "Deploy, restart, and remove apps.",
     "games.read": "See game servers, their addresses, and who is playing.",
@@ -109,7 +111,14 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
     { title: "Notes", scopes: ["notes.use"] },
     {
         title: "Chat",
-        scopes: ["chat.use", "chat.spaces", "chat.groups", "chat.attach", "chat.call"]
+        scopes: [
+            "chat.use",
+            "chat.spaces",
+            "chat.groups",
+            "chat.attach",
+            "chat.call",
+            "chat.meetings"
+        ]
     },
     { title: "Deployments", scopes: ["deploy.read", "deploy.manage"] },
     {

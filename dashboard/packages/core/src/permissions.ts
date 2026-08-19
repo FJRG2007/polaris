@@ -25,6 +25,7 @@ export const PERMISSIONS = [
     "chat.groups",
     "chat.attach",
     "chat.call",
+    "chat.meetings",
     "deploy.read",
     "deploy.manage",
     "games.read",
@@ -182,6 +183,15 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     "chat.groups": { area: "Chat", label: "Start group conversations" },
     "chat.attach": { area: "Chat", label: "Attach files and send voice messages" },
     "chat.call": { area: "Chat", label: "Start and join calls" },
+    // Not one of the four above and deliberately not granted with the chat. The
+    // others are things somebody does inside Polaris with people who are already
+    // in it; this one hands out an address that anybody at all can open, which is
+    // a decision about the instance rather than about a conversation. Nobody
+    // holds it until an operator says who does.
+    "chat.meetings": {
+        area: "Chat",
+        label: "Create meeting links people outside Polaris can join"
+    },
     "deploy.read": { area: "Apps", label: "See deployments, servers and containers" },
     "deploy.manage": { area: "Apps", label: "Deploy, restart and configure apps" },
     "games.read": { area: "Game servers", label: "See game servers and who is playing" },

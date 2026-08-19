@@ -6522,6 +6522,16 @@ model Meeting {
     // default: a link that can be forwarded is a link that will be, and the host
     // seeing who is at the door is the only check left after that.
     approveGuests Boolean   @default(true)
+    // Whether getting in takes a Polaris account. Off by default, because the
+    // whole point of a meeting link is that the person on the other end does not
+    // have one - but a host discussing something internal can say otherwise, and
+    // then the link still names the meeting and the only way through it is
+    // signing in.
+    requireAccount Boolean  @default(false)
+    // When it is meant to happen, for a meeting somebody put in the diary rather
+    // than started on the spot. Null for a call that began the moment a button
+    // was pressed, which is every call started from a conversation.
+    scheduledAt   DateTime?
     startedAt     DateTime  @default(now())
     // Set when the last person leaves, or when the host ends it. A meeting with
     // this set refuses every join, including one holding the guest token.
@@ -6530,9 +6540,57 @@ model Meeting {
 
     channel      ChatChannel?         @relation(fields: [channelId], references: [id], onDelete: Cascade)
     participants MeetingParticipant[]
+    invites      MeetingInvite[]
+    messages     MeetingMessage[]
 
     @@index([channelId, endedAt])
     @@index([endedAt])
+    @@index([scheduledAt])
+}
+
+// Somebody with an account, convened to a meeting.
+//
+// Not a seat and not a permission: it is a fact that they were asked, which is
+// what puts the meeting on their own list and an alert in their bell. Whether
+// they may get in is answered when they knock - by the meeting, not by this row -
+// so removing an invitation does not lock somebody out of a call they are
+// already sitting in, and holding one does not walk anybody past a lobby.
+model MeetingInvite {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    meetingId   String   @db.Uuid
+    userId      String   @db.Uuid
+    invitedById String   @db.Uuid
+    createdAt   DateTime @default(now())
+
+    meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+    @@unique([meetingId, userId])
+    @@index([userId])
+}
+
+// What was said in a meeting's own chat.
+//
+// Its own table rather than the conversation's, and it has to be: half the room
+// may have no account at all, and every message in Chat is written by a user id
+// against a channel somebody is a member of. Neither is true of a guest who
+// typed a name into a link ten seconds ago.
+//
+// So a line here is written by a *seat* - the same participant row the roster
+// draws - which is the only identity a meeting can promise for everybody in it.
+// It goes when the meeting goes, which is the other half of the bargain: this is
+// the chat of a call, not a record of a conversation, and nobody should discover
+// a year later that what they typed into a call outlived the call.
+model MeetingMessage {
+    id            String   @id @default(uuid(7)) @db.Uuid
+    meetingId     String   @db.Uuid
+    participantId String   @db.Uuid
+    body          String
+    createdAt     DateTime @default(now())
+
+    meeting     Meeting            @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+    participant MeetingParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+    @@index([meetingId, createdAt])
 }
 
 // Somebody in a call, or somebody at the door.
@@ -6561,7 +6619,8 @@ model MeetingParticipant {
     // laptop shut is swept rather than left in the room forever.
     lastSeenAt DateTime  @default(now())
 
-    meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+    meeting  Meeting          @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+    messages MeetingMessage[]
 
     @@index([meetingId, leftAt])
     @@index([meetingId, admission])

@@ -19,8 +19,9 @@ export interface MeetingEvent {
     readonly meetingId: string;
     /** roster - somebody joined, left, or was admitted; ended - it is over;
      *  claimed - a device took the call over, and every other one of that
-     *  account's browsers is now out of it. */
-    readonly kind: "roster" | "ended" | "claimed";
+     *  account's browsers is now out of it; said - somebody typed something into
+     *  the room's own chat. */
+    readonly kind: "roster" | "ended" | "claimed" | "said";
     /**
      * Which browser took it, for `claimed`.
      *
