@@ -51,6 +51,36 @@ function suppressors() {
  *  explicitly so the graph is never built at a rate the model cannot use. */
 const SAMPLE_RATE = 48_000;
 
+/**
+ * How much of the level the filter takes away is put back.
+ *
+ * A suppressor is not a fader, but it lowers what comes out all the same: it is
+ * trained to leave speech and remove everything else, and "everything else"
+ * includes the room tone under the speech and the tail of every word. What
+ * arrives at the other end is a voice that is cleaner and quieter, and the whole
+ * room turning their speakers up is not a fix - it turns up everybody who did
+ * not switch the filter on.
+ *
+ * So the level comes back here, on the way out, where it is one person's
+ * microphone rather than everybody's ears. Four decibels: enough to put a
+ * filtered voice back beside an unfiltered one, small enough that it is a
+ * correction rather than a boost. It is a chosen starting point rather than a
+ * measured match - what "the same loudness" is depends on the voice, the room
+ * and the model - which is exactly why the limiter below is not optional.
+ */
+const MAKEUP_GAIN = 1.6;
+
+/**
+ * What stops the makeup from clipping.
+ *
+ * Gain on a signal that was already near full scale does not make it louder, it
+ * squares off the peaks - and a squared-off peak is the crackle that sounds
+ * worse than the quiet ever did. A limiter just under full scale catches those
+ * and leaves everything under them untouched, which on speech is nearly all of
+ * it.
+ */
+const LIMIT_DBFS = -1.5;
+
 /** A microphone with something between it and the call. */
 export interface FilteredMic {
     /** What to send. */
@@ -77,7 +107,10 @@ export interface FilteredMic {
  * the licence hosts the build, and Polaris loads it.
  */
 export interface LicensedFilter {
-    createNode: (context: AudioContext, options: { token: string }) => Promise<AudioNode> | AudioNode;
+    createNode: (
+        context: AudioContext,
+        options: { token: string }
+    ) => Promise<AudioNode> | AudioNode;
     /** Optional, and called when the call ends. */
     dispose?: () => void;
 }
@@ -115,8 +148,20 @@ export async function filterMic(
         return null;
     }
 
+    // The model, then the level it cost, then the guard on that level.
+    const makeup = context.createGain();
+    makeup.gain.value = MAKEUP_GAIN;
+    const limiter = context.createDynamicsCompressor();
+    limiter.threshold.value = LIMIT_DBFS;
+    limiter.knee.value = 0;
+    limiter.ratio.value = 20;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.1;
+
     source.connect(built.node);
-    built.node.connect(sink);
+    built.node.connect(makeup);
+    makeup.connect(limiter);
+    limiter.connect(sink);
 
     const out = sink.stream.getAudioTracks()[0];
     if (!out) {
@@ -130,6 +175,8 @@ export async function filterMic(
         stop: async () => {
             built.dispose();
             source.disconnect();
+            makeup.disconnect();
+            limiter.disconnect();
             out.stop();
             await context.close().catch(() => undefined);
         }

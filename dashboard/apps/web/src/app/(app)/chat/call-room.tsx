@@ -1092,7 +1092,14 @@ function Tile({
                 >
                     <span className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>Volume</span>
-                        <span className="tabular-nums">{Math.round(volume * 100)}%</span>
+                        <span
+                            className={cn(
+                                "tabular-nums",
+                                volume > DEFAULT_VOLUME && "font-medium text-warning"
+                            )}
+                        >
+                            {Math.round(volume * 100)}%
+                        </span>
                     </span>
                     <input
                         type="range"
@@ -1104,6 +1111,21 @@ function Tile({
                         onChange={(event) => setVolume(Number(event.target.value))}
                         className="w-full accent-primary"
                     />
+                    {/* Where they were sent, marked on a track that runs past
+                        it. Without it there is nothing on screen to find your
+                        way back to, and "as loud as they actually are" is the
+                        one position on this slider anybody looks for. Pressing
+                        it is how you get there. */}
+                    <button
+                        type="button"
+                        onClick={() => setVolume(DEFAULT_VOLUME)}
+                        disabled={volume === DEFAULT_VOLUME}
+                        className="self-start text-[11px] text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground disabled:no-underline disabled:opacity-60"
+                    >
+                        {volume === DEFAULT_VOLUME
+                            ? "As they were sent"
+                            : "Back to how they were sent"}
+                    </button>
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => setVolume(volume === 0 ? DEFAULT_VOLUME : 0)}>
                     {volume === 0 ? (

@@ -16,14 +16,18 @@
  * any screen. A guest, who has no dashboard around them, mounts it themselves.
  *
  * Volume is per person and per browser, deafening is one switch over all of it,
- * and both are applied to the elements rather than to the connections - the
- * audio still arrives and is simply not played, so both are instant and nobody
- * is renegotiated at.
+ * and both are applied where the sound is played rather than to the connections -
+ * the audio still arrives and is simply not played, so both are instant and
+ * nobody is renegotiated at.
+ *
+ * Anybody turned up past how they were sent is played through Web Audio instead
+ * of by the element, because an element's volume stops at 1 - see `call-boost`.
  */
 
 import { Volume2 } from "lucide-react";
 import type { CallState } from "./use-call";
 import { useCallVolume } from "./call-volumes";
+import { boostStream, resumeBoost, type Boost } from "./call-boost";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export function CallAudio({ call }: { call: CallState }) {
@@ -99,6 +103,10 @@ export function CallAudio({ call }: { call: CallState }) {
                     <button
                         type="button"
                         onClick={() => {
+                            // The same press does both: an element the browser
+                            // refused to start, and the context it started
+                            // suspended for whoever is boosted.
+                            resumeBoost();
                             for (const press of unblock.current.values()) press();
                         }}
                         className="pointer-events-auto flex items-center gap-2 rounded-full border border-border-strong bg-elevated px-3 py-1.5 text-xs font-medium shadow-modal"
@@ -127,10 +135,17 @@ function RemoteAudio({
 }) {
     const element = useRef<HTMLAudioElement>(null);
     const [volume] = useCallVolume(volumeKey);
+    /** The graph playing this person, while they are turned up past 1. */
+    const boost = useRef<Boost | null>(null);
+    /** Whether this person is boosted at all, which decides which of the two
+     *  things plays them. State rather than a ref: it is read while rendering
+     *  the element that must fall silent when the graph takes over. */
+    const [boosted, setBoosted] = useState(false);
 
     const start = useCallback(() => {
         const audio = element.current;
         if (!audio) return;
+        resumeBoost();
         void audio
             .play()
             .then(() => onPlayState(id, false, start))
@@ -144,11 +159,58 @@ function RemoteAudio({
         start();
     }, [stream, start]);
 
+    /**
+     * Who plays this person: the element, or the graph.
+     *
+     * Anything up to 1 is the element's own volume, which costs nothing and is
+     * what almost every call uses. Past it the element cannot go, so the graph
+     * is built and the element is silenced - but kept attached, because in
+     * Chrome a WebRTC stream is not processed by Web Audio at all unless a media
+     * element is holding it.
+     *
+     * Deafening silences both: muting the element says nothing to a graph
+     * running beside it, so a deafened reader would have gone on hearing exactly
+     * the people they had turned up.
+     */
+    const wanted = muted ? 0 : volume;
+    /** Which stream the graph was built over, so a republished microphone is
+     *  rebuilt rather than turned up while it plays the track before it. */
+    const built = useRef<MediaStream | null>(null);
     useEffect(() => {
-        if (element.current) element.current.volume = volume;
-    }, [volume, stream]);
+        if (!stream || wanted <= 1) {
+            boost.current?.stop();
+            boost.current = null;
+            built.current = null;
+            setBoosted(false);
+            return;
+        }
+        if (built.current !== stream) {
+            boost.current?.stop();
+            boost.current = boostStream(stream, wanted);
+            built.current = boost.current ? stream : null;
+        } else boost.current?.set(wanted);
+        setBoosted(boost.current !== null);
+    }, [stream, wanted]);
 
-    // Never drawn. It is an element because that is what plays a stream, not
-    // because there is anything to look at.
+    // Let go of the graph with the component. Left running, it goes on playing
+    // somebody who has left the call.
+    useEffect(
+        () => () => {
+            boost.current?.stop();
+            boost.current = null;
+            built.current = null;
+        },
+        []
+    );
+
+    useEffect(() => {
+        // Never both at once: whichever is not playing is at zero rather than
+        // merely quiet, or a boosted voice arrives twice.
+        if (element.current) element.current.volume = boosted ? 0 : Math.min(1, volume);
+    }, [boosted, volume, stream]);
+
+    // Never drawn. It is an element because that is what plays a stream - and,
+    // for a boosted one, because that is what keeps the stream flowing into the
+    // graph that plays it.
     return <audio ref={element} autoPlay playsInline muted={muted} className="hidden" />;
 }

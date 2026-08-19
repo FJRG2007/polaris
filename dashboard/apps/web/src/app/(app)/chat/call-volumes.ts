@@ -13,8 +13,8 @@
  * holds across calls. A guest has no account, so their setting lasts as long as
  * their seat does, which is the most that can honestly be offered.
  *
- * Applied to the audio element, never to the connection: the sound still arrives
- * and is simply played quieter, so a change is instant and nobody is
+ * Applied where the sound is played, never to the connection: it still arrives
+ * and is simply played louder or quieter, so a change is instant and nobody is
  * renegotiated at.
  */
 
@@ -22,9 +22,16 @@ import { useCallback, useEffect, useState } from "react";
 
 const PREFIX = "polaris.call.volume.";
 
-/** Everything above 1 is amplification the element does not do, so this is the
- *  whole range: silent to as sent. */
-export const MAX_VOLUME = 1;
+/**
+ * As loud as somebody can be made, as a multiple of how they were sent.
+ *
+ * Twice, which is where every client that offers this puts it. The reason to
+ * offer it at all is the person nobody can hear - a laptop microphone across a
+ * room, somebody who will not move closer - and turning the whole call up to
+ * reach them makes everybody else shout. Past 1 the element cannot help, so it
+ * is done in Web Audio with a limiter after the gain; see `call-boost`.
+ */
+export const MAX_VOLUME = 2;
 
 /** What somebody nobody has adjusted is played at. */
 export const DEFAULT_VOLUME = 1;
@@ -47,7 +54,7 @@ export function volumeFor(personId: string): number {
         const value = Number.parseFloat(raw);
         // A stored value that is not a number, or is out of range, is treated as
         // absent. Local storage is editable by whoever owns the browser, and a
-        // NaN reaching `element.volume` throws.
+        // NaN reaching a gain or an element's volume throws.
         if (!Number.isFinite(value)) return DEFAULT_VOLUME;
         return Math.min(MAX_VOLUME, Math.max(0, value));
     } catch {
