@@ -23,11 +23,14 @@ import Link from "next/link";
 import { Avatar } from "./avatar";
 import { Button } from "@polaris/ui";
 import { Phone, PhoneOff } from "lucide-react";
-import { useHeldCall } from "@/app/(app)/chat/call-session";
+import { useSessionScope } from "./session-scope";
+import { useHeldCall } from "@/app/(app)/chat/call-hold";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
 import { notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
+import { openPeerChannel, type PeerChannel } from "@/lib/shared-stream";
 import { RING_FOR_MS, playCallSound, startRinging } from "@/lib/call-sounds";
+import { CALLS_CHANNEL, callTabMessageSchema, type CallTabMessage } from "@/lib/chat/call-tabs";
 
 interface Ringing {
     readonly channelId: string;
@@ -47,9 +50,59 @@ interface Ringing {
 }
 
 export function IncomingCalls({ viewerId }: { viewerId: string }) {
+    const scope = useSessionScope();
     const held = useHeldCall();
     const [ringing, setRinging] = useState<readonly Ringing[]>([]);
     const inCall = held?.session?.meetingId ?? null;
+
+    const drop = useCallback(
+        (meetingId: string) =>
+            setRinging((current) => current.filter((entry) => entry.meetingId !== meetingId)),
+        []
+    );
+
+    /**
+     * The other tabs of this browser, told when a call has been dealt with here.
+     *
+     * One telephone, however many windows it is drawn in. A call answered in one
+     * tab used to leave every other tab holding a card that offered to join it,
+     * the tab holding the connection still ringing, and the notice the operating
+     * system had drawn still up - all of it until a reload, which is not
+     * something anybody does with a telephone in their hand.
+     */
+    const peers = useRef<PeerChannel<CallTabMessage> | null>(null);
+    useEffect(() => {
+        const channel = openPeerChannel<CallTabMessage>(CALLS_CHANNEL, scope, (message) => {
+            const parsed = callTabMessageSchema.safeParse(message);
+            if (parsed.success) drop(parsed.data.meetingId);
+        });
+        peers.current = channel;
+        return () => {
+            peers.current = null;
+            channel.close();
+        };
+    }, [drop, scope]);
+
+    /** Put a call down here, and everywhere else this browser is drawing it. */
+    const settle = useCallback(
+        (meetingId: string) => {
+            drop(meetingId);
+            peers.current?.post({ kind: "settled", meetingId });
+        },
+        [drop]
+    );
+
+    /**
+     * Answered, wherever in Polaris that happened.
+     *
+     * The card is one way in and deliberately not the only one: the conversation
+     * has a Join, the voice room has a strip, and a call picked up in any of them
+     * is a call the other tabs must stop asking about. Being in it is the fact
+     * they all need, so it is the one that is said out loud.
+     */
+    useEffect(() => {
+        if (inCall) settle(inCall);
+    }, [inCall, settle]);
 
     useChatStream(
         useCallback(
@@ -182,9 +235,6 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
 
     if (showing.length === 0) return null;
 
-    const dismiss = (meetingId: string) =>
-        setRinging((current) => current.filter((entry) => entry.meetingId !== meetingId));
-
     return (
         <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col gap-2">
             {showing.map((entry) => (
@@ -208,7 +258,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                             asChild
                             size="sm"
                             className="flex-1"
-                            onClick={() => dismiss(entry.meetingId)}
+                            onClick={() => settle(entry.meetingId)}
                         >
                             {/* Answering answers. The conversation is still
                                 where the room is drawn, but arriving there and
@@ -232,7 +282,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                                 // one look the same from the other end and
                                 // Polaris has no business saying which it was.
                                 playCallSound("hangUp");
-                                dismiss(entry.meetingId);
+                                settle(entry.meetingId);
                             }}
                         >
                             <PhoneOff className="size-4" />

@@ -654,7 +654,24 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     resort();
                     resortStates();
                 })
+                // Published and unpublished as well as subscribed and not, and
+                // the second pair is what closes a share. A track being taken
+                // down is announced whether or not this browser had got as far
+                // as subscribing to it - and where it had not, nothing else here
+                // ever fires: the room kept the last stream it had been given,
+                // so a screen that had stopped went on holding the big place
+                // above everybody's faces, frozen, until somebody reloaded.
+                .on(RoomEvent.TrackPublished, () => resort())
+                .on(RoomEvent.TrackUnpublished, () => resort())
                 .on(RoomEvent.LocalTrackPublished, () => publishLocalPreview())
+                // The sharer's own copy of the same thing, and the button that
+                // says whether they are sharing along with it: what is true is
+                // whether this browser is still holding a screen, whichever of
+                // the ways out of one it took.
+                .on(RoomEvent.LocalTrackUnpublished, () => {
+                    publishLocalPreview();
+                    setSharing(screen.current !== null);
+                })
                 .on(RoomEvent.TrackMuted, onMuteChanged)
                 .on(RoomEvent.TrackUnmuted, onMuteChanged)
                 .on(RoomEvent.ParticipantAttributesChanged, () => resortStates())
