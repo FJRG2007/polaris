@@ -26,9 +26,9 @@ const TOO_PALE = 0.82;
 const TOO_DARK = 0.04;
 
 /** The colour to draw, or null to leave the card on Polaris' own accent. */
-export function usableAccent(colour: string | null | undefined): string | null {
-    if (!colour || !HEX.test(colour.trim())) return null;
-    const hex = colour.trim().toLowerCase();
+export function usableAccent(color: string | null | undefined): string | null {
+    if (!color || !HEX.test(color.trim())) return null;
+    const hex = color.trim().toLowerCase();
     const light = luminance(hex);
     return light > TOO_PALE || light < TOO_DARK ? null : hex;
 }

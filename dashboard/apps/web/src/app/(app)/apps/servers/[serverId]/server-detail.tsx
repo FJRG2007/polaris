@@ -235,7 +235,7 @@ export function ServerDetail({
                             ) : null}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            A home server behind a router and a data-centre box are exposed in
+                            A home server behind a router and a data-center box are exposed in
                             different ways, so this decides how a domain is pointed at it.
                         </p>
                     </section>

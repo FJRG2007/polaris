@@ -30,6 +30,7 @@ import type { SavedMediaView } from "@/lib/chat/saved-media";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
 import { MAX_NICKNAME, setNickname } from "@/lib/contact-names";
 import { messageToasts, type MessageToast } from "@/lib/chat/toasts";
+import { chatProfile } from "@/lib/chat/profiles";
 import { searchMessages, type ChatSearchHit } from "@/lib/chat/search";
 import { voicePresence, type VoicePresence } from "@/lib/chat/meetings";
 import type { ChatInviteOffer, ChatInviteView } from "@/lib/chat/invites";
@@ -502,6 +503,28 @@ export async function setNicknameAction(
     await setNickname(me.id, parsed.data.subjectId, parsed.data.nickname);
     revalidatePath(CHAT_PATH);
     return {};
+}
+
+/**
+ * Somebody's profile, for the panel beside a direct message.
+ *
+ * Only about people this reader can already reach, which the picker's own rule
+ * answers: a screen that would resolve any id into a name is a directory, and
+ * this instance is not always a company where everybody may know everybody.
+ *
+ * Deliberately no address and no number. Both are settings on that person's own
+ * privacy screen, both default to nobody, and being in a conversation with
+ * somebody is not consent to hand either over.
+ */
+export async function profileAction(
+    userId: string
+): Promise<{ profile?: { name: string; username: string; description: string } }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(userId);
+    if (!parsed.success) return {};
+
+    const profile = await chatProfile(me, parsed.data);
+    return profile ? { profile } : {};
 }
 
 export async function typingAction(channelId: string, activity?: unknown): Promise<void> {

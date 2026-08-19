@@ -238,7 +238,7 @@ export async function refreshModelCatalog(): Promise<CatalogRefresh> {
             headers: { accept: "application/json" },
             cache: "no-store"
         });
-        if (!response.ok) return { ok: false, models: 0, error: `The catalogue answered ${response.status}.` };
+        if (!response.ok) return { ok: false, models: 0, error: `The catalog answered ${response.status}.` };
         payload = await response.json();
     } catch (error) {
         // Offline, blocked, or slow. All of them mean the same thing to a
@@ -246,7 +246,7 @@ export async function refreshModelCatalog(): Promise<CatalogRefresh> {
         return {
             ok: false,
             models: 0,
-            error: error instanceof Error ? error.message : "The catalogue could not be reached."
+            error: error instanceof Error ? error.message : "The catalog could not be reached."
         };
     }
 
@@ -255,7 +255,7 @@ export async function refreshModelCatalog(): Promise<CatalogRefresh> {
     // An empty result is a bad download, not an empty world: replacing the
     // stored catalogue with nothing would leave every picker with one model per
     // provider until the next refresh happened to work.
-    if (rows.length === 0) return { ok: false, models: 0, error: "The catalogue listed no usable models." };
+    if (rows.length === 0) return { ok: false, models: 0, error: "The catalog listed no usable models." };
 
     const providers = [...new Set(rows.map((row) => row.provider))];
     await prisma.$transaction([

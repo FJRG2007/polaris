@@ -88,7 +88,7 @@ export function CatalogCard({ models, refreshedAt }: { models: number; refreshed
             <CardBody className="space-y-3">
                 <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1 space-y-1">
-                        <p className="text-sm font-medium">Model catalogue</p>
+                        <p className="text-sm font-medium">Model catalog</p>
                         <p className="text-muted-foreground text-xs">
                             {count === 0
                                 ? "Nothing downloaded yet, so the model pickers offer only what you type. It refreshes itself once a day."

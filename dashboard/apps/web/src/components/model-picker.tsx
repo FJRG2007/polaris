@@ -217,7 +217,7 @@ export function ModelPicker({
                         {!loading && results.length === 0 && !offerTyped ? (
                             <p className="text-muted-foreground px-3 py-6 text-center text-sm">
                                 {models.length === 0
-                                    ? "No models yet. Connect a provider, or refresh the catalogue under Admin > Agents."
+                                    ? "No models yet. Connect a provider, or refresh the catalog under Admin > Agents."
                                     : "Nothing matches. Type a full specifier to use it anyway."}
                             </p>
                         ) : null}

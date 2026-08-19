@@ -886,7 +886,7 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                 <div className="grid grid-cols-2 gap-x-6 gap-y-2 rounded-md border border-border/60 p-3 text-xs">
                     <StatusRow
                         label="Hosting"
-                        value={status.placement === "cloud" ? "Cloud / data centre" : status.placement === "home" ? "Home / local" : "Unknown"}
+                        value={status.placement === "cloud" ? "Cloud / data center" : status.placement === "home" ? "Home / local" : "Unknown"}
                     />
                     <StatusRow label="Public IP" value={status.publicIp ?? "not detected"} />
                     <StatusRow label="Server IP" value={status.subdomainIp ?? "unknown"} />

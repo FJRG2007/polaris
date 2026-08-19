@@ -154,7 +154,7 @@ function MotdCard({
         return mc.codesOver(map, from, to);
     }, [map, raw, selection]);
     const changed = mc.encodeMotd(text) !== motd;
-    const centred = useMemo(() => mc.isCenteredMotd(text), [text]);
+    const centered = useMemo(() => mc.isCenteredMotd(text), [text]);
     const shown = raw ? text : map.plain;
 
     /**
@@ -259,27 +259,27 @@ function MotdCard({
                     <p className="text-sm font-medium">Description</p>
                     <p className="text-xs text-muted-foreground">
                         The two lines under the server in a player&apos;s multiplayer list. Select some text and pick a
-                        colour or a style for it; press the same one again to take it off. With nothing selected it
+                        color or a style for it; press the same one again to take it off. With nothing selected it
                         applies from the cursor on. The preview is what the server list will actually draw.
                     </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1">
-                    {Object.entries(mc.MOTD_COLORS).map(([code, colour]) => (
+                    {Object.entries(mc.MOTD_COLORS).map(([code, color]) => (
                         <button
                             key={code}
                             type="button"
                             onClick={() => apply(code)}
-                            aria-label={colour.name}
+                            aria-label={color.name}
                             aria-pressed={active.color === code}
-                            title={active.color === code ? `${colour.name} - press to clear` : colour.name}
+                            title={active.color === code ? `${color.name} - press to clear` : color.name}
                             className={cn(
                                 "size-6 rounded border transition-transform hover:scale-110",
                                 active.color === code
                                     ? "border-foreground ring-2 ring-foreground/40"
                                     : "border-border"
                             )}
-                            style={{ backgroundColor: colour.hex }}
+                            style={{ backgroundColor: color.hex }}
                         />
                     ))}
                     {/* Anything the sixteen do not have. Modern servers draw it;
@@ -287,7 +287,7 @@ function MotdCard({
                         the game's own behaviour rather than something to guard. */}
                     <label
                         className="relative size-6 cursor-pointer overflow-hidden rounded border border-border transition-transform hover:scale-110"
-                        title="Any other colour"
+                        title="Any other color"
                         style={{
                             background: "conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)"
                         }}
@@ -295,7 +295,7 @@ function MotdCard({
                         <input
                             type="color"
                             className="absolute inset-0 cursor-pointer opacity-0"
-                            aria-label="Any other colour"
+                            aria-label="Any other color"
                             onChange={(event) => applyHex(event.target.value)}
                         />
                     </label>
@@ -367,14 +367,14 @@ function MotdCard({
                         className="h-6 px-2 text-xs"
                         onClick={() => setText((current) => mc.toggleCenterMotd(current))}
                         title={
-                            centred
+                            centered
                                 ? "Put the lines back against the left"
                                 : "Pad the lines so they sit in the middle of the list"
                         }
-                        aria-pressed={centred}
+                        aria-pressed={centered}
                     >
-                        {centred ? <AlignLeft className="size-3.5" /> : <AlignCenter className="size-3.5" />}
-                        {centred ? "Align left" : "Centre the lines"}
+                        {centered ? <AlignLeft className="size-3.5" /> : <AlignCenter className="size-3.5" />}
+                        {centered ? "Align left" : "Center the lines"}
                     </Button>
                 </div>
 

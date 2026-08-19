@@ -695,7 +695,7 @@ function ServerRow({
                             <IconButton
                                 label={
                                     server.favorite
-                                        ? `Take ${server.name} off your favourites`
+                                        ? `Take ${server.name} off your favorites`
                                         : `Keep ${server.name} at the top`
                                 }
                                 disabled={pending}
@@ -790,7 +790,7 @@ function ServerRow({
                     <Star
                         className={cn("size-4", server.favorite && "fill-amber-400 text-amber-400")}
                     />
-                    {server.favorite ? "Remove from favourites" : "Add to favourites"}
+                    {server.favorite ? "Remove from favorites" : "Add to favorites"}
                 </ContextMenuItem>
                 <ContextMenuItem
                     disabled={pending}

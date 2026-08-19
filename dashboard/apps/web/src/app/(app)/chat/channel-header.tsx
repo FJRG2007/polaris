@@ -45,6 +45,7 @@ import {
     Settings2,
     Trash2,
     UserPlus,
+    UserRound,
     Users,
     Video
 } from "lucide-react";
@@ -195,11 +196,18 @@ export function ChannelHeader({
                         <button
                             type="button"
                             onClick={onMembers}
-                            aria-label="Who is in here"
-                            title="Who is in here"
+                            // A conversation between two people has no roster:
+                            // the panel is the other person, and the control
+                            // says so rather than offering to list two names.
+                            aria-label={channel.kind === "dm" ? "Profile" : "Who is in here"}
+                            title={channel.kind === "dm" ? "Profile" : "Who is in here"}
                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
-                            <Users className="size-4" />
+                            {channel.kind === "dm" ? (
+                                <UserRound className="size-4" />
+                            ) : (
+                                <Users className="size-4" />
+                            )}
                         </button>
                     )}
                     {onSearch && (

@@ -655,7 +655,7 @@ function KeyDialog({
                                 </label>
                             </div>
                             <p className="text-muted-foreground -mt-2 text-xs">
-                                An endpoint publishes no catalogue, so both numbers are needed: without them a
+                                An endpoint publishes no catalog, so both numbers are needed: without them a
                                 run answers in 32,000-token slices and never compacts.
                             </p>
                         </>

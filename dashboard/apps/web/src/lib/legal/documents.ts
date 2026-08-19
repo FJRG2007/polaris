@@ -43,7 +43,7 @@ function contactSection(contact: string | null): LegalSection[] {
         {
             heading: "Getting in touch",
             body: [
-                `This Polaris is run by the person or organisation reachable at ${contact}. Questions about the data it holds, and requests to see or delete it, go there.`
+                `This Polaris is run by the person or organization reachable at ${contact}. Questions about the data it holds, and requests to see or delete it, go there.`
             ]
         }
     ];

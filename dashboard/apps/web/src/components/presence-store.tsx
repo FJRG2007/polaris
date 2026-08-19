@@ -36,6 +36,11 @@ export type { Presence };
 
 export interface PresenceOf {
     readonly status: Presence;
+    /** The line they are showing, or empty when there is none to show. Empty for
+     *  anybody offline, and for anybody whose privacy settings do not show this
+     *  reader their presence at all - both arrive here as offline, and offline
+     *  carries no line. */
+    readonly note: string;
     /** The conversation of a call they are in and the reader could join. */
     readonly inCall: string | null;
 }

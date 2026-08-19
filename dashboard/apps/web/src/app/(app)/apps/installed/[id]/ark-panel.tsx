@@ -536,7 +536,7 @@ function ConnectCard({
                             <JoinAddress
                                 title="Add in Steam, or the in-game browser"
                                 value={withPort(address, status?.queryPort ?? ports.query)}
-                                detail="Steam, View, Servers, Favourites, +. It appears in ARK under Favourites."
+                                detail="Steam, View, Servers, Favorites, +. It appears in ARK under Favorites."
                             />
                             <JoinAddress
                                 title="Or connect straight to it"

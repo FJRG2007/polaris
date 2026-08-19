@@ -14,10 +14,10 @@ import { PhoneCard } from "./phone-card";
 import { EmailsView } from "./emails-view";
 import { useRouter } from "next/navigation";
 import { updateProfileAction } from "./actions";
-import { Card, CardBody, Button, Input } from "@polaris/ui";
+import { Card, CardBody, Button, Input, Textarea } from "@polaris/ui";
 import { useState, type FormEvent, type ReactNode } from "react";
 import type { UserEmailView, UserPhoneView } from "@polaris/auth";
-import { MAX_COMPANY_LENGTH, normalizePersonName } from "@polaris/core";
+import { MAX_COMPANY_LENGTH, MAX_DESCRIPTION, normalizePersonName } from "@polaris/core";
 
 type Result = { ok?: string; error?: string } | null;
 
@@ -25,6 +25,7 @@ interface Profile {
     name: string;
     username: string;
     company: string;
+    description: string;
 }
 
 /** Compare the way the server stores it, so trailing space or case is not a change. */
@@ -57,6 +58,7 @@ export function AccountView({
     name,
     username,
     company,
+    description,
     emails,
     mailReady,
     phone,
@@ -65,6 +67,7 @@ export function AccountView({
     name: string;
     username: string;
     company: string;
+    description: string;
     emails: UserEmailView[];
     /** Whether an email channel is configured, which decides whether an address
      *  can be verified at all. */
@@ -76,8 +79,8 @@ export function AccountView({
     const router = useRouter();
     const primary = emails.find((entry) => entry.primary)?.email ?? "";
 
-    const [profile, setProfile] = useState<Profile>({ name, username, company });
-    const [saved, setSaved] = useState<Profile>({ name, username, company });
+    const [profile, setProfile] = useState<Profile>({ name, username, company, description });
+    const [saved, setSaved] = useState<Profile>({ name, username, company, description });
     const [profileBusy, setProfileBusy] = useState(false);
     const [profileResult, setProfileResult] = useState<Result>(null);
 
@@ -90,7 +93,8 @@ export function AccountView({
         const result = await updateProfileAction({
             name: profile.name,
             username: profile.username,
-            company: profile.company
+            company: profile.company,
+            description: profile.description
         });
         setProfileBusy(false);
         setProfileResult(result.error ? result : { ok: "Profile updated." });
@@ -141,6 +145,21 @@ export function AccountView({
                             autoComplete="organization"
                             onChange={(event) => setProfile({ ...profile, company: event.target.value })}
                         />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm">
+                        About you
+                        <Textarea
+                            rows={3}
+                            value={profile.description}
+                            placeholder="Optional"
+                            maxLength={MAX_DESCRIPTION}
+                            onChange={(event) =>
+                                setProfile({ ...profile, description: event.target.value })
+                            }
+                        />
+                        <span className="text-xs text-muted-foreground">
+                            Shown to anybody who opens your profile.
+                        </span>
                     </label>
                     <div className="flex flex-col gap-1 text-sm">
                         Email

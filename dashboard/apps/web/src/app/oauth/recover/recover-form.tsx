@@ -254,7 +254,7 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
                 ) : (
                     <p className="text-sm text-muted-foreground">
                         There are no security questions on this account, so nothing here can be
-                        checked automatically. Whoever runs this Polaris will have to recognise you
+                        checked automatically. Whoever runs this Polaris will have to recognize you
                         another way before approving it.
                     </p>
                 )}

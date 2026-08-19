@@ -23,12 +23,16 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
             <SmoothScroll />
 
             <header className="flex items-center justify-between gap-2">
+                {/* The mark alone. The name is written under it in the page's
+                    own heading, and the two together read as the word twice -
+                    which is what it looked like: a wordmark stuttering into a
+                    title. Named for a screen reader, which cannot see a mark. */}
                 <Link
                     href={PUBLIC_PATHS.home}
+                    aria-label="Polaris"
                     className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
                 >
                     <PolarisMark className="size-6" />
-                    <span className="text-sm font-medium">Polaris</span>
                 </Link>
                 <Button asChild size="sm" variant="ghost">
                     <Link href="/oauth/login">

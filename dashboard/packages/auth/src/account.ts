@@ -9,7 +9,7 @@
 
 import { prisma } from "@polaris/db";
 import type { Auth } from "./auth.js";
-import { companyField, normalizePersonName } from "@polaris/core";
+import { companyField, descriptionField, normalizePersonName } from "@polaris/core";
 
 /** Read the credential password hash for a user, or null if they have none. */
 async function credentialHash(userId: string): Promise<string | null> {
@@ -28,13 +28,23 @@ async function verifyPassword(auth: Auth, userId: string, password: string): Pro
     return ctx.password.verify({ hash, password });
 }
 
-/** Update a user's own display name, username, and/or company. Username must
- *  stay unique; company is free text and may be cleared. */
+/** Update a user's own display name, username, company and/or description.
+ *  Username must stay unique; the other three are free text and may be cleared. */
 export async function updateUserProfile(
     userId: string,
-    input: { name?: string; username?: string | null; company?: string | null }
+    input: {
+        name?: string;
+        username?: string | null;
+        company?: string | null;
+        description?: string | null;
+    }
 ): Promise<{ error?: string }> {
-    const data: { name?: string; username?: string | null; company?: string | null } = {};
+    const data: {
+        name?: string;
+        username?: string | null;
+        company?: string | null;
+        description?: string;
+    } = {};
     if (input.name !== undefined) {
         // Normalized here rather than only in the form: this is the copy that
         // decides what is stored, and an API key posting a name never sees a blur.
@@ -60,6 +70,15 @@ export async function updateUserProfile(
         const parsed = companyField.safeParse(input.company ?? "");
         if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the company." };
         data.company = parsed.data || null;
+    }
+    if (input.description !== undefined) {
+        const parsed = descriptionField.safeParse(input.description ?? "");
+        if (!parsed.success) {
+            return { error: parsed.error.issues[0]?.message ?? "Check the description." };
+        }
+        // Empty rather than null: it is a line somebody may have cleared, and
+        // the column has no meaning for "unset" that "" does not already carry.
+        data.description = parsed.data;
     }
     if (Object.keys(data).length > 0) await prisma.user.update({ where: { id: userId }, data });
     return {};

@@ -34,7 +34,7 @@ export default function AboutPage() {
                 <p className="text-lg leading-relaxed text-muted-foreground">
                     A self-hosted control plane. One place to keep files, run tasks, deploy applications and manage game
                     servers, on hardware its operator owns rather than on somebody else&apos;s service. This is one such
-                    deployment, run by the person or organisation that installed it.
+                    deployment, run by the person or organization that installed it.
                 </p>
                 <p className="text-base leading-relaxed text-muted-foreground">
                     Everything past this page needs an account here, which its operator hands out. There is nothing to
@@ -74,7 +74,7 @@ export default function AboutPage() {
                     <CardBody className="flex flex-col gap-3">
                         <h2 className="text-xl font-medium tracking-tight">The software</h2>
                         <p className="text-base leading-relaxed text-muted-foreground">
-                            Polaris is open source, published under the Apache 2.0 licence. The people who write it
+                            Polaris is open source, published under the Apache 2.0 license. The people who write it
                             operate no service and never see this deployment: it runs entirely on its operator&apos;s
                             own machine.
                         </p>

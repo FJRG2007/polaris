@@ -8,7 +8,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
-import { setPresenceChoice } from "@/lib/presence-service";
+import * as core from "@polaris/core";
+import { setPresenceChoice, setStatus } from "@/lib/presence-service";
 import { userDisplayPreferencesSchema } from "@polaris/core";
 import { saveUserDisplayPreferences } from "@/lib/display-prefs-service";
 import { isPresenceDuration, PRESENCE_CHOICES, type PresenceChoice } from "@polaris/core";
@@ -50,5 +51,24 @@ export async function setPresenceAction(
     }
 
     await setPresenceChoice(user.id, wanted, isPresenceDuration(minutes) ? minutes : null);
+    return {};
+}
+
+/**
+ * Say what you are up to, and when it should clear itself.
+ *
+ * An empty line is how one is taken off, so it is not an error - the dialog's
+ * Clear button and a field somebody emptied are the same request. The window is
+ * only ever one of the offered ones: it arrives from a browser, and a request
+ * naming five years is refused rather than stored.
+ */
+export async function setStatusAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = core.userStatusSchema.safeParse(input);
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? "That status could not be saved" };
+    }
+
+    await setStatus(user.id, parsed.data.text, parsed.data.minutes);
     return {};
 }

@@ -309,3 +309,88 @@ export function isPresenceDuration(minutes: unknown): minutes is number {
         PRESENCE_DURATIONS.some((duration) => duration.minutes === minutes)
     );
 }
+
+/**
+ * The line an account chooses to show beside its name.
+ *
+ * A different question from the dot: the dot says whether to expect a reply, and
+ * this says why - "back Monday", "in the workshop". One sentence, because it is
+ * read in a list beside thirty other names and anything longer is a paragraph
+ * nobody finishes.
+ */
+export const MAX_STATUS = 100;
+
+export const statusField = z.string().trim().max(MAX_STATUS, `At most ${MAX_STATUS} characters`);
+
+/**
+ * How long a status holds before it clears itself.
+ *
+ * The reason the last entry is not the default: the status people forget. One
+ * set for an afternoon and still there the following week is worse than none at
+ * all, because everybody around them has stopped reading it and nobody is told.
+ * So the same ladder every client that solved this arrived at, and "until I
+ * clear it" is offered rather than assumed.
+ *
+ * Minutes rather than a moment, because it is chosen relative to now and the
+ * moment it lands on is the server's to work out.
+ */
+export const STATUS_DURATIONS = [
+    { minutes: 30, label: "In 30 minutes" },
+    { minutes: 60, label: "In 1 hour" },
+    { minutes: 4 * 60, label: "In 4 hours" },
+    { minutes: 24 * 60, label: "In 24 hours" },
+    { minutes: null, label: "Don't clear" }
+] as const;
+
+export type StatusDuration = (typeof STATUS_DURATIONS)[number]["minutes"];
+
+/** Whether a number is one of the windows offered, which is what stops a request
+ *  naming one nobody was given. */
+export function isStatusDuration(minutes: unknown): minutes is number {
+    return (
+        typeof minutes === "number" && STATUS_DURATIONS.some((entry) => entry.minutes === minutes)
+    );
+}
+
+/** Setting the line, and when it clears. Null minutes is "until I clear it";
+ *  an empty line clears it now, which is how it is taken off. */
+export const userStatusSchema = z.object({
+    text: statusField,
+    minutes: z
+        .number()
+        .nullable()
+        .refine((value) => value === null || isStatusDuration(value), "Not one of the windows offered")
+});
+
+export type UserStatusInput = z.infer<typeof userStatusSchema>;
+
+/**
+ * Whether a status is still standing, right now.
+ *
+ * Pure, and the whole rule, because three places ask it: the screen that draws
+ * somebody's line, the picker that shows the owner their own, and the write that
+ * decides whether to bother storing one. A lapsed status is not a status, and
+ * nothing sweeps them - which only works if everybody agrees on this function.
+ */
+export function statusInForce(
+    status: { readonly statusText: string; readonly statusUntil: Date | string | null },
+    now: Date = new Date()
+): boolean {
+    if (!status.statusText.trim()) return false;
+    if (!status.statusUntil) return true;
+    return new Date(status.statusUntil).getTime() > now.getTime();
+}
+
+/**
+ * What an account says about itself.
+ *
+ * Longer than a status and shorter than a page: it is read on a profile panel
+ * beside a conversation, where the conversation is the point and this is the
+ * context.
+ */
+export const MAX_DESCRIPTION = 280;
+
+export const descriptionField = z
+    .string()
+    .trim()
+    .max(MAX_DESCRIPTION, `At most ${MAX_DESCRIPTION} characters`);

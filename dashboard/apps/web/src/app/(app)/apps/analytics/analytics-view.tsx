@@ -712,10 +712,10 @@ function SettingsPanel({ data, mutate }: { data: AnalyticsOverview; mutate: Muta
                     <Switch
                         checked={settings.countBots}
                         onChange={(checked) => save({ ...settings, countBots: checked })}
-                        aria-label="Count recognised bots as visitors"
+                        aria-label="Count recognized bots as visitors"
                     />
                     <span className="flex flex-col gap-0.5">
-                        <span className="text-sm font-medium">Count recognised bots as visitors</span>
+                        <span className="text-sm font-medium">Count recognized bots as visitors</span>
                         <span className="text-xs text-muted-foreground">
                             Off, because a dashboard where a crawler outranks every real page is one nobody reads. The
                             firewall is where bot traffic is worth looking at.

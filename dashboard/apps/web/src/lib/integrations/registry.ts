@@ -325,7 +325,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         slug: "steam",
         name: "Steam",
         category: "Automation",
-        summary: "Let people link their Steam account, so game servers can recognise them.",
+        summary: "Let people link their Steam account, so game servers can recognize them.",
         description:
             "Steam needs nothing registered: it signs people in over OpenID, so the Connect button on everybody's account works the moment this is switched on. A Web API key is optional and buys one thing - the name and avatar beside a linked account, instead of a seventeen-digit number. An ARK server closed by Steam id can then be opened to somebody by their Polaris name.",
         docsUrl: "https://partner.steamgames.com/doc/features/auth",
@@ -344,7 +344,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         slug: "epic",
         name: "Epic Games",
         category: "Automation",
-        summary: "Let people link their Epic account, so game servers can recognise them.",
+        summary: "Let people link their Epic account, so game servers can recognize them.",
         description:
             "Register a product in Epic's developer portal and everyone here gets a Connect button for their own Epic account. Polaris reads the account id and the display name, which is what a server needs to tell one player from another. Games bought on the Epic Store carry no Steam id at all, so for those players this is the only id there is. The longest setup on this screen: Epic wants an application, a verified domain and a brand review before it will let anybody outside your own organisation authorize.",
         docsUrl: "https://dev.epicgames.com/docs/epic-account-services/getting-started",
@@ -352,7 +352,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
             {
                 label: "Create a product",
                 url: "https://dev.epicgames.com/portal",
-                help: "Everything else hangs off a product, so it is the first thing to make. The organisation it belongs to is created with your account."
+                help: "Everything else hangs off a product, so it is the first thing to make. The organization it belongs to is created with your account."
             },
             {
                 label: "Create a client, and register the redirect URI on it",
@@ -375,7 +375,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
             {
                 label: "Save the draft, then submit it for review",
                 url: "https://dev.epicgames.com/docs/epic-account-services/brand-review/brand-review-process",
-                help: "Until it passes, only accounts in your own organisation can authorize - everybody else is turned away, and your own sees an unverified warning it can click through. That is enough to finish this setup and prove it works; the review is what opens it to everyone else."
+                help: "Until it passes, only accounts in your own organization can authorize - everybody else is turned away, and your own sees an unverified warning it can click through. That is enough to finish this setup and prove it works; the review is what opens it to everyone else."
             },
             {
                 label: "Copy the client id and secret",
@@ -421,7 +421,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         docsUrl: "https://krisp.ai/developers/",
         setupLinks: [
             {
-                label: "Get the SDK and a licence",
+                label: "Get the SDK and a license",
                 url: "https://krisp.ai/developers/",
                 help: "Krisp licenses per seat and hands over a build to host yourself. Any filter published as a module with the same shape works here - it does not have to be theirs."
             }

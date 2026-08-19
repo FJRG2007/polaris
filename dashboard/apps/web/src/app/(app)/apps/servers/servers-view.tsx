@@ -110,7 +110,7 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                         `${unset.length} servers`
                     )}{" "}
                     {unset.length === 1 ? "lives" : "live"}: a home server behind a router and a
-                    data-centre box are exposed in different ways, so Polaris needs the answer
+                    data-center box are exposed in different ways, so Polaris needs the answer
                     before it can tell you how to point a domain.
                 </p>
             ) : null}

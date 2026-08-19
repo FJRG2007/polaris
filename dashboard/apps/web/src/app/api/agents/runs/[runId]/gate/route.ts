@@ -40,7 +40,7 @@ export async function POST(
     const { runId } = await params;
 
     const caller = await authenticateRun(request.headers);
-    if (!caller) return Response.json({ error: "not a recognised run" }, { status: 401 });
+    if (!caller) return Response.json({ error: "not a recognized run" }, { status: 401 });
     if (caller.runId !== runId) return Response.json({ error: "not that run" }, { status: 404 });
 
     const parsed = reportSchema.safeParse(await request.json().catch(() => null));

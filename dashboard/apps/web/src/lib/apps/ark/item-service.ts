@@ -68,7 +68,7 @@ export async function giveArkItem(
     request: ArkGiveRequest
 ): Promise<ArkGiveResult> {
     const item = findArkItem(request.key);
-    if (!item) throw new ArkGiveError("That is not an item this server's catalogue knows");
+    if (!item) throw new ArkGiveError("That is not an item this server's catalog knows");
     const quantity = Math.max(1, Math.min(MAX_ARK_GIVE, Math.trunc(request.quantity)));
     const quality = Math.max(0, Math.min(MAX_ARK_QUALITY, Math.trunc(request.quality)));
     const playerId = await requireArkPlayerId(ownerId, installedAppId, steamId);

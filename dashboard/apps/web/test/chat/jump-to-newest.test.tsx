@@ -69,7 +69,10 @@ vi.mock("@/app/(app)/chat/actions", () => ({
         return {};
     },
     receiptsAction: async () => ({ receipts: {} }),
-    readThreadAction: async () => ({ messages: [] })
+    readThreadAction: async () => ({ messages: [] }),
+    // The profile panel beside a direct message asks for this when it opens.
+    profileAction: async () => ({}),
+    voicePresenceAction: async () => ({ inRoom: {} })
 }));
 
 vi.mock("@/app/(app)/chat/meeting-actions", () => ({
@@ -105,7 +108,10 @@ vi.mock("@/app/(app)/chat/chat-context", () => ({
                 spaceId: null,
                 archived: false,
                 unreadCount: 0,
-                mayModerate: false
+                mayModerate: false,
+                // A one-to-one conversation is named after who is in it, and the
+                // profile panel beside it is drawn from the same list.
+                others: [{ id: "grace", name: "Grace" }]
             }
         ],
         spaces: [],

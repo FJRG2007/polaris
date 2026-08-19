@@ -179,7 +179,7 @@ function ColumnEditor({
                 <input
                     type="color"
                     value={draft.color}
-                    aria-label="Column colour"
+                    aria-label="Column color"
                     onChange={(event) => setDraft({ ...draft, color: event.target.value })}
                     className="size-8 cursor-pointer rounded border border-border bg-transparent"
                 />

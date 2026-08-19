@@ -23,6 +23,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import * as core from "@polaris/core";
 import { allowedBy } from "@/lib/privacy-service";
 import { reachableChannelIds } from "@/lib/chat/access";
 import { PARTICIPANT_TTL_MS } from "@/lib/chat/meetings";
@@ -44,6 +45,19 @@ const IDLE_MS = 15 * 60_000;
 
 export interface PresenceView {
     readonly status: Presence;
+    /**
+     * The line this person is showing, or empty when there is none to show.
+     *
+     * Empty for somebody who is offline, and that is the rule rather than a
+     * consequence: a status is what somebody is doing now, and "back in five
+     * minutes" under a grey dot is a sentence from an afternoon that has ended.
+     * Empty too once its own window has passed, which is worked out here
+     * because nothing sweeps them.
+     *
+     * Withheld from anybody the account does not show its presence to, for free:
+     * they are handed `offline`, and offline carries no line.
+     */
+    readonly note: string;
     /** The conversation of a call they are in, when the reader could walk into
      *  it too. Null when they are not in one, and null when they are in one the
      *  reader cannot reach - which is the same answer, because a call somebody
@@ -67,7 +81,13 @@ export async function presenceFor(
     const [people, sessions, calls, visible] = await Promise.all([
         prisma.user.findMany({
             where: { id: { in: wanted } },
-            select: { id: true, presence: true, presenceUntil: true }
+            select: {
+                id: true,
+                presence: true,
+                presenceUntil: true,
+                statusText: true,
+                statusUntil: true
+            }
         }),
         // The freshest session per account, from one query rather than one each:
         // ordering and taking the first per id in memory is cheaper than a
@@ -97,15 +117,23 @@ export async function presenceFor(
         if (!mine && !visible.has(person.id)) {
             // Not "unknown": there is no third colour, and a dot that is absent
             // for some people and grey for others says which is which.
-            answer.set(person.id, { status: "offline", inCall });
+            answer.set(person.id, { status: "offline", note: "", inCall });
             continue;
         }
+        const status = statusOf(
+            inForce(person.presence, person.presenceUntil, now),
+            seen.get(person.id),
+            now
+        );
         answer.set(person.id, {
-            status: statusOf(
-                inForce(person.presence, person.presenceUntil, now),
-                seen.get(person.id),
-                now
-            ),
+            status,
+            // Only while they are actually here. Both halves matter: a status
+            // whose window has passed is not a status, and one under a grey dot
+            // is a note from a day that is over.
+            note:
+                status !== "offline" && core.statusInForce(person, new Date(now))
+                    ? person.statusText.trim()
+                    : "",
             inCall
         });
     }
@@ -229,4 +257,50 @@ async function callsFor(
         if (!found.has(seat.userId!)) found.set(seat.userId!, channelId);
     }
     return found;
+}
+
+/**
+ * One person's own status, for the picker that sets it.
+ *
+ * Reports it as it stands rather than as it is stored: a window that has passed
+ * is no status, and showing somebody a line they set on Tuesday under a heading
+ * saying it is live would be the screen lying about their own account.
+ */
+export interface StatusView {
+    readonly text: string;
+    /** When it clears, or null for "until I clear it". Null too for one that has
+     *  already lapsed, which reads as no status at all. */
+    readonly until: string | null;
+}
+
+export async function ownStatus(userId: string): Promise<StatusView> {
+    const row = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { statusText: true, statusUntil: true }
+    });
+    if (!row || !core.statusInForce(row)) return { text: "", until: null };
+    return { text: row.statusText.trim(), until: row.statusUntil?.toISOString() ?? null };
+}
+
+/**
+ * Set the line, and when it clears itself.
+ *
+ * An empty line is how one is taken off, so it clears the window with it - a
+ * moment attached to nothing would be a rule about nothing. `minutes` null is
+ * "until I clear it", which is offered rather than assumed for the reason the
+ * ladder exists at all.
+ */
+export async function setStatus(
+    userId: string,
+    text: string,
+    minutes: number | null
+): Promise<void> {
+    const line = text.trim();
+    await prisma.user.update({
+        where: { id: userId },
+        data: {
+            statusText: line,
+            statusUntil: line && minutes !== null ? new Date(Date.now() + minutes * 60_000) : null
+        }
+    });
 }

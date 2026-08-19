@@ -9,7 +9,7 @@ import { CallHolder } from "@/components/call-holder";
 import { accessFor, requireUser } from "@/lib/session";
 import { AccountMenu } from "@/components/account-menu";
 import { DeniedNotice } from "@/components/denied-notice";
-import { presenceChoiceOf } from "@/lib/presence-service";
+import { ownStatus, presenceChoiceOf } from "@/lib/presence-service";
 import { ViewAsBanner } from "@/components/view-as-banner";
 import { AppNavDrawer } from "@/components/app-nav-drawer";
 import { ScopeSwitcher } from "@/components/scope-switcher";
@@ -54,15 +54,17 @@ const NO_CHAT_UNREAD = { messages: 0, conversations: 0 };
 export default async function AppLayout({ children }: { children: ReactNode }) {
     const user = await requireUser();
     const capabilities = getCapabilities();
-    const [notifications, display, baseUrl, apps, scope, organizations, presence] = await Promise.all([
+    const [notifications, display, baseUrl, apps, scope, organizations, presence, status] =
+        await Promise.all([
         listNotifications(user.id),
         resolveDisplayPreferencesFor(user.id),
         appBaseUrl(),
         reachableAppNav(accessFor(user)),
         resolveScope(user.id),
         scopeChoices(user.id),
-        presenceChoiceOf(user.id)
-    ]);
+            presenceChoiceOf(user.id),
+            ownStatus(user.id)
+        ]);
     // Seeded here rather than fetched by the provider, so the badge on the tab
     // icon is right on the first paint instead of appearing a second into the
     // page - which reads as a message that has just arrived when it has been
@@ -136,6 +138,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                                                 email={user.email}
                                                 presence={presence.choice}
                                                 presenceUntil={presence.until}
+                                                status={status.text}
+                                                statusUntil={status.until}
                                             />
                                         </>
                                     }

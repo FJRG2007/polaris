@@ -75,6 +75,7 @@ export async function updateProfileAction(input: {
     name?: string;
     username?: string | null;
     company?: string | null;
+    description?: string | null;
 }): Promise<{ error?: string }> {
     const user = await requireUser();
     if (await changesUsername(user.id, input.username)) {
@@ -84,7 +85,8 @@ export async function updateProfileAction(input: {
     const result = await updateUserProfile(user.id, {
         name: typeof input.name === "string" ? input.name : undefined,
         username: input.username === undefined ? undefined : (input.username ?? ""),
-        company: input.company === undefined ? undefined : (input.company ?? "")
+        company: input.company === undefined ? undefined : (input.company ?? ""),
+        description: input.description === undefined ? undefined : (input.description ?? "")
     });
     if (!result.error) revalidatePath("/account");
     return result;

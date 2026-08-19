@@ -290,7 +290,7 @@ function CreateDialog({
                         <input
                             type="color"
                             value={color}
-                            aria-label={what === "tag" ? "Tag colour" : "Status colour"}
+                            aria-label={what === "tag" ? "Tag color" : "Status color"}
                             onChange={(event) => setPicked(event.target.value)}
                             className="size-8 cursor-pointer rounded border border-border bg-transparent"
                         />

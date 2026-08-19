@@ -114,7 +114,7 @@ export const ARK_MOD_SHELVES: readonly ArkModShelf[] = [
             {
                 id: "632898827",
                 name: "Dino Colors Plus",
-                why: "Far more colours on wild creatures, and babies for species that had none.",
+                why: "Far more colors on wild creatures, and babies for species that had none.",
                 kind: "mod"
             }
         ]

@@ -8,16 +8,25 @@ import { signOut } from "@/lib/auth-client";
 import { Avatar } from "@/components/avatar";
 import { useDisplayFormat } from "@/components/display-format";
 import { usePresenceRefresh } from "@/components/presence-store";
-import { Bell, Check, Link2, LogOut, UserCog } from "lucide-react";
+import { Bell, Check, Link2, LogOut, MessageSquareText, UserCog } from "lucide-react";
 import { noteSignOutAction } from "@/app/(app)/account/sessions/actions";
-import { setPresenceAction } from "@/app/(app)/account/preferences/actions";
+import { setPresenceAction, setStatusAction } from "@/app/(app)/account/preferences/actions";
 import {
+    MAX_STATUS,
     PRESENCE_CHOICES,
     PRESENCE_DURATIONS,
     PRESENCE_LABELS,
+    STATUS_DURATIONS,
     type PresenceChoice
 } from "@polaris/core";
 import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -26,7 +35,9 @@ import {
     DropdownMenuSub,
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
-    DropdownMenuTrigger
+    DropdownMenuTrigger,
+    Input,
+    Select
 } from "@polaris/ui";
 
 /**
@@ -39,7 +50,9 @@ export function AccountMenu({
     name,
     email,
     presence,
-    presenceUntil
+    presenceUntil,
+    status,
+    statusUntil
 }: {
     id: string;
     name: string;
@@ -48,6 +61,11 @@ export function AccountMenu({
     presence: PresenceChoice;
     /** When that choice lapses, or null for "until I change it". */
     presenceUntil: string | null;
+    /** The line this account is showing, empty for none. Already resolved, so a
+     *  lapsed one arrives as empty rather than as something to un-set. */
+    status: string;
+    /** When that line clears, or null for "until I clear it". */
+    statusUntil: string | null;
 }) {
     const router = useRouter();
     const format = useDisplayFormat();
@@ -58,6 +76,25 @@ export function AccountMenu({
     /** How the status row currently being pressed was reached, which decides
      *  whether the press is a choice or only a way into the lengths. */
     const reached = useRef("");
+    /** Whether the status dialog is up, and what is in it. Held here rather than
+     *  inside the dialog so the menu can close on the way in - a dialog mounted
+     *  inside a menu is unmounted by the item that opens it. */
+    const [writing, setWriting] = useState(false);
+    const [line, setLine] = useState(status);
+    const [clears, setClears] = useState<number | null>(null);
+    const [saving, setSaving] = useState(false);
+
+    /** Store the line, or take it off. An empty one is the same request as
+     *  pressing Clear, which is why there is only one path out of here. */
+    const saveStatus = async (text: string, minutes: number | null) => {
+        setSaving(true);
+        setLine(text);
+        await setStatusAction({ text, minutes });
+        setSaving(false);
+        setWriting(false);
+        refreshPresence();
+        router.refresh();
+    };
 
     /**
      * Say what to appear as, and close.
@@ -93,10 +130,11 @@ export function AccountMenu({
     }
 
     return (
-        // Not modal, which is what makes the double press below possible: a
-        // modal menu takes the pointer away from everything behind it, its own
-        // trigger included, so the second press of a double never reaches the
-        // face it was aimed at.
+        <>
+        {/* Not modal, which is what makes the double press below possible: a
+            modal menu takes the pointer away from everything behind it, its own
+            trigger included, so the second press of a double never reaches the
+            face it was aimed at. */}
         <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
             <DropdownMenuTrigger
                 aria-label="Your account"
@@ -197,6 +235,23 @@ export function AccountMenu({
                     );
                 })}
                 <DropdownMenuSeparator />
+                {/* Under the four dots and above everything else, because it is
+                    the same question one answer further on: the dot says whether
+                    to expect a reply and this says why. */}
+                <DropdownMenuItem
+                    onSelect={() => {
+                        setLine(status);
+                        // Reopened on what is already set: a status standing
+                        // until it is cleared should not offer to start
+                        // expiring because the dialog was opened again.
+                        setClears(statusUntil ? nearestWindow(statusUntil) : null);
+                        setWriting(true);
+                    }}
+                >
+                    <MessageSquareText className="size-4" />
+                    <span className="min-w-0 truncate">{status || "Set a status"}</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                     <Link href="/account">
                         <UserCog className="size-4" />
@@ -221,6 +276,62 @@ export function AccountMenu({
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Outside the menu, which closes on the item that opens this: a dialog
+            mounted inside one is unmounted the moment it is asked for. */}
+        <Dialog open={writing} onOpenChange={setWriting}>
+            <DialogContent className="max-w-sm">
+                <DialogHeader>
+                    <DialogTitle>Set a status</DialogTitle>
+                    <DialogDescription>
+                        Shown beside your name while you are online.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-3">
+                    <Input
+                        autoFocus
+                        value={line}
+                        maxLength={MAX_STATUS}
+                        placeholder="What are you up to?"
+                        onChange={(event) => setLine(event.target.value)}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") void saveStatus(line, clears);
+                        }}
+                    />
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Clear</span>
+                        <Select
+                            value={String(clears)}
+                            aria-label="When the status clears"
+                            options={STATUS_DURATIONS.map((duration) => ({
+                                value: String(duration.minutes),
+                                label: duration.label
+                            }))}
+                            onValueChange={(value) =>
+                                setClears(value === "null" ? null : Number(value))
+                            }
+                        />
+                    </label>
+                </div>
+                <DialogFooter>
+                    {/* Only where there is one to take off. A Clear that clears
+                        nothing is a button that does nothing. */}
+                    {status && (
+                        <Button
+                            variant="ghost"
+                            disabled={saving}
+                            onClick={() => void saveStatus("", null)}
+                        >
+                            Clear it
+                        </Button>
+                    )}
+                    <Button disabled={saving} onClick={() => void saveStatus(line, clears)}>
+                        Save
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+        </>
     );
 }
 
@@ -232,3 +343,27 @@ const PRESENCE_DOTS: Record<PresenceChoice, string> = {
     away: "bg-warning",
     invisible: "bg-border-strong"
 };
+
+/**
+ * Which of the offered windows a stored moment is closest to.
+ *
+ * The moment is stored, not the window that produced it, so reopening the dialog
+ * has to work backwards. Closest rather than exact, because time has passed
+ * since it was set - and the alternative, showing "Don't clear" over a status
+ * that plainly does, would be the dialog contradicting itself.
+ */
+function nearestWindow(until: string): number | null {
+    const left = (new Date(until).getTime() - Date.now()) / 60_000;
+    if (left <= 0) return null;
+    let closest: number | null = null;
+    let best = Infinity;
+    for (const duration of STATUS_DURATIONS) {
+        if (duration.minutes === null) continue;
+        const distance = Math.abs(duration.minutes - left);
+        if (distance < best) {
+            best = distance;
+            closest = duration.minutes;
+        }
+    }
+    return closest;
+}

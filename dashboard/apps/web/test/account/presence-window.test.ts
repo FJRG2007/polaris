@@ -18,7 +18,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const NOW = new Date("2026-08-16T12:00:00Z");
 
 /** The one account every test reads. */
-let person: { id: string; presence: string; presenceUntil: Date | null };
+let person: {
+    id: string;
+    presence: string;
+    presenceUntil: Date | null;
+    statusText: string;
+    statusUntil: Date | null;
+};
 
 /** When their newest session was last active. Fresh, so `auto` is "online" and
  *  a lapsed choice is visibly different from a held one. */
@@ -58,7 +64,15 @@ beforeEach(() => {
     vi.setSystemTime(NOW);
     written = null;
     lastSeenAt = new Date(NOW.getTime() - 30_000);
-    person = { id: "ada", presence: "busy", presenceUntil: null };
+    person = {
+        id: "ada",
+        presence: "busy",
+        presenceUntil: null,
+        // The line beside the dot has its own test; here it is only what a row
+        // actually carries, so nothing reads a column that is not there.
+        statusText: "",
+        statusUntil: null
+    };
 });
 
 describe("a status with no window", () => {

@@ -20,7 +20,7 @@ export default async function AccountPage() {
     const [user, photo, emails, mail, phone, whatsappChannel] = await Promise.all([
         prisma.user.findUnique({
             where: { id: session.id },
-            select: { name: true, username: true, company: true }
+            select: { name: true, username: true, company: true, description: true }
         }),
         // Only whether there is one to replace or remove; the picture itself is
         // fetched by the browser like every other face on the page.
@@ -47,6 +47,7 @@ export default async function AccountPage() {
                 name={user?.name ?? session.name}
                 username={user?.username ?? ""}
                 company={user?.company ?? ""}
+                description={user?.description ?? ""}
                 emails={emails}
                 mailReady={mail.channelId !== null}
                 phone={phone}

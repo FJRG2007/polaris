@@ -71,7 +71,7 @@ export async function PATCH(
     const { runId } = await params;
 
     const caller = await authenticateRun(request.headers);
-    if (!caller) return Response.json({ error: "not a recognised run" }, { status: 401 });
+    if (!caller) return Response.json({ error: "not a recognized run" }, { status: 401 });
 
     // Either identifier is accepted, and both have to be about the caller. A
     // path naming somebody else's job is refused rather than quietly writing to

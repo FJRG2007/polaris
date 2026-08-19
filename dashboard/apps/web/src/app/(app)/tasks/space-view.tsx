@@ -321,7 +321,7 @@ function StatusesTab({
                             <input
                                 type="color"
                                 value={draft.color}
-                                aria-label="Status colour"
+                                aria-label="Status color"
                                 onChange={(event) =>
                                     setDraft({ ...draft, color: event.target.value })
                                 }
@@ -454,7 +454,7 @@ function StatusesTab({
                     <input
                         type="color"
                         value={color}
-                        aria-label="Status colour"
+                        aria-label="Status color"
                         onChange={(event) => setColor(event.target.value)}
                         className="h-8 w-12 rounded border border-border bg-field"
                     />
@@ -674,7 +674,7 @@ function TagsTab({
                     <input
                         type="color"
                         value={color}
-                        aria-label="Tag colour"
+                        aria-label="Tag color"
                         onChange={(event) => setColor(event.target.value)}
                         className="h-8 w-12 rounded border border-border bg-field"
                     />

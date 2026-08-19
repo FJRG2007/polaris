@@ -105,7 +105,7 @@ export function ServerGroups({ servers }: { servers: readonly { id: string; name
                         <Input
                             autoFocus
                             value={draftName}
-                            placeholder="e.g. Data centre"
+                            placeholder="e.g. Data center"
                             onChange={(event) => setDraftName(event.target.value)}
                             onKeyDown={(event) => {
                                 if (event.key === "Enter") {

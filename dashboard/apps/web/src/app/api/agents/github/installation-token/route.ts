@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request): Promise<Response> {
     const caller = await authenticateRun(request.headers);
-    if (!caller) return Response.json({ error: "not a recognised run" }, { status: 401 });
+    if (!caller) return Response.json({ error: "not a recognized run" }, { status: 401 });
 
     const owner = caller.repoFullName.split("/")[0] ?? "";
     const token = await githubAppInstallationToken(owner).catch(() => null);

@@ -119,7 +119,7 @@ export async function deleteUsageLimitAction(input: unknown): Promise<{ error?: 
 export async function refreshModelCatalogAction(): Promise<{ models?: number; at?: string; error?: string }> {
     const admin = await requireAdmin();
     const result = await refreshModelCatalog();
-    if (!result.ok) return { error: result.error ?? "The catalogue could not be read." };
+    if (!result.ok) return { error: result.error ?? "The catalog could not be read." };
     await recordAudit({
         actorId: admin.id,
         action: "agents.catalog.refresh",

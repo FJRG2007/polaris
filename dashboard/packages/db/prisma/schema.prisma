@@ -41,6 +41,10 @@ model User {
     image         String?
     // Free-text organisation the account belongs to; shown on the profile only.
     company       String?
+    // What this account says about itself, in its own words. Shown wherever a
+    // profile is opened - the panel beside a direct message, the card on a name -
+    // and nowhere it would be mistaken for something Polaris asserts.
+    description   String   @default("")
     // How this account wants dates, times, temperatures and money written, as
     // stringified JSON holding only the fields it actually chose. Absent fields
     // (and a null column) follow the platform default.
@@ -63,6 +67,17 @@ model User {
     // or choosing not to be seen at all - and they outrank what the sessions
     // say, because that is the whole point of choosing one.
     presence      String   @default("auto")
+    // A line this account is choosing to show: "back on Monday", "heads down".
+    // Separate from `presence` on purpose, and the two are answers to different
+    // questions - one is whether to expect a reply, the other is why. Empty is
+    // no status, which is what almost everybody has almost always.
+    statusText    String   @default("")
+    // When that line clears itself. Null means "until I clear it", which is the
+    // one people forget: a status set for an afternoon and still there a week
+    // later is worse than none, because everybody has stopped reading it. A
+    // lapsed one is worked out on read rather than swept by a job - nothing has
+    // to run for it to be right.
+    statusUntil   DateTime?
     // When that choice stops applying, after which the account is back on `auto`.
     // Null means "until I change it", which is what a status set with no window
     // is. It exists because of the status people forget: do not disturb put on

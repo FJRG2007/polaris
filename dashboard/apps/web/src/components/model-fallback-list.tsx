@@ -35,19 +35,19 @@ export function ModelFallbackList({
     // call for the session, so this is the same one request either way, and a
     // slug the catalogue does not carry renders as itself - which is exactly
     // what a hand-typed specifier is.
-    const [catalogue, setCatalogue] = useState<PickerModel[]>([]);
+    const [catalog, setCatalog] = useState<PickerModel[]>([]);
     useEffect(() => {
         let live = true;
         void loadModels()
             .then((rows) => {
-                if (live) setCatalogue(rows);
+                if (live) setCatalog(rows);
             })
             .catch(() => undefined);
         return () => {
             live = false;
         };
     }, [loadModels]);
-    const known = useMemo(() => new Map(catalogue.map((row) => [row.slug, row])), [catalogue]);
+    const known = useMemo(() => new Map(catalog.map((row) => [row.slug, row])), [catalog]);
     const list = value ?? [];
 
     const move = (from: number, to: number) => {

@@ -26,6 +26,8 @@
 import * as actions from "./actions";
 import { useChat } from "./chat-context";
 import { Avatar } from "@/components/avatar";
+import { usePresence } from "@/components/presence-store";
+import { useWideScreen, WIDE_ENOUGH } from "./use-wide-screen";
 import { MemberMenu, type MenuPerson } from "./member-menu";
 import { useOpenDirect } from "./use-open-direct";
 import { NicknameDialog } from "./nickname-dialog";
@@ -41,17 +43,6 @@ import {
     Skeleton,
     cn
 } from "@polaris/ui";
-
-/**
- * Where the conversation is wide enough to give up 14rem of it.
- *
- * `lg`, not the `md` where the rest of the chat splits its columns: at `md` the
- * spaces rail and the conversation list are already showing, so 768px of screen
- * is 536px of furniture and a column here would leave the messages 232px - a
- * conversation four words wide. At 1024 there is 488px left for it, which is a
- * conversation. Below that the same list opens as a dialog instead.
- */
-const WIDE_ENOUGH = "(min-width: 1024px)";
 
 /** Where the choice to hide it is kept. Per browser and nothing else: it is a
  *  preference about a screen, not a fact about an account. */
@@ -70,21 +61,6 @@ const ROLE_WORDS: Record<string, string> = { admin: "Admin" };
 interface Roster {
     readonly members: readonly ChatMemberView[];
     readonly loading: boolean;
-}
-
-/** True once the conversation has room for a column beside it. False on the
- *  server and on the first paint, so nothing is drawn that is about to be
- *  removed. */
-function useWideScreen(): boolean {
-    const [wide, setWide] = useState(false);
-    useEffect(() => {
-        const query = window.matchMedia(WIDE_ENOUGH);
-        setWide(query.matches);
-        const onChange = (event: MediaQueryListEvent) => setWide(event.matches);
-        query.addEventListener("change", onChange);
-        return () => query.removeEventListener("change", onChange);
-    }, []);
-    return wide;
 }
 
 /**
@@ -218,25 +194,87 @@ function MemberRows({
                 </p>
             )}
             <ul className="flex flex-col gap-0.5 p-2">
-                {members.map((member) => {
-                    const you = member.userId === viewerId;
-                    const role = ROLE_WORDS[member.role];
-                    return (
+                {members.map((member) => (
+                    <MemberRow
+                        key={member.userId}
+                        member={member}
+                        you={member.userId === viewerId}
+                        channel={channel}
+                        viewerId={viewerId}
+                        busy={direct.busy}
+                        onOpen={() => void direct.open(member.userId)}
+                        onMention={onMention}
+                        onNickname={setNaming}
+                        onChanged={onChanged}
+                        onError={setError}
+                    />
+                ))}
+            </ul>
+
+            <NicknameDialog
+                open={naming !== null}
+                person={naming ? { id: naming.userId, name: naming.name } : null}
+                onOpenChange={(open) => !open && setNaming(null)}
+                onSaved={onChanged}
+            />
+        </>
+    );
+}
+
+/**
+ * One person in the roster.
+ *
+ * Its own component because it reads presence, and presence is per person: a
+ * hook inside the loop above would be a hook called a different number of times
+ * whenever somebody joins the room.
+ */
+function MemberRow({
+    member,
+    you,
+    channel,
+    viewerId,
+    busy,
+    onOpen,
+    onMention,
+    onNickname,
+    onChanged,
+    onError
+}: {
+    member: ChatMemberView;
+    you: boolean;
+    channel: ChatChannelView;
+    viewerId: string;
+    busy: boolean;
+    onOpen: () => void;
+    onMention: (text: string) => void;
+    onNickname: (person: MenuPerson) => void;
+    onChanged: () => void;
+    onError: (message: string) => void;
+}) {
+    const role = ROLE_WORDS[member.role];
+    // What they are showing right now. Already on screen for the avatar's dot,
+    // so this costs nothing: the store asked about them either way.
+    const where = usePresence(member.userId);
+    // The line wins over the role when there is one. A role is a fact that does
+    // not change; a status is what somebody is doing this afternoon, and two
+    // lines under a name in a 14rem column is a wall.
+    const under = where?.note || role;
+    return (
                         <li key={member.userId}>
                             <MemberMenu
                                 member={member}
                                 channel={channel}
                                 viewerId={viewerId}
                                 onMention={onMention}
-                                onNickname={setNaming}
+                                onNickname={onNickname}
                                 onChanged={onChanged}
-                                onError={setError}
+                                onError={onError}
                             >
                             <button
                                 type="button"
-                                disabled={you || direct.busy}
+                                disabled={you || busy}
                                 title={you ? member.name : `Message ${member.name}`}
-                                onClick={() => void direct.open(member.userId)}
+                                onClick={onOpen}
                                 className={cn(
                                     "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors",
                                     you ? "cursor-default" : "hover:bg-card-hover disabled:opacity-70"
@@ -260,26 +298,18 @@ function MemberRows({
                                             />
                                         )}
                                     </span>
-                                    {role && (
-                                        <span className="block text-[11px] text-muted-foreground">
-                                            {role}
+                                    {under && (
+                                        <span
+                                            className="block truncate text-[11px] text-muted-foreground"
+                                            title={under}
+                                        >
+                                            {under}
                                         </span>
                                     )}
                                 </span>
                             </button>
                             </MemberMenu>
                         </li>
-                    );
-                })}
-            </ul>
-
-            <NicknameDialog
-                open={naming !== null}
-                person={naming ? { id: naming.userId, name: naming.name } : null}
-                onOpenChange={(open) => !open && setNaming(null)}
-                onSaved={onChanged}
-            />
-        </>
     );
 }
 
