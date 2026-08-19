@@ -114,6 +114,13 @@ vi.mock("@polaris/db", () => {
     return { prisma: client };
 });
 
+// Imported once, at module scope, rather than inside the first test that needs
+// it. Pulling the whole message module in behind a timeout meant the first test
+// in this file paid for compiling it out of its own budget - which is fine on an
+// idle machine and times out on a busy one, and reads as this test being broken
+// rather than as the suite being loaded.
+const { decorateMessages, forward } = await import("@/lib/chat/messages");
+
 const ada = { id: "ada" };
 
 beforeEach(() => {
@@ -125,13 +132,11 @@ beforeEach(() => {
 
 describe("a message from somebody who allows it", () => {
     it("is offered as forwardable", async () => {
-        const { decorateMessages } = await import("@/lib/chat/messages");
         const [view] = await decorateMessages(ada, [original]);
         expect(view?.forwardable).toBe(true);
     });
 
     it("is forwarded", async () => {
-        const { forward } = await import("@/lib/chat/messages");
         await forward(ada, { messageId: "message-1", channelId: "channel-2", note: "" });
         expect(created).toBe(1);
     });
@@ -143,7 +148,6 @@ describe("a message from somebody who does not", () => {
     });
 
     it("is not offered", async () => {
-        const { decorateMessages } = await import("@/lib/chat/messages");
         const [view] = await decorateMessages(ada, [original]);
         expect(view?.forwardable).toBe(false);
     });
@@ -151,7 +155,6 @@ describe("a message from somebody who does not", () => {
     it("is refused if it is asked for anyway", async () => {
         // The hidden button is where somebody finds out; this is where it is
         // true. An action anybody can call is the actual interface.
-        const { forward } = await import("@/lib/chat/messages");
         await expect(
             forward(ada, { messageId: "message-1", channelId: "channel-2", note: "" })
         ).rejects.toThrow(/passed on/);
@@ -161,14 +164,12 @@ describe("a message from somebody who does not", () => {
 
 describe("a message nobody is left to ask", () => {
     it("is forwardable when its author deleted their account", async () => {
-        const { decorateMessages } = await import("@/lib/chat/messages");
         original.authorId = null;
         const [view] = await decorateMessages(ada, [original]);
         expect(view?.forwardable).toBe(true);
     });
 
     it("is not, once it has been taken back", async () => {
-        const { decorateMessages } = await import("@/lib/chat/messages");
         original.deletedAt = SENT;
         const [view] = await decorateMessages(ada, [original]);
         expect(view?.forwardable).toBe(false);

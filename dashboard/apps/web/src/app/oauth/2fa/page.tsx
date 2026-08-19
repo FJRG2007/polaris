@@ -10,9 +10,11 @@
  * methods any address has.
  */
 
-import { challengeOptions, type ChallengeOptions } from "@/lib/two-factor-delivery";
-import { pendingTwoFactorUserId } from "@/lib/two-factor-challenge";
+import { redirect } from "next/navigation";
+import { resolveSession } from "@/lib/session";
 import { TwoFactorView } from "./two-factor-view";
+import { pendingTwoFactorUserId } from "@/lib/two-factor-challenge";
+import { challengeOptions, type ChallengeOptions } from "@/lib/two-factor-delivery";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,13 @@ const AUTHENTICATOR_ONLY: ChallengeOptions = {
 
 export default async function TwoFactorPage() {
     const userId = await pendingTwoFactorUserId();
+
+    // Nothing left to answer, and a session already in hand. The fallback below
+    // exists for somebody mid-sign-in whose challenge cannot be resolved from
+    // here - it was never meant for somebody who is already in, and showing them
+    // a code field that cannot succeed is a dead end with no way out of it.
+    if (!userId && (await resolveSession().catch(() => null))) redirect("/");
+
     const options = userId ? await challengeOptions(userId) : AUTHENTICATOR_ONLY;
     return <TwoFactorView options={options.methods.length > 0 ? options : AUTHENTICATOR_ONLY} />;
 }

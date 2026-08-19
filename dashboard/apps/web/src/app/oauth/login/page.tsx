@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { hasAnyUser } from "@polaris/auth";
+import { resolveSession } from "@/lib/session";
 import { CONNECTION_PROVIDERS } from "@polaris/core";
+import { safeRedirect } from "./post-login-target";
 import { LoginForm, type SignInProvider } from "./login-form";
 import { connectionSignInOffered } from "@/lib/connections/oauth";
 import { pendingTwoFactorUserId } from "@/lib/two-factor-challenge";
@@ -27,13 +29,33 @@ async function signInProviders(): Promise<SignInProvider[]> {
     return offered.filter((provider): provider is SignInProvider => provider !== null);
 }
 
-export default async function LoginPage() {
+export default async function LoginPage({
+    searchParams
+}: {
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
     // A sign-in already half done belongs on the challenge screen, not back at the
     // password field. An emailed link lands here for that reason: the link stands
     // in for the password, so what is left to answer is the second factor. The
     // challenge screen can send somebody back here deliberately, which drops the
     // challenge first so this does not bounce them straight into it again.
     if (await pendingTwoFactorUserId()) redirect("/oauth/2fa");
+
+    // Already signed in. Asking again is not a safe default, it is a dead end:
+    // there is nothing this screen can do that has not been done, and the person
+    // typing has no way to tell that the session they already have is the answer.
+    // Sent where the sign-in would have sent them, so a link with a destination
+    // on it - the one a bookmark or a shared address carries - still lands there
+    // rather than dropping them on the dashboard root.
+    //
+    // Checked after the challenge above, which is the more specific state: a
+    // session plus a live challenge is somebody deliberately signing in as
+    // somebody else, and that belongs at the challenge.
+    const params = await searchParams;
+    const session = await resolveSession().catch(() => null);
+    if (session) {
+        redirect(safeRedirect(typeof params.redirect === "string" ? params.redirect : null));
+    }
     // Where to get an account from is only worth saying while there is no way in
     // at all. Once the instance has its first account the answer is "ask whoever
     // runs it", and the setup command has stopped working anyway.

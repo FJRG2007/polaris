@@ -12,6 +12,21 @@
  * Drive, and one that has nothing still has to land somewhere.
  */
 export function postLoginTarget(): string {
-    const redirect = new URLSearchParams(window.location.search).get("redirect");
-    return redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/";
+    return safeRedirect(new URLSearchParams(window.location.search).get("redirect"));
+}
+
+/**
+ * The same rule, over a value somebody else has already read out.
+ *
+ * Pure, so the sign-in page can apply it on the server when it turns an
+ * already-signed-in visitor around, and so there is one implementation of what
+ * counts as a safe destination. A second copy of this is how a sign-in screen
+ * becomes an open redirect: the one place it is written is the place it gets
+ * audited.
+ *
+ * A path on this origin, or the dashboard root. `//host` is refused because a
+ * browser reads it as a URL on another site, which is the whole attack.
+ */
+export function safeRedirect(target: string | null | undefined): string {
+    return target && target.startsWith("/") && !target.startsWith("//") ? target : "/";
 }
