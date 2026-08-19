@@ -27,9 +27,30 @@ export function referenced(
     return new Map(
         message.references.map((found) => [
             `${found.kind}/${found.id}`,
-            { reachable: found.reachable, label: labelOf(found) }
+            {
+                reachable: found.reachable,
+                label: labelOf(found),
+                // Anything drawn in full underneath comes out of the sentence.
+                // The address said nothing the card does not say better, and
+                // leaving it in is the same thing twice - once as a link nobody
+                // wants to follow.
+                hidden: hasCard(found)
+            }
         ])
     );
+}
+
+/**
+ * Whether this reference is drawn as a card under the message.
+ *
+ * Here rather than in the list that draws them, because two things have to agree
+ * about it: what gets a card, and what comes out of the text. Splitting them is
+ * how you end up with an address in the sentence and nothing underneath, or a
+ * card with the address still sitting above it.
+ */
+export function hasCard(found: ChatReferenceView): boolean {
+    if (!found.reachable) return false;
+    return found.kind === "message" || (found.kind === "channel" && found.channelKind === "voice");
 }
 
 /**

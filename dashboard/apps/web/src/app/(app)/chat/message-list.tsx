@@ -24,9 +24,10 @@ import { VoiceNote } from "./voice-note";
 import { useChat } from "./chat-context";
 import { Avatar } from "@/components/avatar";
 import { MessageMenu } from "./message-menu";
-import { referenced } from "./message-references";
+import { hasCard, referenced } from "./message-references";
 import { ReportDialog } from "./report-dialog";
 import { NicknameDialog } from "./nickname-dialog";
+import { useAppUrl } from "@/components/app-url";
 import { useOpenDirect } from "./use-open-direct";
 import { MemberMenu, type MenuPerson } from "./member-menu";
 import { usableAccent } from "@/lib/chat/accent";
@@ -456,6 +457,7 @@ function Message({
     onError: (message: string) => void;
 }) {
     const format = useDisplayFormat();
+    const baseUrl = useAppUrl();
     const [showingHistory, setShowingHistory] = useState(false);
     // Per message and not remembered. Looking at one thing somebody blocked said
     // is not a decision to start reading them again, and a reveal that outlived
@@ -629,7 +631,11 @@ function Message({
                         </p>
                     ) : (
                         <div className="text-sm">
-                            <RichText value={message.body} references={referenced(message)} />
+                            <RichText
+                                value={message.body}
+                                origin={baseUrl}
+                                references={referenced(message)}
+                            />
                             {/* Under the last message of a block only. Five ticks
                             down a run of five messages say the same thing five
                             times, and seeing the newest is seeing the rest. */}
@@ -1033,13 +1039,11 @@ function ReferenceCards({
      *  conversation by the list above. */
     inRoom: ReadonlyMap<string, readonly VoicePresence[]>;
 }) {
-    const cards = message.references
-        .filter(
-            (found) =>
-                found.reachable &&
-                (found.kind === "message" || (found.kind === "channel" && found.channelKind === "voice"))
-        )
-        .slice(0, MOST_CARDS);
+    const cards = message.references.filter(hasCard).slice(0, MOST_CARDS);
+    // Called before the early return, which is where a hook has to be.
+    const { channels } = useChat();
+    const room = channels.find((channel) => channel.id === message.channelId);
+    const here = room ? { channelId: room.id, spaceId: room.spaceId } : null;
     if (cards.length === 0) return null;
 
     return (
@@ -1049,7 +1053,7 @@ function ReferenceCards({
                     {found.kind === "channel" ? (
                         <VoiceCard reference={found} inRoom={inRoom.get(found.id) ?? []} />
                     ) : (
-                        <QuotedMessageCard reference={found} />
+                        <QuotedMessageCard reference={found} here={here} />
                     )}
                 </li>
             ))}
@@ -1090,23 +1094,76 @@ function VoiceCard({
     );
 }
 
-/** A message from somewhere else, quoted where it was pasted. The same shape as
- *  a reply's quote line, one size up, because it is the same act. */
-function QuotedMessageCard({ reference }: { reference: ChatReferenceView }) {
+/**
+ * Where a quoted message is, said only where it is not obvious.
+ *
+ * Every part that matches where the reader already is comes out. Somebody
+ * reading a quote of a message from the same conversation does not need to be
+ * told the name of the conversation they are looking at, and being told the
+ * server they are already in is a breadcrumb that says nothing. What is left is
+ * exactly the part that is news: the channel, when it is another one; the
+ * server, when it is another server; nothing at all, when it is right here.
+ */
+function whereFrom(
+    reference: ChatReferenceView,
+    here: { channelId: string; spaceId: string | null } | null
+): string {
+    if (here && reference.channelId === here.channelId) return "";
+    const parts: string[] = [];
+    if (reference.spaceName && reference.spaceId !== (here?.spaceId ?? "")) {
+        parts.push(reference.spaceName);
+    }
+    if (reference.name) {
+        parts.push(reference.channelKind === "text" ? `#${reference.name}` : reference.name);
+    }
+    return parts.join(" / ");
+}
+
+/** What a message with no words in it is. A picture is a message, and "No text"
+ *  under somebody's name describes nothing anybody wanted to know. */
+function saidWhat(reference: ChatReferenceView): string {
+    if (reference.excerpt) return reference.excerpt;
+    if (reference.attachments === 1) return "1 attachment";
+    if (reference.attachments > 1) return `${reference.attachments} attachments`;
+    return "No text";
+}
+
+/**
+ * A message from somewhere else, quoted where it was pasted.
+ *
+ * Drawn as the message rather than as a link to it, which is the whole point:
+ * the address said nothing, and this says what was said. It stays a link, so
+ * pressing it lands on the line itself.
+ *
+ * What it shows is resolved every time it is read, never stored - so a message
+ * edited after somebody pasted it reads as it is now, not as it was when the
+ * link was made.
+ */
+function QuotedMessageCard({
+    reference,
+    here
+}: {
+    reference: ChatReferenceView;
+    /** The conversation this card is being drawn in, which is what decides how
+     *  much of the breadcrumb is worth saying. */
+    here: { channelId: string; spaceId: string | null } | null;
+}) {
+    const from = whereFrom(reference, here);
+
     return (
         <Link
             href={`/chat/c/${reference.channelId}/${reference.id}`}
-            className="block max-w-md rounded-md border border-border bg-surface px-3 py-2 no-underline hover:bg-card-hover"
+            className="block max-w-md rounded-md border-l-2 border-primary bg-primary/5 px-3 py-2 no-underline transition-colors hover:bg-primary/10"
         >
+            {from && (
+                <span className="mb-0.5 block truncate text-[11px] text-foreground-subtle">
+                    {from}
+                </span>
+            )}
             <span className="flex items-baseline gap-2">
                 <span className="truncate text-xs font-medium">
                     {reference.authorName || "Somebody who has left"}
                 </span>
-                {reference.name && (
-                    <span className="truncate text-[11px] text-foreground-subtle">
-                        in {reference.name}
-                    </span>
-                )}
                 {reference.at && (
                     <span className="shrink-0 text-[11px] text-foreground-subtle">
                         <RelativeTime iso={reference.at} />
@@ -1114,7 +1171,7 @@ function QuotedMessageCard({ reference }: { reference: ChatReferenceView }) {
                 )}
             </span>
             <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                {reference.excerpt || "No text"}
+                {saidWhat(reference)}
             </span>
         </Link>
     );

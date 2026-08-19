@@ -40,6 +40,16 @@ export interface ResolvedReference {
     readonly reachable: boolean;
     /** What it is called now. Ignored when it is out of reach. */
     readonly label: string;
+    /**
+     * Take it out of the text altogether.
+     *
+     * For a reference that is drawn in full underneath - a message quoted in a
+     * card, say. Leaving the address in the sentence as well would be the same
+     * thing twice, once as a link nobody wants to follow and once as the thing
+     * itself. A paragraph left empty by the removal goes with it, so a message
+     * that was only an address renders as the card alone.
+     */
+    readonly hidden?: boolean;
 }
 
 export function RichText({
@@ -59,13 +69,12 @@ export function RichText({
      *  in the map keeps the label it was written with. */
     references?: ReadonlyMap<string, ResolvedReference>;
 }) {
-    const doc = markdownToDoc(value, origin);
     if (!value.trim()) return null;
-    return (
-        <div className={cn(RICH_TEXT_PROSE, className)}>
-            {blocks(references ? resolve(doc, references).content : doc.content)}
-        </div>
-    );
+    const doc = references ? resolve(markdownToDoc(value, origin), references) : markdownToDoc(value, origin);
+    // Everything it said was an address that is drawn underneath instead. The
+    // blank line that would otherwise sit above the card is not worth a div.
+    if ((doc.content ?? []).length === 0) return null;
+    return <div className={cn(RICH_TEXT_PROSE, className)}>{blocks(doc.content)}</div>;
 }
 
 /**
@@ -76,9 +85,13 @@ export function RichText({
  * through five levels of recursion to reach it.
  */
 function resolve(doc: JSONContent, references: ReadonlyMap<string, ResolvedReference>): JSONContent {
-    const walk = (node: JSONContent): JSONContent => {
+    /** A node the resolution removed, rather than one it rewrote. */
+    const GONE = null;
+
+    const walk = (node: JSONContent): JSONContent | typeof GONE => {
         if (node.type === REFERENCE && node.attrs?.kind && node.attrs?.id) {
             const found = references.get(`${String(node.attrs.kind)}/${String(node.attrs.id)}`);
+            if (found?.hidden) return GONE;
             if (found) {
                 return {
                     ...node,
@@ -91,9 +104,16 @@ function resolve(doc: JSONContent, references: ReadonlyMap<string, ResolvedRefer
             }
         }
         if (!node.content) return node;
-        return { ...node, content: node.content.map(walk) };
+        const content = node.content
+            .map(walk)
+            .filter((child): child is JSONContent => child !== GONE);
+        // A paragraph whose only content was a removed address is a blank line
+        // where the card is about to be. The document itself is never dropped:
+        // an empty one renders as nothing, which is the answer.
+        if (content.length === 0 && node.content.length > 0 && node.type !== "doc") return GONE;
+        return { ...node, content };
     };
-    return walk(doc);
+    return walk(doc) ?? { type: "doc", content: [] };
 }
 
 function blocks(nodes: readonly JSONContent[] | undefined): React.ReactNode {

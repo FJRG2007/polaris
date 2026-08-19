@@ -18,6 +18,8 @@ interface ChannelRow {
     id: string;
     name: string;
     kind: string;
+    spaceId: string | null;
+    space: { name: string } | null;
     members: { userId: string; user: { name: string } }[];
 }
 
@@ -29,6 +31,7 @@ interface MessageRow {
     channelId: string;
     deletedAt: Date | null;
     createdAt: Date;
+    _count: { attachments: number };
 }
 
 const VOICE = "0193aaaa-1111-4222-8333-444444444444";
@@ -39,9 +42,16 @@ const SAID = "0193bbbb-5555-4666-8777-888888888888";
 let reachable = new Set<string>();
 
 const channels: ChannelRow[] = [
-    { id: VOICE, name: "Standup", kind: "voice", members: [] },
-    { id: SECRET, name: "Payroll", kind: "text", members: [] },
-    { id: ROOM, name: "General", kind: "text", members: [] }
+    { id: VOICE, name: "Standup", kind: "voice", spaceId: null, space: null, members: [] },
+    { id: SECRET, name: "Payroll", kind: "text", spaceId: null, space: null, members: [] },
+    {
+        id: ROOM,
+        name: "General",
+        kind: "text",
+        spaceId: "s1",
+        space: { name: "Testing" },
+        members: []
+    }
 ];
 
 const messages: MessageRow[] = [
@@ -52,7 +62,8 @@ const messages: MessageRow[] = [
         authorId: "grace",
         channelId: ROOM,
         deletedAt: null,
-        createdAt: new Date("2026-08-19T10:00:00Z")
+        createdAt: new Date("2026-08-19T10:00:00Z"),
+        _count: { attachments: 0 }
     }
 ];
 
@@ -125,6 +136,9 @@ describe("a message somebody pasted", () => {
         expect(found?.excerpt).toBe("The deploy finished");
         expect(found?.name).toBe("General");
         expect(found?.channelId).toBe(ROOM);
+        // The breadcrumb the card draws, minus whatever matches where the
+        // reader already is.
+        expect(found?.spaceName).toBe("Testing");
     });
 
     it("carries nothing when the reader cannot reach the conversation it is in", async () => {

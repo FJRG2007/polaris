@@ -58,6 +58,12 @@ export interface ChatReferenceView {
     readonly reachable: boolean;
     /** What the conversation is called. Empty when it is out of reach. */
     readonly name: string;
+    /** The space it belongs to, and what that space is called. Both empty for a
+     *  direct message, a group, and anything out of reach. The screen drops
+     *  whichever part matches where the reader already is - naming the server
+     *  they are looking at is a breadcrumb that says nothing. */
+    readonly spaceId: string;
+    readonly spaceName: string;
     /** text | voice | dm | group. Empty when out of reach. Decides whether the
      *  reference is drawn as a name in the sentence or as a card with a way in. */
     readonly channelKind: string;
@@ -67,6 +73,9 @@ export interface ChatReferenceView {
     /** Who wrote the message, and what it said. Both empty for a conversation. */
     readonly authorName: string;
     readonly excerpt: string;
+    /** How many files were on it. A message can be nothing but a picture, and
+     *  "No text" under somebody's name is a card that describes nothing. */
+    readonly attachments: number;
     /** When it was said. Empty for a conversation. */
     readonly at: string;
 }
@@ -79,10 +88,13 @@ function unavailable(kind: ResolvedKind, id: string): ChatReferenceView {
         id,
         reachable: false,
         name: "",
+        spaceId: "",
+        spaceName: "",
         channelKind: "",
         channelId: "",
         authorName: "",
         excerpt: "",
+        attachments: 0,
         at: ""
     };
 }
@@ -188,7 +200,8 @@ export async function resolveChatReferences(
                   authorId: true,
                   channelId: true,
                   deletedAt: true,
-                  createdAt: true
+                  createdAt: true,
+                  _count: { select: { attachments: true } }
               }
           })
         : [];
@@ -206,6 +219,8 @@ export async function resolveChatReferences(
                       id: true,
                       name: true,
                       kind: true,
+                      spaceId: true,
+                      space: { select: { name: true } },
                       members: { select: { userId: true, user: { select: { name: true } } } }
                   }
               })
@@ -254,10 +269,13 @@ export async function resolveChatReferences(
             // A direct message and a group have no name of their own - they are
             // called after who is in them, the same way the rail draws them.
             name: channel.name || nameOfRoom(channel.members, actor.id),
+            spaceId: channel.spaceId ?? "",
+            spaceName: channel.space?.name ?? "",
             channelKind: channel.kind,
             channelId: id,
             authorName: "",
             excerpt: "",
+            attachments: 0,
             at: ""
         });
     }
@@ -277,10 +295,13 @@ export async function resolveChatReferences(
             id,
             reachable: true,
             name: channel ? channel.name || nameOfRoom(channel.members, actor.id) : "",
+            spaceId: channel?.spaceId ?? "",
+            spaceName: channel?.space?.name ?? "",
             channelKind: channel?.kind ?? "",
             channelId: message.channelId,
             authorName: message.authorId ? (authorNames.get(message.authorId) ?? "") : "",
             excerpt: message.kind === "system" ? "" : plainExcerpt(message.body, EXCERPT),
+            attachments: message._count.attachments,
             at: message.createdAt.toISOString()
         });
     }
@@ -296,10 +317,13 @@ export async function resolveChatReferences(
             id,
             reachable: true,
             name: task.name,
+            spaceId: "",
+            spaceName: "",
             channelKind: "",
             channelId: "",
             authorName: "",
             excerpt: "",
+            attachments: 0,
             at: ""
         });
     }
