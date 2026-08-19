@@ -24,60 +24,15 @@ import { CallAudio } from "./call-audio";
 import { Button, cn } from "@polaris/ui";
 import { useChatStream } from "./use-chat-stream";
 import { playCallSound } from "@/lib/call-sounds";
-import { useCall, type CallState } from "./use-call";
+import { useCall } from "./use-call";
 import { Headphones, HeadphoneOff, Mic, MicOff, PhoneOff } from "lucide-react";
-import {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useState,
-    type ReactNode
-} from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { CallHoldContext, useCallHold, type CallHold, type CallSession } from "./call-hold";
 
-/** The call this browser is sitting in. */
-export interface CallSession {
-    readonly meetingId: string;
-    /** The conversation it belongs to, which is the screen that draws it in
-     *  full and the place the bar leads back to. */
-    readonly channelId: string;
-    /** What to call it in the bar, since the bar is drawn where there is no
-     *  conversation header to read it off. */
-    readonly title: string;
-}
-
-interface CallHold {
-    readonly call: CallState;
-    readonly session: CallSession | null;
-    readonly viewerId: string;
-    /** Step into a call. Replaces whatever this browser was in - one call at a
-     *  time, the way a telephone works. */
-    readonly enter: (session: CallSession, withVideo: boolean) => void;
-    readonly leave: () => void;
-    readonly withVideo: boolean;
-}
-
-const Context = createContext<CallHold | null>(null);
-
-export function useCallHold(): CallHold {
-    const hold = useContext(Context);
-    if (!hold) throw new Error("A call needs the provider above it");
-    return hold;
-}
-
-/**
- * The same thing, for a screen that may not be inside a provider.
- *
- * There is exactly one such screen - the guest page, which holds its own call
- * because there is no dashboard around it - and the difference matters for one
- * thing: who is responsible for noticing that the call ended. Inside the
- * dashboard that is this provider, wherever the reader happens to be standing;
- * on the guest page it is the room itself, because that is all there is.
- */
-export function useHeldCall(): CallHold | null {
-    return useContext(Context);
-}
+// The context and the two hooks that read it live in `call-hold`, which has no
+// runtime dependency of its own - see the note there. Passed on from here so
+// every screen that already reads them goes on doing it from one place.
+export { useCallHold, useHeldCall, type CallHold, type CallSession } from "./call-hold";
 
 export function CallProvider({ viewerId, children }: { viewerId: string; children: ReactNode }) {
     const [session, setSession] = useState<CallSession | null>(null);
@@ -125,20 +80,17 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
      * surprise of the worst kind.
      */
     useChatStream(
-        useCallback(
-            (frame) => {
-                if (frame.kind !== "call" || !frame.movedTo) return;
-                setSession((current) => {
-                    if (!current || current.channelId !== frame.channelId) return current;
-                    return {
-                        meetingId: frame.movedTo!.meetingId,
-                        channelId: frame.movedTo!.channelId,
-                        title: current.title
-                    };
-                });
-            },
-            []
-        )
+        useCallback((frame) => {
+            if (frame.kind !== "call" || !frame.movedTo) return;
+            setSession((current) => {
+                if (!current || current.channelId !== frame.channelId) return current;
+                return {
+                    meetingId: frame.movedTo!.meetingId,
+                    channelId: frame.movedTo!.channelId,
+                    title: current.title
+                };
+            });
+        }, [])
     );
 
     const hold = useMemo<CallHold>(
@@ -147,13 +99,13 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
     );
 
     return (
-        <Context.Provider value={hold}>
+        <CallHoldContext.Provider value={hold}>
             {/* Beside the call rather than beside the grid. This is what makes
                 walking out of the conversation shrink a call instead of
                 silencing it: the tiles unmount, the sound does not. */}
             <CallAudio call={call} />
             {children}
-        </Context.Provider>
+        </CallHoldContext.Provider>
     );
 }
 

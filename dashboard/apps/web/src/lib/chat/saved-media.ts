@@ -116,7 +116,10 @@ export async function savedSources(
 export async function sendSavedMedia(
     actor: ChatActor,
     channelId: string,
-    savedId: string
+    savedId: string,
+    /** What this one answers, or carries out of another room, when it was
+     *  chosen with the composer's bar up. */
+    quote: { readonly messageId: string; readonly forwarded: boolean } | null = null
 ): Promise<{ messageId: string } | { remote: string }> {
     await requirePostable(actor, channelId);
 
@@ -140,7 +143,9 @@ export async function sendSavedMedia(
     });
     // A body of one space: the schema refuses an empty one, and what this
     // message says is said by the picture under it.
-    return { messageId: await send(actor, { channelId, body: " ", parentId: null }, [stored]) };
+    return {
+        messageId: await send(actor, { channelId, body: " ", parentId: null }, [stored], quote)
+    };
 }
 
 /** Whether a saved thing is one already stored here. */

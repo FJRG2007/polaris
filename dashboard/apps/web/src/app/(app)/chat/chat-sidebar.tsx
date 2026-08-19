@@ -592,7 +592,16 @@ function ChannelRows({
                     >
                         <Row
                             channel={channel}
-                            href={`/chat/c/${channel.id}`}
+                            // Pressing a voice room's name is how somebody says
+                            // they want to be in it, and the room reads that off
+                            // the address - see the walk-in in `channel-view`,
+                            // which is where the reasoning lives. A text channel
+                            // is only ever opened.
+                            href={
+                                channel.kind === "voice"
+                                    ? `/chat/c/${channel.id}?join=1`
+                                    : `/chat/c/${channel.id}`
+                            }
                             active={open === channel.id}
                             unread={channel.unread}
                             muted={channel.muted}
@@ -789,84 +798,86 @@ function RowMenu({
 
     return (
         <>
-        <ContextMenu>
-            <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-            <ContextMenuContent className="w-48">
-                {/* Kept for this reader and nobody else, which is why it sits
+            <ContextMenu>
+                <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+                <ContextMenuContent className="w-48">
+                    {/* Kept for this reader and nobody else, which is why it sits
                     beside muting rather than in the channel's settings. */}
-                <ContextMenuItem
-                    onSelect={async () => {
-                        await actions.setPinnedAction(channel.id, !channel.pinned);
-                        refresh();
-                    }}
-                >
-                    {channel.pinned ? (
-                        <PinOff className="size-3.5" />
-                    ) : (
-                        <Pin className="size-3.5" />
-                    )}
-                    {channel.pinned ? "Unpin" : "Pin to the top"}
-                </ContextMenuItem>
-                {/* Only where there is something to put back. A conversation
-                    already carrying a badge has nothing to mark, and an item
-                    that does nothing is worse than one that is not drawn. */}
-                {channel.unread === 0 && (
                     <ContextMenuItem
                         onSelect={async () => {
-                            await actions.markUnreadAction({ channelId: channel.id });
+                            await actions.setPinnedAction(channel.id, !channel.pinned);
                             refresh();
                         }}
                     >
-                        <Mail className="size-3.5" />
-                        Mark as unread
+                        {channel.pinned ? (
+                            <PinOff className="size-3.5" />
+                        ) : (
+                            <Pin className="size-3.5" />
+                        )}
+                        {channel.pinned ? "Unpin" : "Pin to the top"}
                     </ContextMenuItem>
-                )}
-                <ContextMenuItem onSelect={() => void copyText(channelLink(baseUrl, channel.id))}>
-                    <Link2 className="size-3.5" />
-                    Copy link
-                </ContextMenuItem>
-                <MuteOptions
-                    channel={channel}
-                    parts={CONTEXT_PARTS}
-                    onChoose={async (minutes) => {
-                        await actions.setMutedAction(channel.id, minutes);
-                        refresh();
-                    }}
-                />
+                    {/* Only where there is something to put back. A conversation
+                    already carrying a badge has nothing to mark, and an item
+                    that does nothing is worse than one that is not drawn. */}
+                    {channel.unread === 0 && (
+                        <ContextMenuItem
+                            onSelect={async () => {
+                                await actions.markUnreadAction({ channelId: channel.id });
+                                refresh();
+                            }}
+                        >
+                            <Mail className="size-3.5" />
+                            Mark as unread
+                        </ContextMenuItem>
+                    )}
+                    <ContextMenuItem
+                        onSelect={() => void copyText(channelLink(baseUrl, channel.id))}
+                    >
+                        <Link2 className="size-3.5" />
+                        Copy link
+                    </ContextMenuItem>
+                    <MuteOptions
+                        channel={channel}
+                        parts={CONTEXT_PARTS}
+                        onChoose={async (minutes) => {
+                            await actions.setMutedAction(channel.id, minutes);
+                            refresh();
+                        }}
+                    />
 
-                {/* What you call them, offered from the row as well as from
+                    {/* What you call them, offered from the row as well as from
                     the open conversation: it is a note about a person, and the
                     place somebody reaches for it is wherever their name is
                     written. Nothing is announced and nobody else sees it. */}
-                {person && (
-                    <ContextMenuItem onSelect={() => setNaming(true)}>
-                        <Pencil className="size-3.5" />
-                        Nickname
-                    </ContextMenuItem>
-                )}
+                    {person && (
+                        <ContextMenuItem onSelect={() => setNaming(true)}>
+                            <Pencil className="size-3.5" />
+                            Nickname
+                        </ContextMenuItem>
+                    )}
 
-                {/* Only for somebody who administers the space, and only for a
+                    {/* Only for somebody who administers the space, and only for a
                     channel in one: a direct message has no settings and a group
                     is managed from its own header. */}
-                {onManage && channel.spaceId && (
-                    <>
-                        <ContextMenuSeparator />
-                        <ContextMenuItem onSelect={() => onManage(channel)}>
-                            <Settings2 className="size-3.5" />
-                            Edit channel
-                        </ContextMenuItem>
-                    </>
-                )}
-            </ContextMenuContent>
-        </ContextMenu>
-        {/* Outside the menu, which closes on the item that opens this: a dialog
+                    {onManage && channel.spaceId && (
+                        <>
+                            <ContextMenuSeparator />
+                            <ContextMenuItem onSelect={() => onManage(channel)}>
+                                <Settings2 className="size-3.5" />
+                                Edit channel
+                            </ContextMenuItem>
+                        </>
+                    )}
+                </ContextMenuContent>
+            </ContextMenu>
+            {/* Outside the menu, which closes on the item that opens this: a dialog
             mounted inside one is unmounted the moment it is asked for. */}
-        <NicknameDialog
-            open={naming}
-            onOpenChange={setNaming}
-            person={person}
-            onSaved={refresh}
-        />
+            <NicknameDialog
+                open={naming}
+                onOpenChange={setNaming}
+                person={person}
+                onSaved={refresh}
+            />
         </>
     );
 }

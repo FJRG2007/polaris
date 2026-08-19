@@ -176,10 +176,9 @@ export function ChannelView({
      * The voice channel this browser has already walked into.
      *
      * Set before the joining starts, not after, and that is the whole of the
-     * bookkeeping: it stops a second attempt while the first is in the air, and
-     * it stops somebody who left a room they are still looking at from being put
-     * straight back into it. Opening the channel again is a fresh press, and the
-     * key having changed is what says so.
+     * bookkeeping: it stops a second attempt while the address is still being
+     * rewritten, and it stops somebody who left a room they are still looking at
+     * from being put straight back into it.
      */
     const walkedIn = useRef<string | null>(null);
     const [joining, setJoining] = useState(false);
@@ -793,29 +792,32 @@ export function ChannelView({
      * conversation being asked for. It says who is being answered while it
      * waits, and the second press does nothing until the first has landed.
      */
-    const replyPrivately = useCallback(async (message: ChatMessageView) => {
-        const authorId = message.authorId;
-        if (!authorId) return;
-        if (opening.current) return;
-        opening.current = authorId;
-        setOpeningName(message.authorName ?? "them");
-        const result = await runAction(
-            () => actions.openDirectAction({ userIds: [authorId] }),
-            setError
-        );
-        opening.current = null;
-        setOpeningName(null);
-        if (!result || result.error || !result.id) return;
-        // Straight there, with the message named in the address. That
-        // conversation draws its own bar from it - see `carried` - so answering
-        // privately ends up looking exactly like answering anything else, which
-        // is the whole point: a dialog with a box of its own was a second way to
-        // write a message, and people already know the first one.
-        router.push(`/chat/c/${result.id}?quote=${message.id}`);
-    }, [router]);
+    const replyPrivately = useCallback(
+        async (message: ChatMessageView) => {
+            const authorId = message.authorId;
+            if (!authorId) return;
+            if (opening.current) return;
+            opening.current = authorId;
+            setOpeningName(message.authorName ?? "them");
+            const result = await runAction(
+                () => actions.openDirectAction({ userIds: [authorId] }),
+                setError
+            );
+            opening.current = null;
+            setOpeningName(null);
+            if (!result || result.error || !result.id) return;
+            // Straight there, with the message named in the address. That
+            // conversation draws its own bar from it - see `carried` - so answering
+            // privately ends up looking exactly like answering anything else, which
+            // is the whole point: a dialog with a box of its own was a second way to
+            // write a message, and people already know the first one.
+            router.push(`/chat/c/${result.id}?quote=${message.id}`);
+        },
+        [router]
+    );
 
     /**
-     * Walk into a voice channel by opening it.
+     * Walk into a voice channel, because somebody pressed it.
      *
      * A voice channel is a room: pressing its name is how somebody says they
      * want to be in it, and asking them to press a second button inside is a
@@ -827,22 +829,32 @@ export function ChannelView({
      * browser was muted last time and joins that way - see `call-muted` - so
      * somebody who mutes once stays muted every time after.
      *
+     * **The press travels in the address, and is taken out of it once acted on.**
+     * The same arrangement the answer above uses, and for the same reason. Read
+     * off the screen being open instead, "pressed the room" and "have the room
+     * on screen" are one fact, and they are not: reloading the page put somebody
+     * straight back into a call they had just left, a link opened in a second tab
+     * joined from an address alone, and a browser reopening yesterday's windows
+     * opened a microphone in a room nobody had touched that morning. Reading what
+     * was said in a room is not the same act as walking into it - and for the
+     * times it is, the strip above the conversation is one press.
+     *
      * It never happens to somebody already in a call, wherever that call is.
-     * `enter` replaces whatever this browser was in, so walking in on sight
-     * would mean that opening a voice channel to see who is in it hangs up the
-     * conversation you are having - silently, with no press. While a call is
-     * held, the strip's button is the way in, and moving rooms stays deliberate.
+     * `enter` replaces whatever this browser was in, so walking in would mean
+     * that opening a voice channel to see who is in it hangs up the conversation
+     * you are having - silently. While a call is held, the strip's button is the
+     * way in, and moving rooms stays deliberate.
      */
+    const pressed = params.get("join");
     useEffect(() => {
-        if (channel?.kind !== "voice" || callsOff) return;
-        if (session) {
-            // Marked as walked into all the same, so hanging up while standing
-            // here does not then open a microphone nobody asked it to.
-            walkedIn.current = channelId;
-            return;
-        }
-        if (walkedIn.current === channelId) return;
+        // Waited for rather than guessed: which kind of room this is decides
+        // whether there is anything to walk into, and the list arrives a moment
+        // after the screen does.
+        if (!pressed || !channel || walkedIn.current === channelId) return;
         walkedIn.current = channelId;
+        router.replace(`/chat/c/${channelId}`, { scroll: false });
+        if (channel.kind !== "voice" || callsOff || session) return;
+
         setJoining(true);
         void runAction(() => calls.startCallAction(channelId), setError).then((result) => {
             setJoining(false);
@@ -856,7 +868,7 @@ export function ChannelView({
             enter({ meetingId: result.meetingId, channelId, title: callTitle }, false);
             checkCall();
         });
-    }, [callTitle, callsOff, channel?.kind, channelId, checkCall, enter, session]);
+    }, [callTitle, callsOff, channel, channelId, checkCall, enter, pressed, router, session]);
 
     const shown = useMemo(() => [...(messages ?? []), ...pending], [messages, pending]);
 
@@ -1024,6 +1036,31 @@ export function ChannelView({
             return;
         }
         return sendText(body);
+    };
+
+    /**
+     * What the composer's bar is pointing at, taken and put down.
+     *
+     * The bar means "the next thing sent answers this", and until now only
+     * typing honoured it: a GIF or a saved picture chosen from the picker sent
+     * itself as an unrelated message and left the bar standing, so the note
+     * typed after it answered something the reader believed they had already
+     * replied to.
+     *
+     * The two cases the bar can be showing are the two `messages.send` already
+     * knows how to quote: a message in this room, which is a reply, and one
+     * carried in from another, which is a forward - and a picture is as good a
+     * note on a forward as a sentence.
+     */
+    const takeReply = (): { messageId: string; forwarded: boolean } | null => {
+        const answering = replyingTo
+            ? { messageId: replyingTo.id, forwarded: false }
+            : carried
+              ? { messageId: carried.message.id, forwarded: true }
+              : null;
+        setReplyingTo(null);
+        setCarried(null);
+        return answering;
     };
 
     const sendText = async (body: string) => {
@@ -1363,8 +1400,8 @@ export function ChannelView({
                    this one is a decision rather than a wait. */
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3">
                     <p className="text-xs text-muted-foreground">
-                        You blocked {channel.name}. They cannot reach you, and you cannot write
-                        to them.
+                        You blocked {channel.name}. They cannot reach you, and you cannot write to
+                        them.
                     </p>
                     <Button
                         size="sm"
@@ -1376,59 +1413,67 @@ export function ChannelView({
                     </Button>
                 </div>
             ) : (
-            <Composer
-                channelId={channelId}
-                rules={rules}
-                disabled={!canPost}
-                attachable={may.attach}
-                placeholder={
-                    canPost
-                        ? `Message ${channel.kind === "text" ? `#${channel.name}` : channel.name}`
-                        : "This conversation is archived."
-                }
-                editing={editing}
-                replyingTo={replyingTo ?? carried?.message ?? null}
-                replyingFrom={
-                    carried?.from ? { name: carried.from, channel: carried.channel } : null
-                }
-                insert={inserting}
-                onCancelReply={() => {
-                    setReplyingTo(null);
-                    setCarried(null);
-                }}
-                onCancelEdit={() => setEditing(null)}
-                onSend={send}
-                onMedia={async (address) => {
-                    following.current = true;
-                    const result = await runAction(
-                        () => actions.sendMediaAction(channelId, address),
-                        setError
-                    );
-                    if (!result?.error) {
-                        await load();
-                        refresh();
+                <Composer
+                    channelId={channelId}
+                    rules={rules}
+                    disabled={!canPost}
+                    attachable={may.attach}
+                    placeholder={
+                        canPost
+                            ? `Message ${channel.kind === "text" ? `#${channel.name}` : channel.name}`
+                            : "This conversation is archived."
                     }
-                }}
-                onSaved={async (savedId) => {
-                    following.current = true;
-                    const result = await runAction(
-                        () => actions.sendSavedMediaAction(channelId, savedId),
-                        setError
-                    );
-                    if (!result?.error) {
-                        await load();
-                        refresh();
+                    editing={editing}
+                    replyingTo={replyingTo ?? carried?.message ?? null}
+                    replyingFrom={
+                        carried?.from ? { name: carried.from, channel: carried.channel } : null
                     }
-                }}
-                onSaveEdit={async (messageId, body) => {
-                    const result = await runAction(
-                        () => actions.editAction({ messageId, body }),
-                        setError
-                    );
-                    setEditing(null);
-                    if (!result?.error) patchMessage(messageId, { body, edited: true });
-                }}
-            />
+                    insert={inserting}
+                    onCancelReply={() => {
+                        setReplyingTo(null);
+                        setCarried(null);
+                    }}
+                    onCancelEdit={() => setEditing(null)}
+                    onSend={send}
+                    onMedia={async (address) => {
+                        following.current = true;
+                        // The picture answers whatever the bar was pointing at, and
+                        // the bar comes down as it is sent - the same two halves a
+                        // typed reply gets. Without them a GIF chosen with a reply
+                        // open landed as an unrelated message and left the bar up,
+                        // so the next thing typed answered something the reader had
+                        // already replied to.
+                        const answering = takeReply();
+                        const result = await runAction(
+                            () => actions.sendMediaAction(channelId, address, null, answering),
+                            setError
+                        );
+                        if (!result?.error) {
+                            await load();
+                            refresh();
+                        }
+                    }}
+                    onSaved={async (savedId) => {
+                        following.current = true;
+                        const answering = takeReply();
+                        const result = await runAction(
+                            () => actions.sendSavedMediaAction(channelId, savedId, answering),
+                            setError
+                        );
+                        if (!result?.error) {
+                            await load();
+                            refresh();
+                        }
+                    }}
+                    onSaveEdit={async (messageId, body) => {
+                        const result = await runAction(
+                            () => actions.editAction({ messageId, body }),
+                            setError
+                        );
+                        setEditing(null);
+                        if (!result?.error) patchMessage(messageId, { body, edited: true });
+                    }}
+                />
             )}
         </>
     );
@@ -1647,7 +1692,19 @@ export function ChannelView({
                                 body: "",
                                 deleted: true,
                                 reactions: [],
-                                attachments: []
+                                attachments: [],
+                                // Everything the body was carrying goes with
+                                // it. The server resolves all four from the
+                                // text, and a tombstone has no text - so a
+                                // voice room card, a link preview or a forward
+                                // left on screen is this browser showing what
+                                // the message said after it was taken back,
+                                // until somebody reloads.
+                                references: [],
+                                link: null,
+                                preview: null,
+                                previewPending: false,
+                                forwardable: false
                             });
                         }
                     }

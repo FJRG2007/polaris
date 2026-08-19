@@ -13,7 +13,13 @@
 import { cn } from "@polaris/ui";
 
 export const RICH_TEXT_PROSE = cn(
-    "text-sm leading-relaxed [&>*+*]:mt-3",
+    // A word with nowhere to break is broken anyway. Nothing else here can save
+    // a column from one: an address pasted into a message is a single word forty
+    // characters long, and in a narrow one - the conversation beside a voice
+    // room is twenty ems - it ran out past the right edge and took a horizontal
+    // scrollbar with it. A fence opts out by being `pre`, where wrapping never
+    // applies, so code keeps the scroll it wants.
+    "text-sm leading-relaxed break-words [&>*+*]:mt-3",
     "[&_h1]:text-lg [&_h1]:font-semibold [&_h2]:text-base [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold",
     "[&_a]:text-primary [&_a]:underline [&_li]:my-0.5",
     "[&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6",

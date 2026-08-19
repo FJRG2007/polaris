@@ -1,14 +1,19 @@
 // @vitest-environment jsdom
 
 /**
- * Opening a voice channel walks into it - unless this browser is already
- * holding a call somewhere else.
+ * Pressing a voice channel walks into it. Arriving at one does not.
  *
- * `enter` replaces whatever this browser was in, so walking in on sight while
- * already on a call would silently hang up the conversation being had, with
- * no press and nothing said about it. The guard is what `session` is for:
- * while a call is held, opening a different voice channel to look inside must
- * not touch it.
+ * The press travels in the address (`?join=1`) and is taken out of it as soon as
+ * it is acted on, so the two cases that look identical to the screen stay apart:
+ * somebody who pressed the room's name in the rail is put into the call, and
+ * somebody whose browser merely has that room on screen - a reload, a second
+ * tab, a window the browser reopened - is not. Read off the screen instead, a
+ * reload put people back into calls they had just left, with a microphone open
+ * and no press anywhere.
+ *
+ * And never on top of a call already being held. `enter` replaces whatever this
+ * browser was in, so walking in while on a call would silently hang up the
+ * conversation being had. The guard is what `session` is for.
  */
 
 import { render } from "@testing-library/react";
@@ -17,10 +22,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let session: { channelId: string; meetingId: string } | null = null;
 let started: string[] = [];
+let params = new URLSearchParams();
+let replaced: string[] = [];
 
 vi.mock("next/navigation", () => ({
-    useRouter: () => ({ push: () => undefined, refresh: () => undefined }),
-    useSearchParams: () => new URLSearchParams()
+    useRouter: () => ({
+        push: () => undefined,
+        refresh: () => undefined,
+        replace: (href: string) => replaced.push(href)
+    }),
+    useSearchParams: () => params
 }));
 
 vi.mock("@/app/(app)/chat/actions", () => ({
@@ -113,6 +124,8 @@ vi.mock("@/app/(app)/chat/members-panel", () => ({
 beforeEach(() => {
     session = null;
     started = [];
+    replaced = [];
+    params = new URLSearchParams("join=1");
     entered.length = 0;
     Element.prototype.scrollIntoView = () => undefined;
 });
@@ -121,8 +134,11 @@ afterEach(() => {
     vi.clearAllMocks();
 });
 
-describe("opening a voice channel", () => {
-    it("walks in on its own when this browser holds no call", async () => {
+/** Long enough for every effect and microtask to have had its turn. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+
+describe("pressing a voice channel", () => {
+    it("walks in when this browser holds no call", async () => {
         render(<ChannelView channelId="c1" />);
 
         await vi.waitFor(() =>
@@ -133,14 +149,33 @@ describe("opening a voice channel", () => {
         expect(started).toEqual(["c1"]);
     });
 
+    it("takes the press out of the address, so a reload does not repeat it", async () => {
+        render(<ChannelView channelId="c1" />);
+
+        await vi.waitFor(() => expect(replaced).toEqual(["/chat/c/c1"]));
+    });
+
     it("does not touch a call already held somewhere else", async () => {
         session = { channelId: "elsewhere", meetingId: "m-elsewhere" };
         render(<ChannelView channelId="c1" />);
 
-        // Give every effect and microtask a turn to run, then confirm it never
-        // started a call.
-        await new Promise((resolve) => setTimeout(resolve, 20));
+        await settle();
         expect(started).toEqual([]);
         expect(entered).toEqual([]);
+    });
+});
+
+describe("arriving at a voice channel without pressing it", () => {
+    it("opens no microphone", async () => {
+        // What a reload, a second tab or a restored window looks like from here:
+        // the room on screen, and nothing in the address saying anybody asked to
+        // be in it.
+        params = new URLSearchParams();
+        render(<ChannelView channelId="c1" />);
+
+        await settle();
+        expect(started).toEqual([]);
+        expect(entered).toEqual([]);
+        expect(replaced).toEqual([]);
     });
 });

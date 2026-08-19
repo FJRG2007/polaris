@@ -343,9 +343,16 @@ export async function searchTenorAction(
 export async function sendMediaAction(
     channelId: string,
     address: string,
-    parentId?: string | null
+    parentId?: string | null,
+    /** What this one answers, or the message it carries out of another room. A
+     *  GIF is a message, so it replies and forwards as readily as any other -
+     *  and the composer's bar sits directly above the picker it was chosen
+     *  from, which is what makes leaving this out read as the answer being
+     *  dropped. */
+    answers?: unknown
 ): Promise<{ id?: string; error?: string }> {
     const me = await actor();
+    const answering = quotedSchema.safeParse(answers);
 
     const access = await guard(() => requirePostable(me, channelId));
     if (access.error) return { error: access.error };
@@ -357,10 +364,26 @@ export async function sendMediaAction(
     const sent = await guard(() =>
         // A body of one space: the schema refuses an empty one, and what this
         // message says is said by the picture under it.
-        messages.send(me, { channelId, body: " ", parentId: parentId ?? null }, [stored])
+        messages.send(
+            me,
+            { channelId, body: " ", parentId: parentId ?? null },
+            [stored],
+            answering.success ? (answering.data ?? null) : null
+        )
     );
     return sent.error ? { error: sent.error } : { id: sent.value };
 }
+
+/**
+ * What a picture is answering, as it arrives from a browser.
+ *
+ * Anything malformed is read as answering nothing rather than as an error: the
+ * picture is what was asked for, and refusing to send it over an id that did not
+ * parse would lose the thing somebody actually pressed. The service decides
+ * whether the quote is allowed at all - a message from a room the sender cannot
+ * read is dropped there, not here.
+ */
+const quotedSchema = z.object({ messageId: z.string().uuid(), forwarded: z.boolean() }).nullish();
 
 /** Keep a message, or stop keeping it. Returns whether it is kept now, so an
  *  optimistic star settles without asking again. */
@@ -699,7 +722,12 @@ export async function timeOutMemberAction(
     minutes: number
 ): Promise<{ error?: string }> {
     const me = await actor();
-    const wanted = z.number().int().min(0).max(60 * 24 * 28).safeParse(minutes);
+    const wanted = z
+        .number()
+        .int()
+        .min(0)
+        .max(60 * 24 * 28)
+        .safeParse(minutes);
     if (!wanted.success) return { error: "That is not a length of time" };
     const result = await guard(() => chat.timeOutMember(me, where, userId, wanted.data));
     if (!result.error) revalidatePath(CHAT_PATH);
@@ -963,11 +991,16 @@ export async function savedSourcesAction(sources: string[]): Promise<{ sources: 
  */
 export async function sendSavedMediaAction(
     channelId: string,
-    savedId: string
+    savedId: string,
+    answers?: unknown
 ): Promise<{ id?: string; error?: string }> {
     const me = await actor();
-    const result = await guard(() => saved.sendSavedMedia(me, String(channelId), String(savedId)));
+    const answering = quotedSchema.safeParse(answers);
+    const quoted = answering.success ? (answering.data ?? null) : null;
+    const result = await guard(() =>
+        saved.sendSavedMedia(me, String(channelId), String(savedId), quoted)
+    );
     if (result.error || !result.value) return { error: result.error ?? "That could not be sent" };
     if ("messageId" in result.value) return { id: result.value.messageId };
-    return sendMediaAction(channelId, result.value.remote);
+    return sendMediaAction(channelId, result.value.remote, null, quoted);
 }

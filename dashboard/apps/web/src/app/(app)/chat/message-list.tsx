@@ -22,6 +22,7 @@ import Link from "next/link";
 import * as actions from "./actions";
 import { VoiceNote } from "./voice-note";
 import { useChat } from "./chat-context";
+import { useHeldCall } from "./call-hold";
 import { Avatar } from "@/components/avatar";
 import { MessageMenu } from "./message-menu";
 import { hasCard, referenced } from "./message-references";
@@ -180,7 +181,9 @@ export function MessageList({
         [messages]
     );
     const asked = voiceIds.join(",");
-    const [inVoice, setInVoice] = useState<ReadonlyMap<string, readonly VoicePresence[]>>(new Map());
+    const [inVoice, setInVoice] = useState<ReadonlyMap<string, readonly VoicePresence[]>>(
+        new Map()
+    );
 
     useEffect(() => {
         if (!asked) {
@@ -1061,9 +1064,17 @@ function ReferenceCards({
     );
 }
 
-/** A voice room somebody pasted: what it is called, who is in it, and the way
- *  in. Pressing it walks into the room, which is what opening a voice channel
- *  does everywhere else in Chat. */
+/**
+ * A voice room somebody pasted: what it is called, who is in it, and the way in.
+ *
+ * Pressing it walks into the room, which is what opening a voice channel does
+ * everywhere else in Chat.
+ *
+ * Except when the reader is already standing in it, and then there is nothing to
+ * press: the card says so and the button is spent. A green Join on the room
+ * whose call is on screen behind it is an invitation to do the thing that has
+ * already happened, and pressing it looked to everybody like nothing at all.
+ */
 function VoiceCard({
     reference,
     inRoom
@@ -1071,6 +1082,11 @@ function VoiceCard({
     reference: ChatReferenceView;
     inRoom: readonly VoicePresence[];
 }) {
+    // The nullable one: a card can be drawn on the guest page, which has no
+    // dashboard around it and so no hold above it.
+    const held = useHeldCall();
+    const joined = held?.session?.channelId === reference.id;
+
     return (
         <div className="flex max-w-md flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-border bg-surface px-3 py-2">
             <Volume2 className="size-4 shrink-0 text-muted-foreground" />
@@ -1084,12 +1100,21 @@ function VoiceCard({
                         : inRoom.map((person) => person.name).join(", ")}
                 </span>
             </span>
-            <Link
-                href={`/chat/c/${reference.id}`}
-                className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground no-underline hover:bg-primary/90"
-            >
-                Join
-            </Link>
+            {joined ? (
+                <span
+                    aria-disabled="true"
+                    className="pointer-events-none shrink-0 rounded-md bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground"
+                >
+                    Joined
+                </span>
+            ) : (
+                <Link
+                    href={`/chat/c/${reference.id}?join=1`}
+                    className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground no-underline hover:bg-primary/90"
+                >
+                    Join
+                </Link>
+            )}
         </div>
     );
 }
