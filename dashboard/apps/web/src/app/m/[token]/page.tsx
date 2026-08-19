@@ -13,7 +13,6 @@
  */
 
 import { prisma } from "@polaris/db";
-import { redirect } from "next/navigation";
 import { GuestCall } from "./guest-call";
 import { getSession } from "@/lib/session";
 import { LinkUnavailable } from "@/components/public-shell";
@@ -40,15 +39,14 @@ export default async function GuestMeetingPage({ params }: { params: Promise<{ t
         );
     }
 
-    // The host asked for accounts.
+    // The host asked for accounts, and nobody is signed in here.
     //
-    // Somebody signed in is sent to the meeting itself, where they arrive as
-    // themselves rather than as a name typed into a box - which is the whole
-    // point of the setting. Everybody else is told, here, before they type a
-    // name that was never going to be accepted; the link still names the meeting,
-    // which is how they know what they are being asked to sign in for.
-    if (meeting.requireAccount) {
-        if (session?.user) redirect(`/chat/meetings/${meeting.id}`);
+    // Said now rather than at the join: the honest thing is to say so before
+    // somebody types a name that was never going to be accepted. The link still
+    // names the meeting, which is how somebody knows what they are being asked to
+    // sign in for - and once they are, this same address seats them under their
+    // own name instead of a typed one.
+    if (meeting.requireAccount && !session?.user) {
         return (
             <LinkUnavailable
                 signedIn={false}
@@ -64,6 +62,10 @@ export default async function GuestMeetingPage({ params }: { params: Promise<{ t
             title={meeting.title}
             signedIn={Boolean(session?.user)}
             suggestedName={session?.user?.name ?? ""}
+            // Whose name they arrive under. A meeting that asked for accounts
+            // seats whoever is signed in as themselves - there is nothing to
+            // type, and nothing they could type that would be believed.
+            asAccount={meeting.requireAccount}
         />
     );
 }

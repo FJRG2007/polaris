@@ -1117,6 +1117,32 @@ export async function joinMeeting(
 }
 
 /**
+ * Join on the link, as an account.
+ *
+ * The case this exists for is a meeting whose host asked for accounts. Its link
+ * is still the invitation - it is how somebody knows the meeting exists and what
+ * it is called - but what it opens is a seat under a real name rather than one
+ * typed into a box. Without it, somebody signed in who followed the link was
+ * turned away by the door the link was supposed to be the key to.
+ *
+ * The token is the proof they were sent it, which is the whole of what a
+ * meeting link ever proves; who they are is the session's to say. Everything
+ * after that is the ordinary rule - the host and anybody convened walk in, a
+ * stranger knocks, and somebody who was removed stays removed.
+ */
+export async function joinOnLink(
+    actor: ChatActor & { name: string },
+    token: string
+): Promise<MeetingSeat> {
+    const meeting = await prisma.meeting.findUnique({
+        where: { guestToken: token },
+        select: { id: true, endedAt: true }
+    });
+    if (!meeting || meeting.endedAt) throw new ChatAccessError("That meeting has ended");
+    return joinMeeting(actor, meeting.id);
+}
+
+/**
  * The meetings this account has any business seeing.
  *
  * Theirs, and the ones they were asked to. Not "every meeting running", which

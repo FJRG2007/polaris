@@ -138,6 +138,27 @@ const guestJoinSchema = z.object({
     name: z.string().trim().min(1, "Say who you are").max(60)
 });
 
+/**
+ * Join on the link as yourself, for a meeting that asked for accounts.
+ *
+ * The link is the invitation either way; what differs is what it opens. Here it
+ * opens a seat under the name on the account, which is exactly what the host
+ * asked for when they closed the door to guests - so the link goes on working
+ * for the people it was sent to, instead of refusing them at it.
+ */
+export async function joinOnLinkAction(
+    token: string
+): Promise<{ meetingId?: string; admission?: string; error?: string }> {
+    const user = await requirePermission("chat.use");
+    if (!(await can(user.id, "chat.call"))) return { error: NO_CALLS };
+    const result = await guard(() =>
+        meetings.joinOnLink({ id: user.id, name: user.name }, String(token ?? ""))
+    );
+    return result.error
+        ? { error: result.error }
+        : { meetingId: result.value!.meetingId, admission: result.value!.admission };
+}
+
 export async function joinAsGuestAction(
     input: unknown
 ): Promise<{ meetingId?: string; admission?: string; error?: string }> {
