@@ -256,6 +256,24 @@ export function ChannelView({
         : "Call";
     const canPost = channel ? !channel.archived : true;
 
+    /**
+     * Pick the conversation up again from a message.
+     *
+     * The rail is asked again straight after, because that is where the outcome
+     * is: the badge coming back on the conversation is the only thing on screen
+     * that says this worked. Nothing here scrolls or navigates - somebody
+     * marking a message unread is saying "later", not "take me away from it" -
+     * and the catch-up that would undo it only runs when a new message arrives
+     * while the list is at the bottom.
+     */
+    const markUnread = async (message: ChatMessageView) => {
+        const result = await runAction(
+            () => actions.markUnreadAction({ channelId, messageId: message.id }),
+            setError
+        );
+        if (!result?.error) refresh();
+    };
+
     /** Let them through again, from the bar that replaced the composer. The rail
      *  is asked again rather than patched: `blocked` is carried on the
      *  conversation, and this screen reads it from there. */
@@ -1229,6 +1247,7 @@ export function ChannelView({
                         onOpenThread={setThread}
                         onReact={react}
                         onStar={star}
+                        onMarkUnread={markUnread}
                         onReply={setReplyingTo}
                         // Not in a direct message, where every reply is
                         // already private and the item would do nothing

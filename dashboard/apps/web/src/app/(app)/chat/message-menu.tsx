@@ -37,6 +37,7 @@ import {
     Forward,
     Info,
     Link2,
+    Mail,
     MessageCircleReply,
     MessageSquare,
     Pencil,
@@ -78,6 +79,15 @@ export interface MessageActions {
     readonly onEdit?: (message: ChatMessageView) => void;
     readonly onOpenThread?: (message: ChatMessageView) => void;
     readonly onStar: (message: ChatMessageView) => void;
+    /**
+     * Pick the conversation up again from here.
+     *
+     * Absent inside a thread, whose unread is its own and would be thrown by a
+     * mark placed in the channel's timeline, and on the reader's own message,
+     * where it would put a conversation back to unread with nothing waiting in
+     * it - a badge of zero, which reads as a menu item that did nothing.
+     */
+    readonly onMarkUnread?: (message: ChatMessageView) => void;
     readonly onDelete: (message: ChatMessageView) => void;
     /** Say something is wrong with it. Not offered on your own message: the
      *  thing to do about your own words is take them back, which is Delete. */
@@ -254,6 +264,12 @@ export function MessageMenu({
                     <Star className="size-3.5" />
                     {message.starred ? "Remove from saved" : "Save"}
                 </ContextMenuItem>
+                {actions.onMarkUnread && !mine && !message.deleted && (
+                    <ContextMenuItem onSelect={() => actions.onMarkUnread?.(message)}>
+                        <Mail className="size-3.5" />
+                        Mark unread from here
+                    </ContextMenuItem>
+                )}
                 {/* Offered on a deleted message too: the line is still there,
                     replies still hang off it, and its address still opens the
                     conversation at the right place. */}

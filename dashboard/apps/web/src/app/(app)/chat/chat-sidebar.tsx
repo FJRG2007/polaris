@@ -45,6 +45,7 @@ import {
     Hash,
     Link2,
     Lock,
+    Mail,
     MessageSquarePlus,
     Pencil,
     Pin,
@@ -806,6 +807,20 @@ function RowMenu({
                     )}
                     {channel.pinned ? "Unpin" : "Pin to the top"}
                 </ContextMenuItem>
+                {/* Only where there is something to put back. A conversation
+                    already carrying a badge has nothing to mark, and an item
+                    that does nothing is worse than one that is not drawn. */}
+                {channel.unread === 0 && (
+                    <ContextMenuItem
+                        onSelect={async () => {
+                            await actions.markUnreadAction({ channelId: channel.id });
+                            refresh();
+                        }}
+                    >
+                        <Mail className="size-3.5" />
+                        Mark as unread
+                    </ContextMenuItem>
+                )}
                 <ContextMenuItem onSelect={() => void copyText(channelLink(baseUrl, channel.id))}>
                     <Link2 className="size-3.5" />
                     Copy link

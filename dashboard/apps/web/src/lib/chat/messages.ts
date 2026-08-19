@@ -963,6 +963,100 @@ export async function markRead(actor: ChatActor, input: core.ChatMarkReadInput):
 }
 
 /**
+ * Put a conversation back to unread.
+ *
+ * The one write that moves the read mark backwards, and the only reason it may:
+ * `markRead` refuses to, because two tabs disagreeing about how far somebody
+ * has scrolled must never un-read what one of them already read. This is not
+ * that - it is somebody saying so on purpose, and it is the whole feature.
+ *
+ * Where the mark lands is the message immediately **before** the one to pick up
+ * from, so that message is the first thing waiting rather than the last thing
+ * read. From the conversation list there is no message under the pointer, and
+ * the answer is the newest one somebody else said - which leaves exactly one
+ * message waiting, the number every client shows for this.
+ *
+ * "Newest one somebody else said" means the same thing the badge means, and the
+ * filters below are the ones `unreadCounts` applies: not a line Polaris wrote
+ * itself, not a reply inside a thread, and not the reader's own. A boundary
+ * picked from a wider set would mark a conversation unread and then show a
+ * count of zero, which reads as a menu item that did nothing.
+ *
+ * Marking a conversation unread that has nothing in it to read is not an error;
+ * it writes nothing and says so by leaving the badge alone.
+ *
+ * The ticks are deliberately left alone. `readAt` on a message records the
+ * moment somebody actually saw it, and they did; retracting that would tell the
+ * other person their message went back to unseen, which is not true and is not
+ * this reader's to say. What changes is only where this reader is picking the
+ * conversation up.
+ */
+export async function markUnread(actor: ChatActor, input: core.ChatMarkUnreadInput): Promise<void> {
+    const channel = await requireChannel(actor, input.channelId);
+
+    /** What is countable here, and therefore what a boundary may be picked from. */
+    const countable = {
+        channelId: input.channelId,
+        deletedAt: null,
+        parentId: null,
+        kind: { not: "system" },
+        authorId: { not: actor.id }
+    };
+
+    const from = input.messageId
+        ? await prisma.chatMessage.findFirst({
+              where: { id: input.messageId, channelId: input.channelId },
+              select: { createdAt: true }
+          })
+        : await prisma.chatMessage.findFirst({
+              where: countable,
+              orderBy: { createdAt: "desc" },
+              select: { createdAt: true }
+          });
+    // A message in another conversation, or a conversation nobody has said
+    // anything in. Neither is worth an error: the menu offering this can be a
+    // moment out of date, and the outcome asked for is already the case.
+    if (!from) return;
+
+    // Deliberately not `countable` - the new mark only has to sit before the
+    // message being picked up from, and the message that happens to be there
+    // may well be a system line or the reader's own. What must not happen is a
+    // mark landing on or after it.
+    const previous = await prisma.chatMessage.findFirst({
+        where: { channelId: input.channelId, createdAt: { lt: from.createdAt } },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, createdAt: true }
+    });
+
+    const current = await prisma.chatChannelMember.findUnique({
+        where: { channelId_userId: { channelId: input.channelId, userId: actor.id } },
+        select: { lastReadAt: true }
+    });
+    // Already unread from at least this far back. Writing anyway would move the
+    // mark forwards, which is the one thing this must never do - somebody
+    // marking a conversation unread twice would end up having read more of it.
+    if (!current?.lastReadAt) return;
+    if (previous && current.lastReadAt <= previous.createdAt) return;
+
+    await prisma.chatChannelMember.update({
+        where: { channelId_userId: { channelId: input.channelId, userId: actor.id } },
+        data: {
+            lastReadMessageId: previous?.id ?? null,
+            lastReadAt: previous?.createdAt ?? null
+        }
+    });
+
+    // The same frame a read sends, because it is the same fact changing: the
+    // rail on the desktop they left open, and this tab's own badge.
+    publishChatChange({
+        channelId: input.channelId,
+        kind: "read",
+        actorId: actor.id,
+        audience: await readAudience(actor, channel)
+    });
+}
+
+/**
  * Whose screens a read is for.
  *
  * Always the reader's own, which is the count coming down on the desktop they

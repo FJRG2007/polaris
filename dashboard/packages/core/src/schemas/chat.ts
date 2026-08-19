@@ -375,6 +375,21 @@ export const chatMarkReadSchema = z.object({
 
 export type ChatMarkReadInput = z.infer<typeof chatMarkReadSchema>;
 
+/**
+ * Putting a conversation back to unread.
+ *
+ * `messageId` is where the reader wants to pick it up again, and the mark lands
+ * just before it. Absent from the conversation list, where there is no message
+ * under the pointer and the answer is "the last thing somebody said to me" -
+ * which the server works out, because only it knows which messages count.
+ */
+export const chatMarkUnreadSchema = z.object({
+    channelId: z.string().uuid(),
+    messageId: z.string().uuid().optional()
+});
+
+export type ChatMarkUnreadInput = z.infer<typeof chatMarkUnreadSchema>;
+
 /** The ticks under messages a screen is already showing, asked for again after
  *  the other person caught up. Bounded by what a conversation holds on screen. */
 export const chatReceiptsSchema = z.object({

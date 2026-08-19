@@ -385,6 +385,20 @@ export async function markReadAction(input: unknown): Promise<{ error?: string }
 }
 
 /**
+ * Put one back to unread.
+ *
+ * Reported rather than swallowed, unlike the read above it: catching up is a
+ * side effect of scrolling and has nowhere to put a failure, while this is a
+ * menu item somebody pressed and expects something to happen.
+ */
+export async function markUnreadAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = core.chatMarkUnreadSchema.safeParse(input);
+    if (!parsed.success) return { error: "That conversation could not be marked unread" };
+    return guard(() => messages.markUnread(me, parsed.data));
+}
+
+/**
  * The ticks under messages already on screen, asked for again.
  *
  * What a screen does when it is told the other person caught up: reloading the

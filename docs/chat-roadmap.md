@@ -86,7 +86,7 @@ when a deploy finishes".
 
 | Item | Status | Prio | Size | Notes |
 |------|--------|------|------|-------|
-| Mark a conversation unread | ⬜ | P0 | S | Read state exists; this is one more write and a menu item. |
+| Mark a conversation unread | ✅ | P0 | S | The one write that moves the read mark backwards, which every other path refuses to do. From the conversation's own menu it leaves the last thing somebody said waiting; from a message it picks up there. The boundary is only ever something the badge would count, so it never marks a conversation unread and then shows nothing in it. Receipts are not retracted - they were read. |
 | Custom emoji per space | ⬜ | P1 | M | Fluxer and Stoat both have packs. Polaris has the storage and the picker already. |
 | Stickers | ⬜ | P2 | M | |
 | Scheduled messages | ⬜ | P2 | M | |

@@ -81,6 +81,9 @@ export interface MessageListProps {
     onOpenThread?: (message: ChatMessageView) => void;
     onReact: (messageId: string, emoji: string) => void;
     onStar: (message: ChatMessageView) => void;
+    /** Pick the conversation up again from a message. Absent inside a thread,
+     *  whose unread is counted separately from the channel's. */
+    onMarkUnread?: (message: ChatMessageView) => void;
     /**
      * Absent inside a thread, which is already the reply.
      *
@@ -114,6 +117,7 @@ export function MessageList({
     onOpenThread,
     onReact,
     onStar,
+    onMarkUnread,
     onReply,
     onReplyPrivately,
     onForward,
@@ -181,6 +185,7 @@ export function MessageList({
                             onOpenThread={onOpenThread}
                             onReact={onReact}
                             onStar={onStar}
+                            onMarkUnread={onMarkUnread}
                             onReply={onReply}
                             onReplyPrivately={onReplyPrivately}
                             onForward={onForward}
@@ -351,6 +356,7 @@ function Message({
     onOpenThread,
     onReact,
     onStar,
+    onMarkUnread,
     onReply,
     onReplyPrivately,
     onForward,
@@ -374,6 +380,7 @@ function Message({
     onOpenThread?: (message: ChatMessageView) => void;
     onReact: (messageId: string, emoji: string) => void;
     onStar: (message: ChatMessageView) => void;
+    onMarkUnread?: (message: ChatMessageView) => void;
     onReply?: (message: ChatMessageView) => void;
     onReplyPrivately?: (message: ChatMessageView) => void;
     onForward?: (message: ChatMessageView) => void;
@@ -451,6 +458,7 @@ function Message({
                 onForward,
                 onOpenThread,
                 onStar,
+                onMarkUnread,
                 onEdit,
                 onDelete,
                 onReport,
