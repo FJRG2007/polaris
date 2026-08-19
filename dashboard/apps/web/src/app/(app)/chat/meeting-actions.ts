@@ -23,6 +23,7 @@ import * as calls from "@/lib/chat/call-server";
 import { requirePermission } from "@/lib/session";
 import type { MeetingView } from "@/lib/chat/meetings";
 import { createNotification } from "@/lib/notification-service";
+import { MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
 import { ChatAccessError, requireChannel } from "@/lib/chat/access";
 import { GUEST_COOKIE, GUEST_COOKIE_MAX_AGE, resolveSeat } from "@/lib/chat/meeting-seat";
 
@@ -340,7 +341,7 @@ export async function meetingsAllowedAction(): Promise<{ create: boolean }> {
 }
 
 const newMeetingSchema = z.object({
-    title: z.string().trim().min(1, "Give the meeting a name").max(meetings.MAX_MEETING_TITLE),
+    title: z.string().trim().min(1, "Give the meeting a name").max(MAX_MEETING_TITLE),
     // The browser sends a moment, not a local time: what "half past two" means
     // depends on where the reader is sitting, and the server is nowhere.
     scheduledAt: z.string().datetime().nullish(),
@@ -456,7 +457,7 @@ export async function uninviteFromMeetingAction(
 
 const meetingOptionsSchema = z.object({
     meetingId: z.string().uuid(),
-    title: z.string().trim().min(1).max(meetings.MAX_MEETING_TITLE).optional(),
+    title: z.string().trim().min(1).max(MAX_MEETING_TITLE).optional(),
     scheduledAt: z.string().datetime().nullish(),
     approveGuests: z.boolean().optional(),
     requireAccount: z.boolean().optional()

@@ -27,22 +27,23 @@ export default async function ChatLayout({ children }: { children: ReactNode }) 
     // organization they are standing in rather than to them personally. It is
     // already memoized for this request by the app shell above.
     //
-    // The four grants beside it are what the screens draw from: resolved once
-    // here rather than asked for by each button, which would be four policy
-    // evaluations per render of a rail.
-    const [scope, spaces, groups, attach, call] = await Promise.all([
+    // The grants beside it are what the screens draw from: resolved once here
+    // rather than asked for by each button, which would be a policy evaluation
+    // per button per render of a rail.
+    const [scope, spaces, groups, attach, call, meetings] = await Promise.all([
         resolveScope(user.id),
         can(user.id, "chat.spaces"),
         can(user.id, "chat.groups"),
         can(user.id, "chat.attach"),
-        can(user.id, "chat.call")
+        can(user.id, "chat.call"),
+        can(user.id, "chat.meetings")
     ]);
 
     return (
         <ChatShell
             viewerId={user.id}
             viewerName={user.name}
-            may={{ spaces, groups, attach, call }}
+            may={{ spaces, groups, attach, call, meetings }}
             orgId={scope.org?.id ?? null}
             orgName={scope.org?.name ?? null}
         >

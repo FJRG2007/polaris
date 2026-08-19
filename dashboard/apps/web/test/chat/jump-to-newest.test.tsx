@@ -97,7 +97,7 @@ vi.mock("@/app/(app)/chat/chat-context", () => ({
         refresh: () => undefined,
         viewerId: "ada",
         viewerName: "Ada",
-        may: { spaces: true, groups: true, attach: true, call: true },
+        may: { spaces: true, groups: true, attach: true, call: true, meetings: true },
         orgId: null,
         orgName: null,
         channels: [

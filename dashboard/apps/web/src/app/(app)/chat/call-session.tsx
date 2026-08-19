@@ -117,9 +117,13 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
  * else - the microphone and hanging up - and a way back to the room. Everything
  * finer is over there.
  */
-export function CallBar({ channelId }: { channelId: string | null }) {
+export function CallBar({ onScreen }: { onScreen: string | null }) {
     const { call, session, leave } = useCallHold();
-    if (!session || session.channelId === channelId) return null;
+    // The room this bar is about, wherever it is drawn in full: a conversation
+    // for a call, the meeting itself for a meeting. Either way the bar is a way
+    // back to a place the reader is already standing in, so it stays away.
+    if (!session) return null;
+    if (session.channelId === onScreen || session.meetingId === onScreen) return null;
 
     const others = (call.meeting?.participants ?? []).filter(
         (person) => person.admission === "admitted" && person.id !== call.participantId
@@ -136,7 +140,7 @@ export function CallBar({ channelId }: { channelId: string | null }) {
                     )}
                 />
                 <Link
-                    href={`/chat/c/${session.channelId}`}
+                    href={session.href ?? `/chat/c/${session.channelId}`}
                     className="min-w-0 max-w-[12rem] truncate text-xs font-medium no-underline hover:underline"
                     title="Back to the call"
                 >

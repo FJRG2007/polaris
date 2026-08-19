@@ -17,12 +17,13 @@
 import * as core from "@polaris/core";
 import { callsUnavailableAction } from "./meeting-actions";
 import { listBlockedAction } from "@/app/(app)/account/privacy/actions";
-import { chatRulesAction, listCategoriesAction, listChannelsAction, listSpacesAction } from "./actions";
-import type {
-    ChatCategoryView,
-    ChatChannelView,
-    ChatSpaceView
-} from "@/lib/chat/chat-service";
+import {
+    chatRulesAction,
+    listCategoriesAction,
+    listChannelsAction,
+    listSpacesAction
+} from "./actions";
+import type { ChatCategoryView, ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
 import {
     createContext,
     useCallback,
@@ -51,6 +52,10 @@ export interface ChatAllowances {
     readonly attach: boolean;
     /** Be in a call. */
     readonly call: boolean;
+    /** Create a meeting anybody holding the link can join. Held by nobody until
+     *  an operator grants it - it is the one thing in Chat that reaches outside
+     *  Polaris. */
+    readonly meetings: boolean;
 }
 
 interface ChatContextValue {

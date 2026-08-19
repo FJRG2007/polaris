@@ -13,6 +13,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { redirect } from "next/navigation";
 import { GuestCall } from "./guest-call";
 import { getSession } from "@/lib/session";
 import { LinkUnavailable } from "@/components/public-shell";
@@ -26,7 +27,7 @@ export default async function GuestMeetingPage({ params }: { params: Promise<{ t
 
     const meeting = await prisma.meeting.findUnique({
         where: { guestToken: token },
-        select: { id: true, endedAt: true, title: true }
+        select: { id: true, endedAt: true, title: true, requireAccount: true }
     });
 
     if (!meeting || meeting.endedAt) {
@@ -35,6 +36,24 @@ export default async function GuestMeetingPage({ params }: { params: Promise<{ t
                 signedIn={Boolean(session?.user)}
                 title="Call unavailable"
                 message="This call has ended, or the link is no longer good."
+            />
+        );
+    }
+
+    // The host asked for accounts.
+    //
+    // Somebody signed in is sent to the meeting itself, where they arrive as
+    // themselves rather than as a name typed into a box - which is the whole
+    // point of the setting. Everybody else is told, here, before they type a
+    // name that was never going to be accepted; the link still names the meeting,
+    // which is how they know what they are being asked to sign in for.
+    if (meeting.requireAccount) {
+        if (session?.user) redirect(`/chat/meetings/${meeting.id}`);
+        return (
+            <LinkUnavailable
+                signedIn={false}
+                title={meeting.title || "Meeting"}
+                message="This meeting is only open to people signed in to Polaris. Sign in, then open the link again."
             />
         );
     }

@@ -28,6 +28,14 @@ export interface CallSession {
     /** What to call it in the bar, since the bar is drawn where there is no
      *  conversation header to read it off. */
     readonly title: string;
+    /**
+     * Where the bar leads back to, when that is not a conversation.
+     *
+     * A meeting is a room of its own: it has no channel, so the conversation the
+     * bar would otherwise point at does not exist. Left out, it is the
+     * conversation, which is every call started from one.
+     */
+    readonly href?: string;
 }
 
 export interface CallHold {

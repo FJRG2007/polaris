@@ -54,6 +54,7 @@ import {
     Settings2,
     Star,
     Trash2,
+    Video,
     Volume2
 } from "lucide-react";
 import {
@@ -99,7 +100,9 @@ export function ChatSidebar() {
         useChat();
     const params = useParams<{ channelId?: string }>();
     const open = params.channelId ?? null;
-    const saved = usePathname() === "/chat/saved";
+    const here = usePathname();
+    const saved = here === "/chat/saved";
+    const meetings = here.startsWith("/chat/meetings");
 
     const [folded, setFolded] = useState<readonly string[]>([]);
     const [newDirect, setNewDirect] = useState(false);
@@ -296,12 +299,27 @@ export function ChatSidebar() {
                 <Link
                     href="/chat/saved"
                     className={cn(
-                        "mb-3 flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover",
+                        "flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover",
                         saved ? "bg-card-hover text-foreground" : "text-muted-foreground"
                     )}
                 >
                     <Star className="size-3.5 shrink-0" />
                     <span>Saved messages</span>
+                </Link>
+
+                {/* In every rail for the same reason, and drawn for everybody:
+                    creating a meeting takes a grant, being invited to one does
+                    not, and somebody who has been invited needs the list far
+                    more than the person who made it. */}
+                <Link
+                    href="/chat/meetings"
+                    className={cn(
+                        "mb-3 flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover",
+                        meetings ? "bg-card-hover text-foreground" : "text-muted-foreground"
+                    )}
+                >
+                    <Video className="size-3.5 shrink-0" />
+                    <span>Meetings</span>
                 </Link>
 
                 {error && (

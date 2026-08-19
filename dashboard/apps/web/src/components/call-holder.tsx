@@ -27,13 +27,15 @@ export function CallHolder({
     const pathname = usePathname();
     if (!hasChat) return <>{children}</>;
 
-    // `/chat/c/<id>` and `/chat/c/<id>/<messageId>`: the conversation is the
-    // first segment after it, whatever follows.
-    const onScreen = /^\/chat\/c\/([^/]+)/.exec(pathname)?.[1] ?? null;
+    // The room being looked at, in either of the two shapes one has: a
+    // conversation at `/chat/c/<id>` (with or without a message after it), and a
+    // meeting at `/chat/meetings/<id>`. Both are places the call is already
+    // drawn in full, which is the one place the bar must not appear.
+    const onScreen = /^\/chat\/(?:c|meetings)\/([^/]+)/.exec(pathname)?.[1] ?? null;
 
     return (
         <CallProvider viewerId={viewerId}>
-            <CallBar channelId={onScreen} />
+            <CallBar onScreen={onScreen} />
             {children}
         </CallProvider>
     );

@@ -20,6 +20,12 @@
 
 import { randomBytes } from "node:crypto";
 import { prisma, type Prisma } from "@polaris/db";
+import {
+    MAX_MEETING_LINE,
+    MAX_MEETING_TITLE,
+    MAX_SCHEDULE_AHEAD_MS,
+    MEETING_LINES
+} from "./meeting-limits";
 import { blockersOf } from "@/lib/blocks";
 import { publishMeetingEvent } from "./meeting-events";
 import { publishChatChange, type CallState } from "./live";
@@ -1014,15 +1020,6 @@ async function closeMeeting(meetingId: string): Promise<void> {
  * address they sent last week would stop working. It ends when the host ends it.
  */
 
-/** How long a title may be. Long enough for a sentence about what the meeting
- *  is, short enough to sit in a row on a phone. */
-export const MAX_MEETING_TITLE = 120;
-
-/** How far ahead something may be put in the diary. A year is past the point
- *  where anybody is scheduling a call and into the point where somebody has
- *  typed the wrong year. */
-export const MAX_SCHEDULE_AHEAD_MS = 365 * 24 * 60 * 60 * 1000;
-
 /** How many meetings a list answers with. Past this it is not a list anybody
  *  reads, and a diary that long is a diary with something wrong in it. */
 const MOST_MEETINGS = 100;
@@ -1367,13 +1364,6 @@ async function requireHost(
  * It is where a link, an address or a name gets dropped while people are
  * talking, which is the one thing a call cannot do out loud.
  */
-export const MAX_MEETING_LINE = 2000;
-
-/** How much of the chat a browser is given. A call is not a conversation with a
- *  history to walk back through: this is the last of it, and there is no
- *  paging - what was said before somebody arrived was not said to them. */
-export const MEETING_LINES = 200;
-
 export interface MeetingLine {
     readonly id: string;
     /** The seat that said it, so a screen can tell its own lines apart. */

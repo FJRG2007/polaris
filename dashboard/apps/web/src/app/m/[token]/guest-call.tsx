@@ -17,6 +17,7 @@ import { Loader2, Video } from "lucide-react";
 import { useCall } from "@/app/(app)/chat/use-call";
 import { CallRoom } from "@/app/(app)/chat/call-room";
 import { CallAudio } from "@/app/(app)/chat/call-audio";
+import { MeetingChat } from "@/app/(app)/chat/meeting-chat";
 import { PublicShell } from "@/components/public-shell";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
 import { joinAsGuestAction, readCallAction } from "@/app/(app)/chat/meeting-actions";
@@ -76,7 +77,7 @@ export function GuestCall({
 
     if (seat?.admission === "admitted") {
         return (
-            <div className="flex h-screen flex-col">
+            <div className="flex h-screen flex-col overflow-hidden">
                 <header className="flex h-header shrink-0 items-center gap-2 border-b border-border px-4">
                     <Video className="size-4 text-muted-foreground" />
                     <span className="text-sm font-medium">{title || "Call"}</span>
@@ -153,13 +154,21 @@ export function GuestCall({
 function GuestRoom({ meetingId, onLeave }: { meetingId: string; onLeave: () => void }) {
     const call = useCall(meetingId, { video: true });
     return (
-        <>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
             {/* The room, played. In the dashboard this is mounted beside the
                 call so it survives walking away from the conversation; here
                 there is nowhere to walk, and it still has to be mounted by
                 somebody - the tiles carry the picture and nothing else. */}
             <CallAudio call={call} />
-            <CallRoom meetingId={meetingId} call={call} onLeave={onLeave} />
-        </>
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <CallRoom meetingId={meetingId} call={call} onLeave={onLeave} />
+            </div>
+            {/* The same column an account gets. A guest is in the same room, not
+                a lesser copy of it - and they are the person most likely to be
+                sent an address in it. */}
+            <aside className="flex min-h-0 w-full shrink-0 flex-col border-t border-border lg:w-80 lg:border-l lg:border-t-0">
+                <MeetingChat meetingId={meetingId} call={call} className="flex-1" />
+            </aside>
+        </div>
     );
 }
