@@ -27,14 +27,16 @@ extract() {
 eval "$(extract compose_hash)"
 eval "$(extract container_hash)"
 eval "$(extract container_image)"
+eval "$(extract container_ref)"
 eval "$(extract image_id)"
 eval "$(extract container_ready)"
 eval "$(extract wait_ready)"
 eval "$(extract edge_labels)"
 eval "$(extract retire)"
 eval "$(extract roll_dashboard)"
+eval "$(extract roll_service)"
 
-for fn in compose_hash container_hash container_image image_id container_ready wait_ready edge_labels retire roll_dashboard; do
+for fn in compose_hash container_hash container_image container_ref image_id container_ready wait_ready edge_labels retire roll_dashboard roll_service; do
     if ! command -v "$fn" >/dev/null 2>&1; then
         printf 'setup failed: %s was not extracted from %s\n' "$fn" "$update_sh" >&2
         exit 2
@@ -204,6 +206,123 @@ case "$retry_absent" in
     *"no container for: callserver"*|*"no container for:"*callserver*) ok "absent-service retry: the missing service is named in the log" ;;
     *) bad "absent-service retry: missing service was not named (logged:$retry_absent)" ;;
 esac
+
+# --- roll_service -----------------------------------------------------------
+# What decides whether a supporting service is recreated. The service this is
+# really about is the call server: it is host-networked and carries every call in
+# the deployment, so recreating that container drops all of them mid-sentence.
+# Doing it because some other service moved - or because a stale local image made
+# it look necessary - is a cost nobody agreed to pay.
+#
+# The fakes below are their own, because the ones above answer `*.Image*` for any
+# inspect format and that pattern also matches `.Config.Image`, which is the
+# reference rather than the digest. Here the two are told apart, which is the
+# whole mechanism being tested.
+svc_started=""
+SVC_CONTAINER=live1
+SVC_WANT_HASH=hash-a
+SVC_HAVE_HASH=hash-a
+SVC_REF="livekit/livekit-server:v1.13"
+SVC_RUNNING=sha-a
+SVC_RESOLVES=sha-a
+
+compose() {
+    case "$1 ${2:-}" in
+        "ps -q") [ -n "$SVC_CONTAINER" ] && printf '%s\n' "$SVC_CONTAINER" ;;
+        "config --hash") printf '%s %s\n' "${3:-}" "$SVC_WANT_HASH" ;;
+        "up -d") svc_started="$svc_started $*" ;;
+    esac
+}
+
+docker() {
+    case "$1 ${2:-}" in
+        "inspect --format")
+            case "$3" in
+                *Config.Image*) printf '%s' "$SVC_REF" ;;
+                *config-hash*) printf '%s' "$SVC_HAVE_HASH" ;;
+                *.Image*) printf '%s' "$SVC_RUNNING" ;;
+            esac
+            ;;
+        "image inspect") printf '%s' "$SVC_RESOLVES" ;;
+    esac
+}
+
+reset_service() {
+    svc_started=""
+    SVC_CONTAINER=live1
+    SVC_WANT_HASH=hash-a
+    SVC_HAVE_HASH=hash-a
+    SVC_REF="livekit/livekit-server:v1.13"
+    SVC_RUNNING=sha-a
+    SVC_RESOLVES=sha-a
+}
+
+build_flag=""
+
+# An update that changed nothing about this service must not touch it. This is
+# the case that matters most: every call in the deployment is riding on that
+# container staying up.
+reset_service
+roll_service livekit >/dev/null
+if [ -z "$svc_started" ]; then
+    ok "roll_service: an unchanged service is left running"
+else
+    bad "roll_service: an unchanged service was recreated (started:$svc_started)"
+fi
+
+# A patch upstream. `v1.13` is a moving tag - that is how patches are meant to
+# arrive - so the same name now resolves to a different image and the service has
+# to be recreated to pick it up.
+reset_service
+SVC_RESOLVES=sha-b
+roll_service livekit >/dev/null
+case "$svc_started" in
+    *livekit*) ok "roll_service: a genuinely newer image is picked up" ;;
+    *) bad "roll_service: a moved tag did not recreate the service (started:$svc_started)" ;;
+esac
+
+# The release changed the service's wiring. The image can be byte-identical and
+# the container still has to be recreated - this is the fault that shipped the
+# call server with no key, because nothing recreated it to mount the volume the
+# release had added.
+reset_service
+SVC_WANT_HASH=hash-b
+roll_service livekit >/dev/null
+case "$svc_started" in
+    *livekit*) ok "roll_service: changed wiring recreates it despite an identical image" ;;
+    *) bad "roll_service: changed wiring did not recreate the service (started:$svc_started)" ;;
+esac
+
+# A service this release adds, which has no container to compare against.
+reset_service
+SVC_CONTAINER=""
+roll_service livekit >/dev/null
+case "$svc_started" in
+    *livekit*) ok "roll_service: a service with no container is started" ;;
+    *) bad "roll_service: a service with no container was not started (started:$svc_started)" ;;
+esac
+
+# Compose too old to report a hash. It cannot prove the wiring is unchanged, so
+# the skip must not fire - the same harmless direction the rollover takes.
+reset_service
+SVC_WANT_HASH=""
+SVC_HAVE_HASH=""
+roll_service livekit >/dev/null
+case "$svc_started" in
+    *livekit*) ok "roll_service: an unreadable hash does not short-circuit the update" ;;
+    *) bad "roll_service: an unreadable hash skipped the service (started:$svc_started)" ;;
+esac
+
+# An image the engine cannot resolve is no evidence that anything changed, and
+# restarting on no evidence is exactly what this exists to stop.
+reset_service
+SVC_RESOLVES=""
+roll_service livekit >/dev/null
+if [ -z "$svc_started" ]; then
+    ok "roll_service: an unresolvable image leaves the container running"
+else
+    bad "roll_service: an unresolvable image recreated the service (started:$svc_started)"
+fi
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

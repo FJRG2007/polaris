@@ -240,6 +240,76 @@ roll_dashboard() {
     return 0
 }
 
+# Bring one supporting service onto this release, or leave it alone.
+#
+# The whole point of asking per service is what a recreate costs. This deployment
+# is meant to be sitting there all day like any other app somebody has open:
+# `livekit` is host-networked and carries every call in it, so recreating that
+# container drops all of them mid-sentence, and `postgres` recreating is every
+# screen at once. Restarting either because some OTHER service moved is a cost
+# nobody agreed to pay for an update that did not touch them.
+#
+# Two questions, both asked of the engine at the moment of asking - nothing is
+# cached, and nothing waits for a later run to notice:
+#
+#   - Its DEFINITION, as the hash compose stamps on a container it creates. A
+#     release that adds a volume, a variable or a label leaves the image
+#     byte-identical and still has to recreate the container. That is not
+#     hypothetical here: it is how the call server shipped, came up and found no
+#     key, because the dashboard was never recreated to mount the volume the
+#     release had added.
+#   - Its IMAGE, as the reference the running container was created from resolves
+#     to right now, after the pull above. `livekit/livekit-server:v1.13` and
+#     `traefik:v3.6` are moving tags: upstream rewrites them with patches, and
+#     that is how a patch is meant to arrive. When one has genuinely moved, the
+#     service is recreated; when it has not, it is left running.
+#
+# Anything this cannot answer falls back to recreating, which is the harmless
+# direction to be wrong in - except for an image it cannot resolve at all, where
+# the honest reading is "no evidence anything changed" and the container keeps
+# running what it was created from.
+roll_service() {
+    svc="$1"
+    id=$($compose ps -q "$svc" 2>/dev/null | head -n1)
+
+    # No container at all: a service this release adds, or one somebody stopped.
+    # Either way there is nothing to compare and something to start.
+    if [ -z "$id" ]; then
+        log "$svc: no container yet; starting it"
+        # shellcheck disable=SC2086 # deliberate word splitting: a build flag
+        $compose up -d --no-deps $build_flag "$svc" || err "$svc could not be started"
+        return 0
+    fi
+
+    want=$(compose_hash "$svc")
+    have=$(container_hash "$id")
+    if [ -n "$want" ] && [ -n "$have" ] && [ "$want" != "$have" ]; then
+        log "$svc: this release changes how it is wired; recreating it"
+        # shellcheck disable=SC2086 # deliberate word splitting: a build flag
+        $compose up -d --no-deps $build_flag "$svc" || err "$svc could not be updated"
+        return 0
+    fi
+    if [ -z "$want" ] || [ -z "$have" ]; then
+        log "$svc: cannot tell what it was created from; letting compose decide"
+        # shellcheck disable=SC2086 # deliberate word splitting: a build flag
+        $compose up -d --no-deps $build_flag "$svc" || err "$svc could not be updated"
+        return 0
+    fi
+
+    ref=$(container_ref "$id")
+    running=$(container_image "$id")
+    current=$([ -n "$ref" ] && image_id "$ref" || true)
+    if [ -n "$current" ] && [ -n "$running" ] && [ "$current" != "$running" ]; then
+        log "$svc: a newer ${ref} was published; recreating it"
+        # shellcheck disable=SC2086 # deliberate word splitting: a build flag
+        $compose up -d --no-deps $build_flag "$svc" || err "$svc could not be updated"
+        return 0
+    fi
+
+    log "$svc: unchanged; leaving it running"
+    return 0
+}
+
 # The definition compose would create a service from right now, as the same hash it
 # stamps onto a container it creates. Empty when compose is too old to be asked, which
 # the caller reads as "cannot tell" rather than as "unchanged".
@@ -248,6 +318,16 @@ compose_hash() {
 }
 
 # The definition a running container was actually created from.
+# The image REFERENCE a container was created from - `livekit/livekit-server:v1.13`,
+# not the digest it resolved to. Asking the engine rather than parsing the compose
+# file: a running container carries the name it was created from, and where the
+# definition is unchanged that name is still the one on disk. It is what makes
+# "has this tag moved under us" answerable without a YAML parser or a compose flag
+# this script cannot be sure of.
+container_ref() {
+    docker inspect --format '{{ .Config.Image }}' "$1" 2>/dev/null || true
+}
+
 container_hash() {
     docker inspect --format '{{ index .Config.Labels "com.docker.compose.config-hash" }}' "$1" 2>/dev/null
 }
@@ -453,9 +533,16 @@ main() {
         build_flag=""
         [ "$source" = "build" ] && build_flag="--build"
 
+        # Service by service rather than as a batch, so that what gets recreated
+        # is decided by whether THAT service moved - see `roll_service`. A batch
+        # `up` reaches the same answer in the ordinary case, but it reaches it
+        # silently: this says which container is being replaced and why, which is
+        # the difference between an update that can be read afterwards and one
+        # that has to be inferred from what broke.
         log "updating the supporting services"
-        # shellcheck disable=SC2086 # deliberate word splitting: a service list
-        $compose up -d --no-deps $build_flag $others || err "some supporting services did not come up"
+        for service in $others; do
+            roll_service "$service"
+        done
 
         # Which of them actually exist afterwards. A batch `up` reports one failure
         # for the whole list, so on its own the line above leaves the operator to

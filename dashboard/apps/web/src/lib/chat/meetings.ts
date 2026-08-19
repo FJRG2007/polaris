@@ -905,7 +905,35 @@ function isUniqueViolation(caught: unknown): boolean {
 }
 
 /** Drop anybody whose browser stopped saying it was there. */
+/**
+ * When this process started serving.
+ *
+ * Not a fact about any call, and it belongs here all the same: it is the only
+ * thing that separates a browser that went quiet from a server that was not
+ * there to hear it.
+ */
+const SERVING_SINCE = Date.now();
+
+/**
+ * Let go of anybody whose browser stopped saying it was there.
+ *
+ * With one exception, and it is the difference between a deployment that can be
+ * updated while people are using it and one that cannot. An update rolls this
+ * process over; a host reboots; a container is replaced. For however long that
+ * takes, every browser in every call goes quiet - not because anybody left, but
+ * because there was nothing listening. Swept on the first request afterwards,
+ * that silence empties every room in the deployment at once: the calls in them
+ * are closed for being empty, and what each person sees is their call dropping
+ * for no reason they can name, seconds after an update they were told was
+ * seamless.
+ *
+ * So a process that has only just started gives the rooms the same window it
+ * gives a browser before it believes silence. Anybody genuinely gone is swept
+ * one window later, which costs a stale name in a roster for half a minute -
+ * against ending every live call in the instance, that is not a close call.
+ */
 async function sweep(meetingId: string): Promise<void> {
+    if (Date.now() - SERVING_SINCE < PARTICIPANT_TTL_MS) return;
     await prisma.meetingParticipant.updateMany({
         where: {
             meetingId,
