@@ -69,7 +69,11 @@ export async function searchMessages(
     });
     const named = new Map(channels.map((channel) => [channel.id, channel]));
 
-    const decorated = await decorateMessages(actor, rows);
+    // Left out rather than folded away. In the conversation a blocked message is
+    // kept as a line so the replies under it still make sense; a result list has
+    // no such shape to preserve, and a row saying "blocked message" is a row that
+    // answers nothing somebody searched for.
+    const decorated = (await decorateMessages(actor, rows)).filter((message) => !message.blocked);
     return decorated.map((message) => {
         const channel = named.get(message.channelId);
         return {

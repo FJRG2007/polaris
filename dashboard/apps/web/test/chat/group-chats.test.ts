@@ -33,6 +33,8 @@ vi.mock("@polaris/auth", () => ({
 
 vi.mock("@polaris/db", () => ({
     prisma: {
+        // Nobody has blocked anybody here; blocking has its own test.
+        userBlock: { findMany: async () => [] },
         chatChannel: {
             findUnique: async () => ({
                 id: "channel-1",

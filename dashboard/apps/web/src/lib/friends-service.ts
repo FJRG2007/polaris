@@ -14,6 +14,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { blockedEitherWay } from "@/lib/blocks";
 import { contactLines } from "@/lib/privacy-service";
 import { notify } from "@/lib/notifications/dispatch";
 
@@ -36,6 +37,11 @@ export interface FriendRequestView {
     readonly outgoing: boolean;
     readonly askedAt: string;
 }
+
+/** Said where a block is what refuses, in both directions and naming neither.
+ *  A sentence that distinguished the two cases would tell somebody they have
+ *  been blocked, which is the one thing a block must not do. */
+const CANNOT_ASK = "You cannot send that request";
 
 export class FriendError extends Error {
     constructor(message: string) {
@@ -145,6 +151,12 @@ export async function requestFriend(userId: string, otherId: string): Promise<vo
     const other = await prisma.user.findUnique({ where: { id: otherId }, select: { id: true } });
     if (!other) throw new FriendError("That account is gone");
 
+    // Either direction, and nothing said about which. A request is a
+    // notification with somebody's name on it, which is precisely what a block
+    // is for; and asking to be friends with somebody you blocked yourself is a
+    // contradiction the screen should not have to explain twice.
+    if (await blockedEitherWay(userId, otherId)) throw new FriendError(CANNOT_ASK);
+
     const existing = await prisma.friendship.findFirst({
         where: {
             OR: [
@@ -236,6 +248,11 @@ export async function requestFriendByUsername(userId: string, username: string):
     // Nothing to say and nothing to do. Deliberately indistinguishable from the
     // case below, from the outside.
     if (!other || other.id === userId) return;
+    // And a block returns the same silence rather than the refusal `requestFriend`
+    // would raise. This path answers a typed username, so a refusal here would be
+    // a way to learn that the name exists AND that the account behind it blocked
+    // you - the two facts this whole function is written to withhold.
+    if (await blockedEitherWay(userId, other.id)) return;
 
     await requestFriend(userId, other.id);
 }

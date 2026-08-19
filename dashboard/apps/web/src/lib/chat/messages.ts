@@ -15,6 +15,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { rulesForChannel } from "./rules";
 import { publishChatChange } from "./live";
+import { blockedBy } from "@/lib/blocks";
 import { nicknamesFor } from "@/lib/contact-names";
 import { announceRoomMention } from "./room-mentions";
 import { noticePeople, renderNotice } from "./notice-text";
@@ -57,6 +58,19 @@ export interface ChatMessageView {
     /** Whether this reader kept it. Private to them - starring is a bookmark,
      *  not a signal to the room. */
     readonly starred: boolean;
+    /**
+     * Whether this reader has blocked whoever wrote it.
+     *
+     * The message is still carried rather than dropped, and the list draws it
+     * folded away with a way to look. Two reasons it is not simply left out: a
+     * conversation with holes in it reads as a bug rather than as a decision,
+     * and the replies underneath one would be answering nothing.
+     *
+     * Only ever the reader's own decision. A block set by the author against
+     * this reader changes nothing here - what they wrote is still what they
+     * wrote, and hiding it would tell the reader something they were not told.
+     */
+    readonly blocked: boolean;
     /**
      * Whether this reader may send it into another conversation.
      *
@@ -281,6 +295,7 @@ export async function send(
 ): Promise<string> {
     const access = await requirePostable(actor, input.channelId);
     await requireSendable(actor, access, input.body);
+    await refuseIfBlocked(actor, access);
 
     // Nothing but whitespace, whatever punctuation it serialized into. The
     // schema refuses an empty string and the composer refuses a blank one, and
@@ -392,6 +407,40 @@ export async function send(
     void announceRoomMention(input.channelId, actor.id, input.body, id).catch(() => undefined);
 
     return id;
+}
+
+/**
+ * Writing to somebody this account has blocked.
+ *
+ * Only that direction, and only in a one-to-one conversation. Blocking somebody
+ * is a decision about being reached, not a promise to stay silent, but a
+ * messenger that lets you write into a room you have shut is a messenger that
+ * will let you have a conversation with somebody who is not receiving it. So it
+ * is refused, and the sentence says exactly what to do about it - there is
+ * nothing to hide from the person who set the block.
+ *
+ * The other direction is deliberately not refused here. Somebody who has been
+ * blocked writes, and it is stored, and it reaches nobody: no toast, no unread,
+ * collapsed where it lands. That is the only shape that does not announce the
+ * block - an error appearing where messages used to send is the announcement,
+ * however carefully it is worded.
+ */
+async function refuseIfBlocked(actor: ChatActor, access: ChannelAccess): Promise<void> {
+    if (access.kind !== "dm") return;
+    const others = await prisma.chatChannelMember.findMany({
+        where: { channelId: access.channelId, userId: { not: actor.id } },
+        select: { userId: true, user: { select: { name: true } } }
+    });
+    if (others.length === 0) return;
+
+    const blocked = await blockedBy(
+        actor.id,
+        others.map((row) => row.userId)
+    );
+    if (blocked.size === 0) return;
+
+    const name = others.find((row) => blocked.has(row.userId))?.user.name || "them";
+    throw new ChatRuleError(`You blocked ${name}. Unblock them to send a message.`);
 }
 
 /**
@@ -1272,6 +1321,9 @@ export async function decorateMessages(
     // and deliberately not given one: chat has no instance-wide override, and a
     // setting about your own words is the last place to introduce the first.
     const mayForward = await allowedBy({ id: actor.id, isAdmin: false }, "forwarding", authorIds);
+    // One query for the page, the same shape as the nicknames above: a block is
+    // per reader, so it cannot be answered where the messages are.
+    const shut = await blockedBy(actor.id, authorIds);
     const names = new Map(
         [...authors, ...quoteAuthors].map((author) => [
             author.id,
@@ -1330,6 +1382,7 @@ export async function decorateMessages(
         attachments: onMessageFiles.get(row.id) ?? [],
         quote: quoteViewOf(row, quotes, names),
         starred: kept.has(row.id),
+        blocked: row.authorId !== null && shut.has(row.authorId),
         // A message whose author has since deleted their account carries no
         // setting to honour, and a deleted one has nothing left to send.
         forwardable:

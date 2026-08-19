@@ -60,6 +60,8 @@ function findUsers({ where }: { where: Record<string, unknown> }) {
 
 vi.mock("@polaris/db", () => ({
     prisma: {
+        // Nobody has blocked anybody here; blocking has its own test.
+        userBlock: { findMany: async () => [] },
         user: { findMany: async (args: { where: Record<string, unknown> }) => findUsers(args) },
         chatSpace: { findUnique: async () => null, findMany: async () => [] },
         chatSpaceMember: { findUnique: async () => null },

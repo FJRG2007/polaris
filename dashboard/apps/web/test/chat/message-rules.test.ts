@@ -80,6 +80,8 @@ vi.mock("@/lib/orgs/org-service", () => ({ memberOrgIds: async () => [] }));
 
 vi.mock("@polaris/db", () => {
     const client = {
+        // Nobody has blocked anybody here; blocking has its own test.
+        userBlock: { findMany: async () => [] },
         chatChannel: {
             findUnique: async () => ({
                 id: "channel-1",
@@ -98,6 +100,7 @@ vi.mock("@polaris/db", () => {
         chatSpaceMember: { findUnique: async () => null },
         chatChannelMember: {
             findUnique: async () => ({ role: "member" }),
+            findMany: async () => [],
             upsert: async () => undefined
         },
         chatMessage: {

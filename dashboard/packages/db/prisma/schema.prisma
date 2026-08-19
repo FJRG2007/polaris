@@ -186,6 +186,8 @@ model User {
     privacyFieldLists   PrivacyFieldList[]
     friendshipsAsked    Friendship[]         @relation("FriendshipRequester")
     friendshipsReceived Friendship[]         @relation("FriendshipAddressee")
+    blocking            UserBlock[]          @relation("UserBlockBlocker")
+    blockedBy           UserBlock[]          @relation("UserBlockBlocked")
 }
 
 // What somebody last searched for, so the panel opens on their own work.
@@ -6415,6 +6417,34 @@ model PrivacyFieldList {
 
     @@id([userId, field])
     @@index([listId])
+}
+
+// One account that has decided it does not want to hear from another.
+//
+// A person's own decision, and the opposite of a timeout in every way that
+// matters: a timeout is a room deciding somebody may not speak in it, ends by
+// itself, and is visible to whoever runs the room. This is one-sided, lasts
+// until it is lifted, and is nobody else's business - least of all the person
+// blocked, who is never told.
+//
+// Kept as a direction rather than a pair, because it is not symmetric: it says
+// nothing about how the other person feels, and each side can hold one without
+// the other. Everything that lets one account reach another asks about both
+// directions and refuses if either is set - a blocked account must not be able
+// to write to whoever blocked them, and somebody who blocked a person should not
+// be surprised by a conversation with them either.
+model UserBlock {
+    blockerId String   @db.Uuid
+    blockedId String   @db.Uuid
+    createdAt DateTime @default(now())
+
+    blocker User @relation("UserBlockBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+    blocked User @relation("UserBlockBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+    @@id([blockerId, blockedId])
+    // Answering "who has blocked me", which every reach check asks and which the
+    // primary key alone cannot serve.
+    @@index([blockedId])
 }
 
 // Two accounts that know each other.

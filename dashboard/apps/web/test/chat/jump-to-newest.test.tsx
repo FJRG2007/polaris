@@ -81,8 +81,16 @@ vi.mock("@/app/(app)/chat/use-chat-stream", () => ({
     }
 }));
 
+vi.mock("@/app/(app)/account/privacy/actions", () => ({
+    listBlockedAction: async () => ({ people: [] }),
+    blockPersonAction: async () => ({}),
+    unblockPersonAction: async () => ({})
+}));
+
 vi.mock("@/app/(app)/chat/chat-context", () => ({
     useChat: () => ({
+        blocked: new Set<string>(),
+        refresh: () => undefined,
         viewerId: "ada",
         viewerName: "Ada",
         may: { spaces: true, groups: true, attach: true, call: true },

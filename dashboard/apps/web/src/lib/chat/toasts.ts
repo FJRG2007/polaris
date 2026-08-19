@@ -14,12 +14,16 @@
  * - only conversations this reader is actually in;
  * - never a muted one, muted being worked out rather than read, since a mute
  *   with an end that has passed is not a mute;
+ * - never somebody they have blocked, which is the same rule as the mute and a
+ *   stronger one: a mute silences a room, and this silences a person in every
+ *   room at once;
  * - the text is the excerpt, not the Markdown, and never the reader's own
  *   message.
  */
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { blockedBy } from "@/lib/blocks";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { reachableChannelIds, type ChatActor } from "./access";
 
@@ -119,10 +123,22 @@ export async function messageToasts(
         : [];
     const names = new Map(authors.map((author) => [author.id, author.name]));
 
+    // Applied after the read rather than inside it, so one conversation whose
+    // newest message is from a blocked account falls through to nothing rather
+    // than announcing whatever they said before it.
+    const blocked = await blockedBy(
+        actor.id,
+        rows.map((row) => row.authorId).filter((id): id is string => id !== null)
+    );
+
     const seen = new Set<string>();
     const toasts: MessageToast[] = [];
     for (const row of rows) {
         if (seen.has(row.channelId)) continue;
+        if (row.authorId && blocked.has(row.authorId)) {
+            seen.add(row.channelId);
+            continue;
+        }
         seen.add(row.channelId);
 
         const others = row.channel.members

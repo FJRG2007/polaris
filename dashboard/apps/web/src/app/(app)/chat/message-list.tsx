@@ -395,6 +395,10 @@ function Message({
 }) {
     const format = useDisplayFormat();
     const [showingHistory, setShowingHistory] = useState(false);
+    // Per message and not remembered. Looking at one thing somebody blocked said
+    // is not a decision to start reading them again, and a reveal that outlived
+    // the scroll would quietly undo the block one line at a time.
+    const [revealed, setRevealed] = useState(false);
     const direct = useOpenDirect(onError);
     const author = message.authorName ?? "Somebody who has left";
     /** Who wrote it, when that is somebody other than the reader. Read out here
@@ -410,6 +414,27 @@ function Message({
         return (
             <p className="py-1 pl-14 pr-4 text-xs text-muted-foreground">
                 {message.body} <RelativeTime iso={message.createdAt} />
+            </p>
+        );
+    }
+
+    // Somebody this reader has blocked. Folded away rather than dropped: a
+    // conversation with gaps in it reads as messages that failed to load, and
+    // the replies underneath one would be answering nothing. Drawn at the same
+    // indent as a line Polaris wrote, because that is what it now is - a note
+    // saying something happened here, not the thing itself.
+    if (message.blocked && !revealed) {
+        return (
+            <p className="flex items-baseline gap-2 py-1 pl-14 pr-4 text-xs text-muted-foreground">
+                <span>Blocked message</span>
+                <button
+                    type="button"
+                    onClick={() => setRevealed(true)}
+                    className="rounded underline-offset-2 hover:underline focus-visible:underline"
+                >
+                    Show
+                </button>
+                <RelativeTime iso={message.createdAt} />
             </p>
         );
     }

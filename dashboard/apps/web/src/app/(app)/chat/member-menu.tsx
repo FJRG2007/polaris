@@ -15,7 +15,7 @@
  * I do about them. What differs is only which of the answers apply, and that is
  * decided here from the conversation rather than by whoever draws it.
  *
- * Two rules run through all of it and neither is arbitrary:
+ * Three rules run through all of it and none is arbitrary:
  *
  * **A group cannot ban.** A group is people who got there by invitation from
  * somebody already in it. There is no door to stand at, so taking somebody out
@@ -26,6 +26,12 @@
  * would be confusing, which is exactly the case for inviting somebody to a
  * server when you administer none. That one is shown and disabled, because "why
  * can I not invite people" is a question worth answering in place.
+ *
+ * **Blocking is not moderation, and it sits apart from it.** Timing somebody out
+ * is a room deciding something and needs standing in that room; blocking is one
+ * person deciding about their own attention and needs none. So it is the last
+ * item of what you do about a person rather than the first of what a moderator
+ * does, and it is the one thing here that everybody can reach.
  */
 
 import * as actions from "./actions";
@@ -37,6 +43,7 @@ import { setVolumeFor, volumeFor } from "./call-volumes";
 import { memberActions } from "./member-actions";
 import { useOpenDirect } from "./use-open-direct";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
+import { blockPersonAction, unblockPersonAction } from "@/app/(app)/account/privacy/actions";
 import {
     AtSign,
     Ban,
@@ -44,6 +51,7 @@ import {
     MessageSquare,
     Phone,
     PenLine,
+    ShieldBan,
     Timer,
     UserMinus,
     UserPlus,
@@ -124,7 +132,7 @@ export function MemberMenu({
     children: ReactNode;
 }) {
     const router = useRouter();
-    const { spaces } = useChat();
+    const { spaces, blocked, refresh } = useChat();
     const [busy, setBusy] = useState(false);
     const direct = useOpenDirect(onError);
     // Read once, when the menu is built. A volume is not something that changes
@@ -142,12 +150,36 @@ export function MemberMenu({
     const you = !may.any;
     const space = channel.spaceId;
     const invitable = may.invitable;
+    const shut = blocked.has(member.userId);
 
     const run = async (what: () => Promise<{ error?: string } | null>) => {
         setBusy(true);
         const result = await runAction(what, onError);
         setBusy(false);
         if (!result?.error) onChanged();
+    };
+
+    /**
+     * Block them, or let them through again.
+     *
+     * Its own handler rather than `run`, because the rail has to be asked again:
+     * a block changes what the conversation list carries - whether the composer
+     * offers a box or an explanation - and the roster reload `onChanged` does
+     * would leave that a screen behind.
+     */
+    const toggleBlock = async () => {
+        setBusy(true);
+        const result = await runAction(
+            () =>
+                shut
+                    ? unblockPersonAction({ userId: member.userId })
+                    : blockPersonAction({ userId: member.userId }),
+            onError
+        );
+        setBusy(false);
+        if (result?.error) return;
+        refresh();
+        onChanged();
     };
 
     const working = busy || direct.busy;
@@ -166,32 +198,48 @@ export function MemberMenu({
 
                 {!you && (
                     <>
-                        <ContextMenuItem
-                            disabled={working}
-                            onSelect={() => void direct.open(member.userId)}
-                        >
-                            <MessageSquare className="size-3.5" />
-                            Message
-                        </ContextMenuItem>
-                        {/* The same conversation, arriving with the call already
-                            starting. The address is what carries that, the way
-                            answering a call from outside a conversation does. */}
-                        <ContextMenuItem
-                            disabled={working}
-                            onSelect={() =>
-                                void direct.open(member.userId, (id) =>
-                                    router.push(`/chat/c/${id}?answer=1`)
-                                )
-                            }
-                        >
-                            <Phone className="size-3.5" />
-                            Call
-                        </ContextMenuItem>
-                        {onMention && (
-                            <ContextMenuItem onSelect={() => onMention(mentionOf(member))}>
-                                <AtSign className="size-3.5" />
-                                Mention
-                            </ContextMenuItem>
+                        {/* The three ways of reaching somebody, and all three
+                            go when this reader has blocked them - the server
+                            refuses each one, and it refuses them with a sentence
+                            that cannot say why. It cannot: naming the block
+                            would also name it in the case where the OTHER person
+                            set it, which is the one thing that must never be
+                            said. So the honesty lives here instead, where the
+                            block is this reader's own and Unblock is one item
+                            further down. */}
+                        {!shut && (
+                            <>
+                                <ContextMenuItem
+                                    disabled={working}
+                                    onSelect={() => void direct.open(member.userId)}
+                                >
+                                    <MessageSquare className="size-3.5" />
+                                    Message
+                                </ContextMenuItem>
+                                {/* The same conversation, arriving with the call
+                                    already starting. The address is what carries
+                                    that, the way answering a call from outside a
+                                    conversation does. */}
+                                <ContextMenuItem
+                                    disabled={working}
+                                    onSelect={() =>
+                                        void direct.open(member.userId, (id) =>
+                                            router.push(`/chat/c/${id}?answer=1`)
+                                        )
+                                    }
+                                >
+                                    <Phone className="size-3.5" />
+                                    Call
+                                </ContextMenuItem>
+                                {onMention && (
+                                    <ContextMenuItem
+                                        onSelect={() => onMention(mentionOf(member))}
+                                    >
+                                        <AtSign className="size-3.5" />
+                                        Mention
+                                    </ContextMenuItem>
+                                )}
+                            </>
                         )}
                         <ContextMenuItem onSelect={() => onNickname(member)}>
                             <PenLine className="size-3.5" />
@@ -248,6 +296,22 @@ export function MemberMenu({
                                 </ContextMenuSubContent>
                             </ContextMenuSub>
                         )}
+
+                        <ContextMenuSeparator />
+                        {/* Last in the group of things you do about a person,
+                            because it is the heaviest of them and because it is
+                            the one that should not be next to Message. Not in
+                            the moderation group below it either: that is a room
+                            deciding something, and this is not. */}
+                        <ContextMenuItem
+                            disabled={working}
+                            onSelect={() => void toggleBlock()}
+                        >
+                            <ShieldBan className={shut ? "size-3.5" : "size-3.5 text-danger"} />
+                            <span className={shut ? undefined : "text-danger"}>
+                                {shut ? "Unblock" : "Block"}
+                            </span>
+                        </ContextMenuItem>
                     </>
                 )}
 

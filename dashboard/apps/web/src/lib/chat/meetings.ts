@@ -20,6 +20,7 @@
 
 import { randomBytes } from "node:crypto";
 import { prisma, type Prisma } from "@polaris/db";
+import { blockersOf } from "@/lib/blocks";
 import { publishMeetingEvent } from "./meeting-events";
 import { publishChatChange, type CallState } from "./live";
 import { ChatAccessError, requireChannel, type ChatActor } from "./access";
@@ -220,19 +221,31 @@ export async function inviteToCall(
     return { meetingId: seat.meetingId, channelId: groupId, moved: true };
 }
 
-/** Ring exactly these people about this call. */
+/**
+ * Ring exactly these people about this call.
+ *
+ * Anybody who has blocked the caller is left out, and a ring with nobody left to
+ * hear it is not published at all. A telephone is the loudest thing one account
+ * can do to another, so it is the last place a block may be walked around - and
+ * this is where being brought into a call by a third person is caught, which
+ * every other check on the way here would have missed.
+ */
 async function ring(
     meetingId: string,
     channelId: string,
     actor: ChatActor & { name: string },
     audience: readonly string[]
 ): Promise<void> {
+    const shut = await blockersOf(actor.id, audience);
+    const heard = audience.filter((userId) => !shut.has(userId));
+    if (heard.length === 0) return;
+
     publishChatChange({
         channelId,
         kind: "call",
         actorId: actor.id,
         actorName: actor.name,
-        audience,
+        audience: heard,
         call: { meetingId, state: "ringing", count: await admittedCount(meetingId) }
     });
 }

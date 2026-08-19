@@ -18,6 +18,8 @@ let sinceCounts: Record<string, number> = {};
 
 vi.mock("@polaris/db", () => ({
     prisma: {
+        // Nobody has blocked anybody here; blocking has its own test.
+        userBlock: { findMany: async () => [] },
         chatChannelMember: { findMany: async () => members },
         chatChannel: { findMany: async () => channels },
         chatMessage: {

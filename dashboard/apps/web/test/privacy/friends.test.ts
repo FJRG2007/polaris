@@ -37,6 +37,8 @@ function match(row: Row, where: Record<string, unknown>): boolean {
 
 vi.mock("@polaris/db", () => ({
     prisma: {
+        // Nobody has blocked anybody here; blocking has its own test.
+        userBlock: { findFirst: async () => null },
         user: { findUnique: async () => ({ id: "grace" }) },
         friendship: {
             findFirst: async ({ where }: { where: Record<string, unknown> }) =>

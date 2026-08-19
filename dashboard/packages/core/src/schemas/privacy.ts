@@ -343,3 +343,22 @@ export const MESSAGE_RECEIPT_LABELS: Record<MessageReceipt, string> = {
     delivered: "Delivered",
     read: "Read"
 };
+
+/**
+ * How many people one account may block.
+ *
+ * A ceiling rather than a rule anybody will meet: it exists because a list with
+ * no limit is a list somebody can be made to write to forever, and because every
+ * check on the way to reaching somebody reads this list. A few hundred is well
+ * past any real use of it and still small enough to hold in memory.
+ */
+export const MOST_BLOCKED = 500;
+
+/** Blocking or unblocking one account. Who is doing it comes from the session
+ *  rather than from here: an id in a payload deciding whose block list is
+ *  written would be the whole vulnerability. */
+export const blockSchema = z.object({
+    userId: z.string().uuid()
+});
+
+export type BlockInput = z.infer<typeof blockSchema>;

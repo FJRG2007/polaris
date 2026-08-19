@@ -3,15 +3,21 @@
  */
 
 import * as core from "@polaris/core";
+import { listBlocked } from "@/lib/blocks";
 import { requireUser } from "@/lib/session";
 import { PrivacyView } from "./privacy-view";
+import { BlockedCard } from "./blocked-card";
 import { listsFor, namePeople, privacyFor } from "@/lib/privacy-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function PrivacyPage() {
     const session = await requireUser();
-    const [settings, lists] = await Promise.all([privacyFor(session.id), listsFor(session.id)]);
+    const [settings, lists, blocked] = await Promise.all([
+        privacyFor(session.id),
+        listsFor(session.id),
+        listBlocked(session.id)
+    ]);
     // Every name any rule needs, in one read: a row draws the people it names,
     // and it holds their ids.
     const people = await namePeople(core.PRIVACY_FIELDS.flatMap((field) => settings[field].people));
@@ -27,6 +33,7 @@ export default async function PrivacyPage() {
                 </p>
             </div>
             <PrivacyView settings={settings} lists={lists} people={people} />
+            <BlockedCard people={blocked} />
         </div>
     );
 }

@@ -13,6 +13,7 @@ import * as core from "@polaris/core";
 import { publishChatChange } from "./live";
 import { groupOwnerId } from "./ownership";
 import { prisma, type Prisma } from "@polaris/db";
+import { blockedBetween, blockedBy } from "@/lib/blocks";
 import { nicknamesFor } from "@/lib/contact-names";
 import { discardChannelFiles } from "./attachments";
 import { postNotice, postSpaceNotice } from "./notices";
@@ -99,6 +100,16 @@ export interface ChatChannelView {
     /** The other people in a direct message, for the avatars beside it. Empty
      *  for a named channel, where the name is the whole label. */
     readonly others: readonly { id: string; name: string }[];
+    /**
+     * Whether this reader has blocked the person on the other end of a
+     * one-to-one conversation. Always false anywhere else.
+     *
+     * Carried so the composer can say so and offer to lift it, rather than
+     * taking a message and refusing it. Only the reader's own decision: a block
+     * held against them is not theirs to be told about, and this field never
+     * says anything about one.
+     */
+    readonly blocked: boolean;
 }
 
 export interface ChatMemberView {
@@ -114,6 +125,17 @@ const UNREAD_CAP = 99;
 /** Said the same way wherever it is refused, because it is one situation and the
  *  next step is the same: an administrator switches the chat on for them. */
 const NO_CHAT = "Somebody there does not have the chat turned on";
+
+/**
+ * Said wherever a block is what refuses, and deliberately vague.
+ *
+ * One sentence for both directions and no name in it. Which of the two people
+ * decided, and which person it was, are the two things this must not give away:
+ * a refusal that says "they have blocked you" is the block telling the person
+ * it was set against, and one that names who in a group of five is the same
+ * leak with an extra step.
+ */
+const NO_REACH = "You cannot start that conversation";
 
 // ---------------------------------------------------------------------------
 // Spaces
@@ -590,6 +612,15 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
         actor.id,
         channels.flatMap((channel) => channel.members.map((member) => member.userId))
     );
+    // One read for the whole rail, and only over the people in one-to-one
+    // conversations: a block does not close a group or a channel, so asking
+    // about their members would be asking a question nothing here answers.
+    const shut = await blockedBy(
+        actor.id,
+        channels
+            .filter((channel) => channel.kind === "dm")
+            .flatMap((channel) => channel.members.map((member) => member.userId))
+    );
 
     return channels.map((channel) => {
         const others = channel.members
@@ -634,7 +665,9 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             ownerId: groupOwnerId(channel),
             membersMayEdit: channel.membersMayEdit,
             slowmode: channel.slowmode,
-            others: channel.spaceId ? [] : others
+            others: channel.spaceId ? [] : others,
+            blocked:
+                channel.kind === "dm" && others.some((other) => shut.has(other.id))
         };
     });
 }
@@ -1006,6 +1039,19 @@ export async function addChannelMembers(
     const missing = wanted.filter((userId) => !reachable.has(userId));
     if (missing.length > 0) throw new ChatAccessError(NO_CHAT);
 
+    // A block stops a group and leaves a channel alone, which is the difference
+    // between the two rooms rather than an inconsistency. A group is a personal
+    // room somebody assembles out of people they choose, and putting a blocked
+    // account in one is the block being walked around. A channel belongs to a
+    // space and its roster is an administrative decision - somebody's own
+    // decision about their own attention does not get to keep a colleague out
+    // of the room they work in. What the block does there is collapse what they
+    // say, which is where it belongs.
+    if (group) {
+        const blocked = await blockedBetween(actor.id, wanted);
+        if (blocked.size > 0) throw new ChatAccessError(NO_REACH);
+    }
+
     const already = new Set(
         (
             await prisma.chatChannelMember.findMany({
@@ -1180,6 +1226,13 @@ export async function openDirect(
     // convenience and this is the check.
     const reachable = await messageable(others);
     if (reachable.size !== others.length) throw new ChatAccessError(NO_CHAT);
+
+    // A block, in either direction, and the same sentence for both. Which of
+    // the two set it is not something this answer may give away: a message
+    // reading "they have blocked you" is the block announcing itself, and a
+    // different one for each case is the same thing said more slowly.
+    const blocked = await blockedBetween(actor.id, others);
+    if (blocked.size > 0) throw new ChatAccessError(NO_REACH);
 
     // Two people is a conversation and three is a group, which is a thing an
     // instance may withhold. Checked here rather than at the action, because a
@@ -1369,12 +1422,17 @@ async function unreadCounts(
     mine: ReadonlyMap<string, { lastReadAt: Date | null }>
 ): Promise<Map<string, number>> {
     const counted = new Map<string, number>();
+    // Read once and applied to both counts below. A blocked account writing into
+    // a room this reader is in must not light their badge: the whole of blocking
+    // somebody is not being made to look, and a number that says three messages
+    // are waiting is Polaris asking them to look.
+    const ignored = [actor.id, ...(await blockedIds(actor.id))];
     const grouped = await prisma.chatMessage.groupBy({
         by: ["channelId"],
         where: {
             channelId: { in: channels.map((channel) => channel.id) },
             deletedAt: null,
-            authorId: { not: actor.id },
+            authorId: { notIn: ignored },
             // Somebody joining is not somebody talking. A room that lit up
             // because a person walked into it is a badge that gets ignored,
             // which costs the messages that really are waiting.
@@ -1398,7 +1456,7 @@ async function unreadCounts(
                     channelId: channel.id,
                     deletedAt: null,
                     parentId: null,
-                    authorId: { not: actor.id },
+                    authorId: { notIn: ignored },
                     kind: { not: "system" },
                     createdAt: { gt: mark }
                 }
@@ -1413,6 +1471,17 @@ async function unreadCounts(
         counted.set(channel.id, Math.min(count, UNREAD_CAP));
     }
     return counted;
+}
+
+/** Everybody this account has blocked, as a plain list of ids. Its own helper
+ *  because the counts above need it as an array to sit inside a `notIn`, and a
+ *  set would only be turned back into one. */
+async function blockedIds(userId: string): Promise<string[]> {
+    const rows = await prisma.userBlock.findMany({
+        where: { blockerId: userId },
+        select: { blockedId: true }
+    });
+    return rows.map((row) => row.blockedId);
 }
 
 /** What a direct message is called: the people in it. Empty when the only other

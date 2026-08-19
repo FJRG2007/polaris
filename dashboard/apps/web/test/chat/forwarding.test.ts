@@ -74,6 +74,8 @@ let created: number;
 
 vi.mock("@polaris/db", () => {
     const client = {
+        // Nobody has blocked anybody here; blocking has its own test.
+        userBlock: { findMany: async () => [] },
         chatChannel: {
             findUnique: async () => ({
                 id: "channel-2",
@@ -88,6 +90,7 @@ vi.mock("@polaris/db", () => {
         },
         chatChannelMember: {
             findUnique: async () => ({ role: "member" }),
+            findMany: async () => [],
             updateMany: async () => undefined,
             upsert: async () => undefined
         },

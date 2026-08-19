@@ -13,6 +13,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { blockedBetween } from "@/lib/blocks";
 import { discoverableBy } from "@/lib/privacy-service";
 import { like } from "@/lib/rich-text/mention-service";
 
@@ -67,11 +68,24 @@ export async function findPeople(
     // Findable first, then usable. The order matters for the count: somebody who
     // has hidden themselves is not "an account that cannot be written to", they
     // are not an account this search knows about at all.
-    const visible = await discoverableBy(
-        { id: viewer.id, isAdmin: false },
-        found.map((person) => person.id)
-    );
-    const candidates = found.filter((person) => visible.has(person.id));
+    //
+    // A block is read the same way rather than as a refusal, and in both
+    // directions. Somebody who blocked this searcher is not a result they may
+    // not use - they are not a result, and a count saying otherwise would be the
+    // block announcing itself. Somebody this searcher blocked is left out for
+    // the plainer reason that picking them would open a conversation their own
+    // decision refuses to carry.
+    const [visible, blocked] = await Promise.all([
+        discoverableBy(
+            { id: viewer.id, isAdmin: false },
+            found.map((person) => person.id)
+        ),
+        blockedBetween(
+            viewer.id,
+            found.map((person) => person.id)
+        )
+    ]);
+    const candidates = found.filter((person) => visible.has(person.id) && !blocked.has(person.id));
 
     const allowed =
         options.reachableOnly && options.reachable

@@ -44,6 +44,7 @@ import { ChannelMembers, useMembersPanel } from "./members-panel";
 import { ForwardDialog } from "./forward-dialog";
 import { ArrowDown, Loader2, MessageCircle, Mic, Video, Volume2 } from "lucide-react";
 import { Button, ConfirmDeleteDialog, EmptyState, Skeleton, cn } from "@polaris/ui";
+import { unblockPersonAction } from "@/app/(app)/account/privacy/actions";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 /** How close to the bottom still counts as "following along". A few pixels of
@@ -122,6 +123,7 @@ export function ChannelView({
     const router = useRouter();
     const params = useSearchParams();
     const { viewerId, channels, refresh, rulesFor, may, callsOff } = useChat();
+    const [unblocking, setUnblocking] = useState(false);
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
     const [pending, setPending] = useState<readonly ChatMessageView[]>([]);
     const [olderThan, setOlderThan] = useState<string | null>(null);
@@ -253,6 +255,18 @@ export function ChannelView({
             : channel.name
         : "Call";
     const canPost = channel ? !channel.archived : true;
+
+    /** Let them through again, from the bar that replaced the composer. The rail
+     *  is asked again rather than patched: `blocked` is carried on the
+     *  conversation, and this screen reads it from there. */
+    const letThemThrough = async () => {
+        const other = channel?.others[0];
+        if (!other) return;
+        setUnblocking(true);
+        const result = await runAction(() => unblockPersonAction({ userId: other.id }), setError);
+        setUnblocking(false);
+        if (!result?.error) refresh();
+    };
     const canModerate = channel?.mayModerate ?? false;
     // What the instance allows in a conversation of this shape. Until the list
     // has arrived there is no channel to ask about, and the defaults are the
@@ -1010,6 +1024,9 @@ export function ChannelView({
             attachments: [],
             quote: null,
             starred: false,
+            // Nobody blocks themselves, and the menu that would offer it does
+            // not appear on your own row.
+            blocked: false,
             // Your own words, which your own setting never stands between you and.
             forwardable: true,
             // The server has not looked at any link in it yet. Left as settled
@@ -1315,6 +1332,26 @@ export function ChannelView({
                 </p>
             )}
 
+            {channel.blocked ? (
+                /* A conversation with somebody this reader blocked. The box is
+                   replaced rather than disabled: a greyed-out composer says
+                   "not now" and leaves them looking for why, and the way out of
+                   this one is a decision rather than a wait. */
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3">
+                    <p className="text-xs text-muted-foreground">
+                        You blocked {channel.name}. They cannot reach you, and you cannot write
+                        to them.
+                    </p>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={unblocking}
+                        onClick={() => void letThemThrough()}
+                    >
+                        Unblock
+                    </Button>
+                </div>
+            ) : (
             <Composer
                 channelId={channelId}
                 rules={rules}
@@ -1368,6 +1405,7 @@ export function ChannelView({
                     if (!result?.error) patchMessage(messageId, { body, edited: true });
                 }}
             />
+            )}
         </>
     );
 

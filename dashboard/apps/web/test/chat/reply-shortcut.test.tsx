@@ -28,8 +28,16 @@ vi.mock("@/app/(app)/chat/actions", () => ({
 
 // A name in a message is the person, and the person's menu asks the app which
 // room this is and what this reader runs - see `Writer`.
+vi.mock("@/app/(app)/account/privacy/actions", () => ({
+    listBlockedAction: async () => ({ people: [] }),
+    blockPersonAction: async () => ({}),
+    unblockPersonAction: async () => ({})
+}));
+
 vi.mock("@/app/(app)/chat/chat-context", () => ({
     useChat: () => ({
+        blocked: new Set<string>(),
+        refresh: () => undefined,
         channels: [
             {
                 id: "c1",

@@ -15,6 +15,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { loadEnv } from "@polaris/config";
 import * as access from "@/lib/tasks/access";
+import { blockedBy } from "@/lib/blocks";
 import { allowedBy } from "@/lib/privacy-service";
 import { memberOrgIds } from "@/lib/orgs/org-service";
 import { conversationAudience } from "@/lib/chat/access";
@@ -134,17 +135,29 @@ async function searchPeople(
         orderBy: { name: "asc" },
         take: limit
     });
+    // Nobody this account has blocked. Only that direction: leaving out somebody
+    // who blocked THEM would take a name out of a picker for a reason the person
+    // typing is not allowed to be told, and a name that quietly vanishes is how
+    // a block announces itself. Their own decision is a different matter - a
+    // name you have shut out is not one to be offered as you type.
+    const shut = await blockedBy(
+        actor.id,
+        users.map((user) => user.id)
+    );
+
     // The handle under the name rather than the address. It is what tells two
     // people with the same name apart, it is public by design - it is how
     // somebody is mentioned and found - and it is not the thing a picker open to
     // everybody in the room should be handing out.
-    return users.map((user) => ({
-        kind: "user" as const,
-        id: user.id,
-        label: user.name || handle(user.username),
-        detail: user.name ? handle(user.username) : "",
-        image: user.image
-    }));
+    return users
+        .filter((user) => !shut.has(user.id))
+        .map((user) => ({
+            kind: "user" as const,
+            id: user.id,
+            label: user.name || handle(user.username),
+            detail: user.name ? handle(user.username) : "",
+            image: user.image
+        }));
 }
 
 /** Somebody's handle, written the way it is elsewhere, or nothing. */

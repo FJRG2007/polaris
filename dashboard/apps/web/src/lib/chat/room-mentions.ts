@@ -19,10 +19,15 @@
  *
  * Somebody who has muted the conversation is not told. Muting is the answer to
  * "stop telling me about this room", and a mention of the room is the room.
+ *
+ * Nor is somebody who has blocked whoever wrote it. `@everyone` is the one place
+ * a blocked account can still reach a whole room's notifications without
+ * addressing anybody, which is exactly what a block is for.
  */
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { blockersOf } from "@/lib/blocks";
 import { onlineUserIds } from "@/lib/notifications/presence";
 import { createNotification } from "@/lib/notification-service";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
@@ -69,6 +74,7 @@ export async function announceRoomMention(
     const label = everyone ? "@everyone" : "@here";
 
     const quiet = await mutedIn(channelId);
+    const shut = await blockersOf(authorId, [...audience]);
     const where = channel.spaceId ? `#${channel.name}` : channel.name;
     const author = await prisma.user.findUnique({
         where: { id: authorId },
@@ -80,6 +86,7 @@ export async function announceRoomMention(
         [...audience]
             .filter((userId) => userId !== authorId)
             .filter((userId) => !quiet.has(userId))
+            .filter((userId) => !shut.has(userId))
             .filter((userId) => online === null || online.has(userId))
             .map((userId) =>
                 createNotification({

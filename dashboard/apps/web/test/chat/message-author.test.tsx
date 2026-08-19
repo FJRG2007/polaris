@@ -30,8 +30,16 @@ vi.mock("@/app/(app)/chat/actions", () => ({
     }
 }));
 
+vi.mock("@/app/(app)/account/privacy/actions", () => ({
+    listBlockedAction: async () => ({ people: [] }),
+    blockPersonAction: async () => ({}),
+    unblockPersonAction: async () => ({})
+}));
+
 vi.mock("@/app/(app)/chat/chat-context", () => ({
     useChat: () => ({
+        blocked: new Set<string>(),
+        refresh: () => undefined,
         channels: [
             {
                 id: "c1",

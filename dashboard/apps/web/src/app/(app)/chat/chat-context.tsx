@@ -16,6 +16,7 @@
 
 import * as core from "@polaris/core";
 import { callsUnavailableAction } from "./meeting-actions";
+import { listBlockedAction } from "@/app/(app)/account/privacy/actions";
 import { chatRulesAction, listCategoriesAction, listChannelsAction, listSpacesAction } from "./actions";
 import type {
     ChatCategoryView,
@@ -63,6 +64,16 @@ interface ChatContextValue {
     readonly channels: readonly ChatChannelView[];
     readonly spaces: readonly ChatSpaceView[];
     readonly categories: readonly ChatCategoryView[];
+    /**
+     * Everybody this reader has blocked, by id.
+     *
+     * Held here because the roster menu asks about one person at a time and the
+     * answer is one small list for the whole app - a lookup per name would be a
+     * request every time somebody right-clicks. Never anybody who has blocked
+     * this reader: that is not theirs to know, and nothing on the client is ever
+     * told it.
+     */
+    readonly blocked: ReadonlySet<string>;
     /** The space the rail is standing in, or null for direct messages. Held here
      *  rather than in the rail because two components read it: the column of
      *  spaces and the list beside it. */
@@ -114,6 +125,7 @@ export function ChatProvider({
     const [rules, setRules] = useState<Record<core.ChatRuleScope, core.ChatRules> | null>(null);
     const [spaces, setSpaces] = useState<readonly ChatSpaceView[]>([]);
     const [categories, setCategories] = useState<readonly ChatCategoryView[]>([]);
+    const [blocked, setBlocked] = useState<ReadonlySet<string>>(() => new Set());
     const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
 
     const refresh = useCallback(() => {
@@ -132,6 +144,11 @@ export function ChatProvider({
             .catch(() => undefined);
         void listCategoriesAction()
             .then((result) => setCategories(result.categories))
+            .catch(() => undefined);
+        // Blocking somebody changes what the roster offers and what the list
+        // draws, so it rides the same signal rather than needing its own.
+        void listBlockedAction()
+            .then((result) => setBlocked(new Set(result.people.map((person) => person.id))))
             .catch(() => undefined);
     }, []);
 
@@ -206,6 +223,7 @@ export function ChatProvider({
             channels,
             spaces,
             categories,
+            blocked,
             activeSpaceId,
             setActiveSpaceId,
             loaded,
@@ -222,6 +240,7 @@ export function ChatProvider({
             channels,
             spaces,
             categories,
+            blocked,
             activeSpaceId,
             loaded,
             refresh,

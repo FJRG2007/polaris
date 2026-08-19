@@ -1,17 +1,28 @@
 "use server";
 
 /**
- * Saving what this account is willing to show, and answering friend requests.
+ * Saving what this account is willing to show, answering friend requests, and
+ * deciding who it does not want to hear from.
  *
  * Every one of these is about the caller's own account. There is no id in any
- * signature for that reason: an action that took one would be an action that
- * could be pointed at somebody else.
+ * signature for whose account it is, and that is deliberate: an action that took
+ * one would be an action that could be pointed at somebody else. The ids that do
+ * appear name the other person - who to ask, who to block - which is a different
+ * thing.
+ *
+ * Blocking lives here rather than with the chat actions even though the roster
+ * is where it is usually reached from, for one reason that matters: these run
+ * behind `requireUser` and the chat's run behind `chat.use`. An account whose
+ * chat has been switched off can still be written to by mail, still turns up in
+ * a picker, and still has a block list - putting it behind the chat permission
+ * would take the setting away from exactly the people who cannot answer back.
  */
 
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { findPeople } from "@/lib/people-search";
+import { BlockError, block, listBlocked, unblock, type BlockedPerson } from "@/lib/blocks";
 import {
     PrivacyError,
     createList,
@@ -29,6 +40,10 @@ import {
 
 const PRIVACY_PATH = "/account/privacy";
 
+/** Blocking changes what the chat screens draw - a collapsed message, a composer
+ *  that says why - so they are told as well as this one. */
+const CHAT_PATH = "/chat";
+
 async function guard(run: () => Promise<void>): Promise<{ error?: string }> {
     try {
         await run();
@@ -38,6 +53,7 @@ async function guard(run: () => Promise<void>): Promise<{ error?: string }> {
         if (caught instanceof FriendError || caught instanceof PrivacyError) {
             return { error: caught.message };
         }
+        if (caught instanceof BlockError) return { error: caught.message };
         throw caught;
     }
 }
@@ -131,4 +147,42 @@ export async function respondToRequestAction(
 export async function removeFriendAction(userId: string): Promise<{ error?: string }> {
     const user = await requireUser();
     return guard(() => removeFriend(user.id, String(userId)));
+}
+
+// ---------------------------------------------------------------------------
+// Who this account does not want to hear from
+// ---------------------------------------------------------------------------
+
+/**
+ * Block somebody.
+ *
+ * Nothing is sent to them and nothing about their screen changes - see
+ * `lib/blocks`, where the rule and its reasons live. This only decides it.
+ */
+export async function blockPersonAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = core.blockSchema.safeParse(input);
+    if (!parsed.success) return { error: "That is not somebody this can block" };
+
+    const result = await guard(() => block(user.id, parsed.data.userId));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result;
+}
+
+/** Let them through again. */
+export async function unblockPersonAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = core.blockSchema.safeParse(input);
+    if (!parsed.success) return { error: "That is not somebody this can unblock" };
+
+    const result = await guard(() => unblock(user.id, parsed.data.userId));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result;
+}
+
+/** Everybody this account has blocked. Read by the screen that lifts one and by
+ *  the chat roster, which needs to know whether to offer Block or Unblock. */
+export async function listBlockedAction(): Promise<{ people: BlockedPerson[] }> {
+    const user = await requireUser();
+    return { people: await listBlocked(user.id) };
 }
