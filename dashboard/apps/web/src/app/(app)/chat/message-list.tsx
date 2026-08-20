@@ -113,6 +113,17 @@ export interface MessageListProps {
     /** A message to point at, after arriving from a search result. It fades on
      *  its own: a highlight that stays is a highlight somebody has to dismiss. */
     highlightId?: string | null;
+    /**
+     * Walk to a message in this same conversation, rather than navigating to it.
+     *
+     * A link to a message is an address, and following an address is a page
+     * load: the conversation it names is the one already open, so the route
+     * change fetches and redraws every line of it to end up where scrolling gets
+     * in one frame - and the reader watches the room they were reading blink
+     * away and come back. Given by the screen that owns the list and can scroll
+     * it; absent inside a thread, where the link still navigates.
+     */
+    onJumpTo?: (messageId: string) => void;
 }
 
 export function MessageList({
@@ -121,6 +132,7 @@ export function MessageList({
     canPost,
     canModerate,
     highlightId,
+    onJumpTo,
     onOpenThread,
     onReact,
     onStar,
@@ -240,6 +252,7 @@ export function MessageList({
                             onStar={onStar}
                             onMarkUnread={onMarkUnread}
                             inVoice={inVoice}
+                            onJumpTo={onJumpTo}
                             onReply={onReply}
                             onReplyPrivately={onReplyPrivately}
                             onForward={onForward}
@@ -412,6 +425,7 @@ function Message({
     onStar,
     onMarkUnread,
     inVoice,
+    onJumpTo,
     onReply,
     onReplyPrivately,
     onForward,
@@ -440,6 +454,9 @@ function Message({
      *  by the list. Empty until the answer arrives, which draws a card saying
      *  the room is empty for a moment rather than no card at all. */
     inVoice: ReadonlyMap<string, readonly VoicePresence[]>;
+    /** Scroll to a message quoted in this one instead of navigating to it - see
+     *  `MessageListProps`. */
+    onJumpTo?: (messageId: string) => void;
     onReply?: (message: ChatMessageView) => void;
     onReplyPrivately?: (message: ChatMessageView) => void;
     onForward?: (message: ChatMessageView) => void;
@@ -664,7 +681,7 @@ function Message({
                     )}
 
                     <LinkArea message={message} />
-                    <ReferenceCards message={message} inRoom={inVoice} />
+                    <ReferenceCards message={message} inRoom={inVoice} onJumpTo={onJumpTo} />
 
                     {message.attachments.length > 0 && (
                         <ul className="mt-1 flex flex-col gap-1">
@@ -1035,12 +1052,16 @@ const MOST_CARDS = 2;
  */
 function ReferenceCards({
     message,
-    inRoom
+    inRoom,
+    onJumpTo
 }: {
     message: ChatMessageView;
     /** Who is sitting in each voice room right now, gathered once for the whole
      *  conversation by the list above. */
     inRoom: ReadonlyMap<string, readonly VoicePresence[]>;
+    /** Scroll to a quoted message rather than navigating to it - see
+     *  `MessageListProps`. */
+    onJumpTo?: (messageId: string) => void;
 }) {
     const cards = message.references.filter(hasCard).slice(0, MOST_CARDS);
     // Called before the early return, which is where a hook has to be.
@@ -1056,7 +1077,7 @@ function ReferenceCards({
                     {found.kind === "channel" ? (
                         <VoiceCard reference={found} inRoom={inRoom.get(found.id) ?? []} />
                     ) : (
-                        <QuotedMessageCard reference={found} here={here} />
+                        <QuotedMessageCard reference={found} here={here} onJumpTo={onJumpTo} />
                     )}
                 </li>
             ))}
@@ -1158,7 +1179,8 @@ function saidWhat(reference: ChatReferenceView): string {
  *
  * Drawn as the message rather than as a link to it, which is the whole point:
  * the address said nothing, and this says what was said. It stays a link, so
- * pressing it lands on the line itself.
+ * pressing it lands on the line itself - by scrolling when the line is in the
+ * conversation on screen, and by travelling when it is not.
  *
  * What it shows is resolved every time it is read, never stored - so a message
  * edited after somebody pasted it reads as it is now, not as it was when the
@@ -1166,18 +1188,37 @@ function saidWhat(reference: ChatReferenceView): string {
  */
 function QuotedMessageCard({
     reference,
-    here
+    here,
+    onJumpTo
 }: {
     reference: ChatReferenceView;
     /** The conversation this card is being drawn in, which is what decides how
      *  much of the breadcrumb is worth saying. */
     here: { channelId: string; spaceId: string | null } | null;
+    /** Scroll to it rather than navigating - see `MessageListProps`. */
+    onJumpTo?: (messageId: string) => void;
 }) {
     const from = whereFrom(reference, here);
+    // Only for a message in the conversation on screen. One somewhere else is a
+    // real journey and stays a link, which is also what keeps this from
+    // rewriting the address to a room the reader is not in.
+    const jump = onJumpTo && here?.channelId === reference.channelId ? onJumpTo : null;
 
     return (
         <Link
             href={`/chat/c/${reference.channelId}/${reference.id}`}
+            onClick={
+                jump
+                    ? (event) => {
+                          // A click held with a modifier is somebody asking for
+                          // a tab or a window. That is the browser's to answer,
+                          // and it needs the address left alone.
+                          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                          event.preventDefault();
+                          jump(reference.id);
+                      }
+                    : undefined
+            }
             className="block max-w-md rounded-md border-l-2 border-primary bg-primary/5 px-3 py-2 no-underline transition-colors hover:bg-primary/10"
         >
             {from && (

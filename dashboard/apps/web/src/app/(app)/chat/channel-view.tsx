@@ -677,6 +677,32 @@ export function ChannelView({
     }, [channel, messageId, messages, jumpTo]);
 
     /**
+     * A link to a message in this same conversation, followed without leaving it.
+     *
+     * The address of a message is the conversation's with the message on the
+     * end, so pressing one quoted here is a navigation to the room already open:
+     * it unmounts this screen, fetches the conversation again and redraws every
+     * line of it, to arrive where scrolling gets in a frame. The reader sees the
+     * room they were reading blink out and come back.
+     *
+     * So the scroll happens instead, and the address is written rather than
+     * navigated to - the line is still what a copied URL or a reload lands on,
+     * which is the whole of what the route was giving. Written and not pushed:
+     * this is the same page it already was, and a back button that walks through
+     * every message somebody glanced at is not a history anybody wants.
+     */
+    const jumpHere = useCallback(
+        (target: string) => {
+            window.history.replaceState(null, "", `/chat/c/${channelId}/${target}`);
+            // Whatever the address says now has been landed on, so the effect
+            // above does not walk back to it a second time.
+            landed.current = target;
+            void jumpTo(target);
+        },
+        [channelId, jumpTo]
+    );
+
+    /**
      * The ticks, asked for again.
      *
      * The other person read the conversation. Nothing about the messages
@@ -1290,6 +1316,7 @@ export function ChannelView({
                         onReact={react}
                         onStar={star}
                         onMarkUnread={markUnread}
+                        onJumpTo={jumpHere}
                         onReply={setReplyingTo}
                         // Not in a direct message, where every reply is
                         // already private and the item would do nothing
