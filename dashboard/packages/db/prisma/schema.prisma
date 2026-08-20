@@ -6297,6 +6297,19 @@ model ChatAttachment {
     // written once, read whole and never queried, and because sixty-four
     // characters is smaller than any structure that would hold the same numbers.
     waveform     String?
+    // A still from a video, taken by the browser that sent it and written beside
+    // it. Null for everything that is not a video, and for videos sent before
+    // there was one.
+    //
+    // Kept rather than made on demand because the alternative is every reader
+    // fetching the head of every video in the room to draw a frame - which is
+    // the thing a thumbnail exists to avoid. It is a few kilobytes against a
+    // file that is measured in megabytes, and it is the difference between a
+    // list of black rectangles and a list somebody can read.
+    posterPath   String?
+    // Where that still is, on the same terms as the file itself: a storage that
+    // moves next month must not orphan the ones already written.
+    posterConnectionId String? @db.Uuid
     createdAt    DateTime @default(now())
 
     message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
@@ -6366,6 +6379,10 @@ model ChatScheduledFile {
     path         String
     durationMs   Int?
     waveform     String?
+    // The still that came with it, carried across so a message scheduled with a
+    // video arrives with the same thumbnail it would have had.
+    posterPath   String?
+    posterConnectionId String? @db.Uuid
     createdAt    DateTime @default(now())
 
     scheduled ChatScheduledMessage @relation(fields: [scheduledId], references: [id], onDelete: Cascade)

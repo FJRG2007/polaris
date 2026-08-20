@@ -154,6 +154,10 @@ export interface StoredAttachment {
     readonly durationMs: number | null;
     /** Its shape, one digit a bar. */
     readonly waveform: string | null;
+    /** Where the still taken from a video lives, and on which storage. Null for
+     *  everything that is not a video. */
+    readonly posterPath: string | null;
+    readonly posterConnectionId: string | null;
 }
 
 /**
@@ -221,7 +225,15 @@ export async function storeAttachment(
     channelId: string,
     file: { name: string; type: string; bytes: Uint8Array },
     /** What the browser said about the sound of it, for a recording. */
-    sound?: SoundDetail
+    sound?: SoundDetail,
+    /**
+     * A still the browser took from a video, to draw before anybody plays it.
+     *
+     * Written beside the file and never instead of it. A failure to write it is
+     * not a failure to send the message: the worst case is a list that draws a
+     * black rectangle where it would have drawn a frame.
+     */
+    poster?: Uint8Array | null
 ): Promise<StoredAttachment> {
     if (file.bytes.length > MAX_ATTACHMENT_BYTES) throw new Error("That file is too big");
 
@@ -249,19 +261,85 @@ export async function storeAttachment(
         throw new AttachmentStorageError(reason(error));
     }
 
+    const still = poster && poster.length > 0 ? await placePoster(folder, path, poster) : null;
+
     return {
         name: file.name.slice(0, 200) || "file",
         size: file.bytes.length,
         contentType: file.type || "application/octet-stream",
         connectionId: placed.targetId === LOCAL_TARGET ? null : placed.targetId,
         path,
+        posterPath: still?.path ?? null,
+        posterConnectionId: still?.connectionId ?? null,
         ...soundOf(sound)
     };
+}
+
+/**
+ * The biggest a still may be.
+ *
+ * A JPEG of a screen at 640 pixels across is twenty kilobytes; a hundred is the
+ * ceiling on what a browser may claim is a thumbnail. It arrives from a client
+ * like everything else here.
+ */
+const MAX_POSTER_BYTES = 100 * 1024;
+
+/**
+ * Write the still beside the file it is of.
+ *
+ * Beside rather than in a folder of its own, so a conversation's files stay one
+ * folder that an operator can find, back up or delete in one go - which is the
+ * whole reason the attachments are laid out the way they are.
+ *
+ * Never fatal. A message with its video and no thumbnail is a message; a message
+ * refused because a thumbnail could not be written is a bug.
+ */
+async function placePoster(
+    folder: string,
+    path: string,
+    bytes: Uint8Array
+): Promise<{ path: string; connectionId: string | null } | null> {
+    if (bytes.length > MAX_POSTER_BYTES) return null;
+    const posterPath = `${path}.poster.jpg`;
+    try {
+        const placed = await placeFile({
+            target: await chatTarget(),
+            localFolder: LOCAL_FOLDER,
+            folder,
+            path: posterPath,
+            bytes,
+            mime: "image/jpeg",
+            what: "thumbnail"
+        });
+        return {
+            path: posterPath,
+            connectionId: placed.targetId === LOCAL_TARGET ? null : placed.targetId
+        };
+    } catch (error) {
+        console.error("chat: could not write a thumbnail:", error);
+        return null;
+    }
 }
 
 /** How long one chunk of a download may take before the storage is treated as
  *  gone. Somebody is waiting on a player, so it is shorter than the write. */
 const READ_TIMEOUT_MS = 20_000;
+
+/**
+ * The still taken from a video, or null when there is none.
+ *
+ * Its own read rather than part of the attachment's, because the two are asked
+ * for at different times and by different screens: a list draws forty
+ * thumbnails and none of the files.
+ */
+export async function readAttachmentPoster(attachmentId: string): Promise<Uint8Array | null> {
+    const row = await prisma.chatAttachment.findUnique({
+        where: { id: attachmentId },
+        select: { posterPath: true, posterConnectionId: true }
+    });
+    if (!row?.posterPath) return null;
+    return readStored(row.posterConnectionId, row.posterPath, `thumbnail ${attachmentId}`);
+}
 
 /** Read one back, for the download route. Null when the bytes are gone. */
 export async function readAttachment(attachmentId: string): Promise<{
@@ -457,7 +535,7 @@ export async function discardEvidence(reportIds: readonly string[]): Promise<voi
 export async function discardAttachments(messageId: string): Promise<void> {
     const files = await prisma.chatAttachment.findMany({
         where: { messageId },
-        select: { id: true, connectionId: true, path: true }
+        select: { id: true, connectionId: true, path: true, posterPath: true, posterConnectionId: true }
     });
     if (files.length === 0) return;
 
@@ -468,7 +546,14 @@ export async function discardAttachments(messageId: string): Promise<void> {
     // indexed lookup that finds nothing.
     await keepForReports(files.map((file) => file.id));
 
-    await removeStoredFiles(files);
+    await removeStoredFiles([
+        ...files,
+        // The still goes with the file it is of. Nothing else points at it, and a
+        // thumbnail left on a NAS is a disk that only fills up.
+        ...files
+            .filter((file) => file.posterPath)
+            .map((file) => ({ connectionId: file.posterConnectionId, path: file.posterPath! }))
+    ]);
 }
 
 /**

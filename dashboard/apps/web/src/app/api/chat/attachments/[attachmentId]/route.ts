@@ -25,7 +25,8 @@ import {
     diagnoseAttachment,
     isInlineImage,
     isPlayableMedia,
-    readAttachment
+    readAttachment,
+    readAttachmentPoster
 } from "@/lib/chat/attachments";
 
 export const runtime = "nodejs";
@@ -55,6 +56,24 @@ export async function GET(
     if (!(await channelAccess({ id: user.id }, channelId))) {
         console.warn(`chat: ${user.id} may not read attachment ${attachmentId}`);
         return new Response(null, { status: 404 });
+    }
+
+    // The still, when that is what was asked for. Its own answer rather than its
+    // own route: the question "may this reader see this attachment" has already
+    // been settled above, and a second route would settle it a second way.
+    if (new URL(request.url).searchParams.get("poster") === "1") {
+        const poster = await readAttachmentPoster(attachmentId);
+        if (!poster) return new Response(null, { status: 404 });
+        return new Response(poster as unknown as BodyInit, {
+            headers: {
+                "Content-Type": "image/jpeg",
+                "Content-Length": String(poster.length),
+                "Cache-Control": CACHE,
+                "X-Content-Type-Options": "nosniff",
+                "Content-Security-Policy": "default-src 'none'; sandbox",
+                "Content-Disposition": "inline"
+            }
+        });
     }
 
     const file = await readAttachment(attachmentId);

@@ -25,8 +25,8 @@ import * as core from "@polaris/core";
 import { typingAction } from "./actions";
 import { EmojiPicker } from "./emoji-picker";
 import { ClipDialog } from "./clip-dialog";
+import { MicSettings } from "./mic-settings";
 import { VideoPreview } from "@/components/video-preview";
-import { useMicrophones } from "./mic-device";
 import { ScheduleDialog } from "./schedule-dialog";
 import { canRecordClip } from "./clip-recorder";
 import type { ChatMessageView } from "@/lib/chat/messages";
@@ -44,7 +44,6 @@ import {
 import {
     CalendarClock,
     Camera,
-    Check,
     ChevronDown,
     CornerUpLeft,
     Image as ImageIcon,
@@ -61,9 +60,6 @@ import {
     cn,
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
     DropdownMenuTrigger
 } from "@polaris/ui";
 
@@ -855,23 +851,23 @@ export function Composer({
 }
 
 /**
- * Record, and pick what to record with.
+ * Record, and set up what records.
  *
- * The button starts the recording and the chevron beside it chooses the
- * microphone - the same shape the call controls use, and for the same reason:
- * which device to use is decided once, and it must not slow down the thing that
- * is decided every time.
+ * The button starts the recording and the chevron beside it opens everything
+ * about the microphone - which one, how much is done to what it hears, and how
+ * loud it goes out. The same shape the call controls use, and for the same
+ * reason: those are decided once, and they must not slow down the thing that is
+ * decided every time.
  *
- * The chevron is only there where there is a choice to make. It also only appears
- * once a microphone permission has been granted, because a browser will not name
- * devices before that - a menu of "Microphone 1, Microphone 2" is not a choice
- * anybody can make.
+ * Always there, unlike before: it used to appear only where a second microphone
+ * existed, which hid the noise and level settings from every laptop with one
+ * built-in microphone - the machines that need them most.
  *
- * The choice is this browser's, shared with calls: see `mic-device`.
+ * Every choice behind it is this browser's and is shared with calls and clips:
+ * see `MicSettings`.
  */
 function MicButton({ disabled, onStart }: { disabled: boolean; onStart: () => void }) {
-    const { devices, chosenId, choose } = useMicrophones();
-    const many = devices.length > 1;
+    const many = true;
 
     return (
         <span className="flex items-center">
@@ -894,30 +890,25 @@ function MicButton({ disabled, onStart }: { disabled: boolean; onStart: () => vo
                         <button
                             type="button"
                             disabled={disabled}
-                            aria-label="Choose a microphone"
-                            title="Choose a microphone"
+                            aria-label="Microphone settings"
+                            title="Microphone settings"
                             className="rounded rounded-l-none py-1.5 pl-0.5 pr-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                         >
                             <ChevronDown className="size-3" />
                         </button>
                     </DropdownMenuTrigger>
-                    {/* Upward: the composer is at the bottom of the screen. */}
-                    <DropdownMenuContent align="start" side="top" className="max-w-72">
-                        <DropdownMenuLabel>Microphone</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {devices.map((device) => (
-                            <DropdownMenuItem key={device.id} onSelect={() => choose(device.id)}>
-                                <Check
-                                    className={cn(
-                                        "size-3.5 shrink-0",
-                                        device.id === chosenId ? "opacity-100" : "opacity-0"
-                                    )}
-                                />
-                                <span className="truncate" title={device.label}>
-                                    {device.label}
-                                </span>
-                            </DropdownMenuItem>
-                        ))}
+                    {/* Upward: the composer is at the bottom of the screen.
+                        The settings are drawn rather than listed as menu items,
+                        because one of them is a slider and a menu that closes on
+                        every press is no place for one - a plain button inside a
+                        menu surface is not an option, so nothing closes when one
+                        is pressed. */}
+                    <DropdownMenuContent
+                        align="start"
+                        side="top"
+                        className="w-72"
+                    >
+                        <MicSettings className="p-1" />
                     </DropdownMenuContent>
                 </DropdownMenu>
             )}

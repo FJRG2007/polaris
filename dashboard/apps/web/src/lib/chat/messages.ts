@@ -134,6 +134,9 @@ export interface ChatAttachmentView {
     readonly durationMs: number | null;
     /** Its shape, one digit a bar, drawn under the play button. */
     readonly waveform: string | null;
+    /** Whether there is a still to draw before anybody plays it. Not the still
+     *  itself: it is fetched by its own route, like the file. */
+    readonly hasPoster: boolean;
 }
 
 /** The message a reply or a forward stands on, as the quote line draws it. */
@@ -1407,6 +1410,7 @@ export async function decorateMessages(
                 name: true,
                 size: true,
                 waveform: true,
+                posterPath: true,
                 messageId: true,
                 durationMs: true,
                 contentType: true
@@ -1472,6 +1476,7 @@ export async function decorateMessages(
             name: file.name,
             size: Number(file.size),
             waveform: file.waveform,
+            hasPoster: file.posterPath !== null,
             durationMs: file.durationMs,
             contentType: file.contentType,
             inline: isInlineImage(file.contentType)

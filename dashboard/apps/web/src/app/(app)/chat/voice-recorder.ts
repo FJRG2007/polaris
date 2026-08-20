@@ -17,7 +17,9 @@
  * back here.
  */
 
-import { micConstraints } from "./mic-cleanup";
+import { micGain } from "./mic-gain";
+import { filterMic, type FilteredMic } from "./mic-filter";
+import { micCleanup, micConstraints } from "./mic-cleanup";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
@@ -201,11 +203,23 @@ export function useVoiceRecording(
     const done = useRef(onRecorded);
     done.current = onRecorded;
 
+    /** The microphone as the browser opened it, and the graph between it and
+     *  what is being recorded. Both have to be let go of, and neither is what
+     *  `recorder.current.stream` points at. */
+    const opened = useRef<MediaStream | null>(null);
+    const processed = useRef<FilteredMic | null>(null);
+
     const release = useCallback(() => {
         if (ticker.current) clearInterval(ticker.current);
         ticker.current = null;
         for (const track of recorder.current?.stream.getTracks() ?? []) track.stop();
         recorder.current = null;
+        // The graph and then the microphone under it, in that order: stopping
+        // the device first leaves the graph reading from a dead track.
+        void processed.current?.stop().catch(() => undefined);
+        processed.current = null;
+        for (const track of opened.current?.getTracks() ?? []) track.stop();
+        opened.current = null;
         // The graph goes with the microphone. A context left open holds the
         // audio hardware awake for a conversation nobody is recording in.
         void listener.current?.close().catch(() => undefined);
@@ -226,8 +240,27 @@ export function useVoiceRecording(
 
         void navigator.mediaDevices
             .getUserMedia({ audio: micConstraints() })
-            .then((stream) => {
+            .then(async (raw) => {
+                // The same cleanup and the same level a call goes out at. A
+                // voice message recorded through the untouched microphone while
+                // calls have the model on it is the same person sounding like
+                // two different rooms, and the setting that says otherwise is
+                // one setting.
+                const built = await filterMic(
+                    raw.getAudioTracks()[0]!,
+                    micCleanup(),
+                    null,
+                    micGain()
+                ).catch(() => null);
+                processed.current = built;
+                // What is recorded is what comes out of the graph; what is
+                // metered and what is stopped is still the microphone itself.
+                const stream = built ? new MediaStream([built.track]) : raw;
                 const media = new MediaRecorder(stream, { mimeType: type });
+                // Held so the raw microphone is released with everything else -
+                // a recorder built on the processed track knows nothing about
+                // the device behind it.
+                opened.current = raw;
                 recorder.current = media;
                 chunks.current = [];
                 keep.current = true;
@@ -264,7 +297,10 @@ export function useVoiceRecording(
                 const analyser = listening.createAnalyser();
                 analyser.fftSize = 1024;
                 analyser.smoothingTimeConstant = 0.2;
-                listening.createMediaStreamSource(stream).connect(analyser);
+                // Metered from the microphone rather than from the graph: the
+                // meter is there to say "it can hear you", which is a question
+                // about the room and not about what was done to it afterwards.
+                listening.createMediaStreamSource(raw).connect(analyser);
                 const frame = new Uint8Array(analyser.fftSize);
 
                 media.start();

@@ -21,9 +21,15 @@
  */
 
 import { cn } from "@polaris/ui";
-import { Pause, Play } from "lucide-react";
+import { useAudioVolume } from "./audio-volume";
 import { useEffect, useRef, useState } from "react";
 import { barsOf, spokenLength } from "./voice-recorder";
+import { Pause, Play, Volume1, Volume2, VolumeX } from "lucide-react";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuTrigger
+} from "@polaris/ui";
 
 /** What a bar shows when the level was nothing at all - a line, so the shape
  *  still reads as a strip of sound rather than a gap in one. */
@@ -82,6 +88,10 @@ export function VoiceNote({
     // change under somebody's finger.
     const [speed, setSpeed] = useState(1);
     useEffect(() => setSpeed(rememberedSpeed()), []);
+    /** How loud every recording in every conversation plays. One level rather
+     *  than one per message: somebody turning this down is saying how loud the
+     *  room should be. */
+    const [volume, setVolume] = useAudioVolume();
 
     // What was stored wins: it was measured while recording, and the file itself
     // may never admit to a duration at all.
@@ -151,6 +161,14 @@ export function VoiceNote({
         if (audio.current) audio.current.playbackRate = speed;
     }, [speed]);
 
+    // The same, for the level. Applied to every player on the screen at once,
+    // because they all read the one setting - a level that took effect on the
+    // next message rather than on the one being listened to would be a control
+    // nobody trusts.
+    useEffect(() => {
+        if (audio.current) audio.current.volume = volume;
+    }, [volume]);
+
     const faster = () => {
         const next = SPEEDS[(SPEEDS.indexOf(speed as (typeof SPEEDS)[number]) + 1) % SPEEDS.length] ?? 1;
         setSpeed(next);
@@ -168,6 +186,7 @@ export function VoiceNote({
         setBroken("");
         if (element.paused) {
             element.playbackRate = speed;
+            element.volume = volume;
             void element.play().then(() => setPlaying(true));
         } else {
             element.pause();
@@ -312,6 +331,52 @@ export function VoiceNote({
                 >
                     {speed}x
                 </button>
+
+                {/* How loud the recordings in this conversation are, on the
+                    thing being listened to. Behind a press rather than always on
+                    screen: it is set once and then never again, and a slider on
+                    every message would be a slider on forty messages. */}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <button
+                            type="button"
+                            aria-label={`Volume, ${Math.round(volume * 100)} per cent`}
+                            title="Volume"
+                            className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
+                        >
+                            {volume === 0 ? (
+                                <VolumeX className="size-3.5" />
+                            ) : volume < 0.5 ? (
+                                <Volume1 className="size-3.5" />
+                            ) : (
+                                <Volume2 className="size-3.5" />
+                            )}
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" side="top" className="w-56 p-3">
+                        <span className="flex items-center justify-between gap-2 pb-2 text-xs">
+                            <span className="font-medium text-foreground-subtle">
+                                Recordings volume
+                            </span>
+                            <span className="tabular-nums text-muted-foreground">
+                                {Math.round(volume * 100)}%
+                            </span>
+                        </span>
+                        <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            step={5}
+                            value={Math.round(volume * 100)}
+                            aria-label="Recordings volume"
+                            onChange={(event) => setVolume(Number(event.target.value) / 100)}
+                            className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-primary"
+                        />
+                        <p className="pt-2 text-[11px] text-muted-foreground">
+                            Every recording in every conversation, on this device.
+                        </p>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </span>
             {/* eslint-disable-next-line jsx-a11y/media-has-caption -- somebody's voice, with no transcript to caption it */}
             <audio ref={audio} src={href} preload="none" />

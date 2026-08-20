@@ -38,6 +38,31 @@ const CHANGED = "polaris:call-mic-cleanup";
 
 const LEVELS: readonly MicFilter[] = ["off", "standard", "enhanced", "licensed"];
 
+/**
+ * How much is done to the microphone, in the order somebody would consider it.
+ *
+ * Written as what each one does to the room rather than as what it is: nobody
+ * choosing a microphone setting wants to be told the name of a model.
+ */
+export const NOISE_LEVELS: readonly { value: MicFilter; label: string; help: string }[] = [
+    {
+        value: "enhanced",
+        label: "Remove background noise",
+        help: "Keeps your voice and takes out the rest - typing, a fan, a dog, somebody talking behind you. Costs a little battery."
+    },
+    {
+        value: "standard",
+        label: "Standard",
+        help: "The browser's own echo and noise handling. Enough for a quiet room."
+    },
+    {
+        value: "licensed",
+        label: "Enhanced (licensed)",
+        help: "The filter your administrator connected."
+    },
+    { value: "off", label: "Off", help: "Send exactly what the microphone hears." }
+];
+
 export function micCleanup(): MicFilter {
     if (typeof window === "undefined") return CLEANUP_DEFAULT;
     try {

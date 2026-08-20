@@ -104,7 +104,9 @@ export async function scheduleMessage(
                     connectionId: file.connectionId,
                     path: file.path,
                     durationMs: file.durationMs,
-                    waveform: file.waveform
+                    waveform: file.waveform,
+                    posterPath: file.posterPath,
+                    posterConnectionId: file.posterConnectionId
                 }))
             }
         },
@@ -156,7 +158,17 @@ export async function countScheduled(actor: ChatActor): Promise<number> {
 export async function cancelScheduled(actor: ChatActor, id: string): Promise<void> {
     const row = await prisma.chatScheduledMessage.findFirst({
         where: { id, authorId: actor.id },
-        select: { id: true, files: { select: { connectionId: true, path: true } } }
+        select: {
+            id: true,
+            files: {
+                select: {
+                    connectionId: true,
+                    path: true,
+                    posterPath: true,
+                    posterConnectionId: true
+                }
+            }
+        }
     });
     // Silent for one that is not theirs or is already gone: both are "there is
     // nothing waiting under that id", and telling them apart would answer
@@ -164,7 +176,13 @@ export async function cancelScheduled(actor: ChatActor, id: string): Promise<voi
     if (!row) return;
 
     await prisma.chatScheduledMessage.delete({ where: { id: row.id } });
-    await removeStoredFiles(row.files);
+    await removeStoredFiles([
+        ...row.files,
+        // The still goes with the file it is of.
+        ...row.files
+            .filter((file) => file.posterPath)
+            .map((file) => ({ connectionId: file.posterConnectionId, path: file.posterPath! }))
+    ]);
 }
 
 /**
@@ -201,7 +219,9 @@ const rowForSending = {
             connectionId: true,
             path: true,
             durationMs: true,
-            waveform: true
+            waveform: true,
+            posterPath: true,
+            posterConnectionId: true
         }
     }
 } as const;
@@ -222,6 +242,8 @@ interface SendableRow {
         path: string;
         durationMs: number | null;
         waveform: string | null;
+        posterPath: string | null;
+        posterConnectionId: string | null;
     }[];
 }
 
@@ -242,7 +264,9 @@ async function deliver(row: SendableRow): Promise<void> {
         connectionId: file.connectionId,
         path: file.path,
         durationMs: file.durationMs,
-        waveform: file.waveform
+        waveform: file.waveform,
+        posterPath: file.posterPath,
+        posterConnectionId: file.posterConnectionId
     }));
 
     await send(

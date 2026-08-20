@@ -25,7 +25,9 @@
  * and neither of which the person did.
  */
 
-import { micConstraints } from "./mic-cleanup";
+import { micGain } from "./mic-gain";
+import { filterMic, type FilteredMic } from "./mic-filter";
+import { micCleanup, micConstraints } from "./mic-cleanup";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
@@ -48,14 +50,28 @@ const MAX_WIDTH = 1280;
  *  sixty. */
 const FPS = 30;
 
-/** The containers a browser will actually record video into, best first. VP9 is
- *  half the size of VP8 for the same picture and is safe everywhere WebM is;
- *  Safari records MP4 and nothing else. */
+/**
+ * What to record into, best first - and "best" is what the person receiving it
+ * can open, not what is smallest.
+ *
+ * MP4 with H.264 first, wherever the browser will make one. WebM with VP9 is a
+ * third smaller for the same picture, and it is the wrong default anyway: a
+ * `.webm` will not open in most desktop players, will not go into a video
+ * editor, and is a container decision nobody asked to make on behalf of whoever
+ * is sent the file. Recording straight into MP4 is also the only honest way to
+ * offer it as one - converting a video in a page means shipping a transcoder and
+ * an afternoon of somebody's battery.
+ *
+ * WebM is what is left for a browser that will not record MP4, and it is played
+ * back perfectly well by the browser that made it.
+ */
 const TYPES = [
+    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+    "video/mp4;codecs=avc1,opus",
+    "video/mp4",
     "video/webm;codecs=vp9,opus",
     "video/webm;codecs=vp8,opus",
-    "video/webm",
-    "video/mp4"
+    "video/webm"
 ];
 
 /** What this browser can record into, or null when it cannot record video. */
@@ -136,6 +152,9 @@ interface Machinery {
      *  there is no camera to compose. */
     recorded: MediaStream | null;
     audio: AudioContext | null;
+    /** The cleanup and the level between the microphone and the recording, when
+     *  either is asked for. */
+    voice: FilteredMic | null;
     canvas: HTMLCanvasElement | null;
     frame: number | null;
     chunks: Blob[];
@@ -159,6 +178,7 @@ export function useClipRecorder(options: { maxBytes: number }): ClipRecording {
         camera: null,
         recorded: null,
         audio: null,
+        voice: null,
         canvas: null,
         frame: null,
         chunks: [],
@@ -181,6 +201,8 @@ export function useClipRecorder(options: { maxBytes: number }): ClipRecording {
         parts.display = null;
         parts.camera = null;
         parts.recorded = null;
+        void parts.voice?.stop().catch(() => undefined);
+        parts.voice = null;
         void parts.audio?.close().catch(() => undefined);
         parts.audio = null;
         parts.recorder = null;
@@ -278,7 +300,20 @@ export function useClipRecorder(options: { maxBytes: number }): ClipRecording {
                 }
             }
 
-            const audio = mixAudio(display, parts.camera);
+            // The microphone gets the same cleanup and the same level it would
+            // on a call: a clip recorded through the untouched microphone while
+            // calls have the model on it is the same person sounding like two
+            // different rooms.
+            const spoken = parts.camera?.getAudioTracks()[0] ?? null;
+            if (spoken) {
+                parts.voice = await filterMic(spoken, micCleanup(), null, micGain()).catch(
+                    () => null
+                );
+            }
+            const audio = mixAudio(
+                display,
+                parts.voice ? new MediaStream([parts.voice.track]) : parts.camera
+            );
             parts.audio = audio.context;
 
             let recorded: MediaStream;

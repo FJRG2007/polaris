@@ -41,6 +41,7 @@ import type { ChatMessageView } from "@/lib/chat/messages";
 import { useRouter, useSearchParams } from "next/navigation";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { ChannelMembers, useMembersPanel } from "./members-panel";
+import { posterFor } from "./video-poster";
 import { ScheduledBar } from "./scheduled-bar";
 import { DirectProfile } from "./direct-profile";
 import type { ScheduledMessageView } from "@/lib/chat/scheduled";
@@ -1068,6 +1069,10 @@ export function ChannelView({
             form.set("sendAt", sendAt);
             if (answering) form.set("replyToId", answering);
             for (const file of files) form.append("files", file);
+            for (const file of files) {
+                const still = await posterFor(file).catch(() => null);
+                form.append("posters", still ?? new Blob([], { type: "image/jpeg" }));
+            }
             const response = await fetch(`/api/chat/channels/${channelId}/scheduled`, {
                 method: "POST",
                 body: form
@@ -1109,6 +1114,16 @@ export function ChannelView({
             form.set("body", body);
             if (replyingTo) form.set("replyToId", replyingTo.id);
             for (const file of files) form.append("files", file);
+            // A still per video, in the same order as the files and with an
+            // empty one standing in for everything that is not a video - so the
+            // two lists line up on the other side without either of them
+            // carrying an index. Taken here rather than on the server: the
+            // bytes are already in this browser, and the alternative is a
+            // transcoder on the machine Polaris runs on.
+            for (const file of files) {
+                const still = await posterFor(file).catch(() => null);
+                form.append("posters", still ?? new Blob([], { type: "image/jpeg" }));
+            }
             // How long each recording is and what it looks like, measured while
             // it was made. Sent as one field in file order rather than one per
             // file, so a message with no recording in it sends nothing.

@@ -730,6 +730,16 @@ function Message({
                                             name={file.name}
                                             size={file.size}
                                             src={`/api/chat/attachments/${file.id}`}
+                                            // A frame of the video itself, taken
+                                            // by the browser that sent it. A few
+                                            // kilobytes, and the difference
+                                            // between a list of black rectangles
+                                            // and a list somebody can read.
+                                            poster={
+                                                file.hasPoster
+                                                    ? `/api/chat/attachments/${file.id}?poster=1`
+                                                    : undefined
+                                            }
                                             download={`/api/chat/attachments/${file.id}?download=1`}
                                         />
                                     ) : (

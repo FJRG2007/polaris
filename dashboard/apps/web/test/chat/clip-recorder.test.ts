@@ -33,11 +33,18 @@ function canShareScreen(yes: boolean) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("what it records into", () => {
-    it("takes the smallest picture a browser will make", () => {
-        browserRecording(["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"]);
-        // VP9 is half the bytes of VP8 for the same picture, and every browser
-        // that records WebM plays it.
-        expect(clipRecordingType()).toBe("video/webm;codecs=vp9,opus");
+    it("takes the one the person receiving it can open, not the smallest", () => {
+        browserRecording([
+            "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+            "video/webm;codecs=vp9,opus",
+            "video/webm"
+        ]);
+        // WebM with VP9 is a third smaller for the same picture and is the wrong
+        // default anyway: a `.webm` opens in almost no desktop player and in no
+        // video editor, and recording straight into MP4 is the only honest way
+        // to hand somebody one - converting a video in a page means shipping a
+        // transcoder.
+        expect(clipRecordingType()).toBe("video/mp4;codecs=avc1.42E01E,mp4a.40.2");
     });
 
     it("falls back through the containers rather than assuming one", () => {
@@ -45,6 +52,8 @@ describe("what it records into", () => {
         expect(clipRecordingType()).toBe("video/webm");
         browserRecording(["video/mp4"]);
         expect(clipRecordingType()).toBe("video/mp4");
+        browserRecording(["video/webm;codecs=vp9,opus", "video/webm"]);
+        expect(clipRecordingType()).toBe("video/webm;codecs=vp9,opus");
     });
 
     it("answers nothing for a browser that records no video at all", () => {

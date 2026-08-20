@@ -34,6 +34,7 @@ import { runAction } from "@/lib/run-action";
 import { searchPeopleAction } from "./actions";
 import { playCallSound } from "@/lib/call-sounds";
 import { useEffect, useRef, useState } from "react";
+import { NOISE_LEVELS } from "./mic-cleanup";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
 import { stagesOf, stagingOf } from "./call-media";
@@ -778,31 +779,6 @@ function Split({
 /** How big the face in an empty tile is. One size for every tile: a grid where
  *  the faces are different sizes reads as a mistake. */
 const AVATAR_SIZE = 72;
-
-/**
- * How much is done to the microphone, in the order somebody would consider it.
- *
- * Written as what each one does to the room rather than as what it is: nobody
- * choosing a microphone setting wants to be told the name of a model.
- */
-const NOISE_LEVELS: readonly { value: MicFilter; label: string; help: string }[] = [
-    {
-        value: "enhanced",
-        label: "Remove background noise",
-        help: "Keeps your voice and takes out the rest - typing, a fan, a dog, somebody talking behind you. Costs a little battery."
-    },
-    {
-        value: "standard",
-        label: "Standard",
-        help: "The browser's own echo and noise handling. Enough for a quiet room."
-    },
-    {
-        value: "licensed",
-        label: "Enhanced (licensed)",
-        help: "The filter your administrator connected."
-    },
-    { value: "off", label: "Off", help: "Send exactly what the microphone hears." }
-];
 
 function Tile({
     stream,

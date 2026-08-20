@@ -49,6 +49,8 @@ function suppressors() {
 
 /** The models want 48 kHz, which is what a call runs at anyway. Asked for
  *  explicitly so the graph is never built at a rate the model cannot use. */
+import { micGain } from "./mic-gain";
+
 const SAMPLE_RATE = 48_000;
 
 /**
@@ -89,8 +91,10 @@ export interface FilteredMic {
      *  undoes what it built. */
     readonly stop: () => Promise<void>;
     /** Which filter ended up running, for the line under the setting. Not always
-     *  the one asked for: the better model can fail to start. */
-    readonly using: "enhanced" | "light" | "licensed";
+     *  the one asked for: the better model can fail to start. `gain` is the
+     *  graph that is only there to make a quiet microphone louder, with no model
+     *  in it at all. */
+    readonly using: "enhanced" | "light" | "licensed" | "gain";
 }
 
 /**
@@ -121,16 +125,27 @@ export type MicFilter = "off" | "standard" | "enhanced" | "licensed";
 /**
  * Build the graph, or answer null.
  *
- * Null is not an error worth showing: it means this browser could not start a
- * filter, and a call with the browser's own suppression is what happens next.
- * Saying so in a dialog would be a warning about a feature nobody switched on.
+ * Null is not an error worth showing: it means there is nothing to do to this
+ * microphone, or that this browser could not start a filter - and a call with
+ * the browser's own suppression is what happens next either way. Saying so in a
+ * dialog would be a warning about a feature nobody switched on.
+ *
+ * Two things put a graph between the microphone and what leaves: a model, and a
+ * level. The level is here rather than in a second graph of its own because a
+ * microphone routed through Web Audio twice is two contexts, two buffers and
+ * twice the latency for one voice - and because the limiter at the end of this
+ * one is exactly what a doubled level needs in front of it.
  */
 export async function filterMic(
     track: MediaStreamTrack,
     filter: MicFilter,
-    licensed?: { moduleUrl: string; token: string } | null
+    licensed?: { moduleUrl: string; token: string } | null,
+    /** How much louder or quieter to make it. One is untouched, and with no
+     *  model asked for there is then nothing to build. */
+    gain: number = micGain()
 ): Promise<FilteredMic | null> {
-    if (filter !== "enhanced" && filter !== "licensed") return null;
+    const model = filter === "enhanced" || filter === "licensed";
+    if (!model && gain === 1) return null;
     if (typeof window === "undefined" || typeof AudioContext === "undefined") return null;
 
     const context = new AudioContext({ sampleRate: SAMPLE_RATE });
@@ -141,16 +156,21 @@ export async function filterMic(
     const source = context.createMediaStreamSource(new MediaStream([track]));
     const sink = context.createMediaStreamDestination();
 
-    const built = await buildNode(context, filter, licensed);
-    if (!built) {
+    // No model when the graph is only here to change the level, and a model that
+    // will not start is not a reason to throw the level away with it.
+    const built = model ? await buildNode(context, filter, licensed) : null;
+    if (model && !built) {
         source.disconnect();
         await context.close().catch(() => undefined);
-        return null;
+        if (gain === 1) return null;
     }
 
-    // The model, then the level it cost, then the guard on that level.
+    // The model, then the level it cost and the level somebody asked for, then
+    // the guard on both. Multiplied rather than added: they are two reasons for
+    // the same knob, and a doubled voice on top of the model's makeup is what
+    // the limiter below is for.
     const makeup = context.createGain();
-    makeup.gain.value = MAKEUP_GAIN;
+    makeup.gain.value = (built ? MAKEUP_GAIN : 1) * gain;
     const limiter = context.createDynamicsCompressor();
     limiter.threshold.value = LIMIT_DBFS;
     limiter.knee.value = 0;
@@ -158,8 +178,12 @@ export async function filterMic(
     limiter.attack.value = 0.003;
     limiter.release.value = 0.1;
 
-    source.connect(built.node);
-    built.node.connect(makeup);
+    if (built) {
+        source.connect(built.node);
+        built.node.connect(makeup);
+    } else {
+        source.connect(makeup);
+    }
     makeup.connect(limiter);
     limiter.connect(sink);
 
@@ -171,9 +195,9 @@ export async function filterMic(
 
     return {
         track: out,
-        using: built.using,
+        using: built ? built.using : "gain",
         stop: async () => {
-            built.dispose();
+            built?.dispose();
             source.disconnect();
             makeup.disconnect();
             limiter.disconnect();

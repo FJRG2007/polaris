@@ -65,6 +65,19 @@ function readSounds(field: FormDataEntryValue | null): unknown {
     }
 }
 
+/**
+ * The still that came with one file, if any came at all.
+ *
+ * An empty entry is what stands in for a file that is not a video, so the two
+ * lists can be walked together; anything that is not a picture is ignored rather
+ * than refused, since it is a decoration and the message is not.
+ */
+async function posterBytes(entry: File | undefined): Promise<Uint8Array | null> {
+    if (!entry || entry.size === 0) return null;
+    if (!entry.type.startsWith("image/")) return null;
+    return new Uint8Array(await entry.arrayBuffer());
+}
+
 export async function POST(
     request: Request,
     { params }: { params: Promise<{ channelId: string }> }
@@ -102,6 +115,10 @@ export async function POST(
     if (!fields.success) return Response.json({ error: "That could not be sent" }, { status: 400 });
 
     const files = form.getAll("files").filter((entry): entry is File => entry instanceof File);
+    // One still per file, in the same order, with an empty one standing in for
+    // everything that is not a video. Never required: a message whose thumbnails
+    // did not arrive is a message.
+    const posters = form.getAll("posters").filter((entry): entry is File => entry instanceof File);
     if (files.length === 0 && !fields.data.body) {
         return Response.json({ error: "Write something, or attach a file" }, { status: 400 });
     }
@@ -149,7 +166,8 @@ export async function POST(
                         type: file.type,
                         bytes: new Uint8Array(await file.arrayBuffer())
                     },
-                    sounds.success ? sounds.data[at] : undefined
+                    sounds.success ? sounds.data[at] : undefined,
+                    await posterBytes(posters[at])
                 )
             );
         }

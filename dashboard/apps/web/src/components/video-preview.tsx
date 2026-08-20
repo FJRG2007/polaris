@@ -10,21 +10,24 @@
  * so that somebody can read the text above them. At the scale this is built for
  * it is also tens of megabytes per reader per open, off somebody's own disk.
  *
- * So nothing is fetched until it is asked for. What is drawn is the frame of the
- * thing - its name, its size, a play button - and pressing it mounts the real
- * player over the top, already playing. From that point it is the same player
- * as everywhere else in Polaris, with the same controls and the same way of
- * saving the file.
+ * So nothing is fetched until it is asked for. What is drawn is a still of the
+ * thing with a play button on it, and pressing it opens the video over the
+ * conversation - which is what every messenger settled on, and for a reason
+ * worth stating: a video playing in a list is a video the size of a message,
+ * beside the thing that is about to scroll it out of view. The moment somebody
+ * presses play they have stopped reading, and the screen should say so.
  *
  * A local file being staged in a composer is the one exception, and it is passed
  * `eager`: those bytes are already in this browser, there is no request to
  * avoid, and somebody who has just attached a video wants to see that it is the
- * right one.
+ * right one without opening anything.
  */
 
 import { cn } from "@polaris/ui";
-import { useState } from "react";
 import { Play } from "lucide-react";
+import { useState } from "react";
+import { createPortal } from "react-dom";
+import { VideoViewer } from "@/components/video-viewer";
 import { MediaPlayer } from "@/components/media-player";
 
 /** Bytes as a person reads them. Kept local rather than imported so this can be
@@ -57,9 +60,12 @@ export function VideoPreview({
     eager?: boolean;
     className?: string;
 }) {
-    const [watching, setWatching] = useState(eager);
+    const [watching, setWatching] = useState(false);
 
-    if (watching) {
+    // Bytes that are already here: drawn as the player itself, in place. There
+    // is nothing to fetch and nothing to open - it is being looked at by the
+    // person who just attached it.
+    if (eager) {
         return (
             <MediaPlayer
                 kind="video"
@@ -67,18 +73,31 @@ export function VideoPreview({
                 name={name}
                 poster={poster}
                 download={download}
-                // Only ever after a press, so the file is wanted: told to play,
-                // and told it may fetch what it needs to.
-                autoPlay={!eager}
-                preload={eager ? "metadata" : "auto"}
+                preload="metadata"
                 className={cn("overflow-hidden rounded-md border border-border bg-black", className)}
             />
         );
     }
 
     return (
-        <button
-            type="button"
+        <>
+            {watching &&
+                typeof document !== "undefined" &&
+                // On the body rather than here: the viewer covers the window,
+                // and this sits inside a scrolling list that a fixed child would
+                // be positioned and clipped by.
+                createPortal(
+                    <VideoViewer
+                        src={src}
+                        name={name}
+                        poster={poster}
+                        download={download}
+                        onClose={() => setWatching(false)}
+                    />,
+                    document.body
+                )}
+            <button
+                type="button"
             onClick={() => setWatching(true)}
             aria-label={name ? `Play ${name}` : "Play the video"}
             className={cn(
@@ -98,6 +117,7 @@ export function VideoPreview({
                     {size !== undefined && <span className="shrink-0">{readable(size)}</span>}
                 </span>
             )}
-        </button>
+            </button>
+        </>
     );
 }

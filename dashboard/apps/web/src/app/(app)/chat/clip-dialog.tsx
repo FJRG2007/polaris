@@ -15,7 +15,8 @@
 
 import { callDevices } from "./call-media";
 import { useEffect, useRef, useState } from "react";
-import { micDevice, setMicDevice } from "./mic-device";
+import { micDevice } from "./mic-device";
+import { MicSettings } from "./mic-settings";
 import { MediaPlayer } from "@/components/media-player";
 import { MAX_CLIP_SECONDS, useClipRecorder, type ClipSources } from "./clip-recorder";
 import { Camera, CameraOff, Circle, Mic, MicOff, Pause, Play, RotateCcw, Square } from "lucide-react";
@@ -213,30 +214,15 @@ export function ClipDialog({
                                     />
                                 </label>
                             )}
-                            {sources.microphone && devices.microphones.length > 1 && (
-                                <label className="flex w-full flex-col gap-1 text-xs">
-                                    Microphone
-                                    <Select
-                                        aria-label="Microphone"
-                                        value={
-                                            sources.microphoneId ?? devices.microphones[0]?.id ?? ""
-                                        }
-                                        onValueChange={(id) => {
-                                            setSources((current) => ({
-                                                ...current,
-                                                microphoneId: id
-                                            }));
-                                            // Kept for calls and voice messages
-                                            // too: it is one headset and one
-                                            // decision.
-                                            setMicDevice(id);
-                                        }}
-                                        options={devices.microphones.map((device) => ({
-                                            value: device.id,
-                                            label: device.label
-                                        }))}
-                                    />
-                                </label>
+                            {/* Everything about the microphone, not only which
+                                one: what it takes out of the room and how loud
+                                it goes out matter more in a clip than in a call,
+                                because a clip is watched rather than answered -
+                                nobody can ask you to say that again. The same
+                                settings as the composer's and the call's, since
+                                it is one microphone. */}
+                            {sources.microphone && (
+                                <MicSettings className="w-full rounded-md border border-border p-2" />
                             )}
                         </div>
                     )}
