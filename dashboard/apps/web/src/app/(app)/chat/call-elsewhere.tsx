@@ -124,7 +124,7 @@ export function CallElsewhere() {
     };
 
     return (
-        <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex justify-end">
+        <div className="flex justify-end">
             <div
                 role="status"
                 className="pointer-events-auto flex w-72 flex-col gap-3 rounded-lg border border-border-strong bg-elevated p-3 shadow-modal"

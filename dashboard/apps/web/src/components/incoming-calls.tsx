@@ -236,7 +236,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
     if (showing.length === 0) return null;
 
     return (
-        <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
             {showing.map((entry) => (
                 <div
                     key={entry.meetingId}

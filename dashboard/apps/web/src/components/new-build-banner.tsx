@@ -10,7 +10,9 @@
  *
  * It offers rather than acts. A reload costs whatever is half-written on the
  * screen - a message, a task, a form - so the tab keeps working on the old build
- * for as long as the reader wants it to, and this waits at the corner. The one
+ * for as long as the reader wants it to, and this waits in the corner stack the
+ * shell lays out - above a ringing call rather than over it, which is what two
+ * cards that each pinned themselves to the same corner used to do. The one
  * thing it does not do is go away by itself: dismissing hides it for this tab,
  * and the next failed action brings it straight back, because by then it is the
  * explanation for what just happened.
@@ -18,7 +20,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "@polaris/ui";
-import { RotateCcw, X } from "lucide-react";
+import { ArrowUpCircle, RotateCcw } from "lucide-react";
 import { checkForNewBuild, newBuildReady, rememberServedBuild, subscribeToBuild } from "@/lib/new-build";
 
 /** Slow on purpose. Nothing here is urgent - the failure it prevents needs the
@@ -57,27 +59,32 @@ export function NewBuildBanner({ served }: { served: string | null }) {
     if (!ready || dismissed) return null;
 
     return (
-        <div className="fixed bottom-4 right-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] items-start gap-3 rounded-lg border border-border-strong bg-elevated p-3 shadow-popover">
-            <div className="flex flex-1 flex-col gap-1">
-                <p className="text-sm font-medium">Polaris has been updated</p>
-                <p className="text-xs text-muted-foreground">
-                    This tab is still running the previous version. Reload when you are ready -
-                    anything half-written on this page is lost.
-                </p>
-            </div>
-            <div className="flex flex-col gap-1">
-                <Button size="sm" onClick={() => window.location.reload()}>
-                    <RotateCcw className="size-4" /> Reload
+        <div
+            role="status"
+            className="pointer-events-auto flex w-72 flex-col gap-3 rounded-lg border border-border-strong bg-elevated p-3 shadow-modal"
+        >
+            <span className="flex items-center gap-2.5">
+                <ArrowUpCircle className="size-4 shrink-0 text-primary" />
+                <span className="min-w-0 flex-1 text-sm font-medium">Polaris has been updated</span>
+            </span>
+            <p className="text-[12px] leading-relaxed text-muted-foreground">
+                This tab is still running the previous version. Reload when you are ready -
+                anything half-written on this page is lost.
+            </p>
+            <span className="flex items-center gap-2">
+                <Button size="sm" className="flex-1" onClick={() => window.location.reload()}>
+                    <RotateCcw className="size-4" />
+                    Reload
                 </Button>
                 <Button
                     size="sm"
-                    variant="ghost"
-                    aria-label="Hide until something needs it"
+                    variant="secondary"
+                    title="Hide until something needs it"
                     onClick={() => setDismissed(true)}
                 >
-                    <X className="size-4" /> Later
+                    Later
                 </Button>
-            </div>
+            </span>
         </div>
     );
 }

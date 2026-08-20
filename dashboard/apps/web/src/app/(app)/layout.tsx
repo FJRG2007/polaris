@@ -93,22 +93,30 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                                     into a bar instead of hanging up. */}
                                 <CallHolder viewerId={user.id} hasChat={apps.ids.includes("chat")}>
                                 <NotificationFavicon />
-                                {/* An update landing under an open tab, said out
-                                    loud before a click is refused by a server that
-                                    no longer knows this bundle. */}
-                                <NewBuildBanner served={buildStamp()} />
                                 <PresenceReporter />
                                 <VisitRecorder />
-                                {/* Out here rather than inside Chat: a call you only
-                                    hear about while looking at the conversation it
-                                    is in is a notice, not a call. Only for somebody
-                                    who has Chat at all - the stream it listens on
-                                    refuses anybody else. */}
-                                {apps.ids.includes("chat") ? <IncomingCalls viewerId={user.id} /> : null}
-                                {/* Beside the ringing card and never at the same
-                                    time as one: a call you are already in
-                                    somewhere is not a call coming in. */}
-                                {apps.ids.includes("chat") ? <CallElsewhere /> : null}
+                                {/* The bottom corner, laid out once. Each of these
+                                    used to pin itself there, so an update landing
+                                    while the phone was ringing drew one card on top
+                                    of the other. They stack instead, urgent nearest
+                                    the corner, and the column takes no clicks of its
+                                    own - only the cards in it do. */}
+                                <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
+                                    {/* An update landing under an open tab, said out
+                                        loud before a click is refused by a server that
+                                        no longer knows this bundle. */}
+                                    <NewBuildBanner served={buildStamp()} />
+                                    {/* Out here rather than inside Chat: a call you only
+                                        hear about while looking at the conversation it
+                                        is in is a notice, not a call. Only for somebody
+                                        who has Chat at all - the stream it listens on
+                                        refuses anybody else. */}
+                                    {apps.ids.includes("chat") ? <IncomingCalls viewerId={user.id} /> : null}
+                                    {/* Beside the ringing card and never at the same
+                                        time as one: a call you are already in
+                                        somewhere is not a call coming in. */}
+                                    {apps.ids.includes("chat") ? <CallElsewhere /> : null}
+                                </div>
                                 {/* Messages announce themselves in the corner and
                                     are then gone. Never through the bell: that is a
                                     record of things to come back to, and a chat
