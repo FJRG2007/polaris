@@ -6,6 +6,8 @@
   <img alt="Next.js" src="https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white"/>
   <br />
   <br />
+  <a href="#if-you-already-pay-for-these">Why</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="#install">Install</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="#whats-in-it">What's in it</a>
@@ -31,6 +33,30 @@ Polaris runs in Docker and reaches out from there: native mounts, the host's own
 Docker engine, and the machines you enrol over SSH are all managed from the one
 container. After the install, nothing needs a terminal - updates, new features
 and repairs all happen from the interface.
+
+## If you already pay for these
+
+The fastest way to say what Polaris is: it is the tools you are already using,
+on hardware you already own, sharing one account and one interface.
+
+| What you use today | What Polaris runs instead |
+| --- | --- |
+| Railway, Render, Fly | Deploy from a repository or an image - onto their servers or onto your own machines |
+| Discord, Slack, WhatsApp, Telegram | One chat: channels and servers, direct messages, calls, meetings, voice notes, screen clips |
+| GitHub Actions | The same workflows on your own runners, so a private repository costs no minutes |
+| CodeRabbit | Reviews and coding agents that run here, on your own model keys |
+| Pterodactyl and a pile of scripts | Game servers - Minecraft and ARK - with worlds, mods, players and schedules |
+| ClickUp, Jira, Linear | Spaces, lists, boards, sprints, goals, docs and time tracking |
+| Home Assistant, a camera app | Places and cameras: live views, detections, clips, and alerts that arrive in chat |
+| Your NAS vendor's web UI | One file browser across every NAS you own, with sharing and drop points |
+| Bitwarden, 1Password | A vault your existing Bitwarden apps can point at, encrypted in the browser |
+| Cloudflare's dashboard | A firewall of your own: rules, country and network blocks, bot defences, bans |
+| A backup tool and a database GUI | Scheduled backups with restore, and Postgres, MySQL, MariaDB, MongoDB and Redis |
+| Google Analytics, Plausible | Cookieless analytics for the sites you host |
+
+None of it is a fork of any of them. It is the same idea, built once, with the
+half those products cannot give you: it is yours, it is on your hardware, and
+every part of it knows about the others.
 
 ## Install
 
@@ -97,7 +123,7 @@ with one thing does not get the rest.
 
 - **Tasks** - spaces, lists, boards, sprints, goals, docs, custom fields,
   automations, forms and time tracking.
-- **Chat** - channels, direct messages and group conversations, with calls,
+- **Chat** - servers and channels, direct messages and groups, with calls,
   meetings, screen sharing, voice messages, screen clips recorded in the browser,
   and messages written now and sent at an hour that suits.
 - **Notes** - somewhere to write things down, nested the way a notebook is.
