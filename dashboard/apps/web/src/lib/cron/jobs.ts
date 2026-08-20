@@ -22,6 +22,7 @@ import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
 import { sweepExpiredSends } from "@/lib/vault/sends";
+import { sweepConnectionHealth } from "@/lib/connections/health";
 import { liftExpiredSuspensions } from "@/lib/user-admin-service";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { sweepGameActivity } from "@/lib/apps/games-activity-service";
@@ -31,6 +32,7 @@ import { runGameRoutines, sweepGameSchedules } from "@/lib/apps/minecraft/schedu
 import { isGameServerApp, sweepGameReach, syncFirewallBans } from "@/lib/apps/games-service";
 
 const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
 
 export interface ScheduledJob {
     /** Names the job everywhere: the route that triggers it, the lease it takes,
@@ -177,6 +179,17 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // for the copy in flight when the budget ran out.
         leaseMs: 20 * MINUTE,
         run: sweepDueBackups
+    },
+    {
+        key: "connection-health",
+        // Slow on purpose. A token expires on a date rather than at a moment,
+        // nothing here is undone by hearing about it four hours late, and every
+        // pass is a request per linked account to somebody else's API.
+        everyMs: Number(process.env.POLARIS_CONNECTION_HEALTH_MS) || 4 * HOUR,
+        // Leased: two runners would each raise the announcement before either
+        // wrote that it had been made, which is the one thing this must not do.
+        leaseMs: 10 * MINUTE,
+        run: sweepConnectionHealth
     },
     {
         key: "task-reminders",

@@ -1684,6 +1684,14 @@ model UserConnection {
     // nobody authorized - and its owner's from then on. The operator's switch is
     // judged separately: both have to allow it.
     signInEnabled  Boolean  @default(false)
+    // Whether this link is known to have stopped working, and which
+    // announcement its owner has already had about it: "" while it works or
+    // while nothing has looked, "expired" once they have been told. Cleared when
+    // it answers again, so a renewed token is announced afresh next time rather
+    // than staying quiet because it once ran out.
+    healthNotice   String   @default("")
+    // The last time the provider was asked whether the credential still works.
+    checkedAt      DateTime?
     linkedAt       DateTime @default(now())
     updatedAt      DateTime @updatedAt
 

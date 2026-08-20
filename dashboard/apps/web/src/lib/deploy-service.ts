@@ -31,7 +31,7 @@ import { getFlagsForEnvironment } from "./deploy-project-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
 import { parseGithubRepo } from "./repo-reference";
-import { githubCloneIdentity, githubTokenForOwner } from "./github-access";
+import { githubCloneIdentity, githubCloneProblem, githubRepoReach, githubTokenForOwner } from "./github-access";
 import { applicationDefaultWafPresets, isTunnelHostname } from "@polaris/core";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { IN_FLIGHT_DEPLOY_STATUSES, TERMINAL_DEPLOY_STATUSES } from "./deploy/status";
@@ -1650,6 +1650,9 @@ async function buildAppPlan(
                 gitSource.authHeader = identity.header;
                 gitSource.authAs = identity.as;
             }
+            // Asked only if the clone is refused, and asked of GitHub rather
+            // than guessed at from what git printed.
+            gitSource.explain = () => githubCloneProblem(ownerId, repo.owner, repo.repo);
         }
     }
     // What this service says about building itself, over and above what the clone
@@ -1740,6 +1743,20 @@ export async function deployApplication(
     meta?: { commitMessage?: string; commitSha?: string; authorName?: string; authorAvatarUrl?: string }
 ): Promise<string> {
     const { plan, target, gitSource, buildCommands, keepsHistory } = await buildAppPlan(applicationId, ownerId);
+
+    // Asked before anything is started, and refused here rather than eight
+    // minutes later at the clone.
+    //
+    // A deploy that cannot reach its own source has one outcome, and it is worth
+    // nothing to anybody: a queued row, a build slot, a log full of git's words
+    // about a terminal, and a failed release on the board. The question is one
+    // cheap request, the answer is the sentence that says what to go and do, and
+    // the account's owner is told their link has stopped working at the same
+    // time - which is how they find out before the next thing needs it.
+    if (gitSource) {
+        const reach = await githubRepoReach(ownerId, gitSource.repoUrl);
+        if (reach) throw new Error(reach);
+    }
 
     // Resolve the commit + author so the deployment shows who shipped it, Railway-
     // style. The provided meta (webhook / poller) wins; otherwise resolve the branch

@@ -40,8 +40,23 @@ vi.mock("@/lib/connections/store", () => ({
     }
 }));
 
+/** What GitHub is standing in for: how it answers about one repository, asked
+ *  with a token and asked with none. */
+let access: "reachable" | "token-refused" | "out-of-reach" | "sso-required" | "unknown" = "reachable";
+let publicly = false;
+const refused: string[] = [];
+
+vi.mock("@/lib/connections/health", () => ({
+    noteConnectionRefused: async (userId: string) => {
+        refused.push(userId);
+    }
+}));
+
 vi.mock("@/lib/github-service", () => ({
     cloneAuthHeader: (token: string | null) => (token ? `Authorization: Basic ${token}` : null),
+    repoAccessFor: async () => access,
+    resolveGithubRepo: async (owner: string, repo: string, token: string | null) =>
+        !token && publicly ? { fullName: `${owner}/${repo}`, defaultBranch: "main", private: false } : null,
     githubAppInstallationToken: async () => installationToken,
     listReposForPat: async (token: string) => {
         patLists.push(token);
@@ -57,8 +72,14 @@ vi.mock("@/lib/github-service", () => ({
     }
 }));
 
-const { githubCloneIdentity, githubCredentialsForUser, githubTokenForOwner, githubTokenForUser, listReposForUser } =
-    await import("@/lib/github-access");
+const {
+    githubCloneIdentity,
+    githubCredentialsForUser,
+    githubRepoReach,
+    githubTokenForOwner,
+    githubTokenForUser,
+    listReposForUser
+} = await import("@/lib/github-access");
 
 function link(userId: string, entry: Link, credential: Record<string, unknown> | null): void {
     links.set(userId, [...(links.get(userId) ?? []), entry]);
@@ -171,5 +192,88 @@ describe("work with nobody watching", () => {
             header: "Authorization: Basic gho_ana",
             as: "ana"
         });
+    });
+});
+
+/**
+ * Whether a deploy is allowed to start at all.
+ *
+ * The failure this replaces: a token that had quietly run out, a deploy queued
+ * anyway, eight minutes of build slot, and a log ending in git asking a terminal
+ * that does not exist for a username. Every answer below is a sentence about
+ * something to go and do, and the two that must NOT refuse are as important as
+ * the ones that must - a public repository has never needed an account, and
+ * refusing one because nothing is linked would stop deploys that have always
+ * worked.
+ */
+describe("whether a deploy can reach its own source", () => {
+    const REPO = "https://github.com/acme/widgets.git";
+
+    beforeEach(() => {
+        access = "reachable";
+        publicly = false;
+        refused.length = 0;
+        installationToken = null;
+    });
+
+    it("says nothing about a repository somewhere other than GitHub", async () => {
+        expect(await githubRepoReach("ana", "https://gitlab.com/acme/widgets.git")).toBeNull();
+    });
+
+    it("lets a public repository through with nothing connected, as it always could", async () => {
+        publicly = true;
+        expect(await githubRepoReach("ana", REPO)).toBeNull();
+    });
+
+    it("refuses a private one with nothing connected, and says what to connect", async () => {
+        const said = await githubRepoReach("ana", REPO);
+        expect(said).toContain("acme/widgets");
+        expect(said).toContain("Connected accounts");
+    });
+
+    it("lets a reachable repository through", async () => {
+        link("ana", { id: "c1", provider: "github", label: "ana", method: "token" }, { token: "ghp_ana" });
+        expect(await githubRepoReach("ana", REPO)).toBeNull();
+    });
+
+    it("refuses when the account can no longer speak for anybody, and notes that the link broke", async () => {
+        link("ana", { id: "c1", provider: "github", label: "ana", method: "token" }, { token: "ghp_ana" });
+        access = "token-refused";
+        const said = await githubRepoReach("ana", REPO);
+        expect(said).toContain("stopped working");
+        expect(refused).toEqual(["ana"]);
+    });
+
+    // The token expiring is still worth recording and still worth telling its
+    // owner about - it just has nothing to do with cloning a public repository,
+    // and must not stop one.
+    it("still lets a public repository through when the token expired", async () => {
+        link("ana", { id: "c1", provider: "github", label: "ana", method: "token" }, { token: "ghp_ana" });
+        access = "token-refused";
+        publicly = true;
+        expect(await githubRepoReach("ana", REPO)).toBeNull();
+        expect(refused).toEqual(["ana"]);
+    });
+
+    it("names the app installation when the account is fine and the repository is not its to see", async () => {
+        link("ana", { id: "c1", provider: "github", label: "ana", method: "oauth" }, { accessToken: "gho_ana" });
+        access = "out-of-reach";
+        const said = await githubRepoReach("ana", REPO);
+        expect(said).toContain("cannot see acme/widgets");
+        expect(refused).toEqual([]);
+    });
+
+    it("names single sign-on when that is what is in the way", async () => {
+        link("ana", { id: "c1", provider: "github", label: "ana", method: "oauth" }, { accessToken: "gho_ana" });
+        access = "sso-required";
+        expect(await githubRepoReach("ana", REPO)).toContain("single sign-on");
+    });
+
+    // GitHub being unreachable, rate-limited or slow is not somebody's token
+    // expiring, and a deploy must not be refused over it.
+    it("lets the deploy try when GitHub itself could not answer", async () => {
+        link("ana", { id: "c1", provider: "github", label: "ana", method: "oauth" }, { accessToken: "gho_ana" });
+        access = "unknown";
+        expect(await githubRepoReach("ana", REPO)).toBeNull();
     });
 });

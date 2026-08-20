@@ -40,6 +40,16 @@ export interface GitSource {
     /** Whose account that header speaks for, for the log to name. Never the
      *  credential itself - only who it belongs to. */
     authAs?: string;
+    /**
+     * What more can be said about a refusal, asked of the forge itself.
+     *
+     * Optional and asked only when the clone was refused for want of an account:
+     * this module knows git and nothing about whoever is hosting the repository,
+     * and every question worth asking here - has the token expired, was this
+     * account ever given this repository, does the organization want its SSO
+     * authorized - is one only they can answer.
+     */
+    explain?: () => Promise<string | null>;
 }
 
 /** What the service says about building itself, over and above what is detected.
@@ -240,7 +250,10 @@ export function gitBuildContext(
             await runCommand("git", args, watched, NO_PROMPTS);
         } catch (error) {
             await rm(dir, { recursive: true, force: true });
-            throw new Error(cloneRefusal(said, source) ?? (error instanceof Error ? error.message : "the clone failed"));
+            const refusal = cloneRefusal(said, source);
+            if (!refusal) throw new Error(error instanceof Error ? error.message : "the clone failed");
+            const more = source.explain ? await source.explain().catch(() => null) : null;
+            throw new Error(more ? `${refusal} ${more}` : refusal);
         }
 
         // Best-effort: a repository that defeats detection still deploys exactly as

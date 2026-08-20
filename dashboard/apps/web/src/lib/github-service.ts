@@ -795,6 +795,41 @@ export async function resolveGithubRepo(owner: string, repo: string, token: stri
 }
 
 /**
+ * What a token turns out to be worth against one repository.
+ *
+ * Four answers rather than a boolean, because they are four different things to
+ * go and do and the clone failure that prompts the question looks identical for
+ * all of them: git asks for a username, is refused a terminal, and stops.
+ */
+export type RepoAccess = "reachable" | "token-refused" | "out-of-reach" | "sso-required" | "unknown";
+
+/**
+ * Ask GitHub about `owner/repo` as this token, and report which of the four it
+ * is.
+ *
+ * Only ever asked after something has already gone wrong. GitHub deliberately
+ * answers 404 rather than 403 for a repository a token may not see - it does not
+ * confirm that private repositories exist - so "not there" and "not yours" are
+ * one answer here, and the sentence built from it has to name both.
+ */
+export async function repoAccessFor(owner: string, repo: string, token: string): Promise<RepoAccess> {
+    const url = `${API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+    let res: Response;
+    try {
+        res = await fetch(url, { headers: apiHeaders(token), cache: "no-store" });
+    } catch {
+        return "unknown";
+    }
+    if (res.ok) return "reachable";
+    if (res.status === 401) return "token-refused";
+    // An organization with SAML on it names that in a header rather than in
+    // anything the body says, and it is the one 403 with an answer of its own.
+    if (res.status === 403) return res.headers.get("x-github-sso") ? "sso-required" : "out-of-reach";
+    if (res.status === 404) return "out-of-reach";
+    return "unknown";
+}
+
+/**
  * Public repositories matching a phrase, best match first. GitHub's search index
  * only covers public repositories however the call is authenticated, so private
  * ones are reached through the caller's own list instead; a token is still passed

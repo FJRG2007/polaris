@@ -15,6 +15,8 @@
  * this existed building exactly as they did.
  */
 
+import { parseGithubRepo } from "@/lib/repo-reference";
+import { noteConnectionRefused } from "@/lib/connections/health";
 import { listConnections, readCredential, updateCredential } from "@/lib/connections/store";
 import {
     cloneAuthHeader,
@@ -22,6 +24,8 @@ import {
     listReposForPat,
     listReposForUserToken,
     refreshGithubUserToken,
+    repoAccessFor,
+    resolveGithubRepo,
     type GithubRepo
 } from "@/lib/github-service";
 
@@ -130,6 +134,89 @@ export async function githubCloneIdentity(
     const installed = await githubAppInstallationToken(owner).catch(() => null);
     const header = cloneAuthHeader(installed);
     return header ? { header, as: "the GitHub App installed on this Polaris" } : null;
+}
+
+/**
+ * Why a clone that went out as a connected account was refused anyway, in terms
+ * of what to go and do about it - or null when there is nothing more to add.
+ *
+ * The clone itself cannot tell these apart. Git sends the credential, GitHub
+ * answers 401, git asks for a username, and there is no terminal to ask at: the
+ * same three lines whether the token has expired, whether the account was never
+ * given that repository, or whether an organization wants its SSO authorized.
+ * They are three different things to go and do, so this asks GitHub which.
+ *
+ * Only ever called after a refusal. A deploy that works pays nothing for it.
+ */
+export async function githubCloneProblem(
+    userId: string | null,
+    owner: string,
+    repo: string
+): Promise<string | null> {
+    const token = await githubTokenForOwner(userId, owner).catch(() => null);
+    if (!token) return null;
+    const access = await repoAccessFor(owner, repo, token);
+    if (access === "token-refused") {
+        return "GitHub no longer accepts that account: connect it again under Connected accounts.";
+    }
+    if (access === "out-of-reach") {
+        return `That account cannot see ${owner}/${repo}. If it reaches GitHub through the Polaris app, the app has to be given this repository as well - the account itself owning it is not enough.`;
+    }
+    if (access === "sso-required") {
+        return `${owner} requires that account to authorize single sign-on before anything may read its repositories.`;
+    }
+    if (access === "reachable") {
+        return `That account can read ${owner}/${repo}, so the clone was refused over the credential rather than over access to it.`;
+    }
+    return null;
+}
+
+/**
+ * Why this deploy cannot reach its own source, or null when it can.
+ *
+ * Asked before a deploy starts rather than discovered at the clone. Every answer
+ * here is a sentence about something to go and do, because every one of them is:
+ * the link ran out, the account was never given this repository, the
+ * organization wants its single sign-on authorized.
+ *
+ * Silent about anything that is not GitHub's, and silent about a public
+ * repository: a clone that needs no account is not a clone anybody has to
+ * connect one for, and refusing it because nothing is linked would break every
+ * deploy that has ever worked without a link.
+ */
+export async function githubRepoReach(userId: string | null, repoUrl: string): Promise<string | null> {
+    const repo = parseGithubRepo(repoUrl);
+    if (!repo) return null;
+
+    const token = await githubTokenForOwner(userId, repo.owner).catch(() => null);
+    // Nothing linked at all. Public repositories still deploy, which is what
+    // they did before any of this existed; a private one is refused with the
+    // thing to do about it.
+    if (!token) {
+        const open = await resolveGithubRepo(repo.owner, repo.repo, null).catch(() => null);
+        return open
+            ? null
+            : `This deploy needs an account: ${repo.owner}/${repo.repo} is private, or it is not there. Connect the account that can see it under Connected accounts.`;
+    }
+
+    const access = await repoAccessFor(repo.owner, repo.repo, token);
+    if (access === "reachable" || access === "unknown") return null;
+
+    // A public repository is reachable whatever the token is worth, so a token
+    // that has expired must not stop one deploying. It still stopped working,
+    // and its owner is told either way.
+    const open = await resolveGithubRepo(repo.owner, repo.repo, null).catch(() => null);
+    if (access === "token-refused") {
+        if (userId) await noteConnectionRefused(userId, PROVIDER).catch(() => undefined);
+        return open
+            ? null
+            : "The GitHub account this deploy would clone with has stopped working. Connect it again under Connected accounts, then deploy again.";
+    }
+    if (open) return null;
+    if (access === "sso-required") {
+        return `${repo.owner} requires the connected account to authorize single sign-on before anything may read its repositories.`;
+    }
+    return `The connected GitHub account cannot see ${repo.owner}/${repo.repo}. If it reaches GitHub through the Polaris app, the app has to be given this repository as well - the account owning it is not enough.`;
 }
 
 /**

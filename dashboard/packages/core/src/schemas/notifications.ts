@@ -247,6 +247,18 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "account.connection.expired",
+        group: "security",
+        label: "A connected account stopped working",
+        description: "A token you linked ran out or was withdrawn, and what it was doing has stopped.",
+        level: "danger",
+        // Mailed by default, and for the same reason the key expiry is: nobody
+        // watches the bell for a thing that has not happened yet, and the first
+        // sign otherwise is a deploy failing at the clone for a reason that
+        // reads like anything but an expired token.
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "account.aiKey.expiring",
         group: "security",
         label: "An AI provider key is about to expire",
