@@ -30,6 +30,42 @@ export const WEEK_STARTS = ["sun", "mon", "sat"] as const;
  *  far; the setting exists so an account keeps its choice when more arrive. */
 export const LANGUAGES = ["en"] as const;
 
+/**
+ * "Wherever this person happens to be", which is what almost everybody wants.
+ *
+ * The alternative to having this value is storing a zone at sign-up and being
+ * wrong the first time somebody travels. Automatic reads the clock of the
+ * device the screen is being drawn on, so a laptop taken to another country
+ * shows that country's time without anybody being asked anything.
+ *
+ * It is a value rather than an absent field because the two mean different
+ * things: absent is "follow the platform", and the platform's own answer may
+ * well be a fixed zone - a company that books everything in one office's time.
+ */
+export const AUTOMATIC_TIME_ZONE = "auto";
+
+/**
+ * Whether a string names a time zone this runtime knows.
+ *
+ * Asked rather than matched against a list: the list of zones is the runtime's,
+ * it changes when the world changes, and a copy of it here would be wrong the
+ * year a country renames one. `auto` is the one name that is ours.
+ */
+export function isTimeZone(value: string): boolean {
+    if (value === AUTOMATIC_TIME_ZONE) return true;
+    try {
+        new Intl.DateTimeFormat("en-US", { timeZone: value });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+export const timeZoneField = z
+    .string()
+    .trim()
+    .refine(isTimeZone, "Not a time zone this server knows");
+
 /** Currencies offered for amounts. Codes are ISO 4217; Intl draws the symbol. */
 export const CURRENCIES = [
     { code: "EUR", label: "Euro" },
@@ -72,6 +108,9 @@ export const displayPreferencesSchema = z.object({
     weekStart: z.enum(WEEK_STARTS),
     currency: z.enum(CURRENCY_CODES),
     language: z.enum(LANGUAGES),
+    /** An IANA zone name, or `auto` for the clock of the device in front of the
+     *  person. Every time on screen is written in it. */
+    timeZone: timeZoneField,
     theme: z.enum(THEME_IDS)
 });
 
@@ -92,6 +131,7 @@ export const DISPLAY_DEFAULTS: DisplayPreferences = {
     weekStart: "sun",
     currency: "EUR",
     language: "en",
+    timeZone: AUTOMATIC_TIME_ZONE,
     theme: "dark"
 };
 
@@ -177,6 +217,89 @@ function pad(value: number): string {
     return String(value).padStart(2, "0");
 }
 
+/** The fields a date and a clock are written out of. */
+interface WallClock {
+    readonly year: number;
+    /** 1-12, as a person counts them. */
+    readonly month: number;
+    readonly day: number;
+    /** 0-23, whatever the clock format turns out to be. */
+    readonly hours: number;
+    readonly minutes: number;
+    readonly seconds: number;
+}
+
+/**
+ * One formatter per zone, kept.
+ *
+ * Building an `Intl.DateTimeFormat` is the expensive half of formatting a date,
+ * and a table of two hundred rows formats two hundred of them. There are only
+ * ever a handful of zones in play on one screen.
+ */
+const zoneFormats = new Map<string, Intl.DateTimeFormat>();
+
+function zoneFormat(timeZone: string): Intl.DateTimeFormat | null {
+    const existing = zoneFormats.get(timeZone);
+    if (existing) return existing;
+    try {
+        const format = new Intl.DateTimeFormat("en-US", {
+            timeZone,
+            // h23 rather than hour12: false, which still hands back "24" for
+            // midnight in some engines.
+            hourCycle: "h23",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit"
+        });
+        zoneFormats.set(timeZone, format);
+        return format;
+    } catch {
+        // A zone this runtime does not know. The device's own clock is a better
+        // answer than refusing to draw the time.
+        return null;
+    }
+}
+
+/**
+ * What the clock says in one zone, or on this device when the zone is automatic.
+ *
+ * This is the one place a time is moved. Every screen formats through
+ * `DisplayFormat`, so a preference set here reaches all of them, and nothing in
+ * the dashboard has to reach for `toLocaleString` and get a server's idea of
+ * midnight - which is what it would get, since half of these are drawn on the
+ * server.
+ */
+export function wallClock(date: Date, timeZone: string): WallClock {
+    const format = timeZone === AUTOMATIC_TIME_ZONE ? null : zoneFormat(timeZone);
+    if (!format) {
+        return {
+            year: date.getFullYear(),
+            month: date.getMonth() + 1,
+            day: date.getDate(),
+            hours: date.getHours(),
+            minutes: date.getMinutes(),
+            seconds: date.getSeconds()
+        };
+    }
+    const parts = new Map(format.formatToParts(date).map((part) => [part.type, part.value]));
+    const read = (type: Intl.DateTimeFormatPartTypes, fallback: number) => {
+        const value = Number(parts.get(type));
+        return Number.isFinite(value) ? value : fallback;
+    };
+    return {
+        year: read("year", date.getFullYear()),
+        month: read("month", date.getMonth() + 1),
+        day: read("day", date.getDate()),
+        // Midnight comes back as 24 in some engines even under h23.
+        hours: read("hour", date.getHours()) % 24,
+        minutes: read("minute", date.getMinutes()),
+        seconds: read("second", date.getSeconds())
+    };
+}
+
 /** The formatters every screen uses. Bound to one set of preferences. */
 export interface DisplayFormat {
     readonly preferences: DisplayPreferences;
@@ -195,27 +318,29 @@ export interface DisplayFormat {
 }
 
 export function createDisplayFormat(preferences: DisplayPreferences): DisplayFormat {
-    const { dateOrder, yearFormat, clock, temperature, currency, language } = preferences;
+    const { dateOrder, yearFormat, clock, temperature, currency, language, timeZone } = preferences;
 
     function date(value: Formattable): string {
         const parsed = toDate(value);
         if (!parsed) return "-";
-        const day = pad(parsed.getDate());
-        const month = pad(parsed.getMonth() + 1);
-        const year = yearFormat === "yy" ? pad(parsed.getFullYear() % 100) : String(parsed.getFullYear());
+        const wall = wallClock(parsed, timeZone);
+        const day = pad(wall.day);
+        const month = pad(wall.month);
+        const year = yearFormat === "yy" ? pad(wall.year % 100) : String(wall.year);
         return dateOrder === "mdy" ? `${month}/${day}/${year}` : `${day}/${month}/${year}`;
     }
 
     function time(value: Formattable, options?: { seconds?: boolean }): string {
         const parsed = toDate(value);
         if (!parsed) return "-";
-        const seconds = options?.seconds ? `:${pad(parsed.getSeconds())}` : "";
-        const minutes = pad(parsed.getMinutes());
+        const wall = wallClock(parsed, timeZone);
+        const seconds = options?.seconds ? `:${pad(wall.seconds)}` : "";
+        const minutes = pad(wall.minutes);
         if (clock === "12h") {
-            const hours = parsed.getHours() % 12 === 0 ? 12 : parsed.getHours() % 12;
-            return `${hours}:${minutes}${seconds} ${parsed.getHours() < 12 ? "AM" : "PM"}`;
+            const hours = wall.hours % 12 === 0 ? 12 : wall.hours % 12;
+            return `${hours}:${minutes}${seconds} ${wall.hours < 12 ? "AM" : "PM"}`;
         }
-        return `${pad(parsed.getHours())}:${minutes}${seconds}`;
+        return `${pad(wall.hours)}:${minutes}${seconds}`;
     }
 
     return {

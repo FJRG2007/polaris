@@ -17,6 +17,7 @@ import {
     THEMES,
     weekdayOrder,
     createDisplayFormat,
+    AUTOMATIC_TIME_ZONE,
     WEEKDAY_SHORT_NAMES,
     resolveDisplayPreferences,
     type WeekStart,
@@ -30,6 +31,35 @@ const INHERIT = "inherit";
 /** A sample instant for the previews - a day past the 12th, so day-first and
  *  month-first read differently, and an afternoon hour so 12h and 24h do too. */
 const SAMPLE = new Date(2026, 6, 31, 14, 5, 9);
+
+/**
+ * Every zone this runtime knows, or the handful worth offering when it will not
+ * say.
+ *
+ * `supportedValuesOf` is the browser's own list and is therefore never out of
+ * date; the fallback is for a runtime old enough not to have it, where a short
+ * list of zones is still better than a field that cannot be used. Automatic sits
+ * at the top and is what almost everybody keeps.
+ */
+function timeZoneOptions(): FieldOption[] {
+    // Reached this way rather than called directly: it is a recent addition to
+    // Intl, and a runtime without it must fall back rather than fail to render
+    // the whole form.
+    const supported = (Intl as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf;
+    let zones: string[] = [];
+    try {
+        zones = supported ? supported("timeZone") : [];
+    } catch {
+        zones = [];
+    }
+    if (zones.length === 0) {
+        zones = ["UTC", "Europe/London", "Europe/Madrid", "Europe/Berlin", "America/New_York", "America/Los_Angeles"];
+    }
+    return [
+        { value: AUTOMATIC_TIME_ZONE, label: "Automatic", short: "Automatic" },
+        ...zones.map((zone) => ({ value: zone, label: zone.replace(/_/g, " "), short: zone }))
+    ];
+}
 
 /** `short` names the choice where the example would not fit, as in the
  *  "Platform default (...)" entry. */
@@ -92,6 +122,12 @@ const FIELDS: FieldSpec[] = [
             { value: "mon", label: "Monday", short: "Monday" },
             { value: "sat", label: "Saturday", short: "Saturday" }
         ]
+    },
+    {
+        key: "timeZone",
+        label: "Time zone",
+        hint: "Every time on screen is written in it. Automatic follows the device you are on.",
+        options: timeZoneOptions()
     },
     {
         key: "temperature",
@@ -225,6 +261,14 @@ export function DisplayPreferencesForm({
                         <Sample label="Date" value={format.date(SAMPLE)} />
                         <Sample label="Time" value={format.time(SAMPLE)} />
                         <Sample label="Week" value={weekSample(effective.weekStart)} />
+                        <Sample
+                            label="Time zone"
+                            value={
+                                effective.timeZone === AUTOMATIC_TIME_ZONE
+                                    ? "This device"
+                                    : effective.timeZone.replace(/_/g, " ")
+                            }
+                        />
                         <Sample label="Temperature" value={format.temperature(21.4)} />
                         <Sample label="Amount" value={format.currency(1234.5)} />
                     </dl>

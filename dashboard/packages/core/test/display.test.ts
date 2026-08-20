@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
     createDisplayFormat,
     DISPLAY_DEFAULTS,
+    isTimeZone,
     parseDisplayPreferences,
     resolveDisplayPreferences,
     stringifyDisplayPreferences,
@@ -85,5 +86,60 @@ describe("formatting", () => {
         expect(format.dateTime(null)).toBe("-");
         expect(format.temperature(null)).toBe("-");
         expect(format.currency(undefined)).toBe("-");
+    });
+});
+
+describe("time zone", () => {
+    /** A moment chosen for the two things a zone can change: a clock reading and,
+     *  with it, the date. Late evening in London on the last day of a month is
+     *  already the next day in Tokyo. */
+    const INSTANT = new Date("2026-07-31T22:30:00Z");
+
+    it("follows the device it is drawn on until a zone is chosen", () => {
+        expect(DISPLAY_DEFAULTS.timeZone).toBe("auto");
+        const format = createDisplayFormat(DISPLAY_DEFAULTS);
+        const local = new Date(2026, 6, 31, 14, 5, 9);
+        expect(format.time(local)).toBe("14:05");
+    });
+
+    it("writes the clock in the chosen zone", () => {
+        const zoned = createDisplayFormat({ ...DISPLAY_DEFAULTS, timeZone: "Europe/Madrid" });
+        expect(zoned.time(INSTANT)).toBe("00:30");
+        const tokyo = createDisplayFormat({ ...DISPLAY_DEFAULTS, timeZone: "Asia/Tokyo" });
+        expect(tokyo.time(INSTANT)).toBe("07:30");
+    });
+
+    it("carries the date with it, since a zone can put the two on different days", () => {
+        const utc = createDisplayFormat({ ...DISPLAY_DEFAULTS, timeZone: "UTC", dateOrder: "dmy" });
+        expect(utc.date(INSTANT)).toBe("31/07/2026");
+        const tokyo = createDisplayFormat({ ...DISPLAY_DEFAULTS, timeZone: "Asia/Tokyo", dateOrder: "dmy" });
+        expect(tokyo.date(INSTANT)).toBe("01/08/2026");
+    });
+
+    it("writes midnight as 00 rather than 24, in both clock formats", () => {
+        const midnight = new Date("2026-07-31T22:00:00Z");
+        const zoned = createDisplayFormat({ ...DISPLAY_DEFAULTS, timeZone: "Europe/Madrid" });
+        expect(zoned.time(midnight)).toBe("00:00");
+        const twelve = createDisplayFormat({
+            ...DISPLAY_DEFAULTS,
+            timeZone: "Europe/Madrid",
+            clock: "12h"
+        });
+        expect(twelve.time(midnight)).toBe("12:00 AM");
+    });
+
+    it("refuses a zone this runtime does not know, and accepts the ones it does", () => {
+        expect(isTimeZone("Europe/Madrid")).toBe(true);
+        expect(isTimeZone("auto")).toBe(true);
+        expect(isTimeZone("Mars/Olympus")).toBe(false);
+        expect(userDisplayPreferencesSchema.safeParse({ timeZone: "Mars/Olympus" }).success).toBe(false);
+        expect(userDisplayPreferencesSchema.safeParse({ timeZone: "UTC" }).success).toBe(true);
+    });
+
+    it("keeps drawing a time when the stored zone has gone, rather than nothing", () => {
+        // Reached past the schema on purpose: a zone stored years ago and dropped
+        // by a runtime since must degrade to this device's clock.
+        const gone = createDisplayFormat({ ...DISPLAY_DEFAULTS, timeZone: "Mars/Olympus" });
+        expect(gone.time(new Date(2026, 6, 31, 14, 5, 9))).toBe("14:05");
     });
 });
