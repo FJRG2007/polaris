@@ -484,6 +484,7 @@ export function TagPicker({
     selected,
     onChange,
     onCreate,
+    spaceId,
     disabled
 }: {
     tags: readonly TagView[];
@@ -492,6 +493,16 @@ export function TagPicker({
     /** Offered when the typed name matches nothing, so a tag can be born where
      *  it is needed instead of in a settings screen. */
     onCreate?: (name: string) => Promise<string | null>;
+    /**
+     * Offers the way to a space's own tags, as the status picker does.
+     *
+     * It is the way out of the mess this picker can make: a tag is created here,
+     * in a hurry, under whatever was being typed, so the screen that renames one
+     * and takes one away has to be reachable from the place that makes them.
+     * Absent on a view spanning several spaces, where there is no single place
+     * to send anybody.
+     */
+    spaceId?: string;
     disabled?: boolean;
 }) {
     const [query, setQuery] = useState("");
@@ -583,6 +594,17 @@ export function TagPicker({
                         </DropdownMenuItem>
                     )}
                 </div>
+                {spaceId && (
+                    <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild className="gap-2 text-muted-foreground">
+                            <Link href={`/tasks/s/${spaceId}?tab=Tags`}>
+                                <Settings2 className="size-3.5" />
+                                Edit tags
+                            </Link>
+                        </DropdownMenuItem>
+                    </>
+                )}
             </DropdownMenuContent>
         </DropdownMenu>
     );

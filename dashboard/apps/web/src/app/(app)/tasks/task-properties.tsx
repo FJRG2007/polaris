@@ -252,6 +252,7 @@ export function PropertyRows({
                     ))}
                     <pickers.TagPicker
                         tags={context.tags}
+                        spaceId={context.spaceId}
                         selected={task.tags.map((tag) => tag.id)}
                         disabled={disabled}
                         onChange={(tagIds) => patch({ tagIds })}

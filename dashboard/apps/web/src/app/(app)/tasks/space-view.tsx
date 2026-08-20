@@ -616,6 +616,19 @@ function FieldsTab({
     );
 }
 
+/**
+ * The tags a space uses, and the only screen that can take one back.
+ *
+ * A tag is made from the picker on a task, which is where somebody needs one -
+ * and that is also why this screen matters: a name typed in a hurry, or the same
+ * idea spelled two ways, is a tag that exists forever unless there is somewhere
+ * to rename it and somewhere to remove it. The picker links here for that
+ * reason; before it did, the only way to find this was to know it was here.
+ *
+ * Removing one is confirmed, because a tag belongs to the space rather than to
+ * the task it is being looked at from: it comes off every task in the space at
+ * once, and nothing about the press says so.
+ */
 function TagsTab({
     spaceId,
     tags,
@@ -629,38 +642,103 @@ function TagsTab({
 }) {
     const [name, setName] = useState("");
     const [color, setColor] = useState("#7c5cff");
+    /** The tag being renamed, and what it is being renamed to. Held apart from
+     *  the row so cancelling puts the stored one back rather than whatever was
+     *  half-typed. */
+    const [editing, setEditing] = useState<TagView | null>(null);
+    const [draft, setDraft] = useState<{ name: string; color: string } | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [removing, setRemoving] = useState<TagView | null>(null);
+
+    const save = async () => {
+        if (!editing || !draft || !draft.name.trim()) return;
+        setSaving(true);
+        const result = await runAction(
+            () => actions.updateTagAction(spaceId, editing.id, draft.name.trim(), draft.color),
+            onError
+        );
+        setSaving(false);
+        if (result?.error) onError(result.error);
+        else if (result) setEditing(null);
+    };
 
     return (
         <section className="flex flex-col gap-3">
-            <div className="flex flex-wrap gap-2">
-                {tags.length === 0 && <p className="text-xs text-muted-foreground">No tags yet.</p>}
-                {tags.map((tag) => (
-                    <span
-                        key={tag.id}
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs"
-                        style={{ backgroundColor: `${tag.color}22`, color: tag.color }}
-                    >
-                        {tag.name}
-                        {canManage && (
-                            <button
-                                type="button"
-                                aria-label={`Remove ${tag.name}`}
-                                title="Remove tag"
-                                onClick={async () => {
-                                    const result = await runAction(
-                                        () => actions.deleteTagAction(spaceId, tag.id),
-                                        onError
-                                    );
-                                    if (result?.error) onError(result.error);
+            <p className="text-xs text-muted-foreground">
+                Every list in this space shares these. Anybody can make one while tagging a task;
+                renaming or removing one here changes it on every task that carries it.
+            </p>
+
+            <ul className="divide-y divide-border rounded-lg border border-border">
+                {tags.length === 0 && (
+                    <li className="px-3 py-2 text-xs text-muted-foreground">No tags yet.</li>
+                )}
+                {tags.map((tag) =>
+                    editing?.id === tag.id && draft ? (
+                        <li key={tag.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
+                            <input
+                                type="color"
+                                value={draft.color}
+                                aria-label="Tag color"
+                                onChange={(event) => setDraft({ ...draft, color: event.target.value })}
+                                className="h-8 w-12 shrink-0 rounded border border-border bg-field"
+                            />
+                            <Input
+                                autoFocus
+                                value={draft.name}
+                                aria-label="Tag name"
+                                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                                onKeyDown={(event) => {
+                                    if (event.key === "Escape") setEditing(null);
+                                    if (event.key === "Enter") void save();
                                 }}
-                                className="opacity-70 hover:opacity-100"
+                                className="h-8 min-w-32 flex-1 text-sm"
+                            />
+                            <Button size="sm" disabled={!draft.name.trim() || saving} onClick={() => void save()}>
+                                {saving ? "Saving..." : "Save"}
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
+                                Cancel
+                            </Button>
+                        </li>
+                    ) : (
+                        <li key={tag.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
+                            <span
+                                className="inline-flex items-center rounded-md px-2 py-0.5 text-xs"
+                                style={{ backgroundColor: `${tag.color}22`, color: tag.color }}
                             >
-                                <Trash2 className="size-3" />
-                            </button>
-                        )}
-                    </span>
-                ))}
-            </div>
+                                {tag.name}
+                            </span>
+                            <span className="flex-1" />
+                            {canManage && (
+                                <>
+                                    <button
+                                        type="button"
+                                        aria-label={`Edit ${tag.name}`}
+                                        title="Edit tag"
+                                        onClick={() => {
+                                            setEditing(tag);
+                                            setDraft({ name: tag.name, color: tag.color });
+                                        }}
+                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                    >
+                                        <Pencil className="size-3.5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-label={`Remove ${tag.name}`}
+                                        title="Remove tag"
+                                        onClick={() => setRemoving(tag)}
+                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                                    >
+                                        <Trash2 className="size-3.5" />
+                                    </button>
+                                </>
+                            )}
+                        </li>
+                    )
+                )}
+            </ul>
 
             {canManage && (
                 <div className="flex flex-wrap items-center gap-2">
@@ -694,6 +772,27 @@ function TagsTab({
                     </Button>
                 </div>
             )}
+
+            <ConfirmDeleteDialog
+                open={removing !== null}
+                onOpenChange={(open) => (open ? undefined : setRemoving(null))}
+                name={removing?.name ?? ""}
+                kind="tag"
+                // One row of many, and it holds no work of its own: typing the
+                // name back would be a ceremony for taking off a label.
+                requireTyping={false}
+                description="It comes off every task in this space that carries it. The tasks themselves stay."
+                confirmLabel="Remove tag"
+                onConfirm={async () => {
+                    if (!removing) return;
+                    const result = await runAction(
+                        () => actions.deleteTagAction(spaceId, removing.id),
+                        onError
+                    );
+                    if (result?.error) onError(result.error);
+                    setRemoving(null);
+                }}
+            />
         </section>
     );
 }

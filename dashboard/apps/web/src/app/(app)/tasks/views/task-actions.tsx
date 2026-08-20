@@ -161,6 +161,7 @@ export function TaskControls({ commands }: { commands: TaskCommands }) {
             />
             <TagPicker
                 tags={context.tags}
+                spaceId={context.spaceId}
                 selected={task.tags.map((tag) => tag.id)}
                 disabled={!canEdit}
                 onChange={(tagIds) => commands.onEdit({ tagIds })}
