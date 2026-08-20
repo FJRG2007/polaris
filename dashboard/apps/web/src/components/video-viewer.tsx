@@ -88,6 +88,11 @@ export function VideoViewer({
                     download={download}
                     // Opened on purpose, so it may fetch what it needs.
                     preload="auto"
+                    // The video is the screen: space is play, and the arrows
+                    // move through it. Nothing else here is listening, and
+                    // without this the space bar scrolls the conversation
+                    // underneath instead of pausing what is being watched.
+                    keyboard="global"
                     className="overflow-hidden rounded-lg bg-black"
                 />
             </div>

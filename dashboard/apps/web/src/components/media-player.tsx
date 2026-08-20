@@ -112,6 +112,7 @@ export function MediaPlayer({
     download,
     poster,
     preload = "metadata",
+    keyboard = "focused",
     className,
     onClick
 }: {
@@ -146,6 +147,19 @@ export function MediaPlayer({
      * of them.
      */
     preload?: "none" | "metadata" | "auto";
+    /**
+     * Which keys the player answers to.
+     *
+     * `focused` by default, and it has to be: a player halfway down a list of
+     * messages must not take the space bar, which is how a page scrolls, from
+     * the conversation around it.
+     *
+     * `global` for a player that IS the screen - one opened over everything
+     * else, where space means play and nothing else on the page is listening.
+     * Without it, opening a video and pressing space scrolls the conversation
+     * underneath instead of pausing what is being watched.
+     */
+    keyboard?: "focused" | "global";
     /** Put on the frame around the player, since the element itself is wrapped
      *  by Plyr and hidden behind its own chrome. */
     className?: string;
@@ -173,7 +187,7 @@ export function MediaPlayer({
                     // The keys, while the player has the focus. Never globally -
                     // space is how a page scrolls, and a player halfway down a
                     // list of clips must not take it.
-                    keyboard: { focused: true, global: false },
+                    keyboard: { focused: true, global: keyboard === "global" },
                     // Where the download button points. Cast because the option
                     // is older than the types shipped beside it: the library
                     // reads `urls.download` and always has, and passing it any
@@ -195,7 +209,7 @@ export function MediaPlayer({
             // by a closed dialog keeps answering them.
             player?.destroy();
         };
-    }, [src, kind, download]);
+    }, [src, kind, download, keyboard]);
 
     // Plyr's own accent, pointed at the token rather than a hex, so it follows
     // the theme like everything else.

@@ -1,49 +1,86 @@
 // @vitest-environment jsdom
 
 /**
- * The player every recording in Polaris is drawn with.
+ * What the player is built with, which is the half nobody sees until it is
+ * wrong.
  *
- * Two things are worth holding still. The element underneath keeps `controls`,
- * so a browser that never loads the player - a stale chunk, a network that went
- * away - is left with its own rather than with a rectangle that does nothing.
- * And the source is the element's key, because Plyr is built against the element
- * it was handed: giving that element a different file underneath it leaves the
- * controls describing the previous one.
+ * Two of these settings are the difference between a player and a rectangle
+ * with a picture in it. A video opened over the conversation has to take the
+ * space bar - it IS the screen at that moment - while a player sitting in a list
+ * of messages must not, because space is how a page scrolls and forty of them
+ * would fight over it. And a player with somewhere to save from has to say so:
+ * Polaris replaced the browser's own menu, so a player with no download control
+ * is a file with no way out.
  */
 
-import { MediaPlayer } from "@/components/media-player";
-import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, waitFor } from "@testing-library/react";
 
-afterEach(cleanup);
+/** What the player was constructed with, for the last one built. */
+let built: { options: Record<string, unknown> } | null = null;
 
-describe("the media player", () => {
-    it("draws a video that still works without the player", () => {
-        const { container } = render(<MediaPlayer src="/api/home/clips/c1/video" kind="video" />);
-        const video = container.querySelector("video");
-        expect(video?.getAttribute("src")).toBe("/api/home/clips/c1/video");
-        expect(video?.hasAttribute("controls")).toBe(true);
-        expect(video?.hasAttribute("playsinline")).toBe(true);
+vi.mock("plyr", () => ({
+    default: class {
+        constructor(_element: unknown, options: Record<string, unknown>) {
+            built = { options };
+        }
+        destroy() {}
+    }
+}));
+
+const { MediaPlayer } = await import("@/components/media-player");
+
+afterEach(() => {
+    cleanup();
+    built = null;
+});
+
+describe("the keys it answers to", () => {
+    it("leaves the space bar to the page it is drawn in", async () => {
+        render(<MediaPlayer kind="video" src="/api/chat/attachments/a1" />);
+        await waitFor(() => expect(built).not.toBeNull());
+        expect(built?.options.keyboard).toEqual({ focused: true, global: false });
     });
 
-    it("draws an audio element for a recording", () => {
-        const { container } = render(<MediaPlayer src="/api/drive/x/audio.mp3" kind="audio" />);
-        expect(container.querySelector("audio")).not.toBeNull();
-        expect(container.querySelector("video")).toBeNull();
+    it("takes it for a player that is the screen", async () => {
+        render(<MediaPlayer kind="video" src="/api/chat/attachments/a1" keyboard="global" />);
+        await waitFor(() => expect(built).not.toBeNull());
+        expect(built?.options.keyboard).toEqual({ focused: true, global: true });
+    });
+});
+
+describe("saving what it is playing", () => {
+    it("offers it where the screen said it may be saved", async () => {
+        render(
+            <MediaPlayer
+                kind="video"
+                src="/api/chat/attachments/a1"
+                download="/api/chat/attachments/a1?download=1"
+            />
+        );
+        await waitFor(() => expect(built).not.toBeNull());
+        expect(built?.options.controls).toContain("download");
+        // Pointed somewhere other than what is being played: one is served to be
+        // played and the other as a file to save.
+        expect(built?.options.urls).toEqual({
+            download: "/api/chat/attachments/a1?download=1"
+        });
     });
 
-    it("only autoplays where the screen asked for it", () => {
-        const { container } = render(<MediaPlayer src="/a.mp4" kind="video" />);
-        expect(container.querySelector("video")?.hasAttribute("autoplay")).toBe(false);
-
-        cleanup();
-        const playing = render(<MediaPlayer src="/a.mp4" kind="video" autoPlay />);
-        expect(playing.container.querySelector("video")?.hasAttribute("autoplay")).toBe(true);
+    it("offers nothing of the sort otherwise", async () => {
+        render(<MediaPlayer kind="video" src="/api/chat/attachments/a1" />);
+        await waitFor(() => expect(built).not.toBeNull());
+        expect(built?.options.controls).not.toContain("download");
+        expect(built?.options.urls).toBeUndefined();
     });
+});
 
-    it("carries the accent as a token rather than a colour", () => {
-        const { container } = render(<MediaPlayer src="/a.mp4" kind="video" />);
-        const frame = container.firstElementChild as HTMLElement | null;
-        expect(frame?.style.getPropertyValue("--plyr-color-main")).toBe("hsl(var(--primary))");
+describe("what it stores about the person watching", () => {
+    it("stores nothing", async () => {
+        // A file on their own instance. There is no session to remember here and
+        // nothing worth writing down about who watched what.
+        render(<MediaPlayer kind="video" src="/api/chat/attachments/a1" />);
+        await waitFor(() => expect(built).not.toBeNull());
+        expect(built?.options.storage).toEqual({ enabled: false });
     });
 });
