@@ -18,13 +18,23 @@ import { useEffect, useState, useTransition } from "react";
 import type { DeliveryView } from "@/lib/notification-service";
 import type { SmsSenderView } from "@/lib/notifications/sms-service";
 import type { DestinationView } from "@/lib/notifications/destinations";
+import { drawFavicon } from "@/lib/favicon";
 import { AlertTriangle, Bell, Mail, Smartphone, Volume2, Webhook } from "lucide-react";
-import { Badge, Card, CardBody, CardHeader, CardTitle, Switch, cn } from "@polaris/ui";
+import { Badge, Card, CardBody, CardHeader, CardTitle, SegmentedControl, Switch, cn } from "@polaris/ui";
 import {
     notificationSoundEnabled,
     playNotificationSound,
     setNotificationSoundEnabled
 } from "@/lib/notification-sound";
+import {
+    DEFAULT_FAVICON_STYLE,
+    FAVICON_STYLES,
+    FAVICON_STYLE_LABEL,
+    faviconBadge,
+    faviconStyle,
+    setFaviconStyle,
+    type FaviconStyle
+} from "@/lib/favicon-style";
 import {
     isMuted,
     NOTIFICATION_EVENTS,
@@ -77,6 +87,7 @@ export function NotificationSettingsView({
             ) : null}
 
             <SoundCard />
+            <TabIconCard />
 
             {groups.map((group) => (
                 <EventGroup
@@ -138,6 +149,76 @@ function SoundCard() {
                         aria-label="Play a sound when a notification arrives"
                     />
                 </div>
+            </CardBody>
+        </Card>
+    );
+}
+
+/** The count the preview is drawn with. Two digits would show what the cap looks
+ *  like, one shows what it looks like on an ordinary afternoon. */
+const PREVIEW_WAITING = 3;
+
+/** Drawn well above the 16px a tab strip uses, so the preview is the shape of
+ *  the icon rather than a blur of it. */
+const PREVIEW_SIZE = 64;
+
+const STYLE_HINT: Record<FaviconStyle, string> = {
+    count: "How many are waiting, on the tab icon.",
+    dot: "A dot on the tab icon, without the number.",
+    none: "The plain icon, whatever is waiting."
+};
+
+/**
+ * What the tab icon says while you are somewhere else. Kept on this device
+ * alongside the chime, for the same reason: it belongs to the screen being
+ * looked at rather than to the account.
+ */
+function TabIconCard() {
+    const [style, setStyle] = useState<FaviconStyle>(DEFAULT_FAVICON_STYLE);
+    const [preview, setPreview] = useState<string | null>(null);
+
+    // Storage and canvas are both out of reach while the page is rendered on the
+    // server, so the control takes its real position on mount.
+    useEffect(() => setStyle(faviconStyle()), []);
+    useEffect(
+        () => setPreview(drawFavicon(faviconBadge(style, PREVIEW_WAITING), PREVIEW_SIZE)),
+        [style]
+    );
+
+    function choose(next: FaviconStyle) {
+        setStyle(next);
+        setFaviconStyle(next);
+    }
+
+    return (
+        <Card>
+            <CardBody className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3">
+                    {/* The tab icon itself, at the choice being made. With
+                        nothing waiting the real tab would not change on a click,
+                        which leaves somebody choosing between three words. */}
+                    <span
+                        aria-hidden
+                        className="grid size-8 shrink-0 place-items-center rounded-md border border-border bg-muted"
+                    >
+                        {preview ? <img src={preview} alt="" width={20} height={20} /> : null}
+                    </span>
+                    <div className="min-w-0">
+                        <p className="text-sm font-medium">Tab icon</p>
+                        <p className="text-xs text-muted-foreground">{STYLE_HINT[style]}</p>
+                    </div>
+                </div>
+                <SegmentedControl
+                    value={style}
+                    onValueChange={choose}
+                    aria-label="What the tab icon shows when something is waiting"
+                    className="shrink-0"
+                    options={FAVICON_STYLES.map((option) => ({
+                        value: option,
+                        label: FAVICON_STYLE_LABEL[option],
+                        title: STYLE_HINT[option]
+                    }))}
+                />
             </CardBody>
         </Card>
     );

@@ -1,10 +1,15 @@
 /**
- * The tab icon, and the unread count drawn onto it.
+ * The tab icon, and what is drawn onto it when something is waiting.
  *
  * A tab sitting behind another window is where a background alert has to be
  * noticed, and the bell is not on screen there - the icon is. So the same badge
  * the bell carries is drawn over the mark and swapped in as the tab's icon,
  * which is what makes a new alert visible without the tab being in front.
+ *
+ * What that badge says is the reader's choice - see `favicon-style`. A count is
+ * the default because it answers "how much" without the page being opened; a
+ * plain dot is the same thing a phone puts on an app icon, for anybody who wants
+ * to be told that something happened and not how often.
  *
  * It is drawn rather than shipped as a set of pre-rendered images: the count
  * changes as alerts arrive and are read, so the icon has to be produced at the
@@ -36,17 +41,26 @@ const RENDER_SIZE = 64;
 
 const BADGE_FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 
+/** How much of the icon each badge takes, as a share of its width. */
+const COUNT_RADIUS = 0.32;
+const DOT_RADIUS = 0.2;
+
 export interface FaviconLink {
     href: string;
     type: string;
 }
 
+/** What the mark is carrying. A count has to be read, a dot only has to be seen,
+ *  and nothing at all is the third choice - which is `null` rather than a member
+ *  here, because it is the absence of a badge and not a kind of one. */
+export type FaviconBadge = { kind: "count"; label: string } | { kind: "dot" };
+
 /**
- * The Polaris mark as a PNG data URL, badged with `label` when there is one.
- * Null when the browser gives us no canvas to draw on, which leaves the icon
- * already in the document alone rather than blanking it.
+ * The Polaris mark as a PNG data URL, carrying `badge` when there is one. Null
+ * when the browser gives us no canvas to draw on, which leaves the icon already
+ * in the document alone rather than blanking it.
  */
-export function drawFavicon(label: string | null, size = RENDER_SIZE): string | null {
+export function drawFavicon(badge: FaviconBadge | null, size = RENDER_SIZE): string | null {
     const canvas = document.createElement("canvas");
     canvas.width = size;
     canvas.height = size;
@@ -67,25 +81,32 @@ export function drawFavicon(label: string | null, size = RENDER_SIZE): string | 
     context.fillStyle = MARK_FOREGROUND;
     context.fill(new Path2D(MARK_STAR));
     context.restore();
-    if (!label) return canvas.toDataURL("image/png");
+    if (!badge) return canvas.toDataURL("image/png");
 
-    const radius = size * 0.32;
+    const dot = badge.kind === "dot";
+    // A disc big enough to hold two digits, or the small one a phone puts on an
+    // app icon - which has to stay small, or it stops reading as a mark on the
+    // icon and starts reading as part of it.
+    const radius = size * (dot ? DOT_RADIUS : COUNT_RADIUS);
     const x = size - radius;
     const y = radius;
     // A red disc straight on violet reads as one shape at 16px, so the mark is
-    // cut away behind the badge and the gap separates them.
+    // cut away behind the badge and the gap separates them. The smaller the
+    // disc, the wider that gap has to be in proportion to survive 16px.
     context.globalCompositeOperation = "destination-out";
-    disc(context, x, y, radius * 1.16);
+    disc(context, x, y, radius * (dot ? 1.34 : 1.16));
     context.globalCompositeOperation = "source-over";
     context.fillStyle = BADGE_BACKGROUND;
     disc(context, x, y, radius);
+    if (dot) return canvas.toDataURL("image/png");
+
     context.fillStyle = MARK_FOREGROUND;
     // The count is the first thing lost when a tab strip draws this at 16px, so
     // it is set as large as the disc holds and heavier than the interface would.
-    context.font = `700 ${radius * (label.length > 1 ? 1.1 : 1.5)}px ${BADGE_FONT}`;
+    context.font = `700 ${radius * (badge.label.length > 1 ? 1.1 : 1.5)}px ${BADGE_FONT}`;
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.fillText(label, x, y);
+    context.fillText(badge.label, x, y);
     return canvas.toDataURL("image/png");
 }
 

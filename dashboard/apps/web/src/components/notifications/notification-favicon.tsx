@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Puts the unread count on the tab icon. Reads the same live feed the bell does,
+ * Puts what is waiting on the tab icon. Reads the same live feed the bell does,
  * so the badge appears the moment an alert arrives and clears as soon as one is
  * read - on this tab or on another device. Renders nothing itself.
  *
@@ -11,13 +11,23 @@
  * icon on the tab and no way at all of learning one had arrived - which is the
  * one place a tab icon is worth anything, since by definition they are not
  * looking at the page.
+ *
+ * Whether that shows as a number, a dot, or nothing at all is the device's
+ * choice - see `favicon-style` - and it is followed while the page is open, so
+ * changing it in Settings redraws the tab there and then.
  */
 
-import { useEffect, useRef } from "react";
-import { badgeLabel } from "@/lib/notification-badge";
+import { useEffect, useRef, useState } from "react";
 import { useChatUnread } from "@/components/chat-unread";
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
 import { applyFavicon, currentFavicon, drawFavicon, type FaviconLink } from "@/lib/favicon";
+import {
+    DEFAULT_FAVICON_STYLE,
+    faviconBadge,
+    faviconStyle,
+    onFaviconStyleChange,
+    type FaviconStyle
+} from "@/lib/favicon-style";
 
 export function NotificationFavicon() {
     const { unread } = useNotificationFeed();
@@ -26,20 +36,29 @@ export function NotificationFavicon() {
     // something here for you", and which half it came from is a question the
     // page itself answers.
     const waiting = unread + chat.messages;
+    // Storage is not readable while the page is rendered on the server, so the
+    // default holds until the first paint has happened.
+    const [style, setStyle] = useState<FaviconStyle>(DEFAULT_FAVICON_STYLE);
     // The plain icon the page was served with. Kept so a feed that empties puts
     // back the crisp vector rather than a drawn copy of it.
     const plain = useRef<FaviconLink | null>(null);
 
     useEffect(() => {
+        const read = () => setStyle(faviconStyle());
+        read();
+        return onFaviconStyleChange(read);
+    }, []);
+
+    useEffect(() => {
         plain.current ??= currentFavicon();
-        const label = badgeLabel(waiting);
-        if (!label) {
+        const badge = faviconBadge(style, waiting);
+        if (!badge) {
             applyFavicon(plain.current);
             return;
         }
-        const badged = drawFavicon(label);
+        const badged = drawFavicon(badge);
         if (badged) applyFavicon({ href: badged, type: "image/png" });
-    }, [waiting]);
+    }, [style, waiting]);
 
     useEffect(() => () => {
         if (plain.current) applyFavicon(plain.current);
