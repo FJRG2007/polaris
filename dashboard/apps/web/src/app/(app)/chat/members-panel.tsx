@@ -367,7 +367,12 @@ export function ChannelMembers({
     }
 
     return (
-        <aside className="flex w-56 shrink-0 flex-col border-l border-border">
+        // A little wider than it was and still narrower than the profile beside
+        // a direct message: this is a list of names, which wraps badly and reads
+        // fine narrow, where that one carries sentences. Every pixel either
+        // takes comes off the conversation, so the wider step waits for a window
+        // with room for it - the same breakpoint the profile uses.
+        <aside className="flex w-60 shrink-0 flex-col border-l border-border xl:w-64">
             <div className="flex h-header shrink-0 items-center justify-between gap-2 border-b border-border px-3">
                 <span className="text-sm font-semibold">{heading}</span>
                 <button

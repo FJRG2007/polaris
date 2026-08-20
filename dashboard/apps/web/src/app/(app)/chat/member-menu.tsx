@@ -147,7 +147,10 @@ interface MenuParts {
     readonly Label: ComponentType<{ className?: string; children: ReactNode }>;
     readonly Separator: ComponentType<Record<string, never>>;
     readonly Sub: ComponentType<{ children: ReactNode }>;
-    readonly SubTrigger: ComponentType<{ children: ReactNode }>;
+    readonly SubTrigger: ComponentType<{
+        variant?: "default" | "danger";
+        children: ReactNode;
+    }>;
     readonly SubContent: ComponentType<{ className?: string; children: ReactNode }>;
 }
 
@@ -386,12 +389,17 @@ export function MemberMenu({
                             deciding something, and this is not. */}
                         <menu.Item
                             disabled={working}
+                            // Red for the half that shuts somebody out, and not
+                            // for the half that lets them back in. Through the
+                            // menu's own variant rather than a colour painted on
+                            // the icon and the label: the row highlights with it,
+                            // which is what makes it read as heavy while the
+                            // pointer is on it.
+                            variant={shut ? "default" : "danger"}
                             onSelect={() => void toggleBlock()}
                         >
-                            <ShieldBan className={shut ? "size-3.5" : "size-3.5 text-danger"} />
-                            <span className={shut ? undefined : "text-danger"}>
-                                {shut ? "Unblock" : "Block"}
-                            </span>
+                            <ShieldBan className="size-3.5" />
+                            {shut ? "Unblock" : "Block"}
                         </menu.Item>
                     </>
                 )}
@@ -419,7 +427,12 @@ export function MemberMenu({
                     <>
                         <menu.Separator />
                         <menu.Sub>
-                            <menu.SubTrigger>
+                            {/* The trigger is red and the lengths under it are
+                                not: choosing between five minutes and a day is
+                                not five decisions of different weight, and a
+                                submenu painted entirely red reads as a warning
+                                about the list rather than about the act. */}
+                            <menu.SubTrigger variant="danger">
                                 <Timer className="size-3.5" />
                                 Time out
                             </menu.SubTrigger>
@@ -463,6 +476,7 @@ export function MemberMenu({
 
                         <menu.Item
                             disabled={working}
+                            variant="danger"
                             onSelect={() =>
                                 void run(() =>
                                     space
@@ -482,14 +496,15 @@ export function MemberMenu({
                         {may.ban && space && (
                             <menu.Item
                                 disabled={working}
+                                variant="danger"
                                 onSelect={() =>
                                     void run(() =>
                                         actions.banFromSpaceAction(space, member.userId)
                                     )
                                 }
                             >
-                                <Ban className="size-3.5 text-danger" />
-                                <span className="text-danger">Ban from the server</span>
+                                <Ban className="size-3.5" />
+                                Ban from the server
                             </menu.Item>
                         )}
                     </>

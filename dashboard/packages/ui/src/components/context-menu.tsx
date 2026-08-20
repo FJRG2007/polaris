@@ -102,8 +102,8 @@ ContextMenuItem.displayName = "ContextMenuItem";
 
 export const ContextMenuSubTrigger = forwardRef<
     ElementRef<typeof RadixMenu.SubTrigger>,
-    ComponentPropsWithoutRef<typeof RadixMenu.SubTrigger>
->(({ className, children, onPointerMove, onPointerLeave, ...props }, ref) => {
+    ComponentPropsWithoutRef<typeof RadixMenu.SubTrigger> & { variant?: "default" | "danger" }
+>(({ className, children, variant = "default", onPointerMove, onPointerLeave, ...props }, ref) => {
     const settled = useSettledHover();
 
     return (
@@ -111,6 +111,10 @@ export const ContextMenuSubTrigger = forwardRef<
             ref={ref}
             className={cn(
                 "relative flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-[13px] outline-none transition-colors duration-fast focus:bg-card-hover data-[state=open]:bg-card-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+                // A submenu whose options all do the same heavy thing is that
+                // thing, and the trigger is the only part of it anybody reads
+                // before deciding. Same red as an item, for the same reason.
+                variant === "danger" && "text-danger focus:bg-danger/10 data-[state=open]:bg-danger/10",
                 className
             )}
             {...props}

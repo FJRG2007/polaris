@@ -160,4 +160,20 @@ describe("the three dots", () => {
             expect(within(menu).getByText(item)).toBeDefined();
         }
     });
+
+    it("draw the one that shuts somebody out in the colour that means that", async () => {
+        const user = userEvent.setup();
+        panel();
+        await user.click(
+            await screen.findByRole("button", { name: "What you can do about Grace Hopper" })
+        );
+        const menu = await screen.findByRole("menu");
+        // Through the menu's own danger variant rather than a colour painted on
+        // the label, so the row highlights in it too - which is what makes it
+        // read as heavy with the pointer on it.
+        const block = within(menu).getByText("Block").closest("[role='menuitem']");
+        expect(block?.className).toContain("text-danger");
+        const message = within(menu).getByText("Message").closest("[role='menuitem']");
+        expect(message?.className).not.toContain("text-danger");
+    });
 });

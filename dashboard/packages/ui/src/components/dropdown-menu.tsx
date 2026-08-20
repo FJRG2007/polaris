@@ -79,14 +79,18 @@ DropdownMenuItem.displayName = "DropdownMenuItem";
  *  they are the same submenus reached two ways. */
 export const DropdownMenuSubTrigger = forwardRef<
     ElementRef<typeof RadixMenu.SubTrigger>,
-    ComponentPropsWithoutRef<typeof RadixMenu.SubTrigger>
->(({ className, children, onPointerMove, onPointerLeave, ...props }, ref) => {
+    ComponentPropsWithoutRef<typeof RadixMenu.SubTrigger> & { variant?: "default" | "danger" }
+>(({ className, children, variant = "default", onPointerMove, onPointerLeave, ...props }, ref) => {
     const settled = useSettledHover();
     return (
         <RadixMenu.SubTrigger
             ref={ref}
             className={cn(
                 "relative flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-[13px] outline-none transition-colors duration-fast focus:bg-card-hover data-[state=open]:bg-card-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+                // A submenu whose options all do the same heavy thing is that
+                // thing, and the trigger is the only part of it anybody reads
+                // before deciding. Same red as an item, for the same reason.
+                variant === "danger" && "text-danger focus:bg-danger/10 data-[state=open]:bg-danger/10",
                 className
             )}
             {...props}
