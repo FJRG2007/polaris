@@ -109,7 +109,16 @@ export function StandingView({
                                     className="flex flex-col items-center gap-2 text-center"
                                     aria-current={lit ? "step" : undefined}
                                 >
-                                    <span className="flex w-full items-center">
+                                    {/* A fixed height, and it is what keeps the
+                                        rail straight: the mark in force is
+                                        twice the size of the rest, so a row that
+                                        took its height from its contents drew
+                                        the lit column taller than its
+                                        neighbours - the line through it sat
+                                        lower and the name under it lower still.
+                                        Every column is the height of the biggest
+                                        mark, and the small ones centre in it. */}
+                                    <span className="flex h-6 w-full items-center">
                                         {/* Half a line either side, so the rail is
                                             continuous across the row and stops at
                                             both ends. */}
