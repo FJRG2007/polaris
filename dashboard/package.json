@@ -3,7 +3,7 @@
     "version": "0.4.6",
     "private": true,
     "type": "module",
-    "description": "Polaris web control plane - dashboard pillar (Drive and future apps).",
+    "description": "Polaris web control plane: files, deploys, work, chat and the machines behind them.",
     "author": "FJRG2007 <fjrg2007@tpeoficial.com>",
     "license": "Apache-2.0",
     "engines": {

@@ -8,21 +8,29 @@
   <br />
   <a href="#install">Install</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="#whats-in-it">What's in it</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="#usage">Usage</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="docs/developers/README.md">Developers</a>
   <hr />
 </div>
 
-Polaris is a self-hosted dashboard for everything in your home lab. It starts
-with an advanced **Drive** - browse, upload, download and share files across any
-NAS - and a **Containers** app to monitor and manage Docker. A single minimalist,
-dark interface with a top-left app switcher, ready to grow into servers, VMs and
-home automation.
+Polaris is a self-hosted workspace for everything you run yourself: your files,
+your servers, the apps you deploy on them, the work you plan around them, and the
+people you do it with. One install, one login, one dark interface with an app
+switcher in the top-left corner.
+
+It replaces the pile that usually grows around a home lab or a small team - a
+file browser, a deployment tool, a task board, a chat client, a password manager,
+an uptime monitor, an analytics script - with one control plane where those
+things already know about each other. A deploy can be discussed in a channel, a
+task can carry the file, and everybody in it has one account.
 
 Polaris runs in Docker and reaches out from there: native mounts, the host's own
 Docker engine, and the machines you enrol over SSH are all managed from the one
-container.
+container. After the install, nothing needs a terminal - updates, new features
+and repairs all happen from the interface.
 
 ## Install
 
@@ -46,8 +54,75 @@ cp .env.example .env                  # then set the two secrets it flags
 docker compose --profile full up -d
 ```
 
-Updating is one command: `./dashboard/scripts/update.sh`, and the dashboard has a
-button for it.
+Updating is a button in Settings. There is a script behind it for anybody who
+would rather drive it themselves.
+
+## What's in it
+
+Every app is switched on per account and per role, so somebody invited to help
+with one thing does not get the rest.
+
+**Files and secrets**
+
+- **Drive** - browse, upload, download and share files across every NAS you own:
+  local disks, SFTP, WebDAV, S3-compatible, SMB/NFS, and vendor APIs (Synology,
+  QNAP, TrueNAS, UniFi UNAS). Streaming transfers, so multi-gigabyte files never
+  buffer. Public links with passwords and expiry, drop points for people who have
+  no account, and viewers and editors for documents, spreadsheets, PDFs and media.
+- **Vault** - a password manager that speaks the Bitwarden client protocol, so
+  the apps and extensions you already use point at your own instance. Everything
+  is encrypted in the browser; the server never sees a master password.
+
+**Running things**
+
+- **Deploy** - deploy an app from a Git repository or an image, with databases,
+  volumes, environment variables, logs, a terminal, a file browser and a domain.
+  Public access through your own domain, a Cloudflare tunnel or DuckDNS.
+- **Servers** - enrol a machine over SSH with one generated command, then use its
+  terminal, files, metrics and Docker engine from here.
+- **Containers** and **Backups** - what is running on every host, and scheduled
+  backups of it with restore.
+- **Marketplace** - one-press installs for the things people actually self-host,
+  including **game servers** (Minecraft and ARK, with worlds, mods, players,
+  schedules and crash detection).
+- **Runners** - GitHub Actions compatible CI on your own machines, with per-repo
+  policy and budgets.
+- **Agents** - coding agents that work in a repository, open pull requests and
+  answer reviews, with your own model keys.
+- **Code** - the pull requests and issues you have open on GitHub, read as you.
+- **Databases** - Postgres, MySQL, MariaDB, MongoDB and Redis: browse, query and
+  back up what you deployed.
+
+**Work and people**
+
+- **Tasks** - spaces, lists, boards, sprints, goals, docs, custom fields,
+  automations, forms and time tracking.
+- **Chat** - channels, direct messages and group conversations, with calls,
+  meetings, screen sharing, voice messages, screen clips recorded in the browser,
+  and messages written now and sent at an hour that suits.
+- **Notes** - somewhere to write things down, nested the way a notebook is.
+- **Inbox** - conversations that arrive from outside, across every channel you
+  connect.
+- **Organizations** - teams, rosters and per-organization roles, so a group of
+  people can own work together.
+
+**Keeping an eye on it**
+
+- **Watch** - alarms on app health, spikes and outages, with webhooks.
+- **Analytics** - cookieless web analytics for the sites you host.
+- **Firewall** - a rule per protection: allow and deny lists, country and network
+  rules, bot and scraper defences, injection scanning, and automatic bans.
+- **Places** - the places you own and the cameras in them: live views, clips,
+  events, detections and alerts that arrive as messages.
+
+**The account itself**
+
+Passwords, passkeys, two-factor, trusted devices, QR sign-in from another device,
+sessions, API keys, access rules, privacy settings, notification preferences, and
+a record of where your account stands.
+
+What is built versus in progress is tracked in
+[`dashboard/ROADMAP.md`](dashboard/ROADMAP.md).
 
 ## Usage
 
@@ -58,18 +133,10 @@ becomes the administrator**.
 so any device on your network can open **`http://polaris.local`**, and the machine
 running Polaris also resolves bare **`http://polaris`**.
 
-- **Drive** - add a storage connection (a local folder or a NAS) and browse it.
-  Upload and download stream straight through, so multi-gigabyte files never
-  buffer. Connect any NAS - local, SFTP, WebDAV, S3-compatible, SMB/NFS, and
-  vendor APIs (Synology, QNAP, TrueNAS, UniFi UNAS).
-- **Containers** - add a Docker host (the local socket, a remote host over SSH,
-  or TCP/TLS) and see a live overview of container CPU and memory, with
-  start/stop/restart controls.
-- **Users** - invite people and assign roles; every action is authorized on the
-  server.
-
-What is built versus in progress is tracked in
-[`dashboard/ROADMAP.md`](dashboard/ROADMAP.md).
+Two editions come out of one image. The **full** edition includes the privileged
+host daemon and can manage the machine it runs on - mounts, the Docker engine,
+updates. The **limited** edition is everything that does not need that, for a
+host you would rather not hand over.
 
 ## Requirements
 
