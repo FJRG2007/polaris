@@ -18,7 +18,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { PersonRef, TagRef, TaskRow } from "@/lib/tasks/facts";
 import type { StatusView, TagView } from "@/lib/tasks/space-service";
 import { PriorityFlag } from "@/components/priority-flag";
-import { Ban, CalendarPlus, Check, ChevronDown, Flag, Plus, Search, Settings2, UserPlus, X } from "lucide-react";
+import { Ban, CalendarPlus, Check, ChevronDown, Flag, Plus, Settings2, UserPlus, X } from "lucide-react";
 import {
     Badge,
     cn,
@@ -27,7 +27,9 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-    Input
+    Input,
+    MenuSearch,
+    menuSearchMatches
 } from "@polaris/ui";
 
 // ---------------------------------------------------------------------------
@@ -42,38 +44,6 @@ import {
  * this module keep doing so.
  */
 export { Avatar, AvatarStack, preloadAvatars } from "@/components/avatar";
-
-/** A menu that filters as you type once the list stops being scannable. */
-function MenuSearch({
-    value,
-    onChange,
-    placeholder,
-    onSubmit
-}: {
-    value: string;
-    onChange: (value: string) => void;
-    placeholder: string;
-    /** What enter does, where typing a name is a way of picking one. */
-    onSubmit?: () => void;
-}) {
-    return (
-        <div className="flex items-center gap-2 border-b border-border px-2 pb-2">
-            <Search className="size-3.5 shrink-0 text-muted-foreground" />
-            <input
-                autoFocus
-                value={value}
-                onChange={(event) => onChange(event.target.value)}
-                onKeyDown={(event) => {
-                    if (event.key !== "Enter" || !onSubmit) return;
-                    event.preventDefault();
-                    onSubmit();
-                }}
-                placeholder={placeholder}
-                className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            />
-        </div>
-    );
-}
 
 export function AssigneePicker({
     people,
@@ -90,7 +60,7 @@ export function AssigneePicker({
 }) {
     const [query, setQuery] = useState("");
     const matches = useMemo(
-        () => people.filter((person) => person.name.toLowerCase().includes(query.trim().toLowerCase())),
+        () => people.filter((person) => menuSearchMatches(person.name, query)),
         [people, query]
     );
 
@@ -117,10 +87,12 @@ export function AssigneePicker({
                 )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 pt-2">
-                {people.length > 6 && <MenuSearch value={query} onChange={setQuery} placeholder="Find someone" />}
+                {people.length > 0 && <MenuSearch value={query} onChange={setQuery} placeholder="Find someone" />}
                 <div className="max-h-64 overflow-y-auto">
                     {matches.length === 0 && (
-                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">Nobody matches that.</p>
+                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                            {people.length === 0 ? "Nobody is on this space yet." : "Nobody matches that."}
+                        </p>
                     )}
                     {matches.map((person) => (
                         <DropdownMenuItem
@@ -305,7 +277,12 @@ export function StatusPicker({
      *  went looking for it. */
     spaceId?: string;
 }) {
+    const [query, setQuery] = useState("");
     const current = statuses.find((status) => status.id === value);
+    // A space names its own states and keeps adding them, so the list is as long
+    // as the workspace has made it.
+    const matches = statuses.filter((status) => menuSearchMatches(status.name, query));
+
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild disabled={disabled}>
@@ -325,20 +302,26 @@ export function StatusPicker({
                     </button>
                 )}
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-                {statuses.map((status) => (
-                    <DropdownMenuItem key={status.id} onSelect={() => onChange(status.id)} className="gap-2">
-                        <StatusIcon color={status.color} type={status.type} size={16} />
-                        <span className="flex-1 truncate">{status.name}</span>
-                        {status.id === value ? (
-                            <Check className="size-3.5 text-primary" />
-                        ) : (
-                            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                                {core.TASK_STATUS_TYPE_LABELS[status.type]}
-                            </span>
-                        )}
-                    </DropdownMenuItem>
-                ))}
+            <DropdownMenuContent align="start" className="w-56 pt-2">
+                <MenuSearch value={query} onChange={setQuery} placeholder="Find a status" />
+                <div className="max-h-64 overflow-y-auto">
+                    {matches.length === 0 && (
+                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">No status matches that.</p>
+                    )}
+                    {matches.map((status) => (
+                        <DropdownMenuItem key={status.id} onSelect={() => onChange(status.id)} className="gap-2">
+                            <StatusIcon color={status.color} type={status.type} size={16} />
+                            <span className="flex-1 truncate">{status.name}</span>
+                            {status.id === value ? (
+                                <Check className="size-3.5 text-primary" />
+                            ) : (
+                                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                    {core.TASK_STATUS_TYPE_LABELS[status.type]}
+                                </span>
+                            )}
+                        </DropdownMenuItem>
+                    ))}
+                </div>
                 {spaceId && (
                     <>
                         <DropdownMenuSeparator />
@@ -514,7 +497,7 @@ export function TagPicker({
     const [query, setQuery] = useState("");
     const [creating, setCreating] = useState(false);
     const needle = query.trim().toLowerCase();
-    const matches = tags.filter((tag) => tag.name.toLowerCase().includes(needle));
+    const matches = tags.filter((tag) => menuSearchMatches(tag.name, query));
     const existing = tags.find((tag) => tag.name.toLowerCase() === needle);
 
     const toggle = (id: string) =>
@@ -559,13 +542,18 @@ export function TagPicker({
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 pt-2">
-                <MenuSearch
-                    value={query}
-                    onChange={setQuery}
-                    onSubmit={() => void submit()}
-                    placeholder={onCreate ? "Find or create a tag" : "Find a tag"}
-                />
+                {(tags.length > 0 || onCreate) && (
+                    <MenuSearch
+                        value={query}
+                        onChange={setQuery}
+                        onSubmit={() => void submit()}
+                        placeholder={onCreate ? "Find or create a tag" : "Find a tag"}
+                    />
+                )}
                 <div className="max-h-56 overflow-y-auto">
+                    {matches.length === 0 && !onCreate && (
+                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">No tag matches that.</p>
+                    )}
                     {matches.map((tag) => (
                         <DropdownMenuItem
                             key={tag.id}

@@ -11,22 +11,12 @@ import { ChevronRight } from "lucide-react";
 import { useSettledHover } from "../lib/menu-hover";
 import { ignoreOpeningPress } from "../lib/menu-press";
 import * as RadixMenu from "@radix-ui/react-context-menu";
-import {
-    createContext,
-    forwardRef,
-    useContext,
-    useState,
-    type ComponentPropsWithoutRef,
-    type ElementRef
-} from "react";
+import { forwardRef, useMemo, useState, type ComponentPropsWithoutRef, type ElementRef } from "react";
+import { MenuSurfaceProvider, useMenuSurface } from "../lib/menu-surface";
 
 export const ContextMenu = RadixMenu.Root;
 export const ContextMenuTrigger = RadixMenu.Trigger;
 export const ContextMenuGroup = RadixMenu.Group;
-
-/** Whether this submenu has been open before, and so is being kept rather than
- *  rebuilt. Read by its content; nothing outside this file needs it. */
-const SubmenuKept = createContext(false);
 
 /**
  * A submenu that is built once and then kept.
@@ -42,19 +32,25 @@ const SubmenuKept = createContext(false);
  * the menu is open, which is the span somebody is moving between the options.
  */
 export function ContextMenuSub({ onOpenChange, ...props }: ComponentPropsWithoutRef<typeof RadixMenu.Sub>) {
+    const [open, setOpen] = useState(false);
     const [kept, setKept] = useState(false);
+    // Published rather than kept to this file: something drawn inside a submenu
+    // that is hidden instead of unmounted has no other way of telling that it
+    // is back on screen - see `menu-surface`.
+    const surface = useMemo(() => ({ open, kept }), [open, kept]);
     return (
-        <SubmenuKept.Provider value={kept}>
+        <MenuSurfaceProvider value={surface}>
             <RadixMenu.Sub
                 {...props}
-                onOpenChange={(open) => {
-                    // Only once it has actually been opened, so a menu nobody
-                    // steps into still costs nothing to put on screen.
-                    if (open) setKept(true);
-                    onOpenChange?.(open);
+                onOpenChange={(next) => {
+                    setOpen(next);
+                    // Kept only once it has actually been opened, so a menu
+                    // nobody steps into still costs nothing to put on screen.
+                    if (next) setKept(true);
+                    onOpenChange?.(next);
                 }}
             />
-        </SubmenuKept.Provider>
+        </MenuSurfaceProvider>
     );
 }
 
@@ -132,7 +128,7 @@ export const ContextMenuSubContent = forwardRef<
     // Kept mounted once it has been opened - see ContextMenuSub. Hidden rather
     // than faded while closed, since there is nothing to animate out of a
     // submenu that is only being stepped past.
-    const kept = useContext(SubmenuKept);
+    const { kept } = useMenuSurface();
     return (
         <RadixMenu.Portal forceMount={kept || undefined}>
             <RadixMenu.SubContent

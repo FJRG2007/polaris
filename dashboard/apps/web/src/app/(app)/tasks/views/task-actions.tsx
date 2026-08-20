@@ -62,7 +62,9 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    MenuSearch,
+    menuSearchMatches
 } from "@polaris/ui";
 
 export interface TaskCommands {
@@ -330,6 +332,17 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
     const { task, targets, context, canEdit } = commands;
     const baseUrl = useAppUrl();
     const [drafting, setDrafting] = useState<Draft | null>(null);
+    /**
+     * What has been typed into each submenu that lists things a workspace keeps
+     * adding to. Held here rather than inside the submenus because a submenu is
+     * kept mounted once opened, and a search that reset every time the pointer
+     * crossed it would be no search at all; the field selects what is in it when
+     * it comes back, so returning to one and typing replaces the old words.
+     */
+    const [statusQuery, setStatusQuery] = useState("");
+    const [peopleQuery, setPeopleQuery] = useState("");
+    const [tagQuery, setTagQuery] = useState("");
+    const [listQuery, setListQuery] = useState("");
 
     // Whether the menu is speaking about a selection rather than the task it was
     // opened on. The verbs are the same either way; what changes is that the ones
@@ -369,6 +382,14 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
         const held = new Set(targets.map((entry) => entry.listId));
         return commands.lists.filter((list) => list.spaceId === spaceId && !(held.size === 1 && held.has(list.id)));
     }, [targets, commands.lists]);
+
+    // What each search has left on screen. A space keeps adding states, tags and
+    // lists, and the people on it only ever grow, so every one of these is a
+    // list somebody eventually has to look through rather than read.
+    const matchingStatuses = context.statuses.filter((status) => menuSearchMatches(status.name, statusQuery));
+    const matchingPeople = context.people.filter((person) => menuSearchMatches(person.name, peopleQuery));
+    const matchingTags = context.tags.filter((tag) => menuSearchMatches(tag.name, tagQuery));
+    const matchingLists = destinations.filter((list) => menuSearchMatches(list.name, listQuery));
 
     const create = async (draft: { name: string; type: core.TaskStatusType; color: string }) => {
         if (drafting === "tag") {
@@ -417,20 +438,32 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                     <Check className="size-3.5" />
                                     Status
                                 </ContextMenuSubTrigger>
-                                <ContextMenuSubContent className="w-52">
-                                    {context.statuses.map((status) => (
-                                        <ContextMenuItem
-                                            key={status.id}
-                                            onSelect={() => commands.onApply({ statusId: status.id })}
-                                            className="gap-2"
-                                        >
-                                            <StatusIcon color={status.color} type={status.type} size={16} />
-                                            <span className="flex-1 truncate">{status.name}</span>
-                                            {status.id === sharedStatusId && (
-                                                <Check className="size-3.5 text-primary" />
-                                            )}
-                                        </ContextMenuItem>
-                                    ))}
+                                <ContextMenuSubContent className="w-52 pt-2">
+                                    <MenuSearch
+                                        value={statusQuery}
+                                        onChange={setStatusQuery}
+                                        placeholder="Find a status"
+                                    />
+                                    <div className="max-h-64 overflow-y-auto">
+                                        {matchingStatuses.length === 0 && (
+                                            <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                                                No status matches that.
+                                            </p>
+                                        )}
+                                        {matchingStatuses.map((status) => (
+                                            <ContextMenuItem
+                                                key={status.id}
+                                                onSelect={() => commands.onApply({ statusId: status.id })}
+                                                className="gap-2"
+                                            >
+                                                <StatusIcon color={status.color} type={status.type} size={16} />
+                                                <span className="flex-1 truncate">{status.name}</span>
+                                                {status.id === sharedStatusId && (
+                                                    <Check className="size-3.5 text-primary" />
+                                                )}
+                                            </ContextMenuItem>
+                                        ))}
+                                    </div>
                                     {commands.onCreateStatus && (
                                         <>
                                             <ContextMenuSeparator />
@@ -482,36 +515,51 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                     <UserPlus className="size-3.5" />
                                     Assign
                                 </ContextMenuSubTrigger>
-                                <ContextMenuSubContent className="max-h-64 w-56 overflow-y-auto">
-                                    {context.people.length === 0 && (
-                                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                                            Nobody is on this space yet.
-                                        </p>
+                                <ContextMenuSubContent className="w-56 pt-2">
+                                    {context.people.length > 0 && (
+                                        <MenuSearch
+                                            value={peopleQuery}
+                                            onChange={setPeopleQuery}
+                                            placeholder="Find someone"
+                                        />
                                     )}
-                                    {context.people.map((person) => {
-                                        const on = assigned.has(person.id);
-                                        return (
-                                            <ContextMenuItem
-                                                key={person.id}
-                                                className="gap-2"
-                                                onSelect={() =>
-                                                    commands.onApply(
-                                                        on
-                                                            ? { removeAssigneeIds: [person.id] }
-                                                            : { addAssigneeIds: [person.id] }
-                                                    )
-                                                }
-                                            >
-                                                {/* The same face the row and the
-                                                    directory draw: a list of names
-                                                    is slower to pick from than a
-                                                    list of people. */}
-                                                <Avatar person={person} size={20} />
-                                                <span className="flex-1 truncate">{person.name}</span>
-                                                {on && <Check className="size-3.5 text-primary" />}
-                                            </ContextMenuItem>
-                                        );
-                                    })}
+                                    <div className="max-h-64 overflow-y-auto">
+                                        {context.people.length === 0 && (
+                                            <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                                                Nobody is on this space yet.
+                                            </p>
+                                        )}
+                                        {context.people.length > 0 && matchingPeople.length === 0 && (
+                                            <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                                                Nobody matches that.
+                                            </p>
+                                        )}
+                                        {matchingPeople.map((person) => {
+                                            const on = assigned.has(person.id);
+                                            return (
+                                                <ContextMenuItem
+                                                    key={person.id}
+                                                    className="gap-2"
+                                                    onSelect={() =>
+                                                        commands.onApply(
+                                                            on
+                                                                ? { removeAssigneeIds: [person.id] }
+                                                                : { addAssigneeIds: [person.id] }
+                                                        )
+                                                    }
+                                                >
+                                                    {/* The same face the row and
+                                                        the directory draw: a list
+                                                        of names is slower to pick
+                                                        from than a list of
+                                                        people. */}
+                                                    <Avatar person={person} size={20} />
+                                                    <span className="flex-1 truncate">{person.name}</span>
+                                                    {on && <Check className="size-3.5 text-primary" />}
+                                                </ContextMenuItem>
+                                            );
+                                        })}
+                                    </div>
                                 </ContextMenuSubContent>
                             </ContextMenuSub>
 
@@ -524,29 +572,45 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                         <Tag className="size-3.5" />
                                         Tags
                                     </ContextMenuSubTrigger>
-                                    <ContextMenuSubContent className="max-h-64 w-56 overflow-y-auto">
-                                        {context.tags.map((tag) => {
-                                            const on = tagged.has(tag.id);
-                                            return (
-                                                <ContextMenuItem
-                                                    key={tag.id}
-                                                    className="gap-2"
-                                                    onSelect={() =>
-                                                        commands.onApply(
-                                                            on ? { removeTagIds: [tag.id] } : { addTagIds: [tag.id] }
-                                                        )
-                                                    }
-                                                >
-                                                    <span
-                                                        aria-hidden
-                                                        className="inline-block size-2.5 shrink-0 rounded-full"
-                                                        style={{ backgroundColor: tag.color }}
-                                                    />
-                                                    <span className="flex-1 truncate">{tag.name}</span>
-                                                    {on && <Check className="size-3.5 text-primary" />}
-                                                </ContextMenuItem>
-                                            );
-                                        })}
+                                    <ContextMenuSubContent className="w-56 pt-2">
+                                        {context.tags.length > 0 && (
+                                            <MenuSearch
+                                                value={tagQuery}
+                                                onChange={setTagQuery}
+                                                placeholder="Find a tag"
+                                            />
+                                        )}
+                                        <div className="max-h-64 overflow-y-auto">
+                                            {context.tags.length > 0 && matchingTags.length === 0 && (
+                                                <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                                                    No tag matches that.
+                                                </p>
+                                            )}
+                                            {matchingTags.map((tag) => {
+                                                const on = tagged.has(tag.id);
+                                                return (
+                                                    <ContextMenuItem
+                                                        key={tag.id}
+                                                        className="gap-2"
+                                                        onSelect={() =>
+                                                            commands.onApply(
+                                                                on
+                                                                    ? { removeTagIds: [tag.id] }
+                                                                    : { addTagIds: [tag.id] }
+                                                            )
+                                                        }
+                                                    >
+                                                        <span
+                                                            aria-hidden
+                                                            className="inline-block size-2.5 shrink-0 rounded-full"
+                                                            style={{ backgroundColor: tag.color }}
+                                                        />
+                                                        <span className="flex-1 truncate">{tag.name}</span>
+                                                        {on && <Check className="size-3.5 text-primary" />}
+                                                    </ContextMenuItem>
+                                                );
+                                            })}
+                                        </div>
                                         {commands.onCreateTag && (
                                             <>
                                                 {context.tags.length > 0 && <ContextMenuSeparator />}
@@ -573,15 +637,28 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                         <FolderInput className="size-3.5" />
                                         Move to
                                     </ContextMenuSubTrigger>
-                                    <ContextMenuSubContent className="max-h-64 w-56 overflow-y-auto">
-                                        {destinations.length === 0 ? (
-                                            <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                                                {many
-                                                    ? "Work only moves between lists of one space, and this selection spans more than one."
-                                                    : "This space has nowhere else to put it."}
-                                            </p>
-                                        ) : (
-                                            destinations.map((list) => (
+                                    <ContextMenuSubContent className="w-56 pt-2">
+                                        {destinations.length > 0 && (
+                                            <MenuSearch
+                                                value={listQuery}
+                                                onChange={setListQuery}
+                                                placeholder="Find a list"
+                                            />
+                                        )}
+                                        <div className="max-h-64 overflow-y-auto">
+                                            {destinations.length === 0 && (
+                                                <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                                                    {many
+                                                        ? "Work only moves between lists of one space, and this selection spans more than one."
+                                                        : "This space has nowhere else to put it."}
+                                                </p>
+                                            )}
+                                            {destinations.length > 0 && matchingLists.length === 0 && (
+                                                <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                                                    No list matches that.
+                                                </p>
+                                            )}
+                                            {matchingLists.map((list) => (
                                                 <ContextMenuItem
                                                     key={list.id}
                                                     className="gap-2"
@@ -589,8 +666,8 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                                 >
                                                     <span className="flex-1 truncate">{list.name}</span>
                                                 </ContextMenuItem>
-                                            ))
-                                        )}
+                                            ))}
+                                        </div>
                                     </ContextMenuSubContent>
                                 </ContextMenuSub>
                             )}

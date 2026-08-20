@@ -8,6 +8,8 @@
 export { cn } from "./lib/cn";
 export { keepFocusOnClose } from "./lib/menu-focus";
 export { useDeferredFocus } from "./lib/use-deferred-focus";
+export { MenuSearch, menuSearchMatches } from "./components/menu-search";
+export { MenuSurfaceProvider, useMenuSurface, type MenuSurfaceState } from "./lib/menu-surface";
 export { Button, buttonVariants, type ButtonProps } from "./components/button";
 export { Input, type InputProps } from "./components/input";
 export { Textarea, type TextareaProps } from "./components/textarea";
