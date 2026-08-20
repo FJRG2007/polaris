@@ -58,10 +58,16 @@ export async function githubCredentialsForUser(userId: string): Promise<GithubCr
  * somebody with a work account and a personal one reaches each of them.
  */
 export async function githubTokenForUser(userId: string, owner?: string): Promise<string | null> {
+    return (await credentialForUser(userId, owner))?.token ?? null;
+}
+
+/** The linked account a call about `owner` is made as: theirs for that owner if
+ *  they have one, otherwise the first they linked. */
+async function credentialForUser(userId: string, owner?: string): Promise<GithubCredential | null> {
     const credentials = await githubCredentialsForUser(userId);
     const wanted = owner?.toLowerCase();
     const match = wanted ? credentials.find((entry) => entry.login.toLowerCase() === wanted) : undefined;
-    return (match ?? credentials[0])?.token ?? null;
+    return match ?? credentials[0] ?? null;
 }
 
 /** Repositories this person can deploy: everything their linked accounts reach. */
@@ -93,13 +99,37 @@ export async function githubTokenForOwner(userId: string | null, owner?: string)
     return githubAppInstallationToken(owner).catch(() => null);
 }
 
+/** Who a clone goes out as, and the header that says so. */
+export interface CloneIdentity {
+    /** The git `http.extraHeader` value. Never logged: it carries the token. */
+    readonly header: string;
+    /** What the deployment log calls whoever this is. */
+    readonly as: string;
+}
+
 /**
- * The header a clone of `owner`'s repository authenticates with, resolved the
- * background way: the project owner's own account first, the App installation
- * second, and null for a public clone.
+ * Who a clone of `owner`'s repository goes out as, resolved the background way:
+ * the project owner's own account first, the App installation second, and null
+ * for a clone that goes out as nobody.
+ *
+ * The name comes back with the header because the deployment log needs it. A
+ * build that reached a private repository unauthenticated fails with git asking
+ * a terminal that does not exist for a username, and the only thing anybody can
+ * tell from that is that something went wrong somewhere - whereas a line saying
+ * which account it used, written before the attempt, answers it in advance.
  */
-export async function githubCloneAuthHeader(userId: string | null, owner?: string): Promise<string | null> {
-    return cloneAuthHeader(await githubTokenForOwner(userId, owner));
+export async function githubCloneIdentity(
+    userId: string | null,
+    owner?: string
+): Promise<CloneIdentity | null> {
+    if (userId) {
+        const personal = await credentialForUser(userId, owner).catch(() => null);
+        const header = cloneAuthHeader(personal?.token ?? null);
+        if (personal && header) return { header, as: personal.login };
+    }
+    const installed = await githubAppInstallationToken(owner).catch(() => null);
+    const header = cloneAuthHeader(installed);
+    return header ? { header, as: "the GitHub App installed on this Polaris" } : null;
 }
 
 /**

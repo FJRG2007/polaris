@@ -31,7 +31,7 @@ import { getFlagsForEnvironment } from "./deploy-project-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
 import { parseGithubRepo } from "./repo-reference";
-import { githubCloneAuthHeader, githubTokenForOwner } from "./github-access";
+import { githubCloneIdentity, githubTokenForOwner } from "./github-access";
 import { applicationDefaultWafPresets, isTunnelHostname } from "@polaris/core";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { IN_FLIGHT_DEPLOY_STATUSES, TERMINAL_DEPLOY_STATUSES } from "./deploy/status";
@@ -1645,8 +1645,11 @@ async function buildAppPlan(
         // `https://elsewhere.example/github.com/o/r` contains the words.
         const repo = parseGithubRepo(gitSource.repoUrl);
         if (repo) {
-            const authHeader = await githubCloneAuthHeader(ownerId, repo.owner);
-            if (authHeader) gitSource.authHeader = authHeader;
+            const identity = await githubCloneIdentity(ownerId, repo.owner);
+            if (identity) {
+                gitSource.authHeader = identity.header;
+                gitSource.authAs = identity.as;
+            }
         }
     }
     // What this service says about building itself, over and above what the clone

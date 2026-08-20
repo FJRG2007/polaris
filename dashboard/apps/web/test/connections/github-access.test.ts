@@ -57,7 +57,7 @@ vi.mock("@/lib/github-service", () => ({
     }
 }));
 
-const { githubCloneAuthHeader, githubCredentialsForUser, githubTokenForOwner, githubTokenForUser, listReposForUser } =
+const { githubCloneIdentity, githubCredentialsForUser, githubTokenForOwner, githubTokenForUser, listReposForUser } =
     await import("@/lib/github-access");
 
 function link(userId: string, entry: Link, credential: Record<string, unknown> | null): void {
@@ -149,12 +149,27 @@ describe("work with nobody watching", () => {
     it("falls back to the App installation, which is what keeps existing services building", async () => {
         installationToken = "instance-token";
         expect(await githubTokenForOwner("ana")).toBe("instance-token");
-        expect(await githubCloneAuthHeader("ana", "acme")).toBe("Authorization: Basic instance-token");
+        expect(await githubCloneIdentity("ana", "acme")).toEqual({
+            header: "Authorization: Basic instance-token",
+            as: "the GitHub App installed on this Polaris"
+        });
     });
 
     it("clones anonymously rather than with somebody else's credential", async () => {
         installationToken = null;
         link("bruno", { id: "c9", provider: "github", label: "bruno", method: "oauth" }, { accessToken: "gho_bruno" });
-        expect(await githubCloneAuthHeader("ana", "acme")).toBeNull();
+        expect(await githubCloneIdentity("ana", "acme")).toBeNull();
+    });
+
+    // The name is what the deployment log says before it tries, so a build that
+    // went out as nobody says so in advance rather than only in git's words
+    // afterwards.
+    it("names the account the clone goes out as", async () => {
+        installationToken = null;
+        link("ana", { id: "c1", provider: "github", label: "ana", method: "oauth" }, { accessToken: "gho_ana" });
+        expect(await githubCloneIdentity("ana", "acme")).toEqual({
+            header: "Authorization: Basic gho_ana",
+            as: "ana"
+        });
     });
 });

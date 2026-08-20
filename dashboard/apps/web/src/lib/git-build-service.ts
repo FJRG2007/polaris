@@ -37,6 +37,9 @@ export interface GitSource {
      * never appears in the clone URL or the streamed deployment log.
      */
     authHeader?: string;
+    /** Whose account that header speaks for, for the log to name. Never the
+     *  credential itself - only who it belongs to. */
+    authAs?: string;
 }
 
 /** What the service says about building itself, over and above what is detected.
@@ -218,6 +221,16 @@ export function gitBuildContext(
         args.push("clone", "--depth", "1");
         if (source.branch) args.push("--branch", source.branch);
         args.push("--", source.repoUrl, dir);
+        // Said before the attempt rather than after it. A clone that goes out as
+        // nobody is the one failure here nobody can read backwards from git's
+        // own words, and it is the common one: a private repository with no
+        // account connected to it looks exactly like a repository that is not
+        // there.
+        log(
+            source.authAs
+                ? `Cloning as ${source.authAs}.\n`
+                : "Cloning with no connected account - a private repository will refuse this.\n"
+        );
         let said = "";
         const watched = (chunk: Buffer): void => {
             if (said.length < TRANSCRIPT_LIMIT) said += chunk.toString("utf8");
