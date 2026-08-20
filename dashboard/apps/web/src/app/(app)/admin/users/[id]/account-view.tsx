@@ -20,6 +20,7 @@
 
 import { useRouter } from "next/navigation";
 import type { RoleOption } from "@/lib/role-service";
+import { BAN_LENGTHS } from "../ban-lengths";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { SessionView } from "@/lib/session-directory";
 import { SessionsTable } from "@/components/sessions-table";
@@ -57,18 +58,6 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
         </div>
     );
 }
-
-/** The lengths worth offering. A day first, because a suspension is nearly always
- *  "come back tomorrow"; the rest are the shapes a moderation decision actually
- *  takes, plus the one that does not end. */
-const BAN_LENGTHS = [
-    { minutes: 60, label: "For an hour" },
-    { minutes: 1440, label: "For a day" },
-    { minutes: 4320, label: "For three days" },
-    { minutes: 10080, label: "For a week" },
-    { minutes: 43200, label: "For a month" },
-    { minutes: 0, label: "Until lifted" }
-] as const;
 
 export function AccountView({
     user,

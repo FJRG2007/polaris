@@ -24,6 +24,9 @@ vi.mock("../../src/app/(app)/admin/users/actions", () => ({
     revokeInviteAction: async () => ({})
 }));
 vi.mock("../../src/app/(app)/admin/users/invite-dialog", () => ({ InviteDialog: () => null }));
+// The row menu can walk into somebody's account, which is a server action and
+// therefore the whole session stack.
+vi.mock("../../src/app/(app)/view-as-actions", () => ({ viewAsUserAction: async () => ({}) }));
 vi.mock("../../src/app/(app)/admin/users/recovery-requests", () => ({
     RecoveryRequests: () => null
 }));

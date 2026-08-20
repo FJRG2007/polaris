@@ -8,24 +8,46 @@
  * Search and the filters run over the rows already on the page: an instance's
  * whole staff is a small list, and asking the server again for a substring would
  * be slower than reading it.
+ *
+ * A right-click on a row carries what an operator came here to do - open the
+ * record, walk into the account, shut it, remove it - because the alternative is
+ * what it was: open the record, find the control, come back. The record is still
+ * where everything lives; this is the short way to the four decisions that are
+ * made from the list itself.
  */
 
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { InviteDialog } from "./invite-dialog";
-import { revokeInviteAction } from "./actions";
-import { useEffect, useMemo, useState } from "react";
+import { SuspendDialog } from "./suspend-dialog";
 import type { RoleOption } from "@/lib/role-service";
 import { RecoveryRequests } from "./recovery-requests";
+import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import type { InviteListItem } from "@/lib/invite-service";
 import type { DirectoryUser } from "@/lib/user-admin-service";
+import { viewAsUserAction } from "@/app/(app)/view-as-actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { isOnline, OnlineDot, useNow } from "@/components/presence";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AccessGroupOption } from "@/components/access-rules-editor";
 import type { RecoveryRequestView } from "@/lib/account-recovery-service";
-import { Badge, Button, Card, CardBody, Input, Select, cn } from "@polaris/ui";
-import { Ban, Mail, MapPin, Search, Shield, Trash2, UserPlus } from "lucide-react";
+import { deleteUserAction, revokeInviteAction, unbanUserAction } from "./actions";
+import { Ban, Eye, Mail, MapPin, Search, Shield, Trash2, Undo2, UserPlus } from "lucide-react";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuSeparator,
+    ContextMenuTrigger,
+    Input,
+    Select,
+    cn
+} from "@polaris/ui";
 
 /** The cuts an operator reaches for; anything finer is what search is for. */
 const FILTERS = [
@@ -82,6 +104,12 @@ export function UsersAdmin({
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState<Filter>("all");
     const [inviting, setInviting] = useState(false);
+    const [confirm, confirmElement] = useConfirm();
+    /** Who is being shut out. Held here rather than in the row's own menu: the
+     *  menu is unmounted the moment an item is chosen, and a dialog opened by
+     *  something about to disappear never appears. */
+    const [suspending, setSuspending] = useState<DirectoryUser | null>(null);
+    const [error, setError] = useState("");
 
     // A link that names somebody - the firewall, saying who is signed in from an
     // address it is about to ban - hands the reader the account itself. That is
@@ -102,6 +130,55 @@ export function UsersAdmin({
         }, 30_000);
         return () => clearInterval(timer);
     }, [router]);
+
+    /** Leave the operator screens behind and carry on as this person. The root
+     *  resolves where their own access starts, which is rarely where you are. */
+    const openAccount = useCallback(
+        async (user: DirectoryUser) => {
+            setError("");
+            const result = await viewAsUserAction(user.id);
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            router.push("/");
+        },
+        [router]
+    );
+
+    const liftBan = useCallback(
+        async (user: DirectoryUser) => {
+            setError("");
+            const result = await unbanUserAction(user.id);
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            router.refresh();
+        },
+        [router]
+    );
+
+    const remove = useCallback(
+        async (user: DirectoryUser) => {
+            const ok = await confirm({
+                title: `Delete ${user.name}?`,
+                description:
+                    "Their account and everything it owns - connections, deployments, shares and uploads - goes with it. This cannot be undone.",
+                confirmLabel: "Delete account",
+                danger: true
+            });
+            if (!ok) return;
+            setError("");
+            const result = await deleteUserAction(user.id);
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            router.refresh();
+        },
+        [confirm, router]
+    );
 
     const shown = useMemo(() => {
         const needle = query.trim().toLowerCase();
@@ -176,8 +253,9 @@ export function UsersAdmin({
                             </tr>
                         ) : (
                             shown.map((user) => (
+                                <ContextMenu key={user.id}>
+                                    <ContextMenuTrigger asChild>
                                 <tr
-                                    key={user.id}
                                     tabIndex={0}
                                     role="button"
                                     aria-label={`Open ${user.name}`}
@@ -265,6 +343,51 @@ export function UsersAdmin({
                                         {format.date(user.createdAt)}
                                     </td>
                                 </tr>
+                                    </ContextMenuTrigger>
+                                    <ContextMenuContent>
+                                        <ContextMenuItem
+                                            onSelect={() => router.push(`/admin/users/${user.id}`)}
+                                        >
+                                            <Shield className="size-4" />
+                                            Open their record
+                                        </ContextMenuItem>
+                                        {/* Not offered on your own row: viewing
+                                            as yourself does nothing, and the
+                                            three below are all refused by the
+                                            service anyway - an administrator
+                                            cannot shut or delete themselves. */}
+                                        {user.id !== viewerId && (
+                                            <>
+                                                <ContextMenuItem onSelect={() => void openAccount(user)}>
+                                                    <Eye className="size-4" />
+                                                    Open their account
+                                                </ContextMenuItem>
+                                                <ContextMenuSeparator />
+                                                {user.banned ? (
+                                                    <ContextMenuItem onSelect={() => void liftBan(user)}>
+                                                        <Undo2 className="size-4" />
+                                                        Lift the suspension
+                                                    </ContextMenuItem>
+                                                ) : (
+                                                    <ContextMenuItem
+                                                        variant="danger"
+                                                        onSelect={() => setSuspending(user)}
+                                                    >
+                                                        <Ban className="size-4" />
+                                                        Suspend the account
+                                                    </ContextMenuItem>
+                                                )}
+                                                <ContextMenuItem
+                                                    variant="danger"
+                                                    onSelect={() => void remove(user)}
+                                                >
+                                                    <Trash2 className="size-4" />
+                                                    Delete the account
+                                                </ContextMenuItem>
+                                            </>
+                                        )}
+                                    </ContextMenuContent>
+                                </ContextMenu>
                             ))
                         )}
                     </tbody>
@@ -331,6 +454,18 @@ export function UsersAdmin({
                     ) : null}
                 </CardBody>
             </Card>
+
+            {error && (
+                <p role="alert" className="text-sm text-danger">
+                    {error}
+                </p>
+            )}
+
+            <SuspendDialog
+                person={suspending}
+                onOpenChange={(next) => !next && setSuspending(null)}
+            />
+            {confirmElement}
 
             {inviting ? (
                 <InviteDialog
