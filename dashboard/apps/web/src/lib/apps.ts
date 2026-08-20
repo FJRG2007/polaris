@@ -68,6 +68,7 @@ import {
     Timer,
     Trash2,
     UserCog,
+    BadgeCheck,
     Users,
     UsersRound,
     Video,
@@ -679,6 +680,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/account",
             icon: UserCog,
             keywords: ["name", "email", "avatar"]
+        },
+        {
+            label: "Account standing",
+            href: "/account/standing",
+            icon: BadgeCheck,
+            keywords: ["moderation", "warnings", "suspended", "reports", "timeout", "ban", "rules"]
         },
         {
             label: "Preferences",
