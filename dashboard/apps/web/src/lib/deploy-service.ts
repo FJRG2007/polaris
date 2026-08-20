@@ -30,6 +30,7 @@ import { memberOrgIds, orgIdsWhere } from "./orgs/org-service";
 import { getFlagsForEnvironment } from "./deploy-project-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
+import { parseGithubRepo } from "./repo-reference";
 import { githubCloneAuthHeader, githubTokenForOwner } from "./github-access";
 import { applicationDefaultWafPresets, isTunnelHostname } from "@polaris/core";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
@@ -1633,9 +1634,18 @@ async function buildAppPlan(
         // private repositories build, falling back to the App installation an
         // administrator put on them; the header is null (public clone) when there
         // is neither.
-        if (source.provider === "github") {
-            const owner = gitSource.repoUrl.match(/github\.com[/:]([^/]+)\//i)?.[1];
-            const authHeader = await githubCloneAuthHeader(ownerId, owner);
+        //
+        // The address is what decides this, not the note left on the service when
+        // it was created. That note is only written when the repository was picked
+        // out of the browser, so a URL somebody pasted by hand - the same
+        // repository, typed rather than clicked - was cloned as nobody, and a
+        // private one failed with git asking a terminal that does not exist for a
+        // username. Read with the anchored parser rather than by looking for the
+        // words: what hangs on the answer is whether a token is handed over, and
+        // `https://elsewhere.example/github.com/o/r` contains the words.
+        const repo = parseGithubRepo(gitSource.repoUrl);
+        if (repo) {
+            const authHeader = await githubCloneAuthHeader(ownerId, repo.owner);
             if (authHeader) gitSource.authHeader = authHeader;
         }
     }
@@ -1720,12 +1730,6 @@ async function mergedEnv(environmentId: string, applicationId: string): Promise<
  * per-target queue. Returns the deployment id immediately; the run streams its
  * output to the deployment's log file and updates the row's status.
  */
-/** Extract owner/repo from a GitHub URL (https or scp-like, with or without .git). */
-function parseGithubRepo(repoUrl: string): { owner: string; repo: string } | null {
-    const match = repoUrl.match(/github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?\/?$/i);
-    return match ? { owner: match[1]!, repo: match[2]! } : null;
-}
-
 export async function deployApplication(
     applicationId: string,
     ownerId: string,

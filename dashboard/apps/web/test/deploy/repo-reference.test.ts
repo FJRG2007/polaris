@@ -44,6 +44,15 @@ describe("parseGithubRepo", () => {
         expect(parseGithubRepo("https://github.com/orgs/vercel")).toBeNull();
     });
 
+    // What a deploy hangs on this answer for is whether it hands GitHub
+    // credentials to the host in the URL. A host that merely has the words in it
+    // is somebody else's server.
+    it("reads the host rather than looking for the words in it", () => {
+        expect(parseGithubRepo("https://elsewhere.example/github.com/FJRG2007/polaris")).toBeNull();
+        expect(parseGithubRepo("https://github.com.elsewhere.example/FJRG2007/polaris")).toBeNull();
+        expect(parseGithubRepo("https://user@evil.example/github.com/FJRG2007/polaris.git")).toBeNull();
+    });
+
     it("refuses names GitHub itself would not accept", () => {
         expect(parseGithubRepo("own er/repo")).toBeNull();
         expect(parseGithubRepo("owner/re po")).toBeNull();

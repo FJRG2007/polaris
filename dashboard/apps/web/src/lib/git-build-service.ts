@@ -52,6 +52,35 @@ export interface BuildCommands {
     port?: number;
 }
 
+/**
+ * How much of a failed clone is kept to explain it. Git says why in its last few
+ * lines; a repository whose clone is chatty must not build a megabyte of string
+ * that nothing will read.
+ */
+const TRANSCRIPT_LIMIT = 4000;
+
+/**
+ * What git says when it was refused for want of an account, in each of the ways
+ * it says it.
+ *
+ * Recognized rather than passed on as it stands, because as it stands it is a
+ * note about a terminal: git wanted a username, there was no terminal to ask at,
+ * and it reported that as the errno of a missing device. True about the process
+ * and useless to the person who pressed Deploy - and on a screen that never
+ * mentions a command line, useless is the whole of the problem.
+ */
+const NEEDS_AN_ACCOUNT =
+    /could not read (?:Username|Password)|Authentication failed|terminal prompts disabled|Invalid username or password|Repository not found|returned error: 40[13]/i;
+
+/**
+ * The clone is never allowed to ask.
+ *
+ * Nothing is watching a deploy run, so a prompt is either an instant failure with
+ * a confusing reason or - where a credential helper is installed on the machine -
+ * a build that hangs until the deadline stops it. Off, so it is always the first.
+ */
+const NO_PROMPTS = { GIT_TERMINAL_PROMPT: "0" } as const;
+
 /** Whether a repo URL is a scheme we will clone (http/https/git, no ssh/file). */
 export function isCloneableUrl(url: string): boolean {
     return /^(https?|git):\/\/[^\s]+$/.test(url.trim());
@@ -189,7 +218,17 @@ export function gitBuildContext(
         args.push("clone", "--depth", "1");
         if (source.branch) args.push("--branch", source.branch);
         args.push("--", source.repoUrl, dir);
-        await runCommand("git", args, onOutput);
+        let said = "";
+        const watched = (chunk: Buffer): void => {
+            if (said.length < TRANSCRIPT_LIMIT) said += chunk.toString("utf8");
+            onOutput(chunk);
+        };
+        try {
+            await runCommand("git", args, watched, NO_PROMPTS);
+        } catch (error) {
+            await rm(dir, { recursive: true, force: true });
+            throw new Error(cloneRefusal(said, source) ?? (error instanceof Error ? error.message : "the clone failed"));
+        }
 
         // Best-effort: a repository that defeats detection still deploys exactly as
         // it did before, with the builder left to its own devices.
@@ -212,9 +251,31 @@ export function gitBuildContext(
     };
 }
 
-function runCommand(command: string, args: string[], onOutput: (chunk: Buffer) => void): Promise<void> {
+/**
+ * Why a clone was refused, in terms of what the reader can do about it, or null
+ * when it failed for some other reason and git's own words are the best there is.
+ *
+ * The two cases are worth telling apart. Nothing connected means the deploy
+ * reached a private repository as nobody, and connecting the account fixes it. A
+ * credential that was sent and refused means the account is linked and cannot see
+ * this repository, which is a different thing to go and do.
+ */
+export function cloneRefusal(said: string, source: GitSource): string | null {
+    if (!NEEDS_AN_ACCOUNT.test(said)) return null;
+    const repo = source.repoUrl.replace(/^[a-z]+:\/\//i, "").replace(/\.git$/i, "");
+    return source.authHeader
+        ? `${repo} refused the connected account. It may no longer have access to the repository, or the account may need linking again under Connected accounts.`
+        : `${repo} needs an account: it is private, or it is not there. Connect the account that can see it under Connected accounts, then deploy again.`;
+}
+
+function runCommand(
+    command: string,
+    args: string[],
+    onOutput: (chunk: Buffer) => void,
+    env?: Record<string, string>
+): Promise<void> {
     return new Promise((resolve, reject) => {
-        const child = spawn(command, args);
+        const child = spawn(command, args, env ? { env: { ...process.env, ...env } } : undefined);
         child.stdout.on("data", (chunk: Buffer) => onOutput(chunk));
         child.stderr.on("data", (chunk: Buffer) => onOutput(chunk));
         child.on("error", reject);

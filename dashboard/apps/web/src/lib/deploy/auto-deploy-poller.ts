@@ -10,6 +10,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { parseGithubRepo } from "../repo-reference";
 import { githubTokenForOwner } from "../github-access";
 import { getChangedFiles, getLatestCommit } from "../github-service";
 import { parseWatchPaths, shouldDeployForPaths } from "@polaris/deploy";
@@ -17,12 +18,6 @@ import { commitPassesFilter, deployApplication } from "../deploy-service";
 
 const INTERVAL_MS = Number(process.env.POLARIS_AUTODEPLOY_POLL_MS) || 60_000;
 let started = false;
-
-/** Extract owner/repo from a GitHub URL (https or scp-like, with or without .git). */
-function parseOwnerRepo(repoUrl: string): { owner: string; repo: string } | null {
-    const match = repoUrl.match(/github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?\/?$/i);
-    return match ? { owner: match[1]!, repo: match[2]! } : null;
-}
 
 /** One poll pass: deploy every auto-deploy app whose branch head has advanced. */
 export async function pollAutoDeploys(): Promise<void> {
@@ -40,7 +35,7 @@ export async function pollAutoDeploys(): Promise<void> {
             continue;
         }
         const repoUrl = typeof source.repoUrl === "string" ? source.repoUrl : "";
-        const parsed = parseOwnerRepo(repoUrl);
+        const parsed = parseGithubRepo(repoUrl);
         if (!parsed) continue;
         const branch = (app.deployBranch?.trim() || (typeof source.branch === "string" ? source.branch : "")).trim();
         if (!branch) continue;
