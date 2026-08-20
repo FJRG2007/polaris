@@ -30,7 +30,7 @@ import type { SavedMediaView } from "@/lib/chat/saved-media";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
 import { MAX_NICKNAME, setNickname } from "@/lib/contact-names";
 import { messageToasts, type MessageToast } from "@/lib/chat/toasts";
-import { chatProfile } from "@/lib/chat/profiles";
+import { chatProfile, type ChatProfile } from "@/lib/chat/profiles";
 import { searchMessages, type ChatSearchHit } from "@/lib/chat/search";
 import { voicePresence, type VoicePresence } from "@/lib/chat/meetings";
 import type { ChatInviteOffer, ChatInviteView } from "@/lib/chat/invites";
@@ -529,24 +529,29 @@ export async function setNicknameAction(
 }
 
 /**
- * Somebody's profile, for the panel beside a direct message.
+ * Somebody's profile, for the panel beside a conversation.
  *
- * Only about people this reader can already reach, which the picker's own rule
- * answers: a screen that would resolve any id into a name is a directory, and
- * this instance is not always a company where everybody may know everybody.
+ * Asked inside the conversation they are being looked at in, and that is what
+ * keeps it from being a directory: an action that resolved any id into a name
+ * would hand over everybody on the instance, and this one only answers about
+ * somebody the reader is already in a room with.
  *
  * Deliberately no address and no number. Both are settings on that person's own
  * privacy screen, both default to nobody, and being in a conversation with
  * somebody is not consent to hand either over.
  */
 export async function profileAction(
+    channelId: string,
     userId: string
-): Promise<{ profile?: { name: string; username: string; description: string } }> {
+): Promise<{ profile?: ChatProfile }> {
     const me = await actor();
-    const parsed = z.string().uuid().safeParse(userId);
+    const parsed = z.object({ channelId: z.string().uuid(), userId: z.string().uuid() }).safeParse({
+        channelId,
+        userId
+    });
     if (!parsed.success) return {};
 
-    const profile = await chatProfile(me, parsed.data);
+    const profile = await chatProfile(me, parsed.data.channelId, parsed.data.userId);
     return profile ? { profile } : {};
 }
 

@@ -23,6 +23,13 @@
  * showing today; the colour still has to mean the same thing here as it does in
  * the roster, or it means nothing anywhere.
  *
+ * The shape is a profile rather than a centred card: a band across the top, the
+ * face cut out of its lower edge on the left, and everything about them reading
+ * down from there. Centring three lines of text under a circle is what a "who is
+ * this" tooltip looks like; a profile is a thing with a top, and the band is what
+ * gives it one. Almost nobody uploads a banner, so the band is a colour taken
+ * from their own face - see `ProfileBanner`.
+ *
  * And what you can do about them is here too, behind the same three dots that
  * carry it in every other list. This screen is about one person and has no list
  * to right-click along, so the whole of the person menu - message, call, mention,
@@ -43,8 +50,10 @@ import { useEffect, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { PRESENCE_WORDS } from "@polaris/core";
 import { NicknameDialog } from "./nickname-dialog";
+import type { ChatProfile } from "@/lib/chat/profiles";
 import { MemberMenu, type MenuPerson } from "./member-menu";
 import { usePresence } from "@/components/presence-store";
+import { ProfileBanner } from "@/components/profile-banner";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Skeleton } from "@polaris/ui";
 
@@ -54,14 +63,18 @@ export interface DirectPerson {
     readonly name: string;
 }
 
-interface Profile {
-    readonly name: string;
-    readonly username: string;
-    readonly description: string;
-}
-
-function useProfile(userId: string | null): { profile: Profile | null; loading: boolean } {
-    const [profile, setProfile] = useState<Profile | null>(null);
+/**
+ * Their profile, asked for inside the conversation it is being read in.
+ *
+ * The conversation is not context here, it is the permission: an action that
+ * resolved a bare id into somebody's handle would be a directory of the whole
+ * instance. See `chatProfile`.
+ */
+function useProfile(
+    channelId: string,
+    userId: string | null
+): { profile: ChatProfile | null; loading: boolean } {
+    const [profile, setProfile] = useState<ChatProfile | null>(null);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -71,7 +84,7 @@ function useProfile(userId: string | null): { profile: Profile | null; loading: 
         }
         let live = true;
         setLoading(true);
-        void profileAction(userId)
+        void profileAction(channelId, userId)
             .then((result) => {
                 if (live) setProfile(result.profile ?? null);
             })
@@ -82,68 +95,91 @@ function useProfile(userId: string | null): { profile: Profile | null; loading: 
         return () => {
             live = false;
         };
-    }, [userId]);
+    }, [channelId, userId]);
 
     return { profile, loading };
 }
 
 /** The panel's contents, whichever shape it is drawn in. */
-function Body({ person }: { person: DirectPerson }) {
-    const { profile, loading } = useProfile(person.id);
+function Body({ person, channelId }: { person: DirectPerson; channelId: string }) {
+    const { profile, loading } = useProfile(channelId, person.id);
     const where = usePresence(person.id);
     const name = profile?.name || person.name;
 
     return (
-        <div className="flex flex-col items-center gap-3 p-4 text-center">
-            {/* The dot rides on the face here as it does everywhere else, rather
-                than being spelled out underneath: somebody who has learnt the
-                colour in the roster should not have to learn a second way of
-                being told the same thing on the screen about that person. */}
-            <Avatar openable person={{ id: person.id, name }} size={72} />
+        <div className="flex flex-col">
+            <ProfileBanner person={{ id: person.id, name }} className="h-16 shrink-0" />
 
-            <div className="flex min-w-0 flex-col items-center gap-0.5">
-                <p className="max-w-full truncate text-sm font-medium" title={name}>
-                    {name}
-                </p>
-                {loading && !profile ? (
-                    <Skeleton className="h-3 w-24" />
-                ) : (
-                    profile?.username && (
-                        <p className="flex max-w-full items-center gap-0.5 truncate text-xs text-muted-foreground">
-                            <AtSign className="size-3 shrink-0" />
-                            {profile.username}
-                        </p>
-                    )
-                )}
-            </div>
+            <div className="flex flex-col gap-3 px-4 pb-4">
+                {/* Cut out of the band's lower edge, on the left, where a profile
+                    puts a face. The ring is the page's own background rather than
+                    a border: it is the cut-out, not a decoration, so it has to be
+                    the colour of whatever the picture is sitting on. */}
+                <div className="-mt-8">
+                    {/* The dot rides on the face here as it does everywhere else,
+                        rather than being spelled out underneath: somebody who has
+                        learnt the colour in the roster should not have to learn a
+                        second way of being told the same thing about that person. */}
+                    <Avatar
+                        openable
+                        person={{ id: person.id, name }}
+                        size={72}
+                        className="ring-[3px] ring-background"
+                    />
+                </div>
 
-            {/* Where they are and what they are showing, in that order and in one
-                place. The word is still said - a colour on its own is a
-                convention somebody has to have learnt, and this is the one screen
-                with room to spell it out - but it sits with the note rather than
-                standing in for the dot. The note is only ever there while they
-                are actually here; see `presence-service`. */}
-            {where && (
-                <div className="flex w-full flex-col items-center gap-1">
-                    <p className="text-xs text-muted-foreground">{PRESENCE_WORDS[where.status]}</p>
-                    {where.note && (
-                        <p className="w-full whitespace-pre-wrap break-words rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground">
-                            {where.note}
+                <div className="flex min-w-0 flex-col gap-0.5">
+                    <p className="truncate text-sm font-medium" title={name}>
+                        {name}
+                    </p>
+                    {loading && !profile ? (
+                        <Skeleton className="h-3 w-24" />
+                    ) : (
+                        profile?.username && (
+                            <p className="flex items-center gap-0.5 truncate text-xs text-muted-foreground">
+                                <AtSign className="size-3 shrink-0" />
+                                {profile.username}
+                            </p>
+                        )
+                    )}
+                    {/* Their name, when it is not already what they are called
+                        here. Two lines saying "Rahma Fellah" one under the other
+                        is not more information about anybody. */}
+                    {profile?.fullName && profile.fullName !== name && (
+                        <p className="truncate text-xs text-muted-foreground" title={profile.fullName}>
+                            {profile.fullName}
                         </p>
                     )}
                 </div>
-            )}
 
-            {profile?.description && (
-                <div className="w-full text-left">
-                    <p className="text-[11px] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                        About
-                    </p>
-                    <p className="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground">
-                        {profile.description}
-                    </p>
-                </div>
-            )}
+                {/* Where they are and what they are showing, in that order and in
+                    one place. The word is still said - a colour on its own is a
+                    convention somebody has to have learnt, and this is the one
+                    screen with room to spell it out - but it sits with the note
+                    rather than standing in for the dot. The note is only ever
+                    there while they are actually here; see `presence-service`. */}
+                {where && (
+                    <div className="flex w-full flex-col gap-1">
+                        <p className="text-xs text-muted-foreground">{PRESENCE_WORDS[where.status]}</p>
+                        {where.note && (
+                            <p className="w-full whitespace-pre-wrap break-words rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground">
+                                {where.note}
+                            </p>
+                        )}
+                    </div>
+                )}
+
+                {profile?.description && (
+                    <div className="w-full text-left">
+                        <p className="text-[11px] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                            About
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                            {profile.description}
+                        </p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
@@ -271,7 +307,7 @@ export function DirectProfile({
                             {menu}
                         </DialogTitle>
                     </DialogHeader>
-                    <Body person={person} />
+                    <Body person={person} channelId={channel.id} />
                     {refusal}
                 </DialogContent>
                 {nickname}
@@ -299,7 +335,7 @@ export function DirectProfile({
                 </span>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
-                <Body person={person} />
+                <Body person={person} channelId={channel.id} />
                 {refusal}
             </div>
             {nickname}

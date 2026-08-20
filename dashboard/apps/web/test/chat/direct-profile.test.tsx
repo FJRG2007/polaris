@@ -41,7 +41,12 @@ const CHANNEL = {
 
 vi.mock("@/app/(app)/chat/actions", () => ({
     profileAction: async () => ({
-        profile: { name: "Grace Hopper", username: "grace", description: "Compilers." }
+        profile: {
+            name: "Grace Hopper",
+            fullName: "Grace Hopper",
+            username: "grace",
+            description: "Compilers."
+        }
     }),
     openDirectAction: async () => ({ id: "d1" }),
     addSpaceMembersAction: async () => ({}),
@@ -116,6 +121,22 @@ describe("how the person is drawn", () => {
         expect(screen.getByText("grace")).toBeDefined();
         expect(screen.getAllByText("Away").length).toBeGreaterThan(0);
         expect(screen.getByText("Reading the manual")).toBeDefined();
+    });
+
+    it("draws the band across the top, whether or not they uploaded one", async () => {
+        const { container } = panel();
+        await screen.findByText("Grace Hopper");
+        // The picture is simply laid over the colour: an account with no banner
+        // is answered with a transparent pixel, so nothing here has to ask which
+        // case it is in first.
+        const band = container.querySelector<HTMLElement>("img[src='/api/banner/grace']");
+        expect(band).not.toBeNull();
+        expect(band?.parentElement?.style.background).not.toBe("");
+    });
+
+    it("does not say their name twice when it is also what they are called", async () => {
+        panel();
+        expect(await screen.findAllByText("Grace Hopper")).toHaveLength(1);
     });
 
     it("draws nothing about where they are when nothing is known", async () => {
