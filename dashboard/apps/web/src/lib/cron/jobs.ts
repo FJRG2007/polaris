@@ -186,9 +186,10 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // nothing here is undone by hearing about it four hours late, and every
         // pass is a request per linked account to somebody else's API.
         everyMs: Number(process.env.POLARIS_CONNECTION_HEALTH_MS) || 4 * HOUR,
-        // Leased: two runners would each raise the announcement before either
+        // Leased, and for longer than the gap between passes as every lease
+        // here is: two runners would each raise the announcement before either
         // wrote that it had been made, which is the one thing this must not do.
-        leaseMs: 10 * MINUTE,
+        leaseMs: 5 * HOUR,
         run: sweepConnectionHealth
     },
     {

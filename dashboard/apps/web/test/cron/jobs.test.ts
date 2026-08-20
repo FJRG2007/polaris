@@ -50,11 +50,15 @@ describe("the work Polaris runs on a schedule", () => {
         // down who was playing, and two runners open a second visit for everybody
         // already on. The two home passes write and delete footage: one would
         // record the same minutes twice, the other would race itself on a file
-        // one of them had already dropped. The rest are written to be re-run and
-        // several already are, from the screens that sweep them lazily.
+        // one of them had already dropped. The connection sweep announces that a
+        // linked account has stopped working, and two runners would each announce
+        // it before either wrote that it had been announced. The rest are written
+        // to be re-run and several already are, from the screens that sweep them
+        // lazily.
         const leased = SCHEDULED_JOBS.filter((job) => job.leaseMs !== null).map((job) => job.key);
         expect(leased.sort()).toEqual([
             "backups",
+            "connection-health",
             "game-health",
             "game-schedules",
             "home-recording",
