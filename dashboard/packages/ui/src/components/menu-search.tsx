@@ -7,9 +7,15 @@
  * text field. The surface claims focus as it opens, which undoes the field's
  * `autoFocus` before anybody can type into it; and from then on every character
  * is read as a jump to the option beginning with that letter, so the first
- * keystroke moves focus off the field. So the field takes focus once the menu
- * has settled - a tick later than mounting, and again each time a kept submenu
- * comes back - and keeps its own typing to itself.
+ * keystroke moves focus off the field.
+ *
+ * The opening is settled by the surface rather than here: a menu that finds one
+ * of these inside it gives it the focus instead of taking it, so there is no
+ * moment when the two disagree about who is being typed into (see
+ * `focusMenuSearch`). This still asks for focus a tick after mounting, which is
+ * what brings a kept submenu back to the field when it reappears without
+ * opening. What the field then does is keep its own typing - and its own enter -
+ * to itself.
  *
  * What still belongs to the menu is handed back: escape closes it, tab is
  * refused there as it is anywhere in a menu, and the arrows step into the
@@ -22,6 +28,7 @@ import { Search } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import { useMenuSurface } from "../lib/menu-surface";
 import { useDeferredFocus } from "../lib/use-deferred-focus";
+import { MENU_SEARCH_ATTRIBUTE } from "../lib/menu-search-focus";
 
 /** Keys the menu around the field still answers for. */
 const MENU_KEYS = new Set(["Escape", "Tab", "ArrowLeft", "ArrowRight"]);
@@ -77,7 +84,13 @@ export function MenuSearch({
         }
 
         if (event.key === "Enter") {
+            // Stopped as well as prevented. Enter typed into this field means
+            // "the thing I have just written", and every layer above has its own
+            // idea about enter - the menu commits whatever it thinks is
+            // highlighted, a dialog around it may take it as its confirm, and a
+            // form anywhere above submits itself and reloads the page.
             event.preventDefault();
+            event.stopPropagation();
             if (onSubmit) onSubmit();
             else options()[0]?.click();
             return;
@@ -91,6 +104,9 @@ export function MenuSearch({
             <Search className="size-3.5 shrink-0 text-muted-foreground" />
             <input
                 ref={ref}
+                // What the menu around this looks for on the way open, so it can
+                // hand over the focus instead of taking it.
+                {...{ [MENU_SEARCH_ATTRIBUTE]: "" }}
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
                 onKeyDown={onKeyDown}

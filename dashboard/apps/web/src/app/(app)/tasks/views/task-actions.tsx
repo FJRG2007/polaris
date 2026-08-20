@@ -165,12 +165,11 @@ export function TaskControls({ commands }: { commands: TaskCommands }) {
                 disabled={!canEdit}
                 onChange={(tagIds) => commands.onEdit({ tagIds })}
                 onCreate={
+                    // Made here and put on the task by the picker, which does
+                    // that for a tag that already existed too. Doing it here as
+                    // well sent the same list twice, as two saves.
                     commands.onCreateTag
-                        ? async (name) => {
-                              const id = await commands.onCreateTag?.(name, tagColorFor(name));
-                              if (id) commands.onEdit({ tagIds: [...task.tags.map((tag) => tag.id), id] });
-                              return id ?? null;
-                          }
+                        ? async (name) => (await commands.onCreateTag?.(name, tagColorFor(name))) ?? null
                         : undefined
                 }
             />

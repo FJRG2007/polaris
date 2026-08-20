@@ -10,6 +10,7 @@ import { cn } from "../lib/cn";
 import { ChevronRight } from "lucide-react";
 import { useSettledHover } from "../lib/menu-hover";
 import { ignoreOpeningPress } from "../lib/menu-press";
+import { redirectMenuFocus } from "../lib/menu-search-focus";
 import * as RadixMenu from "@radix-ui/react-context-menu";
 import { forwardRef, useMemo, useState, type ComponentPropsWithoutRef, type ElementRef } from "react";
 import { MenuSurfaceProvider, useMenuSurface } from "../lib/menu-surface";
@@ -57,7 +58,7 @@ export function ContextMenuSub({ onOpenChange, ...props }: ComponentPropsWithout
 export const ContextMenuContent = forwardRef<
     ElementRef<typeof RadixMenu.Content>,
     ComponentPropsWithoutRef<typeof RadixMenu.Content>
->(({ className, ...props }, ref) => (
+>(({ className, onFocus, ...props }, ref) => (
     <RadixMenu.Portal>
         <RadixMenu.Content
             ref={ref}
@@ -66,6 +67,15 @@ export const ContextMenuContent = forwardRef<
                 className
             )}
             {...props}
+            // A menu with a field at the top of it hands that field the focus
+            // the surface was given - see `redirectMenuFocus`. On the surface's
+            // own focus rather than on the way open, because the menu focuses
+            // itself and this has to be the answer to that rather than a race
+            // with it.
+            onFocus={(event) => {
+                onFocus?.(event);
+                redirectMenuFocus(event);
+            }}
             // After the spread: the menu must never commit an option on the
             // release of the press that opened it.
             onPointerUpCapture={ignoreOpeningPress}
