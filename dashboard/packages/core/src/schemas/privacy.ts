@@ -73,6 +73,7 @@ export const PRIVACY_FIELD_LABELS = {
     readReceipts: "That you have read a message",
     avatar: "Your photo",
     photoFullSize: "Opening your photo",
+    fullName: "Your full name",
     email: "Your email address",
     phone: "Your phone number",
     forwarding: "Passing your messages on"
@@ -85,6 +86,8 @@ export const PRIVACY_FIELD_NOTES = {
     readReceipts:
         'The ticks under a message in a direct conversation. Turning this down also stops you seeing anybody else\'s, and "only" is how you leave them on for one person.',
     avatar: "Who sees your photo. Anybody who cannot gets your initials instead.",
+    fullName:
+        "Who sees the name on your account rather than the name you show. Anybody who cannot sees your display name, which is what every screen draws anyway.",
     photoFullSize:
         "Who can open your photo and look at it full size. Anybody who cannot still sees it beside your name - this is a rule about the press, not a second copy of the picture.",
     email: "Who sees the address you sign in with. Anybody who cannot sees your name and username, which is enough to write to you here.",
@@ -98,6 +101,7 @@ export const PRIVACY_FIELDS = [
     "discoverable",
     "avatar",
     "photoFullSize",
+    "fullName",
     "email",
     "phone",
     "lastSeen",
@@ -124,7 +128,7 @@ export const PRIVACY_SECTIONS = [
     {
         id: "details",
         label: "Your details",
-        fields: ["avatar", "photoFullSize", "email", "phone"]
+        fields: ["avatar", "photoFullSize", "fullName", "email", "phone"]
     },
     {
         id: "presence",
@@ -227,6 +231,20 @@ export const privacySettingsSchema = z.object({
      * away the one-press way to look closer and nothing else.
      */
     photoFullSize: open,
+    /**
+     * Who is shown the name on the account, rather than the name it shows.
+     *
+     * Shut by default, and that is the whole point of an account having both. A
+     * display name is chosen to be seen - it is what every list, every message
+     * and every mention draws - and the name behind it is an ordinary personal
+     * detail, kept because forms and records ask for one. Being in a room with
+     * somebody is not consent to the second, and an instance is not always a
+     * company where everybody may know everybody.
+     *
+     * Nothing needs it to work: a person is named, mentioned, written to and
+     * added to a team by the name they show.
+     */
+    fullName: closed,
     /**
      * Who is shown the address the account signs in with.
      *

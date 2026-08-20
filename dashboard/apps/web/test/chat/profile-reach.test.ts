@@ -51,6 +51,13 @@ const ACCOUNTS = [
 let members = new Set(["ada", "grace", "banned"]);
 /** Who has blocked whom, as the service answers it. */
 let blocked = new Set<string>();
+/** Whose name on the account may be read by the person asking. Nobody's, until
+ *  a test says otherwise - which is the default every account is on. */
+let namesOpen = new Set<string>();
+
+vi.mock("@/lib/privacy-service", () => ({
+    maySee: async (subjectId: string) => namesOpen.has(subjectId)
+}));
 
 vi.mock("@/lib/blocks", () => ({
     blockedBetween: async (_viewerId: string, userIds: readonly string[]) =>
@@ -79,6 +86,7 @@ const { chatProfile } = await import("@/lib/chat/profiles");
 beforeEach(() => {
     members = new Set(["ada", "grace", "banned"]);
     blocked = new Set();
+    namesOpen = new Set();
 });
 
 describe("somebody in the conversation", () => {
@@ -88,17 +96,25 @@ describe("somebody in the conversation", () => {
         expect(profile?.description).toBe("Compilers.");
     });
 
-    it("has their name put back together from both halves", async () => {
+    it("is drawn by the name they chose to show, and not by the one behind it", async () => {
+        // The whole reason an account has both. The display name is what every
+        // screen draws; the name on the account is an ordinary personal detail
+        // and starts shut, so being in a conversation with somebody hands it
+        // over to nobody.
         const profile = await chatProfile({ id: "ada" }, "d1", "grace");
-        // What they are called on screen, and the name behind it - two different
-        // things, and the panel draws the second only when it says something the
-        // first does not.
         expect(profile?.name).toBe("grace");
+        expect(profile?.fullName).toBe("");
+    });
+
+    it("has their name put back together for a reader they allow", async () => {
+        namesOpen = new Set(["grace"]);
+        const profile = await chatProfile({ id: "ada" }, "d1", "grace");
         expect(profile?.fullName).toBe("Grace Hopper");
     });
 
     it("has no name to show when they have not given one", async () => {
         members.add("alan");
+        namesOpen = new Set(["alan"]);
         const profile = await chatProfile({ id: "ada" }, "d1", "alan");
         expect(profile?.fullName).toBe("");
     });

@@ -55,13 +55,17 @@ describe("an account nobody has configured", () => {
         expect(shut.avatar.audience).toBe("everyone");
     });
 
-    it("keeps the address and the number to itself", () => {
-        // The two exceptions, and the reason they are exceptions: an address and
-        // a number are not details of a presence, they are what spam, password
-        // resets and impersonation start from. Nothing in Polaris needs either to
-        // name somebody or write to them.
+    it("keeps the address, the number and the name on the account to itself", () => {
+        // The three exceptions, and the reason they are exceptions: an address
+        // and a number are not details of a presence, they are what spam,
+        // password resets and impersonation start from. The name on the account
+        // is the third and the reason an account has a display name at all - the
+        // chosen one is what every screen draws, and the one behind it is an
+        // ordinary personal detail. Nothing in Polaris needs any of them to name
+        // somebody or write to them.
         expect(DEFAULT_PRIVACY.email.audience).toBe("nobody");
         expect(DEFAULT_PRIVACY.phone.audience).toBe("nobody");
+        expect(DEFAULT_PRIVACY.fullName.audience).toBe("nobody");
     });
 });
 

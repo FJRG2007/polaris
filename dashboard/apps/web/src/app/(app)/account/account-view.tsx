@@ -188,6 +188,14 @@ export function AccountView({
                                 }
                             />
                         </label>
+                        {/* Said here rather than only on the privacy screen: the
+                            two fields above are the one place somebody types a
+                            personal detail into Polaris expecting it to be shown,
+                            and it is not. */}
+                        <p className="text-xs text-muted-foreground sm:col-span-2">
+                            Kept for your account and shown to nobody until you say otherwise in
+                            Privacy. Your display name is what appears everywhere.
+                        </p>
                     </div>
                     <label className="flex flex-col gap-1 text-sm">
                         Username

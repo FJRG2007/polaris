@@ -35,6 +35,7 @@ export class PrivacyError extends Error {
 const AUDIENCE_COLUMNS = {
     avatar: true,
     photoFullSize: true,
+    fullName: true,
     email: true,
     phone: true,
     lastSeen: true,

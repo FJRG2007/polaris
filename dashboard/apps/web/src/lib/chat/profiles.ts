@@ -2,12 +2,18 @@
  * What one person may be told about another, beside a conversation.
  *
  * What is shown is deliberately what an account publishes about itself: what it
- * is called, the name behind that, the handle that tells two people with the
- * same name apart, and whatever they wrote about themselves. An address and a
- * number are not - they are two settings on that person's own privacy screen,
- * they default to nobody, and being in a conversation with somebody has never
- * been consent to hand either over. Anything added here later has to answer that
- * question first.
+ * is called, the handle that tells two people with the same name apart, and
+ * whatever they wrote about themselves. An address, a number and the name on the
+ * account are not - they are three settings on that person's own privacy screen,
+ * all three default to nobody, and being in a conversation with somebody has
+ * never been consent to hand any of them over. Anything added here later has to
+ * answer that question first.
+ *
+ * The name behind the display name is the one worth spelling out, because it is
+ * the whole reason an account has two: the display name is chosen to be seen and
+ * is what every screen draws, and the name on the account is an ordinary
+ * personal detail. So it is only ever included for a reader that person allows,
+ * and the panel simply has nothing to draw for everybody else.
  *
  * Reach is proved by the conversation, and that is the correction worth stating.
  * It used to be proved by the discoverable setting, which is a different
@@ -25,6 +31,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { maySee } from "@/lib/privacy-service";
 import { blockedBetween } from "@/lib/blocks";
 import { channelAccess, type ChatActor } from "./access";
 
@@ -32,8 +39,9 @@ import { channelAccess, type ChatActor } from "./access";
 export interface ChatProfile {
     /** What they are called on screen. */
     readonly name: string;
-    /** Their name, both halves, when they have given either. Empty otherwise -
-     *  most accounts, and a panel that would have drawn an empty line. */
+    /** Their name, both halves, when they have given either AND allow this
+     *  reader to see it. Empty otherwise - which is most accounts and every
+     *  reader by default, and a panel that would have drawn an empty line. */
     readonly fullName: string;
     /** Empty for an account that has not taken one. */
     readonly username: string;
@@ -62,7 +70,7 @@ export async function chatProfile(
     const access = await channelAccess(actor, channelId);
     if (!access) return null;
 
-    const [person, together, blocked] = await Promise.all([
+    const [person, together, blocked, mayReadName] = await Promise.all([
         prisma.user.findFirst({
             where: { id: userId, bannedAt: null },
             select: { id: true, name: true, firstName: true, lastName: true, username: true, description: true }
@@ -72,13 +80,19 @@ export async function chatProfile(
         // one, and a rule that only counted rows would refuse the profile of
         // somebody who is plainly in the room.
         channelAccess({ id: userId }, channelId),
-        blockedBetween(actor.id, [userId])
+        blockedBetween(actor.id, [userId]),
+        // Never as an administrator, like everything else in chat: whoever runs
+        // the instance can read the database, and that is a different and
+        // visible act from a screen Polaris drew for them.
+        maySee(userId, "fullName", { id: actor.id, isAdmin: false })
     ]);
     if (!person || !together || blocked.has(person.id)) return null;
 
     return {
         name: person.name,
-        fullName: [person.firstName, person.lastName].filter(Boolean).join(" ").trim(),
+        fullName: mayReadName
+            ? [person.firstName, person.lastName].filter(Boolean).join(" ").trim()
+            : "",
         username: person.username ?? "",
         description: person.description.trim()
     };

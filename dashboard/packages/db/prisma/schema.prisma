@@ -6397,10 +6397,16 @@ model UserPrivacy {
     // list is what a photo is for, and it is not the same as offering it to be
     // studied. Open by default like the rest.
     photoFullSize String  @default("everyone")
-    // The two that are shut until somebody opens them, and the only ones. An
+    // The three that are shut until somebody opens them, and the only ones. An
     // address and a number are not details of a presence: they are what spam,
     // password resets and impersonation start from, and nothing in Polaris needs
     // either to name somebody, mention them or write to them.
+    //
+    // Somebody's actual name is the third, and it is shut for the same reason the
+    // display name exists at all: the name an account shows is the one it chose
+    // to be known by, and the name on its documents is a different fact about a
+    // person that being in a conversation with them is not consent to.
+    fullName     String   @default("nobody")
     email        String   @default("nobody")
     phone        String   @default("nobody")
     // Who may send something this account wrote into another conversation. Open
