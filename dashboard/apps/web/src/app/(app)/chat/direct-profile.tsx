@@ -316,7 +316,13 @@ export function DirectProfile({
     }
 
     return (
-        <aside className="flex min-h-0 w-64 shrink-0 flex-col border-l border-border">
+        // A little wider than the roster, and wider again where there is room
+        // for it: this column carries sentences - a handle, a name, what
+        // somebody wrote about themselves - where the roster carries a list of
+        // names. The extra width waits for 1280 because at 1024 every pixel here
+        // comes off the conversation, which is already down to its last few
+        // words at that size (see `useWideScreen`).
+        <aside className="flex min-h-0 w-64 shrink-0 flex-col border-l border-border xl:w-72">
             <div className="flex items-center justify-between gap-1 border-b border-border px-3 py-2">
                 <p className="text-xs font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                     Profile
