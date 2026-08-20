@@ -41,7 +41,16 @@ import type { VoicePresence } from "@/lib/chat/meetings";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import type { ChatReferenceView } from "@/lib/chat/references";
 import { RichText } from "@/components/rich-text/rich-text";
+import { MediaPlayer } from "@/components/media-player";
 import { isPlayable, isVoiceMessage } from "./voice-recorder";
+
+/** Whether an attachment is a video Polaris will draw a player for. The same
+ *  fixed list the download route serves as itself - anything else stays an
+ *  opaque download, because the type came from an upload. */
+function isWatchable(contentType: string): boolean {
+    const base = (contentType.split(";")[0] ?? "").trim().toLowerCase();
+    return base === "video/mp4" || base === "video/webm" || base === "video/ogg";
+}
 import { useDisplayFormat } from "@/components/display-format";
 import { ImageViewer, type ViewedImage } from "@/components/image-viewer";
 import {
@@ -709,6 +718,18 @@ function Message({
                                             recorded={isVoiceMessage(file.name, file.contentType)}
                                             waveform={file.waveform}
                                             durationMs={file.durationMs}
+                                        />
+                                    ) : isWatchable(file.contentType) ? (
+                                        // Played where it was sent. A video that
+                                        // arrives as a download is a video
+                                        // nobody watches: the point of recording
+                                        // a screen instead of typing it out is
+                                        // that the other person sees it without
+                                        // deciding to.
+                                        <MediaPlayer
+                                            kind="video"
+                                            src={`/api/chat/attachments/${file.id}`}
+                                            className="max-w-md overflow-hidden rounded-md border border-border"
                                         />
                                     ) : (
                                         <a

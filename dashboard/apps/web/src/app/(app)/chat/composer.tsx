@@ -24,8 +24,10 @@
 import * as core from "@polaris/core";
 import { typingAction } from "./actions";
 import { EmojiPicker } from "./emoji-picker";
+import { ClipDialog } from "./clip-dialog";
 import { useMicrophones } from "./mic-device";
 import { ScheduleDialog } from "./schedule-dialog";
+import { canRecordClip } from "./clip-recorder";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
@@ -47,6 +49,7 @@ import {
     Image as ImageIcon,
     Mic,
     MicOff,
+    MonitorPlay,
     Paperclip,
     SendHorizontal,
     Trash2,
@@ -197,6 +200,13 @@ export function Composer({
     // button that moves under somebody's finger.
     const [recordable, setRecordable] = useState(false);
     useEffect(() => setRecordable(canRecord()), []);
+
+    // The same question about the screen. Separate from the one above because
+    // the answer is different on a phone, which records sound perfectly well and
+    // cannot share a screen at all.
+    const [clippable, setClippable] = useState(false);
+    useEffect(() => setClippable(canRecordClip()), []);
+    const [clipping, setClipping] = useState(false);
 
     // What is being written changes when the message being rewritten changes,
     // and not when the same message arrives again: a reload that replaced the
@@ -685,6 +695,24 @@ export function Composer({
                                     onStart={voice.start}
                                 />
                             )}
+                            {/* Beside the microphone, because it is the same
+                                offer one step further: some things are faster
+                                said than typed, and some are faster shown than
+                                said. Only where a file may be sent, since what
+                                it makes is one, and only in a browser that can
+                                share a screen - which is no phone. */}
+                            {mayAttach && clippable && (
+                                <button
+                                    type="button"
+                                    disabled={disabled || files.length >= rules.maxAttachments}
+                                    onClick={() => setClipping(true)}
+                                    aria-label="Record a screen clip"
+                                    title="Record a clip"
+                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                >
+                                    <MonitorPlay className="size-4" />
+                                </button>
+                            )}
                             <EmojiPicker
                                 disabled={disabled}
                                 // Back to the box, caret at the end. Picking an
@@ -805,6 +833,21 @@ export function Composer({
                 the moment it is asked rather than at the moment the composer was
                 drawn - "tomorrow at nine" is otherwise yesterday's tomorrow on a
                 tab left open overnight. */}
+            {/* Mounted only while it is open: it holds a screen share, a camera
+                and a recorder, and none of that may outlive the dialog. */}
+            {clipping && (
+                <ClipDialog
+                    open
+                    maxBytes={maxBytes}
+                    maxMib={rules.maxAttachmentMib}
+                    onOpenChange={setClipping}
+                    // Staged like any other file, so a clip can go with a line of
+                    // text, with other files, or at nine tomorrow morning -
+                    // none of which is a special case.
+                    onReady={(clip) => stage([clip])}
+                />
+            )}
+
             {scheduling && onSchedule && (
                 <ScheduleDialog
                     open
