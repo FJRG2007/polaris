@@ -54,10 +54,12 @@ describe("the work Polaris runs on a schedule", () => {
         // linked account has stopped working, and two runners would each announce
         // it before either wrote that it had been announced. The rest are written
         // to be re-run and several already are, from the screens that sweep them
-        // lazily.
+        // lazily. A scheduled message is the plainest case of all: two runners
+        // would send it twice, into a room, under somebody's name.
         const leased = SCHEDULED_JOBS.filter((job) => job.leaseMs !== null).map((job) => job.key);
         expect(leased.sort()).toEqual([
             "backups",
+            "chat-scheduled",
             "connection-health",
             "game-health",
             "game-schedules",
