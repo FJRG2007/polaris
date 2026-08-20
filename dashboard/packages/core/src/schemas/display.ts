@@ -300,6 +300,48 @@ export function wallClock(date: Date, timeZone: string): WallClock {
     };
 }
 
+/**
+ * The moment a wall clock reading names, in one zone.
+ *
+ * The inverse of `wallClock`, and the half a picker needs: somebody choosing
+ * "the 8th at 09:00" has named a reading on a clock, and which instant that is
+ * depends entirely on whose clock. Without this a message scheduled for nine in
+ * the morning by somebody working to another zone goes at nine in the server's.
+ *
+ * Worked out by correction rather than by table: guess the instant as if the
+ * reading were UTC, ask what that instant actually reads as in the zone, and
+ * shift by the difference. Twice, because the first shift can cross a daylight
+ * saving change and land in a different offset than the one it was corrected
+ * for - the second pass settles it, and there is no third case.
+ */
+export function zonedInstant(
+    reading: {
+        readonly year: number;
+        readonly month: number;
+        readonly day: number;
+        readonly hours: number;
+        readonly minutes: number;
+    },
+    timeZone: string
+): Date {
+    const { year, month, day, hours, minutes } = reading;
+    // Automatic is this device's own clock, which is what a Date built from
+    // parts already is.
+    if (timeZone === AUTOMATIC_TIME_ZONE || !zoneFormat(timeZone)) {
+        return new Date(year, month - 1, day, hours, minutes, 0, 0);
+    }
+
+    const wanted = Date.UTC(year, month - 1, day, hours, minutes);
+    let guess = wanted;
+    for (let pass = 0; pass < 2; pass += 1) {
+        const wall = wallClock(new Date(guess), timeZone);
+        const lands = Date.UTC(wall.year, wall.month - 1, wall.day, wall.hours, wall.minutes);
+        if (lands === wanted) break;
+        guess += wanted - lands;
+    }
+    return new Date(guess);
+}
+
 /** The formatters every screen uses. Bound to one set of preferences. */
 export interface DisplayFormat {
     readonly preferences: DisplayPreferences;

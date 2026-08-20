@@ -31,6 +31,13 @@ import type { LinkPreviewView } from "@/lib/chat/link-preview";
 import { MAX_NICKNAME, setNickname } from "@/lib/contact-names";
 import { messageToasts, type MessageToast } from "@/lib/chat/toasts";
 import { chatProfile, type ChatProfile } from "@/lib/chat/profiles";
+import {
+    cancelScheduled,
+    listScheduled,
+    scheduleMessage,
+    sendScheduledNow,
+    type ScheduledMessageView
+} from "@/lib/chat/scheduled";
 import { searchMessages, type ChatSearchHit } from "@/lib/chat/search";
 import { voicePresence, type VoicePresence } from "@/lib/chat/meetings";
 import type { ChatInviteOffer, ChatInviteView } from "@/lib/chat/invites";
@@ -553,6 +560,55 @@ export async function profileAction(
 
     const profile = await chatProfile(me, parsed.data.channelId, parsed.data.userId);
     return profile ? { profile } : {};
+}
+
+// ---------------------------------------------------------------------------
+// Sending it later
+// ---------------------------------------------------------------------------
+
+/**
+ * Write one down for an hour that has not happened yet.
+ *
+ * Text only. A scheduled message that carries files goes through the route
+ * beside the one a live message with files uses, because the bytes have to be
+ * written before there is anything to attach them to - see
+ * `/api/chat/channels/[id]/scheduled`.
+ */
+export async function scheduleMessageAction(input: unknown): Promise<{ id?: string; error?: string }> {
+    const me = await actor();
+    const parsed = core.chatScheduleSchema.safeParse(input);
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? "That could not be scheduled" };
+    }
+    const result = await guard(() => scheduleMessage(me, parsed.data));
+    return result.error ? { error: result.error } : { id: result.value };
+}
+
+/** What this reader has waiting here. Theirs only - see `listScheduled`. */
+export async function listScheduledAction(
+    channelId: string
+): Promise<{ scheduled?: ScheduledMessageView[]; error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(channelId);
+    if (!parsed.success) return { scheduled: [] };
+    const result = await guard(() => listScheduled(me, parsed.data));
+    return result.error ? { error: result.error } : { scheduled: result.value };
+}
+
+export async function cancelScheduledAction(id: string): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(id);
+    if (!parsed.success) return {};
+    const result = await guard(() => cancelScheduled(me, parsed.data));
+    return result.error ? { error: result.error } : {};
+}
+
+export async function sendScheduledNowAction(id: string): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(id);
+    if (!parsed.success) return { error: "There is nothing waiting under that id" };
+    const result = await guard(() => sendScheduledNow(me, parsed.data));
+    return result.error ? { error: result.error } : {};
 }
 
 export async function typingAction(channelId: string, activity?: unknown): Promise<void> {

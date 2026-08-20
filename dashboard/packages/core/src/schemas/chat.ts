@@ -342,6 +342,57 @@ export const chatSendSchema = z.object({
 
 export type ChatSendInput = z.infer<typeof chatSendSchema>;
 
+/**
+ * The soonest a message may be scheduled for.
+ *
+ * A minute, and it is a floor rather than a nicety: the sweep runs on a timer,
+ * so anything asked for inside the next few seconds would go late by definition
+ * and read as a broken feature. Somebody who wants it now has the button next
+ * to the one they used to get here.
+ */
+export const SCHEDULE_SOONEST_MS = 60 * 1000;
+
+/**
+ * The furthest ahead one may be scheduled.
+ *
+ * A year. Not a technical limit - it is what stops a typo in a date field
+ * parking somebody's message in the year 3000, where nothing will ever send it
+ * and nothing will ever show it to them again.
+ */
+export const SCHEDULE_FURTHEST_MS = 365 * 24 * 60 * 60 * 1000;
+
+/**
+ * Writing something now and sending it later.
+ *
+ * The moment is an instant rather than a date and a time, because the two are
+ * only a moment once a zone is applied and the zone is the writer's - see
+ * `wallClock`. The window is checked here and again on the server, since a
+ * moment in the past is a message that goes the second it is written and one in
+ * the far future is a message that never goes at all.
+ */
+export const chatScheduleSchema = z.object({
+    channelId: z.string().uuid(),
+    // Empty is allowed, as it is for a live message: a message that is only a
+    // file is a message.
+    body: z.string().trim().max(MAX_CHAT_MESSAGE),
+    parentId: z.string().uuid().nullable().optional(),
+    replyToId: z.string().uuid().nullable().optional(),
+    forwarded: z.boolean().default(false),
+    sendAt: z.string().datetime()
+});
+
+export type ChatScheduleInput = z.infer<typeof chatScheduleSchema>;
+
+/** Whether a moment is one a message may be scheduled for, and why not. Pure, so
+ *  the dialog can say it before the server does. */
+export function scheduleRefusal(sendAt: Date, now: Date = new Date()): string | null {
+    const wait = sendAt.getTime() - now.getTime();
+    if (!Number.isFinite(wait)) return "Pick a date and a time";
+    if (wait < SCHEDULE_SOONEST_MS) return "Pick a time at least a minute from now";
+    if (wait > SCHEDULE_FURTHEST_MS) return "Pick a time within the next year";
+    return null;
+}
+
 /** Sending somebody else's message on to another conversation. */
 export const chatForwardSchema = z.object({
     messageId: z.string().uuid(),

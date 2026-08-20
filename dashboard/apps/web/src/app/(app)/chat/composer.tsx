@@ -25,6 +25,7 @@ import * as core from "@polaris/core";
 import { typingAction } from "./actions";
 import { EmojiPicker } from "./emoji-picker";
 import { useMicrophones } from "./mic-device";
+import { ScheduleDialog } from "./schedule-dialog";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
@@ -38,6 +39,7 @@ import {
     type RecordedSound
 } from "./voice-recorder";
 import {
+    CalendarClock,
     Camera,
     Check,
     ChevronDown,
@@ -80,6 +82,7 @@ export function Composer({
     insert,
     onCancelReply,
     onSend,
+    onSchedule,
     onMedia,
     onSaved,
     onSaveEdit,
@@ -138,6 +141,19 @@ export function Composer({
         files: readonly File[],
         sounds?: readonly RecordedSound[]
     ) => void | Promise<void>;
+    /**
+     * The same message, at an hour that has not happened yet.
+     *
+     * Absent where sending later makes no sense - a task's comment box, an edit -
+     * and then the control is not drawn rather than drawn doing nothing. Answers
+     * with a sentence when the server refuses, since the dialog is still open and
+     * is the only place the person can read it.
+     */
+    onSchedule?: (
+        sendAt: string,
+        body: string,
+        files: readonly File[]
+    ) => Promise<{ error?: string }>;
     /** A GIF or sticker chosen from the picker. Its own path rather than a
      *  staged file: it is already somewhere, and it is the whole message. */
     onMedia?: (address: string) => void | Promise<void>;
@@ -150,6 +166,11 @@ export function Composer({
     const [body, setBody] = useState("");
     const [files, setFiles] = useState<readonly File[]>([]);
     const [refused, setRefused] = useState("");
+    /** Whether the "when" dialog is open, and what the server said about the
+     *  last moment offered to it. */
+    const [scheduling, setScheduling] = useState(false);
+    const [scheduleBusy, setScheduleBusy] = useState(false);
+    const [scheduleError, setScheduleError] = useState("");
     // Two different noes with one answer on screen: the instance allows no files
     // in this kind of conversation, or this account may not send them anywhere.
     // Gone rather than disabled either way - a permanently dead button is a
@@ -301,6 +322,32 @@ export function Composer({
         setGeneration((current) => current + 1);
         if (editing && onSaveEdit) await onSaveEdit(editing.id, text);
         else await onSend(text, sending);
+    };
+
+    /**
+     * The same message, put down for later.
+     *
+     * Everything is emptied only once the server has taken it, unlike sending -
+     * a message that goes now is gone whatever happens next, and one that is
+     * refused at the moment it is scheduled has to be left where it was typed.
+     */
+    const schedule = async (sendAt: string) => {
+        if (!onSchedule || disabled || tooLong) return;
+        const text = isBlankMarkdown(body) ? "" : body.trim();
+        if (!text && files.length === 0) return;
+        setScheduleBusy(true);
+        setScheduleError("");
+        const result = await onSchedule(sendAt, text, files);
+        setScheduleBusy(false);
+        if (result.error) {
+            setScheduleError(result.error);
+            return;
+        }
+        setBody("");
+        setFiles([]);
+        setRefused("");
+        setGeneration((current) => current + 1);
+        setScheduling(false);
     };
 
     /**
@@ -679,16 +726,53 @@ export function Composer({
                                 </Button>
                             </>
                         ) : (
-                            <button
-                                type="button"
-                                disabled={disabled || tooLong || (blank && files.length === 0)}
-                                onClick={() => void submit(body)}
-                                aria-label="Send"
-                                title="Send"
-                                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
-                            >
-                                <SendHorizontal className="size-4" />
-                            </button>
+                            <>
+                                <button
+                                    type="button"
+                                    disabled={disabled || tooLong || (blank && files.length === 0)}
+                                    onClick={() => void submit(body)}
+                                    aria-label="Send"
+                                    title="Send"
+                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+                                >
+                                    <SendHorizontal className="size-4" />
+                                </button>
+                                {/* Beside the send button rather than among the
+                                    attachments, because it is the same act at a
+                                    different hour - and dead until there is
+                                    something to send, since "when" is not a
+                                    question about nothing. */}
+                                {onSchedule && (
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button
+                                                type="button"
+                                                disabled={
+                                                    disabled ||
+                                                    tooLong ||
+                                                    (blank && files.length === 0)
+                                                }
+                                                aria-label="Send later"
+                                                title="Send later"
+                                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+                                            >
+                                                <ChevronDown className="size-3.5" />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem
+                                                onSelect={() => {
+                                                    setScheduleError("");
+                                                    setScheduling(true);
+                                                }}
+                                            >
+                                                <CalendarClock className="size-3.5" />
+                                                Schedule message
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                )}
+                            </>
                         )}
                     </span>
                 </div>
@@ -716,6 +800,20 @@ export function Composer({
                 className="hidden"
                 onChange={picked}
             />
+
+            {/* Mounted only while it is open, so the dialog reads the clock at
+                the moment it is asked rather than at the moment the composer was
+                drawn - "tomorrow at nine" is otherwise yesterday's tomorrow on a
+                tab left open overnight. */}
+            {scheduling && onSchedule && (
+                <ScheduleDialog
+                    open
+                    busy={scheduleBusy}
+                    error={scheduleError || undefined}
+                    onOpenChange={(next) => !next && setScheduling(false)}
+                    onConfirm={(sendAt) => void schedule(sendAt)}
+                />
+            )}
         </div>
     );
 }

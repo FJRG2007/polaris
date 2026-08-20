@@ -468,6 +468,32 @@ export async function discardAttachments(messageId: string): Promise<void> {
     // indexed lookup that finds nothing.
     await keepForReports(files.map((file) => file.id));
 
+    await removeStoredFiles(files);
+}
+
+/**
+ * Take a set of stored files off whatever storage each of them is on.
+ *
+ * One driver per storage rather than one per file, because opening a NAS session
+ * for each of ten attachments is ten handshakes for one delete. A file that
+ * cannot be removed - a target that has moved, a share that is not answering -
+ * does not stop the caller: they are taking something back, and refusing that
+ * because a byte range is unreachable helps nobody.
+ *
+ * The folder goes too when it is the last file in it. A conversation's files
+ * live in one folder named after the channel, and without this every
+ * conversation that ever carried a picture leaves an empty directory named after
+ * a uuid behind it, forever, in somebody's file browser.
+ *
+ * Shared with the scheduled messages, whose files are written when the message
+ * is written and have to be swept when it is taken back - the same bytes in the
+ * same folders, and there is no second way to remove them.
+ */
+export async function removeStoredFiles(
+    files: readonly { readonly connectionId: string | null; readonly path: string }[]
+): Promise<void> {
+    if (files.length === 0) return;
+
     const byTarget = new Map<string, string[]>();
     for (const file of files) {
         const target = file.connectionId ?? LOCAL_TARGET;

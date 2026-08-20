@@ -41,7 +41,9 @@ import type { ChatMessageView } from "@/lib/chat/messages";
 import { useRouter, useSearchParams } from "next/navigation";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { ChannelMembers, useMembersPanel } from "./members-panel";
+import { ScheduledBar } from "./scheduled-bar";
 import { DirectProfile } from "./direct-profile";
+import type { ScheduledMessageView } from "@/lib/chat/scheduled";
 import { ForwardDialog } from "./forward-dialog";
 import { ArrowDown, Loader2, MessageCircle, Mic, Video, Volume2 } from "lucide-react";
 import { Button, ConfirmDeleteDialog, EmptyState, Skeleton, cn } from "@polaris/ui";
@@ -1028,6 +1030,74 @@ export function ChannelView({
      * route and waits, and the composer having shown the staged files all along
      * is what stops that wait from looking like nothing happened.
      */
+    /**
+     * What this reader has waiting here.
+     *
+     * Read when the conversation opens and again whenever one is added, sent or
+     * taken back - never on a timer. The list only changes because this browser
+     * changed it, or because the hour came and the message became an ordinary
+     * message, which arrives on the stream like any other.
+     */
+    const [scheduled, setScheduled] = useState<readonly ScheduledMessageView[]>([]);
+    const loadScheduled = useCallback(async () => {
+        const result = await actions.listScheduledAction(channelId);
+        setScheduled(result.scheduled ?? []);
+    }, [channelId]);
+
+    useEffect(() => {
+        setScheduled([]);
+        void loadScheduled();
+    }, [loadScheduled]);
+
+    /**
+     * The same message, written down for later.
+     *
+     * Two doors, exactly as sending has: text goes through the action, and files
+     * go through the route that can write bytes - the bytes have to be on storage
+     * before the hour comes, since the browser holding them will be closed.
+     */
+    const scheduleMessage = async (
+        sendAt: string,
+        body: string,
+        files: readonly File[]
+    ): Promise<{ error?: string }> => {
+        const answering = replyingTo?.id ?? null;
+        if (files.length > 0) {
+            const form = new FormData();
+            form.set("body", body);
+            form.set("sendAt", sendAt);
+            if (answering) form.set("replyToId", answering);
+            for (const file of files) form.append("files", file);
+            const response = await fetch(`/api/chat/channels/${channelId}/scheduled`, {
+                method: "POST",
+                body: form
+            });
+            if (!response.ok) {
+                const answer: unknown = await response.json().catch(() => null);
+                const message =
+                    typeof answer === "object" && answer !== null && "error" in answer
+                        ? String((answer as { error: unknown }).error)
+                        : "That could not be scheduled";
+                return { error: message };
+            }
+        } else {
+            const result = await actions.scheduleMessageAction({
+                channelId,
+                body,
+                replyToId: answering,
+                forwarded: false,
+                sendAt
+            });
+            if (result.error) return { error: result.error };
+        }
+        // The bar it answers comes down with it, the way it does when a reply is
+        // sent: what was written is no longer pending an answer.
+        setReplyingTo(null);
+        setCarried(null);
+        await loadScheduled();
+        return {};
+    };
+
     const send = async (
         body: string,
         files: readonly File[] = [],
@@ -1440,8 +1510,27 @@ export function ChannelView({
                     </Button>
                 </div>
             ) : (
-                <Composer
-                    channelId={channelId}
+                <>
+                    {/* Above the box rather than in the room: what is waiting is
+                        not a message yet, and the only person it concerns is the
+                        one who wrote it. Nothing at all when nothing is. */}
+                    <ScheduledBar
+                        scheduled={scheduled}
+                        onSendNow={async (id) => {
+                            const result = await actions.sendScheduledNowAction(id);
+                            if (result.error) setError(result.error);
+                            await loadScheduled();
+                            await load();
+                            refresh();
+                        }}
+                        onCancel={async (id) => {
+                            const result = await actions.cancelScheduledAction(id);
+                            if (result.error) setError(result.error);
+                            await loadScheduled();
+                        }}
+                    />
+                    <Composer
+                        channelId={channelId}
                     rules={rules}
                     disabled={!canPost}
                     attachable={may.attach}
@@ -1462,6 +1551,7 @@ export function ChannelView({
                     }}
                     onCancelEdit={() => setEditing(null)}
                     onSend={send}
+                    onSchedule={scheduleMessage}
                     onMedia={async (address) => {
                         following.current = true;
                         // The picture answers whatever the bar was pointing at, and
@@ -1500,7 +1590,8 @@ export function ChannelView({
                         setEditing(null);
                         if (!result?.error) patchMessage(messageId, { body, edited: true });
                     }}
-                />
+                    />
+                </>
             )}
         </>
     );

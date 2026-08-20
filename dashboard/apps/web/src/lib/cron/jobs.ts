@@ -22,6 +22,7 @@ import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
 import { sweepExpiredSends } from "@/lib/vault/sends";
+import { sweepDueScheduledMessages } from "@/lib/chat/scheduled";
 import { sweepConnectionHealth } from "@/lib/connections/health";
 import { liftExpiredSuspensions } from "@/lib/user-admin-service";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
@@ -191,6 +192,17 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // wrote that it had been made, which is the one thing this must not do.
         leaseMs: 5 * HOUR,
         run: sweepConnectionHealth
+    },
+    {
+        key: "chat-scheduled",
+        // Every minute, and the floor on how far ahead a message may be
+        // scheduled is the same minute: anything finer would be a promise the
+        // sweep cannot keep, and anything coarser is a message that goes late by
+        // as much as the gap.
+        everyMs: Number(process.env.POLARIS_CHAT_SCHEDULE_MS) || MINUTE,
+        // Leased, because sending twice is the one thing this must not do.
+        leaseMs: 5 * MINUTE,
+        run: sweepDueScheduledMessages
     },
     {
         key: "task-reminders",

@@ -199,6 +199,7 @@ model User {
     contactNamesGiven    ContactName[]       @relation("ContactNamesGiven")
     contactNamesReceived ContactName[]       @relation("ContactNamesReceived")
     chatReportsMade     ChatReport[]         @relation("ChatReportsMade")
+    chatScheduled       ChatScheduledMessage[]
     chatReportsHandled  ChatReport[]         @relation("ChatReportsHandled")
     searches            SearchHistory[]
     backupDestinations  BackupDestination[]
@@ -5937,6 +5938,7 @@ model ChatChannel {
     members  ChatChannelMember[]
     messages ChatMessage[]
     meetings Meeting[]
+    scheduled ChatScheduledMessage[]
 
     @@index([spaceId, order])
     @@index([categoryId, order])
@@ -6300,6 +6302,75 @@ model ChatAttachment {
     message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
     @@index([messageId])
+}
+
+// A message written now and sent later.
+//
+// It is not a message yet, which is the whole design: nothing about it appears
+// in the conversation, nothing counts it as unread, and it can be taken back
+// without anybody knowing it existed. The room hears about it at the moment it
+// is sent and not a second before.
+//
+// The files are written at the moment it is scheduled rather than at the moment
+// it goes, because the bytes live on the machine that wrote them: a browser
+// closed overnight - or a laptop lid shut - would take them with it. What is
+// kept here is exactly what an attachment row keeps, so sending is the same
+// call the live path makes with the same records.
+//
+// It carries what it was answering too. A reply written at midnight and sent at
+// nine is still a reply, and one that arrived detached from what it answers is a
+// message nobody can read.
+model ChatScheduledMessage {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    channelId  String   @db.Uuid
+    authorId   String   @db.Uuid
+    body       String
+    // The thread it belongs to, for one written under a message.
+    parentId   String?  @db.Uuid
+    // What it answers, and whether that is a reply or something being passed on.
+    replyToId  String?  @db.Uuid
+    forwarded  Boolean  @default(false)
+    // When it goes. The only column the sweep reads.
+    sendAt     DateTime
+    createdAt  DateTime @default(now())
+    // Why it never went. Set instead of deleting the row: a message that
+    // silently disappeared at nine in the morning is worse than one that says it
+    // was refused - the person who wrote it is entitled to know it did not go,
+    // and to the words they wrote.
+    failure    String?
+    failedAt   DateTime?
+
+    channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+    author  User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+    files   ChatScheduledFile[]
+
+    // What the sweep asks: due, and not already dealt with.
+    @@index([sendAt])
+    // What the composer asks: mine, here, soonest first.
+    @@index([channelId, authorId, sendAt])
+}
+
+// A file waiting with the message it belongs to.
+//
+// The same columns an attachment has, because it becomes one: the bytes are
+// already on whatever storage this instance uses, and sending is a matter of
+// tying them to the message that finally exists. Deleting the row takes the file
+// with it - see `cancelScheduled`, which is the only place that happens.
+model ChatScheduledFile {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    scheduledId  String   @db.Uuid
+    name         String
+    size         BigInt   @default(0)
+    contentType  String   @default("application/octet-stream")
+    connectionId String?  @db.Uuid
+    path         String
+    durationMs   Int?
+    waveform     String?
+    createdAt    DateTime @default(now())
+
+    scheduled ChatScheduledMessage @relation(fields: [scheduledId], references: [id], onDelete: Cascade)
+
+    @@index([scheduledId])
 }
 
 // A message somebody kept.

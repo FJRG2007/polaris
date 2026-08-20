@@ -8,7 +8,9 @@ import {
     stringifyDisplayPreferences,
     toDisplayTemperature,
     userDisplayPreferencesSchema,
-    weekdayOrder
+    wallClock,
+    weekdayOrder,
+    zonedInstant
 } from "../src/schemas/display.js";
 
 /** A day past the 12th and an afternoon hour, so every choice reads differently. */
@@ -141,5 +143,46 @@ describe("time zone", () => {
         // by a runtime since must degrade to this device's clock.
         const gone = createDisplayFormat({ ...DISPLAY_DEFAULTS, timeZone: "Mars/Olympus" });
         expect(gone.time(new Date(2026, 6, 31, 14, 5, 9))).toBe("14:05");
+    });
+});
+
+describe("the moment a reading names", () => {
+    /** The inverse of the clock above: what a picker hands back when somebody
+     *  chooses a day and a time. */
+    it("reads a wall clock in the zone the account works to", () => {
+        const at = zonedInstant({ year: 2026, month: 9, day: 8, hours: 9, minutes: 0 }, "UTC");
+        expect(at.toISOString()).toBe("2026-09-08T09:00:00.000Z");
+
+        const madrid = zonedInstant({ year: 2026, month: 9, day: 8, hours: 9, minutes: 0 }, "Europe/Madrid");
+        // Summer time: two hours ahead of UTC.
+        expect(madrid.toISOString()).toBe("2026-09-08T07:00:00.000Z");
+
+        const tokyo = zonedInstant({ year: 2026, month: 9, day: 8, hours: 9, minutes: 0 }, "Asia/Tokyo");
+        expect(tokyo.toISOString()).toBe("2026-09-08T00:00:00.000Z");
+    });
+
+    it("holds across a daylight saving change, on both sides of it", () => {
+        // Madrid goes back on the last Sunday of October 2026 (the 25th).
+        const before = zonedInstant({ year: 2026, month: 10, day: 24, hours: 12, minutes: 0 }, "Europe/Madrid");
+        expect(before.toISOString()).toBe("2026-10-24T10:00:00.000Z");
+        const after = zonedInstant({ year: 2026, month: 10, day: 26, hours: 12, minutes: 0 }, "Europe/Madrid");
+        expect(after.toISOString()).toBe("2026-10-26T11:00:00.000Z");
+    });
+
+    it("is the inverse of the clock it reads", () => {
+        // Whatever else it does, a reading turned into a moment and read back has
+        // to be the same reading - that is the whole contract a picker rests on.
+        for (const zone of ["UTC", "Europe/Madrid", "Asia/Tokyo", "America/New_York"]) {
+            const reading = { year: 2026, month: 3, day: 14, hours: 23, minutes: 45 };
+            const wall = wallClock(zonedInstant(reading, zone), zone);
+            expect({ ...wall, seconds: 0 }).toEqual({ ...reading, seconds: 0 });
+        }
+    });
+
+    it("falls back to this device for a zone that is not one", () => {
+        const local = new Date(2026, 8, 8, 9, 0, 0, 0);
+        expect(
+            zonedInstant({ year: 2026, month: 9, day: 8, hours: 9, minutes: 0 }, "Mars/Olympus").getTime()
+        ).toBe(local.getTime());
     });
 });
