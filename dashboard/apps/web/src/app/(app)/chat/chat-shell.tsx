@@ -16,7 +16,7 @@
  * a 4rem message column helps nobody.
  */
 
-import { PAGE_FILL } from "@polaris/ui";
+import { PAGE_BLEED } from "@polaris/ui";
 import { ServerRail } from "./server-rail";
 import { ChatSidebar } from "./chat-sidebar";
 import { usePathname } from "next/navigation";
@@ -87,7 +87,10 @@ function ChatColumns({ children }: { children: ReactNode }) {
     );
 
     return (
-        <div className={`${PAGE_FILL} flex w-full flex-row`}>
+        // Edge to edge: Chat draws its own rails, headers and panels, and a
+        // page's margin around all of that is a strip of unused background on
+        // four sides. No `w-full` - see PAGE_BLEED.
+        <div className={`${PAGE_BLEED} flex flex-row`}>
             {/* The column of spaces stays on a phone while the list is showing,
                 and steps aside with it once a conversation is open - on a narrow
                 screen the conversation gets the whole width. */}

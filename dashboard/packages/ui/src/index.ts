@@ -44,4 +44,4 @@ export * from "./components/dialog";
 export * from "./shell/capabilities";
 export { AppSwitcher, type PolarisApp } from "./shell/app-switcher";
 export { MobileNav } from "./shell/mobile-nav";
-export { AppShell, PolarisMark, PageHeader, PAGE_FILL } from "./shell/app-shell";
+export { AppShell, PolarisMark, PageHeader, PAGE_FILL, PAGE_BLEED } from "./shell/app-shell";

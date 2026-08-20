@@ -88,6 +88,27 @@ export function AppShell({
  */
 export const PAGE_FILL = "h-[calc(100vh-var(--header-height)-var(--page-inset))] overflow-hidden";
 
+/**
+ * A screen that fills what is left of the window edge to edge, with no margin
+ * around it at all.
+ *
+ * For the one shape of screen that is not a page: an application inside the
+ * application, with its own rails, its own headers and its own panels, each of
+ * which draws its own border. Chat is that - and inside a page's padding it read
+ * as a picture of a chat client pasted onto a page, with a strip of unused
+ * background above it, below it and down both sides while its own panels ran out
+ * of room.
+ *
+ * The negative margins are exactly `main`'s padding, which is why they are
+ * written here beside it rather than in the screen that uses them: two sets of
+ * numbers in two files drift, and the symptom is a one-sided gap nobody can
+ * account for. A screen using this must not also be `w-full` - a block box with
+ * auto width absorbs the negative margins and grows into them, and a fixed width
+ * would push the same distance off the right-hand edge instead.
+ */
+export const PAGE_BLEED =
+    "-m-3 h-[calc(100vh-var(--header-height))] overflow-hidden sm:-m-4 md:-mx-6 md:-my-5";
+
 /** The Polaris wordmark: the star glyph plus the name. `nameClassName` lets a
  *  cramped bar drop the name and keep the glyph.
  *
