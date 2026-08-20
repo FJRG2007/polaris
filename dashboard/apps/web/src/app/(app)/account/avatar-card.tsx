@@ -1,19 +1,26 @@
 "use client";
 
 /**
- * A photo card: yours, or an organization's.
+ * The pictures on a profile: yours, drawn together, or an organization's.
  *
- * The picture is resized and re-encoded here, in the browser, before it is sent.
- * It costs nothing, it means a phone photo does not arrive as eight megabytes of
+ * Yours are one card because they are one thing on screen. A face and a banner
+ * edited in two boxes, each with its own little preview, is two decisions about
+ * a picture nobody has seen: the only question worth answering is whether the
+ * two look right together - whether the face sits over a part of the band that
+ * is not already busy, whether the colours fight. So the card shows exactly what
+ * everybody else will see, and the buttons for each picture sit under the thing
+ * they change.
+ *
+ * Both are resized and re-encoded here, in the browser, before being sent. It
+ * costs nothing, it means a phone photo does not arrive as eight megabytes of
  * something that will be drawn 24 pixels wide, and re-encoding drops the EXIF
  * block - which on a phone photo carries the place and time it was taken, and
  * which nobody setting a profile picture means to publish. The server checks the
  * bytes again regardless: this runs on the uploader's machine, so it is a
  * courtesy rather than a control.
  *
- * One component for both because everything that matters is the same - the size
- * limit, the formats, the crop, the cache dance after a replace. Only the
- * endpoint, the face being drawn and the sentence under the heading differ.
+ * An organization has a face and no banner, and keeps the plain card: it appears
+ * in a switcher and a list, never as somebody's profile.
  */
 
 import { Button, Card, CardBody } from "@polaris/ui";
@@ -103,29 +110,26 @@ async function toBand(file: File): Promise<Blob> {
     }
 }
 
-function PhotoCard({
-    title,
-    hint,
-    preview,
-    endpoint,
-    pictureUrl,
-    hasPhoto,
-    shape = "square"
-}: {
-    title: string;
-    hint: string;
-    preview: ReactNode;
-    /** Where the bytes are posted and deleted. */
-    endpoint: string;
-    /** The URL the picture is served from, so a replacement can be pulled into
-     *  the browser's cache before the page is drawn again from it. */
-    pictureUrl: string;
-    hasPhoto: boolean;
-    /** What the picture is cropped to before it is sent, and how the card is
-     *  laid out: a face is a square beside its buttons, a band is a band with
-     *  its buttons underneath. */
-    shape?: "square" | "band";
-}) {
+/** One picture, and the two things that can be done to it. */
+interface Picture {
+    busy: boolean;
+    error: string;
+    /** The file chooser, which has to be rendered somewhere. */
+    field: ReactNode;
+    /** Open it. */
+    choose: () => void;
+    remove: () => void;
+}
+
+/**
+ * Putting a picture up and taking it down, for one endpoint.
+ *
+ * A hook rather than a component because the profile card draws two of these
+ * inside one preview: the parts that differ are the endpoint and the crop, and
+ * everything else - the size limit, the formats, the cache dance after a
+ * replace, the sentence when it fails - is the same for both.
+ */
+function usePicture(endpoint: string, pictureUrl: string, shape: "square" | "band"): Picture {
     const input = useRef<HTMLInputElement>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
@@ -140,12 +144,11 @@ function PhotoCard({
                 setBusy(false);
                 return;
             }
-            // The face is drawn on this page, in the header, and in whatever list
-            // is behind it. They all point at the one URL, which the browser was
-            // told it could keep for five minutes - so the cached copy is
-            // replaced first, and then the page is drawn again from it. Anything
-            // less and you change the photo and nothing appears to happen except
-            // here.
+            // The picture is drawn on this page, in the header, and in whatever
+            // list is behind it. They all point at the one URL, which the browser
+            // was told it could keep - so the cached copy is replaced first, and
+            // then the page is drawn again from it. Anything less and you change
+            // the photo and nothing appears to happen except here.
             await fetch(pictureUrl, { cache: "reload" }).catch(() => undefined);
             window.location.reload();
         } catch {
@@ -165,100 +168,129 @@ function PhotoCard({
         await run(() => fetch(endpoint, { method: "POST", headers: { "Content-Type": body.type }, body }));
     };
 
+    return {
+        busy,
+        error,
+        choose: () => input.current?.click(),
+        remove: () => void run(() => fetch(endpoint, { method: "DELETE" })),
+        field: (
+            <input
+                ref={input}
+                type="file"
+                accept={ACCEPTED}
+                className="hidden"
+                onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    // Cleared first, so picking the same file twice after a
+                    // failure still counts as a change.
+                    event.target.value = "";
+                    if (file) void upload(file);
+                }}
+            />
+        )
+    };
+}
+
+/** The pair of buttons under a picture. */
+function PictureActions({ label, picture, exists }: { label: string; picture: Picture; exists: boolean }) {
+    return (
+        <div className="flex flex-wrap items-center gap-2">
+            {picture.field}
+            <Button variant="secondary" size="sm" disabled={picture.busy} onClick={picture.choose}>
+                {picture.busy ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                {exists ? `Replace ${label}` : `Upload ${label}`}
+            </Button>
+            {exists && (
+                <Button variant="ghost" size="sm" disabled={picture.busy} onClick={picture.remove}>
+                    <Trash2 className="size-4" />
+                    Remove
+                </Button>
+            )}
+        </div>
+    );
+}
+
+/**
+ * Your face and your banner, drawn the way everybody else sees them.
+ *
+ * The preview is the profile itself rather than a picture of one: the same band,
+ * the same face cut out of its lower edge, at the same proportions. Anything
+ * else is a preview of a preview, and the thing it leaves out - how the two look
+ * together - is the only thing worth looking at before saving.
+ */
+export function ProfilePicturesCard({
+    userId,
+    name,
+    hasPhoto,
+    hasBanner
+}: {
+    userId: string;
+    name: string;
+    hasPhoto: boolean;
+    hasBanner: boolean;
+}) {
+    const photo = usePicture("/api/avatar", avatarUrl(userId), "square");
+    const banner = usePicture("/api/banner", bannerUrl(userId), "band");
+    const error = photo.error || banner.error;
+
     return (
         <Card>
-            <CardBody className="flex flex-col gap-3">
+            <CardBody className="flex flex-col gap-4">
                 <div>
-                    <h2 className="text-sm font-medium">{title}</h2>
-                    <p className="text-xs text-muted-foreground">{hint}</p>
+                    <h2 className="text-sm font-medium">Photo and banner</h2>
+                    <p className="text-xs text-muted-foreground">
+                        How your profile looks to everybody else. Without a photo, Polaris uses the
+                        picture your email address has on Gravatar and your initials if it has none;
+                        without a banner, a colour taken from your photo.
+                    </p>
                 </div>
-                <div className={shape === "band" ? "flex flex-col gap-3" : "flex items-center gap-4"}>
-                    {preview}
-                    <div className="flex flex-wrap items-center gap-2">
-                        <input
-                            ref={input}
-                            type="file"
-                            accept={ACCEPTED}
-                            className="hidden"
-                            onChange={(event) => {
-                                const file = event.target.files?.[0];
-                                // Cleared first, so picking the same file twice
-                                // after a failure still counts as a change.
-                                event.target.value = "";
-                                if (file) void upload(file);
-                            }}
-                        />
-                        <Button variant="secondary" disabled={busy} onClick={() => input.current?.click()}>
-                            {busy ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-                            {hasPhoto ? "Replace" : "Upload"}
-                        </Button>
-                        {hasPhoto && (
-                            <Button
-                                variant="ghost"
-                                disabled={busy}
-                                onClick={() => void run(() => fetch(endpoint, { method: "DELETE" }))}
-                            >
-                                <Trash2 className="size-4" />
-                                Remove
-                            </Button>
-                        )}
+
+                <div className="overflow-hidden rounded-lg border border-border">
+                    <ProfileBanner person={{ id: userId, name }} className="h-24" />
+                    <div className="flex flex-col gap-3 px-4 pb-4">
+                        <div className="-mt-8">
+                            <Avatar
+                                person={{ id: userId, name }}
+                                size={72}
+                                status={false}
+                                className="ring-[3px] ring-card"
+                            />
+                        </div>
+                        <p className="truncate text-sm font-medium" title={name}>{name}</p>
                     </div>
                 </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+                    <PictureActions label="photo" picture={photo} exists={hasPhoto} />
+                    <PictureActions label="banner" picture={banner} exists={hasBanner} />
+                </div>
+
                 {error && <p className="text-sm text-danger">{error}</p>}
             </CardBody>
         </Card>
     );
 }
 
-export function AvatarCard({ userId, name, hasPhoto }: { userId: string; name: string; hasPhoto: boolean }) {
-    return (
-        <PhotoCard
-            title="Photo"
-            hint="Shown wherever your name appears. Without one, Polaris uses the picture your email address has on Gravatar, and your initials if it has none."
-            preview={<Avatar openable person={{ id: userId, name }} size={64} />}
-            endpoint="/api/avatar"
-            pictureUrl={avatarUrl(userId)}
-            hasPhoto={hasPhoto}
-        />
-    );
-}
-
-export function BannerCard({
-    userId,
-    name,
-    hasBanner
-}: {
-    userId: string;
-    name: string;
-    hasBanner: boolean;
-}) {
-    return (
-        <PhotoCard
-            shape="band"
-            title="Banner"
-            hint="The band across the top of your profile. Without one, Polaris uses a colour taken from your photo."
-            preview={
-                <ProfileBanner
-                    person={{ id: userId, name }}
-                    className="h-24 rounded-md ring-1 ring-border"
-                />
-            }
-            endpoint="/api/banner"
-            pictureUrl={bannerUrl(userId)}
-            hasPhoto={hasBanner}
-        />
-    );
-}
-
+/** An organization's face. One picture, so one button beside it. */
 export function OrgPhotoCard({ orgId, name, hasPhoto }: { orgId: string; name: string; hasPhoto: boolean }) {
+    const photo = usePicture(`/api/avatar/org/${orgId}`, orgAvatarUrl(orgId), "square");
+
     return (
-        <PhotoCard
-            title="Photo"
-            hint="Shown wherever this organization appears - the switcher, its people's rosters, and any list it is in. Without one, Polaris draws its initials."
-            preview={<OrgAvatar org={{ id: orgId, name }} size={64} />}
-            endpoint={`/api/avatar/org/${orgId}`}
-            pictureUrl={orgAvatarUrl(orgId)}
-            hasPhoto={hasPhoto}
-        />
+        <Card>
+            <CardBody className="flex flex-col gap-3">
+                <div>
+                    <h2 className="text-sm font-medium">Photo</h2>
+                    <p className="text-xs text-muted-foreground">
+                        Shown wherever this organization appears - the switcher, its people&apos;s
+                        rosters, and any list it is in. Without one, Polaris draws its initials.
+                    </p>
+                </div>
+                <div className="flex items-center gap-4">
+                    <OrgAvatar org={{ id: orgId, name }} size={64} />
+                    <PictureActions label="photo" picture={photo} exists={hasPhoto} />
+                </div>
+                {photo.error && <p className="text-sm text-danger">{photo.error}</p>}
+            </CardBody>
+        </Card>
     );
 }

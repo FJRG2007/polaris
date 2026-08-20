@@ -7,7 +7,7 @@
  */
 
 import { prisma } from "@polaris/db";
-import { AvatarCard, BannerCard } from "./avatar-card";
+import { ProfilePicturesCard } from "./avatar-card";
 import { requireUser } from "@/lib/session";
 import { AccountView } from "./account-view";
 import { getAuthMailStatus } from "@/lib/auth-mail";
@@ -51,8 +51,12 @@ export default async function AccountPage() {
                 <h1 className="text-[17px] font-semibold tracking-tight">Profile</h1>
                 <p className="text-sm text-muted-foreground">How you appear in Polaris, and how you sign in.</p>
             </div>
-            <AvatarCard userId={session.id} name={user?.name ?? session.name} hasPhoto={photo !== null} />
-            <BannerCard userId={session.id} name={user?.name ?? session.name} hasBanner={banner !== null} />
+            <ProfilePicturesCard
+                userId={session.id}
+                name={user?.name ?? session.name}
+                hasPhoto={photo !== null}
+                hasBanner={banner !== null}
+            />
             <AccountView
                 name={user?.name ?? session.name}
                 firstName={user?.firstName ?? ""}
