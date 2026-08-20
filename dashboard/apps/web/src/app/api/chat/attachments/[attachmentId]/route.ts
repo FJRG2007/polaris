@@ -17,6 +17,7 @@
  * a file to save. So the formats with a player get their own type.
  */
 
+import { rangeOf } from "@/lib/http-range";
 import { requirePermission } from "@/lib/session";
 import { channelAccess } from "@/lib/chat/access";
 import {
@@ -84,10 +85,29 @@ export async function GET(
     const asFile = new URL(request.url).searchParams.get("download") === "1";
     const shown =
         !asFile && (isInlineImage(file.contentType) || isPlayableMedia(file.contentType));
-    return new Response(file.bytes as unknown as BodyInit, {
+
+    // What a player asks for when somebody drags the bar. Answered, and said to
+    // be answerable, because a browser that is not offered ranges will not let
+    // anybody seek at all: the bar snaps back to where it was and the video
+    // reads as broken. The bytes are already in hand, so a range is a slice.
+    const range = asFile ? null : rangeOf(request.headers.get("range"), file.bytes.length);
+    if (range === "unsatisfiable") {
+        return new Response(null, {
+            status: 416,
+            headers: { "Content-Range": `bytes */${file.bytes.length}`, "Accept-Ranges": "bytes" }
+        });
+    }
+    const body = range ? file.bytes.subarray(range.from, range.to + 1) : file.bytes;
+
+    return new Response(body as unknown as BodyInit, {
+        status: range ? 206 : 200,
         headers: {
             "Content-Type": shown ? file.contentType : "application/octet-stream",
-            "Content-Length": String(file.bytes.length),
+            "Content-Length": String(body.length),
+            "Accept-Ranges": "bytes",
+            ...(range
+                ? { "Content-Range": `bytes ${range.from}-${range.to}/${file.bytes.length}` }
+                : {}),
             "Cache-Control": CACHE,
             // The bytes came from a person and are served from Polaris's own
             // origin: the browser must treat them as what they were declared to

@@ -13,7 +13,10 @@
  * scheduled for the morning - none of which is a special case here.
  */
 
+import { callDevices } from "./call-media";
 import { useEffect, useRef, useState } from "react";
+import { micDevice, setMicDevice } from "./mic-device";
+import { MediaPlayer } from "@/components/media-player";
 import { MAX_CLIP_SECONDS, useClipRecorder, type ClipSources } from "./clip-recorder";
 import { Camera, CameraOff, Circle, Mic, MicOff, Pause, Play, RotateCcw, Square } from "lucide-react";
 import {
@@ -24,6 +27,7 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    Select,
     cn
 } from "@polaris/ui";
 
@@ -81,6 +85,38 @@ export function ClipDialog({
 }) {
     const clip = useClipRecorder({ maxBytes });
     const [sources, setSources] = useState<ClipSources>({ camera: false, microphone: true });
+    /**
+     * What this machine has to record with.
+     *
+     * Asked when the dialog opens and again whenever something is plugged in.
+     * A browser only names devices once it has been given a permission, so
+     * before that these read "Camera 1" and "Microphone 1" - which is still a
+     * choice between two things, and is what every client shows at that point.
+     */
+    const [devices, setDevices] = useState<{
+        microphones: { id: string; label: string }[];
+        cameras: { id: string; label: string }[];
+    }>({ microphones: [], cameras: [] });
+
+    useEffect(() => {
+        if (!open) return;
+        let live = true;
+        const look = () => {
+            void callDevices().then((found) => {
+                if (live) setDevices(found);
+            });
+        };
+        look();
+        // The microphone is the one already chosen for calls and voice messages:
+        // picking the good headset in a call and then being recorded through the
+        // laptop lid is a surprise that only turns up in the recording.
+        setSources((current) => ({ ...current, microphoneId: micDevice() }));
+        navigator.mediaDevices?.addEventListener?.("devicechange", look);
+        return () => {
+            live = false;
+            navigator.mediaDevices?.removeEventListener?.("devicechange", look);
+        };
+    }, [open]);
     /** Where the composed picture is shown while it records. The canvas is made
      *  by the recorder and put into the page here - it is the same element, not a
      *  copy, so what is on screen is exactly what is being recorded. */
@@ -157,6 +193,51 @@ export function ClipDialog({
                                 Your browser asks which screen or window to record. The camera goes
                                 in the corner of the picture.
                             </p>
+
+                            {/* Which one, where there is more than one to choose
+                                between. A machine with a single camera is not
+                                asked a question it has no answer to. */}
+                            {sources.camera && devices.cameras.length > 1 && (
+                                <label className="flex w-full flex-col gap-1 text-xs">
+                                    Camera
+                                    <Select
+                                        aria-label="Camera"
+                                        value={sources.cameraId ?? devices.cameras[0]?.id ?? ""}
+                                        onValueChange={(id) =>
+                                            setSources((current) => ({ ...current, cameraId: id }))
+                                        }
+                                        options={devices.cameras.map((device) => ({
+                                            value: device.id,
+                                            label: device.label
+                                        }))}
+                                    />
+                                </label>
+                            )}
+                            {sources.microphone && devices.microphones.length > 1 && (
+                                <label className="flex w-full flex-col gap-1 text-xs">
+                                    Microphone
+                                    <Select
+                                        aria-label="Microphone"
+                                        value={
+                                            sources.microphoneId ?? devices.microphones[0]?.id ?? ""
+                                        }
+                                        onValueChange={(id) => {
+                                            setSources((current) => ({
+                                                ...current,
+                                                microphoneId: id
+                                            }));
+                                            // Kept for calls and voice messages
+                                            // too: it is one headset and one
+                                            // decision.
+                                            setMicDevice(id);
+                                        }}
+                                        options={devices.microphones.map((device) => ({
+                                            value: device.id,
+                                            label: device.label
+                                        }))}
+                                    />
+                                </label>
+                            )}
                         </div>
                     )}
 
@@ -181,11 +262,17 @@ export function ClipDialog({
 
                     {/* Once it is stopped: what was made, before anybody sends it. */}
                     {clip.stage === "ready" && clip.preview && (
-                        // eslint-disable-next-line jsx-a11y/media-has-caption -- a recording nobody has transcribed
-                        <video
+                        // The same player the conversation will draw around it,
+                        // rather than the browser's own controls: what is being
+                        // decided here is whether to send this, and it has to be
+                        // watched the way it will be watched. It also seeks -
+                        // see the duration repair in `MediaPlayer`, without which
+                        // a browser recording has no end to seek towards.
+                        <MediaPlayer
+                            kind="video"
                             src={clip.preview}
-                            controls
-                            className="aspect-video w-full rounded-md border border-border bg-black"
+                            download={clip.preview}
+                            className="overflow-hidden rounded-md border border-border bg-black"
                         />
                     )}
 

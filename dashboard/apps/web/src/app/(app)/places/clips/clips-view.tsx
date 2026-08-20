@@ -387,6 +387,15 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                                     kind="video"
                                                     autoPlay
                                                     src={`/api/home/clips/${clip.id}/video`}
+                                                    // Saving it from the player
+                                                    // as well as from the menu:
+                                                    // the moment somebody wants
+                                                    // a copy of what a camera
+                                                    // caught is the moment they
+                                                    // are watching it, and a
+                                                    // right-click is not where
+                                                    // anybody looks for that.
+                                                    download={`/api/home/clips/${clip.id}/video`}
                                                     className="overflow-hidden rounded-md border border-border bg-background"
                                                     onClick={(event) => event.stopPropagation()}
                                                 />

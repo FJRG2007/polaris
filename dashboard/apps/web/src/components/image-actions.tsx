@@ -87,6 +87,7 @@ export async function copyImage(url: string): Promise<string> {
  */
 export function imageItems({
     image,
+    kind = "image",
     baseUrl,
     announce,
     onForward,
@@ -95,6 +96,16 @@ export function imageItems({
     Separator
 }: {
     image: ActionableImage;
+    /**
+     * Which kind of file it is, which changes one item and the words on two.
+     *
+     * A video has no "copy image": there is no gesture in any application that
+     * pastes one, and a menu item that put a video on the clipboard would put
+     * nothing there. Everything else - the link, the download, opening it,
+     * forwarding, reporting - is the same act on a different file, which is why
+     * this is a flag rather than a second copy of this function.
+     */
+    kind?: "image" | "video";
     baseUrl: string;
     /** Say what happened. Copying is the one action with nothing on screen to
      *  show for it, and silence reads as a menu item that did nothing. */
@@ -109,10 +120,12 @@ export function imageItems({
     const messageId = image.messageId;
     return (
         <>
-            <Item onSelect={() => void copyImage(image.url).then(announce)}>
-                <Copy className="size-3.5" />
-                Copy image
-            </Item>
+            {kind === "image" && (
+                <Item onSelect={() => void copyImage(image.url).then(announce)}>
+                    <Copy className="size-3.5" />
+                    Copy image
+                </Item>
+            )}
             <Item
                 onSelect={() => {
                     void copyText(imageLink(image.url, baseUrl));
@@ -125,7 +138,7 @@ export function imageItems({
             {savable(image.url) && (
                 <Item onSelect={() => downloadFile(image.url, image.name)}>
                     <Download className="size-3.5" />
-                    Download
+                    {kind === "video" ? "Download video" : "Download"}
                 </Item>
             )}
             <Item onSelect={() => window.open(image.url, "_blank", "noopener,noreferrer")}>

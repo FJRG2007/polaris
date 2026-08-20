@@ -25,6 +25,7 @@ import * as core from "@polaris/core";
 import { typingAction } from "./actions";
 import { EmojiPicker } from "./emoji-picker";
 import { ClipDialog } from "./clip-dialog";
+import { VideoPreview } from "@/components/video-preview";
 import { useMicrophones } from "./mic-device";
 import { ScheduleDialog } from "./schedule-dialog";
 import { canRecordClip } from "./clip-recorder";
@@ -49,10 +50,10 @@ import {
     Image as ImageIcon,
     Mic,
     MicOff,
-    MonitorPlay,
     Paperclip,
     SendHorizontal,
     Trash2,
+    Video,
     X
 } from "lucide-react";
 import {
@@ -706,11 +707,11 @@ export function Composer({
                                     type="button"
                                     disabled={disabled || files.length >= rules.maxAttachments}
                                     onClick={() => setClipping(true)}
-                                    aria-label="Record a screen clip"
+                                    aria-label="Record a video clip"
                                     title="Record a clip"
                                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                                 >
-                                    <MonitorPlay className="size-4" />
+                                    <Video className="size-4" />
                                 </button>
                             )}
                             <EmojiPicker
@@ -765,40 +766,32 @@ export function Composer({
                                 >
                                     <SendHorizontal className="size-4" />
                                 </button>
-                                {/* Beside the send button rather than among the
-                                    attachments, because it is the same act at a
-                                    different hour - and dead until there is
-                                    something to send, since "when" is not a
-                                    question about nothing. */}
+                                {/* Beside the send button, because it is the same
+                                    act at a different hour - and dead until
+                                    there is something to send, since "when" is
+                                    not a question about nothing.
+
+                                    A button rather than a menu holding one item:
+                                    a press that only opens a list with a single
+                                    thing on it is a press nobody wanted, and the
+                                    dialog it leads to is where the choosing
+                                    actually happens. */}
                                 {onSchedule && (
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <button
-                                                type="button"
-                                                disabled={
-                                                    disabled ||
-                                                    tooLong ||
-                                                    (blank && files.length === 0)
-                                                }
-                                                aria-label="Send later"
-                                                title="Send later"
-                                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
-                                            >
-                                                <ChevronDown className="size-3.5" />
-                                            </button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuItem
-                                                onSelect={() => {
-                                                    setScheduleError("");
-                                                    setScheduling(true);
-                                                }}
-                                            >
-                                                <CalendarClock className="size-3.5" />
-                                                Schedule message
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
+                                    <button
+                                        type="button"
+                                        disabled={
+                                            disabled || tooLong || (blank && files.length === 0)
+                                        }
+                                        onClick={() => {
+                                            setScheduleError("");
+                                            setScheduling(true);
+                                        }}
+                                        aria-label="Schedule this message"
+                                        title="Send later"
+                                        className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+                                    >
+                                        <CalendarClock className="size-4" />
+                                    </button>
                                 )}
                             </>
                         )}
@@ -937,28 +930,32 @@ function MicButton({ disabled, onStart }: { disabled: boolean; onStart: () => vo
  *
  * A picture is shown as the picture. "screenshot-2026-08-17-at-13-42-08.png" is
  * not a description of anything, and pasting three screenshots in a row is three
- * lines of that - which is how somebody sends the wrong one. Everything else is
- * a chip with its name and size, because that is all there is to say about a
- * spreadsheet.
+ * lines of that - which is how somebody sends the wrong one. A video is shown as
+ * the video, and for a stronger version of the same reason: it was very likely
+ * just recorded, and the one question anybody has about it is whether it caught
+ * the right thing. Everything else is a chip with its name and size, because
+ * that is all there is to say about a spreadsheet.
  *
  * The preview is a blob address made here and given back when the file goes.
  * Leaking one holds the whole file in memory for as long as the tab is open.
  */
 function StagedFile({ file, onRemove }: { file: File; onRemove: () => void }) {
     const [preview, setPreview] = useState<string | null>(null);
+    const type = file.type.split(";")[0]?.trim().toLowerCase() ?? "";
+    const watchable = WATCHABLE.has(type);
 
     useEffect(() => {
         // Only what the browser will actually draw. An SVG is an image and is
         // deliberately not on this list - the same rule the conversation itself
         // applies to a picture somebody uploaded.
-        if (!PREVIEWABLE.has(file.type.split(";")[0]?.trim().toLowerCase() ?? "")) return;
+        if (!PREVIEWABLE.has(type) && !WATCHABLE.has(type)) return;
         const address = URL.createObjectURL(file);
         setPreview(address);
         return () => {
             URL.revokeObjectURL(address);
             setPreview(null);
         };
-    }, [file]);
+    }, [file, type]);
 
     const remove = (
         <button
@@ -987,13 +984,28 @@ function StagedFile({ file, onRemove }: { file: File; onRemove: () => void }) {
 
     return (
         <li className="relative">
-            {/* eslint-disable-next-line @next/next/no-img-element -- a local blob, no loader wanted */}
-            <img
-                src={preview}
-                alt={file.name}
-                title={`${file.name} - ${readableSize(file.size)}`}
-                className="size-20 rounded-md border border-border object-cover"
-            />
+            {watchable ? (
+                // The same player the conversation will draw around it once it is
+                // sent, drawn eagerly here: these bytes are already in this
+                // browser, so there is no request to save by waiting, and
+                // somebody who has just recorded something wants to watch it
+                // back before anybody else does.
+                <VideoPreview
+                    eager
+                    src={preview}
+                    name={file.name}
+                    size={file.size}
+                    className="w-64"
+                />
+            ) : (
+                // eslint-disable-next-line @next/next/no-img-element -- a local blob, no loader wanted
+                <img
+                    src={preview}
+                    alt={file.name}
+                    title={`${file.name} - ${readableSize(file.size)}`}
+                    className="size-20 rounded-md border border-border object-cover"
+                />
+            )}
             <span className="absolute -right-1.5 -top-1.5 rounded-full border border-border bg-elevated shadow-sm">
                 {remove}
             </span>
@@ -1005,6 +1017,12 @@ function StagedFile({ file, onRemove }: { file: File; onRemove: () => void }) {
  *  the conversation draws inline, for the same reason: these are the formats that
  *  are pictures and cannot carry script. */
 const PREVIEWABLE = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"]);
+
+/** What is shown as a video rather than as a name. The same three the
+ *  conversation plays, so what is previewed here is exactly what will play
+ *  there - a file that previewed and then arrived as a download would be worse
+ *  than no preview at all. */
+const WATCHABLE = new Set(["video/mp4", "video/webm", "video/ogg"]);
 
 /** A size somebody can read at a glance. Not the display-format helper: that one
  *  writes dates and money, and a file size is neither. */

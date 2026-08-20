@@ -123,6 +123,7 @@ export function MessageMenu({
     const at = pointed.current;
     const link = at.link;
     const picture = at.image;
+    const clip = at.video;
     const announce = (words: string) => toast.show({ title: words });
     // A recording is the one attachment with no way to save it from the message
     // itself: a picture opens into a viewer that offers it and a document is a
@@ -186,6 +187,24 @@ export function MessageMenu({
                     <>
                         {imageItems({
                             image: picture,
+                            baseUrl,
+                            announce,
+                            Item: ContextMenuItem,
+                            Separator: ContextMenuSeparator
+                        })}
+                        <ContextMenuSeparator />
+                    </>
+                )}
+
+                {/* The same set for a video, less the one item that means
+                    nothing for one. Without it a right-click on a clip offered
+                    the message's own actions and no way at all to keep the
+                    video - which is the thing being right-clicked. */}
+                {clip && (
+                    <>
+                        {imageItems({
+                            kind: "video",
+                            image: clip,
                             baseUrl,
                             announce,
                             Item: ContextMenuItem,

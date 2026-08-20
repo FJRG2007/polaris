@@ -432,6 +432,9 @@ function MomentDialog({
                     kind="video"
                     autoPlay
                     src={`/api/home/clips/${clipId}/video#t=${offsetSeconds}`}
+                    // Without the fragment: what is saved is the clip, not the
+                    // moment somebody was sent to inside it.
+                    download={`/api/home/clips/${clipId}/video`}
                     className="overflow-hidden rounded-md border border-border bg-black"
                 />
             </DialogContent>

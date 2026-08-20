@@ -145,3 +145,47 @@ describe("a picture that is also a link", () => {
         expect(target.image?.url).toBe("/api/chat/links/4/image");
     });
 });
+
+describe("a video in the message", () => {
+    it("is what a right-click on it is about", () => {
+        const { root, at } = row(
+            '<video src="/api/chat/attachments/a1" data-name="screen-clip.webm"></video>'
+        );
+        const target = messageTarget(at("video"), root, BASE);
+        // Named by what the screen knows it is called rather than by an address
+        // ending in an id, which is what a download would otherwise be saved as.
+        expect(target.video).toEqual({
+            url: "/api/chat/attachments/a1",
+            name: "screen-clip.webm"
+        });
+        expect(target.image).toBeNull();
+    });
+
+    it("falls back to something readable when nothing named it", () => {
+        const { root, at } = row('<video src="/api/chat/attachments/a1"></video>');
+        expect(messageTarget(at("video"), root, BASE).video?.name).toBe("Video");
+    });
+
+    it("is found through the player drawn around it", () => {
+        // Every video in Polaris is wrapped by the player, so the pointer is
+        // almost never on the element itself - it is on a control, a progress
+        // bar or the poster. A menu that only looked for `video` would offer
+        // nothing at all for a real right-click.
+        const { root, at } = row(
+            '<div class="plyr plyr--video"><div class="plyr__controls"><button class="plyr__control">Play</button></div><video src="/api/chat/attachments/a2"></video></div>'
+        );
+        const target = messageTarget(at("button"), root, BASE);
+        expect(target.video?.url).toBe("/api/chat/attachments/a2");
+    });
+
+    it("names it by its address, since a video carries no alt text", () => {
+        const { root, at } = row('<video src="/api/chat/attachments/a3/screen-clip.webm"></video>');
+        expect(messageTarget(at("video"), root, BASE).video?.name).toBe("screen-clip.webm");
+    });
+
+    it("is nothing at all when the right-click was elsewhere", () => {
+        const { root, at } = row('<p>hello</p><video src="/api/chat/attachments/a4"></video>');
+        expect(messageTarget(at("p"), root, BASE).video).toBeNull();
+        expect(messageTarget(null, root, BASE)).toEqual(NOTHING);
+    });
+});

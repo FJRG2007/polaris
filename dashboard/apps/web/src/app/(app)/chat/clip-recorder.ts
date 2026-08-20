@@ -90,6 +90,12 @@ export interface ClipSources {
     readonly camera: boolean;
     /** Whether their microphone is mixed in. */
     readonly microphone: boolean;
+    /** Which camera, when there is more than one. Absent means whichever the
+     *  browser hands over, which is right for the machine with one. */
+    readonly cameraId?: string | null;
+    /** Which microphone. Absent follows the choice made for calls and voice
+     *  messages, which is the same headset - see `micConstraints`. */
+    readonly microphoneId?: string | null;
 }
 
 export type ClipStage = "idle" | "starting" | "recording" | "paused" | "ready";
@@ -240,10 +246,25 @@ export function useClipRecorder(options: { maxBytes: number }): ClipRecording {
             if (sources.camera || sources.microphone) {
                 try {
                     parts.camera = await navigator.mediaDevices.getUserMedia({
-                        video: sources.camera ? { width: 640, height: 480 } : false,
+                        video: sources.camera
+                            ? {
+                                  width: 640,
+                                  height: 480,
+                                  // Asked for rather than demanded: a camera that
+                                  // has been unplugged since it was chosen should
+                                  // fall back to another one, not refuse to
+                                  // record.
+                                  ...(sources.cameraId
+                                      ? { deviceId: { ideal: sources.cameraId } }
+                                      : {})
+                              }
+                            : false,
                         // The same cleanup a call uses, so somebody who turned it
-                        // off there is not quietly given it back here.
-                        audio: sources.microphone ? micConstraints() : false
+                        // off there is not quietly given it back here - and the
+                        // same microphone, unless this dialog was told otherwise.
+                        audio: sources.microphone
+                            ? micConstraints(sources.microphoneId ?? undefined)
+                            : false
                     });
                 } catch {
                     // The screen is already being shared and is the point of the

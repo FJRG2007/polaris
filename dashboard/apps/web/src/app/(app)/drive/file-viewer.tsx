@@ -104,7 +104,12 @@ export function FilePreview({
             </div>
         );
     }
-    if (kind === "video" || kind === "audio") return <MediaView src={src} kind={kind} />;
+    if (kind === "video" || kind === "audio") {
+        // The same address the toolbar's own save uses: served as a file rather
+        // than to be played, which is the difference between saving it and
+        // navigating to it.
+        return <MediaView src={src} kind={kind} download={(urlFor ?? driveByteUrl)(target, false)} />;
+    }
     if (kind === "pdf") return <PdfView src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
     if (kind === "sheet")
         return <SheetEditor src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;

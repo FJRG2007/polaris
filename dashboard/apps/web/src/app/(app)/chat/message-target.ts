@@ -47,10 +47,19 @@ export interface ImageTarget {
 export interface MessageTarget {
     readonly link: LinkTarget | null;
     readonly image: ImageTarget | null;
+    /**
+     * A video that is part of the message.
+     *
+     * Its own field rather than folded into `image`, because the two do not
+     * offer the same things: bytes on the clipboard is what "copy image" means
+     * and there is no such gesture for a video. Everything else - the link, the
+     * download, opening it - is the same act on a different file.
+     */
+    readonly video: ImageTarget | null;
 }
 
 /** A right-click on the message itself and nothing in it. */
-export const NOTHING: MessageTarget = { link: null, image: null };
+export const NOTHING: MessageTarget = { link: null, image: null, video: null };
 
 /**
  * Read the gesture.
@@ -72,11 +81,36 @@ export function messageTarget(
     // the kind of item somebody reaches for once and never trusts again.
     const image = from.closest("[data-avatar]") ? null : inside(from.closest("img"));
     const anchor = inside(from.closest("a[href]"));
+    // The player wraps the element in its own chrome, so a right-click usually
+    // lands on a control rather than on the video: the walk goes up to whatever
+    // the player was built around and then back down to the element itself.
+    const player = inside(from.closest(".plyr")) ?? inside(from.closest("video"));
+    const video = player
+        ? player.tagName === "VIDEO"
+            ? player
+            : player.querySelector("video")
+        : null;
 
     return {
         link: anchor ? linkOf(anchor.getAttribute("href"), baseUrl) : null,
-        image: image ? imageOf(image) : null
+        image: image ? imageOf(image) : null,
+        video: video ? videoOf(video) : null
     };
+}
+
+/**
+ * A video, named by the file it is playing.
+ *
+ * There is no alt text on a video, so the name is carried on the element by
+ * whoever drew it - see `MediaPlayer`. Falling back to the address is for a
+ * video written into a message rather than attached to one; falling back again
+ * is for an address that ends in an id, which is most of them.
+ */
+function videoOf(video: Element): ImageTarget | null {
+    const url = video.getAttribute("src")?.trim() ?? "";
+    if (!url) return null;
+    const given = video.getAttribute("data-name")?.trim() ?? "";
+    return { url, name: given || nameIn(url) || "Video" };
 }
 
 function imageOf(image: Element): ImageTarget | null {
