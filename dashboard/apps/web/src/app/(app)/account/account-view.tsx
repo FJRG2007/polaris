@@ -22,7 +22,11 @@ import { MAX_COMPANY_LENGTH, MAX_DESCRIPTION, normalizePersonName } from "@polar
 type Result = { ok?: string; error?: string } | null;
 
 interface Profile {
+    /** What they are called on screen. Not their name and not their handle -
+     *  see `displayNameField`. */
     name: string;
+    firstName: string;
+    lastName: string;
     username: string;
     company: string;
     description: string;
@@ -30,7 +34,14 @@ interface Profile {
 
 /** Compare the way the server stores it, so trailing space or case is not a change. */
 function normalize(profile: Profile): string {
-    return [profile.name.trim(), profile.username.trim().toLowerCase(), profile.company.trim()].join("\n");
+    return [
+        profile.name.trim(),
+        profile.firstName.trim(),
+        profile.lastName.trim(),
+        profile.username.trim().toLowerCase(),
+        profile.company.trim(),
+        profile.description.trim()
+    ].join("\n");
 }
 
 function Feedback({ result }: { result: Result }) {
@@ -56,6 +67,8 @@ function Section({ title, description, children }: { title: string; description:
 
 export function AccountView({
     name,
+    firstName,
+    lastName,
     username,
     company,
     description,
@@ -65,6 +78,8 @@ export function AccountView({
     canSendWhatsApp
 }: {
     name: string;
+    firstName: string;
+    lastName: string;
     username: string;
     company: string;
     description: string;
@@ -79,8 +94,9 @@ export function AccountView({
     const router = useRouter();
     const primary = emails.find((entry) => entry.primary)?.email ?? "";
 
-    const [profile, setProfile] = useState<Profile>({ name, username, company, description });
-    const [saved, setSaved] = useState<Profile>({ name, username, company, description });
+    const stored: Profile = { name, firstName, lastName, username, company, description };
+    const [profile, setProfile] = useState<Profile>(stored);
+    const [saved, setSaved] = useState<Profile>(stored);
     const [profileBusy, setProfileBusy] = useState(false);
     const [profileResult, setProfileResult] = useState<Result>(null);
 
@@ -92,6 +108,8 @@ export function AccountView({
         setProfileResult(null);
         const result = await updateProfileAction({
             name: profile.name,
+            firstName: profile.firstName,
+            lastName: profile.lastName,
             username: profile.username,
             company: profile.company,
             description: profile.description
@@ -106,24 +124,71 @@ export function AccountView({
 
     return (
         <div className="flex flex-col gap-4">
-            <Section title="Profile" description="Your display name, username, and how you sign in.">
+            <Section title="Profile" description="Your name, your username, and how you sign in.">
                 <form onSubmit={onProfile} className="flex flex-col gap-3">
+                    {/* First, because it is the one everybody else sees. It is
+                        neither of the two fields under it: not the name on your
+                        documents, not the handle you sign in with - whatever you
+                        want to be called, left exactly as you typed it. */}
                     <label className="flex flex-col gap-1 text-sm">
-                        Name
+                        Display name
                         <Input
                             value={profile.name}
                             required
-                            autoComplete="name"
-                            autoCapitalize="words"
+                            autoComplete="nickname"
                             autoCorrect="off"
                             spellCheck={false}
                             onChange={(event) => setProfile({ ...profile, name: event.target.value })}
-                            // On blur rather than on every keystroke: normalizing as
-                            // somebody types moves the caret and breaks composing a
-                            // name on an IME. The server normalizes it again.
-                            onBlur={() => setProfile((current) => ({ ...current, name: normalizePersonName(current.name) }))}
                         />
+                        <span className="text-xs text-muted-foreground">
+                            Shown wherever your name appears. It does not have to be your name.
+                        </span>
                     </label>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="flex flex-col gap-1 text-sm">
+                            First name
+                            <Input
+                                value={profile.firstName}
+                                placeholder="Optional"
+                                autoComplete="given-name"
+                                autoCapitalize="words"
+                                autoCorrect="off"
+                                spellCheck={false}
+                                onChange={(event) =>
+                                    setProfile({ ...profile, firstName: event.target.value })
+                                }
+                                // On blur rather than on every keystroke: normalizing as
+                                // somebody types moves the caret and breaks composing a
+                                // name on an IME. The server normalizes it again.
+                                onBlur={() =>
+                                    setProfile((current) => ({
+                                        ...current,
+                                        firstName: normalizePersonName(current.firstName)
+                                    }))
+                                }
+                            />
+                        </label>
+                        <label className="flex flex-col gap-1 text-sm">
+                            Last name
+                            <Input
+                                value={profile.lastName}
+                                placeholder="Optional"
+                                autoComplete="family-name"
+                                autoCapitalize="words"
+                                autoCorrect="off"
+                                spellCheck={false}
+                                onChange={(event) =>
+                                    setProfile({ ...profile, lastName: event.target.value })
+                                }
+                                onBlur={() =>
+                                    setProfile((current) => ({
+                                        ...current,
+                                        lastName: normalizePersonName(current.lastName)
+                                    }))
+                                }
+                            />
+                        </label>
+                    </div>
                     <label className="flex flex-col gap-1 text-sm">
                         Username
                         <Input

@@ -14,6 +14,13 @@ export function avatarUrl(userId: string): string {
     return `/api/avatar/${userId}`;
 }
 
+/** The wide picture across the top of somebody's profile. Answers a transparent
+ *  pixel when they have none, like every other picture route here, so what is
+ *  drawn underneath - a colour taken from their face - shows through. */
+export function bannerUrl(userId: string): string {
+    return `/api/banner/${userId}`;
+}
+
 /** The same for an organization. A separate path rather than a shared one keyed
  *  by id: the two are different tables, and a URL that could mean either would
  *  serve a person's face for an organization's id the day the ids collide. */

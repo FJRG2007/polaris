@@ -20,6 +20,31 @@ export const nameField = z.string().trim().min(1, "Name is required").max(120);
  *  rather than in each form, so the server is the copy that decides. */
 export const personNameField = nameField.transform(normalizePersonName);
 
+/**
+ * What somebody is called on screen, which is not the same question as what
+ * their name is.
+ *
+ * Not run through the name normalizer, and that is the whole difference: a
+ * display name is chosen rather than recorded, so "polaris" is not a mistake to
+ * be corrected into "Polaris" and neither is a name written entirely in lower
+ * case on purpose. Whitespace is still settled - a name with a stray double
+ * space in it is a typo in any language - and that is all.
+ */
+export const displayNameField = z
+    .string()
+    .trim()
+    .min(1, "Display name is required")
+    .max(120, "At most 120 characters")
+    .transform((value) => value.replace(/\s+/g, " "));
+
+/** One half of a person's name. Optional everywhere: an account is usable
+ *  without it, and every account that predates the two fields has neither. */
+export const nameHalfField = z
+    .string()
+    .trim()
+    .max(120, "At most 120 characters")
+    .transform(normalizePersonName);
+
 /** Refuse a password built out of the account it protects. Declared on the object
  *  because a password field cannot see the name and address beside it, and the
  *  same rule runs on the client and again here. */

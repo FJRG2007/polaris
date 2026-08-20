@@ -9,7 +9,7 @@
 
 import { prisma } from "@polaris/db";
 import type { Auth } from "./auth.js";
-import { companyField, descriptionField, normalizePersonName } from "@polaris/core";
+import { companyField, descriptionField, displayNameField, nameHalfField } from "@polaris/core";
 
 /** Read the credential password hash for a user, or null if they have none. */
 async function credentialHash(userId: string): Promise<string | null> {
@@ -28,12 +28,25 @@ async function verifyPassword(auth: Auth, userId: string, password: string): Pro
     return ctx.password.verify({ hash, password });
 }
 
-/** Update a user's own display name, username, company and/or description.
- *  Username must stay unique; the other three are free text and may be cleared. */
+/**
+ * Update a user's own profile: what they are called on screen, the name behind
+ * it, their handle, their company and what they say about themselves.
+ *
+ * The display name and the two halves of a name are treated differently on
+ * purpose. A name is recorded, so it is written the way a name is written
+ * wherever it was typed - a phone capitalizes sentences and not words, and
+ * "rahma" typed on one should not be stored differently from the same name typed
+ * on a laptop. A display name is chosen, so it is left exactly as it was typed:
+ * somebody who writes their name in lower case meant to.
+ *
+ * Username must stay unique; everything else is free text and may be cleared.
+ */
 export async function updateUserProfile(
     userId: string,
     input: {
         name?: string;
+        firstName?: string | null;
+        lastName?: string | null;
         username?: string | null;
         company?: string | null;
         description?: string | null;
@@ -41,16 +54,28 @@ export async function updateUserProfile(
 ): Promise<{ error?: string }> {
     const data: {
         name?: string;
+        firstName?: string | null;
+        lastName?: string | null;
         username?: string | null;
         company?: string | null;
         description?: string;
     } = {};
     if (input.name !== undefined) {
-        // Normalized here rather than only in the form: this is the copy that
+        // Checked here rather than only in the form: this is the copy that
         // decides what is stored, and an API key posting a name never sees a blur.
-        const name = normalizePersonName(input.name);
-        if (!name) return { error: "Name cannot be empty." };
-        data.name = name;
+        const parsed = displayNameField.safeParse(input.name);
+        if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the display name." };
+        data.name = parsed.data;
+    }
+    for (const half of ["firstName", "lastName"] as const) {
+        const value = input[half];
+        if (value === undefined) continue;
+        const parsed = nameHalfField.safeParse(value ?? "");
+        if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the name." };
+        // Null rather than empty: an unset half of a name is a column with
+        // nothing in it, and "" would make an account that cleared it look
+        // different from every account that never had one.
+        data[half] = parsed.data || null;
     }
     if (input.username !== undefined) {
         const username = input.username?.trim().toLowerCase() || null;

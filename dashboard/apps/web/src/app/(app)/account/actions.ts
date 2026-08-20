@@ -73,6 +73,8 @@ async function changesUsername(userId: string, username: string | null | undefin
 
 export async function updateProfileAction(input: {
     name?: string;
+    firstName?: string | null;
+    lastName?: string | null;
     username?: string | null;
     company?: string | null;
     description?: string | null;
@@ -84,6 +86,8 @@ export async function updateProfileAction(input: {
     }
     const result = await updateUserProfile(user.id, {
         name: typeof input.name === "string" ? input.name : undefined,
+        firstName: input.firstName === undefined ? undefined : (input.firstName ?? ""),
+        lastName: input.lastName === undefined ? undefined : (input.lastName ?? ""),
         username: input.username === undefined ? undefined : (input.username ?? ""),
         company: input.company === undefined ? undefined : (input.company ?? ""),
         description: input.description === undefined ? undefined : (input.description ?? "")

@@ -41,7 +41,8 @@ export interface AvatarPerson {
 }
 
 /**
- * The colour behind somebody's initials.
+ * The colour behind somebody's initials, and the fallback for the band across
+ * their profile.
  *
  * Everybody used to get `bg-muted`, which is a surface token: hue 225, so a
  * whole column of faces came out the same faint blue and read as a UI element
@@ -57,8 +58,12 @@ export interface AvatarPerson {
  * Fixed values rather than tokens because they must not move with the theme: the
  * initials are white on this in both, and a background that lightened for the
  * light theme would take the contrast with it.
+ *
+ * Exported because a profile with no banner falls back to it - somebody whose
+ * face is initials should not get a band in a colour they are not associated
+ * with anywhere else. See `ProfileBanner`.
  */
-function tintFor(id: string): string {
+export function tintFor(id: string): string {
     let hash = 0;
     for (let index = 0; index < id.length; index += 1) {
         hash = (hash * 31 + id.charCodeAt(index)) >>> 0;

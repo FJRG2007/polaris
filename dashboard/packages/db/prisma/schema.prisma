@@ -33,7 +33,17 @@ datasource db {
 
 model User {
     id            String   @id @default(uuid(7)) @db.Uuid
+    // What this account is called wherever it appears. better-auth owns this
+    // column, so it keeps its name - but it is a chosen label rather than a
+    // person's name: it need not be what their passport says and it need not
+    // resemble their username. The two columns below are the name.
     name          String
+    // Their name, in the two halves every form on earth asks for. Both optional
+    // because every account that existed before them has neither, and nothing
+    // here may stop working for one: `name` is what gets drawn, and these are
+    // what somebody is actually called.
+    firstName     String?
+    lastName      String?
     email         String   @unique
     // Unique handle; sign-in accepts either this or the email.
     username      String?  @unique
@@ -149,6 +159,7 @@ model User {
     emails              UserEmail[]
     phone               UserPhone?
     avatar              UserAvatar?
+    banner              UserBanner?
     emailVerifications  EmailVerification[]
     passkeys            Passkey[]
     notifyDestinations  NotificationDestination[]
@@ -380,6 +391,25 @@ model UserAvatar {
     path         String
     mime         String
     // Bytes. Capped at upload, so an Int is enough and stays JSON-safe.
+    size         Int      @default(0)
+    updatedAt    DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// The wide picture across the top of somebody's profile. Kept exactly like the
+// photo above - same storages, same one-row-replaces-the-last rule - and a
+// separate table rather than two more columns on that one because they are two
+// pictures with two lifetimes: taking your photo down is not taking your banner
+// down, and a row that had to describe both would need every column twice.
+//
+// An account with no row is not missing anything: the profile draws a colour
+// worked out from the face above it, which is what almost everybody will have.
+model UserBanner {
+    userId       String   @id @db.Uuid
+    connectionId String?
+    path         String
+    mime         String
     size         Int      @default(0)
     updatedAt    DateTime @updatedAt
 

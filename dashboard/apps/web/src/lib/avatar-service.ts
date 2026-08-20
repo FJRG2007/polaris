@@ -133,6 +133,16 @@ export async function setAvatarSettings(input: { target: string; gravatar: boole
  */
 export type AvatarOwner =
     | { readonly kind: "user"; readonly id: string }
+    /**
+     * The wide picture across the top of one person's profile.
+     *
+     * The same owner as `user` and a different picture, which is why it is a
+     * kind rather than a flag: everything about keeping it - the storage the
+     * instance chose, the formats, the one-row-replaces-the-last rule, the
+     * deletion of the file the row used to name - is the same, and only the
+     * table it lands in differs.
+     */
+    | { readonly kind: "banner"; readonly id: string }
     | { readonly kind: "org"; readonly id: string }
     /** A chat space - what a Discord server calls its icon. */
     | { readonly kind: "space"; readonly id: string }
@@ -148,6 +158,7 @@ interface AvatarRow {
 
 async function readRow(owner: AvatarOwner): Promise<AvatarRow | null> {
     if (owner.kind === "user") return prisma.userAvatar.findUnique({ where: { userId: owner.id } });
+    if (owner.kind === "banner") return prisma.userBanner.findUnique({ where: { userId: owner.id } });
     if (owner.kind === "org") {
         return prisma.organizationAvatar.findUnique({ where: { orgId: owner.id } });
     }
@@ -201,6 +212,12 @@ export async function storeAvatar(owner: AvatarOwner, bytes: Uint8Array, mime: s
             create: { userId: owner.id, ...stored },
             update: stored
         });
+    } else if (owner.kind === "banner") {
+        await prisma.userBanner.upsert({
+            where: { userId: owner.id },
+            create: { userId: owner.id, ...stored },
+            update: stored
+        });
     } else if (owner.kind === "org") {
         await prisma.organizationAvatar.upsert({
             where: { orgId: owner.id },
@@ -230,6 +247,7 @@ export async function deleteAvatar(owner: AvatarOwner): Promise<void> {
     const existing = await readRow(owner);
     if (!existing) return;
     if (owner.kind === "user") await prisma.userAvatar.delete({ where: { userId: owner.id } });
+    else if (owner.kind === "banner") await prisma.userBanner.delete({ where: { userId: owner.id } });
     else if (owner.kind === "org") {
         await prisma.organizationAvatar.delete({ where: { orgId: owner.id } });
     } else if (owner.kind === "space") {
@@ -476,6 +494,18 @@ export async function resolveAvatar(userId: string): Promise<AvatarAnswer> {
         picture: image ? { etag: image.etag, mime: image.mime, load: async () => image.bytes } : null,
         certain
     };
+}
+
+/**
+ * The banner on somebody's profile, or null when they have not put one up.
+ *
+ * Null is the ordinary answer rather than a failure, and it is most accounts:
+ * what the profile draws instead is a colour taken from the face above it, which
+ * is a banner nobody had to choose. There is nothing to fall through to here -
+ * Gravatar has no banner - so this is the row or nothing.
+ */
+export async function resolveBanner(userId: string): Promise<AvatarRef | null> {
+    return uploadedAvatar({ kind: "banner", id: userId });
 }
 
 /**

@@ -20,10 +20,20 @@ import { Button, Card, CardBody } from "@polaris/ui";
 import { Loader2, Trash2, Upload } from "lucide-react";
 import { Avatar, OrgAvatar } from "@/components/avatar";
 import { useRef, useState, type ReactNode } from "react";
-import { avatarUrl, orgAvatarUrl } from "@/lib/avatar-url";
+import { ProfileBanner } from "@/components/profile-banner";
+import { avatarUrl, bannerUrl, orgAvatarUrl } from "@/lib/avatar-url";
 
 /** Big enough for the largest place a face is drawn, small enough to be free. */
 const MAX_EDGE = 512;
+
+/** The widest a banner is stored at. Wider than anywhere it is drawn, so it
+ *  still looks right on a screen that draws it big, and far short of what a
+ *  camera hands you. */
+const MAX_BANNER_WIDTH = 1200;
+
+/** How much wider than tall a banner is. The band across a profile, at the
+ *  proportions every client that has one settled on. */
+const BANNER_RATIO = 3;
 
 const ACCEPTED = "image/png,image/jpeg,image/webp,image/gif";
 
@@ -52,13 +62,55 @@ async function toSquare(file: File): Promise<Blob> {
     }
 }
 
+/**
+ * The picture as a band, cropped to the middle of whatever was handed over.
+ *
+ * Cropped rather than squashed, like the square above: a banner is drawn at one
+ * shape wherever it appears, so a tall photograph letterboxed to fit would be
+ * drawn stretched anyway. Taking the middle is the crop that is right most
+ * often - it is where the thing in a picture usually is.
+ */
+async function toBand(file: File): Promise<Blob> {
+    const bitmap = await createImageBitmap(file);
+    try {
+        // The widest band this picture can fill, then the tallest slice of the
+        // picture that fits it.
+        const width = Math.min(bitmap.width, MAX_BANNER_WIDTH);
+        const height = Math.round(width / BANNER_RATIO);
+        const sourceHeight = Math.min(bitmap.height, Math.round(bitmap.width / BANNER_RATIO));
+        const sourceWidth = Math.round(sourceHeight * BANNER_RATIO);
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("This browser cannot resize the image");
+        context.drawImage(
+            bitmap,
+            (bitmap.width - sourceWidth) / 2,
+            (bitmap.height - sourceHeight) / 2,
+            sourceWidth,
+            sourceHeight,
+            0,
+            0,
+            width,
+            height
+        );
+        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.9));
+        if (!blob) throw new Error("This browser cannot resize the image");
+        return blob;
+    } finally {
+        bitmap.close();
+    }
+}
+
 function PhotoCard({
     title,
     hint,
     preview,
     endpoint,
     pictureUrl,
-    hasPhoto
+    hasPhoto,
+    shape = "square"
 }: {
     title: string;
     hint: string;
@@ -69,6 +121,10 @@ function PhotoCard({
      *  the browser's cache before the page is drawn again from it. */
     pictureUrl: string;
     hasPhoto: boolean;
+    /** What the picture is cropped to before it is sent, and how the card is
+     *  laid out: a face is a square beside its buttons, a band is a band with
+     *  its buttons underneath. */
+    shape?: "square" | "band";
 }) {
     const input = useRef<HTMLInputElement>(null);
     const [busy, setBusy] = useState(false);
@@ -101,7 +157,7 @@ function PhotoCard({
     const upload = async (file: File) => {
         let body: Blob;
         try {
-            body = await toSquare(file);
+            body = shape === "band" ? await toBand(file) : await toSquare(file);
         } catch {
             setError("That file could not be read as an image");
             return;
@@ -116,7 +172,7 @@ function PhotoCard({
                     <h2 className="text-sm font-medium">{title}</h2>
                     <p className="text-xs text-muted-foreground">{hint}</p>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className={shape === "band" ? "flex flex-col gap-3" : "flex items-center gap-4"}>
                     {preview}
                     <div className="flex flex-wrap items-center gap-2">
                         <input
@@ -163,6 +219,33 @@ export function AvatarCard({ userId, name, hasPhoto }: { userId: string; name: s
             endpoint="/api/avatar"
             pictureUrl={avatarUrl(userId)}
             hasPhoto={hasPhoto}
+        />
+    );
+}
+
+export function BannerCard({
+    userId,
+    name,
+    hasBanner
+}: {
+    userId: string;
+    name: string;
+    hasBanner: boolean;
+}) {
+    return (
+        <PhotoCard
+            shape="band"
+            title="Banner"
+            hint="The band across the top of your profile. Without one, Polaris uses a colour taken from your photo."
+            preview={
+                <ProfileBanner
+                    person={{ id: userId, name }}
+                    className="h-24 rounded-md ring-1 ring-border"
+                />
+            }
+            endpoint="/api/banner"
+            pictureUrl={bannerUrl(userId)}
+            hasPhoto={hasBanner}
         />
     );
 }
