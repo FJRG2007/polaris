@@ -16,6 +16,7 @@
 
 import { useSessionScope } from "@/components/session-scope";
 import type { NotificationView } from "@/lib/notification-service";
+import { claimForDevice } from "@/lib/device-once";
 import { openPeerChannel, subscribeSharedStream, type PeerChannel } from "@/lib/shared-stream";
 import { hasNewArrival, notificationSoundEnabled, playNotificationSound } from "@/lib/notification-sound";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -88,18 +89,26 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
 
     useEffect(
         () =>
-            subscribeSharedStream(STREAM_PATH, scope, ({ data, owner }) => {
+            subscribeSharedStream(STREAM_PATH, scope, ({ data }) => {
                 if (inFlight.current > 0 || Date.now() < peerWriteUntil.current) return;
                 try {
                     const payload = JSON.parse(data) as { items?: NotificationView[] };
                     if (!Array.isArray(payload.items)) return;
                     // Every tab records what it has seen, so the one that ends up
                     // holding the connection later does not chime for a backlog it
-                    // was already showing. Only the tab that took the frame off the
-                    // wire is allowed to make the sound, which is what keeps a
-                    // device with four windows open from chiming four times.
+                    // was already showing.
                     const arrived = hasNewArrival(seen.current, payload.items);
-                    if (arrived && owner && notificationSoundEnabled()) playNotificationSound();
+                    // The chime belongs to the machine, not to the tab, so the
+                    // tabs settle between themselves which of them makes it -
+                    // four windows are one sound. It is claimed rather than left
+                    // to whichever tab holds the connection, because on an
+                    // install served over plain http every tab holds one of its
+                    // own; see `device-once`.
+                    if (arrived && notificationSoundEnabled()) {
+                        void claimForDevice(`${scope}:notification-chime`).then((mine) => {
+                            if (mine) playNotificationSound();
+                        });
+                    }
                     setItems(payload.items);
                 } catch {
                     // A malformed frame is not worth recovering from; the next tick resends the state.

@@ -27,6 +27,7 @@ import { useSessionScope } from "./session-scope";
 import { useHeldCall } from "@/app/(app)/chat/call-hold";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
+import { claimForDevice } from "@/lib/device-once";
 import { notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
 import { openPeerChannel, type PeerChannel } from "@/lib/shared-stream";
 import { RING_FOR_MS, playCallSound, startRinging } from "@/lib/call-sounds";
@@ -42,10 +43,6 @@ interface Ringing {
      *  face is recognised, which is the whole of what somebody deciding whether
      *  to answer is doing. */
     readonly userId: string;
-    /** Whether this tab is the one holding the live connection. The sound and
-     *  the notice the operating system draws belong to the device, so only that
-     *  tab makes them - five open tabs are still one ringing telephone. */
-    readonly owner: boolean;
     readonly at: number;
 }
 
@@ -106,7 +103,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
 
     useChatStream(
         useCallback(
-            (frame, context) => {
+            (frame) => {
                 if (frame.kind !== "call") return;
                 if (frame.state === "ringing") {
                     // Your own call. The frame is addressed to the conversation,
@@ -123,7 +120,6 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                                       meetingId: frame.meetingId,
                                       name: frame.name,
                                       userId: frame.userId,
-                                      owner: context.owner,
                                       at: Date.now()
                                   }
                               ]
@@ -165,14 +161,34 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
     /**
      * One ring for however many are waiting, and silence once none are.
      *
-     * Only the tab holding the connection: the others are the same browser, and
-     * a telephone that rings once per open tab is a telephone people mute.
+     * One ring for however many tabs, too. The tabs of a browser settle between
+     * themselves which of them rings a given call and the rest stay silent - a
+     * telephone that rings once per open tab is a telephone people mute. It is
+     * settled by claim rather than by which tab holds the live connection,
+     * because on an install served over plain http every tab holds one of its
+     * own and so every tab believes it is the one; see `device-once`.
+     *
+     * The claim is held for as long as the call is allowed to ring, so a tab
+     * opened halfway through does not join in, and it is remembered here so that
+     * a re-render deciding to ring the same call again asks nobody a second time.
      */
-    const sounding = showing.some((entry) => entry.owner);
+    const sounding = showing[0]?.meetingId ?? null;
+    const mine = useRef(new Map<string, Promise<boolean>>());
     useEffect(() => {
         if (!sounding) return;
-        return startRinging("ring");
-    }, [sounding]);
+        const claim =
+            mine.current.get(sounding) ?? claimForDevice(`${scope}:ring:${sounding}`, RING_FOR_MS);
+        mine.current.set(sounding, claim);
+        let stop: (() => void) | null = null;
+        let dropped = false;
+        void claim.then((ours) => {
+            if (ours && !dropped) stop = startRinging("ring");
+        });
+        return () => {
+            dropped = true;
+            stop?.();
+        };
+    }, [scope, sounding]);
 
     /**
      * Reach past the browser window.
@@ -182,26 +198,31 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
      * exists inside a page nobody is looking at is a missed call. This is the
      * one thing a browser has that the operating system draws.
      *
-     * Only while the tab is unwatched, only from the tab holding the connection,
-     * and taken back the moment the call is answered or gives up - a notice
-     * offering to join a room that is already over is worse than none.
+     * Only while the tab is unwatched, once for the device however many tabs it
+     * has open, and taken back the moment the call is answered or gives up - a
+     * notice offering to join a room that is already over is worse than none.
      */
     const notices = useRef(new Map<string, { close: () => void }>());
     useEffect(() => {
         for (const entry of showing) {
-            if (!entry.owner || notices.current.has(entry.meetingId) || tabIsWatched()) continue;
-            // Marked before the permission prompt resolves, so a second frame
-            // does not raise a second notice for the same call.
+            if (notices.current.has(entry.meetingId) || tabIsWatched()) continue;
+            // Marked before the claim and the permission prompt resolve, so a
+            // second frame does not raise a second notice for the same call.
             notices.current.set(entry.meetingId, { close: () => undefined });
-            void notifyDesktop({
-                title: `${entry.name || "Somebody"} is calling`,
-                body: "Answer in Polaris",
-                tag: `call:${entry.meetingId}`,
-                href: `/chat/c/${entry.channelId}`,
-                insistent: true
-            }).then((notice) => {
-                if (notice) notices.current.set(entry.meetingId, notice);
-            });
+            void claimForDevice(`${scope}:call-notice:${entry.meetingId}`, RING_FOR_MS).then(
+                (ours) => {
+                    if (!ours) return;
+                    return notifyDesktop({
+                        title: `${entry.name || "Somebody"} is calling`,
+                        body: "Answer in Polaris",
+                        tag: `call:${entry.meetingId}`,
+                        href: `/chat/c/${entry.channelId}`,
+                        insistent: true
+                    }).then((notice) => {
+                        if (notice) notices.current.set(entry.meetingId, notice);
+                    });
+                }
+            );
         }
 
         const live = new Set(showing.map((entry) => entry.meetingId));
@@ -210,7 +231,13 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
             notice.close();
             notices.current.delete(meetingId);
         }
-    }, [showing]);
+        // The same for what this tab decided about ringing each of them: a call
+        // that is over is not one anybody asks about again, and a browser left
+        // open for a week would otherwise keep every answer it ever gave.
+        for (const meetingId of mine.current.keys()) {
+            if (!live.has(meetingId)) mine.current.delete(meetingId);
+        }
+    }, [scope, showing]);
 
     // Nothing outlives the screen: a notice left behind by a page that has gone
     // is one nobody can dismiss from inside Polaris.

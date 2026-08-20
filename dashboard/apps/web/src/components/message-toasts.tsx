@@ -29,6 +29,8 @@ import { useCallback, useEffect, useRef } from "react";
 import { messageToastsAction } from "@/app/(app)/chat/actions";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
 import { playCallSound } from "@/lib/call-sounds";
+import { claimForDevice } from "@/lib/device-once";
+import { useSessionScope } from "@/components/session-scope";
 import { notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
 
 /** How long the words wait for more of them before being fetched. A burst of
@@ -39,6 +41,7 @@ export function MessageToasts() {
     const router = useRouter();
     const pathname = usePathname();
     const toast = useToast();
+    const scope = useSessionScope();
 
     // Held in refs because the stream subscription is set up once: a callback
     // rebuilt on every navigation would tear the subscription down with it.
@@ -51,7 +54,8 @@ export function MessageToasts() {
 
     const pending = useRef(new Set<string>());
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const owner = useRef(false);
+    const device = useRef(scope);
+    device.current = scope;
 
     const flush = useCallback(async () => {
         const asked = [...pending.current];
@@ -85,22 +89,31 @@ export function MessageToasts() {
             // Heard, not only seen. A silent card in the corner of a screen
             // somebody is typing on is a message they find later; every
             // messenger makes a noise for the same reason. Once for the batch,
-            // and only from the tab holding the connection - five tabs are one
-            // notification.
-            if (owner.current && !sounded) {
+            // and once for the device rather than once per open tab - the tabs
+            // settle between themselves which of them makes it, because on an
+            // install served over plain http they all believe they hold the
+            // connection; see `device-once`.
+            if (!sounded) {
                 sounded = true;
-                playCallSound("message");
+                void claimForDevice(`${device.current}:message-chime`).then((mine) => {
+                    if (mine) playCallSound("message");
+                });
             }
 
-            // Past the window as well, when nobody is looking at it - and only
-            // from the tab holding the connection, so one device draws one.
-            if (owner.current && !tabIsWatched()) {
-                void notifyDesktop({
-                    title: who,
-                    body: message.excerpt,
-                    tag: `message:${message.channelId}`,
-                    href: `/chat/c/${message.channelId}/${message.messageId}`
-                });
+            // Past the window as well, when nobody is looking at it, and drawn
+            // once however many tabs this browser has open on it.
+            if (!tabIsWatched()) {
+                void claimForDevice(`${device.current}:message-notice:${message.channelId}`).then(
+                    (mine) => {
+                        if (!mine) return;
+                        void notifyDesktop({
+                            title: who,
+                            body: message.excerpt,
+                            tag: `message:${message.channelId}`,
+                            href: `/chat/c/${message.channelId}/${message.messageId}`
+                        });
+                    }
+                );
             }
         }
     }, []);
@@ -113,7 +126,6 @@ export function MessageToasts() {
                 // connection has nobody to tell and nothing to draw.
                 if (!context.owner && !tabIsWatched()) return;
 
-                owner.current = context.owner;
                 for (const channelId of frame.channels) {
                     if (here.current.startsWith(`/chat/c/${channelId}`)) continue;
                     pending.current.add(channelId);
