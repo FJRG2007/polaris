@@ -1642,8 +1642,12 @@ export function ChannelView({
             {channel.kind === "dm" && !thread && !searching && (
                 <DirectProfile
                     person={channel.others[0] ?? null}
+                    channel={channel}
                     open={members.open}
                     onOpenChange={members.setOpen}
+                    onMention={(text) =>
+                        setInserting((current) => ({ token: (current?.token ?? 0) + 1, text }))
+                    }
                 />
             )}
 

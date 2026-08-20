@@ -38,7 +38,7 @@ import * as actions from "./actions";
 import { useChat } from "./chat-context";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
-import { useState, type ReactNode } from "react";
+import { useState, type ComponentType, type ReactNode } from "react";
 import { setVolumeFor, volumeFor } from "./call-volumes";
 import { memberActions } from "./member-actions";
 import { useOpenDirect } from "./use-open-direct";
@@ -68,6 +68,15 @@ import {
     ContextMenuSubContent,
     ContextMenuSubTrigger,
     ContextMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
+    DropdownMenuTrigger,
     keepFocusOnClose
 } from "@polaris/ui";
 
@@ -106,6 +115,66 @@ function mentionOf(member: MenuPerson): string {
     return `[${member.name.replace(/[[\]]/g, "").trim() || "Somebody"}](polaris:user/${member.userId})`;
 }
 
+/**
+ * The pieces the menu is built out of, so the same items can be reached two
+ * ways.
+ *
+ * A right-click is how you get at somebody in a list of two hundred; a button is
+ * how you get at the one person a screen is already about, where there is
+ * nothing to right-click and no reason to guess that you could. Both are the
+ * same menu - the same items, the same rules about which of them apply - and
+ * writing it twice is how the two drift until the profile panel is missing the
+ * item somebody uses.
+ *
+ * The two primitive sets are the same component library over the same Radix
+ * menu, which is why this is a swap of parts rather than a second component.
+ */
+interface MenuParts {
+    readonly Root: ComponentType<{ children: ReactNode }>;
+    readonly Trigger: ComponentType<{ asChild?: boolean; children: ReactNode }>;
+    readonly Content: ComponentType<{
+        className?: string;
+        align?: "start" | "center" | "end";
+        onCloseAutoFocus?: (event: Event) => void;
+        children: ReactNode;
+    }>;
+    readonly Item: ComponentType<{
+        disabled?: boolean;
+        onSelect?: (event: Event) => void;
+        variant?: "default" | "danger";
+        children: ReactNode;
+    }>;
+    readonly Label: ComponentType<{ className?: string; children: ReactNode }>;
+    readonly Separator: ComponentType<Record<string, never>>;
+    readonly Sub: ComponentType<{ children: ReactNode }>;
+    readonly SubTrigger: ComponentType<{ children: ReactNode }>;
+    readonly SubContent: ComponentType<{ className?: string; children: ReactNode }>;
+}
+
+const RIGHT_CLICK = {
+    Root: ContextMenu,
+    Trigger: ContextMenuTrigger,
+    Content: ContextMenuContent,
+    Item: ContextMenuItem,
+    Label: ContextMenuLabel,
+    Separator: ContextMenuSeparator,
+    Sub: ContextMenuSub,
+    SubTrigger: ContextMenuSubTrigger,
+    SubContent: ContextMenuSubContent
+} as unknown as MenuParts;
+
+const PRESS = {
+    Root: DropdownMenu,
+    Trigger: DropdownMenuTrigger,
+    Content: DropdownMenuContent,
+    Item: DropdownMenuItem,
+    Label: DropdownMenuLabel,
+    Separator: DropdownMenuSeparator,
+    Sub: DropdownMenuSub,
+    SubTrigger: DropdownMenuSubTrigger,
+    SubContent: DropdownMenuSubContent
+} as unknown as MenuParts;
+
 export function MemberMenu({
     member,
     channel,
@@ -114,6 +183,7 @@ export function MemberMenu({
     onNickname,
     onChanged,
     onError,
+    openWith = "right-click",
     children
 }: {
     member: MenuPerson;
@@ -129,8 +199,13 @@ export function MemberMenu({
     onNickname: (member: MenuPerson) => void;
     onChanged: () => void;
     onError: (message: string) => void;
+    /** How the menu is opened. A right-click on whatever the children draw, or a
+     *  press on it - which is what a screen already about one person offers,
+     *  since there is no list there to right-click along. */
+    openWith?: "right-click" | "press";
     children: ReactNode;
 }) {
+    const menu = openWith === "press" ? PRESS : RIGHT_CLICK;
     const router = useRouter();
     const { spaces, blocked, refresh } = useChat();
     const [busy, setBusy] = useState(false);
@@ -185,16 +260,22 @@ export function MemberMenu({
     const working = busy || direct.busy;
 
     return (
-        <ContextMenu>
-            <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+        <menu.Root>
+            <menu.Trigger asChild>{children}</menu.Trigger>
             {/* Focus is not handed back to whatever was right-clicked. Mention
                 puts the caret in the composer, and the hand-back landed a beat
                 later and took it straight out again - which read as a mention
                 that dropped the name in and then refused to let anybody finish
                 the sentence. */}
-            <ContextMenuContent className="w-56" onCloseAutoFocus={keepFocusOnClose}>
-                <ContextMenuLabel className="truncate">{member.name}</ContextMenuLabel>
-                <ContextMenuSeparator />
+            <menu.Content
+                className="w-56"
+                // Only ever read by the pressed menu: a right-click menu is
+                // placed where the pointer was, and has nothing to align to.
+                align={openWith === "press" ? "end" : undefined}
+                onCloseAutoFocus={keepFocusOnClose}
+            >
+                <menu.Label className="truncate">{member.name}</menu.Label>
+                <menu.Separator />
 
                 {!you && (
                     <>
@@ -209,18 +290,18 @@ export function MemberMenu({
                             further down. */}
                         {!shut && (
                             <>
-                                <ContextMenuItem
+                                <menu.Item
                                     disabled={working}
                                     onSelect={() => void direct.open(member.userId)}
                                 >
                                     <MessageSquare className="size-3.5" />
                                     Message
-                                </ContextMenuItem>
+                                </menu.Item>
                                 {/* The same conversation, arriving with the call
                                     already starting. The address is what carries
                                     that, the way answering a call from outside a
                                     conversation does. */}
-                                <ContextMenuItem
+                                <menu.Item
                                     disabled={working}
                                     onSelect={() =>
                                         void direct.open(member.userId, (id) =>
@@ -230,24 +311,24 @@ export function MemberMenu({
                                 >
                                     <Phone className="size-3.5" />
                                     Call
-                                </ContextMenuItem>
+                                </menu.Item>
                                 {onMention && (
-                                    <ContextMenuItem
+                                    <menu.Item
                                         onSelect={() => onMention(mentionOf(member))}
                                     >
                                         <AtSign className="size-3.5" />
                                         Mention
-                                    </ContextMenuItem>
+                                    </menu.Item>
                                 )}
                             </>
                         )}
-                        <ContextMenuItem onSelect={() => onNickname(member)}>
+                        <menu.Item onSelect={() => onNickname(member)}>
                             <PenLine className="size-3.5" />
                             Change nickname
-                        </ContextMenuItem>
+                        </menu.Item>
                         {/* Yours alone. Nobody is told, because it is a decision
                             about a pair of ears - see `call-volumes`. */}
-                        <ContextMenuItem
+                        <menu.Item
                             onSelect={() => {
                                 setVolumeFor(member.userId, silenced ? 1 : 0);
                                 setSilenced(!silenced);
@@ -259,26 +340,26 @@ export function MemberMenu({
                                 <VolumeX className="size-3.5" />
                             )}
                             {silenced ? "Let them through" : "Silence them for you"}
-                        </ContextMenuItem>
+                        </menu.Item>
 
                         {/* Shown even when it can do nothing, and that is
                             deliberate: somebody who administers no server needs
                             to be told that is why, not left looking for a menu
                             item that is not there. */}
                         {invitable.length === 0 ? (
-                            <ContextMenuItem disabled>
+                            <menu.Item disabled>
                                 <UserPlus className="size-3.5" />
                                 No server to invite them to
-                            </ContextMenuItem>
+                            </menu.Item>
                         ) : (
-                            <ContextMenuSub>
-                                <ContextMenuSubTrigger>
+                            <menu.Sub>
+                                <menu.SubTrigger>
                                     <UserPlus className="size-3.5" />
                                     Invite to a server
-                                </ContextMenuSubTrigger>
-                                <ContextMenuSubContent className="max-h-72 overflow-y-auto">
+                                </menu.SubTrigger>
+                                <menu.SubContent className="max-h-72 overflow-y-auto">
                                     {invitable.map((entry) => (
-                                        <ContextMenuItem
+                                        <menu.Item
                                             key={entry.id}
                                             disabled={working}
                                             onSelect={() =>
@@ -291,19 +372,19 @@ export function MemberMenu({
                                             }
                                         >
                                             <span className="truncate" title={entry.name}>{entry.name}</span>
-                                        </ContextMenuItem>
+                                        </menu.Item>
                                     ))}
-                                </ContextMenuSubContent>
-                            </ContextMenuSub>
+                                </menu.SubContent>
+                            </menu.Sub>
                         )}
 
-                        <ContextMenuSeparator />
+                        <menu.Separator />
                         {/* Last in the group of things you do about a person,
                             because it is the heaviest of them and because it is
                             the one that should not be next to Message. Not in
                             the moderation group below it either: that is a room
                             deciding something, and this is not. */}
-                        <ContextMenuItem
+                        <menu.Item
                             disabled={working}
                             onSelect={() => void toggleBlock()}
                         >
@@ -311,16 +392,16 @@ export function MemberMenu({
                             <span className={shut ? undefined : "text-danger"}>
                                 {shut ? "Unblock" : "Block"}
                             </span>
-                        </ContextMenuItem>
+                        </menu.Item>
                     </>
                 )}
 
                 {may.transfer && (
                     <>
-                        <ContextMenuSeparator />
+                        <menu.Separator />
                         {/* A group that cannot be handed over is a group that
                             dies with an account. */}
-                        <ContextMenuItem
+                        <menu.Item
                             disabled={working}
                             onSelect={() =>
                                 void run(() =>
@@ -330,21 +411,21 @@ export function MemberMenu({
                         >
                             <Crown className="size-3.5" />
                             Make them the owner
-                        </ContextMenuItem>
+                        </menu.Item>
                     </>
                 )}
 
                 {may.moderate && (
                     <>
-                        <ContextMenuSeparator />
-                        <ContextMenuSub>
-                            <ContextMenuSubTrigger>
+                        <menu.Separator />
+                        <menu.Sub>
+                            <menu.SubTrigger>
                                 <Timer className="size-3.5" />
                                 Time out
-                            </ContextMenuSubTrigger>
-                            <ContextMenuSubContent>
+                            </menu.SubTrigger>
+                            <menu.SubContent>
                                 {TIMEOUTS.map((choice) => (
-                                    <ContextMenuItem
+                                    <menu.Item
                                         key={choice.minutes}
                                         disabled={working}
                                         onSelect={() =>
@@ -360,10 +441,10 @@ export function MemberMenu({
                                         }
                                     >
                                         For {choice.label}
-                                    </ContextMenuItem>
+                                    </menu.Item>
                                 ))}
-                                <ContextMenuSeparator />
-                                <ContextMenuItem
+                                <menu.Separator />
+                                <menu.Item
                                     disabled={working}
                                     onSelect={() =>
                                         void run(() =>
@@ -376,11 +457,11 @@ export function MemberMenu({
                                     }
                                 >
                                     Let them speak again
-                                </ContextMenuItem>
-                            </ContextMenuSubContent>
-                        </ContextMenuSub>
+                                </menu.Item>
+                            </menu.SubContent>
+                        </menu.Sub>
 
-                        <ContextMenuItem
+                        <menu.Item
                             disabled={working}
                             onSelect={() =>
                                 void run(() =>
@@ -395,11 +476,11 @@ export function MemberMenu({
                         >
                             <UserMinus className="size-3.5" />
                             {space ? "Remove from the server" : "Remove from the group"}
-                        </ContextMenuItem>
+                        </menu.Item>
 
                         {/* Only a space. See `memberActions`. */}
                         {may.ban && space && (
-                            <ContextMenuItem
+                            <menu.Item
                                 disabled={working}
                                 onSelect={() =>
                                     void run(() =>
@@ -409,11 +490,11 @@ export function MemberMenu({
                             >
                                 <Ban className="size-3.5 text-danger" />
                                 <span className="text-danger">Ban from the server</span>
-                            </ContextMenuItem>
+                            </menu.Item>
                         )}
                     </>
                 )}
-            </ContextMenuContent>
-        </ContextMenu>
+            </menu.Content>
+        </menu.Root>
     );
 }
