@@ -124,6 +124,28 @@ export async function authorizeWorker(request: Request): Promise<{ ownerId: stri
 }
 
 /**
+ * How the worker reaches one of Home's own containers.
+ *
+ * Every address a worker is given goes through here, and it is one function
+ * rather than a choice made at each place precisely because it was not. The
+ * recognizer's address was corrected and the camera stream's was left alone, so
+ * a house where faces were reachable had a detector whose ffmpeg exited the
+ * instant it started, over and over, with its error going to a stderr nothing
+ * reads. What the operator saw was a camera that had noticed nothing since the
+ * day it was added.
+ *
+ * The container's own name on the network they share, when there is one. It
+ * stays on the bridge, needs no published port, and cannot be sent out to the
+ * router and back. `directUrl` is the fallback and only correct for something
+ * that is not a container Polaris started: it goes out to the host by a name -
+ * `host.docker.internal` - that Polaris' own compose file gives to Polaris, and
+ * that a container Polaris deployed was never given.
+ */
+function workerReaches(service: { networkUrl: string | null; directUrl: string }): string {
+    return service.networkUrl ?? service.directUrl;
+}
+
+/**
  * What every camera that needs a worker should be watched for.
  *
  * Not filtered by which worker is asking. A house has one or two of these and
@@ -161,10 +183,7 @@ export async function assignmentsFor(installedAppId: string): Promise<VisionAssi
         assignments.push({
             cameraId: camera.id,
             cameraName: camera.name,
-            // The worker runs beside the relay, so it is given the relay's real
-            // address rather than the one Polaris dials it on - a tunnel that
-            // only exists inside the Polaris process reaches nothing from there.
-            streamUrl: `${endpoint.directUrl}/api/stream.mp4?src=${encodeURIComponent(streamName(camera.id, "sub"))}`,
+            streamUrl: `${workerReaches(endpoint)}/api/stream.mp4?src=${encodeURIComponent(streamName(camera.id, "sub"))}`,
             authorization: `Basic ${Buffer.from(`${endpoint.username}:${endpoint.password}`).toString("base64")}`,
             sensitivity: detection.sensitivity,
             minGapSeconds: detection.minGapSeconds,
@@ -175,10 +194,10 @@ export async function assignmentsFor(installedAppId: string): Promise<VisionAssi
             zones: zones.get(camera.id) ?? [],
             faces:
                 faces && detectorReaches(detector, "faces")
-                    ? // The recognizer is usually a container beside it, and is
-                      // addressed the same way and for the same reason.
+                    ? // The recognizer is a container beside it too, and is
+                      // reached the same way and for the same reason.
                       {
-                          baseUrl: faces.networkUrl ?? faces.directUrl,
+                          baseUrl: workerReaches(faces),
                           apiKey: faces.apiKey,
                           threshold: detection.faceThreshold
                       }

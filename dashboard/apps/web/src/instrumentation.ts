@@ -200,6 +200,18 @@ export async function register(): Promise<void> {
     const { startScheduledWork } = await import("./lib/cron/scheduler");
     startScheduledWork();
 
+    // Bring Home's own containers - the camera relay, the vision worker, the
+    // recognizer - to the version of Polaris that is running. They are built and
+    // published by the same CI run as the dashboard and nothing else upgrades
+    // them: the update button updates Polaris, and a marketplace app is upgraded
+    // by whoever installed it, which for these is nobody. A worker left several
+    // versions behind reports that it is watching a camera and does nothing else.
+    // Once per build, and only what is meant to be running.
+    const { upgradeHomeServices } = await import("./lib/home/side-upgrade");
+    void upgradeHomeServices().catch((error) =>
+        console.error("polaris: could not bring Home's own containers up to date:", error)
+    );
+
     // Listen to the cameras that decide for themselves that something moved. It is
     // the cheapest rung of the detection ladder by a wide margin - the camera is
     // doing that work whether or not Polaris exists - and it is one long-poll per
