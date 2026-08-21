@@ -110,6 +110,28 @@ export function isPlayableMedia(contentType: string): boolean {
     return PLAYABLE.has(baseType(contentType));
 }
 
+/**
+ * The one document type the browser renders itself.
+ *
+ * Everything else Polaris previews - a spreadsheet, a document, a slide deck,
+ * markdown, source - is read with `fetch` and drawn by Polaris' own code, so it
+ * can stay an opaque download and be parsed from those bytes. A PDF is the
+ * exception: the viewer for it is the browser's own, and a browser handed
+ * `application/octet-stream` under `nosniff` will save the file rather than
+ * render it.
+ *
+ * So a PDF is served as itself, and the headers around it are what make that
+ * safe: `nosniff` means it is treated as a PDF and nothing else, and the
+ * response's own `Content-Security-Policy` sandboxes it with no sources
+ * allowed - so nothing inside it runs, loads, or navigates anywhere.
+ *
+ * Nothing joins this list without that being true of it. HTML would be stored
+ * cross-site scripting; SVG is not an image here for the same reason.
+ */
+export function isInlineDocument(contentType: string): boolean {
+    return baseType(contentType) === "application/pdf";
+}
+
 /** The type without its parameters. A recording arrives as
  *  `audio/webm;codecs=opus`, and the codec is not part of the question. */
 function baseType(contentType: string): string {

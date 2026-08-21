@@ -7,9 +7,9 @@
  *
  * Served with everything that stops a browser treating somebody's upload as
  * something to run. `Content-Disposition` is inline for the formats the list
- * draws or plays and an attachment for everything else, which is the same
- * decision the message list makes about whether to show it - taken from the same
- * functions, so the two cannot disagree.
+ * draws, plays, or hands to the browser's own viewer, and an attachment for
+ * everything else - the same decision the message list makes about whether to
+ * show it, taken from the same functions, so the two cannot disagree.
  *
  * Type matters as much as disposition here. `nosniff` is set on purpose, which
  * means a browser will do exactly what the header says and nothing else: a
@@ -23,6 +23,7 @@ import { channelAccess } from "@/lib/chat/access";
 import {
     channelOfAttachment,
     diagnoseAttachment,
+    isInlineDocument,
     isInlineImage,
     isPlayableMedia,
     readAttachment,
@@ -103,7 +104,10 @@ export async function GET(
     // does with it does not rest on an attribute alone.
     const asFile = new URL(request.url).searchParams.get("download") === "1";
     const shown =
-        !asFile && (isInlineImage(file.contentType) || isPlayableMedia(file.contentType));
+        !asFile &&
+        (isInlineImage(file.contentType) ||
+            isPlayableMedia(file.contentType) ||
+            isInlineDocument(file.contentType));
 
     // What a player asks for when somebody drags the bar. Answered, and said to
     // be answerable, because a browser that is not offered ranges will not let

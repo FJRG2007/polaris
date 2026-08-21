@@ -21,7 +21,7 @@ import { formatBytes } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
 import { extensionOf } from "./file-categories";
 import { CodeView } from "./viewer/code-view";
-import { languageForFile } from "@/lib/code-language";
+import { viewerKind } from "./viewer/kind";
 import { DocView } from "./viewer/doc-view";
 import { MarkdownView } from "./viewer/markdown-view";
 import { MediaView } from "./viewer/media-view";
@@ -29,42 +29,12 @@ import { PdfView } from "./viewer/pdf-view";
 import { PptxView } from "./viewer/pptx-view";
 import { SheetEditor } from "./viewer/sheet-editor";
 import { PlainTextEditor } from "./viewer/text-editor";
-import type { ViewerKind, ViewerTarget, ViewerUrlFor } from "./viewer/types";
+import type { ViewerTarget, ViewerUrlFor } from "./viewer/types";
 import { useDisplayFormat } from "@/components/display-format";
 
 export type { ViewerTarget, ViewerUrlFor, ViewerKind } from "./viewer/types";
+export { isViewable, viewerKind } from "./viewer/kind";
 
-const IMAGE = new Set(["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif", "ico"]);
-const VIDEO = new Set(["mp4", "webm", "mov", "m4v", "ogv"]);
-const AUDIO = new Set(["mp3", "wav", "flac", "aac", "ogg", "oga", "m4a", "opus"]);
-const SHEET = new Set(["xlsx", "xls", "csv", "ods", "tsv"]);
-const DOC = new Set(["docx"]);
-const SLIDES = new Set(["pptx", "ppsx", "potx"]);
-const MARKDOWN = new Set(["md", "markdown", "mdown", "mkd"]);
-
-/**
- * Which viewer renders a file by its extension. A file the highlighter has a
- * grammar for opens as code; anything without a richer viewer falls back to
- * "text" - the Notepad-style editor opens it as plain text.
- */
-export function viewerKind(name: string): ViewerKind {
-    const ext = extensionOf(name);
-    if (IMAGE.has(ext)) return "image";
-    if (VIDEO.has(ext)) return "video";
-    if (AUDIO.has(ext)) return "audio";
-    if (ext === "pdf") return "pdf";
-    if (SHEET.has(ext)) return "sheet";
-    if (DOC.has(ext)) return "doc";
-    if (SLIDES.has(ext)) return "slides";
-    if (MARKDOWN.has(ext)) return "markdown";
-    if (languageForFile(name)) return "code";
-    return "text";
-}
-
-/** Whether a file can be opened in the viewer (drives the click behavior). */
-export function isViewable(name: string): boolean {
-    return viewerKind(name) !== "none";
-}
 
 /** Default byte URL for a Drive-owned file (served by the session-scoped route). */
 export function driveByteUrl(target: ViewerTarget, inline: boolean): string {

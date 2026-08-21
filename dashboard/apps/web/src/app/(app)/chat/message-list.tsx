@@ -44,6 +44,72 @@ import type { ChatReferenceView } from "@/lib/chat/references";
 import { RichText } from "@/components/rich-text/rich-text";
 import { VideoPreview } from "@/components/video-preview";
 import { isPlayable, isVoiceMessage } from "./voice-recorder";
+import { AttachmentViewer, previewableAs, type ViewedFile } from "./attachment-viewer";
+
+/**
+ * A file on a message that is not a picture, a recording or a clip.
+ *
+ * Two things can be done with one and they are not the same thing: read it, and
+ * keep it. Reading is the common one by a distance - an invoice, a form, a
+ * report, a spreadsheet somebody wants an answer about - and until now it was
+ * the one that took four steps and left a copy in a downloads folder.
+ *
+ * So the chip opens it. Downloading is still one click, as its own control with
+ * its own label, because a chip whose only action is "save" and a chip whose
+ * only action is "open" cannot both be one click on the same rectangle.
+ *
+ * A file with no view worth offering - an archive, an installer - stays exactly
+ * what it was: a link that saves it.
+ */
+function SentFile({
+    file,
+    at,
+    onOpen
+}: {
+    file: ChatMessageView["attachments"][number];
+    at: string;
+    onOpen: (file: ViewedFile) => void;
+}) {
+    const readable = previewableAs(file.name, file.contentType);
+    const chip =
+        "inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-left text-xs transition-colors hover:bg-card-hover";
+
+    if (!readable) {
+        return (
+            <a href={`/api/chat/attachments/${file.id}?download=1`} download={file.name} className={chip}>
+                <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
+                <span className="max-w-[16rem] truncate" title={file.name}>
+                    {file.name}
+                </span>
+                <span className="shrink-0 text-muted-foreground">{readableSize(file.size)}</span>
+            </a>
+        );
+    }
+
+    return (
+        <span className="inline-flex items-center gap-1">
+            <button
+                type="button"
+                className={chip}
+                title={`Open ${file.name}`}
+                onClick={() => onOpen({ id: file.id, name: file.name, size: file.size, sentAt: at })}
+            >
+                <FileText className="size-3.5 shrink-0 text-muted-foreground" />
+                <span className="max-w-[16rem] truncate">{file.name}</span>
+                <span className="shrink-0 text-muted-foreground">{readableSize(file.size)}</span>
+            </button>
+            <a
+                href={`/api/chat/attachments/${file.id}?download=1`}
+                download={file.name}
+                aria-label={`Download ${file.name}`}
+                title="Download"
+                className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
+            >
+                <Download className="size-3.5 shrink-0" />
+            </a>
+        </span>
+    );
+}
 
 /** Whether an attachment is a video Polaris will draw a player for. The same
  *  fixed list the download route serves as itself - anything else stays an
@@ -67,6 +133,8 @@ import {
     Check,
     CheckCheck,
     CornerUpLeft,
+    Download,
+    FileText,
     MessageSquare,
     Paperclip,
     Pencil,
@@ -160,6 +228,9 @@ export function MessageList({
     // The picture being looked at, held here rather than in each message: one
     // viewer is open at a time, and it is drawn over the whole conversation.
     const [viewing, setViewing] = useState<ViewedImage | null>(null);
+    /** The file being read, held here for the same reason as the picture: one is
+     *  open at a time and it covers the whole conversation. */
+    const [reading, setReading] = useState<ViewedFile | null>(null);
     const [reporting, setReporting] = useState<string | null>(null);
     const [explaining, setExplaining] = useState<ChatMessageView | null>(null);
     /** Whose nickname is being changed. Up here with the other dialogs, and for
@@ -253,6 +324,7 @@ export function MessageList({
                             onNickname={setNaming}
                             onError={say}
                             onOpenImage={setViewing}
+                            onOpenFile={setReading}
                             onReport={(target) => setReporting(target.id)}
                             onExplain={setExplaining}
                             canPost={canPost}
@@ -272,6 +344,8 @@ export function MessageList({
                     </li>
                 );
             })}
+
+            <AttachmentViewer file={reading} onClose={() => setReading(null)} />
 
             <ImageViewer
                 image={viewing}
@@ -444,6 +518,7 @@ function Message({
     onEdit,
     onDelete,
     onOpenImage,
+    onOpenFile,
     onReport,
     onExplain,
     viewerId,
@@ -478,6 +553,8 @@ function Message({
      *  rather than in a tab: a tab is the browser's viewer, with no way back and
      *  nothing to do with the picture but look at it. */
     onOpenImage: (image: ViewedImage) => void;
+    /** Open a sent file in the reader rather than saving it. */
+    onOpenFile: (file: ViewedFile) => void;
     onReport: (message: ChatMessageView) => void;
     /** Open the three moments behind the ticks. */
     onExplain: (message: ChatMessageView) => void;
@@ -772,21 +849,11 @@ function Message({
                                             download={`/api/chat/attachments/${file.id}?download=1`}
                                         />
                                     ) : (
-                                        <a
-                                            href={`/api/chat/attachments/${file.id}`}
-                                            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-xs transition-colors hover:bg-card-hover"
-                                        >
-                                            <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
-                                            <span
-                                                className="max-w-[16rem] truncate"
-                                                title={file.name}
-                                            >
-                                                {file.name}
-                                            </span>
-                                            <span className="shrink-0 text-muted-foreground">
-                                                {readableSize(file.size)}
-                                            </span>
-                                        </a>
+                                        <SentFile
+                                            file={file}
+                                            at={message.createdAt}
+                                            onOpen={onOpenFile}
+                                        />
                                     )}
                                 </li>
                             ))}
