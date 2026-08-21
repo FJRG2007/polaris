@@ -13,10 +13,11 @@
  * the full width, so a stream that has no times never pays for a blank gutter.
  */
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Check, Copy, Download, Search } from "lucide-react";
 import { Button, Input, cn } from "@polaris/ui";
 import { useDisplayFormat } from "./display-format";
+import { useFollowBottom } from "@/lib/use-follow-bottom";
 import { formatLogTime, parseLog, type LogEntry, type LogLevel } from "@/lib/log-lines";
 
 const LEVEL_CLASS: Record<LogLevel, string> = {
@@ -48,7 +49,9 @@ export function LogViewer({
 }) {
     const [search, setSearch] = useState("");
     const [copiedAll, setCopiedAll] = useState(false);
-    const scrollRef = useRef<HTMLDivElement>(null);
+    // Follows the tail as new output streams in, matching a live console - and
+    // leaves the view alone while it is being read further up.
+    const follow = useFollowBottom<HTMLDivElement>(log, autoScroll);
 
     const entries = useMemo(() => (log ? parseLog(log) : []), [log]);
     const query = search.trim().toLowerCase();
@@ -60,12 +63,6 @@ export function LogViewer({
     // One gutter for the whole view, not per line: a stream where only some lines
     // are stamped still reads as one column.
     const hasTimes = filtered.some((entry) => entry.time !== null);
-
-    // Follow the tail as new output streams in, matching a live console.
-    useEffect(() => {
-        const el = scrollRef.current;
-        if (el && autoScroll) el.scrollTop = el.scrollHeight;
-    }, [log, autoScroll]);
 
     function exportLog(): void {
         const blob = new Blob([log], { type: "text/plain;charset=utf-8" });
@@ -120,7 +117,8 @@ export function LogViewer({
             </div>
 
             <div
-                ref={scrollRef}
+                ref={follow.ref}
+                onScroll={follow.onScroll}
                 className={cn("h-80 overflow-auto rounded-md bg-[#0b0e14] py-2 font-mono text-xs leading-relaxed", className)}
             >
                 {filtered.length === 0 ? (

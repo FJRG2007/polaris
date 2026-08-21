@@ -23,10 +23,11 @@ import { Avatar } from "@/components/avatar";
 import type { CallState } from "./call-state";
 import { Send, MessageSquare } from "lucide-react";
 import type { MeetingLine } from "@/lib/chat/meetings";
+import { useFollowBottom } from "@/lib/use-follow-bottom";
 import { RelativeTime } from "@/components/relative-time";
 import { Button, Input, Skeleton, cn } from "@polaris/ui";
 import { MAX_MEETING_LINE } from "@/lib/chat/meeting-limits";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { saidInMeetingAction, sayInMeetingAction } from "./meeting-actions";
 
 export function MeetingChat({
@@ -44,7 +45,10 @@ export function MeetingChat({
     const [draft, setDraft] = useState("");
     const [sending, setSending] = useState(false);
     const [error, setError] = useState("");
-    const foot = useRef<HTMLDivElement>(null);
+    // The newest line, kept in view. A chat beside a call is read at the bottom -
+    // but somebody scrolling back through what was said stays where they put
+    // themselves, and gets the tail again by returning to it.
+    const follow = useFollowBottom<HTMLDivElement>(lines);
 
     const load = useCallback(async () => {
         const result = await saidInMeetingAction(meetingId);
@@ -62,12 +66,6 @@ export function MeetingChat({
     useEffect(() => {
         void load();
     }, [load, call.saidAt]);
-
-    // The newest line, kept in view. A chat beside a call is read at the bottom:
-    // nobody scrolls back through what was said during a meeting they are in.
-    useEffect(() => {
-        foot.current?.scrollIntoView({ block: "end" });
-    }, [lines]);
 
     const send = async () => {
         const said = draft.trim();
@@ -90,7 +88,11 @@ export function MeetingChat({
             aria-label="Meeting chat"
             className={cn("flex min-h-0 flex-col border-border", className)}
         >
-            <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+            <div
+                ref={follow.ref}
+                onScroll={follow.onScroll}
+                className="min-h-0 flex-1 overflow-y-auto px-3 py-2"
+            >
                 {lines === null ? (
                     <div className="flex flex-col gap-2">
                         <Skeleton className="h-4 w-2/3" />
@@ -141,7 +143,6 @@ export function MeetingChat({
                         ))}
                     </ol>
                 )}
-                <div ref={foot} />
             </div>
 
             {error && (

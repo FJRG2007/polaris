@@ -18,10 +18,11 @@ import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
+import { useFollowBottom } from "@/lib/use-follow-bottom";
 import { cn, Input, Button, SegmentedControl } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import { RichText } from "@/components/rich-text/rich-text";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { CheckCircle2, Play, SendHorizontal, Square, Trash2 } from "lucide-react";
 import type { ActivityView, CommentView, TimeEntryView } from "@/lib/tasks/task-service";
@@ -111,14 +112,14 @@ export function ActivityStream({
     const [busy, setBusy] = useState(false);
     const [filter, setFilter] = useState<ConversationFilter>("all");
     const [replyTo, setReplyTo] = useState<string | null>(null);
-    const foot = useRef<HTMLDivElement>(null);
-
     const stream = useMemo(() => mergeConversation(comments, activity, filter), [comments, activity, filter]);
 
-    // The newest line is the one worth reading, and it is at the bottom.
-    useEffect(() => {
-        foot.current?.scrollIntoView({ block: "end" });
-    }, [taskId, stream.length]);
+    // The newest line is the one worth reading, and it is at the bottom - so this
+    // follows it, and stops following while somebody is reading back through what
+    // was said. Another task starts again at its own bottom.
+    const follow = useFollowBottom<HTMLDivElement>(stream.length);
+
+    useEffect(() => follow.stick(), [taskId, follow]);
 
     const post = async (body: string, parentId: string | null) => {
         setBusy(true);
@@ -218,7 +219,11 @@ export function ActivityStream({
                 />
             </header>
 
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+            <div
+                ref={follow.ref}
+                onScroll={follow.onScroll}
+                className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4"
+            >
                 {stream.length === 0 && (
                     <p className="text-xs text-muted-foreground">Nothing has happened here yet.</p>
                 )}
@@ -236,7 +241,6 @@ export function ActivityStream({
                         </div>
                     )
                 )}
-                <div ref={foot} />
             </div>
 
             <div className="border-t border-border p-4">

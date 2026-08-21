@@ -10,9 +10,10 @@
 
 import type { Platform } from "@polaris/messaging";
 import { DiscordPeerFields } from "./discord-peer-fields";
+import { useFollowBottom } from "@/lib/use-follow-bottom";
 import { ConnectChannelDialog } from "./connect-channel-dialog";
 import { ChevronLeft, Loader2, MessagesSquare, Plus, Send, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
     PEER_HINT,
     PLATFORM_LABEL,
@@ -280,13 +281,19 @@ function Thread({
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [pending, startTransition] = useTransition();
-    const scrollRef = useRef<HTMLDivElement>(null);
+    // The newest message, kept in view - unless the reader has scrolled up into
+    // what was said before, which the poll must not pull them out of.
+    const follow = useFollowBottom<HTMLDivElement>(messages);
     // Who this was just handed to, before the list has been re-read. Without it the
     // select snaps back to the old name for as long as the round trip takes, which
     // reads as the click having missed. Cleared when a fresh conversation arrives.
     const [assignedTo, setAssignedTo] = useState<string | null | undefined>(undefined);
 
     useEffect(() => setAssignedTo(undefined), [conversation.id, conversation.assigneeId]);
+
+    // Another conversation is another thread: it opens on its newest message,
+    // whatever the reader was looking at in the one before.
+    useEffect(() => follow.stick(), [conversation.id, follow]);
 
     const load = useCallback(async () => {
         try {
@@ -302,10 +309,6 @@ function Thread({
         return () => clearInterval(timer);
     }, [load]);
 
-    useEffect(() => {
-        const element = scrollRef.current;
-        if (element) element.scrollTop = element.scrollHeight;
-    }, [messages]);
 
     function send() {
         setError(null);
@@ -431,7 +434,11 @@ function Thread({
                     </Button>
                 </div>
             </div>
-            <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
+            <div
+                ref={follow.ref}
+                onScroll={follow.onScroll}
+                className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3"
+            >
                 {messages.map((message) => (
                     <MessageBubble key={message.id} message={message} />
                 ))}
