@@ -7079,6 +7079,25 @@ model CameraEvent {
     /// Where the still is, as a key in the house's storage. Null when the stage
     /// that fired keeps no picture (a camera reporting its own motion).
     stillKey  String?
+    /// Where in the picture it was, as a JSON [x1, y1, x2, y2] of fractions of
+    /// the frame. Relative rather than pixels so it can be drawn over a still of
+    /// any size, and over the live view of a camera whose stream has since
+    /// changed resolution. Null on anything that did not come from a detector
+    /// with an opinion about position - a camera's own alert, or a warning.
+    box       String?
+    /// The areas of the camera it was standing in, as a JSON array of their
+    /// names. Names rather than ids on purpose: an area redrawn or removed next
+    /// month must not silently rewrite what a camera saw last night.
+    zones     String  @default("[]")
+    /// When it stopped being there. A detector that follows something across
+    /// frames knows the difference between somebody arriving and somebody still
+    /// standing there, so an event has a length rather than only an instant.
+    /// Null on an event that was an instant, and on one still happening.
+    endedAt   DateTime?
+    /// What the detector called this thing while it was following it. Not a
+    /// stable identity - the same person tomorrow is a different one - only the
+    /// handle that lets a later frame update the event it already opened.
+    trackId   String?
     /// The recording this event sits inside, when one was kept.
     clipId    String?   @db.Uuid
     /// Somebody has seen this and it needs no further attention.
@@ -7093,6 +7112,8 @@ model CameraEvent {
     @@index([cameraId, at])
     @@index([at])
     @@index([cameraId, kind, at])
+    // How a later frame finds the event it already opened for this thing.
+    @@index([cameraId, trackId])
 }
 
 // Footage kept on disk.

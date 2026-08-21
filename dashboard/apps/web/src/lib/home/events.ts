@@ -28,6 +28,22 @@ export interface Detection {
     readonly score?: number | null;
     /** Where the still was written, in the house's storage. */
     readonly stillKey?: string | null;
+    /** Where in the picture it was, as fractions of the frame. */
+    readonly box?: { x1: number; y1: number; x2: number; y2: number } | null;
+    /** The areas of the camera it was standing in, by name. */
+    readonly zones?: readonly string[];
+    /**
+     * The detector's handle on the thing it is following.
+     *
+     * Its presence changes how this is recorded, and that is the point. A
+     * detector that follows something across frames has already decided that
+     * this is one arrival rather than forty, and decided it with far more to go
+     * on than a clock - so the camera's quiet window is not applied to it.
+     * Applying both would mean a second person walking up behind the first is
+     * dropped for having arrived too soon after them, which is exactly the
+     * event nobody wants dropped.
+     */
+    readonly trackId?: string | null;
     readonly at?: Date;
 }
 
@@ -50,6 +66,12 @@ export interface EventView {
     readonly label: string | null;
     readonly score: number | null;
     readonly stillKey: string | null;
+    /** Where in the picture it was, or null when whatever reported it had no
+     *  opinion about position. */
+    readonly box: { x1: number; y1: number; x2: number; y2: number } | null;
+    readonly zones: readonly string[];
+    /** When it stopped being there, for a detector that followed it. */
+    readonly endedAt: string | null;
     readonly clipId: string | null;
     readonly acked: boolean;
 }
@@ -90,13 +112,15 @@ export async function recordDetection(detection: Detection): Promise<EventView |
     const asClass = OBJECT_CLASS_OF[detection.kind];
     if (asClass && !settings.classes.includes(asClass)) return null;
 
-    const gapMs = settings.minGapSeconds * 1000;
     const at = detection.at ?? new Date();
-    const recent = await prisma.cameraEvent.findFirst({
-        where: { cameraId: camera.id, kind: detection.kind, at: { gt: new Date(at.getTime() - gapMs) } },
-        select: { id: true }
-    });
-    if (recent) return null;
+    if (!detection.trackId) {
+        const gapMs = settings.minGapSeconds * 1000;
+        const recent = await prisma.cameraEvent.findFirst({
+            where: { cameraId: camera.id, kind: detection.kind, at: { gt: new Date(at.getTime() - gapMs) } },
+            select: { id: true }
+        });
+        if (recent) return null;
+    }
 
     const row = await prisma.cameraEvent.create({
         data: {
@@ -105,7 +129,10 @@ export async function recordDetection(detection: Detection): Promise<EventView |
             kind: detection.kind,
             label: detection.label ?? null,
             score: detection.score ?? null,
-            stillKey: detection.stillKey ?? null
+            stillKey: detection.stillKey ?? null,
+            box: detection.box ? JSON.stringify([detection.box.x1, detection.box.y1, detection.box.x2, detection.box.y2]) : null,
+            zones: JSON.stringify(detection.zones ?? []),
+            trackId: detection.trackId ?? null
         }
     });
     // Every event gets a picture. A camera reporting its own movement sends
@@ -148,9 +175,53 @@ export async function recordDetection(detection: Detection): Promise<EventView |
         label: row.label,
         score: row.score,
         stillKey: row.stillKey,
+        box: parseEventBox(row.box),
+        zones: parseEventZones(row.zones),
+        endedAt: row.endedAt?.toISOString() ?? null,
         clipId: row.clipId,
         acked: false
     };
+}
+
+/** A stored box, or null for anything that is not four numbers. Read
+ *  defensively: this is drawn over a picture, and a malformed row must be an
+ *  event with no box rather than a screen that will not render. */
+export function parseEventBox(raw: string | null): { x1: number; y1: number; x2: number; y2: number } | null {
+    if (!raw) return null;
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        if (!Array.isArray(parsed) || parsed.length !== 4) return null;
+        const [x1, y1, x2, y2] = parsed.map(Number);
+        if (![x1, y1, x2, y2].every((value) => Number.isFinite(value))) return null;
+        return { x1: x1!, y1: y1!, x2: x2!, y2: y2! };
+    } catch {
+        return null;
+    }
+}
+
+/** The area names a stored event carried. */
+export function parseEventZones(raw: string): string[] {
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Note that the thing an event was opened for has gone.
+ *
+ * Only ever an update: the event already exists, and this is the second half of
+ * its life. A handle that matches nothing is not a failure - it is a detector
+ * reporting the end of something whose beginning was folded away or whose
+ * camera has since been removed.
+ */
+export async function closeDetection(cameraId: string, trackId: string, at: Date): Promise<void> {
+    await prisma.cameraEvent.updateMany({
+        where: { cameraId, trackId, endedAt: null },
+        data: { endedAt: at }
+    });
 }
 
 /**
@@ -298,6 +369,9 @@ export async function listEvents(installedAppId: string, query: EventQuery = {})
             label: true,
             score: true,
             stillKey: true,
+            box: true,
+            zones: true,
+            endedAt: true,
             clipId: true,
             ackedAt: true
         }
@@ -311,6 +385,9 @@ export async function listEvents(installedAppId: string, query: EventQuery = {})
         label: row.label,
         score: row.score,
         stillKey: row.stillKey,
+        box: parseEventBox(row.box),
+        zones: parseEventZones(row.zones),
+        endedAt: row.endedAt?.toISOString() ?? null,
         clipId: row.clipId,
         acked: row.ackedAt !== null
     }));
