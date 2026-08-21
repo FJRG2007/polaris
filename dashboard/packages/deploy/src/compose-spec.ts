@@ -47,6 +47,23 @@ export interface ComposeSpecHealth {
  */
 export type ComposePullPolicy = "always" | "never";
 
+/**
+ * The name a container calls the machine it is running on.
+ *
+ * Docker answers `host-gateway` with the host's address on the container's own
+ * network, and without this entry the name resolves to nothing at all. Polaris'
+ * own services are given it by the stack's compose file; anything Polaris
+ * deploys was not, and the first thing that needed it failed in a way nobody
+ * could see - the vision worker's ffmpeg exited immediately, on a loop, because
+ * the relay it was told to read is published on the host. Its stderr was
+ * discarded, so what the operator saw was a camera that noticed nothing, ever.
+ *
+ * Given to everything Polaris starts rather than to the one app that needed it:
+ * a container talking to something the host publishes is the ordinary case here,
+ * and an entry nothing looks up costs nothing.
+ */
+export const HOST_GATEWAY = "host.docker.internal:host-gateway";
+
 export interface ComposeSpecService {
     readonly name: string;
     readonly image: string;
@@ -57,6 +74,9 @@ export interface ComposeSpecService {
     readonly labels: Record<string, string>;
     readonly command?: string[];
     readonly networks: string[];
+    /** Names this container can reach that DNS cannot answer, as `name:address`.
+     *  One of them is always here - see `HOST_GATEWAY`. */
+    readonly extraHosts?: string[];
     readonly dependsOn?: string[];
     readonly restart?: string;
     readonly healthcheck?: ComposeSpecHealth;
@@ -114,6 +134,7 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
                 })),
                 labels,
                 networks,
+                extraHosts: [HOST_GATEWAY],
                 restart: "unless-stopped",
                 replicas: plan.replicas > 1 ? plan.replicas : undefined,
                 healthcheck: plan.healthcheck
@@ -163,6 +184,7 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
                 volumes: [{ source: plan.volumeName, target: plan.dataPath, kind: "volume" }],
                 labels: {},
                 networks: [network],
+                extraHosts: [HOST_GATEWAY],
                 restart: "unless-stopped"
             }
         ],
@@ -229,6 +251,10 @@ export function renderComposeYaml(spec: ComposeSpec, volumeRoot: string, mountRo
         if (service.networks.length > 0) {
             lines.push("    networks:");
             for (const net of service.networks) lines.push(`      - ${net}`);
+        }
+        if (service.extraHosts && service.extraHosts.length > 0) {
+            lines.push("    extra_hosts:");
+            for (const entry of service.extraHosts) lines.push(`      - ${yamlQuote(entry)}`);
         }
         if (service.command && service.command.length > 0) {
             lines.push(`    command: [${service.command.map(yamlQuote).join(", ")}]`);

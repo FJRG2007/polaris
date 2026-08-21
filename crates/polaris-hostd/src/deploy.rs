@@ -61,6 +61,13 @@ pub struct ServiceSpec {
     pub command: Vec<String>,
     #[serde(default)]
     pub networks: Vec<String>,
+    /// Names this container can reach that DNS cannot answer, as `name:address`.
+    /// Always carries `host.docker.internal:host-gateway`: a container Polaris
+    /// starts routinely talks to something the host publishes - the camera relay,
+    /// for one - and without the entry that name resolves to nothing, which is a
+    /// failure inside the container that nothing outside it can see.
+    #[serde(default)]
+    pub extra_hosts: Vec<String>,
     #[serde(default)]
     pub depends_on: Vec<String>,
     pub restart: Option<String>,
@@ -310,6 +317,12 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
             out.push_str("    networks:\n");
             for net in &service.networks {
                 out.push_str(&format!("      - {net}\n"));
+            }
+        }
+        if !service.extra_hosts.is_empty() {
+            out.push_str("    extra_hosts:\n");
+            for entry in &service.extra_hosts {
+                out.push_str(&format!("      - {}\n", yaml_quote(entry)));
             }
         }
         if !service.depends_on.is_empty() {
