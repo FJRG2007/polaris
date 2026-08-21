@@ -4,25 +4,32 @@
  * Creating a tag from the picker while filling a task in.
  *
  * The tag is made for this task - that is the whole reason somebody typed it
- * there rather than in the space's settings - so it has to end up on the task,
- * not merely exist. What used to break it: the screen draws an edit against the
- * tags it was given when it opened, and a tag created a second ago is not among
- * them, so the id was written and then dropped on the way to the screen.
+ * there rather than in the space's settings - so three things have to hold: it
+ * is on the task at once, without waiting for the server; the task is written
+ * with the id the server gave it rather than the one this browser invented; and
+ * a refused creation takes the tag back off instead of leaving a chip that
+ * stands for nothing.
  */
 
 import userEvent from "@testing-library/user-event";
+import { ToastProvider } from "@polaris/ui";
 import type { PersonRef } from "@/lib/tasks/facts";
 import type { StatusView } from "@/lib/tasks/space-service";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 
-const createTagAction = vi.fn(async (spaceId: string, name: string, color: string) => ({
-    tag: { id: "t-new", name, color }
-}));
+/** The creation, held open so the screen can be read while it is still in flight. */
+let answer: (result: { tag?: { id: string; name: string; color: string }; error?: string }) => void = () => undefined;
+const createTagAction = vi.fn(
+    () => new Promise<{ tag?: { id: string; name: string; color: string }; error?: string }>((resolve) => {
+        answer = resolve;
+    })
+);
+const createTaskAction = vi.fn(async () => ({ id: "task1" }));
 
 vi.mock("@/app/(app)/tasks/actions", () => ({
     createTagAction: (spaceId: string, name: string, color: string) => createTagAction(spaceId, name, color),
-    createTaskAction: async () => ({ id: "task1" })
+    createTaskAction: (input: unknown) => createTaskAction(input)
 }));
 // The description editor asks these for its @ and # pickers; the module reaches
 // the database and the session on import.
@@ -48,6 +55,7 @@ beforeAll(() => {
 afterEach(() => {
     cleanup();
     createTagAction.mockClear();
+    createTaskAction.mockClear();
 });
 
 const { TaskCreateDialog } = await import("@/app/(app)/tasks/task-create-dialog");
@@ -57,33 +65,60 @@ const PEOPLE: PersonRef[] = [{ id: "u1", name: "Ada Lovelace" }];
 
 function dialog() {
     return render(
-        <TaskCreateDialog
-            open
-            spaceId="s1"
-            statuses={STATUSES}
-            tags={[]}
-            people={PEOPLE}
-            lists={[{ id: "l1", name: "Inbox" }]}
-            defaultListId="l1"
-            onClose={() => {}}
-            onCreated={() => {}}
-        />
+        <ToastProvider>
+            <TaskCreateDialog
+                open
+                spaceId="s1"
+                statuses={STATUSES}
+                tags={[]}
+                people={PEOPLE}
+                lists={[{ id: "l1", name: "Inbox" }]}
+                defaultListId="l1"
+                onClose={() => {}}
+                onCreated={() => {}}
+            />
+        </ToastProvider>
     );
 }
 
+/** Type a name no tag carries and take the offer to create it. */
+async function createTag(name: string) {
+    await userEvent.click(screen.getByRole("button", { name: "Tags" }));
+    const field = await screen.findByPlaceholderText("Find or create a tag");
+    await userEvent.type(field, `${name}{Enter}`);
+    await waitFor(() => expect(createTagAction).toHaveBeenCalledWith("s1", name, expect.any(String)));
+    await userEvent.keyboard("{Escape}");
+}
+
 describe("a tag created from the picker of a task being written", () => {
-    it("is put on that task, not only into the space", async () => {
+    it("is on the task before the server has answered", async () => {
         dialog();
 
-        await userEvent.click(screen.getByRole("button", { name: "Tags" }));
-        const field = await screen.findByPlaceholderText("Find or create a tag");
-        await userEvent.type(field, "urgent{Enter}");
+        await createTag("urgent");
 
-        await waitFor(() => expect(createTagAction).toHaveBeenCalledWith("s1", "urgent", expect.any(String)));
-        // The chip beside the picker is the task carrying it. The menu lists the
-        // name too, so the count is what says it landed somewhere else as well.
-        // The chip beside the picker is the task carrying the tag; the menu lists
-        // the name as well, which is why the chip is asked for by its own control.
-        await waitFor(() => expect(screen.getByLabelText("Remove urgent")).toBeDefined());
+        // Nothing has come back yet: the chip is the optimistic one.
+        expect(screen.getByLabelText("Remove urgent")).toBeDefined();
+    });
+
+    it("is written under the id the server gave it, not the one made up for it", async () => {
+        dialog();
+        await createTag("infra");
+        answer({ tag: { id: "tag-real", name: "infra", color: "#3b82f6" } });
+
+        await userEvent.type(screen.getByLabelText("Task name"), "Move the database");
+        await userEvent.click(screen.getByRole("button", { name: "Create task" }));
+
+        await waitFor(() => expect(createTaskAction).toHaveBeenCalled());
+        expect(createTaskAction.mock.calls[0]?.[0]).toMatchObject({ tagIds: ["tag-real"] });
+    });
+
+    it("comes back off the task when the tag is refused, and says so", async () => {
+        dialog();
+        await createTag("billing");
+        answer({ error: "That tag could not be added" });
+
+        await waitFor(() => expect(screen.queryByLabelText("Remove billing")).toBeNull());
+        expect(screen.getByText('Could not create "billing"')).toBeDefined();
+        expect(screen.getByText("That tag could not be added")).toBeDefined();
     });
 });

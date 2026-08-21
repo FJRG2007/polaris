@@ -26,7 +26,7 @@ import { GanttView } from "./views/schedule";
 import { CalendarView } from "./views/calendar";
 import { keyboardIsBusy } from "@/lib/keyboard";
 import { useStableOrder } from "./stable-order";
-import { useTagCreation } from "./tag-creation";
+import { settleTagIds, useTagCreation, withCreatedTags } from "./tag-creation";
 import { ListView, TableView } from "./views/rows";
 import { bulkOverlay, taskOverlay, useLatest } from "./optimistic";
 import { TaskCreateDialog } from "./task-create-dialog";
@@ -135,7 +135,7 @@ export function ListScreen({
     // this screen has to be able to name it before the reload brings it back -
     // see `useTagCreation`. Everything below reads the space through `context`,
     // which is the one the server sent with those tags folded in.
-    const tagBook = useTagCreation(space.spaceId, space.tags, setError);
+    const tagBook = useTagCreation(space.spaceId, space.tags);
     const context = useMemo<SpaceContext>(() => ({ ...space, tags: tagBook.tags }), [space, tagBook.tags]);
     // Read at the moment an edit is applied rather than when the menu that applies
     // it was drawn, so a tag created from that menu resolves - see `useLatest`.
@@ -338,11 +338,14 @@ export function ListScreen({
     const editTask = async (task: TaskRow, change: TaskEdit) => {
         setPending((current) => ({
             ...current,
-            [task.id]: { ...current[task.id], ...taskOverlay(change, tagBook.resolve(directory.current)) }
+            [task.id]: { ...current[task.id], ...taskOverlay(change, withCreatedTags(directory.current)) }
         }));
 
+        // A tag created a moment ago is still carrying this browser's own id, and
+        // the write is where it has to be a real one.
+        const written = change.tagIds ? { ...change, tagIds: await settleTagIds(change.tagIds) } : change;
         const result = await runAction(
-            () => actions.updateTaskAction({ taskId: task.id, ...change }),
+            () => actions.updateTaskAction({ taskId: task.id, ...written }),
             setError
         );
         if (result?.error) setError(result.error);
@@ -618,14 +621,15 @@ export function ListScreen({
             setPending((current) => {
                 const next = { ...current };
                 for (const task of targets) {
-                    next[task.id] = { ...next[task.id], ...bulkOverlay(task, change, tagBook.resolve(directory.current)) };
+                    next[task.id] = { ...next[task.id], ...bulkOverlay(task, change, withCreatedTags(directory.current)) };
                 }
                 return next;
             });
         }
 
+        const written = change.addTagIds ? { ...change, addTagIds: await settleTagIds(change.addTagIds) } : change;
         const result = await runAction(
-            () => actions.bulkUpdateAction({ taskIds, ...change }),
+            () => actions.bulkUpdateAction({ taskIds, ...written }),
             setError
         );
         if (result?.error) setError(result.error);
@@ -707,13 +711,7 @@ export function ListScreen({
         // A tag belongs to a space. A screen that spans them all has none of its
         // own, so there is nowhere to put a new one; the picker then offers
         // finding rather than creating, instead of refusing a typed name.
-        onCreateTag: context.spaceId
-            ? async (name, color) => {
-                  const id = await tagBook.create(name, color);
-                  if (id) refresh();
-                  return id;
-              }
-            : undefined,
+        onCreateTag: context.spaceId ? tagBook.create : undefined,
         groupBy,
         onCreateStatus: canManageColumns
             ? async (name, type, color) => {

@@ -14,6 +14,7 @@ import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { useMemo, useState } from "react";
 import { runAction } from "@/lib/run-action";
+import { settleTagIds, withCreatedTags } from "./tag-creation";
 import type { TaskBulkEdit, TaskEdit } from "./views/shared";
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
 import { TaskMenu, type TaskCommands } from "./views/task-actions";
@@ -190,9 +191,12 @@ export function SubtaskSection({
         onError("");
         setPending((current) => ({
             ...current,
-            [subtaskId]: { ...current[subtaskId], ...taskOverlay(change, context) }
+            [subtaskId]: { ...current[subtaskId], ...taskOverlay(change, withCreatedTags(context)) }
         }));
-        const result = await runAction(() => actions.updateTaskAction({ taskId: subtaskId, ...change }), onError);
+        // A tag created from this row is carrying an id this browser made up until
+        // the write, which is where it has to be a real one.
+        const written = change.tagIds ? { ...change, tagIds: await settleTagIds(change.tagIds) } : change;
+        const result = await runAction(() => actions.updateTaskAction({ taskId: subtaskId, ...written }), onError);
         if (result?.error) onError(result.error);
         reload();
     };
@@ -205,10 +209,11 @@ export function SubtaskSection({
         if (change.archived === undefined) {
             setPending((current) => ({
                 ...current,
-                [subtask.id]: { ...current[subtask.id], ...bulkOverlay(subtask, change, context) }
+                [subtask.id]: { ...current[subtask.id], ...bulkOverlay(subtask, change, withCreatedTags(context)) }
             }));
         }
-        const result = await runAction(() => actions.bulkUpdateAction({ taskIds: [subtask.id], ...change }), onError);
+        const written = change.addTagIds ? { ...change, addTagIds: await settleTagIds(change.addTagIds) } : change;
+        const result = await runAction(() => actions.bulkUpdateAction({ taskIds: [subtask.id], ...written }), onError);
         if (result?.error) onError(result.error);
         reload();
     };

@@ -24,7 +24,7 @@ import { tagColorFor } from "./pickers";
 import { useAutosave } from "./autosave";
 import { ShareDialog } from "./task-share";
 import { runAction } from "@/lib/run-action";
-import { useTagCreation } from "./tag-creation";
+import { settleTagIds, useTagCreation, withCreatedTags } from "./tag-creation";
 import { CopyButton } from "@/components/copy-button";
 import type { TaskDetail } from "@/lib/tasks/task-service";
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
@@ -92,7 +92,7 @@ export function TaskPanel({
     // A tag made in one of this panel's pickers is put on the task at once, so the
     // panel has to be able to draw it before the space's list has been read again -
     // see `useTagCreation`. `context` below is the space with those tags in it.
-    const tagBook = useTagCreation(space.spaceId, space.tags, setError);
+    const tagBook = useTagCreation(space.spaceId, space.tags);
     const context = useMemo<SpaceContext>(() => ({ ...space, tags: tagBook.tags }), [space, tagBook.tags]);
     // Read when the edit is applied, not when the picker was drawn - see `useLatest`.
     const directory = useLatest(context);
@@ -166,14 +166,18 @@ export function TaskPanel({
         if (!wouldChange(input, task)) return true;
 
         setError("");
-        const overlay = taskOverlay(input, tagBook.resolve(directory.current));
+        const overlay = taskOverlay(input, withCreatedTags(directory.current));
         // A picker has to repaint on the click: waiting a round trip to see a status
         // move is what makes a task manager feel slow. A field being typed into is
         // already showing what was typed, and drawing over it takes the caret with it.
         if (mode === "picker") paint(overlay);
 
+        // A tag the picker invented an id for becomes a real one on the way out.
+        const written = Array.isArray(input.tagIds)
+            ? { ...input, tagIds: await settleTagIds(input.tagIds as readonly string[]) }
+            : input;
         const result = await runAction(
-            () => actions.updateTaskAction({ taskId: openId, ...input }),
+            () => actions.updateTaskAction({ taskId: openId, ...written }),
             setError
         );
         if (!result || result.error) {
@@ -315,12 +319,10 @@ export function TaskPanel({
     const openTask = (id: string) => leave(id);
 
     /** A tag born where it is needed - in a picker or a menu - instead of in the
-     *  space's settings, which is where the reason for it gets forgotten. */
-    const createTag = async (name: string, color: string) => {
-        const id = await tagBook.create(name, color);
-        if (id) onChanged();
-        return id;
-    };
+     *  space's settings, which is where the reason for it gets forgotten. It is on
+     *  the task before the server has answered; the write that follows is what
+     *  turns its id into a real one. */
+    const createTag = (name: string, color: string) => tagBook.create(name, color);
 
     const task = detail?.task;
     const watching =

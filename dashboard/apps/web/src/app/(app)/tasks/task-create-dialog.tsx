@@ -25,7 +25,7 @@ import * as core from "@polaris/core";
 import { tagColorFor } from "./pickers";
 import { taskOverlay, useLatest } from "./optimistic";
 import { runAction } from "@/lib/run-action";
-import { useTagCreation } from "./tag-creation";
+import { isProvisionalTagId, settleTagIds, useTagCreation, withCreatedTags } from "./tag-creation";
 import { PropertyRows } from "./task-properties";
 import { useEffect, useMemo, useState } from "react";
 import type { StatusView, TagView } from "@/lib/tasks/space-service";
@@ -138,9 +138,9 @@ export function TaskCreateDialog({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, defaultListId, firstStatusId, defaultName, defaultDueDate]);
 
-    // A tag created here is on the task the moment it exists, so it has to be
-    // among the tags this dialog draws against - see `useTagCreation`.
-    const tagBook = useTagCreation(spaceId, tags, setError);
+    // A tag created here is on the task before the server has answered, so it has
+    // to be among the tags this dialog draws against - see `useTagCreation`.
+    const tagBook = useTagCreation(spaceId, tags);
 
     /** What the property rows are drawn against. The space's own fields and the
      *  sibling tasks are left out: neither can be set before the task exists. */
@@ -165,7 +165,18 @@ export function TaskCreateDialog({
 
     /** The same input the panel sends the server, applied to the draft instead. */
     const patch = (input: Record<string, unknown>) =>
-        setDraft((current) => ({ ...current, ...taskOverlay(input, tagBook.resolve(directory.current)) }));
+        setDraft((current) => ({ ...current, ...taskOverlay(input, withCreatedTags(directory.current)) }));
+
+    /**
+     * The draft as it is drawn. A tag whose creation was refused comes back off
+     * it: the note said so, and leaving the chip there would have the task
+     * created under a tag that does not exist.
+     */
+    const shown = useMemo(() => {
+        const known = new Set(tagBook.tags.map((tag) => tag.id));
+        const kept = draft.tags.filter((tag) => !isProvisionalTagId(tag.id) || known.has(tag.id));
+        return kept.length === draft.tags.length ? draft : { ...draft, tags: kept };
+    }, [draft, tagBook.tags]);
 
     const nameIssue = draft.name.trim() ? core.taskName.safeParse(draft.name).error?.issues[0]?.message : null;
     const canSubmit = draft.name.trim().length > 0 && !nameIssue && Boolean(draft.listId) && !saving;
@@ -174,6 +185,9 @@ export function TaskCreateDialog({
         if (!canSubmit) return;
         setSaving(true);
         setError("");
+        // Tags made in the picker are still carrying an id this browser invented;
+        // the write waits for the real ones and goes without any that were refused.
+        const tagIds = await settleTagIds(shown.tags.map((tag) => tag.id));
         const result = await runAction(
             () =>
                 actions.createTaskAction({
@@ -183,7 +197,7 @@ export function TaskCreateDialog({
                     statusId: draft.statusId,
                     priority: draft.priority,
                     assigneeIds: draft.assignees.map((person) => person.id),
-                    tagIds: draft.tags.map((tag) => tag.id),
+                    tagIds,
                     startDate: draft.startDate,
                     dueDate: draft.dueDate,
                     timed: draft.timed,
@@ -242,7 +256,7 @@ export function TaskCreateDialog({
                     </div>
 
                     <PropertyRows
-                        task={draft}
+                        task={shown}
                         context={context}
                         running={false}
                         waitingOn={0}
