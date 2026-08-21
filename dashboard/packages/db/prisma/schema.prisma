@@ -94,6 +94,13 @@ model User {
     // for a meeting and still on two days later is worse than never setting one,
     // since everybody around them stops expecting an answer and nobody is told.
     presenceUntil DateTime?
+    // When that choice was made. Only a status schedule reads it, and only to
+    // answer the one question a repeating window raises: was this chosen before
+    // the window opened, or inside it? A choice made inside a window is somebody
+    // overruling their own rule for this morning and it stands until the window
+    // closes; one made before it is the rule's to take over. Null for an account
+    // that has never chosen, which is every account until it does.
+    presenceSetAt DateTime?
     // Second gate for admin-only routes, independent of role permissions.
     isAdmin       Boolean  @default(false)
     // When set, the account is banned: sign-in is refused and sessions are void.
@@ -216,6 +223,7 @@ model User {
     friendshipsReceived Friendship[]         @relation("FriendshipAddressee")
     blocking            UserBlock[]          @relation("UserBlockBlocker")
     blockedBy           UserBlock[]          @relation("UserBlockBlocked")
+    presenceSchedules   PresenceSchedule[]
 }
 
 // What somebody last searched for, so the panel opens on their own work.
@@ -6586,6 +6594,48 @@ model UserPrivacy {
     updatedAt    DateTime @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// One repeating window in which an account appears as something it decided in
+// advance rather than something worked out from whether it is at a screen.
+//
+// A rule about a week, not a moment: minutes past midnight and a set of
+// weekdays, read against the account's own clock. Stored that way rather than as
+// a pair of timestamps because it is the only shape that survives the clocks
+// moving, a change of timezone, and next Tuesday - and because nothing has to
+// rewrite anything for tomorrow's window to be right.
+//
+// An end at or before the start is a window that crosses midnight, which is the
+// common case (23:00 to 07:00) rather than an edge one. The days named are the
+// days it opens on.
+//
+// Nothing sweeps these and no job applies them: whether one is open is worked
+// out when somebody's dot is drawn, which matters more here than for a lapsed
+// status - a background job that has to be running for somebody to be invisible
+// is a job whose absence tells everybody where they are.
+model PresenceSchedule {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    userId      String   @db.Uuid
+    // What to appear as while it is open: busy | away | invisible. Never `auto`,
+    // which means "work it out" and so would schedule nothing.
+    presence    String
+    // Which days it opens on, as a bitmask of getDay() indexes - bit 0 Sunday
+    // through bit 6 Saturday. One integer rather than seven columns or a row per
+    // day: every question asked of it is a bit test, and it is portable to both
+    // engines this schema has to fit.
+    days        Int
+    // Minutes past midnight on the account's own clock, 0 to 1439.
+    startMinute Int
+    endMinute   Int
+    // Off keeps the window without applying it, which is what somebody wants for
+    // the week they are on holiday and is not what deleting it means.
+    enabled     Boolean  @default(true)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
 }
 
 // A set of people one account names in its privacy settings.

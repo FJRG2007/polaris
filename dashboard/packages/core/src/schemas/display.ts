@@ -519,15 +519,86 @@ export function isStatusDuration(minutes: unknown): minutes is number {
     );
 }
 
-/** Setting the line, and when it clears. Null minutes is "until I clear it";
+/**
+ * How far ahead a window may reach.
+ *
+ * The ladders are relative and short, and a moment picked off a calendar is
+ * neither - so it needs a ceiling of its own, or a typo of a year in a date
+ * field sets a status that outlives the job. A year is past the point where
+ * anybody means it and well short of the point where it looks like a bug.
+ */
+export const MAX_WINDOW_MS = 365 * 24 * 60 * 60_000;
+
+/**
+ * When a window ends: a length off the ladder, an exact moment, or neither.
+ *
+ * Two ways of saying the same thing because they are two different intentions.
+ * "For an hour" is what somebody stepping into a meeting means, and the ladder
+ * is faster than a date field for it. "Until Monday at nine" is what somebody
+ * going on holiday means, and no ladder of relative lengths says it without
+ * arithmetic. Neither is "until I change it", which stays the answer for
+ * anybody who does not want to decide now.
+ */
+export interface WindowChoice {
+    /** One of the offered lengths, or null for "until I change it". */
+    readonly minutes?: number | null;
+    /** An exact moment, as an ISO string. Wins over `minutes` when both arrive,
+     *  which is only ever a client sending the field it did not clear. */
+    readonly until?: string | null;
+}
+
+/** Whether an exact moment is one this would store: a real reading, still ahead,
+ *  and inside the ceiling. */
+export function isWindowMoment(value: unknown, now: Date = new Date()): value is string {
+    if (typeof value !== "string" || !value.trim()) return false;
+    const at = new Date(value).getTime();
+    if (!Number.isFinite(at)) return false;
+    return at > now.getTime() && at - now.getTime() <= MAX_WINDOW_MS;
+}
+
+/** The moment a window choice lands on, or null for one that never ends. Pure,
+ *  and the one place the two ways of saying it are turned into the one thing
+ *  that gets stored. */
+export function windowEndsAt(choice: WindowChoice, now: Date = new Date()): Date | null {
+    if (choice.until) return new Date(choice.until);
+    if (choice.minutes === null || choice.minutes === undefined) return null;
+    return new Date(now.getTime() + choice.minutes * 60_000);
+}
+
+/** The pair of fields, checked against one of the ladders. Shared, because the
+ *  status and the presence pickers offer different lengths and the same dates. */
+function windowChoiceSchema(offered: readonly { readonly minutes: number | null }[]) {
+    return z.object({
+        minutes: z
+            .number()
+            .nullable()
+            .optional()
+            .refine(
+                (value) =>
+                    value === null ||
+                    value === undefined ||
+                    offered.some((entry) => entry.minutes === value),
+                "Not one of the windows offered"
+            ),
+        until: z
+            .string()
+            .trim()
+            .nullable()
+            .optional()
+            .refine(
+                (value) => !value || isWindowMoment(value),
+                "Pick a moment in the future, no more than a year ahead"
+            )
+    });
+}
+
+export const presenceWindowSchema = windowChoiceSchema(PRESENCE_DURATIONS);
+
+export const statusWindowSchema = windowChoiceSchema(STATUS_DURATIONS);
+
+/** Setting the line, and when it clears. No window at all is "until I clear it";
  *  an empty line clears it now, which is how it is taken off. */
-export const userStatusSchema = z.object({
-    text: statusField,
-    minutes: z
-        .number()
-        .nullable()
-        .refine((value) => value === null || isStatusDuration(value), "Not one of the windows offered")
-});
+export const userStatusSchema = statusWindowSchema.extend({ text: statusField });
 
 export type UserStatusInput = z.infer<typeof userStatusSchema>;
 

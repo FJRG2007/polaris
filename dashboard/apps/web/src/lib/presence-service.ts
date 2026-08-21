@@ -27,7 +27,9 @@ import * as core from "@polaris/core";
 import { allowedBy } from "@/lib/privacy-service";
 import { reachableChannelIds } from "@/lib/chat/access";
 import { PARTICIPANT_TTL_MS } from "@/lib/chat/meetings";
-import { PRESENCE_CHOICES, type Presence, type PresenceChoice } from "@polaris/core";
+import { type Presence, type PresenceChoice } from "@polaris/core";
+import { getPlatformDisplayPreferences } from "@/lib/display-prefs-service";
+import { activeSchedulesFor, schedulesOf, scheduleZoneOf } from "@/lib/presence-schedule-service";
 
 // The vocabulary lives in core, because the picker that sets it is a client
 // component and this file reaches for Prisma the moment it is imported.
@@ -78,15 +80,20 @@ export async function presenceFor(
     const wanted = [...new Set(ids.filter(Boolean))];
     if (wanted.length === 0) return new Map();
 
-    const [people, sessions, calls, visible] = await Promise.all([
+    const [people, sessions, calls, visible, schedules, platformPrefs] = await Promise.all([
         prisma.user.findMany({
             where: { id: { in: wanted } },
             select: {
                 id: true,
                 presence: true,
                 presenceUntil: true,
+                presenceSetAt: true,
                 statusText: true,
-                statusUntil: true
+                statusUntil: true,
+                // Only ever read for the timezone, and only for somebody who has
+                // a schedule: a window written as 00:00 is midnight on their
+                // clock, and the server has none to fall back on.
+                displayPrefs: true
             }
         }),
         // The freshest session per account, from one query rather than one each:
@@ -101,7 +108,14 @@ export async function presenceFor(
         // Asked about the whole page at once rather than once per face: the
         // privacy check is a row read and a rule, and thirty of them one at a
         // time is thirty queries for one avatar strip.
-        allowedBy(viewer, "lastSeen", wanted)
+        allowedBy(viewer, "lastSeen", wanted),
+        // The windows anybody on this page is inside. One indexed lookup that
+        // finds nothing for almost every account, which is the shape that makes
+        // this affordable on a query that runs on every refresh.
+        activeSchedulesFor(wanted),
+        // Memoized per request, so this is the layout's own read almost every
+        // time rather than a second one.
+        getPlatformDisplayPreferences()
     ]);
 
     const seen = new Map<string, Date>();
@@ -110,6 +124,7 @@ export async function presenceFor(
     }
 
     const now = Date.now();
+    const at = new Date(now);
     const answer = new Map<string, PresenceView>();
     for (const person of people) {
         const mine = person.id === viewer.id;
@@ -120,11 +135,21 @@ export async function presenceFor(
             answer.set(person.id, { status: "offline", note: "", inCall });
             continue;
         }
-        const status = statusOf(
-            inForce(person.presence, person.presenceUntil, now),
-            seen.get(person.id),
-            now
+        const rules = schedules.get(person.id) ?? [];
+        const held = core.presenceInForce(
+            person,
+            rules,
+            // Worked out only for the few accounts that have a window, because
+            // it means parsing a blob of preferences per person.
+            rules.length > 0
+                ? core.resolveDisplayPreferences(
+                      platformPrefs,
+                      core.parseDisplayPreferences(person.displayPrefs)
+                  ).timeZone
+                : core.AUTOMATIC_TIME_ZONE,
+            at
         );
+        const status = statusOf(held.choice, seen.get(person.id), now);
         answer.set(person.id, {
             status,
             // Only while they are actually here. Both halves matter: a status
@@ -146,60 +171,77 @@ export interface PresenceChoiceView {
     /** When it goes back to `auto`, or null for "until I change it". Null too
      *  for a choice that has already lapsed, which reads as `auto`. */
     readonly until: string | null;
+    /** Whether a status schedule is what is holding it, rather than something
+     *  this person pressed. The picker says so beside the tick: somebody who
+     *  does not recognize a state they are apparently in should be told where it
+     *  came from, not left to hunt for the setting that did it. */
+    readonly scheduled: boolean;
 }
 
 export async function presenceChoiceOf(userId: string): Promise<PresenceChoiceView> {
-    const row = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { presence: true, presenceUntil: true }
-    });
-    if (!row) return { choice: "auto", until: null };
+    const [row, rules, timeZone] = await Promise.all([
+        prisma.user.findUnique({
+            where: { id: userId },
+            select: { presence: true, presenceUntil: true, presenceSetAt: true }
+        }),
+        schedulesOf(userId),
+        scheduleZoneOf(userId)
+    ]);
+    if (!row) return { choice: "auto", until: null, scheduled: false };
 
-    const held = inForce(row.presence, row.presenceUntil, Date.now());
+    const now = new Date();
     // Tidied on the way past rather than by anything that runs on a schedule.
     // This is the account's own screen, so it is one write, at the one moment
     // somebody is looking at the thing that would otherwise be a lie.
-    if (row.presenceUntil && held === "auto") {
+    //
+    // `presenceSetAt` is deliberately left where it is: lapsing is the window
+    // running out, not a new decision, so a schedule that opened after the
+    // choice was made is still the schedule's to take over.
+    const lapsed = Boolean(row.presenceUntil && row.presenceUntil <= now);
+    if (lapsed) {
         await prisma.user.update({
             where: { id: userId },
             data: { presence: "auto", presenceUntil: null }
         });
-        return { choice: "auto", until: null };
     }
+
+    const held = core.presenceInForce(
+        lapsed ? { ...row, presence: "auto", presenceUntil: null } : row,
+        rules.filter((rule) => rule.enabled),
+        timeZone,
+        now
+    );
     return {
-        choice: held,
-        until: held === "auto" ? null : (row.presenceUntil?.toISOString() ?? null)
+        choice: held.choice,
+        until: held.until?.toISOString() ?? null,
+        scheduled: held.scheduled
     };
 }
 
 /**
- * Say what to appear as, and for how long.
+ * Say what to appear as, and until when.
  *
- * `minutes` null is "until I change it", which is what a status was before there
- * was a window - so the old behaviour is still one of the options rather than
- * something that was taken away. Going back to `auto` clears the window with it:
- * a lapse time on "work it out from whether I am here" would be a rule about
+ * A window with no end is "until I change it", which is what a status was before
+ * there was one at all - so the old behaviour is still one of the options rather
+ * than something that was taken away. Going back to `auto` clears the window with
+ * it: a lapse time on "work it out from whether I am here" would be a rule about
  * nothing.
+ *
+ * The moment of the choice is recorded whatever it was, `auto` included, and
+ * that is the whole mechanism behind overruling a status schedule: choosing
+ * anything inside an open window - being visible again at one in the morning -
+ * is what makes it yours until that window closes.
  */
 export async function setPresenceChoice(
     userId: string,
     choice: PresenceChoice,
-    minutes: number | null = null
+    window: core.WindowChoice = {}
 ): Promise<void> {
-    const until =
-        choice === "auto" || minutes === null ? null : new Date(Date.now() + minutes * 60_000);
+    const until = choice === "auto" ? null : core.windowEndsAt(window);
     await prisma.user.update({
         where: { id: userId },
-        data: { presence: choice, presenceUntil: until }
+        data: { presence: choice, presenceUntil: until, presenceSetAt: new Date() }
     });
-}
-
-/** What a stored choice actually is now. A window that has passed is not a
- *  choice: the account is back on `auto`, whatever the column still says. */
-function inForce(chosen: string, until: Date | null, now: number): PresenceChoice {
-    if (!(PRESENCE_CHOICES as readonly string[]).includes(chosen)) return "auto";
-    if (until && until.getTime() <= now) return "auto";
-    return chosen as PresenceChoice;
 }
 
 /** The rule, on its own so it can be read in one place. */
@@ -286,21 +328,21 @@ export async function ownStatus(userId: string): Promise<StatusView> {
  * Set the line, and when it clears itself.
  *
  * An empty line is how one is taken off, so it clears the window with it - a
- * moment attached to nothing would be a rule about nothing. `minutes` null is
- * "until I clear it", which is offered rather than assumed for the reason the
+ * moment attached to nothing would be a rule about nothing. A window with no end
+ * is "until I clear it", which is offered rather than assumed for the reason the
  * ladder exists at all.
  */
 export async function setStatus(
     userId: string,
     text: string,
-    minutes: number | null
+    window: core.WindowChoice
 ): Promise<void> {
     const line = text.trim();
     await prisma.user.update({
         where: { id: userId },
         data: {
             statusText: line,
-            statusUntil: line && minutes !== null ? new Date(Date.now() + minutes * 60_000) : null
+            statusUntil: line ? core.windowEndsAt(window) : null
         }
     });
 }

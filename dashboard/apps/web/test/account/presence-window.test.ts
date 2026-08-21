@@ -22,6 +22,8 @@ let person: {
     id: string;
     presence: string;
     presenceUntil: Date | null;
+    presenceSetAt: Date | null;
+    displayPrefs: string | null;
     statusText: string;
     statusUntil: Date | null;
 };
@@ -32,7 +34,7 @@ let lastSeenAt: Date;
 
 /** What was written, so clearing an expired choice can be asserted rather than
  *  assumed from what came back. */
-let written: { presence?: string; presenceUntil?: Date | null } | null;
+let written: { presence?: string; presenceUntil?: Date | null; presenceSetAt?: Date } | null;
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -57,6 +59,14 @@ vi.mock("@/lib/privacy-service", () => ({
 }));
 vi.mock("@/lib/chat/access", () => ({ reachableChannelIds: async () => new Set<string>() }));
 vi.mock("@/lib/chat/meetings", () => ({ PARTICIPANT_TTL_MS: 60_000 }));
+// Nobody here has written a schedule. That they beat a choice, and when, is
+// asserted next door in status-schedule.test.ts.
+vi.mock("@/lib/presence-schedule-service", () => ({
+    activeSchedulesFor: async () => new Map(),
+    schedulesOf: async () => [],
+    scheduleZoneOf: async () => "auto"
+}));
+vi.mock("@/lib/display-prefs-service", () => ({ getPlatformDisplayPreferences: async () => ({}) }));
 
 const viewer = { id: "grace", isAdmin: false };
 
@@ -68,6 +78,8 @@ beforeEach(() => {
         id: "ada",
         presence: "busy",
         presenceUntil: null,
+        presenceSetAt: null,
+        displayPrefs: null,
         // The line beside the dot has its own test; here it is only what a row
         // actually carries, so nothing reads a column that is not there.
         statusText: "",
@@ -115,7 +127,7 @@ describe("the picker that set it", () => {
         const { presenceChoiceOf } = await import("@/lib/presence-service");
         person.presenceUntil = new Date(NOW.getTime() - 1_000);
         const mine = await presenceChoiceOf("ada");
-        expect(mine).toEqual({ choice: "auto", until: null });
+        expect(mine).toEqual({ choice: "auto", until: null, scheduled: false });
         expect(written).toEqual({ presence: "auto", presenceUntil: null });
     });
 });
@@ -123,7 +135,7 @@ describe("the picker that set it", () => {
 describe("choosing one", () => {
     it("works out the moment from the minutes it was given", async () => {
         const { setPresenceChoice } = await import("@/lib/presence-service");
-        await setPresenceChoice("ada", "away", 60);
+        await setPresenceChoice("ada", "away", { minutes: 60 });
         expect(written?.presence).toBe("away");
         expect((written?.presenceUntil as Date).toISOString()).toBe(
             new Date(NOW.getTime() + 3_600_000).toISOString()
@@ -132,14 +144,14 @@ describe("choosing one", () => {
 
     it("keeps it until it is changed when no length was picked", async () => {
         const { setPresenceChoice } = await import("@/lib/presence-service");
-        await setPresenceChoice("ada", "invisible", null);
-        expect(written).toEqual({ presence: "invisible", presenceUntil: null });
+        await setPresenceChoice("ada", "invisible", { minutes: null });
+        expect(written).toEqual({ presence: "invisible", presenceUntil: null, presenceSetAt: NOW });
     });
 
     it("clears the window when the answer is to work it out again", async () => {
         // "Back to online, for an hour" is not a thing anybody means.
         const { setPresenceChoice } = await import("@/lib/presence-service");
-        await setPresenceChoice("ada", "auto", 60);
-        expect(written).toEqual({ presence: "auto", presenceUntil: null });
+        await setPresenceChoice("ada", "auto", { minutes: 60 });
+        expect(written).toEqual({ presence: "auto", presenceUntil: null, presenceSetAt: NOW });
     });
 });

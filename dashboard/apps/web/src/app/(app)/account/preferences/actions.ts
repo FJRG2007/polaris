@@ -12,7 +12,7 @@ import * as core from "@polaris/core";
 import { setPresenceChoice, setStatus } from "@/lib/presence-service";
 import { userDisplayPreferencesSchema } from "@polaris/core";
 import { saveUserDisplayPreferences } from "@/lib/display-prefs-service";
-import { isPresenceDuration, PRESENCE_CHOICES, type PresenceChoice } from "@polaris/core";
+import { PRESENCE_CHOICES, type PresenceChoice } from "@polaris/core";
 
 export async function saveDisplayPreferencesAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
@@ -32,25 +32,26 @@ export async function saveDisplayPreferencesAction(input: unknown): Promise<{ er
  * am at the screen" - and the other three are somebody deciding, which is why
  * they outrank what the sessions say.
  *
- * The window is optional and only one of the offered lengths: it arrives from a
- * browser, so a request naming five minutes or five years is refused rather than
- * stored. Absent means "until I change it", which is what a status was before
- * there was a window at all.
+ * The window is optional and either one of the offered lengths or a moment
+ * inside the next year: it arrives from a browser, so a request naming five
+ * minutes or five centuries is refused rather than stored. Neither means "until
+ * I change it", which is what a status was before there was a window at all.
  */
 export async function setPresenceAction(
     choice: unknown,
-    minutes?: unknown
+    window?: unknown
 ): Promise<{ error?: string }> {
     const user = await requireUser();
     const wanted = (PRESENCE_CHOICES as readonly string[]).includes(String(choice))
         ? (String(choice) as PresenceChoice)
         : null;
     if (!wanted) return { error: "That is not a status" };
-    if (minutes !== undefined && minutes !== null && !isPresenceDuration(minutes)) {
-        return { error: "That is not one of the lengths offered" };
+    const parsed = core.presenceWindowSchema.safeParse(window ?? {});
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? "That is not a window" };
     }
 
-    await setPresenceChoice(user.id, wanted, isPresenceDuration(minutes) ? minutes : null);
+    await setPresenceChoice(user.id, wanted, parsed.data);
     return {};
 }
 
@@ -69,6 +70,6 @@ export async function setStatusAction(input: unknown): Promise<{ error?: string 
         return { error: parsed.error.issues[0]?.message ?? "That status could not be saved" };
     }
 
-    await setStatus(user.id, parsed.data.text, parsed.data.minutes);
+    await setStatus(user.id, parsed.data.text, parsed.data);
     return {};
 }

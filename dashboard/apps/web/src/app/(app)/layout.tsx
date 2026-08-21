@@ -146,6 +146,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                                                 email={user.email}
                                                 presence={presence.choice}
                                                 presenceUntil={presence.until}
+                                                presenceScheduled={presence.scheduled}
                                                 status={status.text}
                                                 statusUntil={status.until}
                                             />

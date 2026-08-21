@@ -18,6 +18,7 @@ import {
     Camera,
     Cctv,
     ChartColumn,
+    CalendarClock,
     Clock,
     Code2,
     Contact,
@@ -305,6 +306,17 @@ const CAMERAS_GROUP = "Cameras";
 
 const MACHINES_GROUP = "Machines";
 const OPERATIONS_GROUP = "Operations";
+
+/**
+ * The heading the account's privacy screens are read under.
+ *
+ * Three screens that are one subject: the rules by audience, the people they
+ * name, and the hours that answer the same question by the clock instead. Given
+ * a heading for the reason the security screens have one - somebody arrives
+ * looking for "who can see me", not for the particular screen it happens to be
+ * on, and a flat rail makes them read all eleven entries to find out.
+ */
+const PRIVACY_GROUP = "Privacy";
 
 /**
  * The headings the Management rail is read under.
@@ -693,6 +705,8 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: SlidersHorizontal,
             keywords: ["units", "language", "timezone", "week start", "calendar"]
         },
+        // Who sees what, in one place: the rules by audience, the people those
+        // rules name, and the hours that answer the same question by the clock.
         {
             label: "Privacy",
             href: "/account/privacy",
@@ -704,14 +718,37 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "online",
                 "avatar",
                 "photo",
-                "friends"
-            ]
+                "friends",
+                "blocked"
+            ],
+            group: PRIVACY_GROUP
+        },
+        {
+            label: "Status schedule",
+            href: "/account/privacy/schedule",
+            icon: CalendarClock,
+            keywords: [
+                "invisible",
+                "do not disturb",
+                "away",
+                "quiet hours",
+                "sleep",
+                "night",
+                "working hours",
+                "presence",
+                "automatic",
+                "recurring",
+                "every day",
+                "weekdays"
+            ],
+            group: PRIVACY_GROUP
         },
         {
             label: "Friends",
             href: "/account/friends",
             icon: Users,
-            keywords: ["friend", "request", "add somebody", "contacts"]
+            keywords: ["friend", "request", "add somebody", "contacts"],
+            group: PRIVACY_GROUP
         },
         {
             label: "Notifications",
