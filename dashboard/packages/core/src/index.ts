@@ -10,6 +10,10 @@
 // "@polaris/core/tokens" in server-only code.
 export * from "./async.js";
 export * from "./account-standing.js";
+export * from "./camera-detect.js";
+export * from "./camera-motion.js";
+export * from "./camera-tracking.js";
+export * from "./camera-zones.js";
 export * from "./cidr.js";
 export * from "./geo.js";
 export * from "./hostnames.js";

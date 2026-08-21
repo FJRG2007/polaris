@@ -34,6 +34,7 @@ const KINDS = [
     { value: "face", label: "A known face is seen" },
     { value: "vehicle", label: "A vehicle" },
     { value: "animal", label: "An animal" },
+    { value: "package", label: "A box or bag is left" },
     { value: "motion", label: "Anything moves" },
     { value: "tamper", label: "A camera is tampered with" }
 ];
@@ -43,6 +44,7 @@ export function AlertDialog({
     cameras,
     people,
     known,
+    areas,
     onClose,
     onSaved
 }: {
@@ -52,6 +54,9 @@ export function AlertDialog({
     people: readonly { id: string; name: string }[];
     /** The faces the recognizer knows, for narrowing to one person. */
     known: readonly { id: string; name: string }[];
+    /** The watched areas drawn on the cameras of this place, by name. Empty
+     *  when nobody has drawn one, and then the question is not asked. */
+    areas: readonly string[];
     onClose: () => void;
     onSaved: (rule: AlertRuleView) => void;
 }) {
@@ -59,6 +64,7 @@ export function AlertDialog({
     const [kinds, setKinds] = useState<string[]>([...(rule?.kinds ?? ["person"])]);
     const [cameraId, setCameraId] = useState(rule?.cameraId ?? "");
     const [label, setLabel] = useState(rule?.label ?? "");
+    const [zones, setZones] = useState<string[]>([...(rule?.zones ?? [])]);
     const [hoursOn, setHoursOn] = useState(rule?.hours != null);
     const [from, setFrom] = useState(String(rule?.hours?.from ?? 22));
     const [to, setTo] = useState(String(rule?.hours?.to ?? 7));
@@ -79,6 +85,7 @@ export function AlertDialog({
                     cameraId: cameraId || null,
                     kinds,
                     label: label || null,
+                    zones,
                     hours: hoursOn ? { from: Number(from) || 0, to: Number(to) || 0 } : null,
                     recipients,
                     enabled: rule?.enabled ?? true
@@ -102,8 +109,8 @@ export function AlertDialog({
                 <DialogHeader>
                     <DialogTitle>{rule ? rule.name : "Add an alert"}</DialogTitle>
                     <DialogDescription>
-                        It arrives as a message in a conversation with the people you pick, so it turns up wherever
-                        they are rather than waiting on a badge.
+                        It arrives as a message in a conversation with the people you pick, so it
+                        turns up wherever they are rather than waiting on a badge.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -121,13 +128,22 @@ export function AlertDialog({
                     </label>
 
                     <div className="flex flex-col gap-2">
-                        <span className="text-[12px] font-medium text-muted-foreground">Tell me when</span>
+                        <span className="text-[12px] font-medium text-muted-foreground">
+                            Tell me when
+                        </span>
                         <div className="flex flex-wrap gap-3">
                             {KINDS.map((item) => (
-                                <label key={item.value} className="flex items-center gap-2 text-[13px]">
+                                <label
+                                    key={item.value}
+                                    className="flex items-center gap-2 text-[13px]"
+                                >
                                     <Checkbox
                                         checked={kinds.includes(item.value)}
-                                        onChange={(event) => setKinds(toggle(kinds, item.value, event.target.checked))}
+                                        onChange={(event) =>
+                                            setKinds(
+                                                toggle(kinds, item.value, event.target.checked)
+                                            )
+                                        }
                                     />
                                     {item.label}
                                 </label>
@@ -137,34 +153,75 @@ export function AlertDialog({
 
                     <div className="grid gap-3 sm:grid-cols-2">
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-[12px] font-medium text-muted-foreground">On</span>
+                            <span className="text-[12px] font-medium text-muted-foreground">
+                                On
+                            </span>
                             <Select
                                 value={cameraId}
                                 onValueChange={setCameraId}
                                 options={[
                                     { value: "", label: "Any camera here" },
-                                    ...cameras.map((camera) => ({ value: camera.id, label: camera.name }))
+                                    ...cameras.map((camera) => ({
+                                        value: camera.id,
+                                        label: camera.name
+                                    }))
                                 ]}
                             />
                         </label>
                         {known.length > 0 ? (
                             <label className="flex flex-col gap-1.5">
-                                <span className="text-[12px] font-medium text-muted-foreground">Only about</span>
+                                <span className="text-[12px] font-medium text-muted-foreground">
+                                    Only about
+                                </span>
                                 <Select
                                     value={label}
                                     onValueChange={setLabel}
                                     options={[
                                         { value: "", label: "Anybody, strangers included" },
-                                        ...known.map((person) => ({ value: person.name, label: person.name }))
+                                        ...known.map((person) => ({
+                                            value: person.name,
+                                            label: person.name
+                                        }))
                                     ]}
                                 />
                             </label>
                         ) : null}
                     </div>
 
+                    {areas.length > 0 ? (
+                        <div className="flex flex-col gap-2">
+                            <span className="text-[12px] font-medium text-muted-foreground">
+                                Only in
+                            </span>
+                            <div className="flex flex-wrap gap-3">
+                                {areas.map((area) => (
+                                    <label
+                                        key={area}
+                                        className="flex items-center gap-2 text-[13px]"
+                                    >
+                                        <Checkbox
+                                            checked={zones.includes(area)}
+                                            onChange={(event) =>
+                                                setZones(toggle(zones, area, event.target.checked))
+                                            }
+                                        />
+                                        {area}
+                                    </label>
+                                ))}
+                            </div>
+                            <p className="text-[12px] text-foreground-subtle">
+                                {zones.length === 0
+                                    ? "Anywhere the camera can see."
+                                    : "A camera nobody has drawn on will never match this."}
+                            </p>
+                        </div>
+                    ) : null}
+
                     <div className="flex flex-col gap-2">
                         <label className="flex items-center justify-between gap-3">
-                            <span className="text-[13px] text-foreground">Only at certain hours</span>
+                            <span className="text-[13px] text-foreground">
+                                Only at certain hours
+                            </span>
                             <Switch checked={hoursOn} onChange={setHoursOn} />
                         </label>
                         {hoursOn ? (
@@ -197,11 +254,16 @@ export function AlertDialog({
                         </span>
                         <div className="flex max-h-40 flex-col gap-2 overflow-y-auto rounded-md border border-border p-2">
                             {people.map((person) => (
-                                <label key={person.id} className="flex items-center gap-2 text-[13px]">
+                                <label
+                                    key={person.id}
+                                    className="flex items-center gap-2 text-[13px]"
+                                >
                                     <Checkbox
                                         checked={recipients.includes(person.id)}
                                         onChange={(event) =>
-                                            setRecipients(toggle(recipients, person.id, event.target.checked))
+                                            setRecipients(
+                                                toggle(recipients, person.id, event.target.checked)
+                                            )
                                         }
                                     />
                                     {person.name}
@@ -219,7 +281,9 @@ export function AlertDialog({
                     </Button>
                     <Button
                         onClick={save}
-                        disabled={busy || !name.trim() || kinds.length === 0 || recipients.length === 0}
+                        disabled={
+                            busy || !name.trim() || kinds.length === 0 || recipients.length === 0
+                        }
                     >
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                         {rule ? "Save" : "Add alert"}

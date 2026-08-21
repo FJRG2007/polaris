@@ -7050,6 +7050,7 @@ model Camera {
     place  Place?        @relation(fields: [placeId], references: [id], onDelete: SetNull)
     events CameraEvent[]
     clips  CameraClip[]
+    zones  CameraZone[]
 
     @@index([installedAppId])
     @@index([placeId])
@@ -7066,8 +7067,8 @@ model CameraEvent {
     id        String    @id @default(uuid(7)) @db.Uuid
     cameraId  String    @db.Uuid
     at        DateTime  @default(now())
-    /// motion | person | vehicle | animal | face | offline | tamper - what was
-    /// seen, at the most specific stage that ran.
+    /// motion | person | vehicle | animal | package | face | offline | tamper -
+    /// what was seen, at the most specific stage that ran.
     kind      String
     /// Who or what, when the stage that ran can say: the name of a known face,
     /// the object class. Null for bare movement.
@@ -7078,6 +7079,25 @@ model CameraEvent {
     /// Where the still is, as a key in the house's storage. Null when the stage
     /// that fired keeps no picture (a camera reporting its own motion).
     stillKey  String?
+    /// Where in the picture it was, as a JSON [x1, y1, x2, y2] of fractions of
+    /// the frame. Relative rather than pixels so it can be drawn over a still of
+    /// any size, and over the live view of a camera whose stream has since
+    /// changed resolution. Null on anything that did not come from a detector
+    /// with an opinion about position - a camera's own alert, or a warning.
+    box       String?
+    /// The areas of the camera it was standing in, as a JSON array of their
+    /// names. Names rather than ids on purpose: an area redrawn or removed next
+    /// month must not silently rewrite what a camera saw last night.
+    zones     String  @default("[]")
+    /// When it stopped being there. A detector that follows something across
+    /// frames knows the difference between somebody arriving and somebody still
+    /// standing there, so an event has a length rather than only an instant.
+    /// Null on an event that was an instant, and on one still happening.
+    endedAt   DateTime?
+    /// What the detector called this thing while it was following it. Not a
+    /// stable identity - the same person tomorrow is a different one - only the
+    /// handle that lets a later frame update the event it already opened.
+    trackId   String?
     /// The recording this event sits inside, when one was kept.
     clipId    String?   @db.Uuid
     /// Somebody has seen this and it needs no further attention.
@@ -7092,6 +7112,8 @@ model CameraEvent {
     @@index([cameraId, at])
     @@index([at])
     @@index([cameraId, kind, at])
+    // How a later frame finds the event it already opened for this thing.
+    @@index([cameraId, trackId])
 }
 
 // Footage kept on disk.
@@ -7156,6 +7178,11 @@ model AlertRule {
     /// Only this person, by the name the recognizer puts to them. Null is
     /// anybody - including, deliberately, a stranger.
     label          String?
+    /// Only what was standing in one of these areas, as a JSON array of their
+    /// names. Empty is anywhere the camera can see, which is what every rule
+    /// written before areas existed means. Names rather than ids, to match how
+    /// an event records them.
+    zones          String  @default("[]")
     /// The hours it applies, as a JSON {from,to} in local time, or null for all
     /// day. The same shape a camera's detection window uses.
     hours          String?
@@ -7202,4 +7229,56 @@ model HomePerson {
     @@unique([installedAppId, name])
     @@unique([installedAppId, subjectId])
     @@index([installedAppId])
+}
+
+// The parts of a camera's picture that count, and the ones that never do.
+//
+// A camera sees one rectangle and has no opinion about it, and that is where
+// almost every useless alert comes from: the road at the bottom of the drive,
+// the tree by the fence, the neighbour's door. None of those is a detection
+// fault - the detector is right, a car really did go past - so no amount of
+// sensitivity fixes them. What is missing is a way to say where in the picture
+// Polaris is looking.
+//
+// Two kinds and no more. A `watch` zone narrows the camera: once one exists,
+// something only counts when it is standing inside one of them, and the event
+// records which. An `ignore` zone is never reported, whatever else says
+// otherwise. Between them they cover the mask, the required area and the
+// per-area object filter that the field's three main projects each spell
+// differently.
+model CameraZone {
+    id       String @id @default(uuid(7)) @db.Uuid
+    cameraId String @db.Uuid
+    name     String
+    /// watch | ignore.
+    kind     String @default("watch")
+    /// The outline, as a JSON array of [x, y] pairs from 0 to 1 across the
+    /// frame. Relative rather than pixels because a zone is drawn on whatever
+    /// size picture the browser loaded and tested against whatever size frame
+    /// the detector decoded, and those are never the same number - storing
+    /// pixels means the zone silently moves the day the stream's resolution
+    /// changes.
+    points   String
+    /// Which classes count here, as a JSON array, or empty for all of them. A
+    /// drive that only cares about vehicles and a doorway that only cares about
+    /// people are the same camera.
+    objects  String @default("[]")
+    /// Frames running something must be inside before it is counted as inside.
+    /// A detector's box wobbles by a few pixels every frame, and on a boundary
+    /// that reads as somebody stepping in and out twice a second.
+    inertia  Int    @default(3)
+    /// Seconds it must stay before it counts at all. Zero is the normal case;
+    /// a car park that only cares about somebody who stopped is not.
+    loiterSeconds Int @default(0)
+    enabled  Boolean @default(true)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    camera Camera @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+
+    // Two names on one camera would make an event's zone list ambiguous, which
+    // is the one thing the list has to be.
+    @@unique([cameraId, name])
+    @@index([cameraId])
 }

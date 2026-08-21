@@ -16,7 +16,7 @@ import { prisma } from "@polaris/db";
 import { storeStill } from "@/lib/home/stills";
 import { homeInstall } from "@/lib/home/access";
 import { authorizeWorker } from "@/lib/home/vision";
-import { recordDetection } from "@/lib/home/events";
+import { closeDetection, recordDetection } from "@/lib/home/events";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,13 +25,29 @@ export const dynamic = "force-dynamic";
  *  what stops a wrong (or hostile) worker filling the disk one event at a time. */
 const MAX_STILL_BYTES = 2_000_000;
 
+/** A corner of the frame, as a fraction of it. Bounded rather than free: a box
+ *  outside the picture is a worker that has misread its own model, and it must
+ *  not be drawn over a still. */
+const fractionSchema = z.coerce.number().min(0).max(1);
+
 const bodySchema = z.object({
     cameraId: z.string().uuid(),
-    kind: z.enum(["motion", "person", "vehicle", "animal", "face", "tamper"]),
+    kind: z.enum(["motion", "person", "vehicle", "animal", "package", "face", "tamper"]),
     label: z.string().trim().max(64).nullish(),
     score: z.coerce.number().int().min(0).max(100).nullish(),
     /** JPEG bytes, base64. Optional: the movement rung keeps no picture. */
-    still: z.string().max(Math.ceil(MAX_STILL_BYTES * 1.4)).nullish()
+    still: z
+        .string()
+        .max(Math.ceil(MAX_STILL_BYTES * 1.4))
+        .nullish(),
+    /** Where in the picture it was: [x1, y1, x2, y2]. */
+    box: z.tuple([fractionSchema, fractionSchema, fractionSchema, fractionSchema]).nullish(),
+    /** The areas it was standing in, by the name the camera gave them. */
+    zones: z.array(z.string().trim().max(64)).max(32).default([]),
+    /** The worker's handle on the thing it is following, when it follows one. */
+    trackId: z.string().trim().max(64).nullish(),
+    /** Set when this report is the end of something rather than the start. */
+    ended: z.boolean().default(false)
 });
 
 export async function POST(request: Request): Promise<Response> {
@@ -49,6 +65,13 @@ export async function POST(request: Request): Promise<Response> {
     });
     if (!camera) return Response.json({ error: "No such camera." }, { status: 404 });
 
+    // The end of something is only ever an update to the event its beginning
+    // opened, so it costs no picture and no storage.
+    if (parsed.data.ended) {
+        if (parsed.data.trackId) await closeDetection(camera.id, parsed.data.trackId, new Date());
+        return Response.json({ recorded: false, eventId: null });
+    }
+
     let stillKey: string | null = null;
     if (parsed.data.still) {
         const bytes = Buffer.from(parsed.data.still, "base64");
@@ -63,7 +86,17 @@ export async function POST(request: Request): Promise<Response> {
         kind: parsed.data.kind,
         label: parsed.data.label ?? null,
         score: parsed.data.score ?? null,
-        stillKey
+        stillKey,
+        box: parsed.data.box
+            ? {
+                  x1: parsed.data.box[0],
+                  y1: parsed.data.box[1],
+                  x2: parsed.data.box[2],
+                  y2: parsed.data.box[3]
+              }
+            : null,
+        zones: parsed.data.zones,
+        trackId: parsed.data.trackId ?? null
     });
     // A report folded into the one before it is a normal outcome, not a failure:
     // the worker is told so it can stop doing the expensive part for a while.

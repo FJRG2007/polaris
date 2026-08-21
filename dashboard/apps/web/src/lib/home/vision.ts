@@ -19,6 +19,8 @@ import { prisma } from "@polaris/db";
 import { appBaseUrl } from "@/lib/domain-service";
 import { recognizerFor } from "@/lib/home/recognizer";
 import { parseDetection } from "@/lib/home/cameras";
+import { zonesByCamera } from "@/lib/home/camera-zones";
+import type { Zone } from "@polaris/core";
 import { installApp } from "@/lib/apps/install-service";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { installEnvSecret } from "@/lib/apps/install-secret";
@@ -49,8 +51,17 @@ export interface VisionAssignment {
     readonly classes: readonly ObjectClass[];
     /** Hours it is on, in the house's local time. Null is all day. */
     readonly hours: { from: number; to: number } | null;
+    /** The areas drawn on this camera. The worker masks the ignored ones out of
+     *  movement itself, and tests everything it detects against the watched
+     *  ones - so an area is applied where the pixels are rather than after the
+     *  event has already been written. */
+    readonly zones: readonly Zone[];
     /** Where to ask who somebody is, when the camera reaches that rung. */
-    readonly faces: { readonly baseUrl: string; readonly apiKey: string; readonly threshold: number } | null;
+    readonly faces: {
+        readonly baseUrl: string;
+        readonly apiKey: string;
+        readonly threshold: number;
+    } | null;
 }
 
 /** The vision worker running on one server, or null when there is not one. */
@@ -65,7 +76,11 @@ async function findWorker(serverId: string) {
  * rather than on a render path. It is idempotent: a server that already has one
  * keeps it.
  */
-export async function ensureVisionWorker(ownerId: string, actorId: string, serverId: string): Promise<void> {
+export async function ensureVisionWorker(
+    ownerId: string,
+    actorId: string,
+    serverId: string
+): Promise<void> {
     if (await findWorker(serverId)) return;
     await assertServer(ownerId, serverId);
     await installApp(ownerId, actorId, {
@@ -97,8 +112,13 @@ export async function authorizeWorker(request: Request): Promise<{ ownerId: stri
     });
     const digest = (value: string) => createHash("sha256").update(value).digest();
     for (const worker of workers) {
-        const key = await installEnvSecret(worker.applicationId as string, worker.ownerId, "WORKER_KEY");
-        if (key && timingSafeEqual(digest(presented), digest(key))) return { ownerId: worker.ownerId };
+        const key = await installEnvSecret(
+            worker.applicationId as string,
+            worker.ownerId,
+            "WORKER_KEY"
+        );
+        if (key && timingSafeEqual(digest(presented), digest(key)))
+            return { ownerId: worker.ownerId };
     }
     return null;
 }
@@ -126,6 +146,10 @@ export async function assignmentsFor(installedAppId: string): Promise<VisionAssi
     if (cameras.length === 0) return [];
 
     const faces = await recognizerFor(installedAppId);
+    // One query for the whole house rather than one per camera: the answer is
+    // small and a house with twenty cameras should not cost twenty round trips
+    // to say what was drawn on them.
+    const zones = await zonesByCamera(installedAppId);
     const assignments: VisionAssignment[] = [];
     for (const camera of cameras) {
         const endpoint = await relayEndpoint(relayServerFor(camera.reachVia));
@@ -148,13 +172,18 @@ export async function assignmentsFor(installedAppId: string): Promise<VisionAssi
             detector,
             classes: detection.classes,
             hours: detection.hours,
+            zones: zones.get(camera.id) ?? [],
             faces:
                 faces && detectorReaches(detector, "faces")
                     ? // The worker runs beside the recognizer as often as not, so
                       // it gets the address that machine can dial rather than the
                       // one Polaris uses - which may be a tunnel that exists only
                       // inside this process.
-                      { baseUrl: faces.directUrl, apiKey: faces.apiKey, threshold: detection.faceThreshold }
+                      {
+                          baseUrl: faces.directUrl,
+                          apiKey: faces.apiKey,
+                          threshold: detection.faceThreshold
+                      }
                     : null
         });
     }

@@ -11,6 +11,7 @@
 
 import { z } from "zod";
 import { DETECTORS, OBJECT_CLASSES } from "@/lib/home/detection";
+import { MAX_ZONE_POINTS, MIN_ZONE_POINTS, ZONE_KINDS } from "@polaris/core";
 
 /** How a camera's address is written down, whatever was typed. Hostnames are
  *  case-insensitive and an address is compared, so it is lowered; an IP is
@@ -51,7 +52,10 @@ const addressSchema = z
     .trim()
     .min(1, "Where is the camera?")
     .max(255)
-    .refine((value) => !/[\s@/\\]/.test(value), "Just the address: no slashes, spaces or credentials");
+    .refine(
+        (value) => !/[\s@/\\]/.test(value),
+        "Just the address: no slashes, spaces or credentials"
+    );
 
 const portSchema = z.coerce.number().int().min(1).max(65535);
 
@@ -68,7 +72,10 @@ export const detectionSettingsSchema = z.object({
     classes: z.array(z.enum(OBJECT_CLASSES)).max(OBJECT_CLASSES.length),
     faceThreshold: z.coerce.number().int().min(1).max(100),
     hours: z
-        .object({ from: z.coerce.number().int().min(0).max(23), to: z.coerce.number().int().min(0).max(23) })
+        .object({
+            from: z.coerce.number().int().min(0).max(23),
+            to: z.coerce.number().int().min(0).max(23)
+        })
         .nullable()
 });
 
@@ -119,6 +126,50 @@ export type CameraInput = z.infer<typeof cameraInputSchema>;
  *  rules judge the value that will actually be stored. */
 export function parseCameraInput(input: unknown): CameraInput {
     return cameraInputSchema.parse(normalizeCameraInput((input ?? {}) as Record<string, unknown>));
+}
+
+/**
+ * A zone drawn on a camera.
+ *
+ * The points arrive from a browser as pairs already in frame-relative units,
+ * because the editor cannot know what size the detector will decode and the
+ * detector cannot know what size the editor drew on. They are clamped rather
+ * than rejected: a polygon dragged a few pixels past the edge of the picture is
+ * somebody drawing to the corner, not somebody sending a bad request.
+ */
+const zonePointSchema = z.tuple([
+    z.coerce.number().min(-1).max(2),
+    z.coerce.number().min(-1).max(2)
+]);
+
+export const cameraZoneInputSchema = z.object({
+    name: z.string().trim().min(1, "Give the area a name").max(64),
+    kind: z.enum(ZONE_KINDS).default("watch"),
+    points: z
+        .array(zonePointSchema)
+        .min(MIN_ZONE_POINTS, "An area needs at least three corners")
+        .max(MAX_ZONE_POINTS, "That is more corners than an area needs"),
+    /** Empty means every class this camera reports. */
+    objects: z.array(z.enum(OBJECT_CLASSES)).max(OBJECT_CLASSES.length).default([]),
+    // One frame means "the moment the box lands in it", which is right for a
+    // doorway and wrong for anything with a boundary running through open
+    // ground.
+    inertia: z.coerce.number().int().min(1).max(30).default(3),
+    // A quarter of an hour at the top. Longer than that is not loitering, it is
+    // living there.
+    loiterSeconds: z.coerce.number().int().min(0).max(900).default(0),
+    enabled: z.boolean().default(true)
+});
+
+export type CameraZoneInput = z.infer<typeof cameraZoneInputSchema>;
+
+/** What a zone's editable text is put through, on both sides. Trimmed first so
+ *  two areas cannot be told apart by a trailing space, which the camera-unique
+ *  name constraint would then let through. */
+export function normalizeZoneInput(input: unknown): Record<string, unknown> {
+    const value = { ...((input ?? {}) as Record<string, unknown>) };
+    if (typeof value.name === "string") value.name = value.name.trim();
+    return value;
 }
 
 /** What a discovery sweep is asked for: one subnet, or the one Polaris is on. */

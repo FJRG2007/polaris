@@ -44,6 +44,7 @@ const KIND_LABEL: Record<string, string> = {
     face: "a known face",
     vehicle: "a vehicle",
     animal: "an animal",
+    package: "a box or bag is left",
     tamper: "tampering"
 };
 
@@ -52,6 +53,8 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
     const [cameras, setCameras] = useState<CameraView[]>([]);
     const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
     const [known, setKnown] = useState<{ id: string; name: string }[]>([]);
+    /** The watched areas drawn anywhere in this place, so a rule can name one. */
+    const [areas, setAreas] = useState<string[]>([]);
     const [editing, setEditing] = useState<AlertRuleView | null>(null);
     const [adding, setAdding] = useState(false);
     const [removing, setRemoving] = useState<AlertRuleView | null>(null);
@@ -63,11 +66,12 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
     useEffect(() => {
         let cancelled = false;
         void (async () => {
-            const [list, cams, recipients, faces] = await Promise.all([
+            const [list, cams, recipients, faces, drawn] = await Promise.all([
                 actions.listAlertsAction(),
                 actions.listCamerasAction(),
                 canManage ? actions.listRecipientsAction() : Promise.resolve({ people: [] }),
-                actions.listPeopleAction()
+                actions.listPeopleAction(),
+                actions.listPlaceZoneNamesAction()
             ]);
             if (cancelled) return;
             if (list.error) setError(list.error);
@@ -75,6 +79,7 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
             setCameras(cams.cameras ?? []);
             setPeople(recipients.people ?? []);
             setKnown((faces.people ?? []).map((person) => ({ id: person.id, name: person.name })));
+            setAreas(drawn.zones ?? []);
         })();
         return () => {
             cancelled = true;
@@ -98,12 +103,19 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
     };
 
     const toggle = async (rule: AlertRuleView, enabled: boolean) => {
-        setRules((current) => (current ?? []).map((item) => (item.id === rule.id ? { ...item, enabled } : item)));
-        const result = await runAction(() => actions.saveAlertAction(rule.id, { ...rule, enabled }), setError);
+        setRules((current) =>
+            (current ?? []).map((item) => (item.id === rule.id ? { ...item, enabled } : item))
+        );
+        const result = await runAction(
+            () => actions.saveAlertAction(rule.id, { ...rule, enabled }),
+            setError
+        );
         if (result?.error) {
             setError(result.error);
             setRules((current) =>
-                (current ?? []).map((item) => (item.id === rule.id ? { ...item, enabled: !enabled } : item))
+                (current ?? []).map((item) =>
+                    item.id === rule.id ? { ...item, enabled: !enabled } : item
+                )
             );
         }
     };
@@ -143,8 +155,9 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
         const where = rule.cameraId
             ? (cameras.find((camera) => camera.id === rule.cameraId)?.name ?? "one camera")
             : "any camera here";
+        const inside = rule.zones.length > 0 ? `, in ${rule.zones.join(" or ")}` : "";
         const when = rule.hours ? `, between ${rule.hours.from}:00 and ${rule.hours.to}:00` : "";
-        return `When ${what}${who} is seen on ${where}${when}`;
+        return `When ${what}${who} is seen on ${where}${inside}${when}`;
     };
 
     return (
@@ -185,14 +198,27 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                                 >
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-2">
-                                            <span className="truncate text-[13px] text-foreground" title={rule.name}>{rule.name}</span>
-                                            {rule.channelId ? null : <Badge variant="neutral">Never fired</Badge>}
+                                            <span
+                                                className="truncate text-[13px] text-foreground"
+                                                title={rule.name}
+                                            >
+                                                {rule.name}
+                                            </span>
+                                            {rule.channelId ? null : (
+                                                <Badge variant="neutral">Never fired</Badge>
+                                            )}
                                         </div>
-                                        <p className="truncate text-[11px] text-foreground-subtle">{describe(rule)}</p>
+                                        <p className="truncate text-[11px] text-foreground-subtle">
+                                            {describe(rule)}
+                                        </p>
                                         <p className="truncate text-[11px] text-foreground-subtle">
                                             Tells{" "}
                                             {rule.recipients
-                                                .map((id) => people.find((person) => person.id === id)?.name ?? "somebody")
+                                                .map(
+                                                    (id) =>
+                                                        people.find((person) => person.id === id)
+                                                            ?.name ?? "somebody"
+                                                )
                                                 .join(", ")}
                                         </p>
                                     </div>
@@ -235,18 +261,25 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                                             <Pencil className="size-4 shrink-0" />
                                             Rename and change
                                         </ContextMenuItem>
-                                        <ContextMenuItem onSelect={() => void toggle(rule, !rule.enabled)}>
+                                        <ContextMenuItem
+                                            onSelect={() => void toggle(rule, !rule.enabled)}
+                                        >
                                             <Bell className="size-4 shrink-0" />
                                             {rule.enabled ? "Turn off" : "Turn on"}
                                         </ContextMenuItem>
                                         <ContextMenuSeparator />
-                                        <ContextMenuItem variant="danger" onSelect={() => setRemoving(rule)}>
+                                        <ContextMenuItem
+                                            variant="danger"
+                                            onSelect={() => setRemoving(rule)}
+                                        >
                                             <Trash2 className="size-4 shrink-0" />
                                             Remove
                                         </ContextMenuItem>
                                     </>
                                 ) : (
-                                    <ContextMenuItem disabled>Nothing to change here</ContextMenuItem>
+                                    <ContextMenuItem disabled>
+                                        Nothing to change here
+                                    </ContextMenuItem>
                                 )}
                             </ContextMenuContent>
                         </ContextMenu>
@@ -260,6 +293,7 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                     cameras={cameras}
                     people={people}
                     known={known}
+                    areas={areas}
                     onClose={() => {
                         setEditing(null);
                         setAdding(false);

@@ -18,6 +18,7 @@ import * as actions from "../actions";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { EventView } from "@/lib/home/events";
+import { DetectionBox } from "../detection-box";
 import type { CameraView } from "@/lib/home/cameras";
 import { Bell, Check, Loader2, Trash2 } from "lucide-react";
 import { MediaPlayer } from "@/components/media-player";
@@ -42,18 +43,37 @@ const KINDS = [
     { value: "face", label: "Known faces" },
     { value: "vehicle", label: "Vehicles" },
     { value: "animal", label: "Animals" },
+    { value: "package", label: "Parcels" },
     { value: "motion", label: "Movement" }
 ];
+
+/** The shape every tile is drawn at. The stills are not all this shape - a
+ *  still keeps whatever the camera sends - so it is also what the box drawn over
+ *  one has to be told, or it is placed against the tile instead of against the
+ *  picture inside it. */
+const TILE_SHAPE = 16 / 9;
 
 const KIND_LABEL: Record<string, string> = {
     motion: "Movement",
     person: "Somebody",
     vehicle: "A vehicle",
     animal: "An animal",
+    package: "A box or bag",
     face: "Recognized",
     tamper: "Camera tampered with",
     offline: "Camera went quiet"
 };
+
+/** How long the thing was there, for a detector that followed it. Rounded to
+ *  seconds: nobody reads a duration in milliseconds, and anything under one is
+ *  an instant rather than a stay. */
+function lasted(event: EventView): string | null {
+    if (!event.endedAt) return null;
+    const seconds = Math.round(
+        (new Date(event.endedAt).getTime() - new Date(event.at).getTime()) / 1000
+    );
+    return seconds >= 1 ? `${seconds}s` : null;
+}
 
 export function EventsView({ canControl }: { canControl: boolean }) {
     const format = useDisplayFormat();
@@ -63,10 +83,20 @@ export function EventsView({ canControl }: { canControl: boolean }) {
     const [cameraId, setCameraId] = useState("");
     const [kind, setKind] = useState("");
     const [label, setLabel] = useState("");
+    const [zone, setZone] = useState("");
+    /** The watched areas anybody has drawn in this place, for the filter. Empty
+     *  when nobody has drawn one, and then the filter is not offered at all. */
+    const [zones, setZones] = useState<string[]>([]);
     const [from, setFrom] = useState("");
     const [to, setTo] = useState("");
-    const [moment, setMoment] = useState<{ event: EventView; clipId: string; offsetSeconds: number } | null>(null);
+    const [moment, setMoment] = useState<{
+        event: EventView;
+        clipId: string;
+        offsetSeconds: number;
+    } | null>(null);
     const [noFootage, setNoFootage] = useState<string | null>(null);
+    /** Each still's own shape, by event, learned as the pictures arrive. */
+    const [shapes, setShapes] = useState<Record<string, number>>({});
     const [clearing, setClearing] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
     const [done, setDone] = useState(false);
@@ -75,9 +105,14 @@ export function EventsView({ canControl }: { canControl: boolean }) {
     useEffect(() => {
         let cancelled = false;
         void (async () => {
-            const [list, known] = await Promise.all([actions.listCamerasAction(), actions.listPeopleAction()]);
+            const [list, known, areas] = await Promise.all([
+                actions.listCamerasAction(),
+                actions.listPeopleAction(),
+                actions.listPlaceZoneNamesAction()
+            ]);
             if (cancelled) return;
             setCameras(list.cameras ?? []);
+            setZones(areas.zones ?? []);
             setPeople(
                 (known.people ?? []).map((person) => ({
                     id: person.id,
@@ -100,6 +135,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                 cameraId: cameraId || null,
                 kind: kind || null,
                 label: label || null,
+                zone: zone || null,
                 from: from || null,
                 to: to || null
             });
@@ -110,7 +146,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
         return () => {
             cancelled = true;
         };
-    }, [cameraId, kind, label, from, to]);
+    }, [cameraId, kind, label, zone, from, to]);
 
     const loadMore = async () => {
         if (!events?.length) return;
@@ -121,6 +157,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                     cameraId: cameraId || null,
                     kind: kind || null,
                     label: label || null,
+                    zone: zone || null,
                     from: from || null,
                     to: to || null,
                     before: events[events.length - 1]?.at ?? null
@@ -141,7 +178,9 @@ export function EventsView({ canControl }: { canControl: boolean }) {
         const result = await runAction(() => actions.deleteEventAction(event.id), setError);
         if (result?.error) {
             setError(result.error);
-            setEvents((current) => [event, ...(current ?? [])].sort((a, b) => b.at.localeCompare(a.at)));
+            setEvents((current) =>
+                [event, ...(current ?? [])].sort((a, b) => b.at.localeCompare(a.at))
+            );
         }
     };
 
@@ -153,6 +192,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                     cameraId: cameraId || null,
                     kind: kind || null,
                     label: label || null,
+                    zone: zone || null,
                     from: from || null,
                     to: to || null
                 }),
@@ -175,7 +215,9 @@ export function EventsView({ canControl }: { canControl: boolean }) {
         if (result?.error) {
             setError(result.error);
             setEvents((current) =>
-                (current ?? []).map((item) => (item.id === event.id ? { ...item, acked: false } : item))
+                (current ?? []).map((item) =>
+                    item.id === event.id ? { ...item, acked: false } : item
+                )
             );
         }
     };
@@ -223,7 +265,13 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                         ...cameras.map((camera) => ({ value: camera.id, label: camera.name }))
                     ]}
                 />
-                <Select value={kind} onValueChange={setKind} className="w-44" aria-label="What happened" options={KINDS} />
+                <Select
+                    value={kind}
+                    onValueChange={setKind}
+                    className="w-44"
+                    aria-label="What happened"
+                    options={KINDS}
+                />
                 {people.length > 0 ? (
                     <Select
                         value={label}
@@ -236,7 +284,22 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                             // the event, shown under whatever they are called
                             // now: a name corrected here still finds everything
                             // recorded before the correction.
-                            ...people.map((person) => ({ value: person.subjectId, label: person.name }))
+                            ...people.map((person) => ({
+                                value: person.subjectId,
+                                label: person.name
+                            }))
+                        ]}
+                    />
+                ) : null}
+                {zones.length > 0 ? (
+                    <Select
+                        value={zone}
+                        onValueChange={setZone}
+                        className="w-44"
+                        aria-label="Where"
+                        options={[
+                            { value: "", label: "Anywhere" },
+                            ...zones.map((name) => ({ value: name, label: name }))
                         ]}
                     />
                 ) : null}
@@ -254,7 +317,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                     aria-label="To"
                     className="h-9 rounded-md border border-border bg-field px-2 text-[13px] text-foreground"
                 />
-                {cameraId || kind || label || from || to ? (
+                {cameraId || kind || label || zone || from || to ? (
                     <Button
                         variant="ghost"
                         size="sm"
@@ -262,6 +325,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                             setCameraId("");
                             setKind("");
                             setLabel("");
+                            setZone("");
                             setFrom("");
                             setTo("");
                         }}
@@ -300,17 +364,39 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                             >
                                 <button
                                     type="button"
-                                    className="relative block aspect-video w-full cursor-zoom-in bg-background"
+                                    style={{ aspectRatio: TILE_SHAPE }}
+                                    className="relative block w-full cursor-zoom-in bg-background"
                                     onClick={() => void openMoment(event)}
                                     aria-label={`See ${event.cameraName} at ${format.dateTime(event.at)}`}
                                 >
                                     {event.stillKey ? (
+                                        // Drawn whole rather than cropped to
+                                        // fill: the box below is in fractions of
+                                        // the frame, and a box over a cropped
+                                        // picture points at the wrong part of it.
+                                        // Its own shape is read off it as it
+                                        // loads, because that is what says where
+                                        // in the tile the picture ended up.
                                         <Image
                                             src={`/api/home/events/${event.id}/still`}
                                             alt=""
                                             fill
                                             sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw"
-                                            className="object-cover"
+                                            className="object-contain"
+                                            onLoad={(loaded) => {
+                                                const { naturalWidth, naturalHeight } =
+                                                    loaded.currentTarget;
+                                                if (naturalWidth <= 0 || naturalHeight <= 0) return;
+                                                setShapes((current) =>
+                                                    current[event.id]
+                                                        ? current
+                                                        : {
+                                                              ...current,
+                                                              [event.id]:
+                                                                  naturalWidth / naturalHeight
+                                                          }
+                                                );
+                                            }}
                                             unoptimized
                                         />
                                     ) : (
@@ -318,6 +404,18 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                             No picture kept
                                         </span>
                                     )}
+                                    {event.stillKey ? (
+                                        <DetectionBox
+                                            box={event.box}
+                                            label={
+                                                nameFor(event.label) ??
+                                                KIND_LABEL[event.kind] ??
+                                                null
+                                            }
+                                            picture={shapes[event.id] ?? null}
+                                            tile={TILE_SHAPE}
+                                        />
+                                    ) : null}
                                     {noFootage === event.id ? (
                                         <span className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 text-[11px] text-white">
                                             No footage of this moment was kept
@@ -327,15 +425,29 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                 <div className="flex items-start justify-between gap-2 border-t border-border px-3 py-2">
                                     <div className="min-w-0">
                                         <p className="truncate text-[13px] text-foreground">
-                                            {nameFor(event.label) ?? KIND_LABEL[event.kind] ?? event.kind}
+                                            {nameFor(event.label) ??
+                                                KIND_LABEL[event.kind] ??
+                                                event.kind}
                                         </p>
                                         <p className="truncate text-[11px] text-foreground-subtle">
-                                            {event.cameraName} - {format.dateTime(event.at)}
+                                            {[
+                                                event.cameraName,
+                                                format.dateTime(event.at),
+                                                event.zones.length > 0
+                                                    ? event.zones.join(", ")
+                                                    : null,
+                                                lasted(event)
+                                            ]
+                                                .filter(Boolean)
+                                                .join(" - ")}
                                         </p>
                                     </div>
                                     <div className="flex shrink-0 items-center gap-1">
                                         {event.score !== null ? (
-                                            <Badge variant="neutral" title="How sure the detector was">
+                                            <Badge
+                                                variant="neutral"
+                                                title="How sure the detector was"
+                                            >
                                                 {event.score}
                                             </Badge>
                                         ) : null}
@@ -368,8 +480,15 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                     </ul>
                     {!done ? (
                         <div className="flex justify-center">
-                            <Button variant="secondary" size="sm" onClick={loadMore} disabled={loadingMore}>
-                                {loadingMore ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={loadMore}
+                                disabled={loadingMore}
+                            >
+                                {loadingMore ? (
+                                    <Loader2 className="size-4 shrink-0 animate-spin" />
+                                ) : null}
                                 Show older
                             </Button>
                         </div>
@@ -446,7 +565,10 @@ function FeedSkeleton() {
     return (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {[0, 1, 2].map((index) => (
-                <div key={index} className="overflow-hidden rounded-lg border border-border bg-card">
+                <div
+                    key={index}
+                    className="overflow-hidden rounded-lg border border-border bg-card"
+                >
                     <Skeleton className="aspect-video w-full rounded-none" />
                     <div className="border-t border-border px-3 py-2">
                         <Skeleton className="h-3.5 w-32" />

@@ -12,7 +12,15 @@
  */
 
 import { ARK_MAPS, DEFAULT_ARK_MAP } from "@/lib/apps/ark/maps";
-import { Bot, Gamepad2, House, MessagesSquare, ScanFace, Video, type LucideIcon } from "lucide-react";
+import {
+    Bot,
+    Gamepad2,
+    House,
+    MessagesSquare,
+    ScanFace,
+    Video,
+    type LucideIcon
+} from "lucide-react";
 
 export type AppCategory = "Messaging" | "AI" | "Game servers" | "Home" | "Tools";
 
@@ -192,9 +200,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
             // from dashboard/services/messaging-bridge; the marketplace installs it as
             // a managed Deploy app rather than building from source on the host.
             image: "ghcr.io/fjrg2007/polaris-messaging-bridge:latest",
-            volumes: [
-                { name: "sessions", mountPath: "/app/.sessions", label: "Channel sessions" }
-            ],
+            volumes: [{ name: "sessions", mountPath: "/app/.sessions", label: "Channel sessions" }],
             ports: [{ container: 8787, protocol: "http", label: "Bridge API" }]
         }
     },
@@ -712,7 +718,10 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     default: DEFAULT_ARK_MAP,
                     options: ARK_MAPS.map((map) => ({
                         value: map.value,
-                        label: map.requires === "base" ? map.label : `${map.label} (${map.requires === "paid" ? "needs the DLC" : "a separate free download"})`
+                        label:
+                            map.requires === "base"
+                                ? map.label
+                                : `${map.label} (${map.requires === "paid" ? "needs the DLC" : "a separate free download"})`
                     })),
                     tunable: true,
                     group: "World"
@@ -946,9 +955,9 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         internal: true,
         category: "Home",
         icon: ScanFace,
-        summary: "Watches the small stream for movement, so nothing else has to.",
+        summary: "Watches for movement, then looks properly at what it was.",
         description:
-            "The part of Home that looks at pixels. It reads the small stream from the relay - never the camera - decides that something moved, and only then does anything more expensive. It sits idle the rest of the time, and it runs on the machine you chose rather than on the one Polaris is on.",
+            "The part of Places that looks at pixels. It reads the small stream from the relay - never the camera - and while nothing is happening that is all it does. When something moves in a part of the picture you care about, it looks properly: full frames through a detection model, following whatever it found for as long as it is there, so one arrival is one event with one good picture of it. It sits idle the rest of the time, and it runs on the machine you chose rather than on the one Polaris is on.",
         installMethod: "compose-template",
         capabilities: ["tool"],
         dashboard: "generic",
@@ -1027,7 +1036,9 @@ export function isInstallable(app: AppManifest): boolean {
 /** The env vars an operator fills in: everything the manifest declares except the
  *  ones the install mints itself and the ones installing already answers. */
 export function promptedEnvVars(app: AppManifest): readonly TemplateEnvVar[] {
-    return (app.template?.env ?? []).filter((field) => !field.generated && !isConsentField(app, field));
+    return (app.template?.env ?? []).filter(
+        (field) => !field.generated && !isConsentField(app, field)
+    );
 }
 
 /** The env vars an installed app exposes as settings, in manifest order. */
