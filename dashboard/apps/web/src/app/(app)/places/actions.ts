@@ -18,6 +18,7 @@
 import * as ptz from "@/lib/home/ptz";
 import { HomeError } from "@/lib/home/home-error";
 import { marksForClip, type ClipMark } from "@polaris/core";
+import { cameraActivity, type CameraActivity } from "@/lib/home/vision-activity";
 import { cookies } from "next/headers";
 import * as relay from "@/lib/home/relay";
 import { revalidatePath } from "next/cache";
@@ -740,6 +741,29 @@ export async function homeSettingsAction(): Promise<{
         };
     });
     return result.error ? { error: result.error } : { settings: result.value };
+}
+
+/**
+ * What this camera's detector has actually been doing.
+ *
+ * The screen that asks this is the one somebody opens when a camera has noticed
+ * nothing and they want to know why. Every state that produces no events looks
+ * the same from outside - nothing moved, something moved and was not a person,
+ * the worker has no model, the camera would not say how big its picture is -
+ * and until now telling them apart needed a terminal.
+ *
+ * Null when no worker has said anything recently, which is its own answer: the
+ * camera is not being watched by one.
+ */
+export async function cameraActivityAction(
+    cameraId: string
+): Promise<{ activity?: CameraActivity | null; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(async () => {
+        const camera = await cameras.getCamera(install.id, String(cameraId));
+        return camera ? cameraActivity(camera.id) : null;
+    });
+    return result.error ? { error: result.error } : { activity: result.value ?? null };
 }
 
 /**

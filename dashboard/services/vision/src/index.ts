@@ -26,6 +26,21 @@ const WORKER_KEY = process.env.WORKER_KEY ?? "";
 /** How often the assignment list is re-read. */
 const REFRESH_MS = Number(process.env.REFRESH_MS) || 30_000;
 
+/**
+ * How often Polaris is told what each camera's pipeline has been doing.
+ *
+ * The ladder is silent by design - a burst that runs and finds nothing writes
+ * nothing, and neither does one that never ran - so without this "it is not
+ * detecting" is a question with no answer that does not involve a terminal, a
+ * container and a process listing. The operator has none of those, and is not
+ * supposed to need them.
+ *
+ * One request for every camera on this worker, twice a minute. Cheap enough not
+ * to think about, and often enough that a screen somebody is staring at while
+ * they walk in front of a camera keeps up with them.
+ */
+const ACTIVITY_MS = 30_000;
+
 /** The detection model, baked into the image. Overridable so a machine with a
  *  better one can be pointed at it, and absent is not fatal: a worker with no
  *  model watches for movement, which is the rung below. */
@@ -110,6 +125,23 @@ function sendLive(cameraId: string, boxes: readonly LiveBox[]): void {
         });
 }
 
+/**
+ * Tell Polaris what each camera's pipeline has been doing.
+ *
+ * Swallowed like the live positions and for the same reason: this is what a
+ * screen draws, the next one is along in half a minute, and a worker that
+ * cannot reach Polaris has a bigger problem than a missing status line.
+ */
+function sendActivity(): void {
+    if (watches.size === 0) return;
+    const cameras = [...watches].map(([cameraId, watch]) => ({ cameraId, ...watch.activity() }));
+    void fetch(`${POLARIS_URL}/api/home/vision/activity`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${WORKER_KEY}`, "content-type": "application/json" },
+        body: JSON.stringify({ cameras })
+    }).catch(() => undefined);
+}
+
 /** Bring the running pipelines in line with what Polaris says they should be. */
 async function reconcile(model: LoadedModel | null): Promise<void> {
     let assignments: Assignment[];
@@ -161,6 +193,7 @@ async function main(): Promise<void> {
 
     await reconcile(model);
     setInterval(() => void reconcile(model), REFRESH_MS);
+    setInterval(sendActivity, ACTIVITY_MS);
 
     const shutdown = () => {
         for (const watch of watches.values()) watch.stop();

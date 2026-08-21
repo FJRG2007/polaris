@@ -16,6 +16,8 @@
  */
 
 import * as actions from "../actions";
+import Link from "next/link";
+import type { CameraActivity } from "@/lib/home/vision-activity";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { CameraView } from "@/lib/home/cameras";
@@ -45,6 +47,7 @@ import {
     Input,
     SegmentedControl,
     Select,
+    Skeleton,
     Switch,
     cn
 } from "@polaris/ui";
@@ -150,6 +153,13 @@ export function CameraDialog({
     const [testing, setTesting] = useState(false);
     const [tested, setTested] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    /** Whether faces are being put to names at all, for the rung that needs it.
+     *  Null until asked - a warning drawn before the answer arrives is a warning
+     *  about nothing. */
+    const [recognizes, setRecognizes] = useState<boolean | null>(null);
+    /** What this camera's detector has been doing, for the reader who opened
+     *  this dialog because it has noticed nothing. Undefined until asked. */
+    const [activity, setActivity] = useState<CameraActivity | null | undefined>(undefined);
 
     const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
         setForm((current) => ({ ...current, [key]: value }));
@@ -163,6 +173,41 @@ export function CameraDialog({
     // password is the whole credential. Showing the fields anyway is how somebody
     // ends up typing a camera account into a form that ignores it.
     const usesRtsp = !vendor.nativeScheme;
+
+    // Asked once when the dialog opens rather than only when this rung is
+    // picked: the answer decides what the picker says about a choice somebody is
+    // still deciding on, and it is one small call.
+    useEffect(() => {
+        let cancelled = false;
+        void (async () => {
+            const result = await actions.homeSettingsAction();
+            if (!cancelled) setRecognizes(result.settings?.faceEnabled === true);
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    // Only for a camera that exists. A camera being added has no detector
+    // running yet, and a line saying so would be noise on the one screen where
+    // somebody is busy.
+    useEffect(() => {
+        if (!camera?.id) return;
+        let cancelled = false;
+        const ask = async () => {
+            const result = await actions.cameraActivityAction(camera.id);
+            if (!cancelled) setActivity(result.activity ?? null);
+        };
+        void ask();
+        // The worker publishes twice a minute; asking on the same cadence means
+        // somebody walking in front of their own camera with this open sees it
+        // register rather than having to close and reopen.
+        const timer = setInterval(() => void ask(), 15_000);
+        return () => {
+            cancelled = true;
+            clearInterval(timer);
+        };
+    }, [camera?.id]);
 
     useEffect(() => {
         setTested(null);
@@ -428,9 +473,26 @@ export function CameraDialog({
                                 {DETECTOR_META[form.detector].cost}
                             </span>
                         </p>
-                        {DETECTOR_META[form.detector].requires ? (
+                        {/* Only when it is actually a problem. The line used to
+                            be printed whenever this rung was chosen, so a house
+                            with recognition running was warned that it had none,
+                            and a house with it switched off read the same
+                            sentence and had no way to tell the two apart. */}
+                        {form.detector === "faces" && recognizes === false ? (
                             <p className="text-[12px] leading-relaxed text-warning">
-                                {DETECTOR_META[form.detector].requires}
+                                {DETECTOR_META.faces.requires}{" "}
+                                <Link href="/places/settings" className="underline underline-offset-2">
+                                    Open Settings
+                                </Link>
+                            </p>
+                        ) : null}
+                        {camera?.id && form.detector !== "none" ? (
+                            <DetectorActivity activity={activity} />
+                        ) : null}
+                        {form.detector === "faces" && recognizes === true ? (
+                            <p className="text-[12px] leading-relaxed text-muted-foreground">
+                                Face recognition is on. Teach it who lives here under People and this camera
+                                starts using their names.
                             </p>
                         ) : null}
 
@@ -715,4 +777,60 @@ function Field({
             {hint ? <span className="text-[11px] text-foreground-subtle">{hint}</span> : null}
         </label>
     );
+}
+
+/**
+ * What the detector has been doing, in one line.
+ *
+ * The screen that answers "it has noticed nothing". Every state that produces no
+ * events looks identical from outside - nothing has moved, something moved and
+ * was not a person, the worker has no model, the camera would not say how big
+ * its picture is - and telling them apart used to mean opening a terminal and
+ * reading a container's process list, which the person who owns these cameras
+ * does not have and should not need.
+ *
+ * Ages rather than clock times, because the question is always "recently?" and
+ * never "at what time". Nothing is hidden behind a hover.
+ */
+function DetectorActivity({ activity }: { activity: CameraActivity | null | undefined }) {
+    if (activity === undefined) return <Skeleton className="h-4 w-64" />;
+    if (activity === null) {
+        return (
+            <p className="text-[12px] leading-relaxed text-warning">
+                No detector has reported on this camera. If you have just saved it, give it a minute - the
+                worker asks for its cameras every half minute.
+            </p>
+        );
+    }
+
+    const lines = [
+        activity.watching ? "Watching this camera." : "Not connected to this camera right now.",
+        activity.motionAt ? `Movement ${since(activity.motionAt)}.` : "Nothing has moved in front of it yet.",
+        activity.lookedAt
+            ? activity.foundAt
+                ? `Last looked properly ${since(activity.lookedAt)}, and found ${activity.found ?? "something"} ${since(activity.foundAt)}.`
+                : `Last looked properly ${since(activity.lookedAt)} and found nothing it was asked to report.`
+            : null
+    ].filter(Boolean);
+
+    return (
+        <div className="flex flex-col gap-1 rounded-lg border border-border bg-surface px-3 py-2">
+            <p className="text-[12px] leading-relaxed text-muted-foreground">{lines.join(" ")}</p>
+            {activity.limitedTo ? (
+                <p className="text-[12px] leading-relaxed text-warning">It is {activity.limitedTo}.</p>
+            ) : null}
+        </div>
+    );
+}
+
+/** How long ago, in the words somebody reads a status line in. */
+function since(at: number): string {
+    const seconds = Math.max(0, Math.round((Date.now() - at) / 1000));
+    if (seconds < 45) return "just now";
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 60) return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`;
+    const hours = Math.round(minutes / 60);
+    if (hours < 24) return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
+    const days = Math.round(hours / 24);
+    return `${days} ${days === 1 ? "day" : "days"} ago`;
 }

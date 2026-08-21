@@ -67,7 +67,7 @@ export const DETECTOR_META: Readonly<Record<Detector, DetectorMeta>> = {
         id: "objects",
         label: "People, vehicles and animals",
         summary:
-            "When something moves, Polaris looks properly for as long as it is there, and says what it was and whereabouts in the picture. One arrival is one entry, with the clearest frame of it. This is what stops a swaying branch waking the house.",
+            "When something moves, Polaris looks properly for as long as it is there, and says what it was and whereabouts in the picture. One arrival is one entry, with the clearest frame of it. This is what stops a swaying branch waking the house. It says a person is there, never which person - that is the rung below.",
         cost: "Moderate, and only while something is actually happening. Idle the rest of the time.",
         onCamera: false
     },
@@ -79,7 +79,7 @@ export const DETECTOR_META: Readonly<Record<Detector, DetectorMeta>> = {
         cost: "Highest, and rarest: it runs on the people already found rather than on the whole picture.",
         onCamera: false,
         requires:
-            "A recognizer connected under Settings. Without one, these cameras still report that somebody is there - just not who."
+            "Face recognition, which is off until you turn it on under Settings. While it is off this camera still reports that somebody is there - just not who."
     }
 };
 

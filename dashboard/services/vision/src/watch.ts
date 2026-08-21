@@ -128,6 +128,19 @@ const BURST_MAX_FRAMES = DETECT_FPS * 30;
 /** Frames of nothing at all before a burst gives up. */
 const BURST_IDLE_FRAMES = DETECT_FPS * 2;
 
+/**
+ * The longest a burst may go without a single frame before it is abandoned.
+ *
+ * Everything that ends a burst - the frame ceiling, the idle count - is counted
+ * inside the frame handler, and the stream closing is the only other way out. So
+ * a detect stream that connects and then delivers nothing, without ever closing,
+ * ends nothing: the burst never finishes, the flag that says one is running is
+ * never cleared, and from that moment the camera stops looking at movement
+ * entirely. No log, no event, no restart - the worker goes on reporting that it
+ * is watching. This is the clock that makes that state impossible.
+ */
+const BURST_SILENCE_MS = 20_000;
+
 /** How many frames are held in memory as candidate pictures. Each is half a
  *  megabyte, and a house camera never has this many things in it at once. */
 const MAX_HELD_FRAMES = 6;
@@ -151,8 +164,37 @@ const LIVE_GAP_MS = 180;
 const RESTART_MS = 2000;
 const RESTART_MAX_MS = 60_000;
 
+/**
+ * What one camera's pipeline has actually been doing.
+ *
+ * The ladder is silent by design - a burst that runs and finds nothing writes
+ * nothing, and so does a burst that never ran - which means "it is not
+ * detecting" has no answer anybody can reach. Every question asked about this
+ * today needed a terminal, a container and a process listing to answer, and the
+ * operator has none of those. So each watch keeps the four moments that
+ * distinguish every state it can be in, and they are published.
+ */
+export interface Activity {
+    /** Whether the camera's stream is open right now. False while it is being
+     *  reopened after the camera went away. */
+    readonly watching: boolean;
+    /** Epoch ms of the last movement that counted - past the areas, past the
+     *  settle. Null for a camera nothing has moved in front of since it started. */
+    readonly motionAt: number | null;
+    /** The last time it looked properly, which is the expensive rung. */
+    readonly lookedAt: number | null;
+    /** The last time that look found something, and what. */
+    readonly foundAt: number | null;
+    readonly found: string | null;
+    /** Why it is not looking properly, when it cannot: no model on this worker,
+     *  or a camera that would not say how big its picture is. */
+    readonly limitedTo: string | null;
+}
+
 export interface Watch {
     readonly signature: string;
+    /** Read on a timer and sent to Polaris. */
+    activity(): Activity;
     stop(): void;
 }
 
@@ -216,12 +258,19 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
     let movingFrames = 0;
     let restartIn = RESTART_MS;
     let restartTimer: ReturnType<typeof setTimeout> | null = null;
+    let motionAt: number | null = null;
+    let lookedAt: number | null = null;
+    let foundAt: number | null = null;
+    let foundWhat: string | null = null;
 
     /** The size of the camera's own picture, which every box is divided by.
      *  Null until it has been asked for, and null forever if it would not
      *  answer - in which case this camera watches for movement and no more,
      *  because a guessed size puts every box in the wrong place. */
     let picture: { width: number; height: number } | null = null;
+    /** Whether the question has been asked yet, so "not known" and "asked and
+     *  refused" are not the same answer to a screen. */
+    let probed = false;
 
     let motionState: MotionState = newMotionState(MOTION_WIDTH, MOTION_HEIGHT);
     const mask = buildMotionMask(assignment.zones, MOTION_WIDTH, MOTION_HEIGHT);
@@ -289,6 +338,7 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
             const finish = () => {
                 if (finished) return;
                 finished = true;
+                clearTimeout(silence);
                 frames.stop();
                 if (burst === frames) burst = null;
                 // Anything still being followed when the burst ends - the
@@ -316,7 +366,22 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
             };
             frames.onClosed(() => finish());
 
+            // A stream that says nothing at all cannot end itself; see
+            // BURST_SILENCE_MS. Restarted by every frame that arrives, so a
+            // burst watching something for its full thirty seconds is untouched.
+            let silence = setTimeout(() => {
+                deps.log(`${assignment.cameraName}: the close look sent nothing, giving up on it`);
+                finish();
+            }, BURST_SILENCE_MS);
+            silence.unref?.();
+            const stirred = () => {
+                clearTimeout(silence);
+                silence = setTimeout(() => finish(), BURST_SILENCE_MS);
+                silence.unref?.();
+            };
+
             frames.onFrame((frame) => {
+                stirred();
                 // Frames keep arriving while the model is busy with the last
                 // one. Dropping them is right: catching up would mean running
                 // the model on a backlog of frames describing a moment that has
@@ -371,6 +436,8 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
                         }
 
                         for (const object of update.appeared) {
+                            foundAt = Date.now();
+                            foundWhat = named.get(object.id) ?? object.label;
                             const sent = await announce(object, "start");
                             if (!sent) continue;
                             tracking = markReported(tracking, [object.id]);
@@ -542,6 +609,7 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
         if (now - lastFired < assignment.minGapSeconds * 1000) return;
         if (!withinHours(assignment, new Date().getHours())) return;
         lastFired = now;
+        motionAt = now;
         movingFrames = 0;
 
         if (assignment.detector === "motion") {
@@ -556,6 +624,7 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
         }
 
         busy = true;
+        lookedAt = Date.now();
         void look()
             .catch((error) => deps.log(`${assignment.cameraName}: ${String(error)}`))
             .finally(() => {
@@ -600,10 +669,20 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
         });
     }
 
+    /** Why this camera is on a lower rung than it was set to, in words a screen
+     *  can print. Null when it is doing what it was asked. */
+    function reasonItCannotLook(): string | null {
+        if (assignment.detector === "motion") return null;
+        if (!deps.model) return "this machine has no detection model, so movement only";
+        if (probed && !picture) return "the camera would not say how big its picture is, so movement only";
+        return null;
+    }
+
     // The picture's size is asked for once, and watching starts either way: a
     // camera that will not say how big it is still gets watched for movement.
     void probeSize(source).then((size) => {
         if (stopped) return;
+        probed = true;
         picture = size;
         if (!size && assignment.detector !== "motion") {
             deps.log(
@@ -615,6 +694,16 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
 
     return {
         signature: signatureOf(assignment),
+        activity() {
+            return {
+                watching: motionStream !== null,
+                motionAt,
+                lookedAt,
+                foundAt,
+                found: foundWhat,
+                limitedTo: reasonItCannotLook()
+            };
+        },
         stop() {
             stopped = true;
             if (restartTimer) clearTimeout(restartTimer);
