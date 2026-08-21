@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { DETECTORS, OBJECT_CLASSES } from "@/lib/home/detection";
+import { DETECTORS, LOCAL_MACHINE, OBJECT_CLASSES } from "@/lib/home/detection";
 import { MAX_ZONE_POINTS, MIN_ZONE_POINTS, ZONE_KINDS } from "@polaris/core";
 
 /** How a camera's address is written down, whatever was typed. Hostnames are
@@ -43,6 +43,9 @@ export function normalizeCameraInput<T extends Record<string, unknown>>(input: T
     if (typeof value.username === "string") value.username = value.username.trim();
     return value as T;
 }
+
+/** What the database will accept where it wants a uuid. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** A host or address, once normalized. Deliberately permissive about shape - a
  *  camera can be at an IP, a hostname, or a name only the local network knows -
@@ -106,8 +109,24 @@ export const cameraInputSchema = z.object({
     password: z.string().max(255).optional(),
     reachVia: reachViaSchema.default("direct"),
     detector: z.enum(DETECTORS).default("camera"),
-    /** The server detection runs on, when the chosen rung runs anywhere at all. */
-    detectorTargetId: z.string().trim().max(64).nullable().default(null),
+    /**
+     * The server detection runs on, when the chosen rung runs anywhere at all.
+     *
+     * An enrolled server's id, or the word for Polaris' own machine, which has
+     * none. Checked here rather than left open, because the column behind it
+     * takes uuids and nothing else: anything that is neither is a request that
+     * ends as a database error in front of whoever was adding a camera.
+     */
+    detectorTargetId: z
+        .string()
+        .trim()
+        .max(64)
+        .refine(
+            (value) => value === "" || value === LOCAL_MACHINE || UUID.test(value),
+            "Choose where detection should run"
+        )
+        .nullable()
+        .default(null),
     detection: detectionSettingsSchema,
     recording: z.enum(["off", "motion", "continuous"]).default("motion"),
     /** A storage connection id, "local", or empty for the instance default. The

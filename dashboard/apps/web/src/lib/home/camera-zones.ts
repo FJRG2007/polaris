@@ -12,6 +12,8 @@
  */
 
 import { prisma } from "@polaris/db";
+import { HomeError } from "@/lib/home/home-error";
+
 import { OBJECT_CLASSES } from "@/lib/home/detection";
 import type { CameraZoneInput } from "@/lib/home/schemas";
 import {
@@ -107,7 +109,7 @@ async function assertCamera(installedAppId: string, cameraId: string): Promise<v
         where: { id: cameraId, installedAppId },
         select: { id: true }
     });
-    if (!camera) throw new Error("Camera not found");
+    if (!camera) throw new HomeError("Camera not found");
 }
 
 /**
@@ -127,7 +129,7 @@ async function assertNameFree(
         where: { cameraId, name, ...(exceptId ? { id: { not: exceptId } } : {}) },
         select: { id: true }
     });
-    if (clash) throw new Error("An area on this camera is already called that.");
+    if (clash) throw new HomeError("An area on this camera is already called that.");
 }
 
 /** The same rule again, for the gap between the check above and the write: two
@@ -180,7 +182,7 @@ export async function updateCameraZone(
         where: { id, cameraId, camera: { installedAppId } },
         select: { id: true }
     });
-    if (!existing) throw new Error("Area not found");
+    if (!existing) throw new HomeError("Area not found");
     await assertNameFree(cameraId, input.name, id);
     const row = await prisma.cameraZone
         .update({
@@ -214,6 +216,6 @@ export async function deleteCameraZone(
         where: { id, cameraId, camera: { installedAppId } },
         select: { id: true }
     });
-    if (!existing) throw new Error("Area not found");
+    if (!existing) throw new HomeError("Area not found");
     await prisma.cameraZone.delete({ where: { id } });
 }

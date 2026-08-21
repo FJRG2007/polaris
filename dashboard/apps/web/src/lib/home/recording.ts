@@ -21,6 +21,8 @@
  */
 
 import { prisma } from "@polaris/db";
+import { HomeError } from "@/lib/home/home-error";
+
 import { randomUUID } from "node:crypto";
 import { getCamera } from "@/lib/home/cameras";
 import { footageTarget } from "@/lib/home/stills";
@@ -234,7 +236,7 @@ export async function pinClip(installedAppId: string, id: string, pinned: boolea
         where: { id, camera: { installedAppId } },
         select: { id: true }
     });
-    if (!clip) throw new Error("Clip not found");
+    if (!clip) throw new HomeError("Clip not found");
     await prisma.cameraClip.update({ where: { id }, data: { pinned } });
 }
 
@@ -274,7 +276,7 @@ export async function deleteClip(installedAppId: string, id: string): Promise<vo
         where: { id, camera: { installedAppId } },
         select: { id: true, path: true }
     });
-    if (!clip) throw new Error("Clip not found");
+    if (!clip) throw new HomeError("Clip not found");
     await deleteClipFile(clip.path);
     await prisma.cameraClip.delete({ where: { id } });
 }

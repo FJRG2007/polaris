@@ -15,6 +15,8 @@
  */
 
 import { prisma } from "@polaris/db";
+import { HomeError } from "@/lib/home/home-error";
+
 import { PLACE_KINDS, type PlaceView } from "@/lib/home/place-kinds";
 
 // Re-exported so server code has one import for "places"; the browser reaches
@@ -93,7 +95,7 @@ export interface PlaceInput {
 
 export async function createPlace(installedAppId: string, input: PlaceInput): Promise<PlaceView> {
     const name = input.name.trim();
-    if (!name) throw new Error("Give it a name");
+    if (!name) throw new HomeError("Give it a name");
     const kind = (PLACE_KINDS as readonly string[]).includes(input.kind) ? input.kind : "other";
     const row = await prisma.place.create({
         data: { installedAppId, name, kind, address: input.address.trim() || null }
@@ -103,9 +105,9 @@ export async function createPlace(installedAppId: string, input: PlaceInput): Pr
 
 export async function updatePlace(installedAppId: string, id: string, input: PlaceInput): Promise<PlaceView> {
     const existing = await prisma.place.findFirst({ where: { id, installedAppId }, select: { id: true } });
-    if (!existing) throw new Error("Place not found");
+    if (!existing) throw new HomeError("Place not found");
     const name = input.name.trim();
-    if (!name) throw new Error("Give it a name");
+    if (!name) throw new HomeError("Give it a name");
     const kind = (PLACE_KINDS as readonly string[]).includes(input.kind) ? input.kind : "other";
     const row = await prisma.place.update({
         where: { id },
@@ -128,11 +130,11 @@ export async function deletePlace(installedAppId: string, id: string): Promise<v
         where: { id, installedAppId },
         select: { id: true, _count: { select: { cameras: true } } }
     });
-    if (!place) throw new Error("Place not found");
+    if (!place) throw new HomeError("Place not found");
     if (place._count.cameras > 0) {
-        throw new Error("Move or remove its cameras first");
+        throw new HomeError("Move or remove its cameras first");
     }
     const remaining = await prisma.place.count({ where: { installedAppId } });
-    if (remaining <= 1) throw new Error("There has to be somewhere for cameras to be");
+    if (remaining <= 1) throw new HomeError("There has to be somewhere for cameras to be");
     await prisma.place.delete({ where: { id } });
 }

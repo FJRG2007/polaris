@@ -15,6 +15,8 @@
  */
 
 import { Socket } from "node:net";
+import { HomeError } from "@/lib/home/home-error";
+
 import { prisma } from "@polaris/db";
 import { listHosts } from "@/lib/host-service";
 import { localDialHost } from "@/lib/deploy/dial";
@@ -118,7 +120,7 @@ export async function serviceUrls(applicationId: string, ownerId: string): Promi
 export async function assertServer(ownerId: string, serverId: string): Promise<void> {
     if (serverId === "local") return;
     const hosts = await listHosts(ownerId);
-    if (!hosts.some((host) => host.id === serverId)) throw new Error("That server is not connected");
+    if (!hosts.some((host) => host.id === serverId)) throw new HomeError("That server is not connected");
 }
 
 /** Whether a port answers, remembered for a while.

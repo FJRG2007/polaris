@@ -11,11 +11,13 @@
  */
 
 import { prisma } from "@polaris/db";
+import { HomeError } from "@/lib/home/home-error";
+
 import { loadEnv } from "@polaris/config";
 import { cameraVendor, rtspUrl } from "@/lib/home/vendors";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { detectionSettingsSchema, type CameraInput } from "@/lib/home/schemas";
-import { DEFAULT_DETECTION, type DetectionSettings } from "@/lib/home/detection";
+import { DEFAULT_DETECTION, LOCAL_MACHINE, type DetectionSettings } from "@/lib/home/detection";
 
 /** A camera as a screen sees it. No credential, ever. */
 export interface CameraView {
@@ -142,7 +144,13 @@ export async function getCamera(installedAppId: string, id: string): Promise<Cam
  */
 function detectionRunsOn(input: CameraInput): string | null {
     if (input.reachVia.startsWith("server:")) return input.reachVia.slice("server:".length);
-    return input.detectorTargetId;
+    // "This machine" is offered to the picker as `local`, because a machine that
+    // is not an enrolled server has no id to offer. In the row it is simply no
+    // server at all - which is what every reader of this column already treats
+    // null as. Storing the word instead put a value that is not a uuid into a
+    // uuid column, and the database said so in its own language, to the person
+    // adding a camera.
+    return input.detectorTargetId === LOCAL_MACHINE ? null : input.detectorTargetId;
 }
 
 /** The paths a camera ends up with: what was typed, else what its make uses. */
@@ -199,7 +207,7 @@ export async function updateCamera(
     input: CameraInput
 ): Promise<CameraView> {
     const existing = await prisma.camera.findFirst({ where: { id, installedAppId }, select: { id: true } });
-    if (!existing) throw new Error("Camera not found");
+    if (!existing) throw new HomeError("Camera not found");
     const vendor = cameraVendor(input.vendor);
     const paths = resolvePaths(input);
     const row = await prisma.camera.update({
@@ -237,7 +245,7 @@ export async function updateCamera(
  *  how to reach the storage they went to. */
 export async function deleteCamera(installedAppId: string, id: string): Promise<void> {
     const existing = await prisma.camera.findFirst({ where: { id, installedAppId }, select: { id: true } });
-    if (!existing) throw new Error("Camera not found");
+    if (!existing) throw new HomeError("Camera not found");
     await prisma.camera.delete({ where: { id } });
 }
 

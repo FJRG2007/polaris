@@ -15,6 +15,8 @@
  */
 
 import { prisma } from "@polaris/db";
+import { HomeError } from "@/lib/home/home-error";
+
 import { withinHours } from "@/lib/home/detection";
 import type { Detection } from "@/lib/home/events";
 import { publishChatChange } from "@/lib/chat/live";
@@ -96,9 +98,9 @@ export async function saveAlertRule(
     input: AlertRuleInput
 ): Promise<AlertRuleView> {
     const name = input.name.trim();
-    if (!name) throw new Error("Give it a name");
-    if (input.kinds.length === 0) throw new Error("Choose what it should tell you about");
-    if (input.recipients.length === 0) throw new Error("Choose who to tell");
+    if (!name) throw new HomeError("Give it a name");
+    if (input.kinds.length === 0) throw new HomeError("Choose what it should tell you about");
+    if (input.recipients.length === 0) throw new HomeError("Choose who to tell");
 
     const data = {
         name,
@@ -117,7 +119,7 @@ export async function saveAlertRule(
             where: { id, installedAppId },
             select: { id: true, recipients: true, channelId: true }
         });
-        if (!existing) throw new Error("Alert not found");
+        if (!existing) throw new HomeError("Alert not found");
         // Its conversation follows the rule: somebody added to an alert should
         // see the ones that come after, and somebody taken off should stop
         // seeing them.
@@ -134,7 +136,7 @@ export async function deleteAlertRule(installedAppId: string, id: string): Promi
         where: { id, installedAppId },
         select: { id: true }
     });
-    if (!existing) throw new Error("Alert not found");
+    if (!existing) throw new HomeError("Alert not found");
     // The conversation stays. What it holds is a record of things that actually
     // happened, and deleting the rule that reported them is not a reason to take
     // that away from the people who were told.

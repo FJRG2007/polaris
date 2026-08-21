@@ -17,6 +17,8 @@
  */
 
 import { cameraTarget } from "@/lib/home/cameras";
+import { HomeError } from "@/lib/home/home-error";
+
 import { getPresets, getProfiles, gotoPreset, ptzMove, ptzStop, type OnvifEndpoint } from "@/lib/home/onvif";
 
 /** Which way, as a person would say it. */
@@ -73,7 +75,7 @@ async function controlsFor(installedAppId: string, cameraId: string): Promise<Co
 /** Start moving. Pair it with `stop`. */
 export async function move(installedAppId: string, cameraId: string, direction: PtzDirection): Promise<void> {
     const controls = await controlsFor(installedAppId, cameraId);
-    if (!controls) throw new Error("This camera does not move");
+    if (!controls) throw new HomeError("This camera does not move");
     await ptzMove(controls.endpoint, controls.profileToken, VECTORS[direction]);
 }
 
@@ -96,6 +98,6 @@ export async function presets(installedAppId: string, cameraId: string): Promise
 
 export async function goTo(installedAppId: string, cameraId: string, preset: string): Promise<void> {
     const controls = await controlsFor(installedAppId, cameraId);
-    if (!controls) throw new Error("This camera does not move");
+    if (!controls) throw new HomeError("This camera does not move");
     await gotoPreset(controls.endpoint, controls.profileToken, preset);
 }

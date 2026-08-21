@@ -18,6 +18,8 @@
  */
 
 import { relaySource } from "@/lib/home/vendors";
+import { HomeError } from "@/lib/home/home-error";
+
 import type { CameraTarget } from "@/lib/home/cameras";
 import { installApp } from "@/lib/apps/install-service";
 import { installEnvSecret, installEnvValue } from "@/lib/apps/install-secret";
@@ -88,7 +90,7 @@ export async function ensureRelay(ownerId: string, actorId: string, serverId: st
         env: []
     });
     const endpoint = await relayEndpoint(serverId);
-    if (!endpoint) throw new Error("The camera relay was installed but is not answering yet");
+    if (!endpoint) throw new HomeError("The camera relay was installed but is not answering yet");
     return endpoint;
 }
 
@@ -161,7 +163,7 @@ export async function publishCamera(endpoint: RelayEndpoint, camera: CameraTarge
         const response = await relayFetch(endpoint, `/api/streams?${query.toString()}`, { method: "PUT" });
         // The relay validates the source and refuses one it cannot parse. Its
         // reason is about a URL that carries a password, so it is not passed on.
-        if (!response.ok) throw new Error("The relay would not accept that camera");
+        if (!response.ok) throw new HomeError("The relay would not accept that camera");
     }
 }
 

@@ -24,6 +24,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { HomeError } from "@/lib/home/home-error";
 import { loadEnv } from "@polaris/config";
 import { homeInstall } from "@/lib/home/access";
 import { installApp } from "@/lib/apps/install-service";
@@ -97,7 +98,7 @@ async function writeSecrets(installedAppId: string, secrets: HomeSecrets): Promi
  */
 export async function installRecognizer(ownerId: string, actorId: string, serverId: string): Promise<void> {
     const home = await homeInstall();
-    if (!home) throw new Error("Home is not installed");
+    if (!home) throw new HomeError("Home is not installed");
     await assertServer(ownerId, serverId);
 
     if (!(await findService(RECOGNIZER_APP, serverId))) {
@@ -112,7 +113,7 @@ export async function installRecognizer(ownerId: string, actorId: string, server
         });
     }
     const service = await findService(RECOGNIZER_APP, serverId);
-    if (!service) throw new Error("The recognizer was installed but cannot be found");
+    if (!service) throw new HomeError("The recognizer was installed but cannot be found");
 
     const current = await readSecrets(home.id);
     // The typed address is left alone rather than cleared. Somebody who had their
@@ -139,10 +140,10 @@ export async function setFaceRecognition(installedAppId: string, baseUrl: string
         try {
             parsed = new URL(trimmedUrl);
         } catch {
-            throw new Error("Write the address as http://192.168.1.20:8000");
+            throw new HomeError("Write the address as http://192.168.1.20:8000");
         }
         if (!/^https?:$/.test(parsed.protocol) || !parsed.hostname) {
-            throw new Error("Write the address as http://192.168.1.20:8000");
+            throw new HomeError("Write the address as http://192.168.1.20:8000");
         }
     }
     const current = await readSecrets(installedAppId);

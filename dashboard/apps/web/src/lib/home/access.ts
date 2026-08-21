@@ -13,6 +13,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { HomeError } from "@/lib/home/home-error";
 import { redirect } from "next/navigation";
 import type { Permission } from "@polaris/core";
 import { homePathForUser, requirePermission, sessionCanAny, type SessionUser } from "@/lib/session";
@@ -43,7 +44,7 @@ export async function homeInstall(): Promise<HomeInstall | null> {
  */
 export async function requireHomeInstall(): Promise<HomeInstall> {
     const install = await homeInstall();
-    if (!install) throw new Error("Home is not set up yet");
+    if (!install) throw new HomeError("Home is not set up yet");
     return install;
 }
 

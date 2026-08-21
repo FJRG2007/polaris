@@ -16,6 +16,7 @@
  */
 
 import * as ptz from "@/lib/home/ptz";
+import { HomeError } from "@/lib/home/home-error";
 import { cookies } from "next/headers";
 import * as relay from "@/lib/home/relay";
 import { revalidatePath } from "next/cache";
@@ -36,7 +37,7 @@ import { discoverCameras } from "@/lib/home/discovery";
 import { ensureVisionWorker } from "@/lib/home/vision";
 import * as defaults from "@/lib/home/detection-defaults";
 import { LOCAL_TARGET, storageTargetOptions } from "@/lib/storage-target";
-import { needsSomewhereToRun, type Detector } from "@/lib/home/detection";
+import { LOCAL_MACHINE, needsSomewhereToRun, type Detector } from "@/lib/home/detection";
 import { currentPlace, PLACE_COOKIE, PLACE_COOKIE_MAX_AGE } from "@/lib/home/current-place";
 import {
     cameraInputSchema,
@@ -54,13 +55,25 @@ import {
 
 const PATH = "/places";
 
-/** Turn a refusal into a sentence. Anything else is a real fault and throws. */
+/**
+ * Turn a refusal into a sentence, and a fault into a line in the log.
+ *
+ * Only a `HomeError` is shown, because only a `HomeError` was written to be
+ * read. Everything else that lands here is a fault, and a fault's own words are
+ * about columns, drivers and connection strings - a camera that would not save
+ * once told whoever was adding it about a uuid column, which is a sentence that
+ * helps nobody and describes the schema to anyone passing.
+ *
+ * The real one is not swallowed: it goes to the log, whole, where the operator
+ * can find it and the person adding a camera does not have to read it.
+ */
 async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: string }> {
     try {
         return { value: await run() };
     } catch (caught) {
-        if (caught instanceof Error) return { error: caught.message };
-        return { error: "That did not work." };
+        if (caught instanceof HomeError) return { error: caught.message };
+        console.error("places: an action failed", caught);
+        return { error: "That did not work. Nothing was changed." };
     }
 }
 
@@ -238,7 +251,7 @@ export async function listServersAction(): Promise<{
     const result = await guard(async () => {
         const hosts = await listHosts(install.ownerId);
         return [
-            { id: "local", label: "This machine" },
+            { id: LOCAL_MACHINE, label: "This machine" },
             ...hosts.map((host) => ({ id: host.id, label: host.name }))
         ];
     });
@@ -391,7 +404,7 @@ export async function startCameraAction(id: string): Promise<{ error?: string }>
         // than when the camera was saved, for the same reason as the relay: it is
         // a deploy, and a form should not wait on one.
         if (needsSomewhereToRun(camera.detector as Detector)) {
-            await ensureVisionWorker(install.ownerId, user.id, camera.detectorTargetId ?? "local");
+            await ensureVisionWorker(install.ownerId, user.id, camera.detectorTargetId ?? LOCAL_MACHINE);
         }
     });
     if (result.error) return { error: result.error };

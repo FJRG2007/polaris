@@ -21,6 +21,7 @@ import * as browser from "@/lib/data/browser";
 import { requirePermission } from "@/lib/session";
 import * as connections from "@/lib/data/connections";
 import { engineStats, type DatabaseStats } from "@/lib/data/stats";
+import { DataRequestError, ReadOnlyError } from "@/lib/data/driver";
 import type { DataColumn, DataNamespace, DataPage, DataRelation, QueryResult } from "@/lib/data/driver";
 
 const PATH = "/apps/databases";
@@ -31,13 +32,25 @@ async function actor(): Promise<{ id: string }> {
     return { id: user.id };
 }
 
-/** Turn a refusal into a sentence. Anything else is a real fault and throws. */
+/**
+ * Turn a refusal into a sentence, and a fault into a line in the log.
+ *
+ * Only the refusals this app writes for a reader are shown. Anything else is a
+ * fault, and a fault talking to a database describes that database out loud -
+ * table names, drivers, connection strings - to whoever happens to be looking.
+ * The real one goes to the log, whole, where it is of use.
+ */
 async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: string }> {
     try {
         return { value: await run() };
     } catch (caught) {
-        if (caught instanceof Error) return { error: caught.message };
-        return { error: "That did not work." };
+        const spoken =
+            caught instanceof connections.DataConnectionError ||
+            caught instanceof ReadOnlyError ||
+            caught instanceof DataRequestError;
+        if (spoken) return { error: (caught as Error).message };
+        console.error("databases: an action failed", caught);
+        return { error: "That did not work. Nothing was changed." };
     }
 }
 

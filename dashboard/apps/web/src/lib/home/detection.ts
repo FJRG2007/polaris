@@ -83,6 +83,18 @@ export const DETECTOR_META: Readonly<Record<Detector, DetectorMeta>> = {
     }
 };
 
+/**
+ * "This machine", as the picker offers it.
+ *
+ * Polaris' own machine is not an enrolled server and has no id, so the choice
+ * has to be a word. It is a word only in the form: stored, it is simply no
+ * server at all, because that is what every reader of the column already treats
+ * null as. Writing the word into the column instead put a value that is not a
+ * uuid into a uuid column, and the database said so, in its own language, to
+ * whoever was adding a camera.
+ */
+export const LOCAL_MACHINE = "local";
+
 /** Whether one rung is at or above another - which is the whole gating rule. */
 export function detectorReaches(chosen: Detector, stage: Detector): boolean {
     return DETECTORS.indexOf(chosen) >= DETECTORS.indexOf(stage);

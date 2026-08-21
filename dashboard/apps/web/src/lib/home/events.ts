@@ -11,6 +11,8 @@
  */
 
 import { prisma } from "@polaris/db";
+import { HomeError } from "@/lib/home/home-error";
+
 import { raiseAlerts } from "@/lib/home/alerts";
 import { parseDetection } from "@/lib/home/cameras";
 import type { ObjectClass } from "@/lib/home/detection";
@@ -503,7 +505,7 @@ export async function acknowledgeEvent(
         where: { id, camera: { installedAppId } },
         select: { id: true }
     });
-    if (!event) throw new Error("Event not found");
+    if (!event) throw new HomeError("Event not found");
     await prisma.cameraEvent.update({
         where: { id },
         data: { ackedAt: new Date(), ackedById: userId }
@@ -523,7 +525,7 @@ export async function deleteEvent(installedAppId: string, id: string): Promise<v
         where: { id, camera: { installedAppId } },
         select: { id: true, stillKey: true }
     });
-    if (!event) throw new Error("Event not found");
+    if (!event) throw new HomeError("Event not found");
     if (event.stillKey) await deleteStill(event.stillKey);
     await prisma.cameraEvent.delete({ where: { id } });
 }

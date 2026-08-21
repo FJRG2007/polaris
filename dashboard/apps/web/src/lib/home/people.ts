@@ -13,6 +13,8 @@
  */
 
 import { prisma } from "@polaris/db";
+import { HomeError } from "@/lib/home/home-error";
+
 import { faceEndpoint } from "@/lib/home/recognizer";
 import { FACE_EXTENSION, type FaceImageType } from "@/lib/home/face-image";
 
@@ -97,7 +99,7 @@ async function freeSubject(installedAppId: string, name: string): Promise<string
  *  event, so the two should read the same. */
 export async function addPerson(installedAppId: string, name: string): Promise<PersonView> {
     const trimmed = name.trim();
-    if (!trimmed) throw new Error("Give them a name");
+    if (!trimmed) throw new HomeError("Give them a name");
     const row = await prisma.homePerson.create({
         data: { installedAppId, name: trimmed, subjectId: await freeSubject(installedAppId, trimmed) }
     });
@@ -118,9 +120,9 @@ export async function addPerson(installedAppId: string, name: string): Promise<P
  */
 export async function renamePerson(installedAppId: string, id: string, name: string): Promise<PersonView> {
     const trimmed = name.trim();
-    if (!trimmed) throw new Error("Give them a name");
+    if (!trimmed) throw new HomeError("Give them a name");
     const person = await prisma.homePerson.findFirst({ where: { id, installedAppId }, select: { id: true } });
-    if (!person) throw new Error("Not found");
+    if (!person) throw new HomeError("Not found");
     const row = await prisma.homePerson.update({ where: { id }, data: { name: trimmed } });
     const counts = await faceCounts();
     return {
@@ -137,7 +139,7 @@ export async function renamePerson(installedAppId: string, id: string, name: str
  *  every arrival home becomes one. */
 export async function setNotify(installedAppId: string, id: string, notify: boolean): Promise<void> {
     const person = await prisma.homePerson.findFirst({ where: { id, installedAppId }, select: { id: true } });
-    if (!person) throw new Error("Not found");
+    if (!person) throw new HomeError("Not found");
     await prisma.homePerson.update({ where: { id }, data: { notify } });
 }
 
@@ -156,9 +158,9 @@ export async function addFace(
     contentType: FaceImageType = "image/jpeg"
 ): Promise<void> {
     const person = await prisma.homePerson.findFirst({ where: { id, installedAppId }, select: { subjectId: true } });
-    if (!person) throw new Error("Not found");
+    if (!person) throw new HomeError("Not found");
     const endpoint = await faceEndpoint();
-    if (!endpoint) throw new Error("Face recognition is not set up yet");
+    if (!endpoint) throw new HomeError("Face recognition is not set up yet");
 
     const form = new FormData();
     // Sent as what it is, name and all. The recognizer Home installs reads the
@@ -175,7 +177,7 @@ export async function addFace(
         // visible in the file provided" is an answer somebody can act on, and
         // "that did not work" is not.
         const detail = (await response?.json().catch(() => null)) as { message?: string } | null;
-        throw new Error(detail?.message ?? "The recognizer would not take that photograph");
+        throw new HomeError(detail?.message ?? "The recognizer would not take that photograph");
     }
 }
 
@@ -189,7 +191,7 @@ export async function addFace(
  */
 export async function removePerson(installedAppId: string, id: string): Promise<void> {
     const person = await prisma.homePerson.findFirst({ where: { id, installedAppId }, select: { subjectId: true } });
-    if (!person) throw new Error("Not found");
+    if (!person) throw new HomeError("Not found");
     const endpoint = await faceEndpoint();
     if (endpoint) {
         const response = await fetch(
@@ -199,7 +201,7 @@ export async function removePerson(installedAppId: string, id: string): Promise<
         // A subject the recognizer has never heard of is already forgotten, which
         // is the state being asked for.
         if (response && !response.ok && response.status !== 404) {
-            throw new Error("The recognizer would not forget them, so nothing was removed");
+            throw new HomeError("The recognizer would not forget them, so nothing was removed");
         }
     }
     await prisma.homePerson.delete({ where: { id } });
