@@ -90,9 +90,9 @@ import {
  */
 const TIMEOUTS: readonly { minutes: number; label: string }[] = [
     { minutes: 5, label: "5 minutes" },
-    { minutes: 60, label: "an hour" },
-    { minutes: 60 * 24, label: "a day" },
-    { minutes: 60 * 24 * 7, label: "a week" }
+    { minutes: 60, label: "1 hour" },
+    { minutes: 60 * 24, label: "1 day" },
+    { minutes: 60 * 24 * 7, label: "1 week" }
 ];
 
 /**

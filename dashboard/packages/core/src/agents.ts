@@ -511,7 +511,15 @@ export type LimitPeriod = (typeof LIMIT_PERIODS)[number];
  *  they are: the window rolls back from now, so a month's budget cannot be spent
  *  twice across a month end. */
 export const LIMIT_PERIOD_LABELS: Record<LimitPeriod, string> = {
-    day: "a day",
-    week: "a week",
+    day: "1 day",
+    week: "1 week",
     month: "30 days"
+};
+
+/** The same windows as the thing a limit is counted per, which is a different
+ *  sentence: "per day" rather than "per 1 day". */
+export const LIMIT_PERIOD_PER: Record<LimitPeriod, string> = {
+    day: "per day",
+    week: "per week",
+    month: "per 30 days"
 };

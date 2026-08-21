@@ -13,11 +13,11 @@
  */
 
 export const BAN_LENGTHS = [
-    { minutes: 60, label: "For an hour" },
-    { minutes: 1440, label: "For a day" },
-    { minutes: 4320, label: "For three days" },
-    { minutes: 10080, label: "For a week" },
-    { minutes: 43200, label: "For a month" },
+    { minutes: 60, label: "For 1 hour" },
+    { minutes: 1440, label: "For 1 day" },
+    { minutes: 4320, label: "For 3 days" },
+    { minutes: 10080, label: "For 1 week" },
+    { minutes: 43200, label: "For 30 days" },
     { minutes: 0, label: "Until lifted" }
 ] as const;
 

@@ -91,18 +91,21 @@ describe("how long is left", () => {
 });
 
 describe("saying it out loud", () => {
+    // Always the number, never "an hour". This is a picker's option as well as a
+    // sentence, and one option reading "an hour" between "30 minutes" and
+    // "2 hours" is the odd one out.
     it("uses seconds under a minute", () => {
         expect(slowmodeSpoken(5)).toBe("5 seconds");
-        expect(slowmodeSpoken(1)).toBe("a second");
+        expect(slowmodeSpoken(1)).toBe("1 second");
     });
 
     it("uses minutes over one", () => {
-        expect(slowmodeSpoken(60)).toBe("a minute");
+        expect(slowmodeSpoken(60)).toBe("1 minute");
         expect(slowmodeSpoken(300)).toBe("5 minutes");
     });
 
     it("uses hours at the top of the ladder", () => {
-        expect(slowmodeSpoken(3600)).toBe("an hour");
+        expect(slowmodeSpoken(3600)).toBe("1 hour");
         expect(slowmodeSpoken(21_600)).toBe("6 hours");
     });
 

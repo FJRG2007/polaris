@@ -290,17 +290,21 @@ export function slowmodeWait(input: {
  * Whole units only. "1 minute 43 seconds" is a stopwatch; what a person needs to
  * know is roughly how long they are being asked to hold on for, and every
  * messenger that shows this shows it coarsely.
+ *
+ * Always a number, never "an hour". This is a picker's option as well as a
+ * sentence, and one option reading "an hour" between "30 minutes" and "2 hours"
+ * is the odd one out - which is why every messenger writes the number here.
  */
 export function slowmodeSpoken(seconds: number): string {
     if (seconds >= 3600) {
         const hours = Math.round(seconds / 3600);
-        return hours === 1 ? "an hour" : `${hours} hours`;
+        return `${hours} ${hours === 1 ? "hour" : "hours"}`;
     }
     if (seconds >= 60) {
         const minutes = Math.round(seconds / 60);
-        return minutes === 1 ? "a minute" : `${minutes} minutes`;
+        return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
     }
-    return seconds === 1 ? "a second" : `${seconds} seconds`;
+    return `${seconds} ${seconds === 1 ? "second" : "seconds"}`;
 }
 
 export const chatChannelUpdateSchema = z.object({
@@ -772,7 +776,7 @@ export const MUTE_FOREVER = 0;
 
 export const MUTE_LABELS: Readonly<Record<number, string>> = {
     15: "For 15 minutes",
-    60: "For an hour",
+    60: "For 1 hour",
     180: "For 3 hours",
     480: "For 8 hours",
     1440: "For 24 hours",

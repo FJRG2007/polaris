@@ -20,6 +20,7 @@ import {
     LIMIT_METRICS,
     LIMIT_PERIODS,
     LIMIT_PERIOD_LABELS,
+    LIMIT_PERIOD_PER,
     LIMIT_SUBJECTS,
     type LimitMetric,
     type LimitPeriod,
@@ -187,7 +188,7 @@ function AddLimit({
                 <Select
                     value={period}
                     onValueChange={(next) => setPeriod(next as LimitPeriod)}
-                    options={LIMIT_PERIODS.map((slug) => ({ value: slug, label: `per ${LIMIT_PERIOD_LABELS[slug]}` }))}
+                    options={LIMIT_PERIODS.map((slug) => ({ value: slug, label: LIMIT_PERIOD_PER[slug] }))}
                 />
             </div>
 
