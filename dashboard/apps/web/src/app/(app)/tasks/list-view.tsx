@@ -26,8 +26,9 @@ import { GanttView } from "./views/schedule";
 import { CalendarView } from "./views/calendar";
 import { keyboardIsBusy } from "@/lib/keyboard";
 import { useStableOrder } from "./stable-order";
+import { useTagCreation } from "./tag-creation";
 import { ListView, TableView } from "./views/rows";
-import { bulkOverlay, taskOverlay } from "./optimistic";
+import { bulkOverlay, taskOverlay, useLatest } from "./optimistic";
 import { TaskCreateDialog } from "./task-create-dialog";
 import { AssigneePicker, StatusPicker } from "./pickers";
 import type { SavedView } from "@/lib/tasks/view-service";
@@ -92,7 +93,7 @@ export function ListScreen({
     subtitle,
     tasks,
     savedViews,
-    context,
+    context: space,
     lists,
     defaultListId,
     initialTaskId = null,
@@ -107,7 +108,7 @@ export function ListScreen({
     // else gets. That is also where anything this screen saves for them goes -
     // reshaping what the rest of the team sees is not a thing a drag should do.
     const ownView = savedViews.find(
-        (view) => view.ownerId === context.currentUserId && !view.shared
+        (view) => view.ownerId === space.currentUserId && !view.shared
     );
     const initial = ownView ?? savedViews[0];
     const [viewType, setViewType] = useState<core.TaskViewType>(initial?.type ?? "board");
@@ -129,6 +130,16 @@ export function ListScreen({
     // The task a shift-click reaches back to: the last one clicked on its own.
     const [anchor, setAnchor] = useState<string | null>(null);
     const [error, setError] = useState("");
+
+    // A tag created from a row's picker or its menu goes on the task at once, so
+    // this screen has to be able to name it before the reload brings it back -
+    // see `useTagCreation`. Everything below reads the space through `context`,
+    // which is the one the server sent with those tags folded in.
+    const tagBook = useTagCreation(space.spaceId, space.tags, setError);
+    const context = useMemo<SpaceContext>(() => ({ ...space, tags: tagBook.tags }), [space, tagBook.tags]);
+    // Read at the moment an edit is applied rather than when the menu that applies
+    // it was drawn, so a tag created from that menu resolves - see `useLatest`.
+    const directory = useLatest(context);
 
     // Optimistic overlay: what a drag or a tick changed before the server said so.
     const [pending, setPending] = useState<Record<string, Partial<TaskRow>>>({});
@@ -327,7 +338,7 @@ export function ListScreen({
     const editTask = async (task: TaskRow, change: TaskEdit) => {
         setPending((current) => ({
             ...current,
-            [task.id]: { ...current[task.id], ...taskOverlay(change, context) }
+            [task.id]: { ...current[task.id], ...taskOverlay(change, tagBook.resolve(directory.current)) }
         }));
 
         const result = await runAction(
@@ -607,7 +618,7 @@ export function ListScreen({
             setPending((current) => {
                 const next = { ...current };
                 for (const task of targets) {
-                    next[task.id] = { ...next[task.id], ...bulkOverlay(task, change, context) };
+                    next[task.id] = { ...next[task.id], ...bulkOverlay(task, change, tagBook.resolve(directory.current)) };
                 }
                 return next;
             });
@@ -698,12 +709,9 @@ export function ListScreen({
         // finding rather than creating, instead of refusing a typed name.
         onCreateTag: context.spaceId
             ? async (name, color) => {
-                  const created = await runAction(
-                      () => actions.createTagAction(context.spaceId, name, color),
-                      setError
-                  );
-                  if (created?.id) refresh();
-                  return created?.id ?? null;
+                  const id = await tagBook.create(name, color);
+                  if (id) refresh();
+                  return id;
               }
             : undefined,
         groupBy,

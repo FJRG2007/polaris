@@ -23,8 +23,9 @@
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { tagColorFor } from "./pickers";
-import { taskOverlay } from "./optimistic";
+import { taskOverlay, useLatest } from "./optimistic";
 import { runAction } from "@/lib/run-action";
+import { useTagCreation } from "./tag-creation";
 import { PropertyRows } from "./task-properties";
 import { useEffect, useMemo, useState } from "react";
 import type { StatusView, TagView } from "@/lib/tasks/space-service";
@@ -137,13 +138,17 @@ export function TaskCreateDialog({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, defaultListId, firstStatusId, defaultName, defaultDueDate]);
 
+    // A tag created here is on the task the moment it exists, so it has to be
+    // among the tags this dialog draws against - see `useTagCreation`.
+    const tagBook = useTagCreation(spaceId, tags, setError);
+
     /** What the property rows are drawn against. The space's own fields and the
      *  sibling tasks are left out: neither can be set before the task exists. */
     const context: SpaceContext = useMemo(
         () => ({
             spaceId,
             statuses,
-            tags,
+            tags: tagBook.tags,
             fields: [],
             people,
             canEdit: true,
@@ -151,12 +156,16 @@ export function TaskCreateDialog({
             currentUserId: "",
             siblings: []
         }),
-        [spaceId, statuses, tags, people]
+        [spaceId, statuses, tagBook.tags, people]
     );
+
+    // Read at the moment an edit is applied, so a tag created in a picker is
+    // already among them by the time the picker hands its id back.
+    const directory = useLatest(context);
 
     /** The same input the panel sends the server, applied to the draft instead. */
     const patch = (input: Record<string, unknown>) =>
-        setDraft((current) => ({ ...current, ...taskOverlay(input, context) }));
+        setDraft((current) => ({ ...current, ...taskOverlay(input, tagBook.resolve(directory.current)) }));
 
     const nameIssue = draft.name.trim() ? core.taskName.safeParse(draft.name).error?.issues[0]?.message : null;
     const canSubmit = draft.name.trim().length > 0 && !nameIssue && Boolean(draft.listId) && !saving;
@@ -246,14 +255,7 @@ export function TaskCreateDialog({
                         onError={setError}
                         // A tag belongs to one space, so a screen that spans them
                         // all offers finding rather than creating.
-                        onCreateTag={async (name) => {
-                            if (!spaceId) return null;
-                            const created = await runAction(
-                                () => actions.createTagAction(spaceId, name, tagColorFor(name)),
-                                setError
-                            );
-                            return created?.id ?? null;
-                        }}
+                        onCreateTag={(name) => (spaceId ? tagBook.create(name, tagColorFor(name)) : Promise.resolve(null))}
                     />
 
                     <section className="flex flex-col gap-1 border-t border-border pt-4">

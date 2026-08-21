@@ -1096,17 +1096,19 @@ export async function listTags(spaceId: string): Promise<TagView[]> {
     });
 }
 
-export async function createTag(spaceId: string, name: string, color: string): Promise<string> {
+/** Returns the whole tag, not just its id: it is created where it is about to be
+ *  used, and the screen that asked has to be able to draw it - with its name and
+ *  colour - before the space's own list has been read again. */
+export async function createTag(spaceId: string, name: string, color: string): Promise<TagView> {
     const existing = await prisma.taskTag.findUnique({
         where: { spaceId_name: { spaceId, name } },
-        select: { id: true }
+        select: { id: true, name: true, color: true }
     });
-    if (existing) return existing.id;
-    const tag = await prisma.taskTag.create({
+    if (existing) return existing;
+    return prisma.taskTag.create({
         data: { spaceId, name, color },
-        select: { id: true }
+        select: { id: true, name: true, color: true }
     });
-    return tag.id;
 }
 
 export async function updateTag(

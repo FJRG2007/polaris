@@ -24,6 +24,7 @@ import { tagColorFor } from "./pickers";
 import { useAutosave } from "./autosave";
 import { ShareDialog } from "./task-share";
 import { runAction } from "@/lib/run-action";
+import { useTagCreation } from "./tag-creation";
 import { CopyButton } from "@/components/copy-button";
 import type { TaskDetail } from "@/lib/tasks/task-service";
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
@@ -32,8 +33,8 @@ import { AttachmentSection, CommitSection } from "./task-files";
 import { FieldsSection, PropertyRows } from "./task-properties";
 import { ActivityStream, TimeSection } from "./task-conversation";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
-import { taskOverlay, wouldChange, type TaskOverlay } from "./optimistic";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { taskOverlay, useLatest, wouldChange, type TaskOverlay } from "./optimistic";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ChecklistSection, DependencySection, SubtaskSection } from "./task-subwork";
 import { Bell, BellOff, Loader2, MoreHorizontal, Repeat, Share2 } from "lucide-react";
 import {
@@ -73,7 +74,7 @@ function fieldsOf(input: Record<string, unknown>): string {
 
 export function TaskPanel({
     taskId,
-    context,
+    context: space,
     onClose,
     onChanged
 }: {
@@ -87,6 +88,14 @@ export function TaskPanel({
     const auto = useAutosave();
     const [detail, setDetail] = useState<TaskDetail | null>(null);
     const [error, setError] = useState("");
+
+    // A tag made in one of this panel's pickers is put on the task at once, so the
+    // panel has to be able to draw it before the space's list has been read again -
+    // see `useTagCreation`. `context` below is the space with those tags in it.
+    const tagBook = useTagCreation(space.spaceId, space.tags, setError);
+    const context = useMemo<SpaceContext>(() => ({ ...space, tags: tagBook.tags }), [space, tagBook.tags]);
+    // Read when the edit is applied, not when the picker was drawn - see `useLatest`.
+    const directory = useLatest(context);
     const [openId, setOpenId] = useState<string | null>(taskId);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [sharing, setSharing] = useState(false);
@@ -157,7 +166,7 @@ export function TaskPanel({
         if (!wouldChange(input, task)) return true;
 
         setError("");
-        const overlay = taskOverlay(input, context);
+        const overlay = taskOverlay(input, tagBook.resolve(directory.current));
         // A picker has to repaint on the click: waiting a round trip to see a status
         // move is what makes a task manager feel slow. A field being typed into is
         // already showing what was typed, and drawing over it takes the caret with it.
@@ -308,12 +317,9 @@ export function TaskPanel({
     /** A tag born where it is needed - in a picker or a menu - instead of in the
      *  space's settings, which is where the reason for it gets forgotten. */
     const createTag = async (name: string, color: string) => {
-        const created = await runAction(
-            () => actions.createTagAction(context.spaceId, name, color),
-            setError
-        );
-        if (created?.id) onChanged();
-        return created?.id ?? null;
+        const id = await tagBook.create(name, color);
+        if (id) onChanged();
+        return id;
     };
 
     const task = detail?.task;

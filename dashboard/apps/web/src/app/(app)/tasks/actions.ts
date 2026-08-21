@@ -715,16 +715,16 @@ export async function createTagAction(
     spaceId: string,
     name: string,
     color: string
-): Promise<{ id?: string; error?: string }> {
+): Promise<{ tag?: spaces.TagView; error?: string }> {
     const caller = await actor();
     const parsed = core.tagSchema.safeParse({ spaceId, name, color });
     if (!parsed.success)
         return { error: parsed.error.issues[0]?.message ?? "Check the tag and try again" };
     try {
         await access.requireSpace(caller, spaceId, "member");
-        const id = await spaces.createTag(spaceId, parsed.data.name, parsed.data.color);
+        const tag = await spaces.createTag(spaceId, parsed.data.name, parsed.data.color);
         refresh(caller, spaceId);
-        return { id };
+        return { tag };
     } catch (caught) {
         return failure(caught, "Could not add the tag");
     }

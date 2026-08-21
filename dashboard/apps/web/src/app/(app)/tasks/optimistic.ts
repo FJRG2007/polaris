@@ -14,8 +14,25 @@
  * is why the overlay is dropped rather than merged when fresh rows arrive.
  */
 
+import { useRef } from "react";
 import type { TaskBulkEdit, TaskEdit } from "./views/shared";
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
+
+/**
+ * The space's vocabulary as it stands when a change is applied, rather than as it
+ * stood when the callback applying it was made.
+ *
+ * A picker that creates a tag or a status hands the id back after a round trip, and
+ * by then the list it has to be resolved against is one entry longer than the one
+ * that callback closed over. Read through a ref, the new entry is there: without it
+ * the id is written to the server and then dropped on its way to the screen, which
+ * reads as the tag never having been put on the task at all.
+ */
+export function useLatest<Value>(value: Value): { readonly current: Value } {
+    const ref = useRef(value);
+    ref.current = value;
+    return ref;
+}
 
 /** The row shape as an overlay: writable, and every field optional. */
 export type TaskOverlay = { -readonly [Key in keyof TaskRow]?: TaskRow[Key] };
