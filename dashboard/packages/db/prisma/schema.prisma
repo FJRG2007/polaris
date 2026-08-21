@@ -7050,6 +7050,7 @@ model Camera {
     place  Place?        @relation(fields: [placeId], references: [id], onDelete: SetNull)
     events CameraEvent[]
     clips  CameraClip[]
+    zones  CameraZone[]
 
     @@index([installedAppId])
     @@index([placeId])
@@ -7202,4 +7203,56 @@ model HomePerson {
     @@unique([installedAppId, name])
     @@unique([installedAppId, subjectId])
     @@index([installedAppId])
+}
+
+// The parts of a camera's picture that count, and the ones that never do.
+//
+// A camera sees one rectangle and has no opinion about it, and that is where
+// almost every useless alert comes from: the road at the bottom of the drive,
+// the tree by the fence, the neighbour's door. None of those is a detection
+// fault - the detector is right, a car really did go past - so no amount of
+// sensitivity fixes them. What is missing is a way to say where in the picture
+// Polaris is looking.
+//
+// Two kinds and no more. A `watch` zone narrows the camera: once one exists,
+// something only counts when it is standing inside one of them, and the event
+// records which. An `ignore` zone is never reported, whatever else says
+// otherwise. Between them they cover the mask, the required area and the
+// per-area object filter that the field's three main projects each spell
+// differently.
+model CameraZone {
+    id       String @id @default(uuid(7)) @db.Uuid
+    cameraId String @db.Uuid
+    name     String
+    /// watch | ignore.
+    kind     String @default("watch")
+    /// The outline, as a JSON array of [x, y] pairs from 0 to 1 across the
+    /// frame. Relative rather than pixels because a zone is drawn on whatever
+    /// size picture the browser loaded and tested against whatever size frame
+    /// the detector decoded, and those are never the same number - storing
+    /// pixels means the zone silently moves the day the stream's resolution
+    /// changes.
+    points   String
+    /// Which classes count here, as a JSON array, or empty for all of them. A
+    /// drive that only cares about vehicles and a doorway that only cares about
+    /// people are the same camera.
+    objects  String @default("[]")
+    /// Frames running something must be inside before it is counted as inside.
+    /// A detector's box wobbles by a few pixels every frame, and on a boundary
+    /// that reads as somebody stepping in and out twice a second.
+    inertia  Int    @default(3)
+    /// Seconds it must stay before it counts at all. Zero is the normal case;
+    /// a car park that only cares about somebody who stopped is not.
+    loiterSeconds Int @default(0)
+    enabled  Boolean @default(true)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    camera Camera @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+
+    // Two names on one camera would make an event's zone list ambiguous, which
+    // is the one thing the list has to be.
+    @@unique([cameraId, name])
+    @@index([cameraId])
 }
