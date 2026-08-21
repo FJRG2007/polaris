@@ -6,11 +6,31 @@
 FROM node:22-bookworm-slim AS builder
 WORKDIR /build
 
+# Manifests first so the install layer is cached until dependencies change. The
+# whole workspace's, not just this service's: `npm ci` resolves the lockfile
+# against every member it names, and a member whose manifest is absent is a
+# member whose dependencies never arrive - which surfaces much later, as
+# @polaris/core failing to build for want of one of its own imports.
 COPY package.json package-lock.json ./
+COPY packages/agent-runtime/package.json ./packages/agent-runtime/
+COPY packages/auth/package.json ./packages/auth/
+COPY packages/config/package.json ./packages/config/
+COPY packages/core/package.json ./packages/core/
+COPY packages/db/package.json ./packages/db/
+COPY packages/deploy/package.json ./packages/deploy/
+COPY packages/docker/package.json ./packages/docker/
+COPY packages/hostd-client/package.json ./packages/hostd-client/
+COPY packages/messaging/package.json ./packages/messaging/
+COPY packages/ssh/package.json ./packages/ssh/
+COPY packages/storage/package.json ./packages/storage/
+COPY packages/ui/package.json ./packages/ui/
+COPY apps/web/package.json ./apps/web/
 COPY services/vision/package.json ./services/vision/
 RUN npm ci --ignore-scripts
 
 COPY . .
+# @polaris/core first: the worker bundles the zone geometry, the detector's
+# decoder and the tracker out of its dist.
 RUN npm run build -w @polaris/core && npm run build -w @polaris/vision
 
 # The model, fetched once at build time and checked.
@@ -39,6 +59,19 @@ RUN curl -fsSL -o /detector.onnx "$MODEL_URL" && \
 FROM node:22-bookworm-slim AS deps
 WORKDIR /deps
 COPY package.json package-lock.json ./
+COPY packages/agent-runtime/package.json ./packages/agent-runtime/
+COPY packages/auth/package.json ./packages/auth/
+COPY packages/config/package.json ./packages/config/
+COPY packages/core/package.json ./packages/core/
+COPY packages/db/package.json ./packages/db/
+COPY packages/deploy/package.json ./packages/deploy/
+COPY packages/docker/package.json ./packages/docker/
+COPY packages/hostd-client/package.json ./packages/hostd-client/
+COPY packages/messaging/package.json ./packages/messaging/
+COPY packages/ssh/package.json ./packages/ssh/
+COPY packages/storage/package.json ./packages/storage/
+COPY packages/ui/package.json ./packages/ui/
+COPY apps/web/package.json ./apps/web/
 COPY services/vision/package.json ./services/vision/
 RUN npm ci --omit=dev --workspace @polaris/vision --include-workspace-root=false --ignore-scripts && \
     npm rebuild onnxruntime-node && \
