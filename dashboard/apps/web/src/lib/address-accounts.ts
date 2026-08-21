@@ -104,6 +104,44 @@ interface AccountSignIns {
     lastAt: string;
 }
 
+/**
+ * Which of these addresses somebody is signed in from right now.
+ *
+ * Asked by the firewall before it bans, so that a flood a member's own browser
+ * produced does not take the whole instrument away from them - and, behind a
+ * household or an office router, from everybody sitting near them.
+ *
+ * Live sessions only, and that is the difference between this and everything
+ * else in this file. The panel wants the history, because "signed in from here
+ * last week" is worth knowing about an address attacking today; a ban has to
+ * turn on whether somebody is using the instance from there at this moment, or
+ * an address a member once visited would be immune forever.
+ *
+ * Both columns, for the reason `sessionRowsAt` spells out: better-auth stamps
+ * the address at sign-in and never follows it, while Polaris re-stamps its own
+ * record as a session moves. Two indexed reads rather than one `OR`, so neither
+ * gives up its index.
+ */
+export async function addressesSignedIn(ips: readonly string[]): Promise<Set<string>> {
+    const wanted = [...new Set(ips.filter(Boolean))];
+    if (wanted.length === 0) return new Set();
+    const live = { gt: new Date() };
+    const [opened, moved] = await Promise.all([
+        prisma.session.findMany({
+            where: { ipAddress: { in: wanted }, expiresAt: live },
+            select: { ipAddress: true }
+        }),
+        prisma.session.findMany({
+            where: { state: { is: { ip: { in: wanted } } }, expiresAt: live },
+            select: { state: { select: { ip: true } } }
+        })
+    ]);
+    const found = new Set<string>();
+    for (const row of opened) if (row.ipAddress) found.add(row.ipAddress);
+    for (const row of moved) if (row.state?.ip) found.add(row.state.ip);
+    return found;
+}
+
 /** Newest first and bounded, so the union of the two reads below can be cut to
  *  the same ceiling and still be the newest sessions the address has held. */
 async function sessionRowsMatching(

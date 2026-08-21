@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_WAF_JAILS, detectWafBans, type HttpLogLike, type WafJail } from "../src/waf-jails.js";
+import {
+    DEFAULT_WAF_JAILS,
+    detectWafBans,
+    jailBansSignedIn,
+    WAF_JAIL_IDS,
+    type HttpLogLike,
+    type WafJail
+} from "../src/waf-jails.js";
 import { buildWafIntel, indexWafIntel, WAF_INTEL_VERSION, type WafIntelEntry } from "../src/waf-intel.js";
 
 const NOW = Date.parse("2026-08-02T12:00:00.000Z");
@@ -375,5 +382,36 @@ describe("the intel snapshot", () => {
         expect(index.match("203.0.113.7", NOW)).toBeNull();
         expect(index.match("203.0.113.8", NOW)?.reason).toBe("ban");
         expect(index.match("198.51.100.9", NOW)?.reason).toBe("tor");
+    });
+});
+
+/**
+ * Which jails still bite somebody who is signed in.
+ *
+ * An address ban takes the whole instrument away, and behind a household router
+ * it takes it from everybody sitting near the person who tripped it. The split
+ * is between what a member's own browser can produce by accident - which is
+ * every volume jail, as an afternoon of being locked out proved - and what it
+ * cannot produce at all.
+ */
+describe("an address somebody is signed in from", () => {
+    it("is spared by the jails a browser can trip by accident", () => {
+        expect(jailBansSignedIn("not-found")).toBe(false);
+        expect(jailBansSignedIn("rate-limited")).toBe(false);
+        expect(jailBansSignedIn("auth-failed")).toBe(false);
+        expect(jailBansSignedIn("subdomain-listing")).toBe(false);
+    });
+
+    it("is banned anyway for reaching at an exploit or a credential store", () => {
+        // No screen in Polaris asks for /wp-login.php or reads /.git/config, and
+        // a web session says nothing about who is failing to log into SSH.
+        expect(jailBansSignedIn("probes")).toBe(true);
+        expect(jailBansSignedIn("ssh-auth")).toBe(true);
+    });
+
+    it("has an answer for every jail there is", () => {
+        // A jail added without one would default to undefined, which reads as
+        // "spare them" - the wrong way for a rule nobody thought about to fail.
+        for (const jail of WAF_JAIL_IDS) expect(typeof jailBansSignedIn(jail)).toBe("boolean");
     });
 });

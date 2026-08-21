@@ -16,7 +16,8 @@
 import { readFile } from "node:fs/promises";
 import { parseHttpLogs } from "@polaris/deploy";
 import { getSetting, setSetting } from "@/lib/setting-store";
-import { DEFAULT_WAF_JAILS, detectWafBans, type WafJail } from "@polaris/core";
+import { DEFAULT_WAF_JAILS, detectWafBans, jailBansSignedIn, type WafJail } from "@polaris/core";
+import { addressesSignedIn } from "@/lib/address-accounts";
 import {
     checkReputation,
     priorBanCounts,
@@ -98,7 +99,29 @@ export async function runWafJails(now = Date.now()): Promise<{ scanned: number; 
             now
         });
 
+        // An address ban takes the whole instrument away, and behind a household
+        // or an office router it takes it away from everybody sitting near the
+        // person who tripped it. Against a stranger that is the trade; against
+        // somebody signed in it is nearly always their own browser having a bad
+        // time - a tab left open across a deploy, a screen retrying something
+        // that has stopped existing - and locking them out is the wrong response
+        // to that. The jails that name an exploit or a credential store are
+        // unmoved and do not appear here.
+        const sparing = verdicts.filter((verdict) => !jailBansSignedIn(verdict.jail));
+        const members = sparing.length > 0 ? await addressesSignedIn(sparing.map((v) => v.ip)) : new Set<string>();
+
+        let banned = 0;
         for (const verdict of verdicts) {
+            if (members.has(verdict.ip) && !jailBansSignedIn(verdict.jail)) {
+                // Logged rather than raised. A member's tab misbehaving after a
+                // deploy is the ordinary cause, so notifying would notify on
+                // every deploy - and what an operator needs from this line is
+                // the address, to go and read what it actually did.
+                console.warn(
+                    `polaris: ${verdict.ip} tripped ${verdict.jail} (${verdict.note}) and was not banned - somebody is signed in from there`
+                );
+                continue;
+            }
             await recordWafBan({
                 ip: verdict.ip,
                 reason: "ban",
@@ -108,13 +131,16 @@ export async function runWafJails(now = Date.now()): Promise<{ scanned: number; 
                 // operator lifts it, and the intel snapshot already understands that.
                 until: verdict.until === null ? null : new Date(verdict.until)
             });
+            banned += 1;
         }
 
         // Reputation is asked about the same traffic, in the same pass, so an address
         // that is already known bad elsewhere is blocked before it earns a ban here.
         await checkReputation([...new Set(seen)].filter((ip) => !ignore.includes(ip)));
         await publishWafIntel();
-        return { scanned: entries.length, banned: verdicts.length };
+        // What was actually banned, not what was decided: a caller logging this
+        // is describing what happened to the instance.
+        return { scanned: entries.length, banned };
     } catch (caught) {
         console.error("polaris: the firewall jail pass failed:", caught instanceof Error ? caught.message : caught);
         return { scanned: 0, banned: 0 };

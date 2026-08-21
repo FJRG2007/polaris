@@ -248,6 +248,45 @@ function counts(jail: WafJailId, entry: HttpLogLike): boolean {
 }
 
 /**
+ * The jails that still ban an address somebody is signed in from.
+ *
+ * An address ban is the bluntest thing the firewall does: it takes the whole
+ * instrument away, and behind a household or an office router it takes it away
+ * from everybody sitting near the person who tripped it. That is the right
+ * trade against a stranger and the wrong one against a member, because the
+ * flood a member produces is nearly always their own browser having a bad time -
+ * a tab left open across a deploy, a screen retrying something that has stopped
+ * existing - and the response to that is to fix the tab, not to lock out the
+ * person using it.
+ *
+ * So the jails whose signal a member's own browser can produce by accident spare
+ * them. The two that cannot are unmoved: no screen in Polaris asks for
+ * `/wp-login.php` or reads `/.git/config`, and a web session says nothing at all
+ * about who is failing to log into SSH. A member reaching for a credential store
+ * is banned exactly as fast as a stranger, and the permanent ban is still
+ * permanent.
+ *
+ * What this deliberately does not do is protect the account. An address is
+ * spared, and the account behind it keeps whatever standing its behaviour has
+ * earned - that is a different mechanism, aimed at the right target, and it does
+ * not cut off the people sharing the router.
+ */
+const BANS_SIGNED_IN: Readonly<Record<WafJailId, boolean>> = {
+    "not-found": false,
+    "subdomain-listing": false,
+    "rate-limited": false,
+    "auth-failed": false,
+    probes: true,
+    "ssh-auth": true
+};
+
+/** Whether this jail's verdict stands against an address somebody is signed in
+ *  from. */
+export function jailBansSignedIn(jail: WafJailId): boolean {
+    return BANS_SIGNED_IN[jail];
+}
+
+/**
  * The jails a fresh instance runs, with fail2ban's own defaults for the two it
  * shares. Everything here is editable; these are the starting numbers, not limits.
  *
