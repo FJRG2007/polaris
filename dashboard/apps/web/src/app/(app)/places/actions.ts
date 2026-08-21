@@ -51,6 +51,7 @@ import {
     faceEndpoint,
     faceRecognitionSettings,
     installRecognizer,
+    setFaceEnabled,
     setFaceRecognition
 } from "@/lib/home/recognizer";
 
@@ -715,6 +716,8 @@ export async function removePersonAction(id: string): Promise<{ error?: string }
  *  it put it, and whether it is answering yet. The key itself never comes back. */
 export async function homeSettingsAction(): Promise<{
     settings?: {
+        faceEnabled: boolean;
+        faceRunning: boolean;
         faceApiUrl: string;
         hasFaceKey: boolean;
         recognizerReady: boolean;
@@ -727,6 +730,8 @@ export async function homeSettingsAction(): Promise<{
     const result = await guard(async () => {
         const face = await faceRecognitionSettings(install.id);
         return {
+            faceEnabled: face.enabled,
+            faceRunning: face.running,
             faceApiUrl: face.baseUrl,
             hasFaceKey: face.hasKey,
             recognizerReady: (await faceEndpoint()) !== null,
@@ -735,6 +740,21 @@ export async function homeSettingsAction(): Promise<{
         };
     });
     return result.error ? { error: result.error } : { settings: result.value };
+}
+
+/**
+ * Turn recognition on or off.
+ *
+ * `home.manage` rather than `home.control`: it starts and stops a container, and
+ * off is a real saving rather than a preference - the models sit in memory for
+ * as long as it is up, whether or not a camera ever asks it anything.
+ */
+export async function setFaceEnabledAction(enabled: boolean): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const result = await guard(() => setFaceEnabled(install.id, Boolean(enabled)));
+    if (result.error) return { error: result.error };
+    revalidatePath(`${PATH}/settings`);
+    return {};
 }
 
 /**

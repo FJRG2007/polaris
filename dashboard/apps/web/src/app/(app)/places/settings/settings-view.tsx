@@ -8,7 +8,12 @@
  * be told about it twice - and it is re-read on every write, so connecting one
  * later moves new footage onto it with no migration.
  *
- * Recognition is installed from here, on a machine chosen here, because it is
+ * Recognition is off until it is switched on, and switching it off stops its
+ * container rather than only ignoring it - it is the one part of Places that
+ * costs something while nothing is happening, because the models sit in memory
+ * whether or not a camera ever asks it anything.
+ *
+ * It is installed from here, on a machine chosen here, because it is
  * part of Home rather than something to go and find. The address and key fields
  * are still underneath for a house that already runs its own - they speak the
  * same dialect - but nobody has to touch them to get a name on an event.
@@ -19,7 +24,7 @@ import * as actions from "../actions";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { CircleAlert, CircleCheck, Loader2, ScanFace } from "lucide-react";
-import { Button, Input, Select, Skeleton } from "@polaris/ui";
+import { Button, Input, Select, Skeleton, Switch } from "@polaris/ui";
 
 /** How often a recognizer that has not answered yet is asked again. Short: it is
  *  the difference between watching it come up and reloading the page to find
@@ -32,6 +37,10 @@ const STARTING_EVERY_MS = 5000;
 const STARTING_TRIES = 60;
 
 interface Settings {
+    /** Whether the house wants faces put to names. Off unless it was turned on. */
+    faceEnabled: boolean;
+    /** Whether its container is up, which can disagree with the line above. */
+    faceRunning: boolean;
     faceApiUrl: string;
     hasFaceKey: boolean;
     recognizerReady: boolean;
@@ -82,6 +91,8 @@ export function HomeSettingsView({
             if (cancelled) return;
             if (result.error) setError(result.error);
             const value = result.settings ?? {
+                faceEnabled: false,
+                faceRunning: false,
                 faceApiUrl: "",
                 hasFaceKey: false,
                 recognizerReady: false,
@@ -115,7 +126,12 @@ export function HomeSettingsView({
      * and says so rather than spinning at it all afternoon.
      */
     useEffect(() => {
-        if (!settings?.installedOn || settings.answering || waited) return;
+        // Nothing to watch for a house that has it switched off: the container is
+        // being stopped, not started, and asking a machine every five seconds
+        // whether something nobody wants is answering yet is the exact cost that
+        // switching it off was about.
+        if (!settings?.faceEnabled) return;
+        if (!settings.installedOn || settings.answering || waited) return;
         let left = STARTING_TRIES;
         const timer = setInterval(() => {
             if (left <= 0) {
@@ -135,7 +151,28 @@ export function HomeSettingsView({
                 });
         }, STARTING_EVERY_MS);
         return () => clearInterval(timer);
-    }, [settings?.installedOn, settings?.answering, waited]);
+    }, [settings?.faceEnabled, settings?.installedOn, settings?.answering, waited]);
+
+    const [switching, setSwitching] = useState(false);
+
+    /** Turn recognition on or off. Applied on screen first, and put back if the
+     *  server disagrees - starting a container is slow enough that a switch which
+     *  waits for it reads as one that did not take. */
+    const setEnabled = async (next: boolean) => {
+        setSwitching(true);
+        setError(null);
+        setSettings((current) => (current ? { ...current, faceEnabled: next, faceRunning: next } : current));
+        const result = await runAction(() => actions.setFaceEnabledAction(next), setError);
+        setSwitching(false);
+        if (result?.error) {
+            setSettings((current) =>
+                current ? { ...current, faceEnabled: !next, faceRunning: !next } : current
+            );
+            return;
+        }
+        const fresh = await actions.homeSettingsAction();
+        if (fresh.settings) setSettings(fresh.settings);
+    };
 
     const install = async () => {
         setInstalling(true);
@@ -300,17 +337,62 @@ export function HomeSettingsView({
             </section>
 
             <section className="flex flex-col gap-3">
-                <div>
-                    <h2 className="text-[13px] font-semibold text-foreground">Face recognition</h2>
-                    <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
-                        Optional, and only needed for cameras set to work out who somebody is. Install it on whichever
-                        machine you like - the pictures and what is learned from them stay on that machine, and a face
-                        is only looked at after a camera has already seen a person.
-                    </p>
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h2 className="text-[13px] font-semibold text-foreground">Face recognition</h2>
+                        <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+                            Off unless you turn it on. It puts names to the people you have taught it under People,
+                            and only after a camera has already seen somebody - the pictures and what is learned from
+                            them stay on the machine it runs on. While it is on it holds its models in memory, so
+                            leave it off if you only want cameras to say that somebody is there.
+                        </p>
+                    </div>
+                    {settings === null ? (
+                        <Skeleton className="h-5 w-9 shrink-0" />
+                    ) : (
+                        <Switch
+                            checked={settings.faceEnabled}
+                            onChange={(next) => void setEnabled(next)}
+                            disabled={switching}
+                            aria-label="Face recognition"
+                        />
+                    )}
                 </div>
 
                 {settings === null ? (
                     <Skeleton className="h-9 w-72" />
+                ) : !settings.faceEnabled ? (
+                    settings.faceRunning ? (
+                        // The two disagree, which is the state a house that
+                        // installed a recognizer before there was a switch wakes
+                        // up in. Said out loud, because "off" over a container
+                        // that is still holding a gigabyte is the opposite of
+                        // what somebody switching it off asked for.
+                        <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface px-3 py-2">
+                            <p className="flex items-center gap-1.5 text-[12px] text-foreground">
+                                <CircleAlert className="size-3.5 shrink-0 text-warning" />
+                                Off, but still running on {settings.installedOn ?? "this server"}.
+                            </p>
+                            <p className="text-[11px] text-foreground-subtle">
+                                Nothing is asking it anything. Stopping it gives back the memory it holds its models
+                                in; turning recognition back on starts it again.
+                            </p>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                className="self-start"
+                                disabled={switching}
+                                onClick={() => void setEnabled(false)}
+                            >
+                                {switching ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
+                                Stop it
+                            </Button>
+                        </div>
+                    ) : (
+                        <p className="text-[12px] text-foreground-subtle">
+                            Cameras report that somebody is there, and never who. Nothing is running for it.
+                        </p>
+                    )
                 ) : (
                     <>
                         {settings.installedOn ? (

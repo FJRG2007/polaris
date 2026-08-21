@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HomeSettingsView } from "@/app/(app)/places/settings/settings-view";
 
 let answering = false;
+let enabled = true;
 let asked = 0;
 
 vi.mock("@/app/(app)/places/actions", () => ({
@@ -26,6 +27,8 @@ vi.mock("@/app/(app)/places/actions", () => ({
         asked += 1;
         return {
             settings: {
+                faceEnabled: enabled,
+                faceRunning: true,
                 faceApiUrl: "",
                 hasFaceKey: false,
                 recognizerReady: true,
@@ -40,6 +43,7 @@ vi.mock("@/app/(app)/places/actions", () => ({
     listServersAction: async () => ({ servers: [{ id: "local", label: "this server" }] }),
     installRecognizerAction: async () => ({}),
     setFaceRecognitionAction: async () => ({}),
+    setFaceEnabledAction: async () => ({}),
     setDetectionDefaultsAction: async () => ({})
 }));
 
@@ -54,12 +58,37 @@ async function painted(): Promise<void> {
 beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     answering = false;
+    enabled = true;
     asked = 0;
 });
 
 afterEach(() => {
     cleanup();
     vi.useRealTimers();
+});
+
+describe("a house that has recognition switched off", () => {
+    it("says so, and says the container is still up", async () => {
+        // Watching one come up is only a question for a house that wants it.
+        // Off with a container still running is the state a house that installed
+        // one before there was a switch wakes up in, and it is worth saying.
+        enabled = false;
+        render(<HomeSettingsView storage="this server" canAdmin />);
+        await painted();
+        expect(screen.getByText("Off, but still running on this server.")).toBeDefined();
+    });
+
+    it("never asks the machine whether it is answering yet", async () => {
+        enabled = false;
+        render(<HomeSettingsView storage="this server" canAdmin />);
+        await painted();
+        const once = asked;
+        await act(async () => {
+            vi.advanceTimersByTime(30_000);
+            await Promise.resolve();
+        });
+        expect(asked).toBe(once);
+    });
 });
 
 describe("a recognizer that is still starting", () => {
