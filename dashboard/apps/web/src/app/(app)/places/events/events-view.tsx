@@ -43,6 +43,7 @@ const KINDS = [
     { value: "face", label: "Known faces" },
     { value: "vehicle", label: "Vehicles" },
     { value: "animal", label: "Animals" },
+    { value: "package", label: "Parcels" },
     { value: "motion", label: "Movement" }
 ];
 
@@ -51,6 +52,7 @@ const KIND_LABEL: Record<string, string> = {
     person: "Somebody",
     vehicle: "A vehicle",
     animal: "An animal",
+    package: "A box or bag",
     face: "Recognized",
     tamper: "Camera tampered with",
     offline: "Camera went quiet"

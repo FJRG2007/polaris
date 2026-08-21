@@ -34,6 +34,7 @@ const KINDS = [
     { value: "face", label: "A known face is seen" },
     { value: "vehicle", label: "A vehicle" },
     { value: "animal", label: "An animal" },
+    { value: "package", label: "A box or bag is left" },
     { value: "motion", label: "Anything moves" },
     { value: "tamper", label: "A camera is tampered with" }
 ];

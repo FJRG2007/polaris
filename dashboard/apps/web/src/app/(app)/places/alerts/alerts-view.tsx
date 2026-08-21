@@ -44,6 +44,7 @@ const KIND_LABEL: Record<string, string> = {
     face: "a known face",
     vehicle: "a vehicle",
     animal: "an animal",
+    package: "a box or bag is left",
     tamper: "tampering"
 };
 

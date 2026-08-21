@@ -32,7 +32,7 @@ const fractionSchema = z.coerce.number().min(0).max(1);
 
 const bodySchema = z.object({
     cameraId: z.string().uuid(),
-    kind: z.enum(["motion", "person", "vehicle", "animal", "face", "tamper"]),
+    kind: z.enum(["motion", "person", "vehicle", "animal", "package", "face", "tamper"]),
     label: z.string().trim().max(64).nullish(),
     score: z.coerce.number().int().min(0).max(100).nullish(),
     /** JPEG bytes, base64. Optional: the movement rung keeps no picture. */

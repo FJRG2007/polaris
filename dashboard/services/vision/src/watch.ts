@@ -35,7 +35,6 @@ import {
     readDetections,
     trackFrame,
     zonesAllow,
-    zonesContaining,
     type MotionState,
     type RelativeBox,
     type TrackedObject,
@@ -141,11 +140,18 @@ function withinHours(assignment: Assignment, hour: number): boolean {
  * class, and an area that says "vehicles" is still saying "this part of the
  * picture is the part that matters" - which is the question being asked here.
  */
-function movementCounts(zones: readonly Zone[], box: RelativeBox): boolean {
-    const watching = zones.filter((zone) => zone.kind === "watch" && zone.enabled);
-    if (watching.length === 0) return true;
+function movementIn(zones: readonly Zone[], box: RelativeBox): string[] {
     const point = groundPoint(box);
-    return watching.some((zone) => pointInPolygon(point, zone.points));
+    return zones
+        .filter((zone) => zone.kind === "watch" && zone.enabled && pointInPolygon(point, zone.points))
+        .map((zone) => zone.name);
+}
+
+/** Whether movement here is worth acting on at all: anywhere, if nothing was
+ *  drawn, and otherwise only inside something that was. */
+function movementCounts(zones: readonly Zone[], box: RelativeBox): boolean {
+    if (!zones.some((zone) => zone.kind === "watch" && zone.enabled)) return true;
+    return movementIn(zones, box).length > 0;
 }
 
 /** The smallest box that covers all of them, which is what a camera on the
@@ -158,11 +164,6 @@ function union(boxes: readonly RelativeBox[]): RelativeBox | null {
         x2: Math.max(wide.x2, box.x2),
         y2: Math.max(wide.y2, box.y2)
     }));
-}
-
-/** The kind an event is filed under, from what the model called it. */
-function kindOf(houseClass: string): string {
-    return houseClass === "package" ? "person" : houseClass;
 }
 
 export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
@@ -283,7 +284,7 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
                             improved.delete(object.id);
                             await deps.report({
                                 cameraId: assignment.cameraId,
-                                kind: kindOf(object.label),
+                                kind: object.label,
                                 trackId: object.id,
                                 ended: true
                             });
@@ -334,7 +335,7 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
 
                 return deps.report({
                     cameraId: assignment.cameraId,
-                    kind: label && label !== "Stranger" ? "face" : kindOf(object.label),
+                    kind: label && label !== "Stranger" ? "face" : object.label,
                     label,
                     score,
                     still,
@@ -404,7 +405,7 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
                 cameraId: assignment.cameraId,
                 kind: "motion",
                 box: where ? [where.x1, where.y1, where.x2, where.y2] : null,
-                zones: where ? zonesContaining(assignment.zones, where, "motion") : []
+                zones: where ? movementIn(assignment.zones, where) : []
             });
             return;
         }

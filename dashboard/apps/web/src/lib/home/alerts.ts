@@ -208,6 +208,8 @@ function body(detection: Detection, cameraName: string, placeName: string, event
                 ? "A vehicle"
                 : detection.kind === "animal"
                   ? "An animal"
+                  : detection.kind === "package"
+                    ? "Something was left"
                   : detection.kind === "tamper"
                     ? "Somebody may have tampered with a camera"
                     : "Movement";

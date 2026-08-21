@@ -7067,8 +7067,8 @@ model CameraEvent {
     id        String    @id @default(uuid(7)) @db.Uuid
     cameraId  String    @db.Uuid
     at        DateTime  @default(now())
-    /// motion | person | vehicle | animal | face | offline | tamper - what was
-    /// seen, at the most specific stage that ran.
+    /// motion | person | vehicle | animal | package | face | offline | tamper -
+    /// what was seen, at the most specific stage that ran.
     kind      String
     /// Who or what, when the stage that ran can say: the name of a known face,
     /// the object class. Null for bare movement.

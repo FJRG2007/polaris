@@ -21,7 +21,7 @@ import { MOTION_SECONDS, recordClip } from "@/lib/home/recording";
 /** What a detector reports. The kinds are the ladder's own vocabulary. */
 export interface Detection {
     readonly cameraId: string;
-    readonly kind: "motion" | "person" | "vehicle" | "animal" | "face" | "offline" | "tamper";
+    readonly kind: "motion" | "person" | "vehicle" | "animal" | "package" | "face" | "offline" | "tamper";
     /** A name, when the stage that fired can put one to it. */
     readonly label?: string | null;
     /** 0-100, as the detector reported it. */
@@ -54,7 +54,8 @@ const OBJECT_CLASS_OF: Readonly<Partial<Record<Detection["kind"], ObjectClass>>>
     person: "person",
     face: "person",
     vehicle: "vehicle",
-    animal: "animal"
+    animal: "animal",
+    package: "package"
 };
 
 export interface EventView {
