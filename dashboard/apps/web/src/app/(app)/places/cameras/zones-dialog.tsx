@@ -103,6 +103,10 @@ export function ZonesDialog({
     const [error, setError] = useState<string | null>(null);
     /** Which corner is being dragged, if any. */
     const [dragging, setDragging] = useState<number | null>(null);
+    /** A camera that is off, asleep, or not yet handed to the relay has no frame
+     *  to show. Drawing still works and still means the same thing, so this says
+     *  so rather than leaving a broken picture. */
+    const [noPicture, setNoPicture] = useState(false);
     const frameRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
@@ -216,13 +220,21 @@ export function ZonesDialog({
                                 the picture simply does not arrive, which is the right outcome:
                                 an area can still be drawn on the empty box, and the numbers
                                 mean the same thing. */}
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                                src={`/api/home/cameras/${camera.id}/snapshot?w=960`}
-                                alt=""
-                                draggable={false}
-                                className="pointer-events-none size-full select-none object-contain"
-                            />
+                            {noPicture ? (
+                                <span className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-[12px] text-foreground-subtle">
+                                    No picture from this camera right now. You can still draw on the frame - an area
+                                    is a fraction of the picture, not a set of pixels.
+                                </span>
+                            ) : (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                    src={`/api/home/cameras/${camera.id}/snapshot?w=960`}
+                                    alt=""
+                                    draggable={false}
+                                    onError={() => setNoPicture(true)}
+                                    className="pointer-events-none size-full select-none object-contain"
+                                />
+                            )}
                             <svg
                                 viewBox="0 0 100 100"
                                 preserveAspectRatio="none"

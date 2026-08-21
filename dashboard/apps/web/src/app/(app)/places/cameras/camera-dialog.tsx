@@ -26,6 +26,7 @@ import {
     DETECTORS,
     DETECTOR_META,
     OBJECT_CLASSES,
+    OBJECT_CLASS_HINTS,
     OBJECT_CLASS_LABELS,
     needsSomewhereToRun,
     type Detector,
@@ -513,6 +514,9 @@ export function CameraDialog({
                                         </label>
                                     ))}
                                 </div>
+                                {form.classes.includes("package") ? (
+                                    <p className="text-[12px] text-foreground-subtle">{OBJECT_CLASS_HINTS.package}</p>
+                                ) : null}
                             </Field>
                         ) : null}
 
