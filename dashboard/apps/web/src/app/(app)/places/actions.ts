@@ -412,11 +412,34 @@ export async function deleteCameraZoneAction(cameraId: string, id: string): Prom
     return {};
 }
 
+/** The watched areas drawn on the cameras of this place, by name, so the events
+ *  filter can offer them. Names rather than ids: an event records the name it
+ *  was given, and names are what the filter has to match. */
+export async function listPlaceZoneNamesAction(): Promise<{ zones?: string[]; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(async () => {
+        const { current } = await currentPlace(install.id);
+        const here = new Set((await cameras.listCameras(install.id, current.id)).map((camera) => camera.id));
+        const names = new Set<string>();
+        for (const [cameraId, drawn] of await cameraZones.zonesByCamera(install.id)) {
+            if (!here.has(cameraId)) continue;
+            for (const zone of drawn) {
+                if (zone.kind === "watch") names.add(zone.name);
+            }
+        }
+        return [...names].sort((first, second) => first.localeCompare(second));
+    });
+    if (result.error || !result.value) return { error: result.error ?? "Those areas could not be read." };
+    return { zones: result.value };
+}
+
 export async function listEventsAction(input: {
     cameraId?: string | null;
     kind?: string | null;
     /** One person, by the name the recognizer put to them. */
     label?: string | null;
+    /** One area of one camera, by name. */
+    zone?: string | null;
     /** The window to look inside, as whatever a datetime field produced. */
     from?: string | null;
     to?: string | null;
@@ -437,6 +460,7 @@ export async function listEventsAction(input: {
             cameraId: input.cameraId ?? null,
             kind: input.kind ?? null,
             label: input.label ?? null,
+            zone: input.zone ?? null,
             from: when(input.from),
             to: when(input.to),
             before
@@ -465,6 +489,10 @@ export async function clearEventsAction(input: {
     cameraId?: string | null;
     kind?: string | null;
     label?: string | null;
+    /** Whatever area the list was narrowed to. Carried here because this
+     *  removes what the filter matched, and a filter the delete does not share
+     *  is a delete that takes more than the screen was showing. */
+    zone?: string | null;
     from?: string | null;
     to?: string | null;
 }): Promise<{ removed?: number; error?: string }> {
@@ -480,6 +508,7 @@ export async function clearEventsAction(input: {
             cameraId: input.cameraId ?? null,
             kind: input.kind ?? null,
             label: input.label ?? null,
+            zone: input.zone ?? null,
             from: when(input.from),
             to: when(input.to)
         })

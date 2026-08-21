@@ -113,6 +113,38 @@ export async function recordDetection(detection: Detection): Promise<EventView |
     if (asClass && !settings.classes.includes(asClass)) return null;
 
     const at = detection.at ?? new Date();
+
+    // A second report about something already being followed is the same event
+    // getting better, not another one. The detector sends one when it finds a
+    // frame the thing is more recognizable in, which is usually not the frame it
+    // was first seen in - so the picture is replaced, the old one is dropped from
+    // storage, and nobody is told twice.
+    if (detection.trackId) {
+        const open = await prisma.cameraEvent.findFirst({
+            where: { cameraId: camera.id, trackId: detection.trackId },
+            select: { id: true, stillKey: true }
+        });
+        if (open) {
+            await prisma.cameraEvent.update({
+                where: { id: open.id },
+                data: {
+                    kind: detection.kind,
+                    label: detection.label ?? null,
+                    score: detection.score ?? null,
+                    ...(detection.stillKey ? { stillKey: detection.stillKey } : {}),
+                    ...(detection.box
+                        ? { box: JSON.stringify([detection.box.x1, detection.box.y1, detection.box.x2, detection.box.y2]) }
+                        : {}),
+                    ...(detection.zones ? { zones: JSON.stringify(detection.zones) } : {})
+                }
+            });
+            if (detection.stillKey && open.stillKey && open.stillKey !== detection.stillKey) {
+                await deleteStill(open.stillKey).catch(() => undefined);
+            }
+            return null;
+        }
+    }
+
     if (!detection.trackId) {
         const gapMs = settings.minGapSeconds * 1000;
         const recent = await prisma.cameraEvent.findFirst({
@@ -322,6 +354,9 @@ export interface EventQuery {
      *  of movement is not an answer. */
     readonly from?: Date | null;
     readonly to?: Date | null;
+    /** Only what was standing in this area, by the name it had when the event
+     *  was written. */
+    readonly zone?: string | null;
     /** Newest first, from this point back. Keyset rather than an offset: this
      *  table is the one that grows without limit. */
     readonly before?: Date | null;
@@ -357,6 +392,12 @@ export async function listEvents(installedAppId: string, query: EventQuery = {})
             cameraId: { in: [...names.keys()] },
             ...(query.kind ? { kind: query.kind } : {}),
             ...(query.label ? { label: query.label } : {}),
+            // The area names are a JSON array in one column, so this is a
+            // substring match on the quoted name rather than an index lookup.
+            // A table per event per area would be indexable and would be a
+            // join, a cascade and a migration for a filter used by hand on a
+            // page that is already bounded to a couple of hundred rows.
+            ...(query.zone ? { zones: { contains: JSON.stringify(query.zone) } } : {}),
             ...(Object.keys(at).length > 0 ? { at } : {})
         },
         orderBy: { at: "desc" },
