@@ -21,6 +21,8 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "@polaris/ui";
 import { ArrowUpCircle, RotateCcw } from "lucide-react";
+import { useHeldCall } from "@/app/(app)/chat/call-hold";
+import { rememberCall } from "@/app/(app)/chat/call-resume";
 import { checkForNewBuild, newBuildReady, rememberServedBuild, subscribeToBuild } from "@/lib/new-build";
 
 /** Slow on purpose. Nothing here is urgent - the failure it prevents needs the
@@ -30,6 +32,21 @@ const POLL_MS = 2 * 60 * 1000;
 export function NewBuildBanner({ served }: { served: string | null }) {
     const [dismissed, setDismissed] = useState(false);
     const ready = useSyncExternalStore(subscribeToBuild, newBuildReady, () => false);
+    // Null on an instance without Chat, where there is no call to lose.
+    const held = useHeldCall();
+
+    /**
+     * Take the update, and come back to the call.
+     *
+     * Reloading replaces the tab, which drops the room's participant - so
+     * without this the one thing this button costs somebody on a call is the
+     * call, and the offer becomes one they learn to dismiss. The call is written
+     * down here and walked back into on the way in.
+     */
+    const reload = () => {
+        if (held?.session) rememberCall(held.session, held.withVideo, held.viewerId);
+        window.location.reload();
+    };
 
     useEffect(() => {
         rememberServedBuild(served);
@@ -69,10 +86,11 @@ export function NewBuildBanner({ served }: { served: string | null }) {
             </span>
             <p className="text-[12px] leading-relaxed text-muted-foreground">
                 This tab is still running the previous version. Reload when you are ready -
-                anything half-written on this page is lost.
+                anything half-written on this page is lost
+                {held?.session ? ", though you will come straight back into your call" : ""}.
             </p>
             <span className="flex items-center gap-2">
-                <Button size="sm" className="flex-1" onClick={() => window.location.reload()}>
+                <Button size="sm" className="flex-1" onClick={reload}>
                     <RotateCcw className="size-4" />
                     Reload
                 </Button>

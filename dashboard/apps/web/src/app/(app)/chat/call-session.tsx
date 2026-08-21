@@ -25,6 +25,7 @@ import { Button, cn } from "@polaris/ui";
 import { useChatStream } from "./use-chat-stream";
 import { playCallSound } from "@/lib/call-sounds";
 import { useCall } from "./use-call";
+import { takeRememberedCall } from "./call-resume";
 import { Headphones, HeadphoneOff, Mic, MicOff, PhoneOff } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { CallHoldContext, useCallHold, type CallHold, type CallSession } from "./call-hold";
@@ -45,6 +46,23 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
     }, []);
 
     const leave = useCallback(() => setSession(null), []);
+
+    /**
+     * The call this tab was on before it reloaded to pick up an update.
+     *
+     * Read once, on the way in, and removed as it is read. Only the update
+     * banner ever leaves one - a reload somebody typed is a reload they meant,
+     * and walking back into a call they had stepped away from would be a
+     * microphone opening itself.
+     *
+     * Whether the room is still there is not asked: entering it answers that,
+     * and a room that has since ended is a state the provider already knows how
+     * to let go of.
+     */
+    useEffect(() => {
+        const back = takeRememberedCall(viewerId);
+        if (back) enter(back.session, back.video);
+    }, [enter, viewerId]);
 
     /**
      * The call ended, so this browser is no longer in one.
