@@ -190,6 +190,67 @@ describe("a choice with no schedule anywhere near it", () => {
     });
 });
 
+describe("when the answer stops being the answer", () => {
+    // The moment the picker on your own face waits for. The layout that resolves
+    // its props renders once per page load, so it can see its own choice run out
+    // and cannot see a window open - and reading the rules in the browser would
+    // read them on the browser's clock rather than the account's. So the moment
+    // is worked out here, once, beside the answer it belongs to.
+    it("is the next opening when nothing at all is chosen", () => {
+        const next = core.nextPresenceChange(UNTOUCHED, [rule()], "Europe/Madrid", THURSDAY);
+        // 23:00 in Madrid on the same Thursday, which is 21:00 UTC.
+        expect(next?.toISOString()).toBe("2026-08-20T21:00:00.000Z");
+    });
+
+    it("is tomorrow's opening once today's has already gone by", () => {
+        const inside = new Date("2026-08-20T21:30:00Z");
+        const chosen = {
+            presence: "away",
+            presenceUntil: null,
+            // Chosen inside the open window, so the window is overruled and its
+            // close changes nothing. The next thing that does is the next opening.
+            presenceSetAt: new Date("2026-08-20T21:15:00Z")
+        };
+        const next = core.nextPresenceChange(chosen, [rule()], "Europe/Madrid", inside);
+        expect(next?.toISOString()).toBe("2026-08-21T21:00:00.000Z");
+    });
+
+    it("is the choice running out when that comes first", () => {
+        const chosen = {
+            presence: "busy",
+            presenceUntil: new Date("2026-08-20T13:00:00Z"),
+            presenceSetAt: THURSDAY
+        };
+        const next = core.nextPresenceChange(chosen, [rule()], "Europe/Madrid", THURSDAY);
+        expect(next?.toISOString()).toBe("2026-08-20T13:00:00.000Z");
+    });
+
+    it("is the window closing while the window is what is holding it", () => {
+        const inside = new Date("2026-08-20T21:30:00Z");
+        const next = core.nextPresenceChange(UNTOUCHED, [rule()], "Europe/Madrid", inside);
+        // 07:00 the next morning, Madrid.
+        expect(next?.toISOString()).toBe("2026-08-21T05:00:00.000Z");
+    });
+
+    it("is nothing at all with no schedule and no window on the choice", () => {
+        const forever = { presence: "invisible", presenceUntil: null, presenceSetAt: THURSDAY };
+        expect(core.nextPresenceChange(forever, [], "Europe/Madrid", THURSDAY)).toBeNull();
+        expect(core.nextPresenceChange(UNTOUCHED, [], "Europe/Madrid", THURSDAY)).toBeNull();
+    });
+
+    it("ignores a rule that is switched off", () => {
+        const off = [rule({ enabled: false })];
+        expect(core.nextPresenceChange(UNTOUCHED, off, "Europe/Madrid", THURSDAY)).toBeNull();
+    });
+
+    it("finds an opening later in the week", () => {
+        // Sundays only, and this is a Thursday.
+        const sundays = [rule({ days: core.dayBit(0), startMinute: 9 * 60, endMinute: 17 * 60 })];
+        const next = core.nextPresenceChange(UNTOUCHED, sundays, "Europe/Madrid", THURSDAY);
+        expect(next?.toISOString()).toBe("2026-08-23T07:00:00.000Z");
+    });
+});
+
 describe("what a window is refused for", () => {
     it("no days, because it would never open", () => {
         const written = core.presenceScheduleSchema.safeParse({

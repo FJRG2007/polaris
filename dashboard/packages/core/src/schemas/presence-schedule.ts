@@ -349,3 +349,42 @@ function chosenPresence(
 export function scheduleZoneIsAssumed(timeZone: string): boolean {
     return timeZone === AUTOMATIC_TIME_ZONE;
 }
+
+/** How far ahead an opening is looked for. Every rule repeats weekly, so a week
+ *  and a day finds one wherever this moment falls in the week. */
+const LOOKAHEAD_DAYS = 8;
+
+/**
+ * The next moment this account's presence changes on its own, or null when
+ * nothing is due.
+ *
+ * The counterpart to `presenceInForce` for anything holding that answer rather
+ * than recomputing it: a screen resolved once on the server has no way to know a
+ * window is about to open, and the two edges are not symmetric - a lapse can be
+ * seen coming in the answer itself, an opening cannot. Both are one moment here,
+ * worked out on the clock the account's rules are read against, so a browser in
+ * another zone is told when to ask again rather than left to guess.
+ */
+export function nextPresenceChange(
+    account: {
+        readonly presence: string;
+        readonly presenceUntil: Date | null;
+        readonly presenceSetAt: Date | null;
+    },
+    rules: readonly PresenceScheduleRule[],
+    timeZone: string,
+    now: Date = new Date()
+): Date | null {
+    const held = presenceInForce(account, rules, timeZone, now);
+    let soonest = held.until && held.until > now ? held.until : null;
+    for (const rule of rules) {
+        if (!rule.enabled) continue;
+        for (let ahead = 0; ahead < LOOKAHEAD_DAYS; ahead++) {
+            const window = windowAround(rule, timeZone, now, -ahead);
+            if (!window || window.openedAt <= now) continue;
+            if (!soonest || window.openedAt < soonest) soonest = window.openedAt;
+            break;
+        }
+    }
+    return soonest;
+}

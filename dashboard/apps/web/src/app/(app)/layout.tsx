@@ -147,6 +147,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                                                 presence={presence.choice}
                                                 presenceUntil={presence.until}
                                                 presenceScheduled={presence.scheduled}
+                                                presenceNextChange={presence.nextChangeAt}
                                                 status={status.text}
                                                 statusUntil={status.until}
                                             />

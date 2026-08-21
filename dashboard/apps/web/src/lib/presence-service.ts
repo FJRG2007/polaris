@@ -176,6 +176,11 @@ export interface PresenceChoiceView {
      *  does not recognize a state they are apparently in should be told where it
      *  came from, not left to hunt for the setting that did it. */
     readonly scheduled: boolean;
+    /** The next moment this answer stops being the answer - a window lapsing, a
+     *  window opening - or null when nothing is due. Said here because the
+     *  screen holding it renders once and cannot work out an opening for
+     *  itself: it is the account's rules, on the account's clock. */
+    readonly nextChangeAt: string | null;
 }
 
 export async function presenceChoiceOf(userId: string): Promise<PresenceChoiceView> {
@@ -187,7 +192,7 @@ export async function presenceChoiceOf(userId: string): Promise<PresenceChoiceVi
         schedulesOf(userId),
         scheduleZoneOf(userId)
     ]);
-    if (!row) return { choice: "auto", until: null, scheduled: false };
+    if (!row) return { choice: "auto", until: null, scheduled: false, nextChangeAt: null };
 
     const now = new Date();
     // Tidied on the way past rather than by anything that runs on a schedule.
@@ -205,16 +210,15 @@ export async function presenceChoiceOf(userId: string): Promise<PresenceChoiceVi
         });
     }
 
-    const held = core.presenceInForce(
-        lapsed ? { ...row, presence: "auto", presenceUntil: null } : row,
-        rules.filter((rule) => rule.enabled),
-        timeZone,
-        now
-    );
+    const account = lapsed ? { ...row, presence: "auto", presenceUntil: null } : row;
+    const enabled = rules.filter((rule) => rule.enabled);
+    const held = core.presenceInForce(account, enabled, timeZone, now);
+    const nextChange = core.nextPresenceChange(account, enabled, timeZone, now);
     return {
         choice: held.choice,
         until: held.until?.toISOString() ?? null,
-        scheduled: held.scheduled
+        scheduled: held.scheduled,
+        nextChangeAt: nextChange?.toISOString() ?? null
     };
 }
 

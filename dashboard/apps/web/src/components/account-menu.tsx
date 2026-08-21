@@ -30,6 +30,7 @@ import {
     MAX_WINDOW_MS,
     windowEndsAt,
     presenceInForce,
+    statusInForce,
     AUTOMATIC_TIME_ZONE,
     type DisplayFormat,
     type PresenceChoice,
@@ -68,6 +69,7 @@ export function AccountMenu({
     presence,
     presenceUntil,
     presenceScheduled,
+    presenceNextChange,
     status,
     statusUntil
 }: {
@@ -82,6 +84,11 @@ export function AccountMenu({
      *  pressed. Said beside the tick, because a state nobody remembers choosing
      *  is the one people hunt for the setting behind. */
     presenceScheduled: boolean;
+    /** The next moment the three above stop being true, or null when nothing is
+     *  due. A window opening is not visible in the answer the way a window
+     *  lapsing is, so the moment is said rather than worked out here - and it is
+     *  worked out on the account's clock, which this browser's may not be. */
+    presenceNextChange: string | null;
     /** The line this account is showing, empty for none. Already resolved, so a
      *  lapsed one arrives as empty rather than as something to un-set. */
     status: string;
@@ -95,6 +102,8 @@ export function AccountMenu({
     const [chosen, setChosen] = useState(presence);
     const [until, setUntil] = useState(presenceUntil);
     const [byRule, setByRule] = useState(presenceScheduled);
+    /** The moment the layout's answer is due to stop being the answer. */
+    const [dueAt, setDueAt] = useState(presenceNextChange);
     /** The choice whose exact end is being picked, or null when that dialog is
      *  shut. Held here for the reason the status dialog is: a dialog mounted
      *  inside a menu is unmounted by the item that opens it. */
@@ -121,7 +130,7 @@ export function AccountMenu({
     const [clearsAt, setClearsAt] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
 
-    // All three are resolved in the layout, so a window that lapses or a
+    // All four are resolved in the layout, so a window that lapses or a
     // schedule that opens arrives here as new props. Without this the menu would
     // go on showing whatever was true when the tab was opened, which is exactly
     // the case a schedule creates: nobody reloads at midnight.
@@ -129,7 +138,8 @@ export function AccountMenu({
         setChosen(presence);
         setUntil(presenceUntil);
         setByRule(presenceScheduled);
-    }, [presence, presenceUntil, presenceScheduled]);
+        setDueAt(presenceNextChange);
+    }, [presence, presenceUntil, presenceScheduled, presenceNextChange]);
 
     /**
      * A clock of this menu's own, because the props above are not enough.
@@ -165,27 +175,47 @@ export function AccountMenu({
     const shownChoice = held.choice;
     const shownUntil = held.until?.toISOString() ?? null;
     const shownByRule = held.choice === "auto" ? false : byRule;
-    const lapsed = shownChoice !== chosen;
+
+    // The line the same way, against the same clock and through the same rule
+    // the server applies to it. It lapses on its own exactly as a choice does,
+    // and a lapsed one seeded back into the dialog is a moment in the past in a
+    // field that refuses moments in the past - the edit cannot be saved at all.
+    const statusLive = statusInForce({ statusText: status, statusUntil }, new Date(now));
+    const shownStatus = statusLive ? status : "";
+    const shownStatusUntil = statusLive ? statusUntil : null;
+
+    // Whether what the layout said has stopped being the answer: a choice or a
+    // line that has run out, which is visible from here - or the moment the
+    // server named, which is the half that is not. A window *opening* cannot be
+    // seen in an answer that has already been resolved, and working it out here
+    // would mean reading the account's rules on this browser's clock, which is
+    // not necessarily the one they were written against.
+    const overdue =
+        shownChoice !== chosen ||
+        (status.trim() !== "" && !statusLive) ||
+        (dueAt !== null && now >= Date.parse(dueAt));
 
     // And once it has, ask the server what took over. It knows two things this
     // does not: the choice that was standing before a schedule borrowed the
     // account, and the next window that may have opened in the same breath.
     //
-    // Once per lapse, held by a flag rather than by the dependency list. The
-    // refresh is handed out by a context that does not promise the same function
-    // twice, and an effect that asked again on every render would be a page
-    // reloading itself in a loop for as long as the moment stayed passed.
-    const asked = useRef(false);
+    // Rate-limited rather than latched, and the difference matters when the two
+    // clocks disagree: a browser running minutes ahead reaches the moment first,
+    // and a single ask that was never re-armed would leave the menu wrong for
+    // the life of the tab. Not on the dependency list, because the refresh is
+    // handed out by a context that does not promise the same function twice and
+    // an effect that asked on every render would be a page reloading itself.
+    const askedAt = useRef(0);
     useEffect(() => {
-        if (!lapsed) {
-            asked.current = false;
+        if (!overdue) {
+            askedAt.current = 0;
             return;
         }
-        if (asked.current) return;
-        asked.current = true;
+        if (now - askedAt.current < ASK_AGAIN_MS) return;
+        askedAt.current = now;
         refreshPresence();
         router.refresh();
-    }, [lapsed]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [overdue, now]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /** What is wrong with the moment being typed, empty when nothing is - and
      *  the one answer the two fields add up to, which is only ever built from a
@@ -375,19 +405,21 @@ export function AccountMenu({
                     to expect a reply and this says why. */}
                 <DropdownMenuItem
                     onSelect={() => {
-                        setLine(status);
+                        setLine(shownStatus);
                         // Reopened on what is already set: a status standing
                         // until it is cleared should not offer to start
                         // expiring because the dialog was opened again, and one
                         // that does expire says the moment it was actually set
                         // to rather than the offered length nearest to it.
                         setClears(null);
-                        setClearsAt(statusUntil ? localInput(new Date(statusUntil)) : null);
+                        setClearsAt(
+                            shownStatusUntil ? localInput(new Date(shownStatusUntil)) : null
+                        );
                         setWriting(true);
                     }}
                 >
                     <MessageSquareText className="size-4" />
-                    <span className="min-w-0 truncate">{status || "Set a status"}</span>
+                    <span className="min-w-0 truncate">{shownStatus || "Set a status"}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
@@ -516,7 +548,7 @@ export function AccountMenu({
                 <DialogFooter>
                     {/* Only where there is one to take off. A Clear that clears
                         nothing is a button that does nothing. */}
-                    {status && (
+                    {shownStatus && (
                         <Button
                             variant="ghost"
                             disabled={saving}
@@ -542,6 +574,11 @@ export function AccountMenu({
 /** The value the "at a time" select carries. Not a number, so it can never
  *  collide with one of the offered lengths. */
 const AT_A_TIME = "at";
+
+/** How long before the server is asked again about a moment it has not yet
+ *  agreed has passed. Long enough that two clocks minutes apart cost a handful
+ *  of requests rather than one every tick. */
+const ASK_AGAIN_MS = 60_000;
 
 /**
  * A moment as a `datetime-local` input reads and writes it.

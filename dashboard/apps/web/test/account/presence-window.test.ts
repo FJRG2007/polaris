@@ -127,7 +127,13 @@ describe("the picker that set it", () => {
         const { presenceChoiceOf } = await import("@/lib/presence-service");
         person.presenceUntil = new Date(NOW.getTime() - 1_000);
         const mine = await presenceChoiceOf("ada");
-        expect(mine).toEqual({ choice: "auto", until: null, scheduled: false });
+        expect(mine).toEqual({
+            choice: "auto",
+            until: null,
+            scheduled: false,
+            // No schedule on this account, so there is nothing left to wait for.
+            nextChangeAt: null
+        });
         expect(written).toEqual({ presence: "auto", presenceUntil: null });
     });
 });
