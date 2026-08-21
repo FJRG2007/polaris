@@ -138,6 +138,12 @@ vi.mock("@polaris/db", () => {
                 return { count: 0 };
             }
         },
+        // A tombstone carries no poll either: the question and everybody's votes
+        // go with the text, on the same terms as the files and the reactions.
+        chatPoll: {
+            findMany: async () => [],
+            deleteMany: async () => ({ count: 0 })
+        },
         chatAttachment: {
             findMany: async () => [],
             deleteMany: async ({ where }: { where: { messageId: string } }) => {

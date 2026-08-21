@@ -31,6 +31,7 @@ import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { isBlankMarkdown } from "@/components/rich-text/markdown";
 import { allowedBy, maySee, receiptsBetween } from "@/lib/privacy-service";
 import { discardAttachments, isInlineImage, type StoredAttachment } from "./attachments";
+import { pollsFor, type ChatPollView } from "./polls";
 import { knownPreviews, unfurl, type KnownPreview, type LinkPreviewView } from "./link-preview";
 import {
     ChatAccessError,
@@ -59,6 +60,15 @@ export interface ChatMessageView {
     readonly deleted: boolean;
     readonly reactions: readonly ChatReactionView[];
     readonly attachments: readonly ChatAttachmentView[];
+    /**
+     * The question under this message, when it is a poll.
+     *
+     * Null for everything else, which is what the list reads to decide whether
+     * to draw a card at all. The question itself is the body above it rather
+     * than a field here - see `polls.ts` - so a poll needs no special case in
+     * search, in a quote, in a forward or in the rail's preview.
+     */
+    readonly poll: ChatPollView | null;
     /** The message this one answers or forwards, already resolved to what the
      *  quote line needs. Null when it stands alone, and present-but-gone when
      *  the original was deleted - which is a different thing to say. */
@@ -313,7 +323,21 @@ export async function send(
      *  message nobody could make sense of. */
     attachments: readonly StoredAttachment[] = [],
     /** The message this one answers, or the one being forwarded. */
-    quote: { readonly messageId: string; readonly forwarded: boolean } | null = null
+    quote: { readonly messageId: string; readonly forwarded: boolean } | null = null,
+    /**
+     * The answers, when what is being sent is a poll.
+     *
+     * Written in the same transaction as the message, for the same reason the
+     * attachments are: a poll that landed without its answers would be a
+     * question nobody in the room could do anything with. The question itself is
+     * the body, so nothing else here has to know a poll from a line of text.
+     */
+    poll: {
+        readonly options: readonly string[];
+        readonly multiple: boolean;
+        readonly hideResults: boolean;
+        readonly closesAt: Date | null;
+    } | null = null
 ): Promise<string> {
     const access = await requirePostable(actor, input.channelId);
     await requireSendable(actor, access, input.body);
@@ -382,6 +406,7 @@ export async function send(
             data: {
                 channelId: input.channelId,
                 authorId: actor.id,
+                kind: poll ? "poll" : "text",
                 body: input.body,
                 parentId: input.parentId ?? null,
                 replyToId: quoted,
@@ -390,6 +415,25 @@ export async function send(
                     ? {
                           attachments: {
                               createMany: { data: attachments.map((file) => ({ ...file })) }
+                          }
+                      }
+                    : {}),
+                ...(poll
+                    ? {
+                          poll: {
+                              create: {
+                                  multiple: poll.multiple,
+                                  hideResults: poll.hideResults,
+                                  closesAt: poll.closesAt,
+                                  options: {
+                                      createMany: {
+                                          data: poll.options.map((text, position) => ({
+                                              text,
+                                              position
+                                          }))
+                                      }
+                                  }
+                              }
                           }
                       }
                     : {})
@@ -559,13 +603,26 @@ async function requireSendable(
 export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise<void> {
     const message = await prisma.chatMessage.findUnique({
         where: { id: input.messageId },
-        select: { channelId: true, authorId: true, body: true, deletedAt: true, createdAt: true }
+        select: {
+            kind: true,
+            channelId: true,
+            authorId: true,
+            body: true,
+            deletedAt: true,
+            createdAt: true
+        }
     });
     if (!message) throw new ChatAccessError("That message is gone");
     const editable = await requirePostable(actor, message.channelId);
     if (message.authorId !== actor.id)
         throw new ChatAccessError("You can only edit your own messages");
     if (message.deletedAt) throw new ChatAccessError("That message was deleted");
+    // A poll's body is the question people answered. Changing it after the fact
+    // would leave every vote already cast standing behind something nobody
+    // agreed to - so it is taken back and asked again instead.
+    if (message.kind === "poll") {
+        throw new ChatRuleError("A poll cannot be rewritten. Delete it and ask again.");
+    }
     // The length and the instance's own limit, but never the wait: slow mode is
     // about how often somebody speaks, and rewriting what you already said is
     // not speaking again.
@@ -815,13 +872,17 @@ export async function remove(
 
     if (rules.deleteLeavesTrace || wouldTakeOthers) {
         // The line stays and says so; nothing else does. A tombstone carries no
-        // text, no files and no reactions - which is how it is already drawn - so
-        // leaving the bytes on the NAS would be keeping a photograph nothing can
-        // reach and nobody can find, on somebody else's disk, forever.
+        // text, no files, no reactions and no poll - which is how it is already
+        // drawn - so leaving the bytes on the NAS would be keeping a photograph
+        // nothing can reach and nobody can find, on somebody else's disk,
+        // forever. The same goes for a question nobody can answer and the votes
+        // people had already cast in it.
         await discardAttachments(messageId);
         await prisma.$transaction(async (tx) => {
             await tx.chatAttachment.deleteMany({ where: { messageId } });
             await tx.chatReaction.deleteMany({ where: { messageId } });
+            // The answers and their votes cascade from this one row.
+            await tx.chatPoll.deleteMany({ where: { messageId } });
             await tx.chatMessage.update({
                 where: { id: messageId },
                 data: { deletedAt: new Date(), body: "" }
@@ -1391,7 +1452,15 @@ export async function decorateMessages(
     // it is one other person and two timestamps.
     const receipts = await receiptStateFor(actor, rows);
 
-    const [authors, reactions, files, stars, quoted, previews] = await Promise.all([
+    // The polls on this page, with their answers and their tallies. Only the
+    // rows that are one and are still there: a deleted poll is a tombstone like
+    // any other deleted message, and drawing a card under it would be offering a
+    // vote on something that has been taken back.
+    const pollIds = rows
+        .filter((row) => row.kind === "poll" && row.deletedAt === null)
+        .map((row) => row.id);
+
+    const [authors, reactions, files, stars, quoted, previews, polls] = await Promise.all([
         authorIds.length || noticeIds.length
             ? prisma.user.findMany({
                   where: { id: { in: [...new Set([...authorIds, ...noticeIds])] } },
@@ -1426,7 +1495,8 @@ export async function decorateMessages(
                   select: { id: true, authorId: true, body: true, deletedAt: true }
               })
             : Promise.resolve([]),
-        knownPreviews([...links.values()])
+        knownPreviews([...links.values()]),
+        pollsFor(actor.id, pollIds)
     ]);
 
     // The quoted messages have authors of their own, and they are usually
@@ -1517,6 +1587,7 @@ export async function decorateMessages(
                 (left, right) => right.count - left.count || left.emoji.localeCompare(right.emoji)
             ),
         attachments: onMessageFiles.get(row.id) ?? [],
+        poll: polls.get(row.id) ?? null,
         quote: quoteViewOf(row, quotes, names),
         starred: kept.has(row.id),
         blocked: row.authorId !== null && shut.has(row.authorId),

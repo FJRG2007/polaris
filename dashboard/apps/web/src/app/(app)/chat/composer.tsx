@@ -28,6 +28,7 @@ import { ClipDialog } from "./clip-dialog";
 import { MicSettings } from "./mic-settings";
 import { VideoPreview } from "@/components/video-preview";
 import { ScheduleDialog } from "./schedule-dialog";
+import { PollDialog, type PollDraft } from "./poll-dialog";
 import { canRecordClip } from "./clip-recorder";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -42,6 +43,7 @@ import {
     type RecordedSound
 } from "./voice-recorder";
 import {
+    BarChart3,
     CalendarClock,
     Camera,
     ChevronDown,
@@ -83,6 +85,7 @@ export function Composer({
     onCancelReply,
     onSend,
     onSchedule,
+    onPoll,
     onMedia,
     onSaved,
     onSaveEdit,
@@ -154,6 +157,15 @@ export function Composer({
         body: string,
         files: readonly File[]
     ) => Promise<{ error?: string }>;
+    /**
+     * Ask a question with answers under it.
+     *
+     * Absent where a poll makes no sense - a task's comment box, an edit - and
+     * then the button is not drawn rather than drawn doing nothing. Answers with
+     * a sentence when the server refuses, since the dialog is still open and is
+     * the only place the person can read it.
+     */
+    onPoll?: (draft: PollDraft) => Promise<{ error?: string }>;
     /** A GIF or sticker chosen from the picker. Its own path rather than a
      *  staged file: it is already somewhere, and it is the whole message. */
     onMedia?: (address: string) => void | Promise<void>;
@@ -171,6 +183,11 @@ export function Composer({
     const [scheduling, setScheduling] = useState(false);
     const [scheduleBusy, setScheduleBusy] = useState(false);
     const [scheduleError, setScheduleError] = useState("");
+    /** The same three for the poll dialog, which is the other thing this box
+     *  sends that is not a line of text. */
+    const [polling, setPolling] = useState(false);
+    const [pollBusy, setPollBusy] = useState(false);
+    const [pollError, setPollError] = useState("");
     // Two different noes with one answer on screen: the instance allows no files
     // in this kind of conversation, or this account may not send them anywhere.
     // Gone rather than disabled either way - a permanently dead button is a
@@ -355,6 +372,26 @@ export function Composer({
         setRefused("");
         setGeneration((current) => current + 1);
         setScheduling(false);
+    };
+
+    /**
+     * Send the poll.
+     *
+     * Nothing in the box is touched either way. A poll is its own message and
+     * carries none of what somebody was halfway through typing, so emptying the
+     * field on the way out would throw away a sentence they never asked to send.
+     */
+    const askPoll = async (draft: PollDraft) => {
+        if (!onPoll || disabled) return;
+        setPollBusy(true);
+        setPollError("");
+        const result = await onPoll(draft);
+        setPollBusy(false);
+        if (result.error) {
+            setPollError(result.error);
+            return;
+        }
+        setPolling(false);
     };
 
     /**
@@ -710,6 +747,26 @@ export function Composer({
                                     <Video className="size-4" />
                                 </button>
                             )}
+                            {/* A question with answers under it, which is a
+                                message of its own rather than something that
+                                goes with what is in the box - so it opens a
+                                dialog and sends from there. Not drawn at all
+                                where a poll has nowhere to go. */}
+                            {onPoll && (
+                                <button
+                                    type="button"
+                                    disabled={disabled}
+                                    onClick={() => {
+                                        setPollError("");
+                                        setPolling(true);
+                                    }}
+                                    aria-label="Create a poll"
+                                    title="Create a poll"
+                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                >
+                                    <BarChart3 className="size-4" />
+                                </button>
+                            )}
                             <EmojiPicker
                                 disabled={disabled}
                                 // Back to the box, caret at the end. Picking an
@@ -834,6 +891,16 @@ export function Composer({
                     // text, with other files, or at nine tomorrow morning -
                     // none of which is a special case.
                     onReady={(clip) => stage([clip])}
+                />
+            )}
+
+            {polling && onPoll && (
+                <PollDialog
+                    open
+                    busy={pollBusy}
+                    error={pollError || undefined}
+                    onOpenChange={(next) => !next && setPolling(false)}
+                    onConfirm={(draft) => void askPoll(draft)}
                 />
             )}
 

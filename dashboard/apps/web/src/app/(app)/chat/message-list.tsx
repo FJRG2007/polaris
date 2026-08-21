@@ -25,6 +25,7 @@ import { useChat } from "./chat-context";
 import { useHeldCall } from "./call-hold";
 import { Avatar } from "@/components/avatar";
 import { MessageMenu } from "./message-menu";
+import { PollCard } from "./poll-card";
 import { hasCard, referenced } from "./message-references";
 import { ReportDialog } from "./report-dialog";
 import { NicknameDialog } from "./nickname-dialog";
@@ -409,7 +410,9 @@ function useMessageKeys({
             // so a key can never do something the screen does not offer: your own
             // to rewrite, your own or anybody's here to take down, and anything
             // at all to answer - wherever answering is offered.
-            if (wanted === "edit" && (!mine || !shown.onEdit)) return;
+            // A poll is not rewritten - see `rewrite` in `Message`. The key
+            // follows the pencil rather than reaching past it.
+            if (wanted === "edit" && (message.kind === "poll" || !mine || !shown.onEdit)) return;
             if (wanted === "delete" && !mine && !shown.canModerate) return;
             if (wanted === "reply" && !shown.onReply) return;
             event.preventDefault();
@@ -494,6 +497,15 @@ function Message({
     const [revealed, setRevealed] = useState(false);
     const direct = useOpenDirect(onError);
     const author = message.authorName ?? "Somebody who has left";
+    /**
+     * Rewriting this one, when it is a thing that can be rewritten.
+     *
+     * A poll's body is the question people answered, and changing it would leave
+     * every vote already cast standing behind something nobody agreed to - so
+     * the service refuses it and the pencil is not offered. Taking it down and
+     * asking again is the way to change a poll.
+     */
+    const rewrite = message.kind === "poll" ? undefined : onEdit;
     /** Who wrote it, when that is somebody other than the reader. Read out here
      *  so the name and the face can both ask about them without narrowing it
      *  again in two places. */
@@ -545,7 +557,7 @@ function Message({
                 onOpenThread,
                 onStar,
                 onMarkUnread,
-                onEdit,
+                onEdit: rewrite,
                 onDelete,
                 onReport,
                 onExplain
@@ -687,6 +699,23 @@ function Message({
                                 </button>
                             )}
                         </div>
+                    )}
+
+                    {/* Under the question rather than in place of it: the
+                        message body IS the question, so the card carries only
+                        the answers and what has become of them. */}
+                    {message.poll && !message.deleted && (
+                        <PollCard
+                            message={message}
+                            poll={message.poll}
+                            canPost={canPost}
+                            // Whoever asked it, and whoever moderates the room.
+                            // The two reasons to stop one early are different:
+                            // the asker has their answer, and the moderator has
+                            // a poll that should not be running.
+                            canEnd={mine || canModerate}
+                            onError={onError}
+                        />
                     )}
 
                     <LinkArea message={message} />
@@ -869,8 +898,8 @@ function Message({
                                     align="end"
                                     onCloseAutoFocus={keepFocusOnClose}
                                 >
-                                    {mine && onEdit && (
-                                        <DropdownMenuItem onSelect={() => onEdit(message)}>
+                                    {mine && rewrite && (
+                                        <DropdownMenuItem onSelect={() => rewrite(message)}>
                                             <Pencil className="size-3.5" />
                                             Edit
                                         </DropdownMenuItem>

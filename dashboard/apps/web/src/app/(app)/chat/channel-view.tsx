@@ -24,6 +24,7 @@
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { Composer } from "./composer";
+import type { PollDraft } from "./poll-dialog";
 import { CallRoom } from "./call-room";
 import { threadRootFor } from "./links";
 import { useChat } from "./chat-context";
@@ -1103,6 +1104,30 @@ export function ChannelView({
         return {};
     };
 
+    /**
+     * Ask a question with answers under it.
+     *
+     * The bar the composer is showing is honoured the same way a scheduled
+     * message honours it, and comes down only once the poll has actually gone:
+     * the dialog stays open on a refusal, and clearing the reply under it would
+     * leave somebody looking at an error with the thing they were answering
+     * already forgotten.
+     */
+    const createPoll = async (draft: PollDraft): Promise<{ error?: string }> => {
+        following.current = true;
+        const result = await actions.createPollAction({
+            channelId,
+            ...draft,
+            replyToId: replyingTo?.id ?? null
+        });
+        if (result.error) return { error: result.error };
+        setReplyingTo(null);
+        setCarried(null);
+        await load();
+        refresh();
+        return {};
+    };
+
     const send = async (
         body: string,
         files: readonly File[] = [],
@@ -1189,6 +1214,10 @@ export function ChannelView({
             deleted: false,
             reactions: [],
             attachments: [],
+            // A draft is always a line of text. A poll is written in a dialog
+            // and posted from there, so there is nothing on screen for an
+            // optimistic one to replace.
+            poll: null,
             quote: null,
             starred: false,
             // Nobody blocks themselves, and the menu that would offer it does
@@ -1567,6 +1596,7 @@ export function ChannelView({
                     onCancelEdit={() => setEditing(null)}
                     onSend={send}
                     onSchedule={scheduleMessage}
+                    onPoll={createPoll}
                     onMedia={async (address) => {
                         following.current = true;
                         // The picture answers whatever the bar was pointing at, and

@@ -23,6 +23,7 @@ import * as reports from "@/lib/chat/reports";
 import * as saved from "@/lib/chat/saved-media";
 import * as chat from "@/lib/chat/chat-service";
 import * as messages from "@/lib/chat/messages";
+import * as polls from "@/lib/chat/polls";
 import { allChatRules } from "@/lib/chat/rules";
 import { requirePermission } from "@/lib/session";
 import { storeAttachment } from "@/lib/chat/attachments";
@@ -287,6 +288,64 @@ export async function reactAction(input: unknown): Promise<{ on?: boolean; error
 
     const result = await guard(() => messages.react(me, parsed.data));
     return result.error ? { error: result.error } : { on: result.value };
+}
+
+/**
+ * Ask a question with answers under it.
+ *
+ * The poll goes out as a message, which is why this is `messages.send` with the
+ * answers handed to it rather than a path of its own: the room's rules, slow
+ * mode, blocks, the read mark and the notification are the ones every message
+ * gets, and a second way in would be a second set of all of them.
+ */
+export async function createPollAction(input: unknown): Promise<{ id?: string; error?: string }> {
+    const me = await actor();
+    const parsed = core.chatPollCreateSchema.safeParse(input);
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That poll could not be sent" };
+
+    const { channelId, question, options, multiple, hideResults, hours } = parsed.data;
+    const result = await guard(() =>
+        messages.send(
+            me,
+            { channelId, body: question, parentId: parsed.data.parentId ?? null },
+            [],
+            parsed.data.replyToId ? { messageId: parsed.data.replyToId, forwarded: false } : null,
+            { options, multiple, hideResults, closesAt: core.pollClosesAt(hours) }
+        )
+    );
+    return result.error ? { error: result.error } : { id: result.value };
+}
+
+/** Pick answers, or take a vote back with an empty list. */
+export async function votePollAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = core.chatPollVoteSchema.safeParse(input);
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That vote could not be counted" };
+    return guard(() => polls.vote(me, parsed.data));
+}
+
+/**
+ * One poll, read again.
+ *
+ * What a card asks for when the live frame says something happened in this
+ * conversation. The channel's own catch-up only fetches what was said after the
+ * newest line it holds, so a vote on a poll further up would never reach anybody
+ * else's screen without this.
+ */
+export async function pollAction(
+    messageId: string
+): Promise<{ poll?: polls.ChatPollView | null; error?: string }> {
+    const me = await actor();
+    const result = await guard(() => polls.readPoll(me, messageId));
+    return result.error ? { error: result.error } : { poll: result.value ?? null };
+}
+
+/** Close a poll early. Whoever asked it, and whoever moderates the room. */
+export async function endPollAction(messageId: string): Promise<{ error?: string }> {
+    const me = await actor();
+    return guard(() => polls.endPoll(me, messageId));
 }
 
 /**

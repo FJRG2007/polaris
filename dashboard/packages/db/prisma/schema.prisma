@@ -196,6 +196,7 @@ model User {
     chatSpaceInvites     ChatSpaceInvite[]
     chatSavedMedia       ChatSavedMedia[]
     chatChannelMemberships ChatChannelMember[]
+    chatPollVotes        ChatPollVote[]
     contactNamesGiven    ContactName[]       @relation("ContactNamesGiven")
     contactNamesReceived ContactName[]       @relation("ContactNamesReceived")
     chatReportsMade     ChatReport[]         @relation("ChatReportsMade")
@@ -6103,6 +6104,7 @@ model ChatMessage {
     quotedBy    ChatMessage[]    @relation("ChatQuote")
     reactions   ChatReaction[]
     attachments ChatAttachment[]
+    poll        ChatPoll?
     stars       ChatStar[]
     edits       ChatMessageEdit[]
     reports     ChatReport[]
@@ -6265,6 +6267,85 @@ model ChatReaction {
 
     @@unique([messageId, userId, emoji])
     @@index([messageId])
+}
+
+// A question asked in a conversation, and the answers under it.
+//
+// Keyed by the message rather than carrying an id of its own: a poll is a
+// message, and there is exactly one per message. That also means the question
+// needs no column here - it is the message's body - so a poll is searched,
+// quoted, forwarded and previewed in the rail by every path that already knows
+// how to read a message, and none of them needed a special case.
+//
+// Nothing is denormalized onto it. The tallies are counted from the votes on
+// read: a running count kept here would be a second source of truth for the one
+// number the whole feature is about, and the first vote lost in a retry would
+// leave it wrong forever with nothing to compare against.
+model ChatPoll {
+    messageId   String    @id @db.Uuid
+    // Whether somebody may pick more than one answer.
+    multiple    Boolean   @default(false)
+    // Whether the tallies stay hidden until it closes. A poll that shows a
+    // running total is one where the first few votes decide the rest, which is
+    // exactly what a room asking something contentious wants to avoid.
+    hideResults Boolean   @default(false)
+    // When it runs out on its own, or null for one that only a person ends.
+    // Whether it is over is worked out on read from these two, the same way a
+    // mute that expires is: nothing has to be running for a poll to close on
+    // time.
+    closesAt    DateTime?
+    // When somebody ended it early. Distinct from `closesAt` because they are
+    // different facts - one is the clock and the other is a decision - and the
+    // card says which.
+    closedAt    DateTime?
+    createdAt   DateTime  @default(now())
+
+    message ChatMessage      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+    options ChatPollOption[]
+
+    @@index([closesAt])
+}
+
+// One answer on a poll.
+//
+// `position` rather than the order they were written: the answers are read as a
+// list and the order somebody typed them in is the order they meant.
+model ChatPollOption {
+    id       String @id @default(uuid(7)) @db.Uuid
+    pollId   String @db.Uuid
+    text     String
+    position Int
+
+    poll  ChatPoll         @relation(fields: [pollId], references: [messageId], onDelete: Cascade)
+    votes ChatPollVote[]
+
+    @@index([pollId, position])
+}
+
+// Somebody picking one answer.
+//
+// One row per answer picked rather than one per voter, so a poll that allows
+// several is the same shape as one that does not - what changes is how many rows
+// a person may hold, and that is enforced where the vote is written rather than
+// by the schema. Taking a vote back deletes the row: a poll is a count of who
+// stands where now, not a history of who changed their mind.
+//
+// The poll is reached through the answer rather than named here as well. A page
+// of polls loads its answers to draw them anyway, so the votes are fetched by
+// those ids - which makes a second column pointing at the poll a copy of what
+// the answer already says, and one that could disagree with it.
+model ChatPollVote {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    optionId  String   @db.Uuid
+    userId    String   @db.Uuid
+    createdAt DateTime @default(now())
+
+    option ChatPollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+    user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([optionId, userId])
+    @@index([optionId])
+    @@index([userId])
 }
 
 // A file on a message.

@@ -51,9 +51,16 @@ export type ChatSpaceChannelKind = (typeof CHAT_SPACE_CHANNEL_KINDS)[number];
 
 export type ChatChannelKind = (typeof CHAT_CHANNEL_KINDS)[number];
 
-/** What wrote a message. `system` is Polaris itself saying somebody joined or a
- *  call started, and it has no author. */
-export const CHAT_MESSAGE_KINDS = ["text", "system", "call"] as const;
+/**
+ * What wrote a message, and what kind of thing it is.
+ *
+ * `system` is Polaris itself saying somebody joined or a call started, and it
+ * has no author. `poll` is a question with answers under it: the message still
+ * carries the question as its body, so it is searched, quoted, forwarded and
+ * previewed in the rail exactly like anything else somebody said - what makes it
+ * a poll is the row hanging off it, not a different kind of message.
+ */
+export const CHAT_MESSAGE_KINDS = ["text", "system", "call", "poll"] as const;
 
 export type ChatMessageKind = (typeof CHAT_MESSAGE_KINDS)[number];
 
@@ -417,6 +424,169 @@ export const chatReactSchema = z.object({
 });
 
 export type ChatReactInput = z.infer<typeof chatReactSchema>;
+
+/**
+ * Polls: a question with answers under it, and who picked what.
+ *
+ * The question is the message's own body rather than a column of its own, which
+ * is the whole reason a poll needs no special case anywhere else in Chat: it is
+ * searched, quoted, forwarded, announced in a toast and shown in the rail like
+ * any other line somebody wrote. What hangs off the message is the answers and
+ * the votes.
+ *
+ * Two decisions are offered because they are the two people actually make. One
+ * is whether more than one answer may be picked - a lunch order takes one, a
+ * "which of these can you make" takes several. The other is whether the tallies
+ * are visible while it runs: a poll that shows a running total is a poll where
+ * the first four votes decide the rest, and a room asking something contentious
+ * wants the count kept back until it closes.
+ */
+
+/** The fewest answers a poll can have. One answer is not a question. */
+export const MIN_POLL_OPTIONS = 2;
+
+/** The most. Past ten it is a form rather than a poll, and the bars are too thin
+ *  to read. */
+export const MAX_POLL_OPTIONS = 10;
+
+export const MAX_POLL_QUESTION = 300;
+
+/** Long enough for a sentence, short enough that every answer fits on one line
+ *  beside its bar. */
+export const MAX_POLL_OPTION = 100;
+
+/** How long a poll stays open, in hours. */
+export const POLL_DURATIONS = [1, 4, 8, 24, 72, 168, 336] as const;
+
+/** A poll with no clock on it, which somebody closes by hand. */
+export const POLL_NO_END = 0;
+
+export const POLL_DURATION_LABELS: Readonly<Record<number, string>> = {
+    1: "1 hour",
+    4: "4 hours",
+    8: "8 hours",
+    24: "1 day",
+    72: "3 days",
+    168: "1 week",
+    336: "2 weeks",
+    [POLL_NO_END]: "Until I close it"
+};
+
+/** What a poll runs for unless somebody says otherwise. A day is long enough for
+ *  everybody in a room to see it and short enough to still be about today. */
+export const DEFAULT_POLL_HOURS = 24;
+
+const pollHours: readonly number[] = [POLL_NO_END, ...POLL_DURATIONS];
+
+/**
+ * The answers as they are stored.
+ *
+ * The dialog ships a fixed set of boxes and most of them are empty, so dropping
+ * blanks is the ordinary case rather than an error. Repeats go too: two answers
+ * reading the same thing split the vote between them and leave a result nobody
+ * can act on, and somebody who typed the same word twice meant it once.
+ *
+ * Nothing is truncated here. What is too long is refused rather than quietly
+ * shortened - a check that cannot fail is not a check, and an answer cut off
+ * mid-word is a worse outcome than being told to shorten it.
+ */
+export function normalizePollOptions(options: readonly string[]): string[] {
+    const seen = new Set<string>();
+    const kept: string[] = [];
+    for (const raw of options) {
+        const text = raw.trim().replace(/\s+/g, " ");
+        if (text.length === 0) continue;
+        const key = text.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        kept.push(text);
+    }
+    return kept;
+}
+
+const pollOptions = z
+    .array(z.string())
+    .max(MAX_POLL_OPTIONS * 2)
+    .transform(normalizePollOptions)
+    .pipe(
+        z
+            .array(z.string().max(MAX_POLL_OPTION, "One of the answers is too long"))
+            .min(MIN_POLL_OPTIONS, "A poll needs at least two answers")
+            .max(MAX_POLL_OPTIONS, `A poll holds up to ${MAX_POLL_OPTIONS} answers`)
+    );
+
+export const chatPollCreateSchema = z.object({
+    channelId: z.string().uuid(),
+    question: z
+        .string()
+        .trim()
+        .min(1, "Ask something first")
+        .max(MAX_POLL_QUESTION, "That question is longer than a poll can carry"),
+    options: pollOptions,
+    /** Whether somebody may pick more than one answer. */
+    multiple: z.boolean().default(false),
+    /** Whether the tallies stay hidden until it closes. */
+    hideResults: z.boolean().default(false),
+    /** How long it stays open, in hours. Zero for one that only a person ends. */
+    hours: z
+        .number()
+        .refine((value) => pollHours.includes(value), "That is not a length to offer")
+        .default(DEFAULT_POLL_HOURS),
+    /** A poll asked inside a thread, and one asked as an answer to something.
+     *  The same two a message carries, because a poll is one. */
+    parentId: z.string().uuid().nullable().optional(),
+    replyToId: z.string().uuid().nullable().optional()
+});
+
+export type ChatPollCreateInput = z.infer<typeof chatPollCreateSchema>;
+
+/**
+ * Picking answers, as one decision rather than one press per answer.
+ *
+ * The whole selection travels each time, so a vote is idempotent and the server
+ * never has to work out what changed: an empty list is somebody taking their
+ * vote back, which every poll should allow while it is still running.
+ */
+export const chatPollVoteSchema = z.object({
+    messageId: z.string().uuid(),
+    optionIds: z.array(z.string().uuid()).max(MAX_POLL_OPTIONS)
+});
+
+export type ChatPollVoteInput = z.infer<typeof chatPollVoteSchema>;
+
+/** When a poll of this length runs out, or null when it has no clock. */
+export function pollClosesAt(hours: number, now = new Date()): Date | null {
+    return hours === POLL_NO_END ? null : new Date(now.getTime() + hours * 60 * 60 * 1000);
+}
+
+/**
+ * Whether a poll is over.
+ *
+ * Worked out on read rather than written by a job, on the same terms as a mute
+ * that expires: nothing has to be running for a poll to close on time, and a
+ * deployment whose sweep is wedged does not leave every poll in it open forever.
+ */
+export function pollIsClosed(
+    poll: { closesAt: Date | string | null; closedAt: Date | string | null },
+    now = new Date()
+): boolean {
+    if (poll.closedAt !== null) return true;
+    return poll.closesAt !== null && new Date(poll.closesAt).getTime() <= now.getTime();
+}
+
+/**
+ * Whether the tallies may be shown yet.
+ *
+ * A hidden poll shows nothing until it closes, with one thing that is not an
+ * exception at all: your own vote is always yours to see, which is what stops
+ * the card looking like it dropped the press.
+ */
+export function pollResultsVisible(
+    poll: { hideResults: boolean; closesAt: Date | string | null; closedAt: Date | string | null },
+    now = new Date()
+): boolean {
+    return !poll.hideResults || pollIsClosed(poll, now);
+}
 
 export const chatMarkReadSchema = z.object({
     channelId: z.string().uuid(),

@@ -16,6 +16,7 @@ import { X } from "lucide-react";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { Composer } from "./composer";
+import type { PollDraft } from "./poll-dialog";
 import { Skeleton } from "@polaris/ui";
 import { useChat } from "./chat-context";
 import { MessageList } from "./message-list";
@@ -165,6 +166,20 @@ export function ThreadPanel({
                 disabled={!canPost}
                 attachable={may.attach}
                 placeholder="Reply in this thread"
+                // A poll belongs in a thread as readily as anywhere else: a side
+                // conversation is exactly where somebody asks the room to pick
+                // between the two things being argued about.
+                onPoll={async (draft: PollDraft) => {
+                    const result = await actions.createPollAction({
+                        channelId: root.channelId,
+                        ...draft,
+                        parentId: root.id
+                    });
+                    if (result.error) return { error: result.error };
+                    await load();
+                    onChanged();
+                    return {};
+                }}
                 onMedia={async (address) => {
                     await runAction(
                         () => actions.sendMediaAction(root.channelId, address, root.id),
