@@ -9,6 +9,7 @@
 import { parseContainerState } from "./status.js";
 import { imageTag as toImageTag } from "../naming.js";
 import { appComposeSpec, dbComposeSpec } from "../compose-spec.js";
+import { mountFailureReason } from "../mount-failure.js";
 import type {
     AppDeployPlan,
     DbDeployPlan,
@@ -117,8 +118,13 @@ export class ComposeRuntime implements RuntimeDriver {
         const spec = appComposeSpec(effectivePlan, imageTag, ctx.target.proxyNetwork);
         // Establish any NAS mounts the volumes bind onto, before the container comes
         // up - so `<mount_root>/<id>/...` resolves onto the NAS, not an empty dir.
+        // Which share was being mounted when it went wrong. A deploy can bind
+        // more than one, and "a NAS volume could not be mounted" names none of
+        // them.
+        let mounting: { source: string } | null = null;
         try {
             for (const mount of plan.mounts ?? []) {
+                mounting = mount;
                 const done = step(`Mounting ${mount.kind.toUpperCase()} ${mount.source}`);
                 const created = await ctx.ports.ensureMount(mount);
                 done(created ? "mounted" : "already mounted");
@@ -127,7 +133,13 @@ export class ComposeRuntime implements RuntimeDriver {
             // The share is what the app's data lives on, so a container brought
             // up without it would write into an empty directory on the host and
             // look fine until somebody went looking for the files.
-            return fail(ctx, `could not mount a NAS volume: ${reasonOf(error, "mount failed")}`);
+            //
+            // Translated on the way out, because the mount helper's own words
+            // send people to the wrong place: "Server abruptly closed the
+            // connection" is what a machine that is switched off produces, and
+            // it reads like a password problem.
+            const share = mounting?.source ?? "the share";
+            return fail(ctx, mountFailureReason(share, reasonOf(error, "")));
         }
         const started = step("Starting the containers");
         try {

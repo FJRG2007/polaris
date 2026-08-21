@@ -70,7 +70,7 @@ describe("a deploy that gives up", () => {
         // The step is announced, and then the reason follows it. Before this,
         // the announcement was the last line anybody saw.
         expect(log).toContain("Mounting SMB //192.168.1.145/Personal-Drive");
-        expect(log).toContain("Failed: could not mount a NAS volume");
+        expect(log).toContain("is not answering");
         expect(log).toContain("EHOSTUNREACH 192.168.1.145:445");
     });
 
