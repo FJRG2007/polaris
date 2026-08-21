@@ -71,6 +71,19 @@ pub fn validate<'a>(method: &'a str, path: &'a str) -> Result<AllowedRequest<'a>
         // it acts on one already-existing container and creates nothing. The
         // caller decides `force`/`v` in the query string, which is bounded above.
         ("DELETE", ["containers", id]) => valid_container_id(id),
+        // How much room the machine has and where it went. Read-only, and the
+        // reason the two below are here: a deploy that fills the disk reports it
+        // as a failed rename inside the image store, which reads like a corrupt
+        // image, and an operator with no terminal cannot reach the real answer.
+        ("GET", ["system", "df"]) => true,
+        // Reclaiming, and only the two kinds that hold nothing anybody wrote.
+        // Build cache is regenerable by definition and dangling images are the
+        // layers no tag points at any more; both come back on the next build or
+        // pull, at the cost of time. Neither touches a volume, and
+        // `/volumes/prune` is deliberately absent from this list: that one
+        // deletes data, and no button should be able to reach it through here.
+        ("POST", ["build", "prune"]) => true,
+        ("POST", ["images", "prune"]) => true,
         _ => false,
     };
     if !allowed {
@@ -236,6 +249,19 @@ mod tests {
         assert!(validate("POST", "/containers/web.1/stop").is_ok());
         assert!(validate("POST", "/containers/a-b_c/restart").is_ok());
         assert!(validate("DELETE", "/containers/abc123?force=1&v=0").is_ok());
+        assert!(validate("GET", "/system/df").is_ok());
+        assert!(validate("POST", "/build/prune").is_ok());
+        assert!(validate("POST", "/images/prune?filters=%7B%7D").is_ok());
+    }
+
+    #[test]
+    fn reclaiming_never_reaches_a_volume() {
+        // The one line in the allowlist that would delete something somebody
+        // wrote. Build cache and dangling images come back on the next build or
+        // pull; a volume does not come back at all.
+        assert!(validate("POST", "/volumes/prune").is_err());
+        assert!(validate("POST", "/system/prune").is_err());
+        assert!(validate("DELETE", "/volumes/data").is_err());
     }
 
     #[test]

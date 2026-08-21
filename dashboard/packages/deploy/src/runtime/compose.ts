@@ -10,6 +10,7 @@ import { parseContainerState } from "./status.js";
 import { imageTag as toImageTag } from "../naming.js";
 import { appComposeSpec, dbComposeSpec } from "../compose-spec.js";
 import { mountFailureReason } from "../mount-failure.js";
+import { deployFailureReason } from "../deploy-failure.js";
 import type {
     AppDeployPlan,
     DbDeployPlan,
@@ -82,7 +83,18 @@ export class ComposeRuntime implements RuntimeDriver {
             if (!plan.build.imageRef) return fail(ctx, "an image source needs an image reference");
             imageTag = plan.build.imageRef;
             const done = step(`Pulling ${plan.build.imageRef}`);
-            await ctx.ports.pull(imageTag, sink);
+            try {
+                await ctx.ports.pull(imageTag, sink);
+            } catch (error) {
+                // Translated on the way out, for the reason deploy-failure.ts
+                // gives: the image store reports a disk with no room left as a
+                // failed rename inside its own content directory, which reads
+                // like a corrupt image and sends people to the registry.
+                return fail(
+                    ctx,
+                    deployFailureReason(reasonOf(error, ""), `could not pull ${plan.build.imageRef}`)
+                );
+            }
             done();
         } else if ((plan.build.method === "dockerfile" || plan.build.method === "nixpacks") && ctx.buildContext) {
             // Build from the cloned repo: a Dockerfile, or Nixpacks auto-detecting the
@@ -92,22 +104,31 @@ export class ComposeRuntime implements RuntimeDriver {
             const context = await ctx.buildContext();
             fetched();
             const built = step("Building the image");
-            await ctx.ports.build(
-                {
-                    tag: imageTag,
-                    // A Dockerfile Polaris generated wins: it exists precisely
-                    // because the project was recognized, and it pins the runtime
-                    // the project asked for rather than whatever the build machine
-                    // happens to carry.
-                    dockerfile: context.dockerfile ?? plan.build.dockerfilePath,
-                    contextTar: context.tar,
-                    // Detection may have moved the build up to the repository root -
-                    // a workspace cannot install from inside one of its members.
-                    root: context.root ?? plan.build.rootDirectory,
-                    builder: context.dockerfile || plan.build.method !== "nixpacks" ? "docker" : "nixpacks"
-                },
-                sink
-            );
+            try {
+                await ctx.ports.build(
+                    {
+                        tag: imageTag,
+                        // A Dockerfile Polaris generated wins: it exists precisely
+                        // because the project was recognized, and it pins the runtime
+                        // the project asked for rather than whatever the build machine
+                        // happens to carry.
+                        dockerfile: context.dockerfile ?? plan.build.dockerfilePath,
+                        contextTar: context.tar,
+                        // Detection may have moved the build up to the repository root -
+                        // a workspace cannot install from inside one of its members.
+                        root: context.root ?? plan.build.rootDirectory,
+                        builder:
+                            context.dockerfile || plan.build.method !== "nixpacks"
+                                ? "docker"
+                                : "nixpacks"
+                    },
+                    sink
+                );
+            } catch (error) {
+                // A build fills the same disk a pull does, and reports it the
+                // same unhelpful way.
+                return fail(ctx, deployFailureReason(reasonOf(error, ""), "the image would not build"));
+            }
             built();
         } else {
             // buildpacks/static need a builder toolchain on the target; not yet wired.
@@ -145,7 +166,7 @@ export class ComposeRuntime implements RuntimeDriver {
         try {
             await ctx.ports.composeUp(spec, sink);
         } catch (error) {
-            return fail(ctx, reasonOf(error, "compose up failed"));
+            return fail(ctx, deployFailureReason(reasonOf(error, ""), "compose up failed"));
         }
         started();
         return { ok: true, imageTag };
@@ -193,7 +214,7 @@ export class ComposeRuntime implements RuntimeDriver {
         try {
             await ctx.ports.composeUp(spec, sink);
         } catch (error) {
-            return fail(ctx, reasonOf(error, "database deploy failed"));
+            return fail(ctx, deployFailureReason(reasonOf(error, ""), "database deploy failed"));
         }
         return { ok: true };
     }

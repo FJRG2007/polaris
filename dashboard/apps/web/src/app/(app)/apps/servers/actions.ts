@@ -17,6 +17,7 @@ import type { ActivityLine } from "@/lib/activity/activity";
 import type { ServerMetrics } from "@/lib/server-probe";
 import { setLocalEnvironment } from "@/lib/network-service";
 import { getServerMetrics } from "@/lib/server-metrics-service";
+import { hostSpace, reclaimHostSpace, type HostSpace } from "@/lib/deploy/host-space";
 import { getLocalHostId, setLocalHostId, setLocalServerName } from "@/lib/local-server";
 import { createHost, renameHost, setHostEnvironment, setHostWildcardDomain } from "@/lib/host-service";
 import {
@@ -365,4 +366,44 @@ export async function setHostGroupMembersAction(groupId: string, hostIds: string
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not save the group" };
     }
+}
+
+/**
+ * What the container store is holding on the machine Polaris runs on.
+ *
+ * Only that machine: it is the one Polaris can reach through its own daemon,
+ * and the one whose disk filling up stops Polaris itself from deploying. Null
+ * where the daemon cannot answer, which a screen reads as "cannot say" rather
+ * than as "nothing".
+ *
+ * Behind the same gate as everything else on this screen: what it reports is how
+ * the machine Polaris runs on is being used.
+ */
+export async function hostSpaceAction(): Promise<HostSpace | null> {
+    await requirePermission("system.manage");
+    return hostSpace().catch(() => null);
+}
+
+/**
+ * Hand back the room that holds nothing anybody wrote.
+ *
+ * Audited, because it removes things - even though the things are
+ * regenerable. What it can reach is bounded by the daemon's own allowlist, and
+ * volumes are not on it.
+ */
+export async function reclaimHostSpaceAction(): Promise<{ freed?: number; error?: string }> {
+    const user = await requirePermission("system.manage");
+    const freed = await reclaimHostSpace().catch(() => null);
+    if (freed === null) {
+        return { error: "This machine would not say. Nothing was removed." };
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: "server.space.reclaimed",
+        targetType: "host",
+        targetId: "local",
+        metadata: { freed }
+    });
+    revalidatePath("/apps/servers");
+    return { freed };
 }

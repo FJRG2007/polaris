@@ -18,6 +18,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ServerUsage } from "../server-usage";
+import { ContainerStorage } from "../container-storage";
 import { ServerWorkload } from "./server-workload";
 import { ServerNotesPanel } from "../server-notes-panel";
 import { ENVIRONMENT_META } from "../environment-meta";
@@ -191,6 +192,11 @@ export function ServerDetail({
                             initial={initialUsage}
                         />
                     ) : null}
+
+                    {/* The machine Polaris runs on is the one whose disk filling
+                        up stops Polaris deploying at all, and the only one it can
+                        reach through its own daemon to do anything about it. */}
+                    {server.kind === "local" ? <ContainerStorage /> : null}
 
                     <ServerWorkload connectionId={connectionId} />
 
