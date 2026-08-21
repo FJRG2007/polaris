@@ -24,6 +24,7 @@ import * as alerts from "@/lib/home/alerts";
 import * as places from "@/lib/home/places";
 import * as people from "@/lib/home/people";
 import * as cameras from "@/lib/home/cameras";
+import * as cameraZones from "@/lib/home/camera-zones";
 import { listHosts } from "@/lib/host-service";
 import { probeCamera } from "@/lib/home/onvif";
 import { requireHome } from "@/lib/home/access";
@@ -37,7 +38,7 @@ import * as defaults from "@/lib/home/detection-defaults";
 import { LOCAL_TARGET, storageTargetOptions } from "@/lib/storage-target";
 import { needsSomewhereToRun, type Detector } from "@/lib/home/detection";
 import { currentPlace, PLACE_COOKIE, PLACE_COOKIE_MAX_AGE } from "@/lib/home/current-place";
-import { cameraInputSchema, discoveryInputSchema, normalizeCameraInput } from "@/lib/home/schemas";
+import { cameraInputSchema, cameraZoneInputSchema, discoveryInputSchema, normalizeCameraInput, normalizeZoneInput } from "@/lib/home/schemas";
 import { faceEndpoint, faceRecognitionSettings, installRecognizer, setFaceRecognition } from "@/lib/home/recognizer";
 
 const PATH = "/places";
@@ -362,6 +363,50 @@ export async function deleteCameraAction(id: string): Promise<{ error?: string }
         if (endpoint) await relay.unpublishCamera(endpoint, id);
         await cameras.deleteCamera(install.id, id);
     });
+    if (result.error) return { error: result.error };
+    revalidatePath(PATH);
+    return {};
+}
+
+/**
+ * The areas drawn on one camera.
+ *
+ * Reading them is `home.read`, because a zone is part of what a screen shows
+ * over a live picture. Changing one is `home.manage`, alongside the camera
+ * itself: an ignore area is a decision to stop reporting part of what a camera
+ * can see, which is the same weight as deciding what it connects to.
+ */
+export async function listCameraZonesAction(cameraId: string): Promise<{
+    zones?: cameraZones.CameraZoneView[];
+    error?: string;
+}> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(() => cameraZones.listCameraZones(install.id, cameraId));
+    if (result.error || !result.value) return { error: result.error ?? "Those areas could not be read." };
+    return { zones: result.value };
+}
+
+export async function saveCameraZoneAction(
+    cameraId: string,
+    id: string | null,
+    input: unknown
+): Promise<{ zone?: cameraZones.CameraZoneView; error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const parsed = cameraZoneInputSchema.safeParse(normalizeZoneInput(input));
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Some of that is not right." };
+    const result = await guard(() =>
+        id
+            ? cameraZones.updateCameraZone(install.id, cameraId, id, parsed.data)
+            : cameraZones.createCameraZone(install.id, cameraId, parsed.data)
+    );
+    if (result.error || !result.value) return { error: result.error ?? "That area could not be saved." };
+    revalidatePath(PATH);
+    return { zone: result.value };
+}
+
+export async function deleteCameraZoneAction(cameraId: string, id: string): Promise<{ error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const result = await guard(() => cameraZones.deleteCameraZone(install.id, cameraId, id));
     if (result.error) return { error: result.error };
     revalidatePath(PATH);
     return {};

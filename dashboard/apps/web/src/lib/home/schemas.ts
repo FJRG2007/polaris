@@ -154,12 +154,13 @@ export const cameraZoneInputSchema = z.object({
 
 export type CameraZoneInput = z.infer<typeof cameraZoneInputSchema>;
 
-/** Validate a zone as it arrived, trimming the name first so two areas cannot
- *  be told apart by a trailing space. */
-export function parseCameraZoneInput(input: unknown): CameraZoneInput {
+/** What a zone's editable text is put through, on both sides. Trimmed first so
+ *  two areas cannot be told apart by a trailing space, which the camera-unique
+ *  name constraint would then let through. */
+export function normalizeZoneInput(input: unknown): Record<string, unknown> {
     const value = { ...((input ?? {}) as Record<string, unknown>) };
     if (typeof value.name === "string") value.name = value.name.trim();
-    return cameraZoneInputSchema.parse(value);
+    return value;
 }
 
 /** What a discovery sweep is asked for: one subnet, or the one Polaris is on. */
