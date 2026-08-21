@@ -2,11 +2,11 @@
  * The zones a camera has, as rows: reading them, drawing one, changing one,
  * removing one.
  *
- * The geometry lives in `zones.ts` and is client-safe, because the editor and
- * the worker have to agree about what "inside" means. This is the half that
- * touches the database, and everything in it is scoped by the install and the
- * camera - a zone id from somewhere else must not resolve, the same rule the
- * cameras themselves are read under.
+ * The geometry lives in @polaris/core and is shared, because the editor, the
+ * server and the worker all have to agree about what "inside" means. This is
+ * the half that touches the database, and everything in it is scoped by the
+ * install and the camera - a zone id from somewhere else must not resolve, the
+ * same rule the cameras themselves are read under.
  *
  * Server-only.
  */
@@ -14,7 +14,7 @@
 import { prisma } from "@polaris/db";
 import { OBJECT_CLASSES } from "@/lib/home/detection";
 import type { CameraZoneInput } from "@/lib/home/schemas";
-import { parseZoneObjects, parseZonePoints, serializeZonePoints, type Zone, type ZoneKind } from "@/lib/home/zones";
+import { parseZoneObjects, parseZonePoints, serializeZonePoints, type Zone, type ZoneKind } from "@polaris/core";
 
 /** A zone as a screen and the worker both see it. There is no second shape here:
  *  a zone carries no credential and nothing about it is worth hiding. */

@@ -11,7 +11,7 @@
 
 import { z } from "zod";
 import { DETECTORS, OBJECT_CLASSES } from "@/lib/home/detection";
-import { MAX_ZONE_POINTS, MIN_ZONE_POINTS, ZONE_KINDS } from "@/lib/home/zones";
+import { MAX_ZONE_POINTS, MIN_ZONE_POINTS, ZONE_KINDS } from "@polaris/core";
 
 /** How a camera's address is written down, whatever was typed. Hostnames are
  *  case-insensitive and an address is compared, so it is lowered; an IP is

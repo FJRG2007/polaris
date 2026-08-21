@@ -10,7 +10,7 @@
  * So it is pinned here instead - no camera, no model, no container.
  */
 
-import * as zoning from "@/lib/home/zones";
+import * as zoning from "./camera-zones.js";
 import { describe, expect, it } from "vitest";
 
 /** A square over the bottom-left quarter of the frame. */

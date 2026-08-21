@@ -16,7 +16,7 @@
  */
 
 import * as actions from "../actions";
-import * as zoning from "@/lib/home/zones";
+import * as zoning from "@polaris/core";
 import { runAction } from "@/lib/run-action";
 import { useEffect, useRef, useState } from "react";
 import { Eraser, Loader2, Plus, Trash2, Undo2 } from "lucide-react";
