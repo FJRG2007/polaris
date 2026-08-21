@@ -22,7 +22,7 @@ import * as actions from "./ark-actions";
 import { RestartPlanner } from "./restart-planner";
 import { useCallback, useEffect, useState } from "react";
 import type { ArkRules } from "@/lib/apps/ark/settings-service";
-import { AlertTriangle, Info, Loader2, RefreshCw, RotateCcw } from "lucide-react";
+import { AlertTriangle, Info, Loader2, RefreshCw, RotateCcw, Search } from "lucide-react";
 import { Button, Card, CardBody, Input, Skeleton, Switch, cn } from "@polaris/ui";
 import {
     arkSettingGroups,
@@ -52,6 +52,30 @@ export function ArkRules({
      *  what makes the restart worth offering rather than a button that is always
      *  there. */
     const [changed, setChanged] = useState(false);
+    const [query, setQuery] = useState("");
+
+    /**
+     * The groups to draw, narrowed to what was asked for.
+     *
+     * The key is matched as well as the words. Somebody looking for a setting
+     * here has almost always just read its name somewhere else -
+     * `OverrideOfficialDifficulty`, `BabyMatureSpeedMultiplier` - and the row
+     * they want says "Difficulty" and "How fast babies grow", which are the
+     * right words to read and the wrong ones to search for.
+     */
+    const shown = arkSettingGroups()
+        .map((group) => {
+            const wanted = query.trim().toLowerCase();
+            if (!wanted) return group;
+            const matches = group.settings.filter((setting) =>
+                [setting.key, setting.label, setting.hint, group.group]
+                    .join(" ")
+                    .toLowerCase()
+                    .includes(wanted)
+            );
+            return { ...group, settings: matches };
+        })
+        .filter((group) => group.settings.length > 0);
 
     const load = useCallback(async () => {
         const result = await actions.readArkRulesAction(installedAppId);
@@ -141,6 +165,23 @@ export function ArkRules({
                 />
             )}
 
+            {/* Forty-odd rows in six groups, and somebody arriving here has
+                usually just read the name of one on a wiki. Matched against the
+                key as well as the words, which is the half that makes that
+                arrival work. */}
+            {!loading ? (
+                <label className="relative">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder="Find a setting, by what it does or what ARK calls it"
+                        aria-label="Find a setting"
+                        className="pl-8"
+                    />
+                </label>
+            ) : null}
+
             {loading ? (
                 <div className="flex flex-col gap-2">
                     {Array.from({ length: 6 }, (_, index) => (
@@ -148,7 +189,7 @@ export function ArkRules({
                     ))}
                 </div>
             ) : (
-                arkSettingGroups().map((group) => (
+                shown.map((group) => (
                     <div key={group.group} className="flex flex-col gap-1">
                         <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                             {group.group}
@@ -172,6 +213,14 @@ export function ArkRules({
                     </div>
                 ))
             )}
+
+            {!loading && shown.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                    Nothing here matches “{query}”. ARK has a great many settings and Polaris offers
+                    the ones it can set as launch options; anything else lives in the game&apos;s own
+                    files.
+                </p>
+            ) : null}
 
             <p className="text-xs text-muted-foreground">
                 Polaris writes these as launch options rather than into the game&apos;s own settings
@@ -240,7 +289,15 @@ function SettingRow({
             <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 text-sm font-medium">
                     {setting.label}
-                    {busy && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
+                    {/* What ARK calls it. Quiet, because it is not what the row
+                        is for - and present, because it is what somebody who
+                        came here from a wiki is holding, and without it they are
+                        reading forty rows of prose looking for a word that
+                        appears in none of them. */}
+                    <code className="min-w-0 truncate font-mono text-[11px] font-normal text-foreground-subtle">
+                        {setting.key}
+                    </code>
+                    {busy && <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />}
                 </p>
                 {setting.hint && <p className="text-xs text-muted-foreground">{setting.hint}</p>}
                 {source && <p className="text-xs text-muted-foreground">{source}</p>}

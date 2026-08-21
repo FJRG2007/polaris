@@ -280,25 +280,25 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
         decimal: true
     },
     {
-        key: "DifficultyOffset",
-        label: "Difficulty offset",
-        hint: "Between 0 and 1. With the override below, this is what decides wild creature levels.",
-        type: "number",
-        group: WORLD,
-        fallback: "0.2",
-        min: 0,
-        max: 1,
-        decimal: true
-    },
-    {
         key: "OverrideOfficialDifficulty",
         label: "Difficulty",
-        hint: "5 is the usual choice: wild creatures up to level 150.",
+        hint: "How high wild creatures go: their top level is this times 30. 5 is the usual choice, for level 150. Set, it decides the levels on its own and the offset below stops mattering.",
         type: "number",
         group: WORLD,
         fallback: "off",
         min: 0,
         max: 100,
+        decimal: true
+    },
+    {
+        key: "DifficultyOffset",
+        label: "Difficulty offset",
+        hint: "The older way of saying the same thing, between 0 and 1. Only read when the difficulty above is not set.",
+        type: "number",
+        group: WORLD,
+        fallback: "0.2",
+        min: 0,
+        max: 1,
         decimal: true
     },
     {
