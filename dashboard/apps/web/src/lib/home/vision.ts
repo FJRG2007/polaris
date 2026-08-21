@@ -175,12 +175,10 @@ export async function assignmentsFor(installedAppId: string): Promise<VisionAssi
             zones: zones.get(camera.id) ?? [],
             faces:
                 faces && detectorReaches(detector, "faces")
-                    ? // The worker runs beside the recognizer as often as not, so
-                      // it gets the address that machine can dial rather than the
-                      // one Polaris uses - which may be a tunnel that exists only
-                      // inside this process.
+                    ? // The recognizer is usually a container beside it, and is
+                      // addressed the same way and for the same reason.
                       {
-                          baseUrl: faces.directUrl,
+                          baseUrl: faces.networkUrl ?? faces.directUrl,
                           apiKey: faces.apiKey,
                           threshold: detection.faceThreshold
                       }

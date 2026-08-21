@@ -21,6 +21,8 @@ import { prisma } from "@polaris/db";
 import { listHosts } from "@/lib/host-service";
 import { localDialHost } from "@/lib/deploy/dial";
 import { tunnelledUrl } from "@/lib/home/tunnel";
+import { findApp } from "@/lib/apps/catalog";
+import { serviceRef } from "@/lib/deploy/releases";
 import { hostPortForApp } from "@/lib/deploy-service";
 
 /** One of Home's own containers, as found on a server. */
@@ -44,6 +46,27 @@ export interface ServiceUrls {
      * exists inside the Polaris process.
      */
     readonly directUrl: string;
+    /**
+     * How another container Polaris started dials it: the container's own name,
+     * on the network they share, at the port it actually listens on.
+     *
+     * This is the address that should be handed to a worker, and the reason is a
+     * bug that hid for as long as the feature existed. `directUrl` goes out to
+     * the host and back in - which works for Polaris, whose own compose file
+     * gives it the name of the machine it runs on, and does not work for a
+     * container Polaris deployed, which was never given that name. The worker's
+     * ffmpeg exited on the spot, over and over, and its error went to a stderr
+     * nothing reads: what the operator saw was a camera that had noticed nothing
+     * since the day it was added.
+     *
+     * Container to container is also simply the right path. It stays on the
+     * bridge, needs no published port, and cannot be sent out to a router and
+     * back.
+     *
+     * Null when the service is on another machine, where there is no shared
+     * network and the address means nothing.
+     */
+    readonly networkUrl: string | null;
 }
 
 /** The deploy target a server id resolves to, when one already exists. Null for a
@@ -105,15 +128,41 @@ export async function serviceUrls(applicationId: string, ownerId: string): Promi
 
     const port = hostPortForApp(applicationId);
     const directUrl = `http://${dialHost}:${port}`;
+    const networkUrl = local ? await containerUrl(applicationId) : null;
     const hostId = application.target.hostId;
-    if (local || !hostId) return { baseUrl: directUrl, directUrl };
+    if (local || !hostId) return { baseUrl: directUrl, directUrl, networkUrl };
 
-    if (await reachable(dialHost, port)) return { baseUrl: directUrl, directUrl };
+    if (await reachable(dialHost, port)) return { baseUrl: directUrl, directUrl, networkUrl };
     // A tunnel that cannot be opened is not a reason to answer nothing: the
     // direct address is still the best guess, and the caller's own failure says
     // more than a silent null would.
     const tunnelled = await tunnelledUrl(hostId, ownerId, "127.0.0.1", port).catch(() => null);
-    return { baseUrl: tunnelled ?? directUrl, directUrl };
+    return { baseUrl: tunnelled ?? directUrl, directUrl, networkUrl };
+}
+
+/**
+ * The address this service answers on from inside the network Polaris deploys
+ * onto: its container's name and the port that container actually listens on.
+ *
+ * Both halves are the deployment's own, so neither is guessed. The name is the
+ * one the runtime writes as `container_name`, which is what Docker answers on
+ * the shared bridge; the port is the one the app's manifest declares, not the
+ * one it is published on outside.
+ */
+async function containerUrl(applicationId: string): Promise<string | null> {
+    const application = await prisma.application.findFirst({
+        where: { id: applicationId },
+        select: { id: true, slug: true, environment: { select: { project: { select: { slug: true } } } } }
+    });
+    if (!application?.environment?.project) return null;
+    const install = await prisma.installedApp.findFirst({
+        where: { applicationId },
+        select: { catalogId: true }
+    });
+    const port = install ? findApp(install.catalogId)?.template?.ports?.[0]?.container : undefined;
+    if (!port) return null;
+    const { name } = serviceRef(application.environment.project.slug, application.slug, application.id);
+    return `http://${name}:${port}`;
 }
 
 /** Refuse a server id that names nothing before installing onto it. */

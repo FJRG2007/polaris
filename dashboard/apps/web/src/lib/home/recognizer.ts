@@ -45,13 +45,17 @@ interface HomeSecrets {
     faceInstallId?: string;
 }
 
-/** Where a recognizer answers, for each of the two callers.
+/** Where a recognizer answers, for each of the callers.
  *
  *  They are not the same address. Polaris may be reaching it down a tunnel; the
- *  vision worker runs beside it and has to be given the real one. */
+ *  vision worker is usually another container beside it and reaches it over the
+ *  network they share, by name, without leaving the bridge at all. */
 export interface RecognizerEndpoint {
     readonly baseUrl: string;
     readonly directUrl: string;
+    /** Its container's own address, when it is a container Polaris deployed on
+     *  this machine. Null for one somebody runs themselves. */
+    readonly networkUrl: string | null;
     readonly apiKey: string;
 }
 
@@ -183,7 +187,14 @@ export async function recognizerFor(installedAppId: string): Promise<RecognizerE
     // the workers both have to be able to reach it, which is the deal they made
     // by typing it in.
     return secrets.faceApiUrl && secrets.faceApiKey
-        ? { baseUrl: secrets.faceApiUrl, directUrl: secrets.faceApiUrl, apiKey: secrets.faceApiKey }
+        ? {
+              baseUrl: secrets.faceApiUrl,
+              directUrl: secrets.faceApiUrl,
+              // Typed by a person, so it is one address for everybody: there is
+              // no container of Polaris' to reach it by a shorter path.
+              networkUrl: null,
+              apiKey: secrets.faceApiKey
+          }
         : null;
 }
 
