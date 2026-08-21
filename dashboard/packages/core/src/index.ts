@@ -11,6 +11,7 @@
 export * from "./async.js";
 export * from "./account-standing.js";
 export * from "./camera-detect.js";
+export * from "./camera-motion.js";
 export * from "./camera-tracking.js";
 export * from "./camera-zones.js";
 export * from "./cidr.js";
