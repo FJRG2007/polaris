@@ -52,6 +52,8 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
     const [cameras, setCameras] = useState<CameraView[]>([]);
     const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
     const [known, setKnown] = useState<{ id: string; name: string }[]>([]);
+    /** The watched areas drawn anywhere in this place, so a rule can name one. */
+    const [areas, setAreas] = useState<string[]>([]);
     const [editing, setEditing] = useState<AlertRuleView | null>(null);
     const [adding, setAdding] = useState(false);
     const [removing, setRemoving] = useState<AlertRuleView | null>(null);
@@ -63,11 +65,12 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
     useEffect(() => {
         let cancelled = false;
         void (async () => {
-            const [list, cams, recipients, faces] = await Promise.all([
+            const [list, cams, recipients, faces, drawn] = await Promise.all([
                 actions.listAlertsAction(),
                 actions.listCamerasAction(),
                 canManage ? actions.listRecipientsAction() : Promise.resolve({ people: [] }),
-                actions.listPeopleAction()
+                actions.listPeopleAction(),
+                actions.listPlaceZoneNamesAction()
             ]);
             if (cancelled) return;
             if (list.error) setError(list.error);
@@ -75,6 +78,7 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
             setCameras(cams.cameras ?? []);
             setPeople(recipients.people ?? []);
             setKnown((faces.people ?? []).map((person) => ({ id: person.id, name: person.name })));
+            setAreas(drawn.zones ?? []);
         })();
         return () => {
             cancelled = true;
@@ -143,8 +147,9 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
         const where = rule.cameraId
             ? (cameras.find((camera) => camera.id === rule.cameraId)?.name ?? "one camera")
             : "any camera here";
+        const inside = rule.zones.length > 0 ? `, in ${rule.zones.join(" or ")}` : "";
         const when = rule.hours ? `, between ${rule.hours.from}:00 and ${rule.hours.to}:00` : "";
-        return `When ${what}${who} is seen on ${where}${when}`;
+        return `When ${what}${who} is seen on ${where}${inside}${when}`;
     };
 
     return (
@@ -260,6 +265,7 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                     cameras={cameras}
                     people={people}
                     known={known}
+                    areas={areas}
                     onClose={() => {
                         setEditing(null);
                         setAdding(false);

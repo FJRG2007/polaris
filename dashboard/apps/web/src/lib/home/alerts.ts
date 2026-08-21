@@ -26,6 +26,10 @@ export interface AlertRuleView {
     readonly cameraId: string | null;
     readonly kinds: readonly string[];
     readonly label: string | null;
+    /** Only what was standing in one of these areas, by name. Empty is
+     *  anywhere the camera can see, which is what every rule written before
+     *  areas existed means and what most rules mean anyway. */
+    readonly zones: readonly string[];
     readonly hours: { from: number; to: number } | null;
     readonly recipients: readonly string[];
     readonly enabled: boolean;
@@ -39,6 +43,7 @@ export interface AlertRuleInput {
     readonly cameraId: string | null;
     readonly kinds: readonly string[];
     readonly label: string | null;
+    readonly zones: readonly string[];
     readonly hours: { from: number; to: number } | null;
     readonly recipients: readonly string[];
     readonly enabled: boolean;
@@ -65,6 +70,7 @@ function toView(row: NonNullable<Row>): AlertRuleView {
         cameraId: row.cameraId,
         kinds: parseJson<string[]>(row.kinds, ["person"]),
         label: row.label,
+        zones: parseJson<string[]>(row.zones, []),
         hours: parseJson<{ from: number; to: number } | null>(row.hours, null),
         recipients: parseJson<string[]>(row.recipients, []),
         enabled: row.enabled,
@@ -97,6 +103,7 @@ export async function saveAlertRule(
         cameraId: input.cameraId,
         kinds: JSON.stringify([...input.kinds]),
         label: input.label,
+        zones: JSON.stringify([...input.zones]),
         hours: input.hours ? JSON.stringify(input.hours) : null,
         recipients: JSON.stringify([...input.recipients]),
         enabled: input.enabled
@@ -176,6 +183,15 @@ function matches(rule: AlertRuleView, detection: Detection, cameraId: string, pl
     // particular fires for everybody, strangers included - which is usually the
     // point of writing one.
     if (rule.label && rule.label !== detection.label) return false;
+    // "A person in the driveway", rather than "a person". A rule that names
+    // areas only fires for something that was standing in one of them; a
+    // detection that carries no areas at all - a camera's own alert, or a
+    // camera nobody has drawn on - can never satisfy one, which is right: the
+    // rule asked a question that camera cannot answer.
+    if (rule.zones.length > 0) {
+        const seen = detection.zones ?? [];
+        if (!rule.zones.some((zone) => seen.includes(zone))) return false;
+    }
     if (rule.hours && !withinHours({ hours: rule.hours } as never, new Date().getHours())) return false;
     return true;
 }
@@ -195,7 +211,10 @@ function body(detection: Detection, cameraName: string, placeName: string, event
                   : detection.kind === "tamper"
                     ? "Somebody may have tampered with a camera"
                     : "Movement";
-    const where = placeName ? `${cameraName}, ${placeName}` : cameraName;
+    // The area is the useful half of "where" once somebody has drawn one: "at
+    // the front door" is a sentence, "at Front camera" is a device name.
+    const area = detection.zones?.[0];
+    const where = [area, cameraName, placeName].filter(Boolean).join(", ");
     return `${who} at **${where}** - [see it](/places/events?event=${eventId})`;
 }
 

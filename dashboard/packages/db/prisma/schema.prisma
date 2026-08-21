@@ -7178,6 +7178,11 @@ model AlertRule {
     /// Only this person, by the name the recognizer puts to them. Null is
     /// anybody - including, deliberately, a stranger.
     label          String?
+    /// Only what was standing in one of these areas, as a JSON array of their
+    /// names. Empty is anywhere the camera can see, which is what every rule
+    /// written before areas existed means. Names rather than ids, to match how
+    /// an event records them.
+    zones          String  @default("[]")
     /// The hours it applies, as a JSON {from,to} in local time, or null for all
     /// day. The same shape a camera's detection window uses.
     hours          String?

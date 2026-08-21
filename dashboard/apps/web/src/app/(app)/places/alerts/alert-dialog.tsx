@@ -43,6 +43,7 @@ export function AlertDialog({
     cameras,
     people,
     known,
+    areas,
     onClose,
     onSaved
 }: {
@@ -52,6 +53,9 @@ export function AlertDialog({
     people: readonly { id: string; name: string }[];
     /** The faces the recognizer knows, for narrowing to one person. */
     known: readonly { id: string; name: string }[];
+    /** The watched areas drawn on the cameras of this place, by name. Empty
+     *  when nobody has drawn one, and then the question is not asked. */
+    areas: readonly string[];
     onClose: () => void;
     onSaved: (rule: AlertRuleView) => void;
 }) {
@@ -59,6 +63,7 @@ export function AlertDialog({
     const [kinds, setKinds] = useState<string[]>([...(rule?.kinds ?? ["person"])]);
     const [cameraId, setCameraId] = useState(rule?.cameraId ?? "");
     const [label, setLabel] = useState(rule?.label ?? "");
+    const [zones, setZones] = useState<string[]>([...(rule?.zones ?? [])]);
     const [hoursOn, setHoursOn] = useState(rule?.hours != null);
     const [from, setFrom] = useState(String(rule?.hours?.from ?? 22));
     const [to, setTo] = useState(String(rule?.hours?.to ?? 7));
@@ -79,6 +84,7 @@ export function AlertDialog({
                     cameraId: cameraId || null,
                     kinds,
                     label: label || null,
+                    zones,
                     hours: hoursOn ? { from: Number(from) || 0, to: Number(to) || 0 } : null,
                     recipients,
                     enabled: rule?.enabled ?? true
@@ -161,6 +167,28 @@ export function AlertDialog({
                             </label>
                         ) : null}
                     </div>
+
+                    {areas.length > 0 ? (
+                        <div className="flex flex-col gap-2">
+                            <span className="text-[12px] font-medium text-muted-foreground">Only in</span>
+                            <div className="flex flex-wrap gap-3">
+                                {areas.map((area) => (
+                                    <label key={area} className="flex items-center gap-2 text-[13px]">
+                                        <Checkbox
+                                            checked={zones.includes(area)}
+                                            onChange={(event) => setZones(toggle(zones, area, event.target.checked))}
+                                        />
+                                        {area}
+                                    </label>
+                                ))}
+                            </div>
+                            <p className="text-[12px] text-foreground-subtle">
+                                {zones.length === 0
+                                    ? "Anywhere the camera can see."
+                                    : "A camera nobody has drawn on will never match this."}
+                            </p>
+                        </div>
+                    ) : null}
 
                     <div className="flex flex-col gap-2">
                         <label className="flex items-center justify-between gap-3">
